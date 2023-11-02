@@ -42,7 +42,7 @@ numpy = [
 ]
 
 scipy = [
-    { version = "^1.11.1", python = "<3.9" },
+    { version = "^1.10.1", python = "<3.9" },
     { version = "*", python = ">=3.9, <3.11" }
 ]
 
