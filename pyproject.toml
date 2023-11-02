@@ -29,6 +29,7 @@ classifiers = [
 [tool.poetry.dependencies]
 python = ">=3.8, <3.11"
 tqdm = '*'
+scikit-learn = "*"
 
 
 [build-system]
