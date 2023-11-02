@@ -1,4 +1,4 @@
-from lightautoml.addons.hypex.ABTesting.ab_tester import ABTest
+from ...hypex.ABTesting.ab_tester import ABTest
 
 import pytest
 import pandas as pd

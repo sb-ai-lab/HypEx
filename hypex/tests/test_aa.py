@@ -1,8 +1,8 @@
 import pandas as pd
 import pytest
 
-from lightautoml.addons.hypex.ABTesting.ab_tester import AATest
-from lightautoml.addons.hypex.utils.tutorial_data_creation import create_test_data
+from ...hypex.ABTesting.ab_tester import AATest
+from ...hypex.utils.tutorial_data_creation import create_test_data
 
 
 @pytest.fixture

@@ -2,8 +2,8 @@ import pandas as pd
 import sys
 from pathlib import Path
 
-from lightautoml.addons.hypex import Matcher
-from lightautoml.addons.hypex.utils.tutorial_data_creation import create_test_data
+from ...hypex import Matcher
+from ...hypex.utils.tutorial_data_creation import create_test_data
 
 ROOT = Path("").absolute().parents[0]
 sys.path.append(str(ROOT))
