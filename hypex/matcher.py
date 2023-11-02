@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 
 from .algorithms.faiss_matcher import FaissMatcher
 from .algorithms.no_replacement_matching import MatcherNoReplacement
-from .selectors.lama_feature_selector import LamaFeatureSelector
+from .selectors.feature_selector import FeatureSelector
 from .selectors.spearman_filter import SpearmanFilter
 from .selectors.outliers_filter import OutliersFilter
 from .selectors.base_filtration import const_filtration, nan_filtration
@@ -345,7 +345,7 @@ class Matcher:
         """
         self._log("Counting feature importance")
 
-        feat_select = LamaFeatureSelector(
+        feat_select = FeatureSelector(
             outcome=self.outcomes[0],
             outcome_type=self.outcome_type,
             treatment=self.treatment,
