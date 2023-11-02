@@ -1,14 +1,8 @@
 """Feature selection class using LAMA."""
 import logging
-
 from typing import List
 
 import pandas as pd
-
-from lightautoml.automl.presets.tabular_presets import TabularAutoML
-from lightautoml.report import ReportDeco
-from lightautoml.tasks import Task
-
 
 logger = logging.getLogger("lama_feature_selector")
 console_out = logging.StreamHandler()
@@ -20,21 +14,22 @@ logging.basicConfig(
 )
 
 
-class LamaFeatureSelector:
-    """Class of LAMA Feature selector. Select top features. By default, use LGM."""
+class FeatureSelector:
+    """Class of LAMA Feature selector. Select top features. By default, use LGM.
+    # TODO: write some feature selector"""
 
     def __init__(
-        self,
-        outcome: str,
-        outcome_type: str,
-        treatment: str,
-        timeout: int,
-        n_threads: int,
-        n_folds: int,
-        verbose: bool,  # не используется
-        generate_report: bool,
-        report_dir: str,
-        use_algos: List[str],
+            self,
+            outcome: str,
+            outcome_type: str,
+            treatment: str,
+            timeout: int,
+            n_threads: int,
+            n_folds: int,
+            verbose: bool,  # не используется
+            generate_report: bool,
+            report_dir: str,
+            use_algos: List[str],
     ):
         """Initialize the LamaFeatureSelector.
 
@@ -102,23 +97,6 @@ class LamaFeatureSelector:
             loss = "crossentropy"
             metric = "crossentropy"
 
-        task = Task(name=task_name, loss=loss, metric=metric)
+        features_scores = []
 
-        automl = TabularAutoML(
-            task=task,
-            timeout=self.timeout,
-            cpu_limit=self.n_threads,
-            general_params={"use_algos": [self.use_algos]},
-            reader_params={
-                "n_jobs": self.n_threads,
-                "cv": self.n_folds,
-            },
-        )
-
-        if self.generate_report:
-            report = ReportDeco(output_path=self.report_dir)
-            automl = report(automl)
-
-        _ = automl.fit_predict(df, roles=roles)
-
-        return automl.model.get_feature_scores()
+        return features_scores
