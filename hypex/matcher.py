@@ -215,7 +215,7 @@ class Matcher:
             data = self.input_data.drop(columns=columns_to_drop)
         else:
             data = self.input_data
-        dummy_data = pd.get_dummies(data, drop_first=True)
+        dummy_data = pd.get_dummies(data, drop_first=True, dtype=np.uint8)
         return dummy_data
 
     def _preprocessing_data(self):
