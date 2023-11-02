@@ -46,6 +46,8 @@ scipy = [
     { version = "*", python = ">=3.9, <3.11" }
 ]
 
+faiss-cpu = "*"
+
 
 [build-system]
 requires = ["poetry-core"]
