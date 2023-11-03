@@ -15,7 +15,6 @@ import datetime
 import os
 import sys
 
-
 CURR_PATH = os.path.abspath(os.path.dirname(__file__))
 LIB_PATH = os.path.join(CURR_PATH, os.path.pardir)
 sys.path.insert(0, LIB_PATH)
@@ -152,6 +151,7 @@ intersphinx_mapping = {
     "sklearn": ("https://scikit-learn.org/stable/", None),
     "PIL": ("https://pillow.readthedocs.io/en/stable/", None),
 }
+
 
 # autodoc_type_aliases = {
 #     "RoleType": "lightautoml.dataset.roles.ColumnRole",
