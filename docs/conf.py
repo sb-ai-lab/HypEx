@@ -20,7 +20,7 @@ CURR_PATH = os.path.abspath(os.path.dirname(__file__))
 LIB_PATH = os.path.join(CURR_PATH, os.path.pardir)
 sys.path.insert(0, LIB_PATH)
 
-project = "LightAutoML"
+project = "HypEx"
 copyright = "%s, AI Lab ML Tools" % str(datetime.datetime.now().year)
 author = "AI Lab ML Tools"
 
@@ -44,25 +44,16 @@ exclude_patterns = ["_build/*", "**.ipynb_checkpoints"]
 autosummary_mock_imports = [
     "numpy",
     "pandas",
-    "catboost",
     "scipy",
     "sklearn",
-    "torch",
-    "lightgbm",
     "networkx",
     "holidays",
     "joblib",
     "yaml",
     "gensim",
-    "optuna",
     "PIL",
-    "cv2",
     "albumentations",
-    "efficientnet_pytorch",
     "tqdm",
-    "nltk",
-    "transformers",
-    "autowoe",
     "matplotlib",
     "seaborn",
     "json2html",
@@ -156,17 +147,16 @@ always_document_param_types = False
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable", None),
-    "torch": ("https://pytorch.org/docs/stable/", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", None),
     "sklearn": ("https://scikit-learn.org/stable/", None),
     "PIL": ("https://pillow.readthedocs.io/en/stable/", None),
 }
 
-autodoc_type_aliases = {
-    "RoleType": "lightautoml.dataset.roles.ColumnRole",
-    "NpDataset": "lightautoml.text.utils.NpDataset",
-}
+# autodoc_type_aliases = {
+#     "RoleType": "lightautoml.dataset.roles.ColumnRole",
+#     "NpDataset": "lightautoml.text.utils.NpDataset",
+# }
 
 
 def skip_member(app, what, name, obj, skip, options):
