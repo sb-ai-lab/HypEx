@@ -6,7 +6,6 @@ Python-API
     :maxdepth: 1
     :caption: Main modules
 
-    modules/ABtesting
-    modules/algorithms
+    modules/ab_test
     modules/selectors
     modules/utils

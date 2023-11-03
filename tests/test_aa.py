@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from hypex.ABTesting.ab_tester import AATest
+from hypex.ab_test.ab_tester import AATest
 from hypex.utils.tutorial_data_creation import create_test_data
 
 
