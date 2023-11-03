@@ -1,15 +1,17 @@
-LightAutoML documentation
+HypEx documentation
 =========================
 
-`LightAutoML <https://github.com/AILab-MLTools/LightAutoML>`_ is open-source Python library aimed at automated machine learning.
-It is designed to be lightweight and efficient for various tasks with tabular, text data.
-LightAutoML provides easy-to-use pipeline creation, that enables:
+`HypEx <https://github.com/sb-ai-lab/HypEx>`_ is open-source Python library aimed at automated Causal Infrence.
+It is designed to be lightweight and efficient for various tasks with Matching, A/B-testing
+HypEx provides easy-to-use pipeline creation, that enables:
 
-- Automatic hyperparameter tuning, data processing.
+- Automatic data processing
 - Automatic typing, feature selection.
-- Automatic time utilization.
+- Automatic Matching pipeline
+- Automatic A\B testing pipeline
 - Automatic report creation.
-- Easy-to-use modular scheme to create your own pipelines.
+- Automatic validation of results
+- Easy-to-use modular scheme to create your own pipelines
 
 
 
@@ -19,8 +21,6 @@ LightAutoML provides easy-to-use pipeline creation, that enables:
 
     Installation Guide <pages/Installation>
     Tutorials <pages/Tutorials>
-    Kaggle kernel examples of LightAutoML usage <pages/Kaggle_Kernels>
-    Courses, videos and papers <pages/Others>
     Python-API <pages/Python-API>
 
 
