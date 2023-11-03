@@ -30,22 +30,22 @@ tqdm = '*'
 scikit-learn = "*"
 
 pandas = [
-    { version = "^2.0.3", python = "<3.9" },
+    { version = ">=1.5.0, <=2.0.3", python = "<3.9" },
     { version = ">=1.5.0, <=2.1.2", python = ">=3.9" }
 ]
 
 numpy = [
-    { version = "^1.24.4", python = "<3.9" },
+    { version = ">=1.17.0, <=1.24.4", python = "<3.9" },
     { version = ">=1.17.0, <=1.26.1", python = ">=3.9" }
 ]
 
 scipy = [
-    { version = "^1.10.1", python = "<3.9" },
+    { version = ">=1.5.0, <=1.10.1", python = "<3.9" },
     { version = ">=1.5.0, <=1.11.3", python = ">=3.9, <3.11" }
 ]
 
 matplotlib = [
-    { version = "^3.7.3", python = "<3.9" },
+    { version = ">=3.0.0, <=3.7.3", python = "<3.9" },
     { version = ">=3.0.0, <=3.8.1", python = ">=3.9, <3.11" }]
 
 faiss-cpu = ">=1.6.0, <=1.7.4"
