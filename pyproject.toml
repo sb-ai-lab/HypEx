@@ -9,6 +9,7 @@ readme = "README.md"
 license = "Apache-2.0"
 repository = "https://github.com/sb-ai-lab/HypEx"
 classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -17,8 +18,9 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Natural Language :: English",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence:: Causal Inference",
-    "Typing :: Typed"
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Typing :: Typed",
 ]
 
 
@@ -52,7 +54,7 @@ faiss-cpu = "^1.7.4"
 [tool.poetry.dev-dependencies]
 jupyter = "^1.0.0"
 pytest = "^7.4.3"
-sphinx = {version = "^7.2.6", python = ">=3.9, <3.11"}
+sphinx = { version = "^7.2.6", python = ">=3.9, <3.11" }
 
 
 
