@@ -5,11 +5,11 @@ Installation Guide
 Basic
 -----
 
-You can install library `LightAutoML` from PyPI.
+You can install library `HypEx` from PyPI.
 
 .. code-block:: bash
 
-    pip install lightautoml
+    pip install hypex
 
 
 Development
@@ -21,14 +21,8 @@ Then,
 
 .. code-block:: bash
 
-    git clone git@github.com:AILab-MLTools/LightAutoML.git
-    cd LightAutoML
+    git clone git@github.com:sb-ai-lab/hypex.git
 
-    # Create virtual environment inside your project directory
-    poetry config virtualenvs.in-project true
+    cd hypex
 
-    # If you want to update dependecies, run the command:
-    poetry lock
-
-    # Installation
     poetry install
