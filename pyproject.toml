@@ -51,10 +51,12 @@ matplotlib = [
     { version = "^3.8.1", python = ">=3.9, <3.11" }]
 
 faiss-cpu = "^1.7.4"
-pytest = "^7.4.3"
+
 
 [tool.poetry.dev-dependencies]
 jupyter = "^1.0.0"
+pytest = "^7.4.3"
+sphinx = "^7.2.6"
 
 
 
