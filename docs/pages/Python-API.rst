@@ -3,9 +3,11 @@ Python-API
 
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
     :caption: Main modules
 
+    modules/matcher
     modules/ab_test
     modules/selectors
     modules/utils
+    modules/algorithms
