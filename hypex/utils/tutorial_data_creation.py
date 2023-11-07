@@ -1,8 +1,9 @@
-import numpy as np
-import pandas as pd
 import sys
 from pathlib import Path
 from typing import Iterable, Union
+
+import numpy as np
+import pandas as pd
 
 ROOT = Path('').absolute().parents[0]
 sys.path.append(str(ROOT))
@@ -71,7 +72,7 @@ def create_test_data(
         na_step: Union[Iterable[int], int] = None,
         nan_cols: Union[Iterable[str], str] = None,
         file_name: str = None,
-        rs = None
+        rs=None
 ):
     """Creates data for tutorial.
 
@@ -125,7 +126,7 @@ def create_test_data(
         .groupby(["user_id", "signup_month", "treat"])
         .apply(
             lambda x: pd.Series(
-                {"pre_spends": x.loc[x.month < i, "spend"].mean(), "post_spends": x.loc[x.month > i, "spend"].mean(),}
+                {"pre_spends": x.loc[x.month < i, "spend"].mean(), "post_spends": x.loc[x.month > i, "spend"].mean(), }
             )
         )
         .reset_index()
@@ -154,6 +155,3 @@ def create_test_data(
         data.to_csv(ROOT / f"{file_name}.csv", index=False)
 
     return data
-
-
-# create_test_data(num_users=10_000, file_name="Tutorial_data")

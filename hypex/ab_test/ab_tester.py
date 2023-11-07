@@ -392,7 +392,7 @@ class ABTest:
 
         Metric uses pre-post analysis of target, uses to minimize variance of effect:
         ATE = mean(test_cuped) - mean(control_cuped)
-            , where
+        , where
             test_cuped = target__test - theta * target_before__test
             control_cuped = target__control - theta * target_before__control
                 , where
