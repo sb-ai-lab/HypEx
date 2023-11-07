@@ -26,13 +26,6 @@ Explore usage examples and tutorials [here](https://github.com/sb-ai-lab/Hypex/b
 pip install hypex
 ```
 
-## Dependencies
-
-- Python >= 3.6
-- pandas >= 1.1
-- faiss-cpu >= 1.6.3
-- lightautoml >= 0.2.14
-
 ## Quick Example
 
 ```python
@@ -47,6 +40,12 @@ outcome_column = ['target1', 'target2']
 matcher = Matcher(data, treatment_column, outcome_column)
 results, quality_results, df_matcher = matcher.estimate()
 ```
+
+## Documentation
+
+For more detailed information about the library and its features, visit our [documentation on ReadTheDocs](https://hypex.readthedocs.io/en/latest/).
+
+You'll find comprehensive guides and tutorials that will help you get started with HypEx, as well as detailed API documentation for advanced use cases.
 
 
 ## Conclusion
