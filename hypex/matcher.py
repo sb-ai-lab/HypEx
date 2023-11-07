@@ -4,7 +4,7 @@ import pickle
 
 import numpy as np
 import pandas as pd
-
+from typing import Union
 from tqdm.auto import tqdm
 
 from .algorithms.faiss_matcher import FaissMatcher
@@ -90,7 +90,7 @@ class Matcher:
         self,
         input_data: pd.DataFrame,
         treatment: str,
-        outcome: str = None,
+        outcome: Union[str, list] = None,
         outcome_type: str = "numeric",
         group_col: str = None,
         info_col: list = None,
