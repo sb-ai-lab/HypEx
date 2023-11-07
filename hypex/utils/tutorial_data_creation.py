@@ -48,10 +48,10 @@ def set_nans(
         # correct length of two lists
         if len(na_step) > len(nan_cols):
             na_step = na_step[:len(nan_cols)]
-            print('Length of na_step is bigger than length of columns. Used only first values')
+            # print('Length of na_step is bigger than length of columns. Used only first values') TODO: set to logging
         elif len(na_step) < len(nan_cols):
             na_step = na_step + [na_step[-1]] * (len(nan_cols) - len(na_step))
-            print('Length of na_step is less than length of columns. Used last value several times')
+            # print('Length of na_step is less than length of columns. Used last value several times')
 
         # create list of indexes to fill with na
         nans_indexes = [list(range(i, len(data), period)) for i, period in enumerate(na_step)]
