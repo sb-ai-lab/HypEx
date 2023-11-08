@@ -1,6 +1,6 @@
 # HypEx: Streamlined Causal Inference and AB Testing
 
-[![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/lamamatcher)
+[![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/hypexchat)
 
 ## Introduction
 
