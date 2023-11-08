@@ -65,7 +65,7 @@ class Matcher:
         - Calculation metrics: ATE, ATT, ATC, p-value,  and сonfidence intervals
         - Calculation quality: PS-test, KS test, SMD test
         - Returns metrics as dataframe, quality results as dict of df's and df_matched
-        - After receiving the result, the result should be validated using :func:`~lightautoml.addons.hypex.matcher.Matcher.validate_result`
+        - After receiving the result, the result should be validated using :func:`~hypex.matcher.Matcher.validate_result`
 
     Example:
         Common usecase - base pipeline for matching
