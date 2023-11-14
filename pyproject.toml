@@ -67,7 +67,9 @@ mypy = "<=1.7.0"
 pandas-stubs = "<=2.1.1.230928"
 no_implicit_optional = "<=1.4"
 
-pre-commit = "<=3.5.0"
+pre-commit = "==3.5.0"
+
+isort = "<5.12.0"
 
 
 [build-system]
@@ -117,4 +119,3 @@ check_untyped_defs = true
 [[tool.mypy.overrides]]
 "scipy.*" = { ignore_missing_imports = true }
 "faiss.*" = { ignore_missing_imports = true }
-
