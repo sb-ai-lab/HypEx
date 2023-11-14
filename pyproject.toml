@@ -46,7 +46,8 @@ scipy = [
 
 matplotlib = [
     { version = ">=3.0.0, <=3.7.3", python = "<3.9" },
-    { version = ">=3.0.0, <=3.8.1", python = ">=3.9, <3.11" }]
+    { version = ">=3.0.0, <=3.8.1", python = ">=3.9, <3.11" }
+]
 
 faiss-cpu = ">=1.6.0, <=1.7.4"
 
@@ -55,7 +56,10 @@ faiss-cpu = ">=1.6.0, <=1.7.4"
 jupyter = "^1.0.0"
 pytest = "^7.4.3"
 
-sphinx = { version = "^7.2.6", python = ">=3.9, <3.11" }
+sphinx = [
+    { version = "^7.2.6", python = ">=3.9, <3.11" },
+    { version = "<=7.1.0", python = "<=3.9" },
+]
 nbsphinx = "*"
 nbsphinx_link = "*"
 sphinx_autodoc_typehints = "*"
