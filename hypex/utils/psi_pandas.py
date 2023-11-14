@@ -456,11 +456,10 @@ def report(expected: pd.DataFrame, actual: pd.DataFrame, plot: bool = False, sil
 
     for col in data_cols:
         psi_res = PSI(expected, actual, col, plot=plot, silent=silent)
-        # отладка, в случае ошибки  выдаст прооблемный столбец
         try:
             score, psi_dict, new_cats, abs_cats = psi_res.psi_result()
-        except:
-            logger.warning(f"Can not count PSIs, see column {col}")
+        except Exception as e:
+            logger.warning(f"Can not count PSIs, see column {col}\n {e}")
             continue
 
         if len(new_cats) > 0:
