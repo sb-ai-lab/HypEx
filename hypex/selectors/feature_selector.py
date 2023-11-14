@@ -19,17 +19,17 @@ class FeatureSelector:
     # TODO: write some feature selector"""
 
     def __init__(
-            self,
-            outcome: str,
-            outcome_type: str,
-            treatment: str,
-            timeout: int,
-            n_threads: int,
-            n_folds: int,
-            verbose: bool,  # не используется
-            generate_report: bool,
-            report_dir: str,
-            use_algos: List[str],
+        self,
+        outcome: str,
+        outcome_type: str,
+        treatment: str,
+        timeout: int,
+        n_threads: int,
+        n_folds: int,
+        verbose: bool,  # не используется
+        generate_report: bool,
+        report_dir: str,
+        use_algos: List[str],
     ):
         """Initialize the LamaFeatureSelector.
 
