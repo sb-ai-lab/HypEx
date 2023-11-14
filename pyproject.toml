@@ -61,6 +61,13 @@ nbsphinx_link = "*"
 sphinx_autodoc_typehints = "*"
 sphinx_rtd_theme = "^1.2.2"
 
+flake8 = "<=6.1.0"
+
+mypy = "<=1.7.0"
+pandas-stubs = "<=2.1.1.230928"
+no_implicit_optional = "<=1.4"
+
+pre-commit = "<=3.5.0"
 
 
 [build-system]
@@ -99,7 +106,7 @@ filter_files = true
 
 
 [tool.mypy]
-files = ["hypex", "tests"]
+files = ["hypex"]
 ignore_missing_imports = false
 disallow_untyped_defs = true
 disallow_untyped_calls = true
@@ -107,5 +114,7 @@ warn_redundant_casts = true
 warn_return_any = true
 check_untyped_defs = true
 
-
+[[tool.mypy.overrides]]
+"scipy.*" = { ignore_missing_imports = true }
+"faiss.*" = { ignore_missing_imports = true }
 
