@@ -58,7 +58,7 @@ class SpearmanFilter:
             are significantly correlated with the outcome column
         """
         selected = []
-        columns = df.drop([self.treatment, self.outcome], 1).columns
+        columns = df.drop(columns=[self.treatment, self.outcome]).columns
         for column in columns:
             result = spearmanr(df[self.outcome].values, df[column].values)
             if (abs(result[0] < self.threshold)) and (result[1] < PVALUE):
