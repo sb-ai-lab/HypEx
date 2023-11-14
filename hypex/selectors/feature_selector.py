@@ -79,24 +79,24 @@ class FeatureSelector:
             A DataFrame containing the feature scores from the model
 
         """
-        roles = {
-            "target": self.outcome,
-            "drop": [self.treatment],
-        }
+        # roles = {
+        #     "target": self.outcome,
+        #     "drop": [self.treatment],
+        # }
+        #
+        # if self.outcome_type == "numeric":
+        #     task_name = "reg"
+        #     loss = "mse"
+        #     metric = "mse"
+        # elif self.outcome_type == "binary":
+        #     task_name = "binary"
+        #     loss = "logloss"
+        #     metric = "logloss"
+        # else:
+        #     task_name = "multiclass"
+        #     loss = "crossentropy"
+        #     metric = "crossentropy"
 
-        if self.outcome_type == "numeric":
-            task_name = "reg"
-            loss = "mse"
-            metric = "mse"
-        elif self.outcome_type == "binary":
-            task_name = "binary"
-            loss = "logloss"
-            metric = "logloss"
-        else:
-            task_name = "multiclass"
-            loss = "crossentropy"
-            metric = "crossentropy"
-
-        features_scores = []
+        features_scores = pd.DataFrame()
 
         return features_scores
