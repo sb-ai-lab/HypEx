@@ -1,23 +1,22 @@
 """Base Matcher class."""
 import logging
 import pickle
+from typing import Union
 
 import numpy as np
 import pandas as pd
-from typing import Union
 from tqdm.auto import tqdm
 
 from .algorithms.faiss_matcher import FaissMatcher
 from .algorithms.no_replacement_matching import MatcherNoReplacement
-from .selectors.feature_selector import FeatureSelector
-from .selectors.spearman_filter import SpearmanFilter
-from .selectors.outliers_filter import OutliersFilter
 from .selectors.base_filtration import const_filtration, nan_filtration
+from .selectors.feature_selector import FeatureSelector
+from .selectors.outliers_filter import OutliersFilter
+from .selectors.spearman_filter import SpearmanFilter
 from .utils.validators import random_feature
 from .utils.validators import random_treatment
 from .utils.validators import subset_refuter
 from .utils.validators import test_significance
-
 
 REPORT_FEAT_SELECT_DIR = "report_feature_selector"
 REPORT_PROP_MATCHER_DIR = "report_matcher"
@@ -170,7 +169,7 @@ class Matcher:
         self.input_data = input_data
         if outcome is None:
             outcome = list()
-        self.outcomes = outcome if type(outcome) == list else [outcome]
+        self.outcomes = outcome if isinstance(outcome, list) else [outcome]
         self.treatment = treatment
         self.group_col = group_col
         self.info_col = info_col
