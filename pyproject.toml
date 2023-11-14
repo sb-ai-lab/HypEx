@@ -63,7 +63,6 @@ sphinx_rtd_theme = "^1.2.2"
 
 
 
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
@@ -109,18 +108,4 @@ warn_return_any = true
 check_untyped_defs = true
 
 
-[tool.flake8]
-max-line-length = 120
-ignore = [
-    "E203", # Whitespace before ":" (Black compatibility)
-    "E266", # Too many leading "#" for block comment
-    "E501", # Line too long (handled by Black)
-    "W503", # Line break before binary operator (Black compatibility)
-]
-exclude = [
-    ".venv",
-    ".git",
-    "__pycache__",
-    "build",
-    "dist"
-]
+
