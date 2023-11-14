@@ -37,6 +37,7 @@ repos:
     hooks:
       - id: rstcheck
         language_version: python3.10
+        exclude: ^docs/_templates/
 
   - repo: https://github.com/pre-commit/mirrors-isort
     rev: v5.10.1
