@@ -5,15 +5,11 @@ from typing import Iterable, Union
 import numpy as np
 import pandas as pd
 
-ROOT = Path('').absolute().parents[0]
+ROOT = Path("").absolute().parents[0]
 sys.path.append(str(ROOT))
 
 
-def set_nans(
-        data: pd.DataFrame,
-        na_step: Union[Iterable[int], int] = None,
-        nan_cols: Union[Iterable[str], str] = None
-):
+def set_nans(data: pd.DataFrame, na_step: Union[Iterable[int], int] = None, nan_cols: Union[Iterable[str], str] = None):
     """Fill some values with NaN/
 
     Args:
@@ -34,20 +30,20 @@ def set_nans(
         #  number of nans
         if na_step is None:
             na_step = [10]
-            print(f'No na_step specified: set to {na_step}')
+            print(f"No na_step specified: set to {na_step}")
         elif not isinstance(na_step, Iterable):
             na_step = [na_step]
 
         #  columns
         if nan_cols is None:
             nan_cols = list(data.columns)
-            print('No nan_cols specified. Setting NaNs applied to all columns')
+            print("No nan_cols specified. Setting NaNs applied to all columns")
         elif not isinstance(nan_cols, Iterable):
             nan_cols = [nan_cols]
 
         # correct length of two lists
         if len(na_step) > len(nan_cols):
-            na_step = na_step[:len(nan_cols)]
+            na_step = na_step[: len(nan_cols)]
             # print('Length of na_step is bigger than length of columns. Used only first values') TODO: set to logging
         elif len(na_step) < len(nan_cols):
             na_step = na_step + [na_step[-1]] * (len(nan_cols) - len(na_step))
@@ -60,28 +56,28 @@ def set_nans(
             try:
                 data.loc[nans_indexes[i], nan_cols[i]] = np.nan
             except KeyError:
-                print(f'There is no column {nan_cols[i]} in data. No nans in this column will be added.')
+                print(f"There is no column {nan_cols[i]} in data. No nans in this column will be added.")
     else:
-        print('No NaN added')
+        print("No NaN added")
 
     return data
 
 
 def create_test_data(
-        num_users: int = 10000,
-        na_step: Union[Iterable[int], int] = None,
-        nan_cols: Union[Iterable[str], str] = None,
-        file_name: str = None,
-        rs=None
+    num_users: int = 10000,
+    na_step: Union[Iterable[int], int] = None,
+    nan_cols: Union[Iterable[str], str] = None,
+    file_name: str = None,
+    rs=None,
 ):
     """Creates data for tutorial.
 
     Args:
         num_users: num of strings
-        na_step: 
+        na_step:
             num or list of nums of period to make NaN (step of range)
             If list - iterates accordingly order of columns
-        nan_cols: 
+        nan_cols:
             name of one or several columns to fill with NaN
             If list - iterates accordingly order of na_step
         file_name: name of file to save; doesn't save file if None
@@ -126,7 +122,10 @@ def create_test_data(
         .groupby(["user_id", "signup_month", "treat"])
         .apply(
             lambda x: pd.Series(
-                {"pre_spends": x.loc[x.month < i, "spend"].mean(), "post_spends": x.loc[x.month > i, "spend"].mean(), }
+                {
+                    "pre_spends": x.loc[x.month < i, "spend"].mean(),
+                    "post_spends": x.loc[x.month > i, "spend"].mean(),
+                }
             )
         )
         .reset_index()
