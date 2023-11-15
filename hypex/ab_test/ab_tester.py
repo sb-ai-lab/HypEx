@@ -365,7 +365,7 @@ class AATest:
         figsize = figsize or (15, 7 * feuture_num)
         bin_step = bin_step or self.alpha
         bins = np.arange(0, 1 + bin_step, bin_step)
-        axs, figure = plt.subplots(nrows=feuture_num, ncols=2, figsize=figsize)
+        figure, axs = plt.subplots(nrows=feuture_num, ncols=2, figsize=figsize)
         for i in range(feuture_num):
             experiment_results[f"{self.target_fields[i]} t-test p-value"].hist(
                 ax=axs[i, 0], bins = bins
@@ -397,7 +397,7 @@ class AATest:
 
     def num_feature_uniform_analysis(self, a_values:pd.Series, b_values:pd.Series, **kwargs):
         figsize = kwargs.get('figsize', (25, 20))
-        axs, form = plt.subplots(nrows=2, ncols=1, figsize=figsize)
+        figure, axs = plt.subplots(nrows=2, ncols=1, figsize=figsize)
 
         sns.histplot(
             a_values,
@@ -424,7 +424,7 @@ class AATest:
 
     def cat_feature_uniform_analysis(self, a_values:pd.Series, b_values:pd.Series, **kwargs):
         figsize = kwargs.get('figsize', (25, 20))
-        ax, form = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+        figure, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
 
         sns.histplot(
             a_values,
