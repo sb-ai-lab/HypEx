@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 def merge_groups(
     test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
@@ -30,6 +31,24 @@ def merge_groups(
     control_group.loc[:, "group"] = "control"
 
     return pd.concat([test_group, control_group], ignore_index=True)
+
+def split_splited_data(splitted_data: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+    """Splits a pandas DataFrame into two separate dataframes based on a specified group field.
+
+    Args:
+        data:
+            The input dataframe to be split
+
+    Returns:
+        splitted_data:
+            A dictionary containing two dataframes, 'test' and 'control', where 'test' contains rows where the
+            group field is 'test', and 'control' contains rows where the group field is 'control'.
+    """
+    return {
+        "test": splitted_data[splitted_data["group"] == "test"],
+        "control": splitted_data[splitted_data["group"] == "control"],
+    }
+    
 
 
 class AATest:
@@ -191,13 +210,12 @@ class AATest:
             return 1 - a_mean / b_mean
 
     def sampling_metrics(
-        self, data: pd.DataFrame, alpha: float = 0.05, random_state: int = None
+        self, data: pd.DataFrame, random_state: int = None
     ):
         """Calculates metrics of one sampling.
 
         Args:
             data: Raw input data
-            alpha: Threshold to check statistical hypothesis; usually 0.05
             random_state: Random seeds for searching
             preprocessed_data: Pre-preprocessed data
 
@@ -232,8 +250,8 @@ class AATest:
                 ta, tb, nan_policy="omit"
             ).pvalue
             t_result[f"{tf} ks-test p-value"] = ks_2samp(ta, tb).pvalue
-            t_result[f"{tf} t-test passed"] = t_result[f"{tf} t-test p-value"] < alpha
-            t_result[f"{tf} ks-test passed"] = t_result[f"{tf} ks-test p-value"] < alpha
+            t_result[f"{tf} t-test passed"] = t_result[f"{tf} t-test p-value"] < self.alpha
+            t_result[f"{tf} ks-test passed"] = t_result[f"{tf} ks-test p-value"] < self.alpha
             scores.append(
                 (t_result[f"{tf} t-test p-value"] + 2*t_result[f"{tf} ks-test p-value"])
                 / 3
@@ -263,7 +281,6 @@ class AATest:
     def calc_uniform_tests(
         self,
         data: pd.DataFrame,
-        alpha: float = 0.05,
         iterations: int = 10,
         file_name: Union[Path, str] = None,
         write_mode: str = "full",
@@ -274,8 +291,6 @@ class AATest:
 
         Args:
             data: Raw input data
-            alpha:
-                Threshold to check statistical hypothesis; usually 0.05
             iterations:
                 Number of iterations to search uniform sampling to searching
             file_name:
@@ -308,7 +323,7 @@ class AATest:
         for i, rs in tqdm(
             enumerate(random_states), total=len(random_states), disable=not pbar
         ):
-            res = self.sampling_metrics(data, alpha=alpha, random_state=rs)
+            res = self.sampling_metrics(data, random_state=rs)
             data_from_sampling.update(res["data_from_experiment"])
 
             # write to file
@@ -360,7 +375,7 @@ class AATest:
             axs[i, 1].set_title(f"{self.target_fields[i]} ks-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} ks-test passed'].mean()}")
         plt.show()
 
-    def aa_score(self, experiment_results: pd.DataFrame, alpha: float = 0.05) -> pd.DataFrame:
+    def aa_score(self, experiment_results: pd.DataFrame) -> pd.DataFrame:
         result = pd.DataFrame({
             f : {
                 "t-test passed score": experiment_results[f"{f} t-test passed"].mean(),
@@ -368,23 +383,64 @@ class AATest:
             } for f in self.target_fields
         })
 
-        result['t-test aa passed'] = 0.8 * alpha <= result['t-test passed score'] <= 1.2 * alpha
-        result['ks-test aa passed'] = 0.8 * alpha <= result['ks-test passed score'] <= 1.2 * alpha
+        result['t-test aa passed'] = 0.8 * self.alpha <= result['t-test passed score'] <= 1.2 * self.alpha
+        result['ks-test aa passed'] = 0.8 * self.alpha <= result['ks-test passed score'] <= 1.2 * self.alpha
         result.loc['mean'] = result.mean()
 
         return result
 
     def uniform_tests_interpretation(self, experiment_results: pd.DataFrame, **kwargs) -> pd.DataFrame:
         self.features_p_value_distribution(experiment_results, figsize=kwargs.get('figsize'), bin_step=kwargs.get('bin_step'))
-        return self.aa_score(experiment_results, alpha=kwargs.get('alpha'))
+        return self.aa_score(experiment_results)
 
-    def num_feature_uniform_analysis(self, a_values:pd.Series, b_values:pd.Series, alpha=0.05):
-        pass
+    def num_feature_uniform_analysis(self, a_values:pd.Series, b_values:pd.Series, **kwargs):
+        figsize = kwargs.get('figsize', (25, 20))
+        axs, form = plt.subplots(nrows=2, ncols=1, figsize=figsize)
+
+        sns.histplot(
+            a_values,
+            ax=axs[0],
+            bins=kwargs.get("bins"),
+            
+        )
+        sns.histplot(
+            b_values,
+            ax=axs[0],
+            bins=kwargs.get("bins"),
+        )
+
+        axs[1].plot(
+            range(0, 101),
+            [a_values.quantile(q) for q in np.arange(0, 1, 0.01)],
+        )
+        axs[1].plot(
+            range(0, 101),
+            [a_values.quantile(q) for q in np.arange(0, 1, 0.01)],
+        )
+
+        plt.show()
+
+    def cat_feature_uniform_analysis(self, a_values:pd.Series, b_values:pd.Series, **kwargs):
+        figsize = kwargs.get('figsize', (25, 20))
+        ax, form = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+
+        sns.histplot(
+            a_values,
+            ax=ax,
+        )
+        sns.histplot(
+            b_values,
+            ax=ax
+        )
+
+        plt.show()
     
-    def split_analysis(self, splited_data, alpha=0.05):
-        for tf in self.target_fields:
-            pass
-
+    def split_analysis(self, splited_data: pd.DataFrame, **kwargs):
+        ssd = split_splited_data(splited_data)
+        for nf in self.target_fields:
+            self.num_feature_uniform_analysis(ssd["test"][nf], ssd["control"][nf], **kwargs)
+        for cf in self.group_cols:
+            self.cat_feature_uniform_analysis(ssd["test"][cf], ssd["control"][cf], **kwargs)
 
 class ABTest:
     def __init__(
