@@ -367,12 +367,23 @@ class AATest:
         bins = np.arange(0, 1 + bin_step, bin_step)
         figure, axs = plt.subplots(nrows=feuture_num, ncols=2, figsize=figsize)
         for i in range(feuture_num):
-            experiment_results[f"{self.target_fields[i]} t-test p-value"].hist(
-                ax=axs[i, 0], bins = bins
+            sns.histplot(
+                data=experiment_results,
+                x=f"{self.target_fields[i]} t-test p-value",
+                ax=axs[i, 0],
+                bins=bins,
+                stat="percent",
+                shrink=0.8,
             )
-            experiment_results[f"{self.target_fields[i]} ks-test p-value"].hist(
-                ax=axs[i, 1], bins = bins
+            sns.histplot(
+                data=experiment_results,
+                x=f"{self.target_fields[i]} ks-test p-value",
+                ax=axs[i, 1],
+                bins=bins,
+                stat="percent",
+                shrink=0.8,
             )
+
             axs[i, 0].set_title(f"{self.target_fields[i]} t-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} t-test passed'].mean()}")
             axs[i, 1].set_title(f"{self.target_fields[i]} ks-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} ks-test passed'].mean()}")
         plt.show()
@@ -406,6 +417,8 @@ class AATest:
             ax=axs[0],
             bins=kwargs.get("bins", 20),
             stat="percent",
+            multiple="dodge",
+            shrink=0.8
         )
 
         ssd = split_splited_data(splited_data)
@@ -414,13 +427,17 @@ class AATest:
         axs[1].plot(
             range(0, 101),
             [a_values.quantile(q) for q in np.arange(0, 1.01, 0.01)],
+            alpha=0.7
         )
         axs[1].plot(
             range(0, 101),
             [b_values.quantile(q) for q in np.arange(0, 1.01, 0.01)],
+            alpha=0.7
         )
-
         axs[1].legend(["test", "control"])
+        axs[1].grid(True)
+        axs[1].set_xticks(np.arange(0, 101))
+        axs[1].set_xticklabels(np.arange(0, 101), rotation=45)
         figure.suptitle(f"{analysis_field}")
         plt.show()
 
@@ -432,9 +449,12 @@ class AATest:
             data=splited_data,
             x=analysis_field,
             hue="group",
-            ax=axs[0],
+            ax=ax,
             bins=kwargs.get("bins", 20),
             stat="percent",
+            # alpha=0.7,
+            multiple="dodge",
+            shrink=0.8
         )
 
         figure.suptitle(f"{analysis_field}")
@@ -595,13 +615,11 @@ class ABTest:
                 values of the 'test' and 'control' dataframes
         """
         result = {}
-        if self.calc_difference_method in {"all", "diff_in_diff", "cuped"}:
-            if target_field_before is None:
-                raise ValueError(
-                    "For calculation metrics 'cuped' or 'diff_in_diff' field 'target_field_before' is required.\n"
-                    "Metric 'ate'(=diff-in-means) can be used without 'target_field_before'"
-                )
-
+        if self.calc_difference_method in {"all", "diff_in_diff", "cuped"} and target_field_before is None:
+            raise ValueError(
+                "For calculation metrics 'cuped' or 'diff_in_diff' field 'target_field_before' is required.\n"
+                "Metric 'ate'(=diff-in-means) can be used without 'target_field_before'"
+            )
         if self.calc_difference_method in {"all", "ate"}:
             result["ate"] = (
                 splitted_data["test"][target_field].values
