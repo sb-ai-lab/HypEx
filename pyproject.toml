@@ -122,5 +122,9 @@ warn_return_any = true
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-"scipy.*" = { ignore_missing_imports = true }
-"faiss.*" = { ignore_missing_imports = true }
+module = "scipy.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "faiss.*"
+ignore_missing_imports = true
