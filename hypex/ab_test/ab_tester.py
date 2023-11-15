@@ -363,6 +363,7 @@ class AATest:
     def features_p_value_distribution(self, experiment_results: pd.DataFrame, figsize=None, bin_step=0.05):
         feuture_num = len(self.target_fields)
         figsize = figsize or (15, 7 * feuture_num)
+        bin_step = bin_step or self.alpha
         bins = np.arange(0, 1 + bin_step, bin_step)
         axs, figure = plt.subplots(nrows=feuture_num, ncols=2, figsize=figsize)
         for i in range(feuture_num):
