@@ -99,7 +99,7 @@ class AATest:
 
         else:
             addition_indexes = list(shuffle(data.index, random_state=random_state))
-            edge =  int(len(random_ids) * control_size)
+            edge =  int(len(addition_indexes) * control_size)
             result["test_indexes"] = addition_indexes[:edge]
             result["control_indexes"] = addition_indexes[edge:]
 
@@ -362,7 +362,7 @@ class AATest:
 
     def features_p_value_distribution(self, experiment_results: pd.DataFrame, figsize=None, bin_step=0.05):
         feuture_num = len(self.target_fields)
-        figsize = figsize or (15, 10 * feuture_num)
+        figsize = figsize or (15, 7 * feuture_num)
         bins = np.arange(0, 1 + bin_step, bin_step)
         axs, figure = plt.subplots(nrows=feuture_num, ncols=2, figsize=figsize)
         for i in range(feuture_num):
@@ -382,10 +382,10 @@ class AATest:
                 "t-test passed score": experiment_results[f"{f} t-test passed"].mean(),
                 "ks-test passed score": experiment_results[f"{f} ks-test passed"].mean(),
             } for f in self.target_fields
-        })
+        }).T
 
-        result['t-test aa passed'] = 0.8 * self.alpha <= result['t-test passed score'] <= 1.2 * self.alpha
-        result['ks-test aa passed'] = 0.8 * self.alpha <= result['ks-test passed score'] <= 1.2 * self.alpha
+        result['t-test aa passed'] = result['t-test passed score'].apply(lambda x: 0.8 * self.alpha <= x <= 1.2 * self.alpha)
+        result['ks-test aa passed'] = result['t-test passed score'].apply(lambda x: 0.8 * self.alpha <= x <= 1.2 * self.alpha)
         result.loc['mean'] = result.mean()
 
         return result
@@ -401,22 +401,22 @@ class AATest:
         sns.histplot(
             a_values,
             ax=axs[0],
-            bins=kwargs.get("bins"),
+            bins=kwargs.get("bins", 20),
             
         )
         sns.histplot(
             b_values,
             ax=axs[0],
-            bins=kwargs.get("bins"),
+            bins=kwargs.get("bins", 20),
         )
 
         axs[1].plot(
             range(0, 101),
-            [a_values.quantile(q) for q in np.arange(0, 1, 0.01)],
+            [a_values.quantile(q) for q in np.arange(0, 1.01, 0.01)],
         )
         axs[1].plot(
             range(0, 101),
-            [a_values.quantile(q) for q in np.arange(0, 1, 0.01)],
+            [b_values.quantile(q) for q in np.arange(0, 1.01, 0.01)],
         )
 
         plt.show()
