@@ -441,11 +441,10 @@ class AATest:
         plt.show()
     
     def split_analysis(self, splited_data: pd.DataFrame, **kwargs):
-        ssd = split_splited_data(splited_data)
         for nf in self.target_fields:
-            self.num_feature_uniform_analysis(ssd["test"][nf], ssd["control"][nf], **kwargs)
+            self.num_feature_uniform_analysis(splited_data, nf, **kwargs)
         for cf in self.group_cols:
-            self.cat_feature_uniform_analysis(ssd["test"][cf], ssd["control"][cf], **kwargs)
+            self.cat_feature_uniform_analysis(splited_data, cf, **kwargs)
 
 class ABTest:
     def __init__(
