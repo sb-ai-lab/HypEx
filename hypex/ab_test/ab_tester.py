@@ -395,22 +395,22 @@ class AATest:
         self.features_p_value_distribution(experiment_results, figsize=kwargs.get('figsize'), bin_step=kwargs.get('bin_step'))
         return self.aa_score(experiment_results)
 
-    def num_feature_uniform_analysis(self, a_values:pd.Series, b_values:pd.Series, **kwargs):
+    def num_feature_uniform_analysis(self, splited_data: pd.DataFrame, analysis_field: str, **kwargs):
         figsize = kwargs.get('figsize', (25, 20))
         figure, axs = plt.subplots(nrows=2, ncols=1, figsize=figsize)
 
         sns.histplot(
-            a_values,
+            data=splited_data,
+            x=analysis_field,
+            hue="group",
             ax=axs[0],
             bins=kwargs.get("bins", 20),
-            
-        )
-        sns.histplot(
-            b_values,
-            ax=axs[0],
-            bins=kwargs.get("bins", 20),
+            stat="percent",
         )
 
+        ssd = split_splited_data(splited_data)
+        a_values = ssd["test"][analysis_field]
+        b_values = ssd["control"][analysis_field]
         axs[1].plot(
             range(0, 101),
             [a_values.quantile(q) for q in np.arange(0, 1.01, 0.01)],
@@ -420,21 +420,24 @@ class AATest:
             [b_values.quantile(q) for q in np.arange(0, 1.01, 0.01)],
         )
 
+        axs[1].legend(["test", "control"])
+        figure.suptitle(f"{analysis_field}")
         plt.show()
 
-    def cat_feature_uniform_analysis(self, a_values:pd.Series, b_values:pd.Series, **kwargs):
+    def cat_feature_uniform_analysis(self, splited_data: pd.DataFrame, analysis_field: str, **kwargs):
         figsize = kwargs.get('figsize', (25, 20))
         figure, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
 
         sns.histplot(
-            a_values,
-            ax=ax,
-        )
-        sns.histplot(
-            b_values,
-            ax=ax
+            data=splited_data,
+            x=analysis_field,
+            hue="group",
+            ax=axs[0],
+            bins=kwargs.get("bins", 20),
+            stat="percent",
         )
 
+        figure.suptitle(f"{analysis_field}")
         plt.show()
     
     def split_analysis(self, splited_data: pd.DataFrame, **kwargs):
