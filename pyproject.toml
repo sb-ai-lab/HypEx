@@ -112,8 +112,7 @@ use_parentheses = true
 filter_files = true
 
 
-[tool.mypy]
-files = ["hypex"]
+[tool.mypy.hypex]
 ignore_missing_imports = false
 disallow_untyped_defs = true
 disallow_untyped_calls = true
