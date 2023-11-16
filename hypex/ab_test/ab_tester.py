@@ -440,7 +440,7 @@ class AATest:
         return self.aa_score(experiment_results)
 
     def num_feature_uniform_analysis(
-        self, control_data: pd.Series, test_data: pd.Series, plot_set: Tuple = ("hist", "cumulative" ,"percentile") **kwargs
+        self, control_data: pd.Series, test_data: pd.Series, plot_set: Tuple = ("hist", "cumulative" ,"percentile"), **kwargs
     ):
         if not plot_set:
             return
