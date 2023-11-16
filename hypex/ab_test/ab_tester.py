@@ -56,7 +56,6 @@ class AATest:
     def __init__(
         self,
         target_fields: Union[Iterable[str], str],
-        info_cols: Union[Iterable[str], str] = None,
         group_cols: Union[str, Iterable[str]] = None,
         quant_field: str = None,
         mode: str = "simple",
@@ -65,7 +64,6 @@ class AATest:
         self.target_fields = (
             [target_fields] if isinstance(target_fields, str) else target_fields
         )
-        self.info_cols = [info_cols] if isinstance(info_cols, str) else info_cols
         self.group_cols = [group_cols] if isinstance(group_cols, str) else group_cols
         self.quant_field = quant_field
         self.mode = mode
@@ -189,6 +187,7 @@ class AATest:
         test = data.loc[spit_indexes["test_indexes"]]
         control = data.loc[spit_indexes["control_indexes"]]
         data = merge_groups(test, control)
+        data = data.merge()
 
         return data
 
@@ -233,6 +232,8 @@ class AATest:
         scores = []
         t_result = {"random_state": random_state}
 
+        if self.info_cols:
+            info_data = data[self.info_cols]
         split = self.split(data, random_state, test_size)
 
         a = data.loc[split["test_indexes"]]
@@ -456,6 +457,7 @@ class AATest:
             stat="percent",
             element="poly",
             alpha=0.5,
+            color="blue"
         )
 
         sns.histplot(
@@ -465,6 +467,7 @@ class AATest:
             stat="percent",
             element="poly",
             alpha=0.5,
+            color="red"
         )
 
         axs[1].plot(
@@ -483,7 +486,7 @@ class AATest:
         axs[1].grid(True)
         axs[1].set_xticks(np.arange(0, 101))
         axs[1].set_xticklabels(np.arange(0, 101), rotation=45)
-        figure.suptitle(f"{analysis_field}", fontsize=20)
+        figure.suptitle(f"{control_data.name}", fontsize=20)
         plt.show()
 
     def cat_feature_uniform_analysis(
