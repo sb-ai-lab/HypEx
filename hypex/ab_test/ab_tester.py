@@ -442,48 +442,79 @@ class AATest:
         return self.aa_score(experiment_results)
 
     def num_feature_uniform_analysis(
-        self, control_data: pd.Series, test_data: pd.Series, **kwargs
+        self, control_data: pd.Series, test_data: pd.Series, plot_set: Tuple = ("hist", "" ,"percentile") **kwargs
     ):
+        if not plot_set:
+            return
+
         figsize = kwargs.get("figsize", (25, 20))
         figure, axs = plt.subplots(
-            nrows=2, ncols=1, figsize=figsize, facecolor="honeydew", edgecolor="black"
+            nrows=len(plot_set), ncols=1, figsize=figsize, facecolor="honeydew", edgecolor="black"
         )
+        ax_count = 0
 
-        sns.histplot(
-            data=control_data,
-            ax=axs[0],
-            bins=kwargs.get("bins", 20),
-            stat="percent",
-            element="poly",
-            alpha=0.5,
-        )
+        if "hist" in plot_set:
+            sns.histplot(
+                data=control_data,
+                ax=axs[ax_count],
+                bins=kwargs.get("bins", 20),
+                stat="percent",
+                element="poly",
+                alpha=0.5,
+            )
 
-        sns.histplot(
-            data=test_data,
-            ax=axs[0],
-            bins=kwargs.get("bins", 20),
-            stat="percent",
-            element="poly",
-            alpha=0.5,
-        )
+            sns.histplot(
+                data=test_data,
+                ax=axs[ax_count],
+                bins=kwargs.get("bins", 20),
+                stat="percent",
+                element="poly",
+                alpha=0.5,
+            )
+            ax_count += 1
+            axs[ax_count].legend(["test", "control"])
 
-        axs[1].plot(
-            range(0, 101),
-            [control_data.quantile(q) for q in np.arange(0, 1.01, 0.01)],
-            alpha=0.5,
-        )
-        axs[1].plot(
-            range(0, 101),
-            [test_data.quantile(q) for q in np.arange(0, 1.01, 0.01)],
-            alpha=0.5,
-        )
-        axs[0].legend(["test", "control"])
-        axs[1].legend(["test", "control"])
+        if "percentile" in plot_set:
+            axs[ax_count].plot(
+                range(101),
+                [control_data.quantile(q) for q in np.arange(0, 1.01, 0.01)],
+                alpha=0.5,
+            )
+            axs[ax_count].plot(
+                range(101),
+                [test_data.quantile(q) for q in np.arange(0, 1.01, 0.01)],
+                alpha=0.5,
+            )
+            axs[ax_count].legend(["test", "control"])
 
-        axs[1].grid(True)
-        axs[1].set_xticks(np.arange(0, 101))
-        axs[1].set_xticklabels(np.arange(0, 101), rotation=45)
-        figure.suptitle(f"{analysis_field}", fontsize=20)
+            axs[ax_count].grid(True)
+            axs[ax_count].set_xticks(np.arange(0, 101))
+            axs[ax_count].set_xticklabels(np.arange(0, 101), rotation=45)
+            ax_count += 1
+
+        if "cumulative" in plot_set:
+            sns.histplot(
+                data=control_data,
+                ax=axs[ax_count],
+                bins=kwargs.get("bins", 20),
+                stat="percent",
+                element="step", 
+                fill=False,
+                cumulative=True,
+                alpha=0.5,
+            )
+            sns.histplot(
+                data=test_data,
+                ax=axs[ax_count],
+                bins=kwargs.get("bins", 20),
+                stat="percent",
+                element="step",
+                fill=False,
+                cumulative=True,
+                alpha=0.5,
+            )
+
+        figure.suptitle(f"{analysis_field}", fontsize=kwargs.get("title_size", 20))
         plt.show()
 
     def cat_feature_uniform_analysis(
