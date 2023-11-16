@@ -481,15 +481,13 @@ class AATest:
                 color="red",
             )
             axs[ax_count].grid(True)
-            axs[ax_count].set_xticks(np.arange(0, 101))
-            axs[ax_count].set_xticklabels(np.arange(0, 101), rotation=45)
             ax_count += 1
         
         if "cumulative" in plot_set:
             sns.histplot(
                 data=control_data,
                 ax=axs[ax_count],
-                bins=kwargs.get("bins", 20),
+                bins=bins,
                 stat="percent",
                 element="step", 
                 fill=False,
@@ -500,7 +498,7 @@ class AATest:
             sns.histplot(
                 data=test_data,
                 ax=axs[ax_count],
-                bins=kwargs.get("bins", 20),
+                bins=bins,
                 stat="percent",
                 element="step",
                 fill=False,
@@ -508,6 +506,7 @@ class AATest:
                 alpha=kwargs.get("alpha", 0.3),
                 color="red",
             )
+            ax_count += 1
 
         if "percentile" in plot_set:
             axs[ax_count].plot(
@@ -521,6 +520,8 @@ class AATest:
                 alpha=kwargs.get("alpha", 0.3),
             )
             axs[ax_count].legend(["test", "control"])
+            axs[ax_count].set_xticks(np.arange(0, 101))
+            axs[ax_count].set_xticklabels(np.arange(0, 101), rotation=45)
 
         figure.suptitle(f"{control_data.name}", fontsize=kwargs.get("title_size", 20))
         plt.show()
