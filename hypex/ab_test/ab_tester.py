@@ -70,7 +70,7 @@ class AATest:
         self.mode = mode
         self.alpha = alpha
 
-    def __simple_mode(self, data: pd.DataFrame, random_state: int = None, control_size: float = 0.5) -> Dict:
+    def __simple_mode(self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5) -> Dict:
         """Separates data on A and B samples within simple mode.
 
         Separation performed to divide groups of equal sizes - equal amount of records
@@ -89,7 +89,7 @@ class AATest:
             random_ids = shuffle(
                 data[self.quant_field].unique(), random_state=random_state
             )
-            edge = int(len(random_ids) * control_size)
+            edge = int(len(random_ids) * test_size)
             result["test_indexes"] = list(
                 data[data[self.quant_field].isin(random_ids[:edge])].index
             )
@@ -99,13 +99,13 @@ class AATest:
 
         else:
             addition_indexes = list(shuffle(data.index, random_state=random_state))
-            edge =  int(len(addition_indexes) * control_size)
+            edge =  int(len(addition_indexes) * test_size)
             result["test_indexes"] = addition_indexes[:edge]
             result["control_indexes"] = addition_indexes[edge:]
 
         return result
 
-    def split(self, data: pd.DataFrame, random_state: int = None, control_size: float=0.5) -> Dict:
+    def split(self, data: pd.DataFrame, random_state: int = None, test_size: float=0.5) -> Dict:
         """Divides sample on two groups.
 
         Args:
@@ -129,7 +129,7 @@ class AATest:
                     self.mode = "simple"
 
                 if self.mode == "simple":
-                    t_result = self.__simple_mode(gd, random_state, control_size)
+                    t_result = self.__simple_mode(gd, random_state, test_size)
                     result["test_indexes"] += t_result["test_indexes"]
                     result["control_indexes"] += t_result["control_indexes"]
 
@@ -158,7 +158,7 @@ class AATest:
                     f"Implemented mode 'simple'."
                 )
 
-            t_result = self.__simple_mode(data, random_state, control_size)
+            t_result = self.__simple_mode(data, random_state, test_size)
             result["test_indexes"] = t_result["test_indexes"]
             result["control_indexes"] = t_result["control_indexes"]
 
@@ -210,7 +210,7 @@ class AATest:
             return 1 - a_mean / b_mean
 
     def sampling_metrics(
-        self, data: pd.DataFrame, random_state: int = None, control_size: float = 0.5
+        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
     ):
         """Calculates metrics of one sampling.
 
@@ -228,7 +228,7 @@ class AATest:
         scores = []
         t_result = {"random_state": random_state}
 
-        split = self.split(data, random_state, control_size)
+        split = self.split(data, random_state, test_size)
 
         a = data.loc[split["test_indexes"]]
         b = data.loc[split["control_indexes"]]
@@ -281,7 +281,7 @@ class AATest:
     def calc_uniform_tests(
         self,
         data: pd.DataFrame,
-        control_size: float = 0.5,
+        test_size: float = 0.5,
         iterations: int = 2000,
         file_name: Union[Path, str] = None,
         write_mode: str = "full",
@@ -324,7 +324,7 @@ class AATest:
         for i, rs in tqdm(
             enumerate(random_states), total=len(random_states), disable=not pbar
         ):
-            res = self.sampling_metrics(data, random_state=rs, control_size=control_size)
+            res = self.sampling_metrics(data, random_state=rs, test_size=test_size)
             data_from_sampling.update(res["data_from_experiment"])
 
             # write to file
@@ -427,12 +427,12 @@ class AATest:
         axs[1].plot(
             range(0, 101),
             [a_values.quantile(q) for q in np.arange(0, 1.01, 0.01)],
-            alpha=0.7
+            alpha=0.5
         )
         axs[1].plot(
             range(0, 101),
             [b_values.quantile(q) for q in np.arange(0, 1.01, 0.01)],
-            alpha=0.7
+            alpha=0.5
         )
         axs[1].legend(["test", "control"])
         axs[1].grid(True)
