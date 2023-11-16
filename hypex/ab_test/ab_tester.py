@@ -498,7 +498,7 @@ class AATest:
             data=control_data,
             ax=ax,
             stat="percent",
-            element="poly",
+            element="poly", 
             alpha=0.3,
             color="blue",
         )
