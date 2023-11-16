@@ -453,8 +453,8 @@ class AATest:
             bins=kwargs.get("bins", 20),
             stat="percent",
             element="poly",
-            alpha=0.5,
-            color="blue"
+            alpha=0.3,
+            color="blue",
         )
 
         sns.histplot(
@@ -463,8 +463,8 @@ class AATest:
             bins=kwargs.get("bins", 20),
             stat="percent",
             element="poly",
-            alpha=0.5,
-            color="red"
+            alpha=0.3,
+            color="red",
         )
 
         axs[1].plot(
@@ -487,24 +487,32 @@ class AATest:
         plt.show()
 
     def cat_feature_uniform_analysis(
-        self, splited_data: pd.DataFrame, analysis_field: str, **kwargs
+        self, control_data: pd.Series, test_data: pd.Series, **kwargs
     ):
         figsize = kwargs.get("figsize", (25, 20))
-        figure, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
-
-        sns.histplot(
-            data=splited_data,
-            x=analysis_field,
-            hue="group",
-            ax=ax,
-            bins=kwargs.get("bins", 20),
-            stat="percent",
-            # alpha=0.7,
-            multiple="dodge",
-            shrink=0.8,
+        figure, ax = plt.subplots(
+            nrows=1, ncols=1, figsize=figsize, facecolor="honeydew", edgecolor="black"
         )
 
-        figure.suptitle(f"{analysis_field}")
+        sns.histplot(
+            data=control_data,
+            ax=ax,
+            stat="percent",
+            element="poly",
+            alpha=0.3,
+            color="blue",
+        )
+
+        sns.histplot(
+            data=test_data,
+            ax=ax,
+            stat="percent",
+            element="poly",
+            alpha=0.3,
+            color="red",
+        )
+
+        figure.suptitle(f"{analysis_field}", fontsize=20)
         plt.show()
 
     def split_analysis(self, splited_data: pd.DataFrame, **kwargs):
