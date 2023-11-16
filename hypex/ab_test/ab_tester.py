@@ -522,7 +522,7 @@ class AATest:
             )
             axs[ax_count].legend(["test", "control"])
 
-        figure.suptitle(f"{analysis_field}", fontsize=kwargs.get("title_size", 20))
+        figure.suptitle(f"{control_data.name}", fontsize=kwargs.get("title_size", 20))
         plt.show()
 
     def cat_feature_uniform_analysis(
