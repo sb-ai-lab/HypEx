@@ -447,10 +447,20 @@ class AATest:
             nrows=2, ncols=1, figsize=figsize, facecolor="honeydew", edgecolor="black"
         )
 
+        bins = np.arange(
+            min(control_data.min(), test_data.min()),
+            max(control_data.max(), test_data.max()),
+            (
+                max(control_data.max(), test_data.max())
+                - min(control_data.min(), test_data.min())
+            )
+            / kwargs.get("bins", 20),
+        )
+
         sns.histplot(
             data=control_data,
             ax=axs[0],
-            bins=kwargs.get("bins", 20),
+            bins=bins,
             stat="percent",
             element="poly",
             alpha=0.3,
@@ -460,7 +470,7 @@ class AATest:
         sns.histplot(
             data=test_data,
             ax=axs[0],
-            bins=kwargs.get("bins", 20),
+            bins=bins,
             stat="percent",
             element="poly",
             alpha=0.3,
@@ -498,7 +508,7 @@ class AATest:
             data=control_data,
             ax=ax,
             stat="percent",
-            element="poly", 
+            element="poly",
             alpha=0.3,
             color="blue",
         )
@@ -522,7 +532,9 @@ class AATest:
                 ssp["control"][nf], ssp["test"][nf], **kwargs
             )
         for cf in self.group_cols:
-            self.cat_feature_uniform_analysis(splited_data, cf, **kwargs)
+            self.cat_feature_uniform_analysis(
+                ssp["control"][cf], ssp["test"][cf], **kwargs
+            )
 
 
 class ABTest:
