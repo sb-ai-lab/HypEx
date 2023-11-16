@@ -12,6 +12,7 @@ from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+
 def merge_groups(
     test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
     control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
@@ -32,6 +33,7 @@ def merge_groups(
 
     return pd.concat([test_group, control_group], ignore_index=True)
 
+
 def split_splited_data(splitted_data: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     """Splits a pandas DataFrame into two separate dataframes based on a specified group field.
 
@@ -48,7 +50,6 @@ def split_splited_data(splitted_data: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         "test": splitted_data[splitted_data["group"] == "test"],
         "control": splitted_data[splitted_data["group"] == "control"],
     }
-    
 
 
 class AATest:
@@ -70,7 +71,9 @@ class AATest:
         self.mode = mode
         self.alpha = alpha
 
-    def __simple_mode(self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5) -> Dict:
+    def __simple_mode(
+        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+    ) -> Dict:
         """Separates data on A and B samples within simple mode.
 
         Separation performed to divide groups of equal sizes - equal amount of records
@@ -99,13 +102,15 @@ class AATest:
 
         else:
             addition_indexes = list(shuffle(data.index, random_state=random_state))
-            edge =  int(len(addition_indexes) * test_size)
+            edge = int(len(addition_indexes) * test_size)
             result["test_indexes"] = addition_indexes[:edge]
             result["control_indexes"] = addition_indexes[edge:]
 
         return result
 
-    def split(self, data: pd.DataFrame, random_state: int = None, test_size: float=0.5) -> Dict:
+    def split(
+        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+    ) -> Dict:
         """Divides sample on two groups.
 
         Args:
@@ -250,10 +255,17 @@ class AATest:
                 ta, tb, nan_policy="omit"
             ).pvalue
             t_result[f"{tf} ks-test p-value"] = ks_2samp(ta, tb).pvalue
-            t_result[f"{tf} t-test passed"] = t_result[f"{tf} t-test p-value"] < self.alpha
-            t_result[f"{tf} ks-test passed"] = t_result[f"{tf} ks-test p-value"] < self.alpha
+            t_result[f"{tf} t-test passed"] = (
+                t_result[f"{tf} t-test p-value"] < self.alpha
+            )
+            t_result[f"{tf} ks-test passed"] = (
+                t_result[f"{tf} ks-test p-value"] < self.alpha
+            )
             scores.append(
-                (t_result[f"{tf} t-test p-value"] + 2*t_result[f"{tf} ks-test p-value"])
+                (
+                    t_result[f"{tf} t-test p-value"]
+                    + 2 * t_result[f"{tf} ks-test p-value"]
+                )
                 / 3
             )
 
@@ -360,7 +372,9 @@ class AATest:
         else:
             return pd.DataFrame(results), data_from_sampling
 
-    def features_p_value_distribution(self, experiment_results: pd.DataFrame, figsize=None, bin_step=0.05):
+    def features_p_value_distribution(
+        self, experiment_results: pd.DataFrame, figsize=None, bin_step=0.05
+    ):
         feuture_num = len(self.target_fields)
         figsize = figsize or (15, 7 * feuture_num)
         bin_step = bin_step or self.alpha
@@ -384,65 +398,98 @@ class AATest:
                 shrink=0.8,
             )
 
-            axs[i, 0].set_title(f"{self.target_fields[i]} t-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} t-test passed'].mean()}")
-            axs[i, 1].set_title(f"{self.target_fields[i]} ks-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} ks-test passed'].mean()}")
+            axs[i, 0].set_title(
+                f"{self.target_fields[i]} t-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} t-test passed'].mean()}"
+            )
+            axs[i, 1].set_title(
+                f"{self.target_fields[i]} ks-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} ks-test passed'].mean()}"
+            )
         plt.show()
 
     def aa_score(self, experiment_results: pd.DataFrame) -> pd.DataFrame:
-        result = pd.DataFrame({
-            f : {
-                "t-test passed score": experiment_results[f"{f} t-test passed"].mean(),
-                "ks-test passed score": experiment_results[f"{f} ks-test passed"].mean(),
-            } for f in self.target_fields
-        }).T
+        result = pd.DataFrame(
+            {
+                f: {
+                    "t-test passed score": experiment_results[
+                        f"{f} t-test passed"
+                    ].mean(),
+                    "ks-test passed score": experiment_results[
+                        f"{f} ks-test passed"
+                    ].mean(),
+                }
+                for f in self.target_fields
+            }
+        ).T
 
-        result['t-test aa passed'] = result['t-test passed score'].apply(lambda x: 0.8 * self.alpha <= x <= 1.2 * self.alpha)
-        result['ks-test aa passed'] = result['t-test passed score'].apply(lambda x: 0.8 * self.alpha <= x <= 1.2 * self.alpha)
-        result.loc['mean'] = result.mean()
+        result["t-test aa passed"] = result["t-test passed score"].apply(
+            lambda x: 0.8 * self.alpha <= x <= 1.2 * self.alpha
+        )
+        result["ks-test aa passed"] = result["t-test passed score"].apply(
+            lambda x: 0.8 * self.alpha <= x <= 1.2 * self.alpha
+        )
+        result.loc["mean"] = result.mean()
 
         return result
 
-    def uniform_tests_interpretation(self, experiment_results: pd.DataFrame, **kwargs) -> pd.DataFrame:
-        self.features_p_value_distribution(experiment_results, figsize=kwargs.get('figsize'), bin_step=kwargs.get('bin_step'))
+    def uniform_tests_interpretation(
+        self, experiment_results: pd.DataFrame, **kwargs
+    ) -> pd.DataFrame:
+        self.features_p_value_distribution(
+            experiment_results,
+            figsize=kwargs.get("figsize"),
+            bin_step=kwargs.get("bin_step"),
+        )
         return self.aa_score(experiment_results)
 
-    def num_feature_uniform_analysis(self, splited_data: pd.DataFrame, analysis_field: str, **kwargs):
-        figsize = kwargs.get('figsize', (25, 20))
-        figure, axs = plt.subplots(nrows=2, ncols=1, figsize=figsize)
+    def num_feature_uniform_analysis(
+        self, control_data: pd.Series, test_data: pd.Series, **kwargs
+    ):
+        figsize = kwargs.get("figsize", (25, 20))
+        figure, axs = plt.subplots(
+            nrows=2, ncols=1, figsize=figsize, facecolor="honeydew", edgecolor="black"
+        )
 
         sns.histplot(
-            data=splited_data,
-            x=analysis_field,
-            hue="group",
+            data=control_data,
             ax=axs[0],
             bins=kwargs.get("bins", 20),
             stat="percent",
-            multiple="dodge",
-            shrink=0.8
+            element="poly",
+            alpha=0.5,
         )
 
-        ssd = split_splited_data(splited_data)
-        a_values = ssd["test"][analysis_field]
-        b_values = ssd["control"][analysis_field]
+        sns.histplot(
+            data=test_data,
+            ax=axs[0],
+            bins=kwargs.get("bins", 20),
+            stat="percent",
+            element="poly",
+            alpha=0.5,
+        )
+
         axs[1].plot(
             range(0, 101),
-            [a_values.quantile(q) for q in np.arange(0, 1.01, 0.01)],
-            alpha=0.5
+            [control_data.quantile(q) for q in np.arange(0, 1.01, 0.01)],
+            alpha=0.5,
         )
         axs[1].plot(
             range(0, 101),
-            [b_values.quantile(q) for q in np.arange(0, 1.01, 0.01)],
-            alpha=0.5
+            [test_data.quantile(q) for q in np.arange(0, 1.01, 0.01)],
+            alpha=0.5,
         )
+        axs[0].legend(["test", "control"])
         axs[1].legend(["test", "control"])
+
         axs[1].grid(True)
         axs[1].set_xticks(np.arange(0, 101))
         axs[1].set_xticklabels(np.arange(0, 101), rotation=45)
-        figure.suptitle(f"{analysis_field}")
+        figure.suptitle(f"{analysis_field}", fontsize=20)
         plt.show()
 
-    def cat_feature_uniform_analysis(self, splited_data: pd.DataFrame, analysis_field: str, **kwargs):
-        figsize = kwargs.get('figsize', (25, 20))
+    def cat_feature_uniform_analysis(
+        self, splited_data: pd.DataFrame, analysis_field: str, **kwargs
+    ):
+        figsize = kwargs.get("figsize", (25, 20))
         figure, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
 
         sns.histplot(
@@ -454,17 +501,21 @@ class AATest:
             stat="percent",
             # alpha=0.7,
             multiple="dodge",
-            shrink=0.8
+            shrink=0.8,
         )
 
         figure.suptitle(f"{analysis_field}")
         plt.show()
-    
+
     def split_analysis(self, splited_data: pd.DataFrame, **kwargs):
+        ssp = split_splited_data(splited_data)
         for nf in self.target_fields:
-            self.num_feature_uniform_analysis(splited_data, nf, **kwargs)
+            self.num_feature_uniform_analysis(
+                ssp["control"][nf], ssp["test"][nf], **kwargs
+            )
         for cf in self.group_cols:
             self.cat_feature_uniform_analysis(splited_data, cf, **kwargs)
+
 
 class ABTest:
     def __init__(
@@ -615,7 +666,10 @@ class ABTest:
                 values of the 'test' and 'control' dataframes
         """
         result = {}
-        if self.calc_difference_method in {"all", "diff_in_diff", "cuped"} and target_field_before is None:
+        if (
+            self.calc_difference_method in {"all", "diff_in_diff", "cuped"}
+            and target_field_before is None
+        ):
             raise ValueError(
                 "For calculation metrics 'cuped' or 'diff_in_diff' field 'target_field_before' is required.\n"
                 "Metric 'ate'(=diff-in-means) can be used without 'target_field_before'"
