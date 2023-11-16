@@ -481,6 +481,7 @@ class AATest:
                 color="red",
             )
             axs[ax_count].grid(True)
+            axs[ax_count].legend(["test", "control"])
             ax_count += 1
         
         if "cumulative" in plot_set:
@@ -506,6 +507,7 @@ class AATest:
                 alpha=kwargs.get("alpha", 0.3),
                 color="red",
             )
+            axs[ax_count].legend(["test", "control"])
             ax_count += 1
 
         if "percentile" in plot_set:
