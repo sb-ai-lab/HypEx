@@ -508,7 +508,6 @@ class AATest:
             data=control_data,
             ax=ax,
             stat="percent",
-            element="poly",
             alpha=0.3,
             color="blue",
         )
@@ -517,12 +516,11 @@ class AATest:
             data=test_data,
             ax=ax,
             stat="percent",
-            element="poly",
             alpha=0.3,
             color="red",
         )
 
-        figure.suptitle(f"{analysis_field}", fontsize=20)
+        figure.suptitle(f"{control_data.name}", fontsize=20)
         plt.show()
 
     def split_analysis(self, splited_data: pd.DataFrame, **kwargs):
