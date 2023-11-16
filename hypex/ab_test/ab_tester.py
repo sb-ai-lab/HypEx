@@ -232,8 +232,6 @@ class AATest:
         scores = []
         t_result = {"random_state": random_state}
 
-        if self.info_cols:
-            info_data = data[self.info_cols]
         split = self.split(data, random_state, test_size)
 
         a = data.loc[split["test_indexes"]]
