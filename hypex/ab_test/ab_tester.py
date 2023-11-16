@@ -187,7 +187,6 @@ class AATest:
         test = data.loc[spit_indexes["test_indexes"]]
         control = data.loc[spit_indexes["control_indexes"]]
         data = merge_groups(test, control)
-        data = data.merge()
 
         return data
 
