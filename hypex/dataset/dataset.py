@@ -115,15 +115,15 @@ class Dataset:
         self.main_causes_names: str | list = ''
         self.ate: float = 0.0
         self.sigma = 1.3
-        self.__generate_df__()
+        self._generate_df()
 
-    def __generate_df__(self):
+    def _generate_df(self):
         """
         Generates the dataset and predict ate for it
         """
-        m_with_dummy = self.generate_feature_cols()
-        info = self.generate_info_cols()
-        treatment = self.generate_treatment_cols()
+        m_with_dummy = self._generate_feature_cols()
+        info = self._generate_info_cols()
+        treatment = self._generate_treatment_cols()
 
         m_vector = m_with_dummy.dot(np.ones(self.num_main_causes_cols))
         epsilon = np.random.multivariate_normal(mean=np.zeros(2),
@@ -149,14 +149,14 @@ class Dataset:
         else:
             data = np.column_stack((m_with_dummy, outcome))
 
-        self.df = self.set_df(data, info)
-        self.set_nans()
-        self.__process_ate__()
+        self.df = self._set_df(data, info)
+        self._set_nans()
+        self._process_ate()
 
-    def __process_ate__(self):
+    def _process_ate(self):
         pass
 
-    def generate_feature_cols(self):
+    def _generate_feature_cols(self):
         """
         Generate columns with main features for causal process
 
@@ -170,7 +170,7 @@ class Dataset:
         m_with_dummy = to_categories(m, self.num_main_causes_cols, self.num_discrete_main_causes_cols)
         return m_with_dummy
 
-    def generate_info_cols(self):
+    def _generate_info_cols(self):
         """
         Generate columns with information features for causal process
 
@@ -192,7 +192,7 @@ class Dataset:
                     [letters[a] * ((i // 2) + 1) for a in np.random.choice(a=np.arange(i * 2), size=self.num_records)])
         return info
 
-    def generate_treatment_cols(self):
+    def _generate_treatment_cols(self):
         """
         Generate columns with treatment values
 
@@ -207,7 +207,7 @@ class Dataset:
         treatment = np.digitize(treatment, bins=np.array([0, 0.5, 1])).astype(bool)
         return treatment
 
-    def set_df(self, data, info):
+    def _set_df(self, data, info):
         """
         Generate names for columns and combine all data to DataFrame
         Args:
@@ -234,7 +234,7 @@ class Dataset:
         df.insert(self.num_info_cols + 1, 'feature_col_2', pd.Series(product))
         return df
 
-    def set_nans(self):
+    def _set_nans(self):
         """
         Set NaN values to DataFrame according to their respective
         """
