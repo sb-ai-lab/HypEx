@@ -277,7 +277,7 @@ class Matcher:
         self._log("Applying filter by spearman test - drop columns correlated with outcome")
         self._apply_filter(SpearmanFilter, self.outcomes[0], self.treatment, self.same_target_threshold)
 
-    def _outliers_filter(self):
+    def outliers_filter(self):
         """Removes outlier values from the dataset.
 
         This method employs an OutliersFilter. If `drop_outliers_by_percentile` is True,
