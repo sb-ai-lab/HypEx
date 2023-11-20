@@ -3,7 +3,6 @@ import logging
 
 import pandas as pd
 
-
 logger = logging.getLogger("outliers_filter")
 console_out = logging.StreamHandler()
 logging.basicConfig(
@@ -35,7 +34,7 @@ class OutliersFilter:
         self.min_percentile = min_percentile
         self.max_percentile = max_percentile
 
-    def perform_filter(self, df: pd.DataFrame, interquartile: bool = True) -> set:
+    def perform_filter(self, df: pd.DataFrame, interquartile: bool = True) -> pd.DataFrame:
         """Identifies rows with outliers.
 
         This method creates a set of row indices to be removed, which contains values less than
@@ -75,7 +74,6 @@ class OutliersFilter:
             rows_for_del_column = (df[column] < min_value) | (df[column] > max_value)
             rows_for_del_column = df.index[rows_for_del_column].tolist()
             rows_for_del.extend(rows_for_del_column)
-        rows_for_del = set(rows_for_del)
+        rows_for_del = list(set(rows_for_del))
         logger.info(f"Drop {len(rows_for_del)} rows")
-
-        return rows_for_del
+        return df.drop(rows_for_del)
