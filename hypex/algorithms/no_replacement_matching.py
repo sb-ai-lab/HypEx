@@ -16,7 +16,7 @@ class MatcherNoReplacement:
     control samples.
     """
 
-    def __init__(self, X: pd.DataFrame, a: pd.Series, weights: dict = None):
+    def __init__(self, X: pd.DataFrame, a: pd.Series, weights: dict = None, approximate_match: bool = False):
         """Initialize matching.
 
         Args:
@@ -27,6 +27,7 @@ class MatcherNoReplacement:
         self.treatment = a
         self.X = X
         self.weights = weights
+        self.approximate_match = approximate_match
 
     def match(self):
         """Function run matching with no replacement.
@@ -48,7 +49,7 @@ class MatcherNoReplacement:
         return match_df
 
     def create_match_df(
-        self, base_series: pd.Series, source_df: pd.DataFrame, target_df: pd.DataFrame, distances: list
+            self, base_series: pd.Series, source_df: pd.DataFrame, target_df: pd.DataFrame, distances: list
     ) -> pd.DataFrame:
         """Function creates matching dataframe.
 
@@ -127,8 +128,24 @@ class MatcherNoReplacement:
         """
         cdist_args = dict(XA=_ensure_array_columnlike(source_df.values), XB=_ensure_array_columnlike(target_df.values))
         cdist_args.update(self._get_metric_dict(cov))
-        distance_matrix = distance.cdist(**cdist_args)
 
+        if self.approximate_match:
+            if len(cdist_args['XB']) < len(cdist_args['XA']):
+                covariance_matrix = np.cov(cdist_args['XB'].T)
+            else:
+                covariance_matrix = np.cov(cdist_args['XA'].T)
+            covariance_matrix_reg = covariance_matrix + np.eye(covariance_matrix.shape[0]) * 1e-8
+
+            def m_distance(X: np.ndarray, Y: np.ndarray, inv_covariance: np.ndarray) -> np.ndarray:
+
+                diff = X - Y
+                return np.sqrt(np.sum(np.dot(diff, inv_covariance) * diff, axis=1))
+
+            distance_matrix = np.zeros((cdist_args['XA'].shape[0], cdist_args['XB'].shape[0]))
+            for i, x in enumerate(cdist_args['XA']):
+                distance_matrix[i] = m_distance(cdist_args['XB'], x, np.linalg.inv(covariance_matrix_reg))
+        else:
+            distance_matrix = distance.cdist(**cdist_args)
         return distance_matrix
 
 

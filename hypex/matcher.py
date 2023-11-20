@@ -296,7 +296,7 @@ class Matcher:
             OutliersFilter, self.interquartile_coeff, self.mode_percentile, self.min_percentile, self.max_percentile
         )
 
-    def match_no_rep(self, threshold: float = 0.1) -> pd.DataFrame:
+    def match_no_rep(self, threshold: float = 0.1, approximate_match: bool = False) -> pd.DataFrame:
         """Matching groups with no replacement.
 
         It's done by optimizing the linear sum of
@@ -304,6 +304,7 @@ class Matcher:
 
         Args:
             threshold: caliper for minimum deviation between test and control groups. in case weights is not None.
+            approximate_match: use or not approximate matching
 
         Returns:
               Matched dataframe with no replacements.
@@ -313,7 +314,7 @@ class Matcher:
         if self.info_col is not None:
             X = X.drop(columns=self.info_col)
 
-        index_matched = MatcherNoReplacement(X, a, self.weights).match()
+        index_matched = MatcherNoReplacement(X, a, self.weights, approximate_match).match()
         filtred_matches = index_matched.loc[1].iloc[self.input_data[a == 1].index].matches[index_matched.loc[1].iloc[self.input_data[a == 1].index].matches.apply(lambda x: x != [])]
 
         if self.weights is not None:
