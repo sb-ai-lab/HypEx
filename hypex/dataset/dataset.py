@@ -1,6 +1,6 @@
 import string
 import numpy as np
-import pandas as pd
+import pandas as pd  # type: ignore
 import random
 
 
@@ -17,6 +17,41 @@ def to_categories(arr, num_vars, num_discrete_vars):
 
 
 class Dataset:
+    """Class for generation dataset with multiple columns.
+
+    Examples:
+
+        >>> # Base generation
+        >>> sample_data = Dataset()
+        >>>
+        >>> print(sample_data.df)
+        >>>
+        >>> # Optional
+        >>> num_records = 10000 # Number of records to generate
+        >>> num_main_causes_cols = 3 # Number of columns correlating with outcome
+        >>> num_info_cols = 3 # Number of columns with information about each record
+        >>> num_treatments = 2 # Number of treatments (info about 'treatment' 0 or 1)
+        >>> num_outcomes = 4 # Number of columns with target values
+        >>> num_discrete_main_causes_cols = 0 # Number of discrete columns correlating with outcome
+        >>> binary_outcome = False # If outcome should be binary
+        >>> na_columns = ['feature_col_1', 'feature_col_2'] # List of columns with NA values
+        >>> na_step = 15 # Number of period to make NaN (step of range)
+        >>>
+        >>> sample_data = Dataset(num_records=num_records,
+        >>>                       num_main_causes_cols=num_main_causes_cols,
+        >>>                       num_info_cols=num_info_cols,
+        >>>                       num_treatments=num_treatments,
+        >>>                       num_outcomes=num_outcomes,
+        >>>                       binary_outcome=binary_outcome,
+        >>>                       na_columns=na_columns,
+        >>>                       na_step=na_step)
+        >>>
+        >>> print(sample_data.df)
+        >>>
+        >>> print(sample_data) # More details about attributes
+
+
+    """
     def __init__(
             self,
             num_records: int = 5000,
@@ -26,8 +61,30 @@ class Dataset:
             num_discrete_main_causes_cols: int = 1,
             num_outcomes: int = 1,
             binary_outcome: bool = False,
-            na_columns: str | list = None,
-            na_step: int = None) -> None:
+            na_columns: str | list = '',
+            na_step: int = 0) -> None:
+        """Initialize the Dataset object.
+
+                Args:
+                    num_records:
+                        Number of records in created dataset. Defaults to 5000
+                    num_main_causes_cols:
+                        Number of columns correlating with outcome. Defaults to 4
+                    num_info_cols:
+                        Number of columns with information about each record. Defaults to 2
+                    num_treatments:
+                        Number of treatments (info about 'treatment' 0 or 1). Defaults to 1
+                    num_discrete_main_causes_cols:
+                        Number of discrete columns correlating with outcome. Defaults to 1
+                    num_outcomes:
+                        Number of columns with target values. Defaults to 1
+                    binary_outcome:
+                        If outcome should be binary. Defaults to False
+                    na_columns:
+                        Column or list of columns with NA values. Defaults to None
+                    na_step:
+                        Number of period to make NaN (step of range). Defaults to 0
+                """
         self.num_records = num_records
         self.num_main_causes_cols = num_main_causes_cols
         self.num_info_cols = num_info_cols
@@ -46,6 +103,9 @@ class Dataset:
         self.__generate_df__()
 
     def __generate_df__(self):
+        """
+        Generates the dataset and predict ate for it
+        """
         m_with_dummy = self.generate_feature_cols()
         info = self.generate_info_cols()
         treatment = self.generate_treatment_cols()
@@ -76,17 +136,18 @@ class Dataset:
 
         self.df = self.set_df(data, info)
         self.set_nans()
-        # self.__process_ate__()
+        self.__process_ate__()
 
-    # def __process_ate__(self):
-    #   self.ate = CausalForestDML().fit(
-    #       Y=self.df[self.outcome_name],
-    #       T=self.df[self.treatment_name],
-    #       X=self.df[self.main_causes_names]).marginal_ate(
-    #           X=self.df[self.main_causes_names],
-    #           T=self.df[self.treatment_name])
+    def __process_ate__(self):
+        pass
 
     def generate_feature_cols(self):
+        """
+        Generate columns with main features for causal process
+
+        Returns:
+            Array with features
+        """
         means = np.random.uniform(-1, 1, self.num_main_causes_cols)
         cov_mat = np.identity(self.num_main_causes_cols)
         m = np.random.multivariate_normal(means, cov_mat, self.num_records)
@@ -94,6 +155,12 @@ class Dataset:
         return m_with_dummy
 
     def generate_info_cols(self):
+        """
+        Generate columns with information features for causal process
+
+        Returns:
+            List with features
+        """
         info = []
         for i in range(self.num_info_cols):
             if i % 2 == 0:
@@ -109,14 +176,26 @@ class Dataset:
         return info
 
     def generate_treatment_cols(self):
+        """
+        Generate columns with treatment values
+
+        Returns:
+            Array with treatment
+        """
         if (self.num_treatments > 0 and self.num_outcomes == 1) or (self.num_treatments > self.num_outcomes):
-            treatment = np.random.normal(0, 1.3, (self.num_records, self.num_treatments))
+            treatment = np.random.normal(0, self.sigma, (self.num_records, self.num_treatments))
         else:
-            treatment = np.random.normal(0, 1.3, (self.num_records, self.num_outcomes))
+            treatment = np.random.normal(0, self.sigma, (self.num_records, self.num_outcomes))
         treatment = np.digitize(treatment, bins=np.array([0, 0.5, 1])).astype(bool)
         return treatment
 
     def set_df(self, data, info):
+        """
+        Generate names for columns and combine all data to DataFrame
+
+        Returns:
+            DataFrame with generated data
+        """
         gender = [["male", "female"][i] for i in np.random.choice(a=np.array([0, 1]), size=self.num_records)]
         product = [['Deposit', 'Credit', 'Investment'][i] for i in np.random.choice(a=np.array([0, 1, 2]),
                                                                                     size=self.num_records)]
@@ -132,6 +211,9 @@ class Dataset:
         return df
 
     def set_nans(self):
+        """
+        Set NaN values to DataFrame according to their respective
+        """
         if self.na_columns or self.na_step:
             self.na_step = [self.na_step] if self.na_step else [10]
             self.na_columns = self.na_columns if self.na_columns else self.main_causes_names + self.info_col_names
@@ -147,7 +229,7 @@ class Dataset:
 
 
     def __repr__(self):
-        text = """
+        return """
 Attributes:
 ---------------------------------------------------------------
 df - generated dataset
@@ -158,8 +240,3 @@ main_causes_names - names for columns with features for process
 ate - predicted ate for sample data
 --------------------------------------------
     """
-        return text
-
-
-sample_data = Dataset(num_info_cols=0, num_treatments=3, num_outcomes=1, na_step=5)
-print(sample_data.df)
