@@ -1,10 +1,25 @@
 import string
 import numpy as np
-import pandas as pd  # type: ignore
+import pandas as pd
 import random
 
 
 def to_categories(arr, num_vars, num_discrete_vars):
+    """
+    Converts some columns of array of floats to integers
+
+    Args:
+        arr:
+            Array of floats with data
+        num_vars:
+            Total number of features
+        num_discrete_vars:
+            Number of discrete values
+
+    Returns:
+        arr_with_dummy:
+            Array of floats with integer values
+    """
     quantiles = np.array([0.25, 0.5, 0.75])
     arr_with_dummy = arr.copy()
     for arr_index in range(num_vars - num_discrete_vars, num_vars):
@@ -17,7 +32,8 @@ def to_categories(arr, num_vars, num_discrete_vars):
 
 
 class Dataset:
-    """Class for generation dataset with multiple columns.
+    """
+    Class for generation dataset with multiple columns.
 
     Examples:
 
@@ -49,8 +65,6 @@ class Dataset:
         >>> print(sample_data.df)
         >>>
         >>> print(sample_data) # More details about attributes
-
-
     """
     def __init__(
             self,
@@ -63,28 +77,29 @@ class Dataset:
             binary_outcome: bool = False,
             na_columns: str | list = '',
             na_step: int = 0) -> None:
-        """Initialize the Dataset object.
+        """
+        Initialize the Dataset object.
 
-                Args:
-                    num_records:
-                        Number of records in created dataset. Defaults to 5000
-                    num_main_causes_cols:
-                        Number of columns correlating with outcome. Defaults to 4
-                    num_info_cols:
-                        Number of columns with information about each record. Defaults to 2
-                    num_treatments:
-                        Number of treatments (info about 'treatment' 0 or 1). Defaults to 1
-                    num_discrete_main_causes_cols:
-                        Number of discrete columns correlating with outcome. Defaults to 1
-                    num_outcomes:
-                        Number of columns with target values. Defaults to 1
-                    binary_outcome:
-                        If outcome should be binary. Defaults to False
-                    na_columns:
-                        Column or list of columns with NA values. Defaults to None
-                    na_step:
-                        Number of period to make NaN (step of range). Defaults to 0
-                """
+        Args:
+            num_records:
+                Number of records in created dataset. Defaults to 5000
+            num_main_causes_cols:
+                Number of columns correlating with outcome. Defaults to 4
+            num_info_cols:
+                Number of columns with information about each record. Defaults to 2
+            num_treatments:
+                Number of treatments (info about 'treatment' 0 or 1). Defaults to 1
+            num_discrete_main_causes_cols:
+                Number of discrete columns correlating with outcome. Defaults to 1
+            num_outcomes:
+                Number of columns with target values. Defaults to 1
+            binary_outcome:
+                If outcome should be binary. Defaults to False
+            na_columns:
+                Column or list of columns with NA values. Defaults to None
+            na_step:
+                Number of period to make NaN (step of range). Defaults to 0
+        """
         self.num_records = num_records
         self.num_main_causes_cols = num_main_causes_cols
         self.num_info_cols = num_info_cols
@@ -146,7 +161,8 @@ class Dataset:
         Generate columns with main features for causal process
 
         Returns:
-            Array with features
+            m_with_dummy:
+                Array with features
         """
         means = np.random.uniform(-1, 1, self.num_main_causes_cols)
         cov_mat = np.identity(self.num_main_causes_cols)
@@ -159,7 +175,8 @@ class Dataset:
         Generate columns with information features for causal process
 
         Returns:
-            List with features
+            info:
+                List with features
         """
         info = []
         for i in range(self.num_info_cols):
@@ -180,7 +197,8 @@ class Dataset:
         Generate columns with treatment values
 
         Returns:
-            Array with treatment
+            treatment:
+                Array with treatment
         """
         if (self.num_treatments > 0 and self.num_outcomes == 1) or (self.num_treatments > self.num_outcomes):
             treatment = np.random.normal(0, self.sigma, (self.num_records, self.num_treatments))
@@ -192,9 +210,15 @@ class Dataset:
     def set_df(self, data, info):
         """
         Generate names for columns and combine all data to DataFrame
+        Args:
+            data:
+                Array with main features
+            info:
+                Array with info features
 
         Returns:
-            DataFrame with generated data
+            df:
+                DataFrame with generated data
         """
         gender = [["male", "female"][i] for i in np.random.choice(a=np.array([0, 1]), size=self.num_records)]
         product = [['Deposit', 'Credit', 'Investment'][i] for i in np.random.choice(a=np.array([0, 1, 2]),
@@ -235,7 +259,7 @@ Attributes:
 df - generated dataset
 treatment_name - name for column with treatment
 outcome_name - names for columns with outcome
-info_col_names - names for columns with infornamion
+info_col_names - names for columns with information about records
 main_causes_names - names for columns with features for process
 ate - predicted ate for sample data
 --------------------------------------------
