@@ -1,10 +1,12 @@
 import string
+
+import numpy
 import numpy as np
 import pandas as pd
 import random
 
 
-def to_categories(arr, num_vars, num_discrete_vars):
+def to_categories(arr: numpy.ndarray, num_vars: int, num_discrete_vars: int) -> numpy.ndarray:
     """
     Converts some columns of array of floats to integers
 
@@ -36,7 +38,6 @@ class Dataset:
     Class for generation dataset with multiple columns.
 
     Examples:
-    #TODO пример без тритмента
 
         >>> # Base generation
         >>> sample_data = Dataset()
@@ -64,6 +65,12 @@ class Dataset:
         >>>                       na_step=na_step)
         >>>
         >>> print(sample_data.df)
+        >>>
+        >>> # Without treatment
+        >>> sample_data = Dataset(num_treatments=0)
+        >>>
+        >>> print(sample_data.df)
+        >>>
         >>>
         >>> print(sample_data) # More details about attributes
     """
@@ -208,7 +215,7 @@ class Dataset:
         treatment = np.digitize(treatment, bins=np.array([0, 0.5, 1])).astype(bool)
         return treatment
 
-    def _set_df(self, data, info):
+    def _set_df(self, data: numpy.ndarray, info: numpy.ndarray):
         """
         Generate names for columns and combine all data to DataFrame
         Args:
