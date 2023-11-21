@@ -36,6 +36,7 @@ class Dataset:
     Class for generation dataset with multiple columns.
 
     Examples:
+    #TODO пример без тритмента
 
         >>> # Base generation
         >>> sample_data = Dataset()
@@ -232,6 +233,7 @@ class Dataset:
             df.insert(i, self.info_col_names[i], pd.Series(info[i]))
         df.insert(self.num_info_cols, 'feature_col_1', pd.Series(gender))
         df.insert(self.num_info_cols + 1, 'feature_col_2', pd.Series(product))
+        self.main_causes_names = ['feature_col_1', 'feature_col_2'] + self.main_causes_names
         return df
 
     def _set_nans(self):
@@ -239,17 +241,16 @@ class Dataset:
         Set NaN values to DataFrame according to their respective
         """
         if self.na_columns or self.na_step:
-            self.na_step = [self.na_step] if self.na_step else [10]
-            self.na_columns = self.na_columns if self.na_columns else self.main_causes_names + self.info_col_names
-            self.na_columns = [self.na_columns] if isinstance(self.na_columns, str) else self.na_columns
-            self.na_step = self.na_step[:len(self.na_columns)] if len(self.na_step) > len(
-                self.na_columns) else self.na_step + [self.na_step[-1]] * (len(self.na_columns) - len(self.na_step))
-            nans_indexes = [list(range(i, len(self.df), period)) for i, period in enumerate(self.na_step)]
-            for i in range(len(self.na_columns)):
-                try:
-                    self.df.loc[nans_indexes[i], self.na_columns[i]] = np.nan
-                except KeyError:
-                    print(f'There is no column {self.na_columns[i]} in data. No nans in this column will be added.')
+          self.na_step = [self.na_step] if self.na_step else [10]
+          self.na_columns = self.na_columns if self.na_columns else self.main_causes_names + self.info_col_names
+          self.na_columns = [self.na_columns] if isinstance(self.na_columns, str) else self.na_columns
+          if not set(self.na_columns).issubset(self.df.columns):
+            raise KeyError(f'There is no columns {self.na_columns} in data. Only {list(self.df.columns)} provided.')
+          self.na_step = self.na_step[:len(self.na_columns)] if len(self.na_step) > len(
+              self.na_columns) else self.na_step + [self.na_step[-1]] * (len(self.na_columns) - len(self.na_step))
+          nans_indexes = [list(range(i, len(self.df), period)) for i, period in enumerate(self.na_step)]
+          for i in range(len(self.na_columns)):
+              self.df.loc[nans_indexes[i], self.na_columns[i]] = np.nan
 
 
     def __repr__(self):
