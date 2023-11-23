@@ -13,7 +13,7 @@ def to_categories(arr: np.ndarray, num_vars: int, num_discrete_vars: int) -> np.
         arr:
             Array of floats with data
         num_vars:
-            Total number of num_features
+            Total number of features
         num_discrete_vars:
             Number of discrete values
 
@@ -136,11 +136,11 @@ class DataGenerator:
 
     def _generate_feature_cols(self):
         """
-        Generate columns with main num_features for causal process
+        Generate columns with main features for causal process
 
         Returns:
             m_with_dummy:
-                Array with num_features
+                Array with features
         """
         means = np.random.uniform(-1, 1, self.num_features)
         cov_mat = np.identity(self.num_features)
@@ -150,11 +150,11 @@ class DataGenerator:
 
     def _generate_info_cols(self):
         """
-        Generate columns with information num_features for causal process
+        Generate columns with information features for causal process
 
         Returns:
             info:
-                List with num_features
+                List with features
         """
         info = []
         for i in range(self.num_info_cols):
@@ -232,9 +232,9 @@ class DataGenerator:
         Generate names for columns and combine all data to DataFrame
         Args:
             data:
-                Array with main num_features
+                Array with main features
             info:
-                Array with info num_features
+                Array with info features
 
         Returns:
             df:
@@ -286,7 +286,7 @@ df - generated dataset
 target_name - name for column with treatment
 target_names - names for columns with outcome
 info_col_names - names for columns with information about records
-features_names - names for columns with num_features for process
+features_names - names for columns with main features for process
 ate - predicted ate for sample data
 --------------------------------------------
     """
