@@ -40,7 +40,7 @@ Functions for calculate PSI
 
     report
 
-Dataset creation for tutorials and testing
+DataGenerator creation for tutorials and testing
 --------------------------------------------------------
 
 .. currentmodule:: hypex.utils.tutorial_data_creation

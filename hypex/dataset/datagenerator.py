@@ -13,7 +13,7 @@ def to_categories(arr: np.ndarray, num_vars: int, num_discrete_vars: int) -> np.
         arr:
             Array of floats with data
         num_vars:
-            Total number of features
+            Total number of num_features
         num_discrete_vars:
             Number of discrete values
 
@@ -32,41 +32,34 @@ def to_categories(arr: np.ndarray, num_vars: int, num_discrete_vars: int) -> np.
     return arr_with_dummy
 
 
-class Dataset:
+class DataGenerator:
     """
     Class for generation dataset with multiple columns.
 
     Examples:
 
         >>> # Base generation
-        >>> sample_data = Dataset()
+        >>> sample_data = DataGenerator()
         >>>
         >>> print(sample_data.df)
         >>>
         >>> # Optional
         >>> num_records = 10000 # Number of records to generate
-        >>> num_main_causes_cols = 3 # Number of columns correlating with outcome
+        >>> num_features = 3 # Number of columns correlating with outcome
         >>> num_info_cols = 3 # Number of columns with information about each record
         >>> is_treatment = False #
-        >>> num_outcomes = 4 # Number of columns with target values
-        >>> num_discrete_main_causes_cols = 0 # Number of discrete columns correlating with outcome
-        >>> is_binary_outcome = False # If outcome should be binary
-        >>> na_columns = ['feature_col_1', 'feature_col_2'] # List of columns with NA values
+        >>> num_targets = 4 # Number of columns with target values
+        >>> num_discrete_features = 0 # Number of discrete columns correlating with outcome
+        >>> is_binary_target = False # If outcome should be binary
+        >>> na_columns = ['feature_1', 'feature_2'] # List of columns with NA values
         >>> na_step = 15 # Number of period to make NaN (step of range)
         >>>
-        >>> sample_data = Dataset(num_records=num_records,
-        >>>                       num_main_causes_cols=num_main_causes_cols,
-        >>>                       num_info_cols=num_info_cols,
-        >>>                       is_treatment=is_treatment,
-        >>>                       num_outcomes=num_outcomes,
-        >>>                       is_binary_outcome=is_binary_outcome,
-        >>>                       na_columns=na_columns,
-        >>>                       na_step=na_step)
+        >>> sample_data = DataGenerator(num_records=num_records,num_features=num_features,num_info_cols=num_info_cols,is_treatment=is_treatment,num_targets=num_targets,is_binary_outcome=is_binary_outcome,na_columns=na_columns,na_step=na_step)
         >>>
         >>> print(sample_data.df)
         >>>
         >>> # Without treatment
-        >>> sample_data = Dataset(num_treatments=0)
+        >>> sample_data = DataGenerator(is_treatment=False)
         >>>
         >>> print(sample_data.df)
         >>>
@@ -76,31 +69,31 @@ class Dataset:
     def __init__(
             self,
             num_records: int = 5000,
-            num_main_causes_cols: int = 4,
+            num_features: int = 4,
             num_info_cols: int = 2,
+            num_discrete_features: int = 1,
+            num_targets: int = 1,
             is_treatment: bool = True,
-            num_discrete_main_causes_cols: int = 1,
-            num_outcomes: int = 1,
-            is_binary_outcome: bool = False,
+            is_binary_target: bool = False,
             na_columns: Union[str, list, None] = None,
             na_step: int = 0) -> None:
         """
-        Initialize the Dataset object.
+        Initialize the DataGenerator object.
 
         Args:
             num_records:
                 Number of records in created dataset. Defaults to 5000
-            num_main_causes_cols:
+            num_features:
                 Number of columns correlating with outcome. Defaults to 4
             num_info_cols:
                 Number of columns with information about each record. Defaults to 2
             is_treatment:
                 Number of treatments (info about 'treatment' 0 or 1). Defaults to 1
-            num_discrete_main_causes_cols:
+            num_discrete_features:
                 Number of discrete columns correlating with outcome. Defaults to 1
-            num_outcomes:
+            num_targets:
                 Number of columns with target values. Defaults to 1
-            is_binary_outcome:
+            is_binary_target:
                 If outcome should be binary. Defaults to False
             na_columns:
                 Column or list of columns with NA values. Defaults to None
@@ -108,19 +101,19 @@ class Dataset:
                 Number of period to make NaN (step of range). Defaults to 0
         """
         self.num_records = num_records
-        self.num_main_causes_cols = num_main_causes_cols
+        self.num_features = num_features
         self.num_info_cols = num_info_cols
         self.is_treatment = is_treatment
-        self.num_outcomes = num_outcomes
-        self.num_discrete_main_causes_cols = num_discrete_main_causes_cols
-        self.is_binary_outcome = is_binary_outcome
+        self.num_targets = num_targets
+        self.num_discrete_features = num_discrete_features
+        self.is_binary_target = is_binary_target
         self.na_columns = na_columns
         self.na_step = na_step
         self.df: pd.DataFrame = pd.DataFrame()
-        self.treatment_name: list = []
-        self.outcome_name: list = []
-        self.info_col_names: list = []
-        self.main_causes_names: list = []
+        self.treatment_name: Union[str, list, None] = None
+        self.target_names: list = []
+        self.info_col_names: Union[list, None] = None
+        self.features_names: list = []
         self.ate: float = 0.0
         self.sigma = 1.3
         self._generate_df()
@@ -143,25 +136,25 @@ class Dataset:
 
     def _generate_feature_cols(self):
         """
-        Generate columns with main features for causal process
+        Generate columns with main num_features for causal process
 
         Returns:
             m_with_dummy:
-                Array with features
+                Array with num_features
         """
-        means = np.random.uniform(-1, 1, self.num_main_causes_cols)
-        cov_mat = np.identity(self.num_main_causes_cols)
+        means = np.random.uniform(-1, 1, self.num_features)
+        cov_mat = np.identity(self.num_features)
         m = np.random.multivariate_normal(means, cov_mat, self.num_records)
-        m_with_dummy = to_categories(m, self.num_main_causes_cols, self.num_discrete_main_causes_cols)
+        m_with_dummy = to_categories(m, self.num_features, self.num_discrete_features)
         return m_with_dummy
 
     def _generate_info_cols(self):
         """
-        Generate columns with information features for causal process
+        Generate columns with information num_features for causal process
 
         Returns:
             info:
-                List with features
+                List with num_features
         """
         info = []
         for i in range(self.num_info_cols):
@@ -173,8 +166,8 @@ class Dataset:
             else:
                 unique_letters = list(set(string.ascii_letters.upper()))
                 letters = [random.choice(unique_letters) for _ in range(i * 2)]
-                info.append(
-                    [letters[a] * ((i // 2) + 1) for a in np.random.choice(a=np.arange(i * 2), size=self.num_records)])
+                info.append([letters[j] * ((i // 2) + 1) for j in np.random.choice(a=np.arange(i * 2),
+                                                                                   size=self.num_records)])
         return info
 
     def _generate_treatment_cols(self):
@@ -185,43 +178,63 @@ class Dataset:
             treatment:
                 Array with treatment
         """
-        if self.is_treatment and self.num_outcomes == 1:
+        if self.is_treatment and self.num_targets == 1:
             treatment = np.random.normal(0, self.sigma, (self.num_records, 1))
         else:
-            treatment = np.random.normal(0, self.sigma, (self.num_records, self.num_outcomes))
+            treatment = np.random.normal(0, self.sigma, (self.num_records, self.num_targets))
         treatment = np.digitize(treatment, bins=np.array([0, 0.5, 1])).astype(bool)
         return treatment
 
-    def _generate_outcome_and_full_data(self, m_with_dummy, treatment):
-        m_vector = m_with_dummy.dot(np.ones(self.num_main_causes_cols))
+    def _generate_y_for_target(self, m_with_dummy):
+        """
+        Generate data for target field
+        Args:
+            m_with_dummy: Array with main features
+
+        Returns:
+            y0, y1: Arrays with values for target field
+        """
+        m_vector = m_with_dummy.dot(np.ones(self.num_features))
         epsilon = np.random.multivariate_normal(mean=np.zeros(2),
                                                 cov=np.identity(2),
                                                 size=self.num_records)
         y0 = m_vector + epsilon[:, 0]
-        y1 = self.sigma + m_with_dummy.dot(np.ones(self.num_main_causes_cols) * 2) + epsilon[:, 1]
-        if self.is_treatment and self.num_outcomes == 1:
+        y1 = self.sigma + m_with_dummy.dot(np.ones(self.num_features) * 2) + epsilon[:, 1]
+        return y0, y1
+
+    def _generate_outcome_and_full_data(self, m_with_dummy, treatment):
+        """
+        Generates outcome depending on treatment and create array with main numeric features
+        Args:
+            m_with_dummy: Array with main features
+            treatment: Array with treatment values
+
+        Returns:
+            data: Array with main numeric features
+        """
+        y0, y1 = self._generate_y_for_target(m_with_dummy)
+        if self.is_treatment and self.num_targets == 1:
             outcome = (1 - treatment.flatten()) * y0 + treatment.flatten() * y1
         else:
             outcome = np.multiply((1 - treatment), y0[:, np.newaxis]) + np.multiply(treatment, y1[:, np.newaxis])
             treatment = treatment[:, 0:1]
 
-        outcome = np.digitize(outcome, bins=np.array([np.mean(outcome) - 2])) if self.is_binary_outcome else outcome
+        outcome = np.digitize(outcome, bins=np.array([np.mean(outcome) - 2])) if self.is_binary_target else outcome
 
         if self.is_treatment:
-            data = np.column_stack((m_with_dummy, treatment, outcome))
-        else:
-            data = np.column_stack((m_with_dummy, outcome))
+            return np.column_stack((m_with_dummy, treatment, outcome))
 
-        return data
+        return np.column_stack((m_with_dummy, outcome))
+
 
     def _set_df(self, data: np.ndarray, info: np.ndarray):
         """
         Generate names for columns and combine all data to DataFrame
         Args:
             data:
-                Array with main features
+                Array with main num_features
             info:
-                Array with info features
+                Array with info num_features
 
         Returns:
             df:
@@ -230,17 +243,23 @@ class Dataset:
         gender = [["male", "female"][i] for i in np.random.choice(a=np.array([0, 1]), size=self.num_records)]
         product = [['Deposit', 'Credit', 'Investment'][i] for i in np.random.choice(a=np.array([0, 1, 2]),
                                                                                     size=self.num_records)]
-        self.main_causes_names = ['feature_col_' + str(i) for i in range(3, self.num_main_causes_cols + 3)]
-        self.treatment_name = ['treatment'] if self.is_treatment else []
-        self.outcome_name = ['outcome_' + str(i) for i in range(1, self.num_outcomes + 1)] if self.num_outcomes > 1 else ['outcome']
-        self.info_col_names = ['info_col'] if self.num_info_cols == 1 else ['info_col_' + str(i) for i in range(1, self.num_info_cols + 1)]
-        df = pd.DataFrame(data=data, columns=self.main_causes_names + self.treatment_name + self.outcome_name)
+        df = pd.DataFrame(data=data, columns=self.features_names + self.treatment_name + self.target_names)
+        self.treatment_name = 'treatment' if self.is_treatment else []
         for i in range(self.num_info_cols):
             df.insert(i, self.info_col_names[i], pd.Series(info[i]))
-        df.insert(self.num_info_cols, 'feature_col_1', pd.Series(gender))
-        df.insert(self.num_info_cols + 1, 'feature_col_2', pd.Series(product))
-        self.main_causes_names = ['feature_col_1', 'feature_col_2'] + self.main_causes_names
+        df.insert(self.num_info_cols, 'feature_1', pd.Series(gender))
+        df.insert(self.num_info_cols + 1, 'feature_2', pd.Series(product))
+        self.features_names = ['feature_1', 'feature_2'] + self.features_names
         return df
+
+    def _set_column_names(self):
+        """
+        Set names for columns in DataFrame
+        """
+        self.features_names = ['feature_' + str(i) for i in range(3, self.num_features + 3)]
+        self.treatment_name = ['treatment'] if self.is_treatment else []
+        self.target_names = ['target_' + str(i) for i in range(1, self.num_targets + 1)] if self.num_targets > 1 else ['target']
+        self.info_col_names = ['info'] if self.num_info_cols == 1 else ['info_' + str(i) for i in range(1, self.num_info_cols + 1)]
 
     def _set_nans(self):
         """
@@ -248,7 +267,7 @@ class Dataset:
         """
         if self.na_columns or self.na_step:
           self.na_step = [self.na_step] if self.na_step else [10]
-          self.na_columns = self.na_columns if self.na_columns else self.main_causes_names + self.info_col_names
+          self.na_columns = self.na_columns if self.na_columns else self.features_names + self.info_col_names
           self.na_columns = [self.na_columns] if isinstance(self.na_columns, str) else self.na_columns
           if not set(self.na_columns).issubset(self.df.columns):
             raise KeyError(f'There is no columns {self.na_columns} in data. Only {list(self.df.columns)} provided.')
@@ -264,10 +283,10 @@ class Dataset:
 Attributes:
 ---------------------------------------------------------------
 df - generated dataset
-treatment_name - name for column with treatment
-outcome_name - names for columns with outcome
+target_name - name for column with treatment
+target_names - names for columns with outcome
 info_col_names - names for columns with information about records
-main_causes_names - names for columns with features for process
+features_names - names for columns with num_features for process
 ate - predicted ate for sample data
 --------------------------------------------
     """

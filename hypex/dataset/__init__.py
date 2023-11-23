@@ -1,5 +1,5 @@
 """Tools to configure resources for data."""
-from .dataset import Dataset
+from .datagenerator import DataGenerator
 
 
-__all__ = ["Dataset"]
+__all__ = ["DataGenerator"]
