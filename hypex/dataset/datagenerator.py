@@ -66,6 +66,7 @@ class DataGenerator:
         >>>
         >>> print(sample_data) # More details about attributes
     """
+
     def __init__(
             self,
             num_records: int = 5000,
@@ -126,7 +127,7 @@ class DataGenerator:
         info = self._generate_info_cols()
         treatment = self._generate_treatment_cols()
         data = self._generate_outcome_and_full_data(m_with_dummy, treatment)
-
+        self._set_column_names()
         self.df = self._set_df(data, info)
         self._set_nans()
         self._process_ate()
@@ -223,9 +224,7 @@ class DataGenerator:
 
         if self.is_treatment:
             return np.column_stack((m_with_dummy, treatment, outcome))
-
         return np.column_stack((m_with_dummy, outcome))
-
 
     def _set_df(self, data: np.ndarray, info: np.ndarray):
         """
@@ -243,6 +242,7 @@ class DataGenerator:
         gender = [["male", "female"][i] for i in np.random.choice(a=np.array([0, 1]), size=self.num_records)]
         product = [['Deposit', 'Credit', 'Investment'][i] for i in np.random.choice(a=np.array([0, 1, 2]),
                                                                                     size=self.num_records)]
+        self.treatment_name = ['treatment'] if self.is_treatment else []
         df = pd.DataFrame(data=data, columns=self.features_names + self.treatment_name + self.target_names)
         self.treatment_name = 'treatment' if self.is_treatment else []
         for i in range(self.num_info_cols):
@@ -258,25 +258,26 @@ class DataGenerator:
         """
         self.features_names = ['feature_' + str(i) for i in range(3, self.num_features + 3)]
         self.treatment_name = ['treatment'] if self.is_treatment else []
-        self.target_names = ['target_' + str(i) for i in range(1, self.num_targets + 1)] if self.num_targets > 1 else ['target']
-        self.info_col_names = ['info'] if self.num_info_cols == 1 else ['info_' + str(i) for i in range(1, self.num_info_cols + 1)]
+        self.target_names = ['target_' + str(i) for i in range(1, self.num_targets + 1)] if self.num_targets > 1 else [
+            'target']
+        self.info_col_names = ['info'] if self.num_info_cols == 1 else ['info_' + str(i) for i in
+                                                                        range(1, self.num_info_cols + 1)]
 
     def _set_nans(self):
         """
         Set NaN values to DataFrame according to their respective
         """
         if self.na_columns or self.na_step:
-          self.na_step = [self.na_step] if self.na_step else [10]
-          self.na_columns = self.na_columns if self.na_columns else self.features_names + self.info_col_names
-          self.na_columns = [self.na_columns] if isinstance(self.na_columns, str) else self.na_columns
-          if not set(self.na_columns).issubset(self.df.columns):
-            raise KeyError(f'There is no columns {self.na_columns} in data. Only {list(self.df.columns)} provided.')
-          self.na_step = self.na_step[:len(self.na_columns)] if len(self.na_step) > len(
-              self.na_columns) else self.na_step + [self.na_step[-1]] * (len(self.na_columns) - len(self.na_step))
-          nans_indexes = [list(range(i, len(self.df), period)) for i, period in enumerate(self.na_step)]
-          for i in range(len(self.na_columns)):
-              self.df.loc[nans_indexes[i], self.na_columns[i]] = np.nan
-
+            self.na_step = [self.na_step] if self.na_step else [10]
+            self.na_columns = self.na_columns if self.na_columns else self.features_names + self.info_col_names
+            self.na_columns = [self.na_columns] if isinstance(self.na_columns, str) else self.na_columns
+            if not set(self.na_columns).issubset(self.df.columns):
+                raise KeyError(f'There is no columns {self.na_columns} in data. Only {list(self.df.columns)} provided.')
+            self.na_step = self.na_step[:len(self.na_columns)] if len(self.na_step) > len(
+                self.na_columns) else self.na_step + [self.na_step[-1]] * (len(self.na_columns) - len(self.na_step))
+            nans_indexes = [list(range(i, len(self.df), period)) for i, period in enumerate(self.na_step)]
+            for i in range(len(self.na_columns)):
+                self.df.loc[nans_indexes[i], self.na_columns[i]] = np.nan
 
     def __repr__(self):
         return """
