@@ -8,9 +8,10 @@ from typing import Iterable, Union, Optional, Dict, Any, Tuple
 from tqdm.auto import tqdm
 import pandas as pd
 import numpy as np
-from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu
+from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu, norm
 import matplotlib.pyplot as plt
 import seaborn as sns
+from statsmodels.stats.power import TTestIndPower
 
 
 def merge_groups(
@@ -50,6 +51,81 @@ def split_splited_data(splitted_data: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         "test": splitted_data[splitted_data["group"] == "test"],
         "control": splitted_data[splitted_data["group"] == "control"],
     }
+
+
+def calc_mde(
+    test_group: pd.Series,
+    control_group: pd.Series,
+    reliability: float = 0.95,
+    power: float = 0.8,
+) -> float:
+    """Calculates the minimum detectable effect (MDE) for a given test and control groups.
+
+    Args:
+        test_group: The test group as a pandas Series
+        control_group: The control group as a pandas Series
+        reliability: The reliability of the test
+        power: The power of the test
+
+    Returns:
+        mde: The minimum detectable effect
+    """
+
+    m = norm.ppf(1 - (1 - reliability) / 2) + norm.ppf(power)
+
+    n_test, n_control = len(test_group), len(control_group)
+    proportion = n_test / (n_test + n_control)
+    p = np.sqrt(1 / (proportion * (1 - proportion)))
+
+    var_test, var_control = np.var(test_group, ddof=1), np.var(control_group, ddof=1)
+    s = np.sqrt(var_test / n_test + var_control / n_control)
+
+    return p * m * s
+
+
+def calc_sample_size(
+    test_group: pd.Series,
+    control_group: pd.Series,
+    mde,
+    significance: float = 0.05,
+    power: float = 0.8,
+) -> float:
+    if isinstance(mde, Iterable):
+        z_alpha = norm.ppf((2 - significance) / 2)
+        z_beta = norm.ppf(power)
+
+        p1 = mde[0]
+        p2 = mde[1]
+
+        return (
+            (z_alpha + z_beta) ** 2 * (p1 * (1 - p1) + p2 * (1 - p2)) / (p1 - p2) ** 2
+        )
+    else:
+        test_std = test_group.std()
+        controle_std = control_group.std()
+
+        test_proportion = len(test_group) / (len(test_group) + len(control_group))
+        control_proportion = 1 - test_proportion
+
+        d = ((norm.ppf(1 - significance / 2) + norm.ppf(power)) / mde) ** 2
+        s = test_std**2 / test_proportion + controle_std**2 / control_proportion
+        return d * s
+
+
+def calc_power(
+    effect_size: float,
+    test_size: float,
+    control_size: float,
+    significance: float = 0.05,
+) -> float:
+    analysis = TTestIndPower()
+    ratio = test_size / control_size
+    return analysis.power(
+        effect_size=effect_size,
+        nobs1=test_size,
+        ratio=ratio,
+        alpha=significance,
+    )
 
 
 class AATest:
@@ -297,6 +373,7 @@ class AATest:
         write_mode: str = "full",
         write_step: int = None,
         pbar: bool = True,
+        **kwargs,
     ) -> Optional[Tuple[pd.DataFrame, Dict[Any, Dict]]]:
         """Chooses random_state for finding homogeneous distribution.
 
@@ -440,14 +517,22 @@ class AATest:
         return self.aa_score(experiment_results)
 
     def num_feature_uniform_analysis(
-        self, control_data: pd.Series, test_data: pd.Series, plot_set: Tuple = ("hist", "cumulative" ,"percentile"), **kwargs
+        self,
+        control_data: pd.Series,
+        test_data: pd.Series,
+        plot_set: Tuple = ("hist", "cumulative", "percentile"),
+        **kwargs,
     ):
         if not plot_set:
             return
 
         figsize = kwargs.get("figsize", (25, 20))
         figure, axs = plt.subplots(
-            nrows=len(plot_set), ncols=1, figsize=figsize, facecolor="honeydew", edgecolor="black"
+            nrows=len(plot_set),
+            ncols=1,
+            figsize=figsize,
+            facecolor="honeydew",
+            edgecolor="black",
         )
         ax_count = 0
 
@@ -482,14 +567,14 @@ class AATest:
             )
             axs[ax_count].grid(True)
             ax_count += 1
-        
+
         if "cumulative" in plot_set:
             sns.histplot(
                 data=control_data,
                 ax=axs[ax_count],
                 bins=bins,
                 stat="percent",
-                element="step", 
+                element="step",
                 fill=False,
                 cumulative=True,
                 alpha=kwargs.get("alpha", 0.3),
@@ -563,6 +648,15 @@ class AATest:
             self.cat_feature_uniform_analysis(
                 ssp["control"][cf], ssp["test"][cf], **kwargs
             )
+
+    def process(self, data: pd.DataFrame, optimize_groups: bool = False, **kwargs):
+        experiment_results, data_splits = self.calc_uniform_tests(data, **kwargs)
+        aa_scores = self.uniform_tests_interpretation(experiment_results, **kwargs)
+        best_rs = experiment_results.loc[
+            experiment_results["mean_tests_score"].idxmax(), "random_state"
+        ]
+        self.split_analysis(data_splits[best_rs], **kwargs)
+        return data_splits[best_rs]
 
 
 class ABTest:
