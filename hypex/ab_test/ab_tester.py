@@ -4,7 +4,7 @@ from copy import copy
 from IPython.display import display
 from pathlib import Path
 from sklearn.utils import shuffle
-from typing import Iterable, Union, Optional, Dict, Any, Tuple
+from typing import Iterable, Union, Optional, Dict, Any, Tuple, List
 from tqdm.auto import tqdm
 import pandas as pd
 import numpy as np
