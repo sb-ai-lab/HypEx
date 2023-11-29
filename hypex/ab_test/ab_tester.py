@@ -687,7 +687,7 @@ class AATest:
         else:
             best_results, best_split = self.calc_uniform_tests(data, **kwargs)
 
-        aa_scores = self.uniform_tests_interpretation(best_results, **kwargs)
+        aa_scores = self.uniform_tests_interpretation(best_results)
         best_rs = experiment_results.loc[
             best_results["mean_tests_score"].idxmax(), "random_state"
         ]
