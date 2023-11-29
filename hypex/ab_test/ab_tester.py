@@ -151,8 +151,8 @@ class AATest:
     def columns_labeling(self, data: pd.DataFrame) -> Dict[str, List[str]]:
         t_data = data.drop(columns=self.info_cols, errors="ignore")
         return {
-            "target_field": list(t_data.select_dtypes(include="number").columns),
-            "group_col": list(t_data.select_dtypes(include="object").columns),
+            "target_field": list(data.select_dtypes(include="number").columns.drop(self.info_cols)),
+            "group_col": list(data.select_dtypes(include="object").columns.drop(self.info_cols)),
         }
 
     def __simple_mode(
