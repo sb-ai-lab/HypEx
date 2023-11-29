@@ -625,7 +625,7 @@ class AATest:
     def cat_feature_uniform_analysis(
         self, control_data: pd.Series, test_data: pd.Series, **kwargs
     ):
-        figsize = kwargs.get("figsize", (25, 20))
+        figsize = kwargs.get("figsize", (10, 15))
         figure, ax = plt.subplots(
             nrows=1, ncols=1, figsize=figsize, facecolor="honeydew", edgecolor="black"
         )
@@ -955,15 +955,3 @@ class ABTest:
         """Shows results of 'execute' function - dict as dataframes."""
         for k in self.results.keys():
             display(pd.DataFrame(self.results[k], index=[k]).T)
-
-
-# from itertools import combinations
-
-# t = ["A", "B", "C", "D"]
-# groups = []
-
-# for i in range(1, len(t)):
-#     i_combinstions = combinations(t, i)
-#     for c in i_combinstions:
-#         groups.append(c)
-# print(groups)
