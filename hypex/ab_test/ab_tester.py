@@ -508,7 +508,7 @@ class AATest:
         result["t-test aa passed"] = result["t-test passed score"].apply(
             lambda x: 0.8 * self.alpha <= x <= 1.2 * self.alpha
         )
-        result["ks-test aa passed"] = result["t-test passed score"].apply(
+        result["ks-test aa passed"] = result["ks-test passed score"].apply(
             lambda x: 0.8 * self.alpha <= x <= 1.2 * self.alpha
         )
         result.loc["mean"] = result.mean()
@@ -646,6 +646,11 @@ class AATest:
             color="red",
         )
 
+        ax.legend(["test", "control"])
+        svc = control_data.value_counts() + test_data.value_counts()
+        svc = svc.sort_values(ascending=False)
+        ax.set_xticks(range(len(svc)))
+        ax.set_xticklabels(len(svc.index), rotation=45)
         figure.suptitle(f"{control_data.name}", fontsize=kwargs.get("title_size", 20))
         plt.show()
 
