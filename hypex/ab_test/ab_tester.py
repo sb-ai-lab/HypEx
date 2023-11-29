@@ -149,10 +149,9 @@ class AATest:
         self.alpha = alpha
 
     def columns_labeling(self, data: pd.DataFrame) -> Dict[str, List[str]]:
-        t_data = data.drop(columns=self.info_cols, errors="ignore")
         return {
-            "target_field": list(data.select_dtypes(include="number").columns.drop(self.info_cols)),
-            "group_col": list(data.select_dtypes(include="object").columns.drop(self.info_cols)),
+            "target_field": list(data.select_dtypes(include="number").columns.drop(self.info_cols, errors="ignore")),
+            "group_col": list(data.select_dtypes(include="object").columns.drop(self.info_cols, errors="ignore")),
         }
 
     def __simple_mode(
