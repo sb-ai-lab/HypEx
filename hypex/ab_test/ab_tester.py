@@ -131,7 +131,7 @@ def calc_power(
 class AATest:
     def __init__(
         self,
-        target_fields: Union[Iterable[str], str],
+        target_fields: Union[Iterable[str], str] = None,
         group_cols: Union[str, Iterable[str]] = None,
         quant_field: str = None,
         mode: str = "simple",
@@ -144,6 +144,13 @@ class AATest:
         self.quant_field = quant_field
         self.mode = mode
         self.alpha = alpha
+
+    @staticmethod
+    def columns_labeling(data: pd.DataFrame) -> Dict[str, List[str]]:
+        return {
+            "target_field": list(data.select_dtypes(include="number").columns),
+            "group_col": list(data.select_dtypes(include="object").columns),
+        }
 
     def __simple_mode(
         self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
@@ -652,13 +659,38 @@ class AATest:
             )
 
     def process(self, data: pd.DataFrame, optimize_groups: bool = False, **kwargs):
-        experiment_results, data_splits = self.calc_uniform_tests(data, **kwargs)
-        aa_scores = self.uniform_tests_interpretation(experiment_results, **kwargs)
+        labeling = self.columns_labeling(data)
+        best_results, best_split = None, None
+
+        if not self.target_fields:
+            self.target_fields = labeling["target_fields"]
+
+        if optimize_groups:
+            max_score = 0
+
+            group_variants = []
+            for i in range(1, len(labeling["group_col"])):
+                i_combinstions = combinations(labeling["group_col"], i)
+                group_variants.extend(iter(i_combinstions))
+                
+            for gs in tqdm(group_variants):
+                self.group_cols = gs
+                experiment_results, data_splits = self.calc_uniform_tests(data, **kwargs)
+                aa_scores = self.aa_score(experiment_results, **kwargs)
+                group_score = max(aa_scores.loc["mean", "t-test aa passed"], aa_scores.loc["mean", "t-test aa passed"])
+                if group_score > max_score:
+                    best_results, best_split = experiment_results, data_splits
+                    max_score = group_score
+
+        else:
+            best_results, best_split = self.calc_uniform_tests(data, **kwargs)
+
+        aa_scores = self.uniform_tests_interpretation(best_results, **kwargs)
         best_rs = experiment_results.loc[
-            experiment_results["mean_tests_score"].idxmax(), "random_state"
+            best_results["mean_tests_score"].idxmax(), "random_state"
         ]
-        self.split_analysis(data_splits[best_rs], **kwargs)
-        return data_splits[best_rs]
+        self.split_analysis(best_split[best_rs], **kwargs)
+        return best_split[best_rs]
 
 
 class ABTest:
@@ -916,3 +948,15 @@ class ABTest:
         """Shows results of 'execute' function - dict as dataframes."""
         for k in self.results.keys():
             display(pd.DataFrame(self.results[k], index=[k]).T)
+
+
+# from itertools import combinations
+
+# t = ["A", "B", "C", "D"]
+# groups = []
+
+# for i in range(1, len(t)):
+#     i_combinstions = combinations(t, i)
+#     for c in i_combinstions:
+#         groups.append(c)
+# print(groups)
