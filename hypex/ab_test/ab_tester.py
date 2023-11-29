@@ -1,5 +1,6 @@
 import warnings
 from copy import copy
+from itertools import combinations
 
 from IPython.display import display
 from pathlib import Path
