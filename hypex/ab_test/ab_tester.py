@@ -649,8 +649,8 @@ class AATest:
         ax.legend(["test", "control"])
         svc = control_data.value_counts() + test_data.value_counts()
         svc = svc.sort_values(ascending=False)
-        ax.set_xticks(range(len(svc)))
-        ax.set_xticklabels(len(svc.index), rotation=45)
+        ax.set_xticks(list(svc.index))
+        ax.set_xticklabels(list(svc.index), rotation=45)
         figure.suptitle(f"{control_data.name}", fontsize=kwargs.get("title_size", 20))
         plt.show()
 
@@ -673,7 +673,7 @@ class AATest:
             self.target_fields = labeling["target_fields"]
 
         if optimize_groups:
-            max_score = 0
+            max_score = -1
 
             group_variants = []
             for i in range(1, len(labeling["group_col"])):
