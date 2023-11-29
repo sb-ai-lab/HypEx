@@ -668,7 +668,7 @@ class AATest:
             self.target_fields = labeling["target_fields"]
 
         if optimize_groups:
-            max_score = 0
+            max_score = -1
 
             group_variants = []
             for i in range(1, len(labeling["group_col"])):
