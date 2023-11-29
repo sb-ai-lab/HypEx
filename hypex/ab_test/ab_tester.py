@@ -676,7 +676,7 @@ class AATest:
                 group_variants.extend(iter(i_combinstions))
                 
             for gs in tqdm(group_variants, desc="Group optimization"):
-                self.group_cols = gs
+                self.group_cols = list(gs)
                 experiment_results, data_splits = self.calc_uniform_tests(data, pbar=False, **kwargs)
                 aa_scores = self.aa_score(experiment_results, **kwargs)
                 group_score = max(aa_scores.loc["mean", "t-test aa passed"], aa_scores.loc["mean", "t-test aa passed"])
