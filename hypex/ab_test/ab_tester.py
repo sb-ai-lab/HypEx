@@ -134,6 +134,7 @@ class AATest:
         self,
         target_fields: Union[Iterable[str], str] = None,
         group_cols: Union[str, Iterable[str]] = None,
+        info_cols: Union[str, Iterable[str]] = None,
         quant_field: str = None,
         mode: str = "simple",
         alpha: float = 0.05,
@@ -142,12 +143,13 @@ class AATest:
             [target_fields] if isinstance(target_fields, str) else target_fields
         )
         self.group_cols = [group_cols] if isinstance(group_cols, str) else group_cols
+        self.info_cols = [info_cols] if isinstance(info_cols, str) else info_cols
         self.quant_field = quant_field
         self.mode = mode
         self.alpha = alpha
 
-    @staticmethod
-    def columns_labeling(data: pd.DataFrame) -> Dict[str, List[str]]:
+    def columns_labeling(self, data: pd.DataFrame) -> Dict[str, List[str]]:
+        t_data = data.drop(columns=self.info_cols)
         return {
             "target_field": list(data.select_dtypes(include="number").columns),
             "group_col": list(data.select_dtypes(include="object").columns),
@@ -674,9 +676,9 @@ class AATest:
                 i_combinstions = combinations(labeling["group_col"], i)
                 group_variants.extend(iter(i_combinstions))
                 
-            for gs in tqdm(group_variants):
+            for gs in tqdm(group_variants, desc="Group optimization"):
                 self.group_cols = gs
-                experiment_results, data_splits = self.calc_uniform_tests(data, **kwargs)
+                experiment_results, data_splits = self.calc_uniform_tests(data, pbar=False, **kwargs)
                 aa_scores = self.aa_score(experiment_results, **kwargs)
                 group_score = max(aa_scores.loc["mean", "t-test aa passed"], aa_scores.loc["mean", "t-test aa passed"])
                 if group_score > max_score:
