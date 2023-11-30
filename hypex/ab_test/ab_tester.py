@@ -625,7 +625,7 @@ class AATest:
                 color="red",
                 alpha=kwargs.get("alpha", 0.3),
             )
-            axs[ax_count].legend(["test", "control"])
+            axs[ax_count].legend(["control", "test"])
             axs[ax_count].set_xticks(np.arange(0, 101))
             axs[ax_count].set_xticklabels(np.arange(0, 101), rotation=45)
             axs[ax_count].set_title("Percentile destribution")
@@ -641,8 +641,8 @@ class AATest:
             nrows=1, ncols=1, figsize=figsize, facecolor="honeydew", edgecolor="black"
         )
 
-        control_counts = control_data.value_counts(normolize=True) * 100
-        test_counts = test_counts.value_counts(normolize=True) * 100
+        control_counts = control_data.value_counts(normalize=True) * 100
+        test_counts = test_data.value_counts(normalize=True) * 100
 
         ax.fill_between(
             control_counts.index,
