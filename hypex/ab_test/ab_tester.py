@@ -150,8 +150,16 @@ class AATest:
 
     def columns_labeling(self, data: pd.DataFrame) -> Dict[str, List[str]]:
         return {
-            "target_field": list(data.select_dtypes(include="number").columns.drop(self.info_cols, errors="ignore")),
-            "group_col": list(data.select_dtypes(include="object").columns.drop(self.info_cols, errors="ignore")),
+            "target_field": list(
+                data.select_dtypes(include="number").columns.drop(
+                    self.info_cols, errors="ignore"
+                )
+            ),
+            "group_col": list(
+                data.select_dtypes(include="object").columns.drop(
+                    self.info_cols, errors="ignore"
+                )
+            ),
         }
 
     def __simple_mode(
@@ -552,7 +560,7 @@ class AATest:
                 max(control_data.max(), test_data.max())
                 - min(control_data.min(), test_data.min())
             )
-            / kwargs.get("bins", 20),
+            / kwargs.get("bins", 100),
         )
 
         if "hist" in plot_set:
@@ -575,7 +583,8 @@ class AATest:
                 color="red",
             )
             axs[ax_count].grid(True)
-            axs[ax_count].legend(["test", "control"])
+            axs[ax_count].legend(["control", "test"])
+            axs[ax_count].set_title("Histogram")
             ax_count += 1
 
         if "cumulative" in plot_set:
@@ -584,8 +593,7 @@ class AATest:
                 ax=axs[ax_count],
                 bins=bins,
                 stat="percent",
-                element="step",
-                fill=False,
+                element="poly",
                 cumulative=True,
                 alpha=kwargs.get("alpha", 0.3),
                 color="blue",
@@ -595,29 +603,32 @@ class AATest:
                 ax=axs[ax_count],
                 bins=bins,
                 stat="percent",
-                element="step",
-                fill=False,
+                element="poly",
                 cumulative=True,
                 alpha=kwargs.get("alpha", 0.3),
                 color="red",
             )
-            axs[ax_count].legend(["test", "control"])
+            axs[ax_count].legend(["control", "test"])
+            axs[ax_count].set_title("Cumulative destribution")
             ax_count += 1
 
         if "percentile" in plot_set:
-            axs[ax_count].plot(
+            axs[ax_count].fill_between(
                 range(101),
                 [control_data.quantile(q) for q in np.arange(0, 1.01, 0.01)],
+                color="blue",
                 alpha=kwargs.get("alpha", 0.3),
             )
-            axs[ax_count].plot(
+            axs[ax_count].fill_between(
                 range(101),
                 [test_data.quantile(q) for q in np.arange(0, 1.01, 0.01)],
+                color="red",
                 alpha=kwargs.get("alpha", 0.3),
             )
             axs[ax_count].legend(["test", "control"])
             axs[ax_count].set_xticks(np.arange(0, 101))
             axs[ax_count].set_xticklabels(np.arange(0, 101), rotation=45)
+            axs[ax_count].set_title("Percentile destribution")
 
         figure.suptitle(f"{control_data.name}", fontsize=kwargs.get("title_size", 20))
         plt.show()
@@ -630,27 +641,22 @@ class AATest:
             nrows=1, ncols=1, figsize=figsize, facecolor="honeydew", edgecolor="black"
         )
 
-        sns.histplot(
-            data=control_data,
-            ax=ax,
-            stat="percent",
-            alpha=kwargs.get("alpha", 0.3),
+        control_counts = control_data.value_counts(normolize=True) * 100
+        test_counts = test_counts.value_counts(normolize=True) * 100
+
+        ax.fill_between(
+            control_counts.index,
+            control_counts.values,
             color="blue",
+            alpha=0.3,
+            label="control",
+        )
+        ax.fill_between(
+            test_counts.index, test_counts.values, color="red", alpha=0.3, label="test"
         )
 
-        sns.histplot(
-            data=test_data,
-            ax=ax,
-            stat="percent",
-            alpha=kwargs.get("alpha", 0.3),
-            color="red",
-        )
-
-        ax.legend(["test", "control"])
-        svc = control_data.value_counts() + test_data.value_counts()
-        svc = svc.sort_values(ascending=False)
-        ax.set_xticks(list(svc.index))
-        ax.set_xticklabels(list(svc.index), rotation=45)
+        ax.legend()
+        ax.tick_params(axis="x", rotation=90)
         figure.suptitle(f"{control_data.name}", fontsize=kwargs.get("title_size", 20))
         plt.show()
 
@@ -679,12 +685,17 @@ class AATest:
             for i in range(1, len(labeling["group_col"])):
                 i_combinstions = combinations(labeling["group_col"], i)
                 group_variants.extend(iter(i_combinstions))
-                
+
             for gs in tqdm(group_variants, desc="Group optimization"):
                 self.group_cols = list(gs)
-                experiment_results, data_splits = self.calc_uniform_tests(data, pbar=False, **kwargs)
+                experiment_results, data_splits = self.calc_uniform_tests(
+                    data, pbar=False, **kwargs
+                )
                 aa_scores = self.aa_score(experiment_results)
-                group_score = max(aa_scores.loc["mean", "t-test aa passed"], aa_scores.loc["mean", "t-test aa passed"])
+                group_score = max(
+                    aa_scores.loc["mean", "t-test aa passed"],
+                    aa_scores.loc["mean", "t-test aa passed"],
+                )
                 if group_score > max_score:
                     best_results, best_split = experiment_results, data_splits
                     max_score = group_score
