@@ -697,7 +697,7 @@ class AATest:
             best_results["mean_tests_score"].idxmax(), "random_state"
         ]
         self.split_analysis(best_split[best_rs], **kwargs)
-        return best_split[best_rs]
+        return best_results, best_split[best_rs]
 
 
 class ABTest:
