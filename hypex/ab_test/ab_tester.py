@@ -625,7 +625,7 @@ class AATest:
     def cat_feature_uniform_analysis(
         self, control_data: pd.Series, test_data: pd.Series, **kwargs
     ):
-        figsize = kwargs.get("figsize", (10, 15))
+        figsize = kwargs.get("figsize", (15, 10))
         figure, ax = plt.subplots(
             nrows=1, ncols=1, figsize=figsize, facecolor="honeydew", edgecolor="black"
         )
