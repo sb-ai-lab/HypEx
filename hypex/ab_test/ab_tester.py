@@ -14,24 +14,22 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from statsmodels.stats.power import TTestIndPower
 
-
 def merge_groups(
-    test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
     control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
+    test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
 ) -> pd.DataFrame:
     """Merges test and control groups in one DataFrame and creates column "group".
 
     Column "group" contains of "test" and "control" values.
 
     Args:
-        test_group: Data of target group
         control_group: Data of control group
-
+        test_group: Data of target group
     Returns:
         merged_data: Concatted DataFrame
     """
-    test_group.loc[:, "group"] = "test"
     control_group.loc[:, "group"] = "control"
+    test_group.loc[:, "group"] = "test"
 
     return pd.concat([test_group, control_group], ignore_index=True)
 
@@ -49,8 +47,8 @@ def split_splited_data(splitted_data: pd.DataFrame) -> Dict[str, pd.DataFrame]:
             group field is 'test', and 'control' contains rows where the group field is 'control'.
     """
     return {
-        "test": splitted_data[splitted_data["group"] == "test"],
         "control": splitted_data[splitted_data["group"] == "control"],
+        "test": splitted_data[splitted_data["group"] == "test"],
     }
 
 
@@ -85,8 +83,8 @@ def calc_mde(
 
 
 def calc_sample_size(
-    test_group: pd.Series,
     control_group: pd.Series,
+    test_group: pd.Series,
     mde,
     significance: float = 0.05,
     power: float = 0.8,
@@ -102,8 +100,8 @@ def calc_sample_size(
             (z_alpha + z_beta) ** 2 * (p1 * (1 - p1) + p2 * (1 - p2)) / (p1 - p2) ** 2
         )
     else:
-        test_std = test_group.std()
         controle_std = control_group.std()
+        test_std = test_group.std()
 
         test_proportion = len(test_group) / (len(test_group) + len(control_group))
         control_proportion = 1 - test_proportion
@@ -115,8 +113,8 @@ def calc_sample_size(
 
 def calc_power(
     effect_size: float,
-    test_size: float,
     control_size: float,
+    test_size: float,
     significance: float = 0.05,
 ) -> float:
     analysis = TTestIndPower()
