@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from statsmodels.stats.power import TTestIndPower
 
+
 def merge_groups(
     control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
     test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
@@ -427,7 +428,8 @@ class AATest:
             enumerate(random_states), total=len(random_states), disable=not pbar
         ):
             res = self.sampling_metrics(data, random_state=rs, test_size=test_size)
-            data_from_sampling.update(res["data_from_experiment"])
+            if write_splited_data:
+                data_from_sampling.update(res["data_from_experiment"])
 
             # write to file
             passed = []
@@ -439,10 +441,13 @@ class AATest:
 
             if write_mode == "all" and all(passed):
                 results.append(res["metrics"])
+                data_from_sampling.update(res["data_from_experiment"])
             if write_mode == "any" and any(passed):
                 results.append(res["metrics"])
+                data_from_sampling.update(res["data_from_experiment"])
             if write_mode == "full":
                 results.append(res["metrics"])
+                data_from_sampling.update(res["data_from_experiment"])
 
             if file_name and write_step:
                 if i == write_step:
@@ -628,7 +633,11 @@ class AATest:
             axs[ax_count].set_xticklabels(np.arange(0, 101), rotation=45)
             axs[ax_count].set_title("Percentile destribution")
 
-        figure.suptitle(f"{control_data.name}", fontsize=kwargs.get("title_size", 20))
+        fig_title = f"""{control_data.name}
+            
+            t-test p-value: {ttest_ind(control_data, test_data, nan_policy='omit').pvalue}
+            ks-test p-value: {ks_2samp(control_data, test_data).pvalue}"""
+        figure.suptitle(fig_title, fontsize=kwargs.get("title_size", 20))
         plt.show()
 
     def cat_feature_uniform_analysis(
@@ -699,7 +708,9 @@ class AATest:
                     max_score = group_score
 
         else:
-            best_results, best_split = self.calc_uniform_tests(data, **kwargs)
+            best_results, best_split = self.calc_uniform_tests(
+                data, write_mode="any", **kwargs
+            )
 
         aa_scores = self.uniform_tests_interpretation(best_results)
         best_rs = experiment_results.loc[
