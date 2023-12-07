@@ -444,18 +444,18 @@ class AATest:
                 ]
 
             if all(passed):
-                if self.experiment_write_mode == "all":
+                if experiment_write_mode == "all":
                     results.append(res["metrics"])
-                if self.split_write_mode == "all":
+                if split_write_mode == "all":
                     data_from_sampling.update(res["data_from_experiment"])
             if any(passed):
-                if self.experiment_write_mode == "any":
+                if experiment_write_mode == "any":
                     results.append(res["metrics"])
                 if self.split_write_mode == "any":
                     data_from_sampling.update(res["data_from_experiment"])
-            if self.experiment_write_mode == "full":
+            if experiment_write_mode == "full":
                 results.append(res["metrics"])
-            if self.split_write_mode == "full":
+            if split_write_mode == "full":
                 data_from_sampling.update(res["data_from_experiment"])
 
             if file_name and write_step:
