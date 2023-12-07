@@ -443,12 +443,12 @@ class AATest:
                     res["metrics"][f"{tf} ks-test passed"],
                 ]
 
-            if all(passed):
+            if all(~passed):
                 if experiment_write_mode == "all":
                     results.append(res["metrics"])
                 if split_write_mode == "all":
                     data_from_sampling.update(res["data_from_experiment"])
-            if any(passed):
+            if any(~passed):
                 if experiment_write_mode == "any":
                     results.append(res["metrics"])
                 if split_write_mode == "any":
