@@ -703,20 +703,23 @@ class AATest:
                 experiment_results, data_splits = self.calc_uniform_tests(
                     data, pbar=False, **kwargs
                 )
-                aa_scores = self.aa_score(experiment_results)
-                group_score = max(
-                    aa_scores.loc["mean", "t-test aa passed"],
-                    aa_scores.loc["mean", "t-test aa passed"],
-                )
-                if group_score > max_score:
-                    best_results, best_split = experiment_results, data_splits
-                    max_score = group_score
+                if len(experiment_results):
+                    aa_scores = self.aa_score(experiment_results)
+                    group_score = max(
+                        aa_scores.loc["mean", "t-test aa passed"],
+                        aa_scores.loc["mean", "t-test aa passed"],
+                    )
+                    if group_score > max_score:
+                        best_results, best_split = experiment_results, data_splits
+                        max_score = group_score
 
         else:
             best_results, best_split = self.calc_uniform_tests(
                 data, write_mode="any", **kwargs
             )
-
+            
+        if len(best_results) == 0:
+            return best_results, best_split
         aa_scores = self.uniform_tests_interpretation(best_results)
         best_rs = best_results.loc[
             best_results["mean_tests_score"].idxmax(), "random_state"
