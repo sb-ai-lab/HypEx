@@ -428,8 +428,6 @@ class AATest:
             enumerate(random_states), total=len(random_states), disable=not pbar
         ):
             res = self.sampling_metrics(data, random_state=rs, test_size=test_size)
-            if write_splited_data:
-                data_from_sampling.update(res["data_from_experiment"])
 
             # write to file
             passed = []
