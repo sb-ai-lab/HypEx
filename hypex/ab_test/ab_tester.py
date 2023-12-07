@@ -419,11 +419,16 @@ class AATest:
         results = []
         data_from_sampling = {}
 
-        if write_mode not in ("full", "all", "any"):
+        if experiment_write_mode not in ("full", "all", "any"):
             warnings.warn(
-                f"Write mode '{write_mode}' is not supported. Mode 'full' will be used"
+                f"Write mode '{experiment_write_mode}' is not supported. Mode 'full' will be used"
             )
-            write_mode = "full"
+            experiment_write_mode = "full"
+        if split_write_mode not in ("full", "all", "any"):
+            warnings.warn(
+                f"Write mode '{split_write_mode}' is not supported. Mode 'full' will be used"
+            )
+            split_write_mode = "full"
 
         for i, rs in tqdm(
             enumerate(random_states), total=len(random_states), disable=not pbar
