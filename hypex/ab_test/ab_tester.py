@@ -386,7 +386,8 @@ class AATest:
         test_size: float = 0.5,
         iterations: int = 2000,
         file_name: Union[Path, str] = None,
-        write_mode: str = "full",
+        experiment_write_mode: str = "full",
+        split_write_mode: str = "full",
         write_step: int = None,
         pbar: bool = True,
         **kwargs,
@@ -437,15 +438,21 @@ class AATest:
                     res["metrics"][f"{tf} ks-test passed"],
                 ]
 
-            if write_mode == "all" and all(passed):
+            if all(passed):
+                if self.experiment_write_mode == "all":
+                    results.append(res["metrics"])
+                if self.split_write_mode == "all":
+                    data_from_sampling.update(res["data_from_experiment"])
+            if any(passed):
+                if self.experiment_write_mode == "any":
+                    results.append(res["metrics"])
+                if self.split_write_mode == "any":
+                    data_from_sampling.update(res["data_from_experiment"])
+            if self.experiment_write_mode == "full":
                 results.append(res["metrics"])
+            if self.split_write_mode == "full":
                 data_from_sampling.update(res["data_from_experiment"])
-            if write_mode == "any" and any(passed):
-                results.append(res["metrics"])
-                data_from_sampling.update(res["data_from_experiment"])
-            if write_mode == "full":
-                results.append(res["metrics"])
-                data_from_sampling.update(res["data_from_experiment"])
+            
 
             if file_name and write_step:
                 if i == write_step:
