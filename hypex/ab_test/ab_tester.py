@@ -452,7 +452,6 @@ class AATest:
                 results.append(res["metrics"])
             if self.split_write_mode == "full":
                 data_from_sampling.update(res["data_from_experiment"])
-            
 
             if file_name and write_step:
                 if i == write_step:
@@ -715,9 +714,9 @@ class AATest:
 
         else:
             best_results, best_split = self.calc_uniform_tests(
-                data, write_mode="any", **kwargs
+                data, experiment_write_mode="full", split_write_mode="any", **kwargs
             )
-            
+
         if len(best_results) == 0:
             return best_results, best_split
         aa_scores = self.uniform_tests_interpretation(best_results)
