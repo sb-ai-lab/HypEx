@@ -451,7 +451,7 @@ class AATest:
             if any(passed):
                 if experiment_write_mode == "any":
                     results.append(res["metrics"])
-                if self.split_write_mode == "any":
+                if split_write_mode == "any":
                     data_from_sampling.update(res["data_from_experiment"])
             if experiment_write_mode == "full":
                 results.append(res["metrics"])
