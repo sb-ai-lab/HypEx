@@ -22,7 +22,7 @@ def info_col():
 
 def test_aa_simple(data, iterations, info_col):
     model = AATest(target_fields=["pre_spends", "post_spends"], info_cols=info_col)
-    res, datas_dict = model.search_dist_uniform_sampling(data, iterations=iterations)
+    res, datas_dict = model.calc_uniform_tests(data, iterations=iterations)
 
     assert isinstance(res, pd.DataFrame), "Metrics are not dataframes"
     assert res.shape[0] == iterations, (
@@ -39,7 +39,7 @@ def test_aa_group(data, iterations, info_col):
     group_cols = "industry"
 
     model = AATest(target_fields=["pre_spends", "post_spends"], info_cols=info_col, group_cols=group_cols)
-    res, datas_dict = model.search_dist_uniform_sampling(data, iterations=iterations)
+    res, datas_dict = model.calc_uniform_tests(data, iterations=iterations)
 
     assert isinstance(res, pd.DataFrame), "Metrics are not dataframes"
     assert res.shape[0] == iterations, (
@@ -70,3 +70,13 @@ def test_aa_quantfields(data, iterations, info_col):
     assert all(data.columns) == all(datas_dict[0].drop(columns=["group"]).columns), (
         "Columns in the result are not " "the same as columns in initial " "data "
     )
+
+def test_aa_process(data, iterations, info_col):
+    group_cols = "industry"
+
+    model = AATest(target_fields=["pre_spends", "post_spends"], info_cols=info_col, group_cols=group_cols)
+    model.process_data(data, iterations=iterations)
+
+def test_group_optimization(data, info_col):
+    model = AATest(target_fields=["pre_spends", "post_spends"], info_cols=info_col)
+    model.process(data, optimize_groups=True, iterations=5)

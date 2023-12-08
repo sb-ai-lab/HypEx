@@ -325,8 +325,8 @@ class AATest:
 
         split = self.split(data, random_state, test_size)
 
-        a = data.loc[split["test_indexes"]]
-        b = data.loc[split["control_indexes"]]
+        a = data.loc[split["control_indexes"]]
+        b = data.loc[split["test_indexes"]]
 
         data_from_sampling_dict = {random_state: self._postprep_data(data, split)}
         for tf in self.target_fields:
@@ -359,8 +359,10 @@ class AATest:
                 / 3
             )
 
-        t_result["test %"] = len(a) / len(data) * 100
-        t_result["control %"] = len(b) / len(data) * 100
+        t_result["control %"] = len(a) / len(data) * 100
+        t_result["test %"] = len(b) / len(data) * 100
+        t_result["control size"] = len(a)
+        t_result["test size"] = len(b)
         t_result["t-test mean p-value"] = np.mean(
             [p_value for key, p_value in t_result.items() if "t-test p-value" in key]
         )
@@ -668,7 +670,9 @@ class AATest:
             label="control",
         )
         ax.fill_between(
-            test_counts.index, test_counts.values, color="red", alpha=0.3, label="test"
+            control_counts.index, 
+            test_counts[[i for i in test_counts.index if i in control_counts.index]].values, 
+            color="red", alpha=0.3, label="test"
         )
 
         ax.legend()
@@ -687,7 +691,7 @@ class AATest:
                 ssp["control"][cf], ssp["test"][cf], **kwargs
             )
 
-    def process(self, data: pd.DataFrame, optimize_groups: bool = False, **kwargs):
+    def process(self, data: pd.DataFrame, optimize_groups: bool = False, iterations: int = 2000, **kwargs):
         labeling = self.columns_labeling(data)
         best_results, best_split = None, None
 
