@@ -141,7 +141,7 @@ class AATest:
         self.target_fields = (
             [target_fields] if isinstance(target_fields, str) else target_fields
         )
-        self.group_cols = [group_cols] if isinstance(group_cols, str) else group_cols
+        self.group_cols = ([group_cols] if isinstance(group_cols, str) else group_cols) or []
         self.info_cols = [info_cols] if isinstance(info_cols, str) else info_cols
         self.quant_field = quant_field
         self.mode = mode
@@ -691,7 +691,7 @@ class AATest:
                 ssp["control"][cf], ssp["test"][cf], **kwargs
             )
 
-    def process(self, data: pd.DataFrame, optimize_groups: bool = False, iterations: int = 2000, **kwargs):
+    def process(self, data: pd.DataFrame, optimize_groups: bool = False, iterations: int = 2000, show_plots=True, **kwargs):
         labeling = self.columns_labeling(data)
         best_results, best_split = None, None
 
@@ -701,7 +701,7 @@ class AATest:
         if optimize_groups:
             max_score = -1
 
-            group_variants = []
+            group_variants = [[]]
             for i in range(1, len(labeling["group_col"])):
                 i_combinstions = combinations(labeling["group_col"], i)
                 group_variants.extend(iter(i_combinstions))
@@ -709,7 +709,7 @@ class AATest:
             for gs in tqdm(group_variants, desc="Group optimization"):
                 self.group_cols = list(gs)
                 experiment_results, data_splits = self.calc_uniform_tests(
-                    data, pbar=False, **kwargs
+                    data, pbar=False, iterations=iterations, **kwargs
                 )
                 if len(experiment_results):
                     aa_scores = self.aa_score(experiment_results)
@@ -723,16 +723,20 @@ class AATest:
 
         else:
             best_results, best_split = self.calc_uniform_tests(
-                data, experiment_write_mode="full", split_write_mode="any", **kwargs
+                data, experiment_write_mode="full", split_write_mode="any", iterations=iterations, **kwargs
             )
 
         if len(best_results) == 0:
             return best_results, best_split
-        aa_scores = self.uniform_tests_interpretation(best_results)
+        if show_plots:
+            aa_scores = self.uniform_tests_interpretation(best_results)
+        else:
+            aa_scores = self.aa_score(best_results)
         best_rs = best_results.loc[
             best_results["mean_tests_score"].idxmax(), "random_state"
         ]
-        self.split_analysis(best_split[best_rs], **kwargs)
+        if show_plots:
+            self.split_analysis(best_split[best_rs], **kwargs)
         return best_results, best_split[best_rs]
 
 

@@ -26,7 +26,8 @@ def test_aa_simple(data, iterations, info_col):
 
     assert isinstance(res, pd.DataFrame), "Metrics are not dataframes"
     assert res.shape[0] == iterations, (
-        "Metrics dataframe contains more or less rows with random states " "(#rows should be equal #of experiments"
+        "Metrics dataframe contains more or less rows with random states "
+        "(#rows should be equal #of experiments"
     )
     assert isinstance(datas_dict, dict), "Result is not dict"
     assert len(datas_dict) == iterations, "# of dataframes is not equal # of iterations"
@@ -38,12 +39,17 @@ def test_aa_simple(data, iterations, info_col):
 def test_aa_group(data, iterations, info_col):
     group_cols = "industry"
 
-    model = AATest(target_fields=["pre_spends", "post_spends"], info_cols=info_col, group_cols=group_cols)
+    model = AATest(
+        target_fields=["pre_spends", "post_spends"],
+        info_cols=info_col,
+        group_cols=group_cols,
+    )
     res, datas_dict = model.calc_uniform_tests(data, iterations=iterations)
 
     assert isinstance(res, pd.DataFrame), "Metrics are not dataframes"
     assert res.shape[0] == iterations, (
-        "Metrics dataframe contains more or less rows with random states " "(#rows should be equal #of experiments"
+        "Metrics dataframe contains more or less rows with random states "
+        "(#rows should be equal #of experiments"
     )
     assert isinstance(datas_dict, dict), "Result is not dict"
     assert len(datas_dict) == iterations, "# of dataframes is not equal # of iterations"
@@ -57,13 +63,17 @@ def test_aa_quantfields(data, iterations, info_col):
     quant_field = "gender"
 
     model = AATest(
-        target_fields=["pre_spends", "post_spends"], info_cols=info_col, group_cols=group_cols, quant_field=quant_field
+        target_fields=["pre_spends", "post_spends"],
+        info_cols=info_col,
+        group_cols=group_cols,
+        quant_field=quant_field,
     )
-    res, datas_dict = model.search_dist_uniform_sampling(data, iterations=iterations)
+    res, datas_dict = model.calc_uniform_tests(data, iterations=iterations)
 
     assert isinstance(res, pd.DataFrame), "Metrics are not dataframes"
     assert res.shape[0] == iterations, (
-        "Metrics dataframe contains more or less rows with random states " "(#rows should be equal #of experiments"
+        "Metrics dataframe contains more or less rows with random states "
+        "(#rows should be equal #of experiments"
     )
     assert isinstance(datas_dict, dict), "Result is not dict"
     assert len(datas_dict) == iterations, "# of dataframes is not equal # of iterations"
@@ -71,12 +81,18 @@ def test_aa_quantfields(data, iterations, info_col):
         "Columns in the result are not " "the same as columns in initial " "data "
     )
 
+
 def test_aa_process(data, iterations, info_col):
     group_cols = "industry"
 
-    model = AATest(target_fields=["pre_spends", "post_spends"], info_cols=info_col, group_cols=group_cols)
-    model.process_data(data, iterations=iterations)
+    model = AATest(
+        target_fields=["pre_spends", "post_spends"],
+        info_cols=info_col,
+        group_cols=group_cols,
+    )
+    model.process(data, iterations=iterations, show_plots=False)
+
 
 def test_group_optimization(data, info_col):
     model = AATest(target_fields=["pre_spends", "post_spends"], info_cols=info_col)
-    model.process(data, optimize_groups=True, iterations=5)
+    model.process(data, optimize_groups=True, iterations=5, show_plots=False)
