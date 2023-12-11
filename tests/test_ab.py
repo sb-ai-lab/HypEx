@@ -1,4 +1,4 @@
-from ...hypex.ab_test.ab_tester import ABTest
+from hypex.ab_test.ab_tester import ABTest
 
 import pytest
 import pandas as pd

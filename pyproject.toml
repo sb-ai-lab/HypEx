@@ -46,7 +46,17 @@ scipy = [
 
 matplotlib = [
     { version = ">=3.0.0, <=3.7.3", python = "<3.9" },
-    { version = ">=3.0.0, <=3.8.1", python = ">=3.9, <3.11" }]
+    { version = ">=3.0.0, <=3.8.1", python = ">=3.9, <3.11" }
+]
+
+seaborn = [
+    { version = "<=0.13.9", python = ">=3.8, <3.11" }
+]
+
+
+statsmodels = [
+    { version = "<=0.14.0", python = ">=3.8, <3.11" }
+]
 
 faiss-cpu = ">=1.6.0, <=1.7.4"
 
