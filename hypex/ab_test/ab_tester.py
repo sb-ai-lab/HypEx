@@ -654,23 +654,26 @@ class AATest:
     def cat_feature_uniform_analysis(
         self, control_data: pd.Series, test_data: pd.Series, **kwargs
     ):
+        s_control_data = control_data.astype("str")
+        s_test_data = test_data.astype("str")
+
         figsize = kwargs.get("figsize", (15, 10))
         figure, ax = plt.subplots(
             nrows=1, ncols=1, figsize=figsize, facecolor="honeydew", edgecolor="black"
         )
 
-        control_counts = control_data.value_counts(normalize=True) * 100
-        test_counts = test_data.value_counts(normalize=True) * 100
+        control_counts = s_control_data.value_counts(normalize=True) * 100
+        test_counts = s_test_data.value_counts(normalize=True) * 100
 
         ax.fill_between(
-            control_counts.index,
-            control_counts.values,
+            s_control_data.index,
+            s_control_data.values,
             color="blue",
             alpha=0.3,
             label="control",
         )
         ax.fill_between(
-            control_counts.index, 
+            s_control_data.index, 
             test_counts[[i for i in test_counts.index if i in control_counts.index]].values, 
             color="red", alpha=0.3, label="test"
         )
