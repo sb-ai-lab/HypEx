@@ -505,10 +505,10 @@ class AATest:
             )
 
             axs[i, 0].set_title(
-                f"{self.target_fields[i]} t-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} t-test passed'].mean()}"
+                f"{self.target_fields[i]} t-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} t-test passed'].mean():.3f}"
             )
             axs[i, 1].set_title(
-                f"{self.target_fields[i]} ks-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} ks-test passed'].mean()}"
+                f"{self.target_fields[i]} ks-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} ks-test passed'].mean():.3f}"
             )
         plt.show()
 
@@ -646,8 +646,8 @@ class AATest:
 
         fig_title = f"""{control_data.name}
             
-            t-test p-value: {ttest_ind(control_data, test_data, nan_policy='omit').pvalue}
-            ks-test p-value: {ks_2samp(control_data, test_data).pvalue}"""
+            t-test p-value: {ttest_ind(control_data, test_data, nan_policy='omit').pvalue:.3f}
+            ks-test p-value: {ks_2samp(control_data, test_data).pvalue:.3f}"""
         figure.suptitle(fig_title, fontsize=kwargs.get("title_size", 20))
         plt.show()
 
