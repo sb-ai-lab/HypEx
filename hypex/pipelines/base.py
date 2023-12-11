@@ -13,7 +13,7 @@ class BaseExecutor(ABC):
         pass
 
 
-class BasePipeline(ABC, BaseExecutor):
+class BasePipeline(BaseExecutor):
     """
     Abstract base pipline.
     Defines structure to execute special pipelines.

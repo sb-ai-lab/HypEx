@@ -1,9 +1,8 @@
-from abc import ABC, abstractmethod
-
+from abc import abstractmethod
 from hypex.pipelines.base import BaseExecutor
 
 
-class BaseDataGenerator(ABC, BaseExecutor):
+class BaseDataGenerator(BaseExecutor):
     """
     Base class for data generation.
     Subclasses must implement the following methods.
