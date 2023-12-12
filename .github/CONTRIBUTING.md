@@ -1,20 +1,22 @@
-# Table of contents
+# Contributing to HypEx
 
-- [Table of contents](#table-of-contents)
-    - [Contributing to HypEx](#contributing-to-hypex)
-    - [Pull Requests](#pull-requests)
-        - [Types of Pull Requests](#types-of-pull-requests)
-    - [Codebase structure](#codebase-structure)
-    - [Developing HypEx](#developing-hypex)
-        - [Installation](#installation)
-        - [Style Guide](#style-guide)
-    - [Documentation](#documentation)
-        - [Building Documentation](#building-documentation)
-        - [Writing Documentation](#writing-documentation)
-        - [Adding new submodules](#adding-new-submodules)
-        - [Adding Tutorials](#adding-tutorials)
+## Table of contents
 
-## Contributing to HypEx
+- [Contributing to HypEx](#contributing-to-hypex)
+- [Beginning](#beginning-)
+- [Pull Requests](#pull-requests)
+    - [Types of Pull Requests](#types-of-pull-requests)
+- [Codebase structure](#codebase-structure)
+- [Developing HypEx](#developing-hypex)
+    - [Installation](#installation)
+    - [Style Guide](#style-guide)
+- [Documentation](#documentation)
+    - [Building Documentation](#building-documentation)
+    - [Writing Documentation](#writing-documentation)
+    - [Adding new submodules](#adding-new-submodules)
+    - [Adding Tutorials](#adding-tutorials)
+
+## Beginning 
 
 We're thrilled you're considering contributing to HypEx! Your contributions help keep HypEx robust and valuable. Here's
 how you can get involved:
