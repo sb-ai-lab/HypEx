@@ -38,7 +38,7 @@ Examples can be added in several ways:
 
 - [Inside the documentation](#writing-documentation)
 - [Jupyter notebooks](#adding-tutorials)
-- [Your own tests](#testing)
+- [Your own tests](#testing-)
 
 ## Pull Requests
 
@@ -271,7 +271,8 @@ poetry run pre-commit install
    If you experience any issues with pre-commit, please ask for support on the
    usual help channels.
 
-### Testing (in progress)
+### Testing 
+(in progress)
 
 ## Documentation
 
