@@ -14,8 +14,8 @@
 
 ## Contributing to HypEx
 
-Thank you for your interest in contributing to HypEx! Before you begin writing code,
-it is important that you share your intention to contribute with the developers team.
+We're thrilled you're considering contributing to HypEx! Your contributions help keep HypEx robust and valuable. Here's
+how you can get involved:
 
 - First, please look for discussions on this topic in [issues](https://github.com/sb-ai-lab/HypEx/issues)
   before implementing anything inside the project.
@@ -94,7 +94,7 @@ Each change in the code will be reflected in the library inside the environment.
 
 ### Style Guide
 
-We follow [the standard python PEP8](https://www.python.org/dev/peps/pep-0008/) conventions for style.
+We follow [PEP8 standards](https://www.python.org/dev/peps/pep-0008/).  Automated code quality checks are in progress.
 
 #### Automated code checking (in progress)
 
@@ -122,6 +122,8 @@ poetry run pre-commit install
    resolved.
    If you experience any issues with pre-commit, please ask for support on the
    usual help channels.
+
+### Testing (in progress)
 
 ## Documentation
 
@@ -156,13 +158,12 @@ poetry install -E cv -E nlp
 ```bash
 cd docs
 poetry run make clean html
-cd ..
 ```
 
 4. Generate HTML documentation files. The generated files will be in `docs/_build/html`.
 
 ```bash
-poetry run python check_docs.py
+poetry build
 ```
 
 ### Writing Documentation
