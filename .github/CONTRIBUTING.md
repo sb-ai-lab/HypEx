@@ -2,6 +2,8 @@
 
 - [Table of contents](#table-of-contents)
     - [Contributing to HypEx](#contributing-to-hypex)
+    - [Pull Requests](#pull-requests)
+        - [Types of Pull Requests](#types-of-pull-requests)
     - [Codebase structure](#codebase-structure)
     - [Developing HypEx](#developing-hypex)
         - [Installation](#installation)
@@ -35,6 +37,150 @@ Examples can be added in several ways:
 - [Inside the documentation](#writing-documentation)
 - [Jupyter notebooks](#adding-tutorials)
 - [Your own tests](#testing)
+
+## Pull Requests
+
+We welcome pull requests from the community! Below are the types of pull requests we accept and the templates you should
+use for each.
+
+### Types of Pull Requests
+
+1. **Feature Additions or Enhancements**
+    - Use the [Feature PR Template](#feature-pull-request-template).
+2. **Bug Fixes**
+    - Use the [Bug Fix PR Template](#bug-fix-pull-request-template).
+3. **Documentation Updates**
+    - Use the [Documentation Update PR Template](#documentation-update-pull-request-template).
+
+### Feature Pull Request Template
+
+#### Description
+
+<!-- Briefly describe the problem or user story this PR addresses. -->
+
+#### Changes Made
+
+<!-- Detail the code changes made. Include code snippets or screenshots as needed. -->
+
+#### Related Issues
+
+<!-- Link to related issues or feature requests. -->
+
+#### Additional Notes
+
+<!-- Include any extra information or considerations for reviewers, such as impacted areas of the codebase or specific areas needing thorough review. -->
+
+#### Testing and Validation
+
+<!-- Describe how the changes have been tested and validated. -->
+
+#### Performance Considerations
+
+<!-- Discuss any performance implications of the changes. -->
+
+#### Breaking Changes
+
+<!-- Indicate if the changes introduce any breaking changes and how they have been handled. -->
+
+#### Dependencies
+
+<!-- List any new dependencies introduced by this PR and reasons for their inclusion. -->
+
+#### Merge Request Checklist
+
+- [ ] Code follows project coding guidelines.
+- [ ] Documentation reflects the changes made.
+- [ ] Unit tests cover new or changed functionality.
+- [ ] Performance and breaking changes have been considered.
+
+### Bug Fix Pull Request Template
+
+<!-- Briefly describe the bug that this PR addresses. Include relevant issue numbers if applicable. -->
+
+#### Steps to Reproduce
+
+<!-- List the steps to reproduce the behavior. This helps reviewers to verify the bug and understand the context. -->
+
+1.
+2.
+3.
+4.
+
+#### Expected Behavior
+
+<!-- Describe what should happen ideally after your changes are applied. -->
+
+#### Actual Behavior
+
+<!-- Describe what is actually happening. Include screenshots or error messages if applicable. -->
+
+#### Changes Made
+
+<!-- Summarize the changes made to fix the bug. Provide code snippets or screenshots as needed. -->
+
+#### Testing Performed
+
+<!-- Describe the tests you ran to verify your changes. Include instructions so reviewers can reproduce. -->
+
+#### Related Issues
+
+<!-- Link any related issues here. This helps to track the history and context of the bug. -->
+
+#### Additional Notes
+
+<!-- Include any extra information or considerations for reviewers. -->
+
+#### Checklist
+
+- [ ] The code follows project coding guidelines.
+- [ ] I have added tests to cover my changes.
+- [ ] All new and existing tests passed.
+- [ ] Documentation has been updated to reflect the changes made.
+- [ ] I have verified that the changes fix the issue as described.
+
+### Documentation Update Pull Request Template
+
+<!-- Provide a brief description of what the documentation update entails and the reason for the changes. -->
+
+#### Areas of Documentation Updated
+
+<!-- List the sections or pages of the documentation that have been updated. -->
+
+1.
+2.
+3.
+
+#### Details of Changes
+
+<!-- Describe the specific changes made to the documentation. Include reasons for changes, if not obvious. -->
+
+#### Screenshots / Code Snippets
+
+<!-- If applicable, add screenshots or code snippets to help explain the changes. -->
+
+#### Related Issues or Pull Requests
+
+<!-- Link any related issues or previous pull requests that are relevant to this documentation update. -->
+
+#### Additional Notes
+
+<!-- Include any additional information that might be helpful for reviewers. -->
+
+#### Checklist
+
+- [ ] The changes are clear and easy to understand.
+- [ ] I have verified that the changes are accurate and necessary.
+- [ ] The updated documentation has been tested for clarity and comprehensibility.
+- [ ] All modified sections are properly formatted and adhere to project documentation standards.
+
+## How to Submit a Pull Request
+
+1. Fork the repository and create your branch from `master`.
+2. If you've added code that should be tested, add tests.
+3. If you've changed APIs, update the documentation.
+4. Ensure the test suite passes.
+5. Make sure your code lints.
+6. Issue the pull request!
 
 ## Codebase structure
 
@@ -94,7 +240,7 @@ Each change in the code will be reflected in the library inside the environment.
 
 ### Style Guide
 
-We follow [PEP8 standards](https://www.python.org/dev/peps/pep-0008/).  Automated code quality checks are in progress.
+We follow [PEP8 standards](https://www.python.org/dev/peps/pep-0008/). Automated code quality checks are in progress.
 
 #### Automated code checking (in progress)
 
