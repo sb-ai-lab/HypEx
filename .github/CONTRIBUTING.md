@@ -186,17 +186,17 @@ use for each.
 
 ## Codebase structure
 
-- [docs](docs) - For documenting we use [Sphinx](https://www.sphinx-doc.org/).
+- [docs](../docs) - For documenting we use [Sphinx](https://www.sphinx-doc.org/).
   It provides easy to use auto-documenting via docstrings.
-    - [Tutorials](docs/tutorials) - Notebooks with tutorials.
+    - [Tutorials](../examples/tutorials) - Notebooks with tutorials.
 
-- [hypex](hypex) - The code of HypEx library.
-    - [addons](hypex/ab_test) - The main module for A/B testing
-    - [automl](hypex/algorithms) - Modules with different algorithms for calculation (Like Knn)
+- [hypex](../hypex) - The code of HypEx library.
+    - [ab_test](../hypex/ab_test) - The main module for A/B testing
+    - [algorithms](../hypex/algorithms) - Modules with different algorithms for calculation (Like Knn)
       blenders and ready-made presets.
-    - [dataset](hypex/dataset) - The internal interface for working with data. Also contains data generator
-    - [image](hypex/selectors) - Modules with different pre-processing data (Filters, feature selectors)
-    - [utils](hypex/utils) - Common util tools (Timer, Profiler, Logging).
+    - [dataset](../hypex/dataset) - The internal interface for working with data. Also contains data generator
+    - [selectors](../hypex/selectors) - Modules with different pre-processing data (Filters, feature selectors)
+    - [utils](../hypex/utils) - Common util tools (Timer, Profiler, Logging).
 
 ## Developing HypEx
 
