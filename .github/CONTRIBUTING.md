@@ -291,10 +291,10 @@ To build the documentation:
 
 1. Clone repository to your device.
 
-    ```bash
-    git clone git@github.com:sb-ai-lab/HypEx.git
-    cd HypEx
-    ```
+```bash
+git clone git@github.com:sb-ai-lab/HypEx.git
+cd HypEx
+```
 
 2. Make environment and install requirements.
 
