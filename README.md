@@ -27,6 +27,8 @@ Diff-in-Diff) and CUPED methods, to rigorously test hypotheses and validate expe
   analysis.
 - **AB Testing Suite**: Features a suite of AB testing tools for comprehensive hypothesis evaluation.
 - **Stratification support**: Stratify groups for nuanced analysis
+- **Weights support**:  Empower your analysis by assigning custom weights to features, enhancing the matching precision
+  to suit your specific research needs
 
 ## Quick Start
 
@@ -52,7 +54,7 @@ df = create_test_data(rs=42, na_step=45, nan_cols=['age', 'gender'])
 info_col = ['user_id']
 outcome = 'post_spends'
 treatment = 'treat'
-model = Matcher(input_data=df, outcome=outcome, treatment=treatment, info_col=info_col, weights=weights)
+model = Matcher(input_data=df, outcome=outcome, treatment=treatment, info_col=info_col)
 results, quality_results, df_matched = model.estimate()
 ```
 
