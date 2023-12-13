@@ -15,8 +15,8 @@ from tqdm.auto import tqdm
 
 
 def merge_groups(
-        control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
-        test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
+        control_group: pd.DataFrame,
+        test_group: pd.DataFrame,
 ) -> pd.DataFrame:
     """Merges test and control groups in one DataFrame and creates column "group".
 
@@ -99,14 +99,14 @@ def calc_sample_size(
                 (z_alpha + z_beta) ** 2 * (p1 * (1 - p1) + p2 * (1 - p2)) / (p1 - p2) ** 2
         )
     else:
-        controle_std = control_group.std()
+        control_std = control_group.std()
         test_std = test_group.std()
 
         test_proportion = len(test_group) / (len(test_group) + len(control_group))
         control_proportion = 1 - test_proportion
 
         d = ((norm.ppf(1 - significance / 2) + norm.ppf(power)) / mde) ** 2
-        s = test_std ** 2 / test_proportion + controle_std ** 2 / control_proportion
+        s = test_std ** 2 / test_proportion + control_std ** 2 / control_proportion
         return d * s
 
 
@@ -328,8 +328,7 @@ class AATest:
 
         data_from_sampling_dict = {random_state: self._postprep_data(data, split)}
         for tf in self.target_fields:
-            ta = a[tf]
-            tb = b[tf]
+            ta, tb = a[tf], b[tf]
 
             t_result[f"{tf} a mean"] = ta.mean()
             t_result[f"{tf} b mean"] = tb.mean()
@@ -359,24 +358,14 @@ class AATest:
 
         t_result["control %"] = len(a) / len(data) * 100
         t_result["test %"] = len(b) / len(data) * 100
-        t_result["control size"] = len(a)
-        t_result["test size"] = len(b)
-        t_result["t-test mean p-value"] = np.mean(
-            [p_value for key, p_value in t_result.items() if "t-test p-value" in key]
-        )
-        t_result["ks-test mean p-value"] = np.mean(
-            [p_value for key, p_value in t_result.items() if "ks-test p-value" in key]
-        )
-        t_result["t-test passed %"] = np.mean(
-            [passed * 100 for key, passed in t_result.items() if "t-test passed" in key]
-        )
-        t_result["ks-test passed %"] = np.mean(
-            [
-                passed * 100
-                for key, passed in t_result.items()
-                if "ks-test passed" in key
-            ]
-        )
+        t_result["control size"], t_result["test size"] = len(a), len(b)
+        for test in ('t_test', 'ks-test'):
+            t_result[f"{test} mean p-value"] = np.mean(
+                [p_value for key, p_value in t_result.items() if f"{test} p-value" in key]
+            )
+            t_result[f"{test} passed %"] = np.mean(
+                [passed * 100 for key, passed in t_result.items() if f"{test} passed" in key]
+            )
         t_result["mean_tests_score"] = np.mean(scores)
         return {"metrics": t_result, "data_from_experiment": data_from_sampling_dict}
 
@@ -443,19 +432,15 @@ class AATest:
                 ]
 
             if all(passed):
-                if experiment_write_mode == "all":
+                if experiment_write_mode in ["all", "full"]:
                     results.append(res["metrics"])
-                if split_write_mode == "all":
+                if split_write_mode in ["all", "full"]:
                     data_from_sampling.update(res["data_from_experiment"])
             if any(passed):
-                if experiment_write_mode == "any":
+                if experiment_write_mode in ["any", "full"]:
                     results.append(res["metrics"])
-                if split_write_mode == "any":
+                if split_write_mode in ["any", "full"]:
                     data_from_sampling.update(res["data_from_experiment"])
-            if experiment_write_mode == "full":
-                results.append(res["metrics"])
-            if split_write_mode == "full":
-                data_from_sampling.update(res["data_from_experiment"])
 
             if file_name and write_step:
                 if i == write_step:
@@ -524,12 +509,10 @@ class AATest:
             }
         ).T
 
-        result["t-test aa passed"] = result["t-test passed score"].apply(
-            lambda x: 0.8 * self.alpha <= x <= 1.2 * self.alpha
-        )
-        result["ks-test aa passed"] = result["ks-test passed score"].apply(
-            lambda x: 0.8 * self.alpha <= x <= 1.2 * self.alpha
-        )
+        for test in ('t-test', 'ks-test'):
+            result[f"{test} aa passed"] = result[f"{test} passed score"].apply(
+                lambda x: 0.8 * self.alpha <= x <= 1.2 * self.alpha
+            )
         result.loc["mean"] = result.mean()
 
         return result
