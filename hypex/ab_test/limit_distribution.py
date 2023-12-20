@@ -15,28 +15,35 @@ from scipy.stats import norm
 # Функции минимального размера выборки и критерия являются основными
 # Функция квантиля предельного распределения случайной величины минимума используется в основных функциях
 
-def calculate_comparisons(Z: np.ndarray, var: List[float], equal_variance: bool, k: int) -> List[float]:
+
+def calculate_comparisons(sample_array: np.ndarray, variances: List[float], equal_variance: bool) -> np.ndarray:
     """
     Calculate the comparison values for a given sample array.
 
     Args:
-        Z:
-            The sample array.
-        var:
+        sample_array:
+            The sample array representing a specific observation across different samples.
+        variances:
             List of variances of the samples.
         equal_variance:
             Indicates if variances are equal.
-        k:
-            Number of samples.
 
     Returns:
-        A list of comparison values.
+        A NumPy array of comparison values.
     """
+    num_samples = sample_array.shape[0]
     if equal_variance:
-        return [(Z[j] - Z[i]) / np.sqrt(2) for j in range(k) for i in range(k) if i != j]
+        diff_matrix = sample_array.reshape(num_samples, 1) - sample_array
+        comparison_values = diff_matrix / np.sqrt(2)
     else:
-        return [Z[j] / np.sqrt(1 + var[i] / var[j]) - Z[i] / np.sqrt(1 + var[j] / var[i]) for j in range(k) for i in
-                range(k) if i != j]
+        variances = np.array(variances)
+        scaling_factors = 1 / np.sqrt(1 + variances.reshape(num_samples, 1) / variances)
+        scaled_sample_array = sample_array * scaling_factors
+        comparison_values = scaled_sample_array.reshape(num_samples, 1) - scaled_sample_array
+
+    # Remove diagonal elements (i != j)
+    np.fill_diagonal(comparison_values, np.nan)
+    return comparison_values[~np.isnan(comparison_values)]
 
 
 def calculate_quantiles(k: int, var: List[float], equal_variance: bool, iter_size: int = 20000) -> List[float]:
