@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Optional
 
 import numpy as np
 from scipy.stats import norm
@@ -140,6 +140,46 @@ def test_on_marginal_distribution(X: List[List[float]], alpha: float = 0.05, equ
     return 0
 
 
+def _calculate_sample_size_equal_var(k: int, d: float, var: float, alpha: float, beta: float, c_1: Optional[float],
+                                     c_2: Optional[float]) -> int:
+    """
+    Calculate sample size for equal variances.
+    (Docstring omitted for brevity)
+    """
+    if c_1 is None:
+        c_1 = quantile_of_marginal_distribution(k, 1 - alpha / k, var, True)
+    if c_2 is None:
+        c_2 = quantile_of_marginal_distribution(k, beta, var, True)
+
+    return int(2 * var * ((c_1 - c_2) / d) ** 2) + 1
+
+
+def _calculate_sample_size_unequal_var(k: int, d: float, var: List[float], alpha: float, beta: float,
+                                       c_1: Optional[List[float]], N: Optional[int]) -> int:
+    """
+    Calculate sample size for unequal variances.
+    (Docstring omitted for brevity)
+    """
+    iter_size = 3000
+    if c_1 is None:
+        c_1 = quantile_of_marginal_distribution(k, 1 - alpha / k, var, False)
+
+    N_ = []
+    for j in range(k):
+        n = N or 0
+        power = 0
+        while power < 1 - beta:
+            n += 100
+            power = sum(
+                all(Z[j] / np.sqrt(1 + var[i] / var[j]) - Z[i] / np.sqrt(1 + var[j] / var[i]) + d * np.sqrt(
+                    n / (var[j] + var[i])) > c_1[j]
+                    for i in range(k) if i != j)
+                for Z in norm.rvs(size=[iter_size, k])
+            ) / iter_size
+        N_.append(n)
+    return max(N_)
+
+
 def min_sample_size(k, d, var, alpha=0.05, beta=0.2, equal_var=True, c_1=None, c_2=None, N=None):
     """Функция для подсчёта минимального размера выборки
 
@@ -177,45 +217,10 @@ def min_sample_size(k, d, var, alpha=0.05, beta=0.2, equal_var=True, c_1=None, c
     int
         Число n - размер одной выборки
     """
-    if equal_var == True:
-        if c_1 == None:
-            c_1 = quantile_of_marginal_distribution(k=k,
-                                                    gamma=1 - alpha / k)  # квантиль предельного распределения 1-alpha/k
-
-        if c_2 == None:
-            c_2 = quantile_of_marginal_distribution(k=k, gamma=beta)  # квантиль предельного распределения beta
-
-        return int(2 * var * ((c_1 - c_2) / d) ** 2) + 1
+    if equal_var:
+        return _calculate_sample_size_equal_var(k, d, var, alpha, beta, c_1, c_2)
     else:
-        iter_size = 3000  # Количество итераций
-        if c_1 == None:
-            c_1 = quantile_of_marginal_distribution(k=k, gamma=1 - alpha / k, var=var,
-                                                    equal_var=False)  # набор квантилей предельного распределения
-        N_ = []  # для размеров выборки
-        for j in range(k):
-            if N == None:
-                n = 0
-            else:
-                n = N
-            power = 0  # мощность
-            while power < 1 - beta:
-                n += 100
-                power = 0
-                total = norm.rvs(size=[iter_size, k])
-                for l in range(iter_size):
-                    Z = total[l]
-                    t = np.inf
-                    for i in range(k):
-                        if i != j:
-                            t_ji = Z[j] / np.sqrt(1 + var[i] / var[j]) - Z[i] / np.sqrt(
-                                1 + var[j] / var[i]) + d * np.sqrt(n / (var[j] + var[i]))
-                            if t_ji < t:
-                                t = t_ji
-                    if t > c_1[j]:
-                        power += 1
-                power = power / iter_size
-            N_ += [n]
-        return np.max(N_)
+        return _calculate_sample_size_unequal_var(k, d, var, alpha, beta, c_1, N)
 
 
 # Применение метода
