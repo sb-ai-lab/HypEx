@@ -1,3 +1,5 @@
+from typing import List, Union
+
 import numpy as np
 from scipy.stats import norm
 
@@ -13,60 +15,83 @@ from scipy.stats import norm
 # Функции минимального размера выборки и критерия являются основными
 # Функция квантиля предельного распределения случайной величины минимума используется в основных функциях
 
-def quantile_of_marginal_distribution(k, gamma, var=[1, 1, 1], equal_var=True):
-    """Функция квантиля предельного распределения минимума
-
-    Parameters
-    ----------
-    k : int
-        Количество выборок, целое число больше 2
-    gamma : float
-        Уровень квантиля предельного распределения минимума
-    var : list of float, optional
-        Список дисперсий выборок одинаковой длины. Количество выборок больше 2
-    equal_var : bool, optional
-        Равенство дисперсий
-
-    Returns
-    -------
-    float, если equal_var=True
-        Квантиль предельного распределения минимума уровня gamma
-    list of float, если equal_var=False
-        Набор квантилей предельного распределения минимума для каждого j уровня gamma
+def calculate_comparisons(Z: np.ndarray, var: List[float], equal_variance: bool, k: int) -> List[float]:
     """
-    iter_size = 20000  # Количество итераций теста
-    # N = 80                                 # Количество генераций квантилей, из которых возвращается максимум
+    Calculate the comparison values for a given sample array.
 
-    if equal_var == True:
-        j = 0  # в силу симметрии j по гипотезе H_0 возьмём j = 0 (первая выборка)
-        t_j = []
-        total = norm.rvs(size=[iter_size, k])
-        for l in range(iter_size):
-            Z = total[l]
-            t = np.inf
-            for i in range(k):
-                if i != j:
-                    t_ji = (Z[j] - Z[i]) / np.sqrt(2)
-                    if t_ji < t:
-                        t = t_ji
-            t_j += [t]
+    Args:
+        Z:
+            The sample array.
+        var:
+            List of variances of the samples.
+        equal_variance:
+            Indicates if variances are equal.
+        k:
+            Number of samples.
+
+    Returns:
+        A list of comparison values.
+    """
+    if equal_variance:
+        return [(Z[j] - Z[i]) / np.sqrt(2) for j in range(k) for i in range(k) if i != j]
+    else:
+        return [Z[j] / np.sqrt(1 + var[i] / var[j]) - Z[i] / np.sqrt(1 + var[j] / var[i]) for j in range(k) for i in
+                range(k) if i != j]
+
+
+def calculate_quantiles(k: int, var: List[float], equal_variance: bool, iter_size: int = 20000) -> List[float]:
+    """
+     Calculate quantiles for the distribution.
+
+     Args:
+         k:
+             Number of samples.
+         var:
+             List of variances of the samples.
+         equal_variance:
+             Indicates if variances are equal.
+         iter_size:
+             Number of iterations for generating random variables.
+
+     Returns:
+         List of quantiles.
+     """
+    t_j = []
+    total = norm.rvs(size=[iter_size, k])
+    for Z in total:
+        comparisons = calculate_comparisons(Z, var, equal_variance, k)
+        t_j.append(min(comparisons))
+    return t_j
+
+
+def quantile_of_marginal_distribution(k: int, gamma: float, var: List[float] = None, equal_var: bool = True) -> Union[
+    float, List[float]]:
+    """
+    Calculate the quantile of the marginal distribution of the minimum.
+
+    Args:
+        k:
+            Number of samples, an integer greater than 2.
+        gamma:
+            Level of the quantile of the marginal distribution of the minimum.
+        var:
+            List of variances of the samples, all of the same length. Number of samples greater than 2.
+            If None, defaults to a list of ones.
+        equal_var:
+            Indicates if variances are equal.
+
+    Returns:
+        If equal_var=True, returns the quantile of the marginal distribution of the minimum at level gamma.
+        If equal_var=False, returns a set of quantiles of the marginal distribution of the minimum for each j at level gamma.
+    """
+    if var is None:
+        var = [1] * k
+
+    t_j = calculate_quantiles(k, var, equal_var)
+    if equal_var:
         return np.quantile(t_j, gamma)
     else:
-        c_ = []
-        for j in range(k):
-            t_j = []
-            total = norm.rvs(size=[iter_size, k])
-            for l in range(iter_size):
-                Z = total[l]
-                t = np.inf
-                for i in range(k):
-                    if i != j:
-                        t_ji = Z[j] / np.sqrt(1 + var[i] / var[j]) - Z[i] / np.sqrt(1 + var[j] / var[i])
-                        if t_ji < t:
-                            t = t_ji
-                t_j += [t]
-            c_ += [np.quantile(t_j, gamma)]
-        return c_
+        return [np.quantile(t_j, gamma) for _ in range(k)]
 
 
 def test_on_marginal_distribution(X, alpha=0.05, equal_var=True, c=None):
