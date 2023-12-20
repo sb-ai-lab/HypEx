@@ -94,64 +94,50 @@ def quantile_of_marginal_distribution(k: int, gamma: float, var: List[float] = N
         return [np.quantile(t_j, gamma) for _ in range(k)]
 
 
-def test_on_marginal_distribution(X, alpha=0.05, equal_var=True, c=None):
-    """Функция критерия, основанного на предельном распределении минимума
+def calculate_statistics(X: List[List[float]]) -> (List[float], List[float]):
+    """Calculate mean and variance for each sample in X."""
+    n = len(X[0])
+    mean = [np.mean(sample) for sample in X]
+    var = [np.var(sample) * n / (n - 1) for sample in X]
+    return mean, var
 
-    Parameters
-    ----------
-    X : list of lists
-        Список выборок одинаковой длины. Количество выборок больше 2
-    alpha : float, optional
-        Уровень значимости, число от 0 до 1
-    equal_var : bool, optional
-        Равенство дисперсий
-    c : optional
-            float, если equal_var=True
-                Квантиль предельного распределения минимума уровня 1-alpha/len(X)
-            list of float, если equal_var=False
-                Набор квантилей предельного распределения минимума для каждого j уровня 1-alpha/len(X)
-    
-    Returns
-    -------
-    int
-        Число от 0 до k - номер принятой гипотезы
+
+def test_on_marginal_distribution(X: List[List[float]], alpha: float = 0.05, equal_var: bool = True,
+                                  c: Union[float, List[float]] = None) -> int:
     """
-    k = len(X)  # Число выборок
-    n = len(X[0])  # Размер выборки
+    Function for testing based on the marginal distribution of the minimum.
 
-    mean = []
-    var = []
-    for m in range(k):
-        mean += [np.mean(X[m])]
-        var += [np.var(X[m]) * n / (n - 1)]
+    Args:
+        X:
+            List of samples of equal length. The number of samples is greater than 2.
+        alpha:
+            Significance level, a number between 0 and 1.
+        equal_var:
+            Indicates if variances are equal.
+        c:
+            Quantile of the marginal distribution of the minimum at level 1-alpha/len(X) if equal_var=True.
+            Set of quantiles for each j at level 1-alpha/len(X) if equal_var=False.
 
-    if equal_var == True:
-        if c == None:
-            c = quantile_of_marginal_distribution(k=k, gamma=1 - alpha / k)  # квантиль предельного распределения
-        for j in range(k):
-            t_j = np.inf
-            for i in range(k):
-                if i != j:
-                    t_ji = np.sqrt(n) * (mean[j] - mean[i]) / np.sqrt(var[j] + var[i])
-                    if t_ji < t_j:
-                        t_j = t_ji
-            if t_j > c:
-                return j + 1
-        return 0
-    else:
-        if c == None:
-            c = quantile_of_marginal_distribution(k=k, gamma=1 - alpha / k, var=var,
-                                                  equal_var=False)  # набор квантилей предельного распределения
-        for j in range(k):
-            t_j = np.inf
-            for i in range(k):
-                if i != j:
-                    t_ji = np.sqrt(n) * (mean[j] - mean[i]) / np.sqrt(var[j] + var[i])
-                    if t_ji < t_j:
-                        t_j = t_ji
-            if t_j > c[j]:
-                return j + 1
-        return 0
+    Returns:
+        An integer from 0 to k - the number of the accepted hypothesis.
+    """
+    k = len(X)
+    mean, var = calculate_statistics(X)
+
+    if c is None:
+        gamma = 1 - alpha / k
+        c = quantile_of_marginal_distribution(k, gamma, var, equal_var)
+
+    for j in range(k):
+        t_j = np.inf
+        for i in range(k):
+            if i != j:
+                t_ji = np.sqrt(len(X[0])) * (mean[j] - mean[i]) / np.sqrt(var[j] + var[i])
+                t_j = min(t_j, t_ji)
+        if (equal_var and t_j > c) or (not equal_var and t_j > c[j]):
+            return j + 1
+
+    return 0
 
 
 def min_sample_size(k, d, var, alpha=0.05, beta=0.2, equal_var=True, c_1=None, c_2=None, N=None):
