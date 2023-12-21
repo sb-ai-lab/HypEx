@@ -801,14 +801,14 @@ class AATest:
         test_counts = s_test_data.value_counts(normalize=True) * 100
 
         ax.fill_between(
-            s_control_data.index,
-            s_control_data.values,
+            control_counts.index,
+            control_counts.values,
             color="blue",
             alpha=0.3,
             label="control",
         )
         ax.fill_between(
-            s_control_data.index,
+            test_counts.index,
             test_counts[
                 [i for i in test_counts.index if i in control_counts.index]
             ].values,
@@ -828,7 +828,7 @@ class AATest:
             targets_dict[tf] = {}
             for i in experiment.index:
                 targets_dict[tf][i[len(tf) + 1 :]] = experiment[i]
-        return pd.DataFrame(targets_dict).T, experiment.iloc[-7:]
+        return pd.DataFrame(targets_dict).T, experiment.iloc[-9:]
 
     def split_analysis(self, splited_data: pd.DataFrame, **kwargs):
         """P-value analyser for numerical and category features in Kolmogorov-Smirnov and T tests.
@@ -939,7 +939,7 @@ class AATest:
             "experiments": best_results,
             "split": best_split[best_rs],
             "best_experiment_stat": best_experiment_stat,
-            "split_split_stat": best_split_stat,
+            "split_stat": best_split_stat,
         }
 
 
@@ -1201,3 +1201,5 @@ class ABTest:
         """Shows results of 'execute' function - dict as dataframes."""
         for k in self.results.keys():
             display(pd.DataFrame(self.results[k], index=[k]).T)
+
+

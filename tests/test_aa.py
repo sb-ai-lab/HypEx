@@ -1,6 +1,10 @@
 import pandas as pd
 import pytest
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(".").absolute().parent))
+
 from hypex.ab_test.ab_tester import AATest
 from hypex.utils.tutorial_data_creation import create_test_data
 
@@ -96,3 +100,8 @@ def test_aa_process(data, iterations, info_col):
 def test_group_optimization(data, info_col):
     model = AATest(target_fields=["pre_spends", "post_spends"], info_cols=info_col)
     model.process(data, optimize_groups=True, iterations=5, show_plots=False)
+
+
+d = create_test_data(rs=52)
+model = AATest(target_fields=["pre_spends", "post_spends"], info_cols="user_id")
+model.process(d, optimize_groups=True, iterations=5, show_plots=True)
