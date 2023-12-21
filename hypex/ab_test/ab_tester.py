@@ -827,7 +827,8 @@ class AATest:
         for tf in self.target_fields:
             targets_dict[tf] = {}
             for i in experiment.index:
-                targets_dict[tf][i[len(tf) + 1 :]] = experiment[i]
+                if i.startswith(f"{tf} "):
+                    targets_dict[tf][i[len(tf) + 1 :]] = experiment[i]
         return pd.DataFrame(targets_dict).T, experiment.iloc[-9:]
 
     def split_analysis(self, splited_data: pd.DataFrame, **kwargs):
@@ -937,6 +938,7 @@ class AATest:
         )
         return {
             "experiments": best_results,
+            "aa_score": aa_scores,
             "split": best_split[best_rs],
             "best_experiment_stat": best_experiment_stat,
             "split_stat": best_split_stat,
