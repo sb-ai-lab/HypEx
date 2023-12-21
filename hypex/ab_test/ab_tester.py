@@ -1,37 +1,38 @@
 import warnings
-from copy import copy
 from itertools import combinations
-
-from IPython.display import display
 from pathlib import Path
-from sklearn.utils import shuffle
 from typing import Iterable, Union, Optional, Dict, Any, Tuple, List
-from tqdm.auto import tqdm
-import pandas as pd
-import numpy as np
-from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu, norm
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
+from IPython.display import display
+from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu, norm
+from sklearn.utils import shuffle
 from statsmodels.stats.power import TTestIndPower
+from tqdm.auto import tqdm
 
 
 def merge_groups(
-    test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
     control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
+    test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
 ) -> pd.DataFrame:
     """Merges test and control groups in one DataFrame and creates column "group".
 
     Column "group" contains of "test" and "control" values.
 
     Args:
-        test_group: Data of target group
-        control_group: Data of control group
-
+        control_group:
+            Data of control group
+        test_group:
+            Data of target group
     Returns:
-        merged_data: Concatted DataFrame
+        merged_data:
+            Contacted DataFrame
     """
-    test_group.loc[:, "group"] = "test"
     control_group.loc[:, "group"] = "control"
+    test_group.loc[:, "group"] = "test"
 
     return pd.concat([test_group, control_group], ignore_index=True)
 
@@ -40,17 +41,16 @@ def split_splited_data(splitted_data: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     """Splits a pandas DataFrame into two separate dataframes based on a specified group field.
 
     Args:
-        data:
+        splitted_data:
             The input dataframe to be split
 
     Returns:
-        splitted_data:
-            A dictionary containing two dataframes, 'test' and 'control', where 'test' contains rows where the
-            group field is 'test', and 'control' contains rows where the group field is 'control'.
+        A dictionary containing two dataframes, 'test' and 'control', where 'test' contains rows where the
+        group field is 'test', and 'control' contains rows where the group field is 'control'.
     """
     return {
-        "test": splitted_data[splitted_data["group"] == "test"],
         "control": splitted_data[splitted_data["group"] == "control"],
+        "test": splitted_data[splitted_data["group"] == "test"],
     }
 
 
@@ -63,13 +63,17 @@ def calc_mde(
     """Calculates the minimum detectable effect (MDE) for a given test and control groups.
 
     Args:
-        test_group: The test group as a pandas Series
-        control_group: The control group as a pandas Series
-        reliability: The reliability of the test
-        power: The power of the test
+        test_group:
+            The test group as a pandas Series
+        control_group:
+            The control group as a pandas Series
+        reliability:
+            The reliability of the test
+        power:
+            The power of the test
 
     Returns:
-        mde: The minimum detectable effect
+        The minimum detectable effect
     """
 
     m = norm.ppf(1 - (1 - reliability) / 2) + norm.ppf(power)
@@ -85,12 +89,29 @@ def calc_mde(
 
 
 def calc_sample_size(
-    test_group: pd.Series,
     control_group: pd.Series,
+    test_group: pd.Series,
     mde,
     significance: float = 0.05,
     power: float = 0.8,
 ) -> float:
+    """Calculates sample size of dataframe depends on mde and power.
+
+    Args:
+        control_group:
+            Numpy Series with data from control group
+        test_group:
+            Numpy Series with data from test group
+        mde:
+            Minimum detectable effect
+        significance:
+            Level of significance (alpha)
+        power:
+            Power of criterion
+
+    Returns:
+        Sample_size of dataframe
+    """
     if isinstance(mde, Iterable):
         z_alpha = norm.ppf((2 - significance) / 2)
         z_beta = norm.ppf(power)
@@ -102,23 +123,38 @@ def calc_sample_size(
             (z_alpha + z_beta) ** 2 * (p1 * (1 - p1) + p2 * (1 - p2)) / (p1 - p2) ** 2
         )
     else:
+        control_std = control_group.std()
         test_std = test_group.std()
-        controle_std = control_group.std()
 
         test_proportion = len(test_group) / (len(test_group) + len(control_group))
         control_proportion = 1 - test_proportion
 
         d = ((norm.ppf(1 - significance / 2) + norm.ppf(power)) / mde) ** 2
-        s = test_std**2 / test_proportion + controle_std**2 / control_proportion
+        s = test_std**2 / test_proportion + control_std**2 / control_proportion
         return d * s
 
 
 def calc_power(
     effect_size: float,
-    test_size: float,
     control_size: float,
+    test_size: float,
     significance: float = 0.05,
 ) -> float:
+    """Statistical power calculations for t-test for two independent sample and known significance.
+
+    Args:
+        effect_size:
+            Size of the effect
+        control_size:
+            Size of control group
+        test_size:
+            Size of test group
+        significance:
+            Level of significance (alpha)
+
+    Returns:
+        Statistical power
+    """
     analysis = TTestIndPower()
     ratio = test_size / control_size
     return analysis.power(
@@ -139,10 +175,31 @@ class AATest:
         mode: str = "simple",
         alpha: float = 0.05,
     ):
+        """Initialize the AATest class.
+
+        Args:
+            target_fields:
+                List or str with target columns
+            group_cols:
+                List or str with columns for grouping
+            info_cols:
+                List or str with informational columns
+            quant_field:
+
+            mode:
+                Mode of the AA-test
+                Available modes:
+                    * simple
+                    * balanced
+            alpha:
+                Level of significance
+        """
         self.target_fields = (
             [target_fields] if isinstance(target_fields, str) else target_fields
         )
-        self.group_cols = [group_cols] if isinstance(group_cols, str) else group_cols
+        self.group_cols = (
+            [group_cols] if isinstance(group_cols, str) else group_cols
+        ) or []
         self.info_cols = [info_cols] if isinstance(info_cols, str) else info_cols
         self.quant_field = quant_field
         self.mode = mode
@@ -150,8 +207,16 @@ class AATest:
 
     def columns_labeling(self, data: pd.DataFrame) -> Dict[str, List[str]]:
         return {
-            "target_field": list(data.select_dtypes(include="number").columns.drop(self.info_cols, errors="ignore")),
-            "group_col": list(data.select_dtypes(include="object").columns.drop(self.info_cols, errors="ignore")),
+            "target_field": list(
+                data.select_dtypes(include="number").columns.drop(
+                    self.info_cols, errors="ignore"
+                )
+            ),
+            "group_col": list(
+                data.select_dtypes(include="object").columns.drop(
+                    self.info_cols, errors="ignore"
+                )
+            ),
         }
 
     def __simple_mode(
@@ -163,11 +228,13 @@ class AATest:
         or equal amount of groups in each sample.
 
         Args:
-            data: Input data
-            random_state: Seed of random
+            data:
+                Input data
+            random_state:
+                Seed of random
 
         Returns:
-            result: Test and control samples of indexes dictionary
+            Test and control samples of indexes dictionary
         """
         result = {"test_indexes": [], "control_indexes": []}
 
@@ -197,12 +264,15 @@ class AATest:
         """Divides sample on two groups.
 
         Args:
-            data: Raw input data
-            preprocessing_data: Flag to preprocess data
-            random_state: Seed of random - one integer to fix split
+            data:
+                Raw input data
+            random_state:
+                Seed of random - one integer to fix split
+            test_size:
+                Group size ratio
 
         Returns:
-            result: Dict of indexes with division on test and control group
+            Dict of indexes with division on test and control group
         """
 
         result = {"test_indexes": [], "control_indexes": []}
@@ -262,11 +332,13 @@ class AATest:
         Adds info_cols and decode binary variables
 
         Args:
-            data: Raw input data
-            spit_indexes: Dict of indexes with separation on test and control group
+            data:
+                Raw input data
+            spit_indexes:
+                Dict of indexes with separation on test and control group
 
         Returns:
-            data: Separated initial data with column "group"
+            Separated initial data with column "group"
         """
         # prep data to show user (add info_cols and decode binary variables)
         test = data.loc[spit_indexes["test_indexes"]]
@@ -280,15 +352,18 @@ class AATest:
         """Calculates target delta between A and B groups.
 
         Args:
-            a_mean: Average of target in one group
-            b_mean: Average of target in another group
-            mode: Type of expected result:
-                'percentile' - percentage exceeding the average in group A compared to group B
-                'absolute' - absolute value of difference between B and A group
-                'relative' - percent in format of number (absolute) exceeding the average in group A compared to group B
+            a_mean:
+                Average of target in one group
+            b_mean:
+                Average of target in another group
+            mode:
+                Type of expected result:
+                    * 'percentile' - percentage exceeding the average in group A compared to group B
+                    * 'absolute' - absolute value of difference between B and A group
+                    * 'relative' - percent in format of number (absolute) exceeding the average in group A compared to group B
 
         Returns:
-            result: Delta between groups as percent or absolute value
+            Delta between groups as percent or absolute value
         """
         if mode == "percentile":
             return (1 - a_mean / b_mean) * 100
@@ -303,12 +378,15 @@ class AATest:
         """Calculates metrics of one sampling.
 
         Args:
-            data: Raw input data
-            random_state: Random seeds for searching
-            preprocessed_data: Pre-preprocessed data
+            data:
+                Raw input data
+            random_state:
+                Random seeds for searching
+            test_size:
+                Percentage of test data
 
         Returns:
-            result: Tuple of
+            Tuple of
                 1) metrics dataframe (stat tests) and
                 2) dict of random state with test_control dataframe
         """
@@ -318,8 +396,8 @@ class AATest:
 
         split = self.split(data, random_state, test_size)
 
-        a = data.loc[split["test_indexes"]]
-        b = data.loc[split["control_indexes"]]
+        a = data.loc[split["control_indexes"]]
+        b = data.loc[split["test_indexes"]]
 
         data_from_sampling_dict = {random_state: self._postprep_data(data, split)}
         for tf in self.target_fields:
@@ -352,8 +430,10 @@ class AATest:
                 / 3
             )
 
-        t_result["test %"] = len(a) / len(data) * 100
-        t_result["control %"] = len(b) / len(data) * 100
+        t_result["control %"] = len(a) / len(data) * 100
+        t_result["test %"] = len(b) / len(data) * 100
+        t_result["control size"] = len(a)
+        t_result["test size"] = len(b)
         t_result["t-test mean p-value"] = np.mean(
             [p_value for key, p_value in t_result.items() if "t-test p-value" in key]
         )
@@ -379,7 +459,8 @@ class AATest:
         test_size: float = 0.5,
         iterations: int = 2000,
         file_name: Union[Path, str] = None,
-        write_mode: str = "full",
+        experiment_write_mode: str = "full",
+        split_write_mode: str = "full",
         write_step: int = None,
         pbar: bool = True,
         **kwargs,
@@ -387,13 +468,21 @@ class AATest:
         """Chooses random_state for finding homogeneous distribution.
 
         Args:
-            data: Raw input data
+            data:
+                Raw input data
             iterations:
                 Number of iterations to search uniform sampling to searching
+            test_size:
+                Percentage of test data
             file_name:
                 Name of file to save results (if None - no results will be saved, func returns result)
-            write_mode:
-                Mode to write:
+            experiment_write_mode:
+                Mode to write experiment results:
+                    'full' - save all experiments
+                    'all' - save experiments that passed all statistical tests
+                    'any' - save experiments that passed any statistical test
+            split_write_mode:
+                Mode to write split results:
                     'full' - save all experiments
                     'all' - save experiments that passed all statistical tests
                     'any' - save experiments that passed any statistical test
@@ -403,7 +492,6 @@ class AATest:
                 Flag to show progress bar
 
         Returns:
-             results:
                 If no saving (no file_name, no write mode and no write_step) returns dataframe
                 else None and saves file to csv
         """
@@ -411,32 +499,44 @@ class AATest:
         results = []
         data_from_sampling = {}
 
-        if write_mode not in ("full", "all", "any"):
+        if experiment_write_mode not in ("full", "all", "any"):
             warnings.warn(
-                f"Write mode '{write_mode}' is not supported. Mode 'full' will be used"
+                f"Write mode '{experiment_write_mode}' is not supported. Mode 'full' will be used"
             )
-            write_mode = "full"
+            experiment_write_mode = "full"
+        if split_write_mode not in ("full", "all", "any"):
+            warnings.warn(
+                f"Write mode '{split_write_mode}' is not supported. Mode 'full' will be used"
+            )
+            split_write_mode = "full"
 
         for i, rs in tqdm(
             enumerate(random_states), total=len(random_states), disable=not pbar
         ):
             res = self.sampling_metrics(data, random_state=rs, test_size=test_size)
-            data_from_sampling.update(res["data_from_experiment"])
 
             # write to file
             passed = []
             for tf in self.target_fields:
                 passed += [
-                    res["metrics"][f"{tf} t-test passed"],
-                    res["metrics"][f"{tf} ks-test passed"],
+                    not res["metrics"][f"{tf} t-test passed"],
+                    not res["metrics"][f"{tf} ks-test passed"],
                 ]
 
-            if write_mode == "all" and all(passed):
+            if all(passed):
+                if experiment_write_mode == "all":
+                    results.append(res["metrics"])
+                if split_write_mode == "all":
+                    data_from_sampling.update(res["data_from_experiment"])
+            if any(passed):
+                if experiment_write_mode == "any":
+                    results.append(res["metrics"])
+                if split_write_mode == "any":
+                    data_from_sampling.update(res["data_from_experiment"])
+            if experiment_write_mode == "full":
                 results.append(res["metrics"])
-            if write_mode == "any" and any(passed):
-                results.append(res["metrics"])
-            if write_mode == "full":
-                results.append(res["metrics"])
+            if split_write_mode == "full":
+                data_from_sampling.update(res["data_from_experiment"])
 
             if file_name and write_step:
                 if i == write_step:
@@ -447,24 +547,34 @@ class AATest:
                     )
                     results = []
 
+        results = pd.DataFrame(results)
         if file_name and write_step:
-            pd.DataFrame(results).to_csv(file_name, index=False, header=False, mode="a")
+            results.to_csv(file_name, index=False, header=False, mode="a")
         elif file_name:
-            results = pd.DataFrame(results)
             results.to_csv(file_name, index=False)
             return results, data_from_sampling
         else:
-            return pd.DataFrame(results), data_from_sampling
+            return results, data_from_sampling
 
     def features_p_value_distribution(
         self, experiment_results: pd.DataFrame, figsize=None, bin_step=0.05
     ):
-        feuture_num = len(self.target_fields)
-        figsize = figsize or (15, 7 * feuture_num)
+        """Process plots of features' p-value distribution.
+
+        Args:
+            experiment_results:
+                Results of experiment
+            figsize:
+                Size of figure for plot
+            bin_step:
+                Step for bins in X axis
+        """
+        feature_num = len(self.target_fields)
+        figsize = figsize or (15, 7 * feature_num)
         bin_step = bin_step or self.alpha
         bins = np.arange(0, 1 + bin_step, bin_step)
-        figure, axs = plt.subplots(nrows=feuture_num, ncols=2, figsize=figsize)
-        for i in range(feuture_num):
+        figure, axs = plt.subplots(nrows=feature_num, ncols=2, figsize=figsize)
+        for i in range(feature_num):
             sns.histplot(
                 data=experiment_results,
                 x=f"{self.target_fields[i]} t-test p-value",
@@ -483,14 +593,23 @@ class AATest:
             )
 
             axs[i, 0].set_title(
-                f"{self.target_fields[i]} t-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} t-test passed'].mean()}"
+                f"{self.target_fields[i]} t-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} t-test passed'].mean():.3f}"
             )
             axs[i, 1].set_title(
-                f"{self.target_fields[i]} ks-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} ks-test passed'].mean()}"
+                f"{self.target_fields[i]} ks-test p-value\npassed score: {experiment_results[f'{self.target_fields[i]} ks-test passed'].mean():.3f}"
             )
         plt.show()
 
     def aa_score(self, experiment_results: pd.DataFrame) -> pd.DataFrame:
+        """Estimates mean passed score for t-test and ks-test in AA-test.
+
+        Args:
+            experiment_results:
+                Results of the experiment
+
+        Returns:
+            Pandas dataframe containing the results of the AA-test
+        """
         result = pd.DataFrame(
             {
                 f: {
@@ -508,7 +627,7 @@ class AATest:
         result["t-test aa passed"] = result["t-test passed score"].apply(
             lambda x: 0.8 * self.alpha <= x <= 1.2 * self.alpha
         )
-        result["ks-test aa passed"] = result["t-test passed score"].apply(
+        result["ks-test aa passed"] = result["ks-test passed score"].apply(
             lambda x: 0.8 * self.alpha <= x <= 1.2 * self.alpha
         )
         result.loc["mean"] = result.mean()
@@ -518,6 +637,18 @@ class AATest:
     def uniform_tests_interpretation(
         self, experiment_results: pd.DataFrame, **kwargs
     ) -> pd.DataFrame:
+        """Process plotting of p-value distribution and results of AA-test.
+
+        Args:
+            experiment_results:
+                Results of the experiment
+            **kwargs:
+                Some extra keyword arguments
+
+        Returns:
+            Pandas dataframe containing the results of the AA-test
+
+        """
         self.features_p_value_distribution(
             experiment_results,
             figsize=kwargs.get("figsize"),
@@ -532,6 +663,22 @@ class AATest:
         plot_set: Tuple = ("hist", "cumulative", "percentile"),
         **kwargs,
     ):
+        """P-value analyser for numerical features in Kolmogorov-Smirnov and T tests.
+
+        Args:
+            control_data:
+                Data from control group
+            test_data:
+                Data from test group
+            plot_set:
+                Type of plot
+                Available types:
+                    * hist
+                    * cumulative
+                    * percentile
+            **kwargs:
+                Some extra keyword arguments
+        """
         if not plot_set:
             return
 
@@ -552,7 +699,7 @@ class AATest:
                 max(control_data.max(), test_data.max())
                 - min(control_data.min(), test_data.min())
             )
-            / kwargs.get("bins", 20),
+            / kwargs.get("bins", 100),
         )
 
         if "hist" in plot_set:
@@ -575,7 +722,8 @@ class AATest:
                 color="red",
             )
             axs[ax_count].grid(True)
-            axs[ax_count].legend(["test", "control"])
+            axs[ax_count].legend(["control", "test"])
+            axs[ax_count].set_title("Histogram")
             ax_count += 1
 
         if "cumulative" in plot_set:
@@ -584,8 +732,7 @@ class AATest:
                 ax=axs[ax_count],
                 bins=bins,
                 stat="percent",
-                element="step",
-                fill=False,
+                element="poly",
                 cumulative=True,
                 alpha=kwargs.get("alpha", 0.3),
                 color="blue",
@@ -595,61 +742,103 @@ class AATest:
                 ax=axs[ax_count],
                 bins=bins,
                 stat="percent",
-                element="step",
-                fill=False,
+                element="poly",
                 cumulative=True,
                 alpha=kwargs.get("alpha", 0.3),
                 color="red",
             )
-            axs[ax_count].legend(["test", "control"])
+            axs[ax_count].legend(["control", "test"])
+            axs[ax_count].set_title("Cumulative destribution")
             ax_count += 1
 
         if "percentile" in plot_set:
-            axs[ax_count].plot(
+            axs[ax_count].fill_between(
                 range(101),
                 [control_data.quantile(q) for q in np.arange(0, 1.01, 0.01)],
+                color="blue",
                 alpha=kwargs.get("alpha", 0.3),
             )
-            axs[ax_count].plot(
+            axs[ax_count].fill_between(
                 range(101),
                 [test_data.quantile(q) for q in np.arange(0, 1.01, 0.01)],
+                color="red",
                 alpha=kwargs.get("alpha", 0.3),
             )
-            axs[ax_count].legend(["test", "control"])
+            axs[ax_count].legend(["control", "test"])
             axs[ax_count].set_xticks(np.arange(0, 101))
             axs[ax_count].set_xticklabels(np.arange(0, 101), rotation=45)
+            axs[ax_count].set_title("Percentile destribution")
 
-        figure.suptitle(f"{control_data.name}", fontsize=kwargs.get("title_size", 20))
+        fig_title = f"""{control_data.name}
+
+            t-test p-value: {ttest_ind(control_data, test_data, nan_policy='omit').pvalue:.3f}
+            ks-test p-value: {ks_2samp(control_data, test_data).pvalue:.3f}"""
+        figure.suptitle(fig_title, fontsize=kwargs.get("title_size", 20))
         plt.show()
 
     def cat_feature_uniform_analysis(
         self, control_data: pd.Series, test_data: pd.Series, **kwargs
     ):
-        figsize = kwargs.get("figsize", (25, 20))
+        """P-value analyser for category features in Kolmogorov-Smirnov and T tests.
+
+        Args:
+            control_data:
+                Data from control group
+            test_data:
+                Data from test group
+            **kwargs:
+                Some extra keyword arguments
+        """
+        s_control_data = control_data.astype("str")
+        s_test_data = test_data.astype("str")
+
+        figsize = kwargs.get("figsize", (15, 10))
         figure, ax = plt.subplots(
             nrows=1, ncols=1, figsize=figsize, facecolor="honeydew", edgecolor="black"
         )
 
-        sns.histplot(
-            data=control_data,
-            ax=ax,
-            stat="percent",
-            alpha=kwargs.get("alpha", 0.3),
+        control_counts = s_control_data.value_counts(normalize=True) * 100
+        test_counts = s_test_data.value_counts(normalize=True) * 100
+
+        ax.fill_between(
+            s_control_data.index,
+            s_control_data.values,
             color="blue",
+            alpha=0.3,
+            label="control",
         )
-
-        sns.histplot(
-            data=test_data,
-            ax=ax,
-            stat="percent",
-            alpha=kwargs.get("alpha", 0.3),
+        ax.fill_between(
+            s_control_data.index,
+            test_counts[
+                [i for i in test_counts.index if i in control_counts.index]
+            ].values,
             color="red",
+            alpha=0.3,
+            label="test",
         )
 
+        ax.legend()
+        ax.tick_params(axis="x", rotation=90)
         figure.suptitle(f"{control_data.name}", fontsize=kwargs.get("title_size", 20))
         plt.show()
 
+    def experiment_result_transform(self, experiment: pd.Series):
+        targets_dict = {}
+        for tf in self.target_fields:
+            targets_dict[tf] = {}
+            for i in experiment.index:
+                targets_dict[tf][i[len(tf) + 1 :]] = experiment[i]
+        return pd.DataFrame(targets_dict).T, experiment.iloc[-7:]
+
     def split_analysis(self, splited_data: pd.DataFrame, **kwargs):
+        """P-value analyser for numerical and category features in Kolmogorov-Smirnov and T tests.
+
+        Args:
+            splited_data:
+                Data for visualization purposes
+            **kwargs:
+                Some extra keyword arguments
+        """
         ssp = split_splited_data(splited_data)
         for nf in self.target_fields:
             self.num_feature_uniform_analysis(
@@ -660,7 +849,39 @@ class AATest:
                 ssp["control"][cf], ssp["test"][cf], **kwargs
             )
 
-    def process(self, data: pd.DataFrame, optimize_groups: bool = False, **kwargs):
+    def process(
+        self,
+        data: pd.DataFrame,
+        optimize_groups: bool = False,
+        iterations: int = 2000,
+        show_plots=True,
+        **kwargs,
+    ):
+        """Main function for AATest estimation.
+
+        Provides:
+            * Columns labeling
+            * Results calculations
+            * Plotting results
+
+        Args:
+            data:
+                Input dataset
+            optimize_groups:
+                Is in necessary to optimize groups (True/False)
+            iterations:
+                Number of iterations for AB-test
+            show_plots:
+                Is in necessary to show plots (True/False)
+            **kwargs:
+                Some extra keyword arguments
+
+        Returns:
+            best_results:
+                Results of the experiment with metrics for all fields
+            best_split:
+                Result of separation
+        """
         labeling = self.columns_labeling(data)
         best_results, best_split = None, None
 
@@ -670,29 +891,56 @@ class AATest:
         if optimize_groups:
             max_score = -1
 
-            group_variants = []
+            group_variants = [[]]
             for i in range(1, len(labeling["group_col"])):
-                i_combinstions = combinations(labeling["group_col"], i)
-                group_variants.extend(iter(i_combinstions))
-                
+                i_combinations = combinations(labeling["group_col"], i)
+                group_variants.extend(iter(i_combinations))
+
             for gs in tqdm(group_variants, desc="Group optimization"):
                 self.group_cols = list(gs)
-                experiment_results, data_splits = self.calc_uniform_tests(data, pbar=False, **kwargs)
-                aa_scores = self.aa_score(experiment_results)
-                group_score = max(aa_scores.loc["mean", "t-test aa passed"], aa_scores.loc["mean", "t-test aa passed"])
-                if group_score > max_score:
-                    best_results, best_split = experiment_results, data_splits
-                    max_score = group_score
+                experiment_results, data_splits = self.calc_uniform_tests(
+                    data, pbar=False, iterations=iterations, **kwargs
+                )
+                if len(experiment_results):
+                    aa_scores = self.aa_score(experiment_results)
+                    group_score = max(
+                        aa_scores.loc["mean", "t-test aa passed"],
+                        aa_scores.loc["mean", "t-test aa passed"],
+                    )
+                    if group_score > max_score:
+                        best_results, best_split = experiment_results, data_splits
+                        max_score = group_score
 
         else:
-            best_results, best_split = self.calc_uniform_tests(data, **kwargs)
+            best_results, best_split = self.calc_uniform_tests(
+                data,
+                experiment_write_mode="full",
+                split_write_mode="any",
+                iterations=iterations,
+                **kwargs,
+            )
 
-        aa_scores = self.uniform_tests_interpretation(best_results)
-        best_rs = experiment_results.loc[
+        if len(best_results) == 0:
+            return best_results, best_split
+        if show_plots:
+            aa_scores = self.uniform_tests_interpretation(best_results)
+        else:
+            aa_scores = self.aa_score(best_results)
+        best_rs = best_results.loc[
             best_results["mean_tests_score"].idxmax(), "random_state"
         ]
-        self.split_analysis(best_split[best_rs], **kwargs)
-        return best_split[best_rs]
+        if show_plots:
+            self.split_analysis(best_split[best_rs], **kwargs)
+
+        best_experiment_stat, best_split_stat = self.experiment_result_transform(
+            best_results[best_results["random_state"] == best_rs].iloc[0]
+        )
+        return {
+            "experiments": best_results,
+            "split": best_split[best_rs],
+            "best_experiment_stat": best_experiment_stat,
+            "split_split_stat": best_split_stat,
+        }
 
 
 class ABTest:
@@ -730,9 +978,8 @@ class ABTest:
                 The column name representing the group field
 
         Returns:
-            splitted_data:
-                A dictionary containing two dataframes, 'test' and 'control', where 'test' contains rows where the
-                group field is 'test', and 'control' contains rows where the group field is 'control'.
+            A dictionary containing two dataframes, 'test' and 'control', where 'test' contains rows where the
+            group field is 'test', and 'control' contains rows where the group field is 'control'.
         """
         return {
             "test": data[data[group_field] == "test"],
@@ -774,8 +1021,7 @@ class ABTest:
                 Column name of target before pilot
 
         Returns:
-            result:
-                Named tuple with pvalue, effect, ci_length, left_bound and right_bound
+                Named tuple with p-value, effect, ci_length, left_bound and right_bound
         """
         control = control_data[target_field]
         control_before = control_data[target_field_before]
@@ -807,13 +1053,17 @@ class ABTest:
         ATE = (y_test_after - y_control_after) - (y_test_before - y_control_before)
 
         Args:
-            test_data: Input data of test group
-            control_data: Input data of control group
-            target_field: Column name of target after pilot
-            target_field_before: Column name of target before pilot
+            test_data:
+                Input data of test group
+            control_data:
+                Input data of control group
+            target_field:
+                Column name of target after pilot
+            target_field_before:
+                Column name of target before pilot
 
         Returns:
-            did: Value of difference in difference
+            Value of difference in difference
         """
         mean_test = np.mean(test_data[target_field])
         mean_control = np.mean(control_data[target_field])
@@ -839,9 +1089,8 @@ class ABTest:
                 The name of the target field contains data before pilot
 
         Returns:
-            result:
-                A dictionary containing the difference between the target field
-                values of the 'test' and 'control' dataframes
+            A dictionary containing the difference between the target field
+            values of the 'test' and 'control' dataframes
         """
         result = {}
         if (
@@ -879,7 +1128,7 @@ class ABTest:
     def calc_p_value(
         self, splitted_data: Dict[str, pd.DataFrame], target_field: str
     ) -> Dict[str, float]:
-        """Calculates the p-value for a given data set.
+        """Calculates the p-value for a given dataset.
 
         Args:
             splitted_data:
@@ -888,9 +1137,8 @@ class ABTest:
             target_field:
                 The name of the target field
         Returns:
-            result:
-                A dictionary containing the calculated p-values, where the keys are 't-test' and 'mann_whitney'
-                and the values are the corresponding p-values
+            A dictionary containing the calculated p-values, where the keys are 't-test' and 'mann_whitney'
+            and the values are the corresponding p-values
         """
         result = {}
         if self.calc_p_value_method in {"all", "t-test"}:
@@ -917,17 +1165,20 @@ class ABTest:
         """Splits the input data based on the group field and calculates the size, difference, and p-value.
 
         Parameters:
-            data: Input data as a pandas DataFrame
-            target_field: Target field to be analyzed
-            group_field: Field used to split the data into groups
-            target_field_before: Target field without treatment to be analyzed
+            data:
+                Input data as a pandas DataFrame
+            target_field:
+                Target field to be analyzed
+            group_field:
+                Field used to split the data into groups
+            target_field_before:
+                Target field without treatment to be analyzed
 
         Returns:
-            results:
-                A dictionary containing the size, difference, and p-value of the split data
-                    'size': A dictionary with the sizes of the test and control groups
-                    'difference': A dictionary with the calculated differences between the groups
-                    'p-value': A dictionary with the calculated p-values for each group
+            A dictionary containing the size, difference, and p-value of the split data
+                'size': A dictionary with the sizes of the test and control groups
+                'difference': A dictionary with the calculated differences between the groups
+                'p-value': A dictionary with the calculated p-values for each group
         """
         splitted_data = self.split_ab(data, group_field)
 
@@ -950,15 +1201,3 @@ class ABTest:
         """Shows results of 'execute' function - dict as dataframes."""
         for k in self.results.keys():
             display(pd.DataFrame(self.results[k], index=[k]).T)
-
-
-# from itertools import combinations
-
-# t = ["A", "B", "C", "D"]
-# groups = []
-
-# for i in range(1, len(t)):
-#     i_combinstions = combinations(t, i)
-#     for c in i_combinstions:
-#         groups.append(c)
-# print(groups)
