@@ -15,8 +15,8 @@ from tqdm.auto import tqdm
 
 
 def merge_groups(
-        control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
-        test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
+    control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
+    test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
 ) -> pd.DataFrame:
     """Merges test and control groups in one DataFrame and creates column "group".
 
@@ -55,10 +55,10 @@ def split_splited_data(splitted_data: pd.DataFrame) -> Dict[str, pd.DataFrame]:
 
 
 def calc_mde(
-        test_group: pd.Series,
-        control_group: pd.Series,
-        reliability: float = 0.95,
-        power: float = 0.8,
+    test_group: pd.Series,
+    control_group: pd.Series,
+    reliability: float = 0.95,
+    power: float = 0.8,
 ) -> float:
     """Calculates the minimum detectable effect (MDE) for a given test and control groups.
 
@@ -89,11 +89,11 @@ def calc_mde(
 
 
 def calc_sample_size(
-        control_group: pd.Series,
-        test_group: pd.Series,
-        mde,
-        significance: float = 0.05,
-        power: float = 0.8,
+    control_group: pd.Series,
+    test_group: pd.Series,
+    mde,
+    significance: float = 0.05,
+    power: float = 0.8,
 ) -> float:
     """Calculates sample size of dataframe depends on mde and power.
 
@@ -120,7 +120,7 @@ def calc_sample_size(
         p2 = mde[1]
 
         return (
-                (z_alpha + z_beta) ** 2 * (p1 * (1 - p1) + p2 * (1 - p2)) / (p1 - p2) ** 2
+            (z_alpha + z_beta) ** 2 * (p1 * (1 - p1) + p2 * (1 - p2)) / (p1 - p2) ** 2
         )
     else:
         control_std = control_group.std()
@@ -130,15 +130,15 @@ def calc_sample_size(
         control_proportion = 1 - test_proportion
 
         d = ((norm.ppf(1 - significance / 2) + norm.ppf(power)) / mde) ** 2
-        s = test_std ** 2 / test_proportion + control_std ** 2 / control_proportion
+        s = test_std**2 / test_proportion + control_std**2 / control_proportion
         return d * s
 
 
 def calc_power(
-        effect_size: float,
-        control_size: float,
-        test_size: float,
-        significance: float = 0.05,
+    effect_size: float,
+    control_size: float,
+    test_size: float,
+    significance: float = 0.05,
 ) -> float:
     """Statistical power calculations for t-test for two independent sample and known significance.
 
@@ -167,13 +167,13 @@ def calc_power(
 
 class AATest:
     def __init__(
-            self,
-            target_fields: Union[Iterable[str], str] = None,
-            group_cols: Union[str, Iterable[str]] = None,
-            info_cols: Union[str, Iterable[str]] = None,
-            quant_field: str = None,
-            mode: str = "simple",
-            alpha: float = 0.05,
+        self,
+        target_fields: Union[Iterable[str], str] = None,
+        group_cols: Union[str, Iterable[str]] = None,
+        info_cols: Union[str, Iterable[str]] = None,
+        quant_field: str = None,
+        mode: str = "simple",
+        alpha: float = 0.05,
     ):
         """Initialize the AATest class.
 
@@ -197,7 +197,9 @@ class AATest:
         self.target_fields = (
             [target_fields] if isinstance(target_fields, str) else target_fields
         )
-        self.group_cols = ([group_cols] if isinstance(group_cols, str) else group_cols) or []
+        self.group_cols = (
+            [group_cols] if isinstance(group_cols, str) else group_cols
+        ) or []
         self.info_cols = [info_cols] if isinstance(info_cols, str) else info_cols
         self.quant_field = quant_field
         self.mode = mode
@@ -218,7 +220,7 @@ class AATest:
         }
 
     def __simple_mode(
-            self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
     ) -> Dict:
         """Separates data on A and B samples within simple mode.
 
@@ -257,7 +259,7 @@ class AATest:
         return result
 
     def split(
-            self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
     ) -> Dict:
         """Divides sample on two groups.
 
@@ -371,7 +373,7 @@ class AATest:
             return 1 - a_mean / b_mean
 
     def sampling_metrics(
-            self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
     ):
         """Calculates metrics of one sampling.
 
@@ -415,15 +417,15 @@ class AATest:
             ).pvalue
             t_result[f"{tf} ks-test p-value"] = ks_2samp(ta, tb).pvalue
             t_result[f"{tf} t-test passed"] = (
-                    t_result[f"{tf} t-test p-value"] < self.alpha
+                t_result[f"{tf} t-test p-value"] < self.alpha
             )
             t_result[f"{tf} ks-test passed"] = (
-                    t_result[f"{tf} ks-test p-value"] < self.alpha
+                t_result[f"{tf} ks-test p-value"] < self.alpha
             )
             scores.append(
                 (
-                        t_result[f"{tf} t-test p-value"]
-                        + 2 * t_result[f"{tf} ks-test p-value"]
+                    t_result[f"{tf} t-test p-value"]
+                    + 2 * t_result[f"{tf} ks-test p-value"]
                 )
                 / 3
             )
@@ -452,16 +454,16 @@ class AATest:
         return {"metrics": t_result, "data_from_experiment": data_from_sampling_dict}
 
     def calc_uniform_tests(
-            self,
-            data: pd.DataFrame,
-            test_size: float = 0.5,
-            iterations: int = 2000,
-            file_name: Union[Path, str] = None,
-            experiment_write_mode: str = "full",
-            split_write_mode: str = "full",
-            write_step: int = None,
-            pbar: bool = True,
-            **kwargs,
+        self,
+        data: pd.DataFrame,
+        test_size: float = 0.5,
+        iterations: int = 2000,
+        file_name: Union[Path, str] = None,
+        experiment_write_mode: str = "full",
+        split_write_mode: str = "full",
+        write_step: int = None,
+        pbar: bool = True,
+        **kwargs,
     ) -> Optional[Tuple[pd.DataFrame, Dict[Any, Dict]]]:
         """Chooses random_state for finding homogeneous distribution.
 
@@ -509,7 +511,7 @@ class AATest:
             split_write_mode = "full"
 
         for i, rs in tqdm(
-                enumerate(random_states), total=len(random_states), disable=not pbar
+            enumerate(random_states), total=len(random_states), disable=not pbar
         ):
             res = self.sampling_metrics(data, random_state=rs, test_size=test_size)
 
@@ -555,7 +557,7 @@ class AATest:
             return results, data_from_sampling
 
     def features_p_value_distribution(
-            self, experiment_results: pd.DataFrame, figsize=None, bin_step=0.05
+        self, experiment_results: pd.DataFrame, figsize=None, bin_step=0.05
     ):
         """Process plots of features' p-value distribution.
 
@@ -633,7 +635,7 @@ class AATest:
         return result
 
     def uniform_tests_interpretation(
-            self, experiment_results: pd.DataFrame, **kwargs
+        self, experiment_results: pd.DataFrame, **kwargs
     ) -> pd.DataFrame:
         """Process plotting of p-value distribution and results of AA-test.
 
@@ -655,11 +657,11 @@ class AATest:
         return self.aa_score(experiment_results)
 
     def num_feature_uniform_analysis(
-            self,
-            control_data: pd.Series,
-            test_data: pd.Series,
-            plot_set: Tuple = ("hist", "cumulative", "percentile"),
-            **kwargs,
+        self,
+        control_data: pd.Series,
+        test_data: pd.Series,
+        plot_set: Tuple = ("hist", "cumulative", "percentile"),
+        **kwargs,
     ):
         """P-value analyser for numerical features in Kolmogorov-Smirnov and T tests.
 
@@ -694,8 +696,8 @@ class AATest:
             min(control_data.min(), test_data.min()),
             max(control_data.max(), test_data.max()),
             (
-                    max(control_data.max(), test_data.max())
-                    - min(control_data.min(), test_data.min())
+                max(control_data.max(), test_data.max())
+                - min(control_data.min(), test_data.min())
             )
             / kwargs.get("bins", 100),
         )
@@ -775,7 +777,7 @@ class AATest:
         plt.show()
 
     def cat_feature_uniform_analysis(
-            self, control_data: pd.Series, test_data: pd.Series, **kwargs
+        self, control_data: pd.Series, test_data: pd.Series, **kwargs
     ):
         """P-value analyser for category features in Kolmogorov-Smirnov and T tests.
 
@@ -807,14 +809,26 @@ class AATest:
         )
         ax.fill_between(
             s_control_data.index,
-            test_counts[[i for i in test_counts.index if i in control_counts.index]].values,
-            color="red", alpha=0.3, label="test"
+            test_counts[
+                [i for i in test_counts.index if i in control_counts.index]
+            ].values,
+            color="red",
+            alpha=0.3,
+            label="test",
         )
 
         ax.legend()
         ax.tick_params(axis="x", rotation=90)
         figure.suptitle(f"{control_data.name}", fontsize=kwargs.get("title_size", 20))
         plt.show()
+
+    def experiment_result_transform(self, experiment: pd.Series):
+        targets_dict = {}
+        for tf in self.target_fields:
+            targets_dict[tf] = {}
+            for i in experiment.index:
+                targets_dict[tf][i[len(tf) + 1 :]] = experiment[i]
+        return pd.DataFrame(targets_dict).T, experiment.iloc[-7:]
 
     def split_analysis(self, splited_data: pd.DataFrame, **kwargs):
         """P-value analyser for numerical and category features in Kolmogorov-Smirnov and T tests.
@@ -835,8 +849,14 @@ class AATest:
                 ssp["control"][cf], ssp["test"][cf], **kwargs
             )
 
-    def process(self, data: pd.DataFrame, optimize_groups: bool = False, iterations: int = 2000, show_plots=True,
-                **kwargs):
+    def process(
+        self,
+        data: pd.DataFrame,
+        optimize_groups: bool = False,
+        iterations: int = 2000,
+        show_plots=True,
+        **kwargs,
+    ):
         """Main function for AATest estimation.
 
         Provides:
@@ -893,7 +913,11 @@ class AATest:
 
         else:
             best_results, best_split = self.calc_uniform_tests(
-                data, experiment_write_mode="full", split_write_mode="any", iterations=iterations, **kwargs
+                data,
+                experiment_write_mode="full",
+                split_write_mode="any",
+                iterations=iterations,
+                **kwargs,
             )
 
         if len(best_results) == 0:
@@ -907,14 +931,23 @@ class AATest:
         ]
         if show_plots:
             self.split_analysis(best_split[best_rs], **kwargs)
-        return best_results, best_split[best_rs]
+
+        best_experiment_stat, best_split_stat = self.experiment_result_transform(
+            best_results[best_results["random_state"] == best_rs].iloc[0]
+        )
+        return {
+            "experiments": best_results,
+            "split": best_split[best_rs],
+            "best_experiment_stat": best_experiment_stat,
+            "split_split_stat": best_split_stat,
+        }
 
 
 class ABTest:
     def __init__(
-            self,
-            calc_difference_method: str = "all",
-            calc_p_value_method: str = "all",
+        self,
+        calc_difference_method: str = "all",
+        calc_p_value_method: str = "all",
     ):
         """Initializes the ABTest class.
 
@@ -955,10 +988,10 @@ class ABTest:
 
     @staticmethod
     def cuped(
-            test_data: pd.DataFrame,
-            control_data: pd.DataFrame,
-            target_field: str,
-            target_field_before: str,
+        test_data: pd.DataFrame,
+        control_data: pd.DataFrame,
+        target_field: str,
+        target_field_before: str,
     ) -> float:
         """Counts CUPED (Controlled-Experiment using Pre-Experiment Data) in absolute values.
 
@@ -996,8 +1029,8 @@ class ABTest:
         test_before = test_data[target_field_before]
 
         theta = (
-                        np.cov(control, control_before)[0, 1] + np.cov(test, test_before)[0, 1]
-                ) / (np.var(control_before) + np.var(test_before))
+            np.cov(control, control_before)[0, 1] + np.cov(test, test_before)[0, 1]
+        ) / (np.var(control_before) + np.var(test_before))
 
         control_cuped = control - theta * control_before
         test_cuped = test - theta * test_before
@@ -1009,10 +1042,10 @@ class ABTest:
 
     @staticmethod
     def diff_in_diff(
-            test_data: pd.DataFrame,
-            control_data: pd.DataFrame,
-            target_field: str,
-            target_field_before: str,
+        test_data: pd.DataFrame,
+        control_data: pd.DataFrame,
+        target_field: str,
+        target_field_before: str,
     ) -> float:
         """Counts Difference in Difference.
 
@@ -1040,10 +1073,10 @@ class ABTest:
         return (mean_test - mean_control) - (mean_test_before - mean_control_before)
 
     def calc_difference(
-            self,
-            splitted_data: Dict[str, pd.DataFrame],
-            target_field: str,
-            target_field_before: str = None,
+        self,
+        splitted_data: Dict[str, pd.DataFrame],
+        target_field: str,
+        target_field_before: str = None,
     ) -> Dict[str, float]:
         """Calculates the difference between the target field values of the 'test' and 'control' dataframes.
 
@@ -1061,8 +1094,8 @@ class ABTest:
         """
         result = {}
         if (
-                self.calc_difference_method in {"all", "diff_in_diff", "cuped"}
-                and target_field_before is None
+            self.calc_difference_method in {"all", "diff_in_diff", "cuped"}
+            and target_field_before is None
         ):
             raise ValueError(
                 "For calculation metrics 'cuped' or 'diff_in_diff' field 'target_field_before' is required.\n"
@@ -1070,8 +1103,8 @@ class ABTest:
             )
         if self.calc_difference_method in {"all", "ate"}:
             result["ate"] = (
-                    splitted_data["test"][target_field].values
-                    - splitted_data["control"][target_field].values
+                splitted_data["test"][target_field].values
+                - splitted_data["control"][target_field].values
             ).mean()
 
         if self.calc_difference_method in {"all", "cuped"}:
@@ -1093,7 +1126,7 @@ class ABTest:
         return result
 
     def calc_p_value(
-            self, splitted_data: Dict[str, pd.DataFrame], target_field: str
+        self, splitted_data: Dict[str, pd.DataFrame], target_field: str
     ) -> Dict[str, float]:
         """Calculates the p-value for a given dataset.
 
@@ -1123,11 +1156,11 @@ class ABTest:
         return result
 
     def execute(
-            self,
-            data: pd.DataFrame,
-            target_field: str,
-            group_field: str,
-            target_field_before: str = None,
+        self,
+        data: pd.DataFrame,
+        target_field: str,
+        group_field: str,
+        target_field_before: str = None,
     ) -> Dict[str, Dict[str, float]]:
         """Splits the input data based on the group field and calculates the size, difference, and p-value.
 
