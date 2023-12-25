@@ -205,6 +205,17 @@ class AATest:
         self.alpha = alpha
 
     def columns_labeling(self, data: pd.DataFrame) -> Dict[str, List[str]]:
+        """
+        Label columns as target columns and group columns.
+
+        Args:
+            data:
+                Input dataframe
+
+        Returns:
+            Dictionary with list of target columns and group columns
+
+        """
         return {
             "target_field": list(
                 data.select_dtypes(include="number").columns.drop(
@@ -372,8 +383,7 @@ class AATest:
             return 1 - a_mean / b_mean
 
     def sampling_metrics(
-        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
-    ):
+        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5):
         """Calculates metrics of one sampling.
 
         Args:
@@ -556,8 +566,7 @@ class AATest:
             return results, data_from_sampling
 
     def features_p_value_distribution(
-        self, experiment_results: pd.DataFrame, figsize=None, bin_step=0.05
-    ):
+        self, experiment_results: pd.DataFrame, figsize=None, bin_step=0.05):
         """Process plots of features' p-value distribution.
 
         Args:
@@ -660,7 +669,7 @@ class AATest:
         control_data: pd.Series,
         test_data: pd.Series,
         plot_set: Tuple = ("hist", "cumulative", "percentile"),
-        **kwargs,
+        **kwargs
     ):
         """P-value analyser for numerical features in Kolmogorov-Smirnov and T tests.
 
@@ -776,8 +785,7 @@ class AATest:
         plt.show()
 
     def cat_feature_uniform_analysis(
-        self, control_data: pd.Series, test_data: pd.Series, **kwargs
-    ):
+        self, control_data: pd.Series, test_data: pd.Series, **kwargs):
         """P-value analyser for category features in Kolmogorov-Smirnov and T tests.
 
         Args:
@@ -891,6 +899,8 @@ class AATest:
             * Plotting results
 
         Args:
+            test_size:
+                Size of test group (float)
             data:
                 Input dataset
             optimize_groups:
@@ -899,6 +909,8 @@ class AATest:
                 Number of iterations for AB-test
             show_plots:
                 Is in necessary to show plots (True/False)
+            pbar:
+                Show progress-bar
             **kwargs:
                 Some extra keyword arguments
 
