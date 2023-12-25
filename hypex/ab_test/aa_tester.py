@@ -7,8 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from IPython.display import display
-from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu, norm
+from scipy.stats import ttest_ind, ks_2samp, norm
 from sklearn.utils import shuffle
 from statsmodels.stats.power import TTestIndPower
 from tqdm.auto import tqdm
