@@ -206,6 +206,14 @@ class AATest:
         self.alpha = alpha
 
     def columns_labeling(self, data: pd.DataFrame) -> Dict[str, List[str]]:
+        """
+
+        Args:
+            data:
+
+        Returns:
+
+        """
         return {
             "target_field": list(
                 data.select_dtypes(include="number").columns.drop(
@@ -823,6 +831,14 @@ class AATest:
         plt.show()
 
     def experiment_result_transform(self, experiment: pd.Series):
+        """
+
+        Args:
+            experiment:
+
+        Returns:
+
+        """
         targets_dict = {}
         for tf in self.target_fields:
             targets_dict[tf] = {}
@@ -855,6 +871,15 @@ class AATest:
         aa_score: pd.DataFrame,
         best_experiment_stat: pd.DataFrame
     ):
+        """
+
+        Args:
+            aa_score:
+            best_experiment_stat:
+
+        Returns:
+
+        """
         result = {"aa test passed": {}, "split is uniform": {}}
         for field in self.target_fields:
             result["aa test passed"][field] = (
@@ -895,7 +920,13 @@ class AATest:
             show_plots:
                 Is in necessary to show plots (True/False)
             **kwargs:
-                Some extra keyword arguments
+                Some extra keyword arguments. May contain:
+                    * plot_set - types of plot, that you want to show ("hist", "cumulative", "percentile")
+                    * figsize - size of figure for plots
+                    * alpha - value to change the transparency of the histogram plot
+                    * bins - generic bin parameter that can be the name of a reference rule,
+                      the number of bins, or the breaks of the bins
+                    * title_size - size of title for plots
 
         Returns:
             best_results:
