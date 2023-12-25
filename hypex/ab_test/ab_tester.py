@@ -220,7 +220,7 @@ class AATest:
         }
 
     def __simple_mode(
-        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+        self, data: pd.DataFrame, random_state: int = None, control_size: float = 0.5
     ) -> Dict:
         """Separates data on A and B samples within simple mode.
 
@@ -242,7 +242,7 @@ class AATest:
             random_ids = shuffle(
                 data[self.quant_field].unique(), random_state=random_state
             )
-            edge = int(len(random_ids) * test_size)
+            edge = int(len(random_ids) * control_size)
             result["test_indexes"] = list(
                 data[data[self.quant_field].isin(random_ids[:edge])].index
             )
@@ -252,14 +252,14 @@ class AATest:
 
         else:
             addition_indexes = list(shuffle(data.index, random_state=random_state))
-            edge = int(len(addition_indexes) * test_size)
+            edge = int(len(addition_indexes) * control_size)
             result["test_indexes"] = addition_indexes[:edge]
             result["control_indexes"] = addition_indexes[edge:]
 
         return result
 
     def split(
-        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+        self, data: pd.DataFrame, random_state: int = None, control_size: float = 0.5
     ) -> Dict:
         """Divides sample on two groups.
 
@@ -268,7 +268,7 @@ class AATest:
                 Raw input data
             random_state:
                 Seed of random - one integer to fix split
-            test_size:
+            control_size:
                 Group size ratio
 
         Returns:
@@ -287,7 +287,7 @@ class AATest:
                     self.mode = "simple"
 
                 if self.mode == "simple":
-                    t_result = self.__simple_mode(gd, random_state, test_size)
+                    t_result = self.__simple_mode(gd, random_state, control_size)
                     result["test_indexes"] += t_result["test_indexes"]
                     result["control_indexes"] += t_result["control_indexes"]
 
@@ -316,7 +316,7 @@ class AATest:
                     f"Implemented mode 'simple'."
                 )
 
-            t_result = self.__simple_mode(data, random_state, test_size)
+            t_result = self.__simple_mode(data, random_state, control_size)
             result["test_indexes"] = t_result["test_indexes"]
             result["control_indexes"] = t_result["control_indexes"]
 
@@ -373,7 +373,7 @@ class AATest:
             return 1 - a_mean / b_mean
 
     def sampling_metrics(
-        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+        self, data: pd.DataFrame, random_state: int = None, control_size: float = 0.5
     ):
         """Calculates metrics of one sampling.
 
@@ -382,8 +382,8 @@ class AATest:
                 Raw input data
             random_state:
                 Random seeds for searching
-            test_size:
-                Percentage of test data
+            control_size:
+                Percentage of control data
 
         Returns:
             Tuple of
@@ -394,7 +394,7 @@ class AATest:
         scores = []
         t_result = {"random_state": random_state}
 
-        split = self.split(data, random_state, test_size)
+        split = self.split(data, random_state, control_size)
 
         a = data.loc[split["control_indexes"]]
         b = data.loc[split["test_indexes"]]
@@ -456,7 +456,7 @@ class AATest:
     def calc_uniform_tests(
         self,
         data: pd.DataFrame,
-        test_size: float = 0.5,
+        control_size: float = 0.5,
         iterations: int = 2000,
         file_name: Union[Path, str] = None,
         experiment_write_mode: str = "full",
@@ -472,8 +472,8 @@ class AATest:
                 Raw input data
             iterations:
                 Number of iterations to search uniform sampling to searching
-            test_size:
-                Percentage of test data
+            control_size:
+                Percentage of control data
             file_name:
                 Name of file to save results (if None - no results will be saved, func returns result)
             experiment_write_mode:
@@ -513,7 +513,7 @@ class AATest:
         for i, rs in tqdm(
             enumerate(random_states), total=len(random_states), disable=not pbar
         ):
-            res = self.sampling_metrics(data, random_state=rs, test_size=test_size)
+            res = self.sampling_metrics(data, random_state=rs, control_size=control_size)
 
             # write to file
             passed = []
@@ -850,6 +850,26 @@ class AATest:
                 ssp["control"][cf], ssp["test"][cf], **kwargs
             )
 
+    def get_resume(
+        self,
+        aa_score: pd.DataFrame,
+        best_experiment_stat: pd.DataFrame
+    ):
+        result = {"aa test passed": {}, "split is uniform": {}}
+        for field in self.target_fields:
+            result["aa test passed"][field] = (
+                aa_score.loc[field, "t-test aa passed"]
+                or aa_score.loc[field, "ks-test aa passed"]
+            )
+            result["split is uniform"][field] = (
+                best_experiment_stat.loc[field, "t-test passed"]
+                or best_experiment_stat.loc[field, "ks-test passed"]
+            )
+        result = pd.DataFrame(result)
+        result["split is uniform"] = result["split is uniform"].astype("bool").replace({False: "OK", True: "not OK"})
+        result["aa test passed"] = result["aa test passed"].astype("bool").replace({False: "not OK", True: "OK"})
+        return result
+
     def process(
         self,
         data: pd.DataFrame,
@@ -906,7 +926,7 @@ class AATest:
                     aa_scores = self.aa_score(experiment_results)
                     group_score = max(
                         aa_scores.loc["mean", "t-test aa passed"],
-                        aa_scores.loc["mean", "t-test aa passed"],
+                        aa_scores.loc["mean", "ks-test aa passed"],
                     )
                     if group_score > max_score:
                         best_results, best_split = experiment_results, data_splits
@@ -936,12 +956,16 @@ class AATest:
         best_experiment_stat, best_split_stat = self.experiment_result_transform(
             best_results[best_results["random_state"] == best_rs].iloc[0]
         )
+
+        resume = self.get_resume(aa_scores, best_experiment_stat)
+
         return {
             "experiments": best_results,
             "aa_score": aa_scores,
             "split": best_split[best_rs],
             "best_experiment_stat": best_experiment_stat,
             "split_stat": best_split_stat,
+            "resume": resume
         }
 
 
@@ -1203,5 +1227,3 @@ class ABTest:
         """Shows results of 'execute' function - dict as dataframes."""
         for k in self.results.keys():
             display(pd.DataFrame(self.results[k], index=[k]).T)
-
-
