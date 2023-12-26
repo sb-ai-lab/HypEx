@@ -35,6 +35,8 @@ def calculate_comparisons(sample_array: np.ndarray, variances: List[float], equa
     if equal_variance:
         diff_matrix = sample_array[:, np.newaxis] - sample_array
         comparison_values = diff_matrix / np.sqrt(2)
+        np.fill_diagonal(comparison_values, np.nan)
+        return comparison_values[~np.isnan(comparison_values)]
     else:
         variances = np.array(variances)
         scaling_factors = 1 / np.sqrt(1 + variances[:, np.newaxis] / variances)
@@ -84,7 +86,7 @@ def calculate_quantiles(num_samples: int, variances: List[float], equal_variance
     Returns:
         List of quantiles.
     """
-    random_samples = norm.rvs(size=[iterations, num_samples])
+    random_samples = norm.rvs(size=[iterations, num_samples], random_state=42)
     min_comparison_values = calculate_min_comparisons(random_samples, variances, equal_variance)
     return list(min_comparison_values)
 
@@ -114,6 +116,7 @@ def quantile_of_marginal_distribution(num_samples: int, gamma_level: float,
         variances = np.ones(num_samples)
 
     min_comparison_values = calculate_quantiles(num_samples, variances, equal_variance)
+    print(f"{min_comparison_values = }")
     if equal_variance:
         return np.quantile(min_comparison_values, gamma_level)
     else:
@@ -197,12 +200,14 @@ def _calculate_sample_size_equal_var(num_samples: int, minimum_effect: float, va
         quantile_1 = quantile_of_marginal_distribution(num_samples, 1 - alpha / num_samples, variance, True)
     if quantile_2 is None:
         quantile_2 = quantile_of_marginal_distribution(num_samples, beta, variance, True)
-
+    print(f"{quantile_1 = }")
+    print(f"{quantile_2 = }")
     return int(2 * variance * ((quantile_1 - quantile_2) / minimum_effect) ** 2) + 1
 
 
 def _calculate_sample_size_unequal_var(num_samples: int, minimum_effect: float, variances: List[float], alpha: float,
-                                       beta: float, quantile_thresholds: Optional[List[float]],
+                                       beta: float,
+                                       quantile_thresholds: Optional[List[float]],
                                        initial_estimate: Optional[int], increment: int = 100,
                                        iterations: int = 3000) -> int:
     """
@@ -230,7 +235,7 @@ def _calculate_sample_size_unequal_var(num_samples: int, minimum_effect: float, 
         sample_size = initial_estimate or 0
         while True:
             sample_size += increment
-            random_samples = norm.rvs(size=[iterations, num_samples])
+            random_samples = norm.rvs(size=[iterations, num_samples], random_state=42)
             power = np.mean([
                 np.all([
                     (random_samples[i, j] / np.sqrt(1 + variances[i] / variances[j]) - random_samples[i, i] / np.sqrt(
@@ -249,7 +254,8 @@ def _calculate_sample_size_unequal_var(num_samples: int, minimum_effect: float, 
 def min_sample_size(num_samples: int, minimum_effect: float, variances: Union[List[float], float], alpha: float = 0.05,
                     beta: float = 0.2, equal_variance: bool = True,
                     quantile_1: Optional[Union[float, List[float]]] = None, quantile_2: Optional[float] = None,
-                    initial_estimate: Optional[int] = None) -> int:
+                    initial_estimate: Optional[int] = None,
+                    ) -> int:
     """
     Calculate the minimum sample size required for a statistical test.
 
@@ -277,79 +283,77 @@ def min_sample_size(num_samples: int, minimum_effect: float, variances: Union[Li
 
 # Применение метода
 
-# Пример 1
-# Рассмотрим множественный тест для выявления выборки с лучшей конверсии (распределение Бернулли)
-# В этом случае при гипотезе H_0, равенстве конверсий на всех выборках, дисперсии равны, 
-# поскольку дисперсия зависит только от конверсии
+import numpy as np
 
-from scipy.stats import bernoulli
+# Фиксированный random state
+random_state = np.random.RandomState(42)  # Вы можете выбрать любое число в качестве seed
 
 k = 10  # число выборок
 d = 0.05  # MDE
-p = 0.3  # предполагаемая конверсия (параметр распределения Бернулли)
+p = 0.3  # предполагаемая конверсия
 alpha = 0.05  # уровень значимости
 beta = 0.2  # 1 - мощность
 
-# считаем минимальный размер выборки
-n = min_sample_size(k, d, p * (1 - p), alpha=alpha, beta=beta, equal_variance=True)
+# Считаем минимальный размер выборки
+n = min_sample_size(k, d, variances=p * (1 - p), alpha=alpha, beta=beta, equal_variance=True)
 print(f'Размер выборки = {n}')
-
-# Попробуем сгенерировать выборки и посмотреть результат тестирования
-N = 5
-# все выборки имеют одинаковую конверсию
-print('\nВсе выборки имеют одинаковую конверсию')
-for _ in range(N):
-    X = bernoulli.rvs(p, size=[k, n])
-    hyp = test_on_marginal_distribution(X, alpha=alpha)
-    print(f'\tПринята гипотеза H({hyp})')
-
-# десятая выборка имеет большую на MDE конверсию
-print('\nДесятая выборка имеет большую на MDE конверсию')
-for _ in range(N):
-    X = []
-    for i in range(k - 1):
-        X += [bernoulli.rvs(p, size=n)]
-    X += [bernoulli.rvs(p + d, size=n)]
-    hyp = test_on_marginal_distribution(X, alpha=alpha)
-    print(f'\tПринята гипотеза H({hyp})')
-
-# Пример 2
-# Рассмотрим множественный тест для выявления выборки с лучшим доходом на клиента (конверсия * цена)
-# В этом случае при гипотезе H_0, равенстве ARPU на всех выборках, дисперсии не равны, 
-# поскольку при гипотезе H_0 при разных ценах получаем разные конверсии
-
-k = 5  # число выборок
-d = 2.5  # MDE
-# в среднем ARPU = 15 рублей
-Price = [100, 150, 150, 200, 250]  # цены тарифов
-conv = [0.15, 0.1, 0.1, 0.075, 0.06]  # конверсии тарифов
-alpha = 0.05  # уровень значимости
-beta = 0.2  # 1 - мощность
-var = []  # дисперсии тарифов
-for i in range(k):
-    var += [Price[i] ** 2 * conv[i] * (1 - conv[i])]
-
-# считаем минимальный размер выборки
-n = min_sample_size(k, d, var, alpha=alpha, beta=beta, equal_variance=False)
-print(f'Размер выборки = {n}')
-
-# Попробуем сгенерировать выборки и посмотреть результат тестирования
-N = 5
-# все выборки имеют одинаковый ARPU
-print('\nВсе выборки имеют одинаковый ARPU')
-for _ in range(N):
-    X = []
-    for i in range(k):
-        X += [Price[i] * bernoulli.rvs(conv[i], size=n)]
-    hyp = test_on_marginal_distribution(X, alpha=alpha)
-    print(f'\tПринята гипотеза H({hyp})')
-
-# десятая выборка имеет больший на MDE ARPU
-print('\nДесятая выборка имеет больший на MDE ARPU')
-for _ in range(N):
-    X = []
-    for i in range(k - 1):
-        X += [Price[i] * bernoulli.rvs(conv[i], size=n)]
-    X += [Price[k - 1] * bernoulli.rvs(conv[k - 1] + d / Price[k - 1], size=n)]
-    hyp = test_on_marginal_distribution(X, alpha=alpha)
-    print(f'\tПринята гипотеза H({hyp})')
+#
+# N = 5
+#
+# # Все выборки имеют одинаковую конверсию
+# print('\nВсе выборки имеют одинаковую конверсию')
+# for _ in range(N):
+#     X = bernoulli.rvs(p, size=[k, n], random_state=random_state)
+#     hyp = test_on_marginal_distribution(X, alpha=alpha)
+#     print(f'\tПринята гипотеза H({hyp})')
+#
+# # Десятая выборка имеет большую на MDE конверсию
+# print('\nДесятая выборка имеет большую на MDE конверсию')
+# for _ in range(N):
+#     X = []
+#     for i in range(k - 1):
+#         X.append(bernoulli.rvs(p, size=n, random_state=random_state))
+#     X.append(bernoulli.rvs(p + d, size=n, random_state=random_state))
+#     hyp = test_on_marginal_distribution(X, alpha=alpha)
+#     print(f'\tПринята гипотеза H({hyp})')
+#
+# # Пример 2
+# # Рассмотрим множественный тест для выявления выборки с лучшим доходом на клиента (конверсия * цена)
+# # В этом случае при гипотезе H_0, равенстве ARPU на всех выборках, дисперсии не равны,
+# # поскольку при гипотезе H_0 при разных ценах получаем разные конверсии
+#
+# k = 5  # число выборок
+# d = 2.5  # MDE
+# # в среднем ARPU = 15 рублей
+# Price = [100, 150, 150, 200, 250]  # цены тарифов
+# conv = [0.15, 0.1, 0.1, 0.075, 0.06]  # конверсии тарифов
+# alpha = 0.05  # уровень значимости
+# beta = 0.2  # 1 - мощность
+# var = []  # дисперсии тарифов
+# for i in range(k):
+#     var += [Price[i] ** 2 * conv[i] * (1 - conv[i])]
+#
+# # считаем минимальный размер выборки
+# n = min_sample_size(k, d, var, alpha=alpha, beta=beta, equal_variance=False)
+# print(f'Размер выборки = {n}')
+#
+# # Попробуем сгенерировать выборки и посмотреть результат тестирования
+# N = 5
+# # все выборки имеют одинаковый ARPU
+# print('\nВсе выборки имеют одинаковый ARPU')
+# for _ in range(N):
+#     X = []
+#     for i in range(k):
+#         X += [Price[i] * bernoulli.rvs(conv[i], size=n)]
+#     hyp = test_on_marginal_distribution(X, alpha=alpha)
+#     print(f'\tПринята гипотеза H({hyp})')
+#
+# # десятая выборка имеет больший на MDE ARPU
+# print('\nДесятая выборка имеет больший на MDE ARPU')
+# for _ in range(N):
+#     X = []
+#     for i in range(k - 1):
+#         X += [Price[i] * bernoulli.rvs(conv[i], size=n)]
+#     X += [Price[k - 1] * bernoulli.rvs(conv[k - 1] + d / Price[k - 1], size=n)]
+#     hyp = test_on_marginal_distribution(X, alpha=alpha)
+#     print(f'\tПринята гипотеза H({hyp})')
