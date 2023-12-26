@@ -1,11 +1,11 @@
-.. currentmodule:: hypex.ab_test.ab_tester
+.. currentmodule:: hypex.ab_test
 
 AB Testing
 ===================
 
-Classes for AB testing analysis.
+Classes for AB and AA testing analysis.
 
-AB Test Classes
+AA-AB Test Classes
 ------------------------
 
 .. autosummary::
@@ -16,8 +16,16 @@ AB Test Classes
     AATest
     ABTest
 
-
 Utility Functions
 -----------------
 
-.. autofunction:: merge_groups
+.. currentmodule:: hypex.ab_test.aa_tester
+.. autosummary::
+    :toctree: ./generated
+    :nosignatures:
+    :template: functiontemplate.rst
+
+    merge_groups
+
+
+
