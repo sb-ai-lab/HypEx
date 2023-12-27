@@ -184,7 +184,7 @@ class AATest:
             info_cols:
                 List or str with informational columns
             quant_field:
-
+                String with name of column for quantization
             mode:
                 Mode of the AA-test
                 Available modes:
