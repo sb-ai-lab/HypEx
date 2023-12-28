@@ -1,3 +1,4 @@
+"""Module for AB tests"""
 from typing import Dict
 import pandas as pd
 from IPython.display import display
@@ -6,6 +7,53 @@ from scipy.stats import ttest_ind, mannwhitneyu
 
 
 class ABTest:
+    """
+       A class for conducting A/B testing using statistical methods.
+
+       This class provides methods for splitting data into test and control groups,
+       calculating various metrics to compare these groups, and computing p-values
+       to assess the statistical significance of the observed differences.
+
+       Attributes:
+           calc_difference_method (str): Method used for calculating the difference
+               between test and control groups. Options include 'all' (default),
+               'ate' (average treatment effect), 'diff_in_diff' (difference in
+               differences), and 'cuped' (Controlled-Experiment using Pre-Experiment
+               Data).
+           calc_p_value_method (str): Method used for calculating the p-value.
+               Options include 'all' (default), 't-test', and 'mann_whitney'.
+           results (dict or None): Stores the results of the executed tests. Each
+               key (like 'size', 'difference', 'p-value') maps to a corresponding
+               result.
+
+       Methods:
+           split_ab(data, group_field):
+               Splits a DataFrame into test and control groups based on a group field.
+           cuped(test_data, control_data, target_field, target_field_before):
+               Calculates the Controlled-Experiment using Pre-Experiment Data (CUPED)
+               metric.
+           diff_in_diff(test_data, control_data, target_field, target_field_before):
+               Computes the Difference in Differences (DiD) metric.
+           calc_difference(splitted_data, target_field, target_field_before):
+               Calculates the difference in the target field between test and control.
+           calc_p_value(splitted_data, target_field):
+               Calculates the p-value for the difference between test and control groups.
+           execute(data, target_field, group_field, target_field_before):
+               Executes the A/B test, splitting the data and calculating size,
+               difference, and p-value.
+           show_beautiful_result():
+               Displays the results in an easy-to-read format.
+
+       Example:
+        >>> model = ABTest()
+        >>> results = model.execute(
+        >>>     data=data_ab,
+        >>>     target_field='post_spends',
+        >>>     target_field_before='pre_spends',
+        >>>     group_field='group'
+        >>>)
+        >>>results
+       """
     def __init__(
         self,
         calc_difference_method: str = "all",
