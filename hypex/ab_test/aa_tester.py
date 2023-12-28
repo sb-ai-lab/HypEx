@@ -18,7 +18,6 @@ def merge_groups(
     test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
 ) -> pd.DataFrame:
     """Merges test and control groups in one DataFrame and creates column "group".
-
     Column "group" contains of "test" and "control" values.
 
     Args:
@@ -233,7 +232,6 @@ class AATest:
         self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
     ) -> Dict:
         """Separates data on A and B samples within simple mode.
-
         Separation performed to divide groups of equal sizes - equal amount of records
         or equal amount of groups in each sample.
 
@@ -338,8 +336,7 @@ class AATest:
     @staticmethod
     def _postprep_data(data, spit_indexes: Dict = None) -> pd.DataFrame:
         """Prepares data to show user.
-
-        Adds info_cols and decode binary variables
+        Adds info_cols and decode binary variables.
 
         Args:
             data:
@@ -830,6 +827,16 @@ class AATest:
         plt.show()
 
     def experiment_result_transform(self, experiment: pd.Series):
+        """
+        Transform the experiment result into readable view.
+
+        Args:
+            experiment:
+                Results of the experiment
+
+        Returns:
+            DataFrame with results of the experiment and statistics from best split
+        """
         targets_dict = {}
         for tf in self.target_fields:
             targets_dict[tf] = {}
@@ -858,6 +865,18 @@ class AATest:
             )
 
     def get_resume(self, aa_score: pd.DataFrame, best_experiment_stat: pd.DataFrame):
+        """Format results into clear format for understanding.
+
+        Args:
+            aa_score:
+                Results of aa-test
+            best_experiment_stat:
+                Results of the best experiment
+
+        Returns:
+            DataFrame with OK and not OK depending on the results of statistical tests
+
+        """
         result = {"aa test passed": {}, "split is uniform": {}}
         for field in self.target_fields:
             result["aa test passed"][field] = (
