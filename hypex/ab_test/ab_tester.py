@@ -52,7 +52,7 @@ class ABTest:
         >>>     target_field_before='pre_spends',
         >>>     group_field='group'
         >>>)
-        >>>results
+        >>> results
        """
 
     def __init__(
