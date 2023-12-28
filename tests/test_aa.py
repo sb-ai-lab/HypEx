@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(".").absolute().parent))
 
-from hypex.ab_test.aa_tester import AATest
+from hypex import AATest
 from hypex.utils.tutorial_data_creation import create_test_data
 
 
@@ -114,4 +114,4 @@ def test_unbalanced_groups(data, iterations, info_col):
         test_size=test_size,
         pbar=False
     )
-    assert abs(results["split_stat"]["test %"]/100 - test_size) < 0.05
+    assert abs(results["split_stat"]["test %"] / 100 - test_size) < 0.05
