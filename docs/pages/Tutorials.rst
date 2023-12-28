@@ -8,4 +8,4 @@ Tutorials
 
     tutorials/Tutorial_1_Matching.nblink
     tutorials/Tutorial_2_AAtesting.nblink
-    Tutorial_3_ABtesting.nblink
+    tutorials/Tutorial_3_ABtesting.nblink

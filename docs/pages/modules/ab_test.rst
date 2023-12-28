@@ -1,4 +1,4 @@
-.. currentmodule:: hypex.ab_test
+.. currentmodule:: hypex
 
 AB Testing
 ===================
@@ -13,6 +13,7 @@ AA-AB Test Classes
     :nosignatures:
     :template: classtemplate.rst
 
+
     AATest
     ABTest
 
@@ -25,7 +26,7 @@ Utility Functions
     :nosignatures:
     :template: functiontemplate.rst
 
-    merge_groups
+
 
 
 
