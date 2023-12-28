@@ -76,7 +76,22 @@ results.keys()
 
 ### AB-test example
 
-Coming soon
+```python
+from hypex import ABTest
+from hypex.utils.tutorial_data_creation import create_test_data
+
+data = create_test_data(rs=52, na_step=10, nan_cols=['age', 'gender'])
+
+model = ABTest()
+results = model.execute(
+    data=data, 
+    target_field='post_spends', 
+    target_field_before='pre_spends', 
+    group_field='group'
+)
+
+model.show_beautiful_result()
+```
 
 ## Documentation
 
