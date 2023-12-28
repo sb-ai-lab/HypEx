@@ -54,10 +54,11 @@ class ABTest:
         >>>)
         >>>results
        """
+
     def __init__(
-        self,
-        calc_difference_method: str = "all",
-        calc_p_value_method: str = "all",
+            self,
+            calc_difference_method: str = "all",
+            calc_p_value_method: str = "all",
     ):
         """Initializes the ABTest class.
 
@@ -98,10 +99,10 @@ class ABTest:
 
     @staticmethod
     def cuped(
-        test_data: pd.DataFrame,
-        control_data: pd.DataFrame,
-        target_field: str,
-        target_field_before: str,
+            test_data: pd.DataFrame,
+            control_data: pd.DataFrame,
+            target_field: str,
+            target_field_before: str,
     ) -> float:
         """Counts CUPED (Controlled-Experiment using Pre-Experiment Data) in absolute values.
 
@@ -139,8 +140,8 @@ class ABTest:
         test_before = test_data[target_field_before]
 
         theta = (
-            np.cov(control, control_before)[0, 1] + np.cov(test, test_before)[0, 1]
-        ) / (np.var(control_before) + np.var(test_before))
+                        np.cov(control, control_before)[0, 1] + np.cov(test, test_before)[0, 1]
+                ) / (np.var(control_before) + np.var(test_before))
 
         control_cuped = control - theta * control_before
         test_cuped = test - theta * test_before
@@ -152,10 +153,10 @@ class ABTest:
 
     @staticmethod
     def diff_in_diff(
-        test_data: pd.DataFrame,
-        control_data: pd.DataFrame,
-        target_field: str,
-        target_field_before: str,
+            test_data: pd.DataFrame,
+            control_data: pd.DataFrame,
+            target_field: str,
+            target_field_before: str,
     ) -> float:
         """Counts Difference in Difference.
 
@@ -183,10 +184,10 @@ class ABTest:
         return (mean_test - mean_control) - (mean_test_before - mean_control_before)
 
     def calc_difference(
-        self,
-        splitted_data: Dict[str, pd.DataFrame],
-        target_field: str,
-        target_field_before: str = None,
+            self,
+            splitted_data: Dict[str, pd.DataFrame],
+            target_field: str,
+            target_field_before: str = None,
     ) -> Dict[str, float]:
         """Calculates the difference between the target field values of the 'test' and 'control' dataframes.
 
@@ -204,8 +205,8 @@ class ABTest:
         """
         result = {}
         if (
-            self.calc_difference_method in {"all", "diff_in_diff", "cuped"}
-            and target_field_before is None
+                self.calc_difference_method in {"all", "diff_in_diff", "cuped"}
+                and target_field_before is None
         ):
             raise ValueError(
                 "For calculation metrics 'cuped' or 'diff_in_diff' field 'target_field_before' is required.\n"
@@ -213,8 +214,8 @@ class ABTest:
             )
         if self.calc_difference_method in {"all", "ate"}:
             result["ate"] = (
-                splitted_data["test"][target_field].values
-                - splitted_data["control"][target_field].values
+                    splitted_data["test"][target_field].values
+                    - splitted_data["control"][target_field].values
             ).mean()
 
         if self.calc_difference_method in {"all", "cuped"}:
@@ -236,7 +237,7 @@ class ABTest:
         return result
 
     def calc_p_value(
-        self, splitted_data: Dict[str, pd.DataFrame], target_field: str
+            self, splitted_data: Dict[str, pd.DataFrame], target_field: str
     ) -> Dict[str, float]:
         """Calculates the p-value for a given dataset.
 
@@ -266,11 +267,11 @@ class ABTest:
         return result
 
     def execute(
-        self,
-        data: pd.DataFrame,
-        target_field: str,
-        group_field: str,
-        target_field_before: str = None,
+            self,
+            data: pd.DataFrame,
+            target_field: str,
+            group_field: str,
+            target_field_before: str = None,
     ) -> Dict[str, Dict[str, float]]:
         """Splits the input data based on the group field and calculates the size, difference, and p-value.
 
