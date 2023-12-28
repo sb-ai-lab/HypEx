@@ -50,6 +50,10 @@ matplotlib = [
 
 faiss-cpu = ">=1.6.0, <=1.7.4"
 
+seaborn = "<=0.13.0"
+
+statsmodels = "<0.14.1"
+
 
 [tool.poetry.dev-dependencies]
 jupyter = "^1.0.0"
