@@ -339,7 +339,6 @@ class AATest:
         Returns:
             Dict of indexes with division on test and control group
         """
-
         result = {"test_indexes": [], "control_indexes": []}
 
         if self.group_cols:
@@ -404,7 +403,6 @@ class AATest:
         Returns:
             Separated initial data with column "group"
         """
-        # prep data to show user (add info_cols and decode binary variables)
         test = data.loc[spit_indexes["test_indexes"]]
         control = data.loc[spit_indexes["control_indexes"]]
         data = merge_groups(control, test)
@@ -454,7 +452,6 @@ class AATest:
                 1) metrics dataframe (stat tests) and
                 2) dict of random state with test_control dataframe
         """
-
         scores = []
         t_result = {"random_state": random_state}
 
@@ -713,7 +710,6 @@ class AATest:
 
         Returns:
             Pandas dataframe containing the results of the AA-test
-
         """
         self.features_p_value_distribution(
             experiment_results,
@@ -942,7 +938,6 @@ class AATest:
 
         Returns:
             DataFrame with OK and not OK depending on the results of statistical tests
-
         """
         result = {"aa test passed": {}, "split is uniform": {}}
         for field in self.target_fields:
