@@ -1,10 +1,10 @@
-from ...hypex.ab_test.ab_tester import ABTest
+from hypex import ABTest
 
 import pytest
 import pandas as pd
 import numpy as np
 
-DATA_SIZE = 100
+DATA_SIZE = 1000
 
 
 @pytest.fixture
@@ -72,21 +72,20 @@ def test_calc_difference_with_previous_value(ab_test, data, group_field, target_
 def test_calc_p_value(ab_test, data, group_field, target_field, previous_value, alpha):
     splitted_data = ab_test.split_ab(data, group_field)
     result = ab_test.calc_p_value(splitted_data, target_field)
-    assert result["t_test"] < alpha
+    assert result["t-test"] < alpha
     assert result["mann_whitney"] < alpha
 
     result = ab_test.calc_p_value(splitted_data, previous_value)
-    assert result["t_test"] > alpha
+    assert result["t-test"] > alpha
     assert result["mann_whitney"] > alpha
 
 
 def test_execute(ab_test, data, group_field, target_field, previous_value, alpha):
     result = ab_test.execute(data, target_field, group_field, previous_value)
-    print(result)
     assert result["size"]["test"] == DATA_SIZE
     assert result["size"]["control"] == DATA_SIZE
     assert 1 < result["difference"]["ate"] < 3
     assert 1 < result["difference"]["cuped"] < 3
     assert 1 < result["difference"]["diff_in_diff"] < 3
-    assert result["p_value"]["t_test"] < alpha
-    assert result["p_value"]["mann_whitney"] < alpha
+    assert result["p-value"]["t-test"] < alpha
+    assert result["p-value"]["mann_whitney"] < alpha
