@@ -15,8 +15,8 @@ from tqdm.auto import tqdm
 
 
 def merge_groups(
-        control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
-        test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
+    control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
+    test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
 ) -> pd.DataFrame:
     """Merges test and control groups in one DataFrame and creates column "group".
     Column "group" contains of "test" and "control" values.
@@ -54,10 +54,10 @@ def split_splited_data(splitted_data: pd.DataFrame) -> Dict[str, pd.DataFrame]:
 
 
 def calc_mde(
-        test_group: pd.Series,
-        control_group: pd.Series,
-        reliability: float = 0.95,
-        power: float = 0.8,
+    test_group: pd.Series,
+    control_group: pd.Series,
+    reliability: float = 0.95,
+    power: float = 0.8,
 ) -> float:
     """Calculates the minimum detectable effect (MDE) for a given test and control groups.
 
@@ -88,11 +88,11 @@ def calc_mde(
 
 
 def calc_sample_size(
-        control_group: pd.Series,
-        test_group: pd.Series,
-        mde,
-        significance: float = 0.05,
-        power: float = 0.8,
+    control_group: pd.Series,
+    test_group: pd.Series,
+    mde,
+    significance: float = 0.05,
+    power: float = 0.8,
 ) -> float:
     """Calculates sample size of dataframe depends on mde and power.
 
@@ -119,7 +119,7 @@ def calc_sample_size(
         p2 = mde[1]
 
         return (
-                (z_alpha + z_beta) ** 2 * (p1 * (1 - p1) + p2 * (1 - p2)) / (p1 - p2) ** 2
+            (z_alpha + z_beta) ** 2 * (p1 * (1 - p1) + p2 * (1 - p2)) / (p1 - p2) ** 2
         )
     else:
         control_std = control_group.std()
@@ -129,15 +129,15 @@ def calc_sample_size(
         control_proportion = 1 - test_proportion
 
         d = ((norm.ppf(1 - significance / 2) + norm.ppf(power)) / mde) ** 2
-        s = test_std ** 2 / test_proportion + control_std ** 2 / control_proportion
+        s = test_std**2 / test_proportion + control_std**2 / control_proportion
         return d * s
 
 
 def calc_power(
-        effect_size: float,
-        control_size: float,
-        test_size: float,
-        significance: float = 0.05,
+    effect_size: float,
+    control_size: float,
+    test_size: float,
+    significance: float = 0.05,
 ) -> float:
     """Statistical power calculations for t-test for two independent sample and known significance.
 
@@ -167,7 +167,7 @@ def calc_power(
 class AATest:
     """
     A class for conducting AA testing (random split testing) to assess the
-    statistical equivalence of two samples.
+    statistical uniform of two samples.
 
     AA testing is used to validate that the splitting mechanism of an A/B test
     is unbiased and random. This class supports various statistical methods to
@@ -175,11 +175,11 @@ class AATest:
     metrics.
 
     Attributes:
-        target_fields (Union[Iterable[str], str]): Target column names to analyze.
-        group_cols (Union[str, Iterable[str]]): Column names used for grouping.
+        target_fields (Union[Iterable[str], str]): Target column names to analyze. This fields should be numeric.
+        group_cols (Union[str, Iterable[str]]): Column names used for grouping. This fields should be categorical. It's a field for stratification. Stratification - the way to divide groups with equal number of categories in each of them.
         info_cols (Union[str, Iterable[str]]): Column names for additional information.
-        quant_field (str): Name of the column for quantization.
-        mode (str): Mode of the AA test. Options are 'simple' and 'balanced'.
+        quant_field (str): Name of the column for quantization. This fields should be categorical. A quantum is a category that passes entirely into one of the groups.
+        mode (str): Mode of the AA test. Options are 'simple' and 'balanced'. 'simple' - naively splits groups in half. 'balanced' - separation with quantum balancing at each step (only used if a quantization field is specified.
         alpha (float): Level of significance for statistical tests.
 
     Methods:
@@ -190,7 +190,7 @@ class AATest:
         split(data, random_state, test_size):
             Splits the dataset into test and control groups.
         _postprep_data(data, spit_indexes):
-            Prepares and formats the split data for presentation.
+            Combines the index markup obtained at the split step.
         calc_ab_delta(a_mean, b_mean, mode):
             Calculates the difference between averages of two samples.
         sampling_metrics(data, random_state, test_size):
@@ -210,7 +210,7 @@ class AATest:
         experiment_result_transform(experiment):
             Transforms the result of an experiment into a readable format.
         split_analysis(splited_data):
-            Analyzes split data for both numerical and categorical features.
+            Analyzes split data for both target and group columns.
         get_resume(aa_score, best_experiment_stat):
             Formats the final results of AA testing for clarity.
         process(data, optimize_groups, iterations, show_plots, test_size, pbar):
@@ -222,30 +222,30 @@ class AATest:
     """
 
     def __init__(
-            self,
-            target_fields: Union[Iterable[str], str] = None,
-            group_cols: Union[str, Iterable[str]] = None,
-            info_cols: Union[str, Iterable[str]] = None,
-            quant_field: str = None,
-            mode: str = "simple",
-            alpha: float = 0.05,
+        self,
+        target_fields: Union[Iterable[str], str] = None,
+        group_cols: Union[str, Iterable[str]] = None,
+        info_cols: Union[str, Iterable[str]] = None,
+        quant_field: str = None,
+        mode: str = "simple",
+        alpha: float = 0.05,
     ):
         """Initialize the AATest class.
 
         Args:
             target_fields:
-                List or str with target columns
+                List or str with target columns. This fields should be numeric.
             group_cols:
-                List or str with columns for grouping
+                List or str with columns for grouping. This fields should be categorical. It's a field for stratification. Stratification - the way to divide groups with equal number of categories in each of them.
             info_cols:
                 List or str with informational columns
             quant_field:
-                String with name of column for quantization
+                String with name of column for quantization. This fields should be categorical. A quantum is a category that passes entirely into one of the groups.
             mode:
                 Mode of the AA-test
                 Available modes:
-                    * simple
-                    * balanced
+                    * simple - naively splits groups in half
+                    * balanced - separation with quantum balancing at each step (only used if a quantization field is specified)
             alpha:
                 Level of significance
         """
@@ -253,8 +253,8 @@ class AATest:
             [target_fields] if isinstance(target_fields, str) else target_fields
         )
         self.group_cols = (
-                              [group_cols] if isinstance(group_cols, str) else group_cols
-                          ) or []
+            [group_cols] if isinstance(group_cols, str) else group_cols
+        ) or []
         self.info_cols = [info_cols] if isinstance(info_cols, str) else info_cols
         self.quant_field = quant_field
         self.mode = mode
@@ -286,7 +286,7 @@ class AATest:
         }
 
     def __simple_mode(
-            self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
     ) -> Dict:
         """Separates data on A and B samples within simple mode.
         Separation performed to divide groups of equal sizes - equal amount of records
@@ -324,17 +324,17 @@ class AATest:
         return result
 
     def split(
-            self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
     ) -> Dict:
         """Divides sample on two groups.
 
         Args:
             data:
-                Raw input data
+                Input data
             random_state:
                 Seed of random - one integer to fix split
             test_size:
-                Group size ratio
+                Proportion of the test group
 
         Returns:
             Dict of indexes with division on test and control group
@@ -397,7 +397,7 @@ class AATest:
 
         Args:
             data:
-                Raw input data
+                Input data
             spit_indexes:
                 Dict of indexes with separation on test and control group
 
@@ -412,7 +412,7 @@ class AATest:
         return data
 
     @staticmethod
-    def calc_ab_delta(a_mean: float, b_mean: float, mode: str = "percentile"):
+    def calc_ab_delta(a_mean: float, b_mean: float, mode: str = "percentile")->float:
         """Calculates target delta between A and B groups.
 
         Args:
@@ -437,19 +437,20 @@ class AATest:
             return 1 - a_mean / b_mean
 
     def sampling_metrics(
-            self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5):
+        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+    ) -> Dict:
         """Calculates metrics of one sampling.
 
         Args:
             data:
-                Raw input data
+                Input data
             random_state:
                 Random seeds for searching
             test_size:
-                Percentage of control data
+                Proportion of the test group
 
         Returns:
-            Tuple of
+            Dict of
                 1) metrics dataframe (stat tests) and
                 2) dict of random state with test_control dataframe
         """
@@ -480,15 +481,15 @@ class AATest:
             ).pvalue
             t_result[f"{tf} ks-test p-value"] = ks_2samp(ta, tb).pvalue
             t_result[f"{tf} t-test passed"] = (
-                    t_result[f"{tf} t-test p-value"] < self.alpha
+                t_result[f"{tf} t-test p-value"] < self.alpha
             )
             t_result[f"{tf} ks-test passed"] = (
-                    t_result[f"{tf} ks-test p-value"] < self.alpha
+                t_result[f"{tf} ks-test p-value"] < self.alpha
             )
             scores.append(
                 (
-                        t_result[f"{tf} t-test p-value"]
-                        + 2 * t_result[f"{tf} ks-test p-value"]
+                    t_result[f"{tf} t-test p-value"]
+                    + 2 * t_result[f"{tf} ks-test p-value"]
                 )
                 / 3
             )
@@ -517,26 +518,26 @@ class AATest:
         return {"metrics": t_result, "data_from_experiment": data_from_sampling_dict}
 
     def calc_uniform_tests(
-            self,
-            data: pd.DataFrame,
-            test_size: float = 0.5,
-            iterations: int = 2000,
-            file_name: Union[Path, str] = None,
-            experiment_write_mode: str = "full",
-            split_write_mode: str = "full",
-            write_step: int = None,
-            pbar: bool = True,
-            **kwargs,
+        self,
+        data: pd.DataFrame,
+        test_size: float = 0.5,
+        iterations: int = 2000,
+        file_name: Union[Path, str] = None,
+        experiment_write_mode: str = "full",
+        split_write_mode: str = "full",
+        write_step: int = None,
+        pbar: bool = True,
+        **kwargs,
     ) -> Optional[Tuple[pd.DataFrame, Dict[Any, Dict]]]:
-        """Chooses random_state for finding homogeneous distribution.
+        """Performs multiple separation experiments for different random states.
 
         Args:
             data:
-                Raw input data
+                Input data
             iterations:
                 Number of iterations to search uniform sampling to searching
             test_size:
-                Percentage of control data
+                Proportion of the test group
             file_name:
                 Name of file to save results (if None - no results will be saved, func returns result)
             experiment_write_mode:
@@ -574,7 +575,7 @@ class AATest:
             split_write_mode = "full"
 
         for i, rs in tqdm(
-                enumerate(random_states), total=len(random_states), disable=not pbar
+            enumerate(random_states), total=len(random_states), disable=not pbar
         ):
             res = self.sampling_metrics(data, random_state=rs, test_size=test_size)
 
@@ -620,12 +621,13 @@ class AATest:
             return results, data_from_sampling
 
     def features_p_value_distribution(
-            self, experiment_results: pd.DataFrame, figsize=None, bin_step=0.05):
+        self, experiment_results: pd.DataFrame, figsize=None, bin_step=0.05
+    ):
         """Process plots of features' p-value distribution.
 
         Args:
             experiment_results:
-                Results of experiment
+                Results of experiments
             figsize:
                 Size of figure for plot
             bin_step:
@@ -697,15 +699,17 @@ class AATest:
         return result
 
     def uniform_tests_interpretation(
-            self, experiment_results: pd.DataFrame, **kwargs
+        self, experiment_results: pd.DataFrame, **kwargs
     ) -> pd.DataFrame:
         """Process plotting of p-value distribution and results of AA-test.
 
         Args:
             experiment_results:
-                Results of the experiment
+                Results of experiments
             **kwargs:
-                Some extra keyword arguments
+                Some extra keyword arguments:
+                    * figsize: Size of figure for plot
+                    * bin_step: Step for bins in X axis
 
         Returns:
             Pandas dataframe containing the results of the AA-test
@@ -719,13 +723,13 @@ class AATest:
         return self.aa_score(experiment_results)
 
     def num_feature_uniform_analysis(
-            self,
-            control_data: pd.Series,
-            test_data: pd.Series,
-            plot_set: Tuple = ("hist", "cumulative", "percentile"),
-            **kwargs
+        self,
+        control_data: pd.Series,
+        test_data: pd.Series,
+        plot_set: Tuple = ("hist", "cumulative", "percentile"),
+        **kwargs,
     ):
-        """P-value analyser for numerical features in Kolmogorov-Smirnov and T tests.
+        """Show plots of distribution in groups with uniform tests.
 
         Args:
             control_data:
@@ -739,7 +743,10 @@ class AATest:
                     * cumulative
                     * percentile
             **kwargs:
-                Some extra keyword arguments
+                Some extra keyword arguments:
+                    * figsize: Size of figure for plot
+                    * bins: Number of bins in X axis
+                    * alpha: Transparency of histograms
         """
         if not plot_set:
             return
@@ -758,8 +765,8 @@ class AATest:
             min(control_data.min(), test_data.min()),
             max(control_data.max(), test_data.max()),
             (
-                    max(control_data.max(), test_data.max())
-                    - min(control_data.min(), test_data.min())
+                max(control_data.max(), test_data.max())
+                - min(control_data.min(), test_data.min())
             )
             / kwargs.get("bins", 100),
         )
@@ -839,8 +846,9 @@ class AATest:
         plt.show()
 
     def cat_feature_uniform_analysis(
-            self, control_data: pd.Series, test_data: pd.Series, **kwargs):
-        """P-value analyser for category features in Kolmogorov-Smirnov and T tests.
+        self, control_data: pd.Series, test_data: pd.Series, **kwargs
+    ):
+        """Show plots of distribution in groups.
 
         Args:
             control_data:
@@ -848,7 +856,9 @@ class AATest:
             test_data:
                 Data from test group
             **kwargs:
-                Some extra keyword arguments
+                Some extra keyword arguments:
+                    * figsize: Size of figure for plot
+                    * alpha: Transparency of histograms
         """
         s_control_data = control_data.astype("str")
         s_test_data = test_data.astype("str")
@@ -865,7 +875,7 @@ class AATest:
             control_counts.index,
             control_counts.values,
             color="blue",
-            alpha=0.3,
+            alpha=kwargs.get("alpha", 0.3),
             label="control",
         )
         ax.fill_between(
@@ -874,7 +884,7 @@ class AATest:
                 [i for i in test_counts.index if i in control_counts.index]
             ].values,
             color="red",
-            alpha=0.3,
+            alpha=kwargs.get("alpha", 0.3),
             label="test",
         )
 
@@ -885,11 +895,11 @@ class AATest:
 
     def experiment_result_transform(self, experiment: pd.Series):
         """
-        Transform the experiment result into readable view.
+        Transform experiments results into readable view.
 
         Args:
             experiment:
-                Results of the experiment
+                Results of experiments
 
         Returns:
             DataFrame with results of the experiment and statistics from best split
@@ -899,17 +909,17 @@ class AATest:
             targets_dict[tf] = {}
             for i in experiment.index:
                 if i.startswith(f"{tf} "):
-                    targets_dict[tf][i[len(tf) + 1:]] = experiment[i]
+                    targets_dict[tf][i[len(tf) + 1 :]] = experiment[i]
         return pd.DataFrame(targets_dict).T, experiment.iloc[-9:]
 
     def split_analysis(self, splited_data: pd.DataFrame, **kwargs):
-        """P-value analyser for numerical and category features in Kolmogorov-Smirnov and T tests.
+        """Conducts a full splitting analysis.
 
         Args:
             splited_data:
-                Data for visualization purposes
+                Data that has already been split
             **kwargs:
-                Some extra keyword arguments
+                Some extra keyword arguments for plots in visualization
         """
         ssp = split_splited_data(splited_data)
         for nf in self.target_fields:
@@ -937,12 +947,12 @@ class AATest:
         result = {"aa test passed": {}, "split is uniform": {}}
         for field in self.target_fields:
             result["aa test passed"][field] = (
-                    aa_score.loc[field, "t-test aa passed"]
-                    or aa_score.loc[field, "ks-test aa passed"]
+                aa_score.loc[field, "t-test aa passed"]
+                or aa_score.loc[field, "ks-test aa passed"]
             )
             result["split is uniform"][field] = (
-                    best_experiment_stat.loc[field, "t-test passed"]
-                    or best_experiment_stat.loc[field, "ks-test passed"]
+                best_experiment_stat.loc[field, "t-test passed"]
+                or best_experiment_stat.loc[field, "ks-test passed"]
             )
         result = pd.DataFrame(result)
         result["split is uniform"] = (
@@ -958,14 +968,14 @@ class AATest:
         return result
 
     def process(
-            self,
-            data: pd.DataFrame,
-            optimize_groups: bool = False,
-            iterations: int = 2000,
-            show_plots=True,
-            test_size=0.5,
-            pbar=True,
-            **kwargs,
+        self,
+        data: pd.DataFrame,
+        optimize_groups: bool = False,
+        iterations: int = 2000,
+        show_plots: bool=True,
+        test_size: float=0.5,
+        pbar: bool=True,
+        **kwargs,
     ):
         """Main function for AATest estimation.
 
@@ -976,15 +986,15 @@ class AATest:
 
         Args:
             test_size:
-                Size of test group (float)
+                Proportion of the test group
             data:
                 Input dataset
             optimize_groups:
-                Is in necessary to optimize groups (True/False)
+                Is in necessary to optimize groups
             iterations:
-                Number of iterations for AB-test
+                Number of iterations for AA-test
             show_plots:
-                Is in necessary to show plots (True/False)
+                Is in necessary to show plots
             pbar:
                 Show progress-bar
             **kwargs:
@@ -1010,9 +1020,7 @@ class AATest:
                 i_combinations = combinations(labeling["group_col"], i)
                 group_variants.extend(iter(i_combinations))
 
-            for gs in tqdm(
-                    group_variants, desc="Group optimization", disable=not pbar
-            ):
+            for gs in tqdm(group_variants, desc="Group optimization", disable=not pbar):
                 self.group_cols = list(gs)
                 experiment_results, data_splits = self.calc_uniform_tests(
                     data,
