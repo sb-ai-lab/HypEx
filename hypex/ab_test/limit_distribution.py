@@ -1,6 +1,15 @@
-from typing import List, Union, Optional, Tuple
+# Решаем задачу множественного тестирования
+# Хотим выбрать лучшую выборку из k выборок по некоторой целевой метрике
+# Пусть гипотеза H_i - iя выборка лучшая, i = 1, ..., k
+# Пусть гипотеза H_0 - нет лучшей выборки
 
-import numpy as np
+# Разработали метод, основанный на предельном распределении
+# Он позволяет придерживаться заложенных вероятностей ошибок 1го и 2го рода
+
+# Функции минимального размера выборки и критерия являются основными
+# Функция квантиля предельного распределения случайной величины минимума используется в основных функциях
+
+
 from scipy.stats import norm
 
 
@@ -15,270 +24,199 @@ from scipy.stats import norm
 # Функции минимального размера выборки и критерия являются основными
 # Функция квантиля предельного распределения случайной величины минимума используется в основных функциях
 
+def quantile_of_marginal_distribution(k, gamma, var=[1, 1, 1], equal_var=True):
+    """Функция квантиля предельного распределения минимума
 
-def calculate_comparisons(sample_array: np.ndarray, variances: List[float], equal_variance: bool) -> np.ndarray:
+    Parameters
+    ----------
+    k : int
+        Количество выборок, целое число больше 2
+    gamma : float
+        Уровень квантиля предельного распределения минимума
+    var : list of float, optional
+        Список дисперсий выборок одинаковой длины. Количество выборок больше 2
+    equal_var : bool, optional
+        Равенство дисперсий
+
+    Returns
+    -------
+    float, если equal_var=True
+        Квантиль предельного распределения минимума уровня gamma
+    list of float, если equal_var=False
+        Набор квантилей предельного распределения минимума для каждого j уровня gamma
     """
-    Calculate the comparison values for a given sample array.
+    iter_size = 20000  # Количество итераций теста
+    # N = 80                                 # Количество генераций квантилей, из которых возвращается максимум
 
-    Args:
-        sample_array:
-            The sample array representing a specific observation across different samples.
-        variances:
-            List of variances of the samples.
-        equal_variance:
-            Indicates if variances are equal.
-
-    Returns:
-        A NumPy array of comparison values.
-    """
-    num_samples = len(sample_array)
-    if equal_variance:
-        diff_matrix = sample_array[:, np.newaxis] - sample_array
-        comparison_values = diff_matrix / np.sqrt(2)
-        np.fill_diagonal(comparison_values, np.nan)
-        return comparison_values[~np.isnan(comparison_values)]
+    if equal_var == True:
+        j = 0  # в силу симметрии j по гипотезе H_0 возьмём j = 0 (первая выборка)
+        t_j = []
+        total = norm.rvs(size=[iter_size, k], random_state=random_state)
+        for l in range(iter_size):
+            Z = total[l]
+            t = np.inf
+            for i in range(k):
+                if i != j:
+                    t_ji = (Z[j] - Z[i]) / np.sqrt(2)
+                    if t_ji < t:
+                        t = t_ji
+            t_j += [t]
+        return np.quantile(t_j, gamma)
     else:
-        variances = np.array(variances)
-        scaling_factors = 1 / np.sqrt(1 + variances[:, np.newaxis] / variances)
-        sample_array_2d = sample_array[:, np.newaxis]
-        scaled_sample_array = sample_array_2d * scaling_factors
-        comparison_values = scaled_sample_array - scaled_sample_array.T
+        c_ = []
+        for j in range(k):
+            t_j = []
+            total = norm.rvs(size=[iter_size, k], random_state=random_state)
+            for l in range(iter_size):
+                Z = total[l]
+                t = np.inf
+                for i in range(k):
+                    if i != j:
+                        t_ji = Z[j] / np.sqrt(1 + var[i] / var[j]) - Z[i] / np.sqrt(1 + var[j] / var[i])
+                        if t_ji < t:
+                            t = t_ji
+                t_j += [t]
+            c_ += [np.quantile(t_j, gamma)]
+        return c_
 
-    # Remove diagonal elements (i != j)
-    np.fill_diagonal(comparison_values, np.nan)
-    return comparison_values[~np.isnan(comparison_values)]
 
+def test_on_marginal_distribution(X, alpha=0.05, equal_var=True, c=None):
+    """Функция критерия, основанного на предельном распределении минимума
 
-def calculate_min_comparisons(sample_matrix: np.ndarray, variances: List[float], equal_variance: bool) -> np.ndarray:
+    Parameters
+    ----------
+    X : list of lists
+        Список выборок одинаковой длины. Количество выборок больше 2
+    alpha : float, optional
+        Уровень значимости, число от 0 до 1
+    equal_var : bool, optional
+        Равенство дисперсий
+    c : optional
+            float, если equal_var=True
+                Квантиль предельного распределения минимума уровня 1-alpha/len(X)
+            list of float, если equal_var=False
+                Набор квантилей предельного распределения минимума для каждого j уровня 1-alpha/len(X)
+
+    Returns
+    -------
+    int
+        Число от 0 до k - номер принятой гипотезы
     """
-    Calculate the minimum comparison values for each row in a sample matrix.
+    k = len(X)  # Число выборок
+    n = len(X[0])  # Размер выборки
 
-    Args:
-        sample_matrix:
-            A matrix of random samples, each row representing a set of observations across samples.
-        variances:
-            List of variances of the samples.
-        equal_variance:
-            Indicates if variances are equal.
+    mean = []
+    var = []
+    for m in range(k):
+        mean += [np.mean(X[m])]
+        var += [np.var(X[m]) * n / (n - 1)]
 
-    Returns:
-        A NumPy array of minimum comparison values for each row.
-    """
-    min_comparisons = np.array([min(calculate_comparisons(row, variances, equal_variance)) for row in sample_matrix])
-    return min_comparisons
-
-
-def calculate_quantiles(num_samples: int, variances: List[float], equal_variance: bool, iterations: int = 20000) -> \
-        List[float]:
-    """
-    Calculate quantiles for the distribution.
-
-    Args:
-        num_samples:
-            Number of samples.
-        variances:
-            List of variances of the samples.
-        equal_variance:
-            Indicates if variances are equal.
-        iterations:
-            Number of iterations for generating random variables.
-
-    Returns:
-        List of quantiles.
-    """
-    random_samples = norm.rvs(size=[iterations, num_samples], random_state=42)
-    min_comparison_values = calculate_min_comparisons(random_samples, variances, equal_variance)
-    return list(min_comparison_values)
-
-
-def quantile_of_marginal_distribution(num_samples: int, gamma_level: float,
-                                      variances: Union[List[float], np.ndarray] = None,
-                                      equal_variance: bool = True) -> Union[float, List[float]]:
-    """
-    Calculate the quantile of the marginal distribution of the minimum.
-
-    Args:
-        num_samples:
-            Number of samples, an integer greater than 2.
-        gamma_level:
-            Level of the quantile of the marginal distribution of the minimum.
-        variances:
-            List of variances of the samples, all of the same length. Number of samples greater than 2.
-            If None, defaults to a list of ones.
-        equal_variance:
-            Indicates if variances are equal.
-
-    Returns:
-        If equal_variance=True, returns the quantile of the marginal distribution of the minimum at level gamma_level.
-        If equal_variance=False, returns a set of quantiles of the marginal distribution of the minimum for each sample at level gamma_level.
-    """
-    if variances is None:
-        variances = np.ones(num_samples)
-
-    min_comparison_values = calculate_quantiles(num_samples, variances, equal_variance)
-    print(f"{min_comparison_values = }")
-    if equal_variance:
-        return np.quantile(min_comparison_values, gamma_level)
+    if equal_var == True:
+        if c == None:
+            c = quantile_of_marginal_distribution(k=k, gamma=1 - alpha / k)  # квантиль предельного распределения
+        for j in range(k):
+            t_j = np.inf
+            for i in range(k):
+                if i != j:
+                    t_ji = np.sqrt(n) * (mean[j] - mean[i]) / np.sqrt(var[j] + var[i])
+                    if t_ji < t_j:
+                        t_j = t_ji
+            if t_j > c:
+                return j + 1
+        return 0
     else:
-        return np.quantile(min_comparison_values, [gamma_level] * num_samples)
+        if c == None:
+            c = quantile_of_marginal_distribution(k=k, gamma=1 - alpha / k, var=var,
+                                                  equal_var=False)  # набор квантилей предельного распределения
+        for j in range(k):
+            t_j = np.inf
+            for i in range(k):
+                if i != j:
+                    t_ji = np.sqrt(n) * (mean[j] - mean[i]) / np.sqrt(var[j] + var[i])
+                    if t_ji < t_j:
+                        t_j = t_ji
+            if t_j > c[j]:
+                return j + 1
+        return 0
 
 
-def calculate_statistics(samples: List[List[float]]) -> Tuple[np.ndarray, np.ndarray]:
+def min_sample_size(k, d, var, alpha=0.05, beta=0.2, equal_var=True, c_1=None, c_2=None, N=None):
+    """Функция для подсчёта минимального размера выборки
+
+    Parameters
+    ----------
+    k : int
+        Количество выборок, целое число больше 2
+    d : float
+        Minimum Detectable Effect, положительное число
+    var : list of float, если equal_var=False
+          float, если equal_var=True
+        Оценка дисперсии выборок одинаковой длины при H(0). Количество выборок больше 2
+    alpha : float, optional
+        Уровень значимости, число от 0 до 1
+    beta : float, optional
+        1 - мощность, число от 0 до 1
+    equal_var : bool, optional
+        Равенство дисперсий
+    c_1 : optional
+            float, если equal_var=True
+                Квантиль предельного распределения минимума уровня 1-alpha/len(X)
+            list of float, если equal_var=False
+                Набор квантилей предельного распределения минимума для каждого j уровня 1-alpha/len(X)
+    c_2 : optional
+            float, если equal_var=True
+                Квантиль предельного распределения минимума уровня beta
+            None, если equal_var=False
+    N : int, optional
+        Нижняя граница для размера (для более быстрой работы программы)
+
+    # В нашем случае все выборки будут одного размера
+
+    Returns
+    -------
+    int
+        Число n - размер одной выборки
     """
-    Calculate mean and variance for each sample in a collection of samples.
+    random_state = 42
+    if equal_var == True:
+        if c_1 == None:
+            c_1 = quantile_of_marginal_distribution(k=k,
+                                                    gamma=1 - alpha / k)  # квантиль предельного распределения 1-alpha/k
 
-    Args:
-        samples: A list of lists, where each inner list represents a sample.
+        if c_2 == None:
+            c_2 = quantile_of_marginal_distribution(k=k, gamma=beta)  # квантиль предельного распределения beta
 
-    Returns:
-        A tuple containing two arrays:
-        - The first array is the means of each sample.
-        - The second array is the variances of each sample.
-    """
-    samples_array = np.array([np.array(sample) for sample in samples])
-    means = np.mean(samples_array, axis=1)
-    variances = np.var(samples_array, axis=1, ddof=1)  # ddof=1 for sample variance
-    return means, variances
-
-
-def test_on_marginal_distribution(samples: List[List[float]], alpha: float = 0.05, equal_var: bool = True,
-                                  quantiles: Union[float, List[float]] = None) -> int:
-    """
-    Function for testing based on the marginal distribution of the minimum.
-
-    Args:
-        samples:
-            List of samples of equal length. The number of samples is greater than 2.
-        alpha:
-            Significance level, a number between 0 and 1.
-        equal_var:
-            Indicates if variances are equal.
-        quantiles:
-            Quantile of the marginal distribution of the minimum at level 1-alpha/len(samples) if equal_var=True.
-            Set of quantiles for each j at level 1-alpha/len(samples) if equal_var=False.
-
-    Returns:
-        An integer from 0 to the number of samples - the number of the accepted hypothesis.
-    """
-    num_samples = len(samples)
-    means, variances = calculate_statistics(samples)
-    sample_size = len(samples[0])
-
-    if quantiles is None:
-        gamma_level = 1 - alpha / num_samples
-        quantiles = quantile_of_marginal_distribution(num_samples, gamma_level, variances, equal_var)
-
-    for j in range(num_samples):
-        comparison_values = np.sqrt(sample_size) * (means[j] - means) / np.sqrt(variances[j] + variances)
-        comparison_values[j] = np.inf  # Ignore self-comparison
-        t_j = np.min(comparison_values)
-
-        if (equal_var and t_j > quantiles) or (not equal_var and t_j > quantiles[j]):
-            return j + 1
-
-    return 0
-
-
-def _calculate_sample_size_equal_var(num_samples: int, minimum_effect: float, variance: float, alpha: float,
-                                     beta: float, quantile_1: Optional[float], quantile_2: Optional[float]) -> int:
-    """
-    Calculate the required sample size assuming equal variances across samples.
-
-    Args:
-        num_samples: The number of samples.
-        minimum_effect: The minimum detectable effect size (d).
-        variance: The common variance of the samples.
-        alpha: The significance level.
-        beta: The probability of Type II error (1 - power of the test).
-        quantile_1: The quantile of the marginal distribution for 1 - alpha/k. If None, it will be calculated.
-        quantile_2: The quantile of the marginal distribution for beta. If None, it will be calculated.
-
-    Returns:
-        The calculated sample size.
-    """
-    if quantile_1 is None:
-        quantile_1 = quantile_of_marginal_distribution(num_samples, 1 - alpha / num_samples, variance, True)
-    if quantile_2 is None:
-        quantile_2 = quantile_of_marginal_distribution(num_samples, beta, variance, True)
-    print(f"{quantile_1 = }")
-    print(f"{quantile_2 = }")
-    return int(2 * variance * ((quantile_1 - quantile_2) / minimum_effect) ** 2) + 1
-
-
-def _calculate_sample_size_unequal_var(num_samples: int, minimum_effect: float, variances: List[float], alpha: float,
-                                       beta: float,
-                                       quantile_thresholds: Optional[List[float]],
-                                       initial_estimate: Optional[int], increment: int = 100,
-                                       iterations: int = 3000) -> int:
-    """
-    Calculate the required sample size for unequal variances across samples.
-
-    Args:
-        num_samples: The number of samples.
-        minimum_effect: The minimum detectable effect size.
-        variances: A list of variances for each sample.
-        alpha: The significance level.
-        beta: The probability of Type II error (1 - power of the test).
-        quantile_thresholds: Precomputed quantiles for the marginal distribution. If None, they will be calculated.
-        initial_estimate: An initial estimate of sample size. If None, starts from 0.
-        increment: The step size to increment the sample size in each iteration.
-        iterations: The number of iterations for the simulation.
-
-    Returns:
-        The calculated sample size.
-    """
-    if quantile_thresholds is None:
-        quantile_thresholds = quantile_of_marginal_distribution(num_samples, 1 - alpha / num_samples, variances, False)
-
-    sample_sizes = []
-    for j in range(num_samples):
-        sample_size = initial_estimate or 0
-        while True:
-            sample_size += increment
-            random_samples = norm.rvs(size=[iterations, num_samples], random_state=42)
-            power = np.mean([
-                np.all([
-                    (random_samples[i, j] / np.sqrt(1 + variances[i] / variances[j]) - random_samples[i, i] / np.sqrt(
-                        1 + variances[j] / variances[i]) + minimum_effect * np.sqrt(
-                        sample_size / (variances[j] + variances[i]))) > quantile_thresholds[j]
-                    for i in range(num_samples) if i != j
-                ])
-                for i in range(iterations)
-            ])
-            if power >= 1 - beta:
-                break
-        sample_sizes.append(sample_size)
-    return max(sample_sizes)
-
-
-def min_sample_size(num_samples: int, minimum_effect: float, variances: Union[List[float], float], alpha: float = 0.05,
-                    beta: float = 0.2, equal_variance: bool = True,
-                    quantile_1: Optional[Union[float, List[float]]] = None, quantile_2: Optional[float] = None,
-                    initial_estimate: Optional[int] = None,
-                    ) -> int:
-    """
-    Calculate the minimum sample size required for a statistical test.
-
-    Args:
-        num_samples: Number of samples, an integer greater than 2.
-        minimum_effect: The Minimum Detectable Effect (MDE), a positive number.
-        variances: Estimates of the variances of the samples. It's a list of floats if variances are unequal, or a single float if variances are equal.
-        alpha: Significance level, a number between 0 and 1.
-        beta: 1 minus the power of the test, a number between 0 and 1.
-        equal_variance: Indicates if variances are equal.
-        quantile_1: Quantile of the marginal distribution at level 1-alpha/num_samples. For equal variances, it's a float; for unequal variances, it's a list of floats.
-        quantile_2: Quantile of the marginal distribution at level beta. It's a float for equal variances and None for unequal variances.
-        initial_estimate: An optional lower bound for the sample size to speed up the calculation.
-
-    Returns:
-        The calculated minimum sample size.
-    """
-    if equal_variance:
-        return _calculate_sample_size_equal_var(num_samples, minimum_effect, variances, alpha, beta, quantile_1,
-                                                quantile_2)
+        return int(2 * var * ((c_1 - c_2) / d) ** 2) + 1
     else:
-        return _calculate_sample_size_unequal_var(num_samples, minimum_effect, variances, alpha, beta, quantile_1,
-                                                  initial_estimate)
+        iter_size = 3000  # Количество итераций
+        if c_1 == None:
+            c_1 = quantile_of_marginal_distribution(k=k, gamma=1 - alpha / k, var=var,
+                                                    equal_var=False)  # набор квантилей предельного распределения
+        N_ = []  # для размеров выборки
+        for j in range(k):
+            if N == None:
+                n = 0
+            else:
+                n = N
+            power = 0  # мощность
+            while power < 1 - beta:
+                n += 100
+                power = 0
+                total = norm.rvs(size=[iter_size, k], random_state=random_state)
+                for l in range(iter_size):
+                    Z = total[l]
+                    t = np.inf
+                    for i in range(k):
+                        if i != j:
+                            t_ji = Z[j] / np.sqrt(1 + var[i] / var[j]) - Z[i] / np.sqrt(
+                                1 + var[j] / var[i]) + d * np.sqrt(n / (var[j] + var[i]))
+                            if t_ji < t:
+                                t = t_ji
+                    if t > c_1[j]:
+                        power += 1
+                power = power / iter_size
+            N_ += [n]
+        return np.max(N_)
 
 
 # Применение метода
@@ -295,7 +233,7 @@ alpha = 0.05  # уровень значимости
 beta = 0.2  # 1 - мощность
 
 # Считаем минимальный размер выборки
-n = min_sample_size(k, d, variances=p * (1 - p), alpha=alpha, beta=beta, equal_variance=True)
+n = min_sample_size(k, d, var=p * (1 - p), alpha=alpha, beta=beta, equal_var=True)
 print(f'Размер выборки = {n}')
 #
 # N = 5
