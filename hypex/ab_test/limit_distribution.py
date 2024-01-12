@@ -24,6 +24,7 @@ from scipy.stats import norm
 # Функции минимального размера выборки и критерия являются основными
 # Функция квантиля предельного распределения случайной величины минимума используется в основных функциях
 
+
 def quantile_of_marginal_distribution(num_samples: int, quantile_level: float, variances: List[float] = [1, 1, 1],
                                       equal_variance: bool = True) -> Union[float, List[float]]:
     """
@@ -48,32 +49,21 @@ def quantile_of_marginal_distribution(num_samples: int, quantile_level: float, v
         List of quantiles of the marginal distribution of the minimum for each sample if variances are not equal.
     """
     iteration_size = 20000  # Number of iterations for the test
+    random_samples = norm.rvs(size=[iteration_size, num_samples], random_state=np.random.RandomState(42))
 
     if equal_variance:
-        reference_sample_index = 0  # Assuming symmetry under H_0, choose the first sample
-        t_values = []
-        random_samples = norm.rvs(size=[iteration_size, num_samples], random_state=random_state)
-        for sample in random_samples:
-            min_t_value = np.inf
-            for i in range(num_samples):
-                if i != reference_sample_index:
-                    t_value = (sample[reference_sample_index] - sample[i]) / np.sqrt(2)
-                    min_t_value = min(min_t_value, t_value)
-            t_values.append(min_t_value)
+        differences = random_samples[:, 0, None] - random_samples
+        t_values = np.min(np.abs(differences) / np.sqrt(2), axis=1)
         return np.quantile(t_values, quantile_level)
     else:
         quantiles = []
+        variances_array = np.array(variances)
         for j in range(num_samples):
-            t_values = []
-            random_samples = norm.rvs(size=[iteration_size, num_samples], random_state=random_state)
-            for sample in random_samples:
-                min_t_value = np.inf
-                for i in range(num_samples):
-                    if i != j:
-                        t_value = sample[j] / np.sqrt(1 + variances[i] / variances[j]) - sample[i] / np.sqrt(
-                            1 + variances[j] / variances[i])
-                        min_t_value = min(min_t_value, t_value)
-                t_values.append(min_t_value)
+            differences = random_samples[:, j, None] - random_samples
+            # Broadcasting fix: Adjust the shape of the denominator
+            denominator = np.sqrt(1 + variances_array[None, :] / variances[j])
+            adjusted_diff = differences / denominator
+            t_values = np.min(np.abs(adjusted_diff), axis=1)
             quantiles.append(np.quantile(t_values, quantile_level))
         return quantiles
 
