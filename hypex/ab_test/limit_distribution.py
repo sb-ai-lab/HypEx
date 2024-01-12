@@ -170,7 +170,6 @@ def min_sample_size(number_of_samples: int, minimum_detectable_effect: float, va
         The required sample size for each sample.
     """
     random_state = 42
-    iteration_size = 3000  # Number of iterations
 
     if equal_variance:
         if quantile_1 is None:
@@ -181,12 +180,14 @@ def min_sample_size(number_of_samples: int, minimum_detectable_effect: float, va
 
         return int(2 * variances * ((quantile_1 - quantile_2) / minimum_detectable_effect) ** 2) + 1
     else:
-        sample_sizes = []
+
+        iteration_size = 3000  # Number of iterations
         if quantile_1 is None:
             quantile_1 = quantile_of_marginal_distribution(num_samples=number_of_samples,
                                                            quantile_level=1 - significance_level / number_of_samples,
                                                            variances=variances,
-                                                         equal_variance=False)  # Set of quantiles for the marginal distribution
+                                                           equal_variance=False)  # Set of quantiles for the marginal distribution
+        sample_sizes = []
         for sample_index in range(number_of_samples):
             sample_size = initial_estimate or 0
             current_power = 0
@@ -207,7 +208,7 @@ def min_sample_size(number_of_samples: int, minimum_detectable_effect: float, va
                         current_power += 1
                 current_power /= iteration_size
             sample_sizes.append(sample_size)
-        return max(sample_sizes)
+        return np.max(sample_sizes)
 
 
 # Применение метода
@@ -232,13 +233,14 @@ sample_size = min_sample_size(num_samples, minimum_detectable_effect,
                               significance_level=significance_level, power_level=power_level, equal_variance=True)
 print(f'Sample size = {sample_size}')
 
-
 # Testing samples with equal conversion rate
 print('\nSamples with equal conversion rate')
 for _ in range(5):
     samples = bernoulli.rvs(assumed_conversion, size=[num_samples, sample_size], random_state=random_state)
     hypothesis = test_on_marginal_distribution(samples, significance_level=significance_level)
     print(f'\tAccepted hypothesis H({hypothesis})')
+
+print("kek")
 
 # Testing where the last sample has a higher conversion rate by MDE
 print('\nLast sample has higher conversion by MDE')
@@ -253,8 +255,11 @@ for _ in range(5):
 # Multiple testing for best client income sample (conversion * price)
 # Parameters for different samples
 num_samples = 5  # Number of samples
+minimum_detectable_effect = 2.5  # MDE
 prices = [100, 150, 150, 200, 250]  # Tariff prices
 conversions = [0.15, 0.1, 0.1, 0.075, 0.06]  # Tariff conversions
+significance_level = 0.05
+power_level = 0.2
 variances = [price ** 2 * conversion * (1 - conversion) for price, conversion in zip(prices, conversions)]
 
 # Calculate minimum sample size for unequal variances
