@@ -42,4 +42,3 @@
 - [ ] All new and existing tests passed.
 - [ ] Documentation has been updated to reflect the changes made.
 - [ ] I have verified that the changes fix the issue as described.
-

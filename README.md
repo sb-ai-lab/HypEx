@@ -84,9 +84,9 @@ data = create_test_data(rs=52, na_step=10, nan_cols=['age', 'gender'])
 
 model = ABTest()
 results = model.execute(
-    data=data, 
-    target_field='post_spends', 
-    target_field_before='pre_spends', 
+    data=data,
+    target_field='post_spends',
+    target_field_before='pre_spends',
     group_field='group'
 )
 
