@@ -5,7 +5,7 @@ class Executor(ABC):
     pass
 
     @abstractmethod
-    def execute(self):
+    def execute(self, data):
         pass
 
 class Pipeline(Executor):
@@ -13,6 +13,6 @@ class Pipeline(Executor):
     def __init__(self, executors: Iterable[Executor]):
         self.executors = executors
 
-    def execute(self):
+    def execute(self, data):
         for executor in self.executors:
-            executor.execute()
+            executor.execute(data)
