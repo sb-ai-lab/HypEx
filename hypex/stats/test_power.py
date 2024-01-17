@@ -54,7 +54,7 @@ class StatMdeBySize(Experiment):
 class StatSampleSizeByMde(Experiment):
     sample_size: int
 
-    def __init__(self, mde: float, significance: float, power: float):
+    def __init__(self, mde: float, significance: float = 0.05, power: float = 0.8):
         self.mde = mde
         self.significance = significance
         self.power = power
