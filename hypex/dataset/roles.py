@@ -14,9 +14,8 @@ class ABCRole(ABC):
         role_name = role_name.lower()
         if role_name in possible_roles:
             return getattr(sys.modules[__name__], role_name.title() + "Role")(
-                kwargs.get('data_type',
-                           getattr(sys.modules[__name__], role_name.title() + "RoleTypes")
-                           ))
+                kwargs.get('data_type', getattr(sys.modules[__name__], role_name.title() + "RoleTypes"))
+            )
         raise ValueError(f"Unknown role: {role_name}. "
                          f"Possible roles: " + ("{} " * len(possible_roles)).format(*possible_roles))
 
