@@ -71,13 +71,15 @@ def pd_lgbm_feature_selector(
             columns=[f'"{_target_col}" importance']
         ).sort_index()
 
-        feature_importance[f'"{_target_col}" rank'] = np.argsort(feature_importance[f'"{_target_col}" importance'])
+        feature_importance[f'"{_target_col}" rank'] = feature_importance[f'"{_target_col}" importance']\
+            .rank(ascending=False, method='first').astype('int')
         feature_importance_list.append(feature_importance)
 
     result = pd.concat(feature_importance_list, axis=1)
     rank_col_list = result.iloc[:, 1::2].columns.tolist()
-    result.insert(0, 'total min rank', result.loc[:, rank_col_list].min(axis=1))
-    result = result.sort_values(['total min rank'] + rank_col_list, ascending=True)
+    result.insert(0, 'rank', result.loc[:, rank_col_list].min(axis=1))
+    result = result.sort_values(['rank'] + rank_col_list, ascending=True)
+    result['rank'] = result['rank'].rank(ascending=True, method='first').astype('int')
     return result
 
 
@@ -135,10 +137,10 @@ def pd_ridgecv_feature_selector(
 
     pipe = make_pipeline(
         # OneHotEncoder(sparse=False),
-        # SimpleImputer(strategy='median'),
+        SimpleImputer(strategy='median'),
         StandardScaler(with_mean=False),
         # RobustScaler(),
-        RidgeCV(alphas=100000 * 0.5**np.arange(1000))
+        RidgeCV(alphas=np.geomspace(1e5, 1e-5, num=100))
     )
 
     fitted_pipe = pipe.fit(
@@ -150,6 +152,6 @@ def pd_ridgecv_feature_selector(
         index='"' + pd.Series(target) + '" weight',
         columns=fitted_pipe[:-1].get_feature_names_out(),
     ).T
-    result.insert(0, 'total max weight', result.abs().max(axis=1))
-    result = result.sort_values('total max weight', ascending=False)
+    result.insert(0, 'rank', result.abs().max(axis=1).rank(ascending=False).astype('int'))
+    result = result.sort_values('rank', ascending=True)
     return result

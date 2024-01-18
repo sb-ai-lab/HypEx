@@ -117,4 +117,4 @@ def test_validate_result_pos():
     """
 
     assert len(res) > 0, "features return empty"
-    assert list(model.pval_dict.values())[0][1] < 0.05, "p-value on validate results is less than 0.05"
+    assert list(model.pval_dict.values())[0][1] > 0.05, "p-value on validate results is less than 0.05"
