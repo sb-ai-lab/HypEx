@@ -2,6 +2,11 @@ import sys
 from abc import ABC
 from hypex.utils.hypex_typings import *
 
+
+MatchingRoles = []
+AARoles = []
+ABRoles = []
+
 class ABCRole(ABC):
     _role_name = 'Abstract'
 
@@ -23,7 +28,6 @@ class ABCRole(ABC):
 class InfoRole(ABCRole):
     _role_name = 'Info'
 
-    # нужен ли дефолтный тип данных?
     def __init__(self, data_type: InfoRoleTypes):
         super().__init__(data_type)
 
@@ -45,6 +49,7 @@ class TreatmentRole(ABCRole):
     def __init__(self, data_type: TreatmentRoleTypes):
         super().__init__(data_type)
 
+
 class TargetRole(ABCRole):
     _role_name = 'Target'
 
@@ -61,7 +66,3 @@ class FeatureRole(ABCRole):
 
 class PretargetRole(TargetRole):
     _role_name = 'PreTarget'
-
-# if __name__ == '__main__':
-#     cl = ABCRole().get_from_str('PreTarget')
-#     print(cl.data_type)

@@ -1,25 +1,20 @@
 from abc import ABC
 from typing import Any, Dict
+
+import pandas
+
 from roles import ABCRole
-
-
-class Hypothesis:
-    pass
+from hypex.hypotheses.base import Hypothesis
 
 
 class ABCDataset(ABC):
-    # _check_columns = (наличие столбцов для задачи)
     def __init__(self,
-                 data: Any,
-                 roles: Dict[ABCRole, list[str]],
-                 task: Hypothesis):
-        if data and self.check(roles, task):
+                 data: Any = None,
+                 roles: Dict[ABCRole, list[str]] = None,
+                 task: Hypothesis = None):
+        self.task = task
+        if data is not None:
             self.set_data(data, roles)
-
-    def check(self,
-              roles: Dict[ABCRole, list[str]],
-              task: Hypothesis):
-        pass # наличие столбцов, корректные типы и тд
 
     def set_data(self,
                  data: Any,
@@ -28,11 +23,12 @@ class ABCDataset(ABC):
         self.roles = roles
 
 
+
+
 class ABCColumn(ABC):
     def __init__(self,
                  data: Any,
                  role: ABCRole):
         self.data = data
         self.role = role
-
 
