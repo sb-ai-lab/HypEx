@@ -28,7 +28,7 @@ RANDOM_STATE = 123
 TEST_SIZE = 0.2
 TIMEOUT = 600
 VERBOSE = 2
-USE_ALGOS = ["lgb"]
+USE_ALGOS = "lgb"
 PROP_SCORES_COLUMN = "prop_scores"
 GENERATE_REPORT = True
 SAME_TARGET_THRESHOLD = 0.7
@@ -335,7 +335,7 @@ class Matcher:
                                       self.input_data.loc[np.concatenate(filtred_matches.values)]])
         return matched_data
 
-    def feature_select(self, selection_model='lgbm') -> pd.DataFrame:
+    def feature_select(self) -> pd.DataFrame:
         """Calculates the importance of each feature.
 
         This method use LamaFeatureSelector to rank the importance of each feature in the dataset
@@ -347,15 +347,16 @@ class Matcher:
         self._log("Counting feature importance")
 
         feat_select = FeatureSelector(
-            outcome=self.outcomes[0],
-            outcome_type=self.outcome_type,
+            # outcome=self.outcomes[0],
+            outcome=self.outcomes,
+            # outcome_type=self.outcome_type,
             treatment=self.treatment,
-            timeout=self.timeout,
-            n_threads=self.n_threads,
-            n_folds=self.n_folds,
-            verbose=self.verbose,
-            generate_report=self.generate_report,
-            report_dir=self.report_feat_select_dir,
+            # timeout=self.timeout,
+            # n_threads=self.n_threads,
+            # n_folds=self.n_folds,
+            # verbose=self.verbose,
+            # generate_report=self.generate_report,
+            # report_dir=self.report_feat_select_dir,
             use_algos=self.use_algos,
         )
         df = self.input_data if self.group_col is None else self.input_data.drop(columns=self.group_col)
@@ -364,13 +365,15 @@ class Matcher:
             df = df.drop(columns=self.info_col)
 
         features = feat_select.perform_selection(df=df)
-        if self.group_col is None:
-            self.features_importance = features
-        else:
-            self.features_importance = features.append(
-                {"Feature": self.group_col, "Importance": features.Importance.max()}, ignore_index=True
-            )
-        return self.features_importance.sort_values("Importance", ascending=False)
+
+        # if self.group_col is None:
+        #     self.features_importance = features
+        # else:
+        #     self.features_importance = features.append(
+        #         {"Feature": self.group_col, "Importance": features.Importance.max()}, ignore_index=True
+        #     )
+        # return self.features_importance.sort_values("Importance", ascending=False)
+        return features
 
     def _create_faiss_matcher(self, df=None, validation=None):
         """Creates a FaissMatcher object.

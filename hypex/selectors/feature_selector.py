@@ -21,15 +21,15 @@ class FeatureSelector:
     def __init__(
             self,
             outcome: str,
-            outcome_type: str,
+            # outcome_type: str,
             treatment: str,
-            timeout: int,
-            n_threads: int,
-            n_folds: int,
-            verbose: bool,  # не используется
-            generate_report: bool,
-            report_dir: str,
-            use_algos: List[str],
+            # timeout: int,
+            # n_threads: int,
+            # n_folds: int,
+            # verbose: bool,  # не используется
+            # generate_report: bool,
+            # report_dir: str,
+            use_algos: str,
     ):
         """Initialize the LamaFeatureSelector.
 
@@ -56,15 +56,15 @@ class FeatureSelector:
                 List of names of LAMA algorithms for feature selection
         """
         self.outcome = outcome
-        self.outcome_type = outcome_type
+        # self.outcome_type = outcome_type
         self.treatment = treatment
         self.use_algos = use_algos
-        self.timeout = timeout
-        self.n_threads = n_threads
-        self.n_folds = n_folds
-        self.verbose = verbose
-        self.generate_report = generate_report
-        self.report_dir = report_dir
+        # self.timeout = timeout
+        # self.n_threads = n_threads
+        # self.n_folds = n_folds
+        # self.verbose = verbose
+        # self.generate_report = generate_report
+        # self.report_dir = report_dir
 
     def perform_selection(self, df: pd.DataFrame) -> pd.DataFrame:
         """Trains a model and returns feature scores.
@@ -84,19 +84,35 @@ class FeatureSelector:
             "drop": [self.treatment],
         }
 
-        if self.outcome_type == "numeric":
-            task_name = "reg"
-            loss = "mse"
-            metric = "mse"
-        elif self.outcome_type == "binary":
-            task_name = "binary"
-            loss = "logloss"
-            metric = "logloss"
+        # if self.outcome_type == "numeric":
+        #     task_name = "reg"
+        #     loss = "mse"
+        #     metric = "mse"
+        # elif self.outcome_type == "binary":
+        #     task_name = "binary"
+        #     loss = "logloss"
+        #     metric = "logloss"
+        # else:
+        #     task_name = "multiclass"
+        #     loss = "crossentropy"
+        #     metric = "crossentropy"
+
+        # features_scores = []
+
+        from hypex.selectors import selector_primal_methods
+        if self.use_algos == 'lgb':
+            selector = selector_primal_methods.pd_lgbm_feature_selector
+        elif self.use_algos == 'ridgecv':
+            selector = selector_primal_methods.pd_ridgecv_feature_selector
         else:
-            task_name = "multiclass"
-            loss = "crossentropy"
-            metric = "crossentropy"
-
-        features_scores = []
-
-        return features_scores
+            raise Exception(f"Unknown input algorithm used on feature_selector: {self.use_algos}")
+        report_df = selector(
+            df=df,
+            info_col_list=None,
+            target=self.outcome,
+            treatment_col=self.treatment,
+            weights_col_list=None,
+            category_col_list=None,
+            model=None
+        )
+        return report_df
