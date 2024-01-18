@@ -80,7 +80,7 @@ class Matcher:
         >>>
         >>> # Matching
         >>> model = Matcher(data, outcome=target, treatment=treatment, info_col=info_col, group_col=group_col)
-        >>> features = model.lama_feature_select() # Feature selection via lama
+        >>> features = model.feature_select() # Feature selection via lama
         >>> results, quality, df_matched = model.estimate(features=some_features) # Performs matching
         >>>
         >>> model.validate_result()
@@ -335,14 +335,14 @@ class Matcher:
                                       self.input_data.loc[np.concatenate(filtred_matches.values)]])
         return matched_data
 
-    def lama_feature_select(self) -> pd.DataFrame:
+    def feature_select(self, selection_model='lgbm') -> pd.DataFrame:
         """Calculates the importance of each feature.
 
         This method use LamaFeatureSelector to rank the importance of each feature in the dataset
         The features are then sorted by their importance with the most important feature first
 
         Returns:
-            The feature importances, sorted in descending order
+            The feature importance, sorted in descending order
         """
         self._log("Counting feature importance")
 
