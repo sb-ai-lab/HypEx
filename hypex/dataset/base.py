@@ -9,9 +9,9 @@ from hypex.hypotheses.base import Hypothesis
 
 class ABCDataset(ABC):
     def __init__(self,
-                 data: Any = None,
-                 roles: Dict[ABCRole, list[str]] = None,
-                 task: Hypothesis = None):
+                 data: Any,
+                 roles: Dict[ABCRole, list[str]],
+                 task: Hypothesis):
         self.task = task
         if data is not None:
             self.set_data(data, roles)
