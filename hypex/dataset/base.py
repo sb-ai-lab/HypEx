@@ -1,31 +1,55 @@
 from abc import ABC
-from typing import Any, Dict
-from roles import ABCRole
-from hypex.hypotheses.base import Hypothesis
+from typing import Any, Union, Sequence, Iterable
+from pandas import DataFrame
 
 
-class ABCDataset(ABC):
-    def __init__(self,
-                 data: Any,
-                 roles: Dict[ABCRole, list[str]],
-                 task: Hypothesis):
-        self.task = task
-        if data is not None:
-            self.set_data(data, roles)
+class DatasetSeletor(ABC):
 
-    def set_data(self,
-                 data: Any,
-                 roles: Dict[ABCRole, list[str]]):
+    @staticmethod
+    def select_dataset(data):
+        return PandasDataset(data)
+
+    def __len__(self):
+        pass
+
+    def __getitem__(self, idx):
+        pass
+
+    def __repr__(self):
+        pass
+
+    def __add__(self, other):
+        pass
+
+
+class PandasDataset(DatasetSeletor):
+    def __init__(self, data: DataFrame):
         self.data = data
-        self.roles = roles
+
+    def _get_column_index(self,
+                          column_name: Union[Sequence[str], str]) -> Union[int, Sequence[int]]:
+        idx = self.data.columns.get_loc(column_name) if isinstance(column_name, str) \
+            else self.data.columns.get_indexer(column_name)
+        return idx
+
+    def __getitem__(self, item):
+        if isinstance(item, slice) or isinstance(item, int):
+            return self.data.iloc[item]
+        if isinstance(item, str) or isinstance(item, list):
+            return self.data[item]
+        raise KeyError("No such column or row")
+
+    def __len__(self):
+        return len(self.data)
+
+    def __setitem__(self, key: str, value: Iterable):
+        self.data[key] = value
+        return self.data
 
     def __repr__(self):
         return self.data.__repr__()
 
+    def iloc(self, seq):
+        return self.data.iloc[seq]
 
-class ABCColumn(ABC):
-    def __init__(self,
-                 data: Any,
-                 role: ABCRole):
-        self.data = data
-        self.role = role
+
