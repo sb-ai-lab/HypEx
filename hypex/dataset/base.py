@@ -1,8 +1,5 @@
 from abc import ABC
 from typing import Any, Dict
-
-import pandas
-
 from roles import ABCRole
 from hypex.hypotheses.base import Hypothesis
 
@@ -26,12 +23,9 @@ class ABCDataset(ABC):
         return self.data.__repr__()
 
 
-
-
 class ABCColumn(ABC):
     def __init__(self,
                  data: Any,
                  role: ABCRole):
         self.data = data
         self.role = role
-

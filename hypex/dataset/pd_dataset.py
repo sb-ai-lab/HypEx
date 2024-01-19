@@ -1,7 +1,8 @@
 from hypex.dataset.base import *
-from pandas import DataFrame, Series
+from pandas import DataFrame
 from typing import Optional, Union, Sequence
 from hypex.errors.roleserrors import RoleError
+import pandas
 
 
 class PandasDataset(ABCDataset):
@@ -36,7 +37,7 @@ class PandasDataset(ABCDataset):
             return self.data.iloc[item]
         if isinstance(item, str) or isinstance(item, list):
             return self.data[item]
-        raise KeyError("Not implemented yet")
+        raise KeyError("No such column or row")
 
     def __len__(self):
         return len(self.data)
