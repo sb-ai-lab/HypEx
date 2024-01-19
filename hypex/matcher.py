@@ -165,6 +165,8 @@ class Matcher:
             pbar:
                 Display progress bar while get index
         """
+        self.short_features_df = None
+        self.detailed_features_df = None
         if use_algos is None:
             use_algos = USE_ALGOS
         self.input_data = input_data
@@ -364,16 +366,10 @@ class Matcher:
         if self.info_col is not None:
             df = df.drop(columns=self.info_col)
 
-        features = feat_select.perform_selection(df=df)
+        self.detailed_features_df = feat_select.perform_selection(df=df)
+        self.short_features_df = self.detailed_features_df.loc[:, ['rank']]
 
-        # if self.group_col is None:
-        #     self.features_importance = features
-        # else:
-        #     self.features_importance = features.append(
-        #         {"Feature": self.group_col, "Importance": features.Importance.max()}, ignore_index=True
-        #     )
-        # return self.features_importance.sort_values("Importance", ascending=False)
-        return features
+        return self.short_features_df
 
     def _create_faiss_matcher(self, df=None, validation=None):
         """Creates a FaissMatcher object.
@@ -551,8 +547,12 @@ class Matcher:
         Returns:
             Results of matching and matching quality metrics
         """
+        features = [*features]
+        if self.group_col is not None and self.group_col not in features:
+            features.append(self.group_col)
         if features is not None:
             self.features_importance = features
+
         return self._matching()
 
     def save(self, filename):
