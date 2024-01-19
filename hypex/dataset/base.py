@@ -22,6 +22,9 @@ class ABCDataset(ABC):
         self.data = data
         self.roles = roles
 
+    def __repr__(self):
+        return self.data.__repr__()
+
 
 
 
