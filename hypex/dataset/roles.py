@@ -66,3 +66,8 @@ class FeatureRole(ABCRole):
 
 class PretargetRole(TargetRole):
     _role_name = 'PreTarget'
+
+
+class DropRole(ABCRole):
+    _role_name = 'DropRole'
+
