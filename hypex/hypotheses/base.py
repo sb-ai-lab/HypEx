@@ -7,7 +7,7 @@ class Hypothesis:
 
     @staticmethod
     def get_name_from_str(name):
-        if name.lower() in ['matching', 'aa', 'ab']:
+        if name.lower() in ['matching', 'aa', 'ab', 'auto']:
             return name
         raise ValueError("Not a valid name for the experiment")
     def parse_task_roles(self):
