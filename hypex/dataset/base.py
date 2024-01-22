@@ -7,7 +7,9 @@ class DatasetSeletor(ABC):
 
     @staticmethod
     def select_dataset(data):
-        return PandasDataset(data)
+        if isinstance(data, DataFrame):
+            return PandasDataset(data)
+        return 0
 
     def __len__(self):
         pass
@@ -23,6 +25,7 @@ class DatasetSeletor(ABC):
 
 
 class PandasDataset(DatasetSeletor):
+
     def __init__(self, data: DataFrame):
         self.data = data
 
@@ -48,8 +51,5 @@ class PandasDataset(DatasetSeletor):
 
     def __repr__(self):
         return self.data.__repr__()
-
-    def iloc(self, seq):
-        return self.data.iloc[seq]
 
 
