@@ -547,11 +547,11 @@ class Matcher:
         Returns:
             Results of matching and matching quality metrics
         """
-        features = [*features]
-        if self.group_col is not None and self.group_col not in features:
-            features.append(self.group_col)
         if features is not None:
+            features = [*features]
             self.features_importance = features
+            if self.group_col is not None and self.group_col not in features:
+                features.append(self.group_col)
 
         return self._matching()
 
