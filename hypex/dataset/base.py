@@ -55,4 +55,5 @@ class PandasDataset(DatasetSeletor):
     def apply(self, *args, **kwargs):
         return self.data.apply(*args, **kwargs)
 
-
+    def map(self, *args, **kwargs):
+        return self.data.map(*args, **kwargs)

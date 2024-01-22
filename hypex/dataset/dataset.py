@@ -1,7 +1,4 @@
-from math import sqrt
 from typing import Optional, Dict, Union
-
-import numpy as np
 from pandas import DataFrame
 from hypex.dataset.roles import ABCRole
 from hypex.errors.roleserrors import *
@@ -63,12 +60,8 @@ class Dataset:
         except AttributeError:
             raise MethodError('apply', self.data.__class__.__name__)
 
-
-
-if __name__ == "__main__":
-    d = {'col1': [1, 2], 'col2': [3, 4]}
-    d2 = {'col1': [1, 2], 'col2': [3, 4]}
-    df = DataFrame(data=d)
-    df2 = [1, 2, 3]
-    abc = Dataset(df2)
-    print(abc.apply(np.sqrt))
+    def map(self, func, na_action=None, **kwargs):
+        try:
+            return self.data.map(func, na_action, **kwargs)
+        except AttributeError:
+            raise MethodError('map', self.data.__class__.__name__)
