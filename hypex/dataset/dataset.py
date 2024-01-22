@@ -58,11 +58,3 @@ class Dataset:
             return self.data.map(func, na_action, **kwargs)
         except AttributeError:
             raise MethodError('map', self.data.__class__.__name__)
-
-
-if __name__ == '__main__':
-    d = {'col1': [1, 2], 'col2': [3, 4]}
-    df = DataFrame(data=d)
-    df2 = [1, 2, 3]
-    abc = Dataset(df)
-    print(abc.loc[[1]])
