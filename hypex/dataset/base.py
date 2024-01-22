@@ -52,4 +52,7 @@ class PandasDataset(DatasetSeletor):
     def __repr__(self):
         return self.data.__repr__()
 
+    def apply(self, *args, **kwargs):
+        return self.data.apply(*args, **kwargs)
+
 

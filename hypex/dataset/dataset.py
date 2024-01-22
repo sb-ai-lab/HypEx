@@ -1,8 +1,10 @@
+from math import sqrt
 from typing import Optional, Dict, Union
 
+import numpy as np
 from pandas import DataFrame
 from hypex.dataset.roles import ABCRole
-from hypex.errors.roleserrors import RoleError
+from hypex.errors.roleserrors import *
 from hypex.hypotheses.base import Hypothesis
 from hypex.dataset.base import DatasetSeletor, PandasDataset
 
@@ -50,13 +52,23 @@ class Dataset:
     def __repr__(self):
         return self.data.__repr__()
 
+    @property
+    def roles(self):
+        return self.roles
+
+    def apply(self, func, axis=0, raw=False,
+              result_type=None, args=(), by_row='compat', **kwargs):
+        try:
+            return self.data.apply(func, axis, raw, result_type, args, by_row, **kwargs)
+        except AttributeError:
+            raise MethodError('apply', self.data.__class__.__name__)
+
+
 
 if __name__ == "__main__":
     d = {'col1': [1, 2], 'col2': [3, 4]}
     d2 = {'col1': [1, 2], 'col2': [3, 4]}
     df = DataFrame(data=d)
     df2 = [1, 2, 3]
-    abc = Dataset(df)
-    abc2 = Dataset(df2)
-    print(abc.loc[1])
-    print(abc2.iloc[1])
+    abc = Dataset(df2)
+    print(abc.apply(np.sqrt))
