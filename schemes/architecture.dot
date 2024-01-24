@@ -1,0 +1,93 @@
+digraph Architecture{
+    compound=true
+    node[style=filled]
+
+    subgraph modules{
+        node[shape=box3d, fillcolor=violet]
+
+        executor_legend[label="Executor"]
+        // -------
+        experiment_executor_list[label="List[Executor]", shape=folder]
+        experiment_legend[label="Experiment"]
+        experiment_executor_0_in_list[label="Executor 0"]
+        experiment_executor_1_in_list[label="Executor 1"]
+        experiment_executor_dotted_in_list[label="..."]
+        experiment_executor_n_in_list[label="Executor n"]
+        // -------
+        multiexperiment_experiment[label="Experiment"]
+        multiexperiment[label="MultiExperiment"]
+
+    }
+
+    subgraph methods{
+        node[shape=box, fillcolor=cornflowerblue]
+        executor_execute_legend[label="execute"]
+        // -------
+        experiment_execute_legend[label="execute"]
+        experiment_execute_0[label="execute 0"]
+        experiment_execute_1[label="execute 1"]
+        experiment_execute_dotted[label="..."]
+        experiment_execute_n[label="execute n"]
+        // -------
+        multiexperiment_execute[label="execute"]
+    }
+
+    subgraph data{
+        node[shape=note, fillcolor=lightgreen]
+
+        executor_legend_data[label="Dataset"]
+        // -------
+        experiment_legend_data[label="Dataset"]
+        experiment_data_0[label="ExperimentData 0"]
+        experiment_data_1[label="ExperimentData 1"]
+        experiment_data_n[label="ExperimentData n-1"]
+        experiment_data_final[label="ExperimentData n"]
+        // -------
+        multiexperiment_data[label="Dataset"]
+    }
+
+    subgraph atributes{
+        node[shape=record, fillcolor=lightpink]
+        experiment_executor_list_attribute[label="List[Executor]"]
+    }
+
+    subgraph cluster_executor{
+        graph[style=dashed, label="Executor"]
+
+        executor_legend_data -> executor_execute_legend
+        executor_legend -> executor_execute_legend [arrowhead=none]
+    }
+
+    subgraph cluster_experiment{
+        graph[style=dashed, label="Experiment"]
+        experiment_executor_list -> experiment_executor_list_attribute
+        experiment_executor_list_attribute -> experiment_legend [arrowhead=none]
+        experiment_legend -> experiment_execute_legend [arrowhead=none]
+        experiment_legend_data -> experiment_execute_legend
+        experiment_legend_data -> experiment_execute_0 [style=dotted]
+
+        subgraph cluster_experiment_executor{
+            graph[style=dotted, label="execute"]
+            experiment_executor_0_in_list -> experiment_execute_0 [arrowhead=none]
+            experiment_execute_0 -> experiment_data_0 -> experiment_execute_1
+            experiment_executor_1_in_list -> experiment_execute_1 [arrowhead=none]
+            experiment_execute_1 -> experiment_data_1 -> experiment_execute_dotted
+            experiment_executor_dotted_in_list -> experiment_execute_dotted [arrowhead=none]
+            experiment_execute_dotted -> experiment_data_n -> experiment_execute_n
+            experiment_executor_n_in_list -> experiment_execute_n [arrowhead=none]
+            experiment_execute_n -> experiment_data_final
+        }
+
+        experiment_execute_legend -> experiment_execute_0 [
+            arrowhead=none, 
+            lhead=cluster_experiment_executor
+        ]
+    }
+
+    subgraph cluster_multiexperiment{
+        graph[style=dashed, label="MultiExperiment"]
+
+    }
+
+
+}
