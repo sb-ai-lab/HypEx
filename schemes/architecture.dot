@@ -16,6 +16,7 @@ digraph Architecture{
         // -------
         multiexperiment_experiment[label="Experiment"]
         multiexperiment[label="MultiExperiment"]
+        multiexperiment_execte_executor[label="Executor"]
 
     }
 
@@ -30,6 +31,8 @@ digraph Architecture{
         experiment_execute_n[label="execute n"]
         // -------
         multiexperiment_execute[label="execute"]
+        multiexperiment_executor_execute[label="execute"]
+        multiexperiment_execute_data_append[label="append"]
     }
 
     subgraph data{
@@ -44,6 +47,8 @@ digraph Architecture{
         experiment_data_final[label="ExperimentData n"]
         // -------
         multiexperiment_data[label="Dataset"]
+        multiexperiment_executor_experiment_data[label="ExperimentData i"]
+        multiexperiment_executor_result_data[label="ExperimentData"]
     }
 
     subgraph atributes{
@@ -86,7 +91,22 @@ digraph Architecture{
 
     subgraph cluster_multiexperiment{
         graph[style=dashed, label="MultiExperiment"]
+        multiexperiment_experiment -> multiexperiment [arrowhead=none]
+        multiexperiment -> multiexperiment_execute [arrowhead=none]
+        multiexperiment_data -> multiexperiment_execute
 
+        subgraph cluster_multiexperiment_execute{
+            graph[style=dotted, label="execute"]
+            
+            multiexperiment_execte_executor -> multiexperiment_executor_execute [arrowhead=none]
+            multiexperiment_executor_execute -> multiexperiment_executor_experiment_data
+            multiexperiment_executor_experiment_data -> multiexperiment_execute_data_append
+            multiexperiment_execute_data_append -> multiexperiment_executor_result_data
+
+            multiexperiment_executor_result_data -> multiexperiment_executor_execute [style=dashed]
+        }
+            node [style=filled color=white]
+        }
     }
 
 
