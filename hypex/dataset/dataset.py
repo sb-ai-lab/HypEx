@@ -8,7 +8,7 @@ from hypex.dataset.base import DatasetSeletor, PandasDataset
 
 class Dataset:
     class Locker:
-        def __init__(self, df: DataFrame, method: str):
+        def __init__(self, df: Union[DataFrame, str], method: str):
             self.df = df
             self.method = getattr(df, method)
 
@@ -45,6 +45,9 @@ class Dataset:
 
     def __repr__(self):
         return self.data.__repr__()
+
+    def __getitem__(self, item):
+        return self.data.__getitem__(item)
 
     def apply(self, func, axis=0, raw=False,
               result_type=None, args=(), by_row='compat', **kwargs):
