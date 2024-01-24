@@ -80,7 +80,7 @@ class Matcher:
         >>>
         >>> # Matching
         >>> model = Matcher(data, outcome=target, treatment=treatment, info_col=info_col, group_col=group_col)
-        >>> features = model.feature_select() # Feature selection via lama
+        >>> features = model.feature_select() # Feature selection
         >>> results, quality, df_matched = model.estimate(features=some_features) # Performs matching
         >>>
         >>> model.validate_result()
@@ -349,16 +349,8 @@ class Matcher:
         self._log("Counting feature importance")
 
         feat_select = FeatureSelector(
-            # outcome=self.outcomes[0],
             outcome=self.outcomes,
-            # outcome_type=self.outcome_type,
             treatment=self.treatment,
-            # timeout=self.timeout,
-            # n_threads=self.n_threads,
-            # n_folds=self.n_folds,
-            # verbose=self.verbose,
-            # generate_report=self.generate_report,
-            # report_dir=self.report_feat_select_dir,
             use_algos=self.use_algos,
         )
         df = self.input_data if self.group_col is None else self.input_data.drop(columns=self.group_col)

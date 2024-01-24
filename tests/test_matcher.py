@@ -46,8 +46,6 @@ def test_matcher_pos():
     assert model.results["p-val"].values[1] <= 0.05, "p-value on ATC is greater than 0.1"
     assert model.results["p-val"].values[2] <= 0.05, "p-value on ATT is greater than 0.1"
 
-    print('_'*300)
-    print(res)
     # assert isinstance(res, tuple), "result of function estimate is not tuple"
     assert len(res) == 3, "tuple does not return 3 values"
 
@@ -117,5 +115,4 @@ def test_validate_result_pos():
     """
 
     assert len(res) > 0, "features return empty"
-    print(list(model.pval_dict.values()))
     assert list(model.pval_dict.values())[0][1] > 0.05, "p-value on validate results is less than 0.05"

@@ -1,16 +1,22 @@
 import numpy as np
 import pandas as pd
 
+from lightgbm import LGBMRegressor
+from catboost import CatBoostRegressor
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler, RobustScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import RidgeCV
+
 
 def pd_lgbm_feature_selector(
-        df:pd.DataFrame,
+        df: pd.DataFrame,
         info_col_list=None,
         target='target',
         treatment_col=None,
         weights_col_list=None,
         category_col_list=None,
         model=None) -> pd.DataFrame:
-
     if category_col_list is None:
         category_col_list = []
     if weights_col_list is None:
@@ -51,27 +57,27 @@ def pd_lgbm_feature_selector(
 
     feature_importance_list = []
     for _target_col in target:
-        from catboost import CatBoostRegressor
-        feature_selection_model = CatBoostRegressor(
-            #     iterations=100,
-            learning_rate=1e-3,
-            depth=7,
+        lgbm_selection_model = LGBMRegressor(
+            silent=False,
+            verbose=-1,
+            num_leaves=31,
+            n_estimators=50,
+            importance_type='gain',
         )
 
-        feature_selection_model.fit(
+        lgbm_selection_model.fit(
             df[feature_col_list],
             df[_target_col],
-            cat_features=category_col_list,
-            silent=True,
+            categorical_feature=category_col_list,
         )
 
         feature_importance = pd.DataFrame(
-            feature_selection_model.feature_importances_,
+            lgbm_selection_model.feature_importances_,
             index=feature_col_list,
             columns=[f'"{_target_col}" importance']
         ).sort_index()
 
-        feature_importance[f'"{_target_col}" rank'] = feature_importance[f'"{_target_col}" importance']\
+        feature_importance[f'"{_target_col}" rank'] = feature_importance[f'"{_target_col}" importance'] \
             .rank(ascending=False, method='first').astype('int')
         feature_importance_list.append(feature_importance)
 
@@ -130,13 +136,7 @@ def pd_ridgecv_feature_selector(
         numeric_fill_values = df.loc[:, numeric_col_list].describe(include='all').loc['50%']
         df.loc[:, numeric_col_list] = df.loc[:, numeric_col_list].fillna(numeric_fill_values)
 
-    from sklearn.pipeline import make_pipeline
-    from sklearn.preprocessing import StandardScaler, RobustScaler, OneHotEncoder
-    from sklearn.impute import SimpleImputer
-    from sklearn.linear_model import RidgeCV
-
     pipe = make_pipeline(
-        # OneHotEncoder(sparse=False),
         SimpleImputer(strategy='median'),
         StandardScaler(with_mean=False),
         # RobustScaler(),
@@ -154,4 +154,83 @@ def pd_ridgecv_feature_selector(
     ).T
     result.insert(0, 'rank', result.abs().max(axis=1).rank(ascending=False).astype('int'))
     result = result.sort_values('rank', ascending=True)
+    return result
+
+
+def pd_catboost_feature_selector(
+        df: pd.DataFrame,
+        info_col_list=None,
+        target='target',
+        treatment_col=None,
+        weights_col_list=None,
+        category_col_list=None,
+        model=None) -> pd.DataFrame:
+    if category_col_list is None:
+        category_col_list = []
+    if weights_col_list is None:
+        weights_col_list = []
+    if treatment_col is None:
+        treatment_col = []
+    if info_col_list is None:
+        info_col_list = []
+    if model is None:
+        model = 'lgbm_regressor'
+    if isinstance(target, str):
+        target = [target]
+
+    feature_col_list = [
+        col
+        for col in df.columns
+        if col not in (
+            *info_col_list,
+            *target,
+            treatment_col,
+            *weights_col_list,
+        )
+    ]
+
+    numeric_col_list = [
+        col
+        for col in feature_col_list
+        if col not in category_col_list
+    ]
+
+    if category_col_list:
+        category_fill_values = df.loc[:, category_col_list].astype('str').describe(include='all').loc['top']
+        df.loc[:, category_col_list] = df.loc[:, category_col_list].fillna(category_fill_values).astype('str')
+
+    if numeric_col_list:
+        numeric_fill_values = df.loc[:, numeric_col_list].describe(include='all').loc['50%']
+        df.loc[:, numeric_col_list] = df.loc[:, numeric_col_list].fillna(numeric_fill_values)
+
+    feature_importance_list = []
+    for _target_col in target:
+        catboost_selection_model = CatBoostRegressor(
+            #     iterations=100,
+            learning_rate=1e-3,
+            depth=7,
+        )
+
+        catboost_selection_model.fit(
+            df[feature_col_list],
+            df[_target_col],
+            cat_features=category_col_list,
+            silent=True,
+        )
+
+        feature_importance = pd.DataFrame(
+            catboost_selection_model.feature_importances_,
+            index=feature_col_list,
+            columns=[f'"{_target_col}" importance']
+        ).sort_index()
+
+        feature_importance[f'"{_target_col}" rank'] = feature_importance[f'"{_target_col}" importance'] \
+            .rank(ascending=False, method='first').astype('int')
+        feature_importance_list.append(feature_importance)
+
+    result = pd.concat(feature_importance_list, axis=1)
+    rank_col_list = result.iloc[:, 1::2].columns.tolist()
+    result.insert(0, 'rank', result.loc[:, rank_col_list].min(axis=1))
+    result = result.sort_values(['rank'] + rank_col_list, ascending=True)
+    result['rank'] = result['rank'].rank(ascending=True, method='first').astype('int')
     return result
