@@ -115,3 +115,7 @@ def test_unbalanced_groups(data, iterations, info_col):
         pbar=False
     )
     assert abs(results["split_stat"]["test %"] / 100 - test_size) < 0.05
+
+def test_aa_empty_unbalanced_process(data, iterations):
+    model = AATest()
+    model.process(data, iterations=iterations, show_plots=False, pbar=False, test_size=0.05)
