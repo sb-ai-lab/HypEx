@@ -23,22 +23,51 @@ from scipy.stats import norm
 # Функции минимального размера выборки и критерия являются основными
 # Функция квантиля предельного распределения случайной величины минимума используется в основных функциях
 
-def t_value_equal_var(sample, i):
-    t_value = (sample[0] - sample[i]) / np.sqrt(2)
-    return t_value
+def t_value_quantile_equal_var(sample, i):
+    return (sample[0] - sample[i]) / np.sqrt(2)
 
 
-def t_value_not_equal_var(sample, variances, i, j):
-    t_value = sample[j] / np.sqrt(1 + variances[i] / variances[j]) - sample[i] / np.sqrt(
-        1 + variances[j] / variances[i])
-    return t_value
+def t_value_quantile_unequal_var(sample, variances, i, j):
+    return sample[j] / np.sqrt(1 + variances[i] / variances[j]) - sample[i] / np.sqrt(1 + variances[j] / variances[i])
 
 
-def calculate_t_value(sample, i, variances=None, j=None):
-    if variances:
-        return t_value_not_equal_var(sample, variances, i, j)
+def t_value_test_marginal(means, variances, sample_size, i, j):
+    return np.sqrt(sample_size) * (means[j] - means[i]) / np.sqrt(variances[j] + variances[i])
+
+
+def t_value_min_sample_size(sample, variances, sample_size, minimum_detectable_effect, i, j):
+    return sample[j] / np.sqrt(1 + variances[i] / variances[j]) - sample[i] / np.sqrt(
+        1 + variances[j] / variances[i]) + minimum_detectable_effect * np.sqrt(
+        sample_size / (variances[j] + variances[i]))
+
+
+def calculate_t_value(sample, i, j, variances=None, means=None, sample_size=None, mde=None):
+    """Calculate the t-value based on the provided parameters.
+
+    Args:
+        sample (list[float]): The sample data.
+        i (int): Index of the first sample.
+        j (int): Index of the second sample.
+        variances (list[float], optional): List of variances for each sample.
+        means (list[float], optional): Means of the samples, required for test_on_marginal_distribution.
+        sample_size (int, optional): Size of each sample, required for test_on_marginal_distribution and min_sample_size.
+        mde (float, optional): Minimum Detectable Effect, required for min_sample_size.
+
+    Returns:
+        float: The calculated t-value.
+    """
+    if variances is None:
+        # For quantile_of_marginal_distribution with equal variance
+        return t_value_quantile_equal_var(sample, i)
+    elif means is None:
+        # For quantile_of_marginal_distribution with unequal variance
+        return t_value_quantile_unequal_var(sample, variances, i, j)
+    elif mde is None:
+        # For test_on_marginal_distribution
+        return t_value_test_marginal(means, variances, sample_size, i, j)
     else:
-        return t_value_equal_var(sample, i)
+        # For min_sample_size
+        return t_value_min_sample_size(sample, variances, sample_size, mde, i, j)
 
 
 # def calculate_quantiles()
@@ -55,7 +84,7 @@ def quantile_of_marginal_distribution(num_samples, quantile_level, variances=Non
             min_t_value = np.inf
             for i in range(num_samples):
                 if i != j:
-                    t_value = calculate_t_value(sample, i, variances, j)
+                    t_value = calculate_t_value(sample, i, j, variances)
                     min_t_value = min(min_t_value, t_value)
             t_values.append(min_t_value)
         quantiles.append(np.quantile(t_values, quantile_level))
@@ -67,17 +96,18 @@ def test_on_marginal_distribution(samples, significance_level=0.05, equal_varian
     sample_size = len(samples[0])  # Размер выборки
 
     means = [np.mean(sample) for sample in samples]
-    variances = [np.var(sample) * sample_size / (sample_size - 1) for sample in samples] if equal_variance else None
+    variances_q = [np.var(sample) * sample_size / (sample_size - 1) for sample in samples] if equal_variance else None
+    variances = [np.var(sample) * sample_size / (sample_size - 1) for sample in samples]
 
     if quantiles is None:
         quantiles = quantile_of_marginal_distribution(num_samples=num_samples,
                                                       quantile_level=1 - significance_level / num_samples,
-                                                      variances=variances)  # квантиль предельного распределения
+                                                      variances=variances_q)  # квантиль предельного распределения
     for j in range(num_samples):
         min_t_value = np.inf
         for i in range(num_samples):
             if i != j:
-                t_value = np.sqrt(sample_size) * (means[j] - means[i]) / np.sqrt(variances[j] + variances[i])
+                t_value = calculate_t_value(samples, i, j, variances, means, sample_size)
                 min_t_value = min(min_t_value, t_value)
 
         if min_t_value > quantiles[j]:
@@ -106,7 +136,7 @@ def min_sample_size(number_of_samples, minimum_detectable_effect, variances, sig
                                                            variances=variances,
                                                            )  # набор квантилей предельного распределения
         sample_sizes = []  # для размеров выборки
-        for sample_index in range(number_of_samples):
+        for j in range(number_of_samples):
             sample_size = initial_estimate or 0
             current_power = 0  # мощность
             while current_power < 1 - power_level:
@@ -116,13 +146,11 @@ def min_sample_size(number_of_samples, minimum_detectable_effect, variances, sig
                 for sample in total_samples:
                     min_t_value = np.inf
                     for i in range(number_of_samples):
-                        if i != sample_index:
-                            t_value = sample[sample_index] / np.sqrt(1 + variances[i] / variances[sample_index]) - \
-                                      sample[i] / np.sqrt(
-                                1 + variances[sample_index] / variances[i]) + minimum_detectable_effect * np.sqrt(
-                                sample_size / (variances[sample_index] + variances[i]))
+                        if i != j:
+                            t_value = calculate_t_value(sample, i, j, variances, sample_size=sample_size,
+                                                        mde=minimum_detectable_effect)
                             min_t_value = min(min_t_value, t_value)
-                    if min_t_value > quantile_1[sample_index]:
+                    if min_t_value > quantile_1[j]:
                         current_power += 1
                 current_power /= iteration_size
             sample_sizes.append(sample_size)
