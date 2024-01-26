@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Any
 
 import numpy as np
 import pandas as pd
@@ -93,15 +93,30 @@ def pd_input_preproc(
     return feature_col_list, target_col_list, numeric_col_list, category_col_list, df
 
 
-def get_feature_importance_df(gb_model, feature_names, target_name):
+def get_feature_importance_df(gb_model: Any, feature_names: List[str], target_name: str) -> pd.DataFrame:
+    """
+    Generates a DataFrame with feature importances from a gradient boosting model.
+
+    This function is compatible with various gradient boosting models such as CatBoost
+    and LightGBM.
+
+    Args:
+        gb_model (Any): The trained gradient boosting model (CatBoostRegressor, LGBMModel, etc.).
+        feature_names (List[str]): List of feature names used in the model.
+        target_name (str): Name of the target variable.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing feature importances and their ranks.
+    """
     feature_importance = pd.DataFrame(
         gb_model.feature_importances_,
         index=feature_names,
         columns=[f'"{target_name}" importance']
-    ).sort_index()
+    ).sort_values(by=f'"{target_name}" importance', ascending=False)
 
     feature_importance[f'"{target_name}" rank'] = feature_importance[f'"{target_name}" importance'] \
         .rank(ascending=False, method='first').astype('int')
+
     return feature_importance
 
 
