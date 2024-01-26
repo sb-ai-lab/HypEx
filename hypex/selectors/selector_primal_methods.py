@@ -282,19 +282,29 @@ def pd_catboost_feature_selector(
 
 def pd_ridgecv_feature_selector(
         df: pd.DataFrame,
-        info_col_list=None,
-        target='target',
-        treatment_col=None,
-        weights_col_list=None,
-        category_col_list=None,
-        model=None) -> pd.DataFrame:
-    (
-        feature_col_list,
-        target_col_list,
-        numeric_col_list,
-        category_col_list,
-        df
-    ) = pd_input_preproc(
+        info_col_list: Optional[List[str]] = None,
+        target: Union[str, List[str]] = 'target',
+        treatment_col: Optional[Union[str, List[str]]] = None,
+        weights_col_list: Optional[List[str]] = None,
+        category_col_list: Optional[List[str]] = None,
+        model: Optional = None) -> pd.DataFrame:
+    """
+    Processes input data and uses RidgeCV for feature selection.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        info_col_list (Optional[List[str]]): List of informational column names.
+        target (Union[str, List[str]]): Target column name(s) for the model.
+        treatment_col (Optional[Union[str, List[str]]]): Treatment column name(s).
+        weights_col_list (Optional[List[str]]): List of weights column names.
+        category_col_list (Optional[List[str]]): List of categorical column names.
+        model (Optional): The RidgeCV model to use. If None, a default model is used.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing feature weights, their absolute values, and ranks.
+
+    """
+    feature_col_list, target_col_list, numeric_col_list, category_col_list, df = pd_input_preproc(
         df,
         info_col_list=info_col_list,
         target=target,
@@ -306,19 +316,19 @@ def pd_ridgecv_feature_selector(
     pipe = make_pipeline(
         SimpleImputer(strategy='median'),
         StandardScaler(with_mean=False),
-        # RobustScaler(),
-        RidgeCV(alphas=np.geomspace(1e5, 1e-5, num=100))
+        RidgeCV(alphas=np.geomspace(1e5, 1e-5, num=100)) if model is None else model
     )
 
-    fitted_pipe = pipe.fit(
-        df[feature_col_list].pipe(pd.get_dummies),
-        df[target],
-    )
+    target_data = df[target] if isinstance(target, str) else df[target_col_list]
+    fitted_pipe = pipe.fit(df[feature_col_list].pipe(pd.get_dummies), target_data)
+
     result = pd.DataFrame(
         fitted_pipe[-1].coef_,
         index='"' + pd.Series(target) + '" weight',
         columns=fitted_pipe[:-1].get_feature_names_out(),
     ).T
+
     result.insert(0, 'rank', result.abs().max(axis=1).rank(ascending=False).astype('int'))
     result = result.sort_values('rank', ascending=True)
+
     return result
