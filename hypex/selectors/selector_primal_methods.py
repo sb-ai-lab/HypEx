@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -44,81 +44,53 @@ def pd_fillna_inplace(df: pd.DataFrame, col_list: List[str], is_category: bool =
 
 def pd_input_preproc(
         df: pd.DataFrame,
-        info_col_list=None,
-        target='target',
-        treatment=None,
-        weights_col_list=None,
-        category_col_list=None) -> tuple[
-    list[str],
-    list[str],
-    list[str],
-    list[str],
-    pd.DataFrame
-]:
+        info_col_list: Optional[List[str]] = None,
+        target: Union[str, List[str]] = 'target',
+        treatment: Optional[Union[str, List[str]]] = None,
+        weights_col_list: Optional[List[str]] = None,
+        category_col_list: Optional[List[str]] = None
+) -> tuple[List[str], List[str], List[str], List[str], pd.DataFrame]:
     """
-    Marks and convert column types.
-    Fills NANs.
+    Processes the input DataFrame by marking and converting column types and filling NaNs.
+
     Args:
-        df:
-        info_col_list:
-        target:
-        treatment:
-        weights_col_list:
-        category_col_list:
+        df (pd.DataFrame): The input DataFrame to process.
+        info_col_list (Optional[List[str]]): List of informational column names.
+        target (Union[str, List[str]]): Target column name(s).
+        treatment (Optional[Union[str, List[str]]]): Treatment column name(s).
+        weights_col_list (Optional[List[str]]): List of weights column names.
+        category_col_list (Optional[List[str]]): List of categorical column names.
 
-    Returns: marked column sets and copy of processed dataframe
-
+    Returns:
+        tuple: A tuple containing:
+            - feature_col_list (List[str]): List of feature column names.
+            - target_col_list (List[str]): List of target column names.
+            - numeric_col_list (List[str]): List of numeric column names.
+            - category_col_list (List[str]): List of categorical column names.
+            - df (pd.DataFrame): The processed DataFrame.
     """
-    if info_col_list is None:
-        info_col_list = []
-    if weights_col_list is None:
-        weights_col_list = []
-    if category_col_list is None:
-        category_col_list = []
-
-    if treatment is None:
-        treatment_col_list = []
-    elif isinstance(treatment, str):
-        treatment_col_list = [treatment]
-    else:
-        treatment_col_list = treatment
-
-    if isinstance(target, str):
-        target_col_list = [target]
-    else:
-        target_col_list = target
+    info_col_list = info_col_list or []
+    weights_col_list = weights_col_list or []
+    category_col_list = category_col_list or []
+    treatment_col_list = [treatment] if isinstance(treatment, str) else treatment or []
+    target_col_list = [target] if isinstance(target, str) else target
 
     df = df.copy(deep=True)
 
     feature_col_list = [
-        col
-        for col in df.columns
-        if col not in (
-            *info_col_list,
-            *target_col_list,
-            *treatment_col_list,
-            *weights_col_list,
-        )
+        col for col in df.columns
+        if col not in info_col_list + target_col_list + treatment_col_list + weights_col_list
     ]
 
-    numeric_col_list = [
-        col
-        for col in feature_col_list
-        if col not in category_col_list
-    ]
+    numeric_col_list = [col for col in feature_col_list if col not in category_col_list]
 
-    df.loc[:, category_col_list] = df.loc[:, category_col_list].astype('str')
+    df[category_col_list] = df[category_col_list].astype('str')
     pd_fillna_inplace(df, category_col_list, is_category=True)
     pd_fillna_inplace(df, numeric_col_list, is_category=False)
 
-    df = df.loc[:, target_col_list + feature_col_list]
-    return (
-        feature_col_list,
-        target_col_list,
-        numeric_col_list,
-        category_col_list,
-        df
-    )
+    df = df[target_col_list + feature_col_list]
+
+    return feature_col_list, target_col_list, numeric_col_list, category_col_list, df
 
 
 def get_feature_importance_df(gb_model, feature_names, target_name):
