@@ -120,12 +120,27 @@ def get_feature_importance_df(gb_model: Any, feature_names: List[str], target_na
     return feature_importance
 
 
-def concat_feature_importance_dfs(feature_importance_list):
+def concat_feature_importance_dfs(feature_importance_list: List[pd.DataFrame]) -> pd.DataFrame:
+    """
+    Concatenates a list of DataFrames containing feature importances and recalculates the ranks.
+
+    This function assumes each DataFrame in the list contains columns of feature importances
+    and their ranks. It concatenates these DataFrames side-by-side, recalculates the overall
+    ranks, and sorts the features accordingly.
+
+    Args:
+        feature_importance_list (List[pd.DataFrame]): A list of DataFrames with feature importances
+                                                      and ranks.
+
+    Returns:
+        pd.DataFrame: A concatenated DataFrame with updated overall ranks.
+    """
     result = pd.concat(feature_importance_list, axis=1)
     rank_col_list = result.iloc[:, 1::2].columns.tolist()
-    result.insert(0, 'rank', result.loc[:, rank_col_list].min(axis=1))
+    result.insert(0, 'rank', result[rank_col_list].min(axis=1))
     result = result.sort_values(['rank'] + rank_col_list, ascending=True)
     result['rank'] = result['rank'].rank(ascending=True, method='first').astype('int')
+
     return result
 
 
