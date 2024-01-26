@@ -146,19 +146,31 @@ def concat_feature_importance_dfs(feature_importance_list: List[pd.DataFrame]) -
 
 def pd_lgbm_feature_selector(
         df: pd.DataFrame,
-        info_col_list=None,
-        target='target',
-        treatment_col=None,
-        weights_col_list=None,
-        category_col_list=None,
-        model=None) -> pd.DataFrame:
-    (
-        feature_col_list,
-        target_col_list,
-        numeric_col_list,
-        category_col_list,
-        df
-    ) = pd_input_preproc(
+        info_col_list: Optional[List[str]] = None,
+        target: Union[str, List[str]] = 'target',
+        treatment_col: Optional[Union[str, List[str]]] = None,
+        weights_col_list: Optional[List[str]] = None,
+        category_col_list: Optional[List[str]] = None,
+        model: Optional = None) -> pd.DataFrame:
+    """
+    Processes input data and uses LightGBM to select feature importance.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        info_col_list (Optional[List[str]]): List of informational column names.
+        target (Union[str, List[str]]): Target column name(s) for the model.
+        treatment_col (Optional[Union[str, List[str]]]): Treatment column name(s).
+        weights_col_list (Optional[List[str]]): List of weights column names.
+        category_col_list (Optional[List[str]]): List of categorical column names.
+        model (Optional): The LightGBM model to use. If None, a default model is used.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing feature importances and their ranks.
+
+    Raises:
+        ImportError: If LightGBM is not installed.
+    """
+    feature_col_list, target_col_list, numeric_col_list, category_col_list, df = pd_input_preproc(
         df,
         info_col_list=info_col_list,
         target=target,
@@ -166,6 +178,7 @@ def pd_lgbm_feature_selector(
         weights_col_list=weights_col_list,
         category_col_list=category_col_list
     )
+
     try:
         from lightgbm import LGBMRegressor
     except ImportError:
@@ -175,14 +188,16 @@ def pd_lgbm_feature_selector(
         )
 
     feature_importance_list = []
-    for _target_col in target:
+    target_col_list = [target] if isinstance(target, str) else target
+
+    for _target_col in target_col_list:
         lgbm_selection_model = LGBMRegressor(
             silent=False,
             verbose=-1,
             num_leaves=31,
             n_estimators=50,
             importance_type='gain',
-        )
+        ) if model is None else model
 
         lgbm_selection_model.fit(
             df[feature_col_list],
