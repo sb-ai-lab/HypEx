@@ -1,11 +1,11 @@
-"""Feature selection class using LAMA."""
+"""Feature selection class."""
 import logging
 from typing import List
 
 import pandas as pd
 from hypex.selectors import selector_primal_methods
 
-logger = logging.getLogger("lama_feature_selector")
+logger = logging.getLogger("feature_selector")
 console_out = logging.StreamHandler()
 logging.basicConfig(
     handlers=(console_out,),
@@ -16,7 +16,7 @@ logging.basicConfig(
 
 
 class FeatureSelector:
-    """Class of LAMA Feature selector. Select top features. By default, use LGM.
+    """Class of Feature selector. Select top features. By default, use LGM.
     # TODO: write some feature selector"""
 
     def __init__(
@@ -25,7 +25,7 @@ class FeatureSelector:
             treatment: str,
             use_algos: str,
     ):
-        """Initialize the LamaFeatureSelector.
+        """Initialize the FeatureSelector.
 
         Args:
             outcome:
@@ -33,7 +33,7 @@ class FeatureSelector:
             treatment:
                 The column that determines control and test groups
             use_algos:
-                List of names of LAMA algorithms for feature selection
+                List of names of algorithms for feature selection
         """
         self.outcome = outcome
         self.treatment = treatment
