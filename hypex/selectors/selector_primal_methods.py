@@ -1,23 +1,45 @@
+from typing import List
+
 import numpy as np
 import pandas as pd
-
-from lightgbm import LGBMRegressor
-from catboost import CatBoostRegressor
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler, RobustScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import RidgeCV
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 
-def pd_fillna_inplace(df, col_list, is_category=False):
+def pd_fillna_inplace(df: pd.DataFrame, col_list: List[str], is_category: bool = False) -> None:
+    """
+    Fill NaN values in specified columns of a DataFrame in place.
+
+    This function fills NaN values in the specified columns of the DataFrame
+    with the most frequent value for categorical data or the median value
+    for numerical data.
+
+    Args:
+        df (pd.DataFrame): The DataFrame in which NaN values will be filled.
+        col_list (List[str]): A list of column names in which NaN values will be filled.
+        is_category (bool, optional): A flag indicating whether the specified columns
+                                      are categorical. If True, the most frequent value
+                                      ('top') is used for filling NaN values. If False,
+                                      the median value ('50%') is used. Defaults to False.
+
+    Examples:
+        >>> df = pd.DataFrame({'A': [1, 2, None], 'B': ['x', None, 'y']})
+        >>> pd_fillna_inplace(df, ['A'], is_category=False)
+        >>> pd_fillna_inplace(df, ['B'], is_category=True)
+        >>> df
+           A  B
+        0  1.0  x
+        1  2.0  x
+        2  1.5  y
+    """
     if col_list:
-        category_fill_values = (
-            df.loc[:, col_list]
-                .astype('str' if is_category else 'double')
-                .describe(include='all')
-                .loc['top' if is_category else '50%']
-        )
-        df.loc[:, col_list] = df.loc[:, col_list].fillna(category_fill_values)
+        dtype = 'str' if is_category else 'float'
+        stats = 'top' if is_category else '50%'
+
+        fill_values = df[col_list].astype(dtype).describe(include='all').loc[stats]
+        df[col_list] = df[col_list].fillna(fill_values)
 
 
 def pd_input_preproc(
@@ -27,12 +49,12 @@ def pd_input_preproc(
         treatment=None,
         weights_col_list=None,
         category_col_list=None) -> tuple[
-                                            list[str],
-                                            list[str],
-                                            list[str],
-                                            list[str],
-                                            pd.DataFrame
-                                        ]:
+    list[str],
+    list[str],
+    list[str],
+    list[str],
+    pd.DataFrame
+]:
     """
     Marks and convert column types.
     Fills NANs.
@@ -142,6 +164,13 @@ def pd_lgbm_feature_selector(
         weights_col_list=weights_col_list,
         category_col_list=category_col_list
     )
+    try:
+        from lightgbm import LGBMRegressor
+    except ImportError:
+        raise ImportError(
+            "LightGBM is not installed. Install it by running "
+            "'pip install hypex[lgbm]' or 'pip install hypex[all]' to use this feature."
+        )
 
     feature_importance_list = []
     for _target_col in target:
@@ -189,6 +218,13 @@ def pd_catboost_feature_selector(
         weights_col_list=weights_col_list,
         category_col_list=category_col_list
     )
+    try:
+        from catboost import CatBoostRegressor
+    except ImportError:
+        raise ImportError(
+            "CatBoost is not installed. Install it by running "
+            "'pip install hypex[cat]' or 'pip install hypex[all]' to use this feature."
+        )
 
     feature_importance_list = []
     for _target_col in target:
