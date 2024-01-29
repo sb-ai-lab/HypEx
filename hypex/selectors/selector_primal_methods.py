@@ -9,7 +9,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import RidgeCV
 
 
-def pd_fillna_inplace(df, col_list, is_category=False):
+def pd_fillna_inplace_by_type(df, col_list, is_category=False):
     if col_list:
         category_fill_values = (
             df.loc[:, col_list]
@@ -18,6 +18,11 @@ def pd_fillna_inplace(df, col_list, is_category=False):
                 .loc['top' if is_category else '50%']
         )
         df.loc[:, col_list] = df.loc[:, col_list].fillna(category_fill_values)
+
+
+def pd_fillna_inplace(df, numeric_col_list, category_col_list):
+    pd_fillna_inplace_by_type(df, numeric_col_list, is_category=False)
+    pd_fillna_inplace_by_type(df, category_col_list, is_category=True)
 
 
 def pd_input_preproc(
@@ -86,8 +91,7 @@ def pd_input_preproc(
     ]
 
     df.loc[:, category_col_list] = df.loc[:, category_col_list].astype('str')
-    pd_fillna_inplace(df, category_col_list, is_category=True)
-    pd_fillna_inplace(df, numeric_col_list, is_category=False)
+    pd_fillna_inplace(df, numeric_col_list, category_col_list)
 
     df = df.loc[:, target_col_list + feature_col_list]
     return (
@@ -126,8 +130,7 @@ def pd_lgbm_feature_selector(
         target='target',
         treatment_col=None,
         weights_col_list=None,
-        category_col_list=None,
-        model=None) -> pd.DataFrame:
+        category_col_list=None) -> pd.DataFrame:
     (
         feature_col_list,
         target_col_list,
@@ -173,8 +176,7 @@ def pd_catboost_feature_selector(
         target='target',
         treatment_col=None,
         weights_col_list=None,
-        category_col_list=None,
-        model=None) -> pd.DataFrame:
+        category_col_list=None) -> pd.DataFrame:
     (
         feature_col_list,
         target_col_list,
@@ -219,8 +221,7 @@ def pd_ridgecv_feature_selector(
         target='target',
         treatment_col=None,
         weights_col_list=None,
-        category_col_list=None,
-        model=None) -> pd.DataFrame:
+        category_col_list=None) -> pd.DataFrame:
     (
         feature_col_list,
         target_col_list,

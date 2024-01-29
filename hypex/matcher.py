@@ -4,7 +4,7 @@ import pickle
 
 import numpy as np
 import pandas as pd
-from typing import Union
+from typing import Union, Iterable
 from tqdm.auto import tqdm
 
 from .algorithms.faiss_matcher import FaissMatcher
@@ -13,6 +13,8 @@ from .selectors.feature_selector import FeatureSelector
 from .selectors.spearman_filter import SpearmanFilter
 from .selectors.outliers_filter import OutliersFilter
 from .selectors.base_filtration import const_filtration, nan_filtration
+from hypex.selectors.selector_primal_methods import pd_lgbm_feature_selector,\
+    pd_catboost_feature_selector, pd_ridgecv_feature_selector
 from .utils.validators import random_feature
 from .utils.validators import random_treatment
 from .utils.validators import subset_refuter
@@ -28,7 +30,12 @@ RANDOM_STATE = 123
 TEST_SIZE = 0.2
 TIMEOUT = 600
 VERBOSE = 2
-USE_ALGOS = "lgb"
+DEFAULT_FEATURE_SELECT_ALGO = "lgbm"
+FEATURE_SELECT_ALGO = {
+    "lgbm": pd_lgbm_feature_selector,
+    "catboost": pd_catboost_feature_selector,
+    "ridgecv": pd_ridgecv_feature_selector,
+}
 PROP_SCORES_COLUMN = "prop_scores"
 GENERATE_REPORT = True
 SAME_TARGET_THRESHOLD = 0.7
@@ -146,7 +153,7 @@ class Matcher:
             verbose:
                 Flag to show process stages. Defaults to 2
             use_algos:
-                List of names of LAMA algorithms for feature selection. Defaults to ["lgb"]
+                List of names of algorithms for feature selection. Defaults to catboost
             same_target_threshold:
                 Threshold for correlation coefficient filter (Spearman). Default to 0.7
             interquartile_coeff:
@@ -167,8 +174,10 @@ class Matcher:
         """
         self.short_features_df = None
         self.detailed_features_df = None
-        if use_algos is None:
-            use_algos = USE_ALGOS
+        use_algos = DEFAULT_FEATURE_SELECT_ALGO if use_algos is None else use_algos
+        self.feature_selection_method = FEATURE_SELECT_ALGO.get(use_algos, None)
+        if self.feature_selection_method is None:
+            raise Exception(f"Unknown input algorithm used on feature_selector: {use_algos}")
         self.input_data = input_data
         if outcome is None:
             outcome = list()
@@ -340,7 +349,7 @@ class Matcher:
     def feature_select(self) -> pd.DataFrame:
         """Calculates the importance of each feature.
 
-        This method use LamaFeatureSelector to rank the importance of each feature in the dataset
+        This use one of FeatureSelector methods to rank the importance of each feature in the dataset
         The features are then sorted by their importance with the most important feature first
 
         Returns:
@@ -351,7 +360,7 @@ class Matcher:
         feat_select = FeatureSelector(
             outcome=self.outcomes,
             treatment=self.treatment,
-            use_algos=self.use_algos,
+            feature_selection_method=self.feature_selection_method,
         )
         df = self.input_data if self.group_col is None else self.input_data.drop(columns=self.group_col)
 
@@ -529,7 +538,7 @@ class Matcher:
 
         return self.pval_dict
 
-    def estimate(self, features: list = None) -> tuple:
+    def estimate(self, features: Iterable = None) -> tuple:
         """Performs matching via Mahalanobis distance.
 
         Args:
@@ -540,7 +549,7 @@ class Matcher:
             Results of matching and matching quality metrics
         """
         if features is not None:
-            features = [*features]
+            features = list(features)
             self.features_importance = features
             if self.group_col is not None and self.group_col not in features:
                 features.append(self.group_col)
