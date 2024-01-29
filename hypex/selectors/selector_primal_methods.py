@@ -8,32 +8,33 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 
-def pd_fillna_inplace(df: pd.DataFrame, col_list: List[str], is_category: bool = False) -> None:
+
+def pd_fillna_inplace_by_type(df: pd.DataFrame, col_list: List[str], is_category: bool = False) -> None:
     """
-    Fill NaN values in specified columns of a DataFrame in place.
+        Fill NaN values in specified columns of a DataFrame in place.
 
-    This function fills NaN values in the specified columns of the DataFrame
-    with the most frequent value for categorical data or the median value
-    for numerical data.
+        This function fills NaN values in the specified columns of the DataFrame
+        with the most frequent value for categorical data or the median value
+        for numerical data.
 
-    Args:
-        df (pd.DataFrame): The DataFrame in which NaN values will be filled.
-        col_list (List[str]): A list of column names in which NaN values will be filled.
-        is_category (bool, optional): A flag indicating whether the specified columns
-                                      are categorical. If True, the most frequent value
-                                      ('top') is used for filling NaN values. If False,
-                                      the median value ('50%') is used. Defaults to False.
+        Args:
+            df (pd.DataFrame): The DataFrame in which NaN values will be filled.
+            col_list (List[str]): A list of column names in which NaN values will be filled.
+            is_category (bool, optional): A flag indicating whether the specified columns
+                                          are categorical. If True, the most frequent value
+                                          ('top') is used for filling NaN values. If False,
+                                          the median value ('50%') is used. Defaults to False.
 
-    Examples:
-        >>> df = pd.DataFrame({'A': [1, 2, None], 'B': ['x', None, 'y']})
-        >>> pd_fillna_inplace(df, ['A'], is_category=False)
-        >>> pd_fillna_inplace(df, ['B'], is_category=True)
-        >>> df
-           A  B
-        0  1.0  x
-        1  2.0  x
-        2  1.5  y
-    """
+        Examples:
+            >>> df = pd.DataFrame({'A': [1, 2, None], 'B': ['x', None, 'y']})
+            >>> pd_fillna_inplace(df, ['A'], is_category=False)
+            >>> pd_fillna_inplace(df, ['B'], is_category=True)
+            >>> df
+               A  B
+            0  1.0  x
+            1  2.0  x
+            2  1.5  y
+        """
     if col_list:
         dtype = 'str' if is_category else 'float'
         stats = 'top' if is_category else '50%'
@@ -85,8 +86,8 @@ def pd_input_preproc(
     numeric_col_list = [col for col in feature_col_list if col not in category_col_list]
 
     df[category_col_list] = df[category_col_list].astype('str')
-    pd_fillna_inplace(df, category_col_list, is_category=True)
-    pd_fillna_inplace(df, numeric_col_list, is_category=False)
+    pd_fillna_inplace_by_type(df, category_col_list, is_category=True)
+    pd_fillna_inplace_by_type(df, numeric_col_list, is_category=False)
 
     df = df[target_col_list + feature_col_list]
 
@@ -151,7 +152,8 @@ def pd_lgbm_feature_selector(
         treatment_col: Optional[Union[str, List[str]]] = None,
         weights_col_list: Optional[List[str]] = None,
         category_col_list: Optional[List[str]] = None,
-        model: Optional = None) -> pd.DataFrame:
+        model: Optional = None
+        ) -> pd.DataFrame:
     """
     Processes input data and uses LightGBM to select feature importance.
 
@@ -176,7 +178,7 @@ def pd_lgbm_feature_selector(
         target=target,
         treatment=treatment_col,
         weights_col_list=weights_col_list,
-        category_col_list=category_col_list
+        category_col_list=category_col_list,
     )
 
     try:
@@ -269,7 +271,8 @@ def pd_catboost_feature_selector(
         catboost_selection_model.fit(
             df[feature_col_list],
             df[_target_col],
-            cat_features=category_col_list
+            cat_features=category_col_list,
+            silent=True
         )
 
         feature_importance = get_feature_importance_df(

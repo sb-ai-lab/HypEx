@@ -3,7 +3,6 @@ import logging
 from typing import List
 
 import pandas as pd
-from hypex.selectors import selector_primal_methods
 
 logger = logging.getLogger("feature_selector")
 console_out = logging.StreamHandler()
@@ -23,7 +22,7 @@ class FeatureSelector:
             self,
             outcome: str,
             treatment: str,
-            use_algos: str,
+            feature_selection_method,
     ):
         """Initialize the FeatureSelector.
 
@@ -37,7 +36,7 @@ class FeatureSelector:
         """
         self.outcome = outcome
         self.treatment = treatment
-        self.use_algos = use_algos
+        self.feature_selection_method = feature_selection_method
 
     def perform_selection(self, df: pd.DataFrame) -> pd.DataFrame:
         """Trains a model and returns feature scores.
@@ -56,22 +55,12 @@ class FeatureSelector:
             "target": self.outcome,
             "drop": [self.treatment],
         }
-
-        if self.use_algos == 'lgb':
-            selector = selector_primal_methods.pd_lgbm_feature_selector
-        elif self.use_algos == 'catboost':
-            selector = selector_primal_methods.pd_catboost_feature_selector
-        elif self.use_algos == 'ridgecv':
-            selector = selector_primal_methods.pd_ridgecv_feature_selector
-        else:
-            raise Exception(f"Unknown input algorithm used on feature_selector: {self.use_algos}")
-        report_df = selector(
+        report_df = self.feature_selection_method(
             df=df,
             info_col_list=None,
             target=self.outcome,
             treatment_col=self.treatment,
             weights_col_list=None,
             category_col_list=None,
-            model=None
         )
         return report_df
