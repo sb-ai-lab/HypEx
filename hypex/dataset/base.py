@@ -1,5 +1,7 @@
 from abc import ABC
-from typing import Any, Union, Sequence, Iterable
+from typing import Union, Sequence, Iterable
+
+import pandas as pd
 from pandas import DataFrame
 
 
@@ -9,6 +11,8 @@ class DatasetSeletor(ABC):
     def select_dataset(data):
         if isinstance(data, DataFrame):
             return PandasDataset(data)
+        if isinstance(data, str) and data.endswith('.csv'):
+            return PandasDataset(pd.read_csv(data))
         return 0
 
     def __len__(self):
@@ -18,9 +22,6 @@ class DatasetSeletor(ABC):
         pass
 
     def __repr__(self):
-        pass
-
-    def __add__(self, other):
         pass
 
 
