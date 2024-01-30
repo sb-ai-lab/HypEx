@@ -551,15 +551,16 @@ class FaissMatcher:
             try:
                 np.linalg.cholesky(cov)
             except:
-                logger.info(f'Grouping by attribute {group} is not possible')
+                if not self.validation:
+                    logger.info(f'Grouping by attribute {group} is not possible')
                 group_error.append(group)
                 
                 treated_duplicated = treated.columns[treated.T.duplicated()].values
                 untreated_duplicated = untreated.columns[untreated.T.duplicated()].values
-                if treated_duplicated is not []:
-                    logger.info(f'The data has the same columns: {treated_duplicated} in test group')
-                if untreated_duplicated is not []:
-                    logger.info(f'The data has the same columns: {untreated_duplicated} in control group')
+                if treated_duplicated is not [] and not self.validation:
+                    logger.info(f'The data has the duplicate columns: {treated_duplicated} in test group')
+                if untreated_duplicated is not [] and not self.validation:
+                    logger.info(f'The data has the duplicate columns: {untreated_duplicated} in control group')
                 
         df_group_positive = self.df[~self.df[self.group_col].isin(group_error)]
         
@@ -683,7 +684,7 @@ class FaissMatcher:
             DataFrame containing ATE, ATC, and ATT results
         """
         result = (self.ATE, self.ATC, self.ATT)
-
+      
         for outcome in self.outcomes:
             res = pd.DataFrame(
                 [x[outcome] + [outcome] for x in result],
@@ -780,9 +781,9 @@ def _transform_to_np(treated: pd.DataFrame, untreated: pd.DataFrame, weights: di
 
         treated_duplicated = list(treated.columns[treated.T.duplicated()].values)
         untreated_duplicated = list(untreated.columns[untreated.T.duplicated()].values)
-        if treated_duplicated is not []:
+        if treated_duplicated is not [] and not self.validation:
             logger.info(f'The data has the duplicate columns: {treated_duplicated} in test group')
-        if untreated_duplicated is not []:
+        if untreated_duplicated is not [] and not self.validation:
             logger.info(f'The data has the duplicate columns: {untreated_duplicated} in control group')
 
         columns_duplicated = set(treated_duplicated + untreated_duplicated)
