@@ -2,10 +2,6 @@ from abc import ABC
 
 from hypex.utils.hypex_typings import *
 
-MatchingRoles = []
-AARoles = []
-ABRoles = []
-
 
 class ABCRole(ABC):
     _role_name = "Abstract"
@@ -66,5 +62,5 @@ roles = {
     "target": TargetRole(TargetRoleTypes),
     "pretarget": PreTargetRole(PreTargetRoleTypes),
     "drop": DropRole(),
-    "stratification": StratificationRole(StratificationRoleTypes)
+    "stratification": StratificationRole(StratificationRoleTypes),
 }

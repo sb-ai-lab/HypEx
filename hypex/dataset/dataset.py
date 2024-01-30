@@ -6,6 +6,7 @@ from hypex.dataset.base import select_dataset, DatasetBase
 from hypex.dataset.roles import ABCRole
 
 
+# what do we want from dataset?
 class Dataset(DatasetBase):
 
     def set_data(self, data: DataFrame, roles):
