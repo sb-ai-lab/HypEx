@@ -17,7 +17,8 @@ digraph Architecture{
         multiexperiment_experiment[label="Experiment"]
         multiexperiment[label="MultiExperiment"]
         multiexperiment_execte_executor[label="Executor"]
-
+        // -------
+        spliter_executor[label="Spliter"]
     }
 
     subgraph methods{
@@ -33,6 +34,8 @@ digraph Architecture{
         multiexperiment_execute[label="execute"]
         multiexperiment_executor_execute[label="execute"]
         multiexperiment_execute_data_append[label="append"]
+        // -------
+        spliter_execute[label="execute"]
     }
 
     subgraph data{
@@ -49,6 +52,8 @@ digraph Architecture{
         multiexperiment_data[label="Dataset"]
         multiexperiment_executor_experiment_data[label="ExperimentData i"]
         multiexperiment_executor_result_data[label="ExperimentData"]
+        // -------
+        spliter_data[shape=record label="Dataset | group column"]
     }
 
     subgraph atributes{
@@ -89,6 +94,11 @@ digraph Architecture{
         ]
     }
 
+    executor_legend -> experiment_legend [
+        ltail=cluster_executor, 
+        lhead=cluster_experiment
+    ]
+
     subgraph cluster_multiexperiment{
         graph[style=dashed, label="MultiExperiment"]
         multiexperiment_experiment -> multiexperiment [arrowhead=none]
@@ -105,9 +115,21 @@ digraph Architecture{
 
             multiexperiment_executor_result_data -> multiexperiment_executor_execute [style=dashed]
         }
-            node [style=filled color=white]
-        }
     }
 
+    experiment_legend -> multiexperiment [
+        ltail=cluster_experiment, 
+        lhead=cluster_multiexperiment
+    ]
 
+    subgraph cluster_spliter{
+        graph[style=dashed, label="Spliter"]
+
+        spliter_executor -> spliter_execute -> spliter_data
+    }
+
+    experiment_legend -> spliter_executor [
+        ltail=cluster_experiment, 
+        lhead=cluster_spliter
+    ]
 }
