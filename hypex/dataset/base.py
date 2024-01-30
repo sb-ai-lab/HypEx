@@ -5,12 +5,22 @@ import pandas as pd
 from pandas import DataFrame
 
 
-# TODO пути до файла
 def select_dataset(data):
     if isinstance(data, DataFrame):
         return PandasDataset(data)
-    if isinstance(data, str) and data.endswith(".csv"):
-        return PandasDataset(pd.read_csv(data))
+    if isinstance(data, str):
+        check_data = check_file_extension(data)
+        if check_data is not None:
+            return PandasDataset(check_data)
+    return None
+
+
+def check_file_extension(file_path):
+    read_functions = {"csv": pd.read_csv, "xlsx": pd.read_excel, "json": pd.read_json}
+    extension = file_path.split(".")[-1].lower()
+    if extension in read_functions:
+        read_function = read_functions[extension]
+        return read_function(file_path)
     return None
 
 
@@ -75,4 +85,3 @@ class PandasDataset(DatasetBase):
 
     def map(self, *args, **kwargs):
         return self.data.map(*args, **kwargs)
-
