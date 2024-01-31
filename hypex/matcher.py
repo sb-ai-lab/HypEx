@@ -17,6 +17,7 @@ from .utils.validators import random_feature
 from .utils.validators import random_treatment
 from .utils.validators import subset_refuter
 from .utils.validators import test_significance
+from .utils.validators import emissions
 
 
 REPORT_FEAT_SELECT_DIR = "report_feature_selector"
@@ -372,7 +373,7 @@ class Matcher:
             )
         return self.features_importance.sort_values("Importance", ascending=False)
 
-    def _create_faiss_matcher(self, df=None, validation=None):
+    def _create_faiss_matcher(self, df=None, validation=None, refuter=None):
         """Creates a FaissMatcher object.
 
         Args:
@@ -392,6 +393,7 @@ class Matcher:
             features=self.features_importance,
             group_col=self.group_col,
             validation=validation,
+            refuter=refuter,
             n_neighbors=self.n_neighbors,
             pbar=False if validation else self.pbar,
         )
@@ -437,8 +439,8 @@ class Matcher:
         return self.results, self.quality_result, df_matched
 
     def validate_result(
-        self, refuter: str = "random_feature", effect_type: str = "ate", n_sim: int = 10, fraction: float = 0.8
-    ) -> dict:
+        self, refuter: str = "random_feature", effect_type: str = "ate", n_sim: int = 10, fraction: float = 0.8,
+    low: float = 1.0,  high: float = 99.0):
         """Validates estimated ATE (Average Treatment Effect).
 
         Validates estimated effect:
@@ -448,19 +450,25 @@ class Matcher:
                                     significantly, p-val < 0.05;
                                     3) estimates effect on subset of data (default fraction is 0.8). Estimated effect
                                     shouldn't change significantly, p-val < 0.05.
+                                    4) by a given percentile from the target in the control and test groups.
 
         Args:
             refuter:
-                Refuter type (`random_treatment`, `random_feature`, `subset_refuter`)
+                Refuter type (`random_treatment`, `random_feature`, `subset_refuter`, `emissions`)
             effect_type:
                 Which effect to validate (`ate`, `att`, `atc`)
             n_sim:
                 Number of simulations
             fraction:
                 Subset fraction for subset refuter only
+            low:
+                The lower percentile value for removing outliers (default = 1)
+            high: 
+                The upper percentile value for removing outliers (default = 99)
 
         Returns:
             Dictionary of outcome_name (mean_effect on validation, p-value)
+            or dataframe with effects after outliers are removed 
         """
         if self.silent:
             logger.debug("Applying validation of result")
@@ -473,53 +481,92 @@ class Matcher:
         effect_dict = {"ate": 0, "atc": 1, "att": 2}
 
         assert effect_type in effect_dict.keys()
-
-        for i in tqdm(range(n_sim)):
-            if refuter in ["random_treatment", "random_feature"]:
-                if refuter == "random_treatment":
-                    self.input_data, orig_treatment, self.validate = random_treatment(self.input_data, self.treatment)
-                elif refuter == "random_feature":
-                    self.input_data, self.validate = random_feature(self.input_data)
-                    if self.features_importance is not None and i == 0:
-                        self.features_importance.append("random_feature")
-
-                self.matcher = FaissMatcher(
-                    self.input_data,
-                    self.outcomes,
-                    self.treatment,
-                    info_col=self.info_col,
-                    features=self.features_importance,
-                    group_col=self.group_col,
-                    validation=self.validate,
-                    n_neighbors=self.n_neighbors,
-                    pbar=False,
-                )
-            elif refuter == "subset_refuter":
-                df, self.validate = subset_refuter(self.input_data, self.treatment, fraction)
-                self.matcher = FaissMatcher(
-                    df,
-                    self.outcomes,
-                    self.treatment,
-                    info_col=self.info_col,
-                    features=self.features_importance,
-                    group_col=self.group_col,
-                    validation=self.validate,
-                    n_neighbors=self.n_neighbors,
-                    pbar=False,
-                )
-            else:
-                logger.error("Incorrect refuter name")
-                raise NameError(
-                    "Incorrect refuter name! Available refuters: `random_feature`, `random_treatment`, `subset_refuter`"
-                )
-
-            if self.group_col is None:
-                sim = self.matcher.match()
-            else:
-                sim = self.matcher.group_match()
-
-            for key in self.val_dict.keys():
-                self.val_dict[key].append(sim[key][0])
+        
+        if refuter == "emissions":
+            
+             self._create_faiss_matcher(self.input_data, validation=True, refuter="emissions")
+             if self.group_col is None:
+                 results = self.matcher.match()
+             else:
+                 results = self.matcher.group_match()
+             ATE, ATC, ATT = results['effect_size']
+            
+            
+             df_full_test, count_test, percent_test = emissions(self.input_data, 1, self.outcomes[0], low, high)
+             self._create_faiss_matcher(df_full_test, validation=True, refuter="emissions")
+             if self.group_col is None:
+                 results_test = self.matcher.match()
+             else:
+                 results_test = self.matcher.group_match()                
+             ATE_test, ATC_test, ATT_test = results_test['effect_size']
+            
+            
+             df_full_control, count_control, percent_control = emissions(self.input_data, 0, self.outcomes[0], low, high)
+             self._create_faiss_matcher(df_full_control, validation=True, refuter="emissions")
+             if self.group_col is None:
+                results_control = self.matcher.match()
+             else:
+                results_control = self.matcher.group_match()
+             ATE_control, ATC_control, ATT_control = results_control['effect_size']
+            
+            
+             dict_metrics = {'ATE': [ATE, ATE_test, ATE_control], 
+                'ATC': [ATC, ATC_test, ATC_control],
+                'ATT': [ATT, ATT_test, ATT_control]
+                        }
+             rslt_emissions = pd.DataFrame(dict_metrics, index =['Data with outliers',
+                                          f'Metric for deleting {count_test} rows ({percent_test}%) from the test',
+                                          f'Metric for deleting {count_control} rows ({percent_control}%) from the control'])
+             return rslt_emissions
+         
+        else:
+            
+            for i in tqdm(range(n_sim)):
+                if refuter in ["random_treatment", "random_feature"]:
+                    if refuter == "random_treatment":
+                        self.input_data, orig_treatment, self.validate = random_treatment(self.input_data, self.treatment)
+                    elif refuter == "random_feature":
+                        self.input_data, self.validate = random_feature(self.input_data)
+                        if self.features_importance is not None and i == 0:
+                            self.features_importance.append("random_feature")
+            
+                    self.matcher = FaissMatcher(
+                        self.input_data,
+                        self.outcomes,
+                        self.treatment,
+                        info_col=self.info_col,
+                        features=self.features_importance,
+                        group_col=self.group_col,
+                        validation=self.validate,
+                        n_neighbors=self.n_neighbors,
+                        pbar=False,
+                    )
+                elif refuter == "subset_refuter":
+                    df, self.validate = subset_refuter(self.input_data, self.treatment, fraction)
+                    self.matcher = FaissMatcher(
+                        df,
+                        self.outcomes,
+                        self.treatment,
+                        info_col=self.info_col,
+                        features=self.features_importance,
+                        group_col=self.group_col,
+                        validation=self.validate,
+                        n_neighbors=self.n_neighbors,
+                        pbar=False,
+                    )
+                else:
+                    logger.error("Incorrect refuter name")
+                    raise NameError(
+                        "Incorrect refuter name! Available refuters: `random_feature`, `random_treatment`, `subset_refuter`"
+                    )
+            
+                if self.group_col is None:
+                    sim = self.matcher.match()
+                else:
+                    sim = self.matcher.group_match()
+            
+                for key in self.val_dict.keys():
+                    self.val_dict[key].append(sim[key][0])
 
         for outcome in self.outcomes:
             self.pval_dict.update({outcome: [np.mean(self.val_dict[outcome])]})
