@@ -252,8 +252,8 @@ class FaissMatcher:
 
             y_match_treated_bias = y_treated - y_match_treated + bias_t
             y_match_untreated_bias = y_match_untreated - y_untreated - bias_c
-            
-            self.delta_t = round(abs(bias_t.mean())*100 / abs(y_match_treated_bias.mean()), 1)
+
+            self.delta_t = round(abs(bias_t.mean()) * 100 / abs(y_match_treated_bias.mean()), 1)
 
             self.dict_outcome_untreated[outcome] = y_untreated
             self.dict_outcome_untreated[outcome + POSTFIX] = y_match_untreated
@@ -522,7 +522,7 @@ class FaissMatcher:
             logger.info(f"Repeats info: \n {rep_df.head(10)}")
 
         return self.quality_dict
-    
+
     def group_match(self):
         """Matches the dataframe if it divided by groups.
     
@@ -538,22 +538,22 @@ class FaissMatcher:
         group_arr_t = df[df[self.treatment] == 1][self.group_col].to_numpy()
         treat_arr_c = df[df[self.treatment] == 0][self.treatment].to_numpy()
         treat_arr_t = df[df[self.treatment] == 1][self.treatment].to_numpy()
-    
+
         if self.pbar:
             self.tqdm = tqdm(total=len(groups) * 2)
-    
+
         for group in groups:
             df_group = df[df[self.group_col] == group]
             temp = df_group[self.columns_match + [self.group_col]]
             temp = temp.loc[:, (temp != 0).any(axis=0)].drop(columns=self.group_col)
             treated, untreated = self._get_split(temp)
-    
+
             std_treated_np, std_untreated_np = _transform_to_np(treated, untreated, self.weights)
-    
+
             if self.pbar:
                 self.tqdm.set_description(desc=f"Get untreated index by group {group}")
             matches_u_i = _get_index(std_treated_np, std_untreated_np, self.n_neighbors)
-    
+
             if self.pbar:
                 self.tqdm.update(1)
                 self.tqdm.set_description(desc=f"Get treated index by group {group}")
@@ -561,7 +561,7 @@ class FaissMatcher:
             if self.pbar:
                 self.tqdm.update(1)
                 self.tqdm.refresh()
-    
+
             group_mask_c = group_arr_c == group
             group_mask_t = group_arr_t == group
             matches_c_mask = np.arange(treat_arr_t.shape[0])[group_mask_t]
@@ -570,24 +570,23 @@ class FaissMatcher:
             matches_t_i = [matches_t_mask[i] for i in matches_t_i]
             matches_c.extend(matches_u_i)
             matches_t.extend(matches_t_i)
-    
+
         if self.pbar:
             self.tqdm.close()
-    
+
         self.untreated_index = matches_c
         self.treated_index = matches_t
-    
+
         df_group = df[self.columns_match].drop(columns=self.group_col)
         treated, untreated = self._get_split(df_group)
         self._predict_outcome(treated, untreated)
         df_matched = self._create_matched_df()
         self._calculate_ate_all_target(df_matched)
-    
+
         if self.validation:
             return self.val_dict
-    
-        return self.report_view(), df_matched
 
+        return self.report_view(), df_matched
 
     def match(self):
         """Matches the dataframe.
@@ -641,7 +640,7 @@ class FaissMatcher:
         """
         result = (self.ATE, self.ATC, self.ATT)
         if not self.validation:
-            logger.info(f"The entry of bias into the ATT is {str(self.delta_t)+'%'}")
+            logger.info(f"The entry of bias into the ATT is {str(self.delta_t) + '%'}")
 
         for outcome in self.outcomes:
             res = pd.DataFrame(
@@ -739,7 +738,6 @@ def _transform_to_np(treated: pd.DataFrame, untreated: pd.DataFrame, weights: di
     yt = np.dot(xt, mahalanobis_transform.T)
 
     return yt.copy(order="C").astype("float32"), yc.copy(order="C").astype("float32")
-
 
 
 def calc_atx_var(vars_c: np.ndarray, vars_t: np.ndarray, weights_c: np.ndarray, weights_t: np.ndarray) -> float:
