@@ -1,10 +1,9 @@
-"""Feature selection class using LAMA."""
+"""Feature selection class."""
 import logging
-from typing import List
 
 import pandas as pd
 
-logger = logging.getLogger("lama_feature_selector")
+logger = logging.getLogger("feature_selector")
 console_out = logging.StreamHandler()
 logging.basicConfig(
     handlers=(console_out,),
@@ -15,56 +14,27 @@ logging.basicConfig(
 
 
 class FeatureSelector:
-    """Class of LAMA Feature selector. Select top features. By default, use LGM.
-    # TODO: write some feature selector"""
+    """Class of Feature selector. Select top features. By default, use LGM."""
 
     def __init__(
             self,
             outcome: str,
-            outcome_type: str,
             treatment: str,
-            timeout: int,
-            n_threads: int,
-            n_folds: int,
-            verbose: bool,  # не используется
-            generate_report: bool,
-            report_dir: str,
-            use_algos: List[str],
+            feature_selection_method,
     ):
-        """Initialize the LamaFeatureSelector.
+        """Initialize the FeatureSelector.
 
         Args:
             outcome:
                 The target column
-            outcome_type:
-                The type of target column
             treatment:
                 The column that determines control and test groups
-            timeout:
-                Time limit for the execution of the code
-            n_threads:
-                Maximum number of threads to be used
-            n_folds:
-                Number of folds for cross-validation
-            verbose:
-                Flag to control the verbosity of the process stages
-            generate_report:
-                Flag to control whether to create a report or not
-            report_dir:
-                Directory for storing report files
-            use_algos:
-                List of names of LAMA algorithms for feature selection
+            feature_selection_method:
+                List of names of algorithms for feature selection
         """
         self.outcome = outcome
-        self.outcome_type = outcome_type
         self.treatment = treatment
-        self.use_algos = use_algos
-        self.timeout = timeout
-        self.n_threads = n_threads
-        self.n_folds = n_folds
-        self.verbose = verbose
-        self.generate_report = generate_report
-        self.report_dir = report_dir
+        self.feature_selection_method = feature_selection_method
 
     def perform_selection(self, df: pd.DataFrame) -> pd.DataFrame:
         """Trains a model and returns feature scores.
@@ -79,24 +49,12 @@ class FeatureSelector:
             A DataFrame containing the feature scores from the model
 
         """
-        roles = {
-            "target": self.outcome,
-            "drop": [self.treatment],
-        }
-
-        if self.outcome_type == "numeric":
-            task_name = "reg"
-            loss = "mse"
-            metric = "mse"
-        elif self.outcome_type == "binary":
-            task_name = "binary"
-            loss = "logloss"
-            metric = "logloss"
-        else:
-            task_name = "multiclass"
-            loss = "crossentropy"
-            metric = "crossentropy"
-
-        features_scores = []
-
-        return features_scores
+        report_df = self.feature_selection_method(
+            df=df,
+            info_col_list=None,
+            target=self.outcome,
+            treatment_col=self.treatment,
+            weights_col_list=None,
+            category_col_list=None,
+        )
+        return report_df

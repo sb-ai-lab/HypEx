@@ -4,7 +4,7 @@ import pickle
 
 import numpy as np
 import pandas as pd
-from typing import Union
+from typing import Union, Iterable
 from tqdm.auto import tqdm
 
 from .algorithms.faiss_matcher import FaissMatcher
@@ -13,6 +13,8 @@ from .selectors.feature_selector import FeatureSelector
 from .selectors.spearman_filter import SpearmanFilter
 from .selectors.outliers_filter import OutliersFilter
 from .selectors.base_filtration import const_filtration, nan_filtration
+from hypex.selectors.selector_primal_methods import pd_lgbm_feature_selector,\
+    pd_catboost_feature_selector, pd_ridgecv_feature_selector
 from .utils.validators import random_feature
 from .utils.validators import random_treatment
 from .utils.validators import subset_refuter
@@ -28,7 +30,12 @@ RANDOM_STATE = 123
 TEST_SIZE = 0.2
 TIMEOUT = 600
 VERBOSE = 2
-USE_ALGOS = ["lgb"]
+DEFAULT_FEATURE_SELECT_ALGO = "catboost"
+FEATURE_SELECT_ALGO = {
+    "lgbm": pd_lgbm_feature_selector,
+    "catboost": pd_catboost_feature_selector,
+    "ridgecv": pd_ridgecv_feature_selector,
+}
 PROP_SCORES_COLUMN = "prop_scores"
 GENERATE_REPORT = True
 SAME_TARGET_THRESHOLD = 0.7
@@ -80,7 +87,7 @@ class Matcher:
         >>>
         >>> # Matching
         >>> model = Matcher(data, outcome=target, treatment=treatment, info_col=info_col, group_col=group_col)
-        >>> features = model.lama_feature_select() # Feature selection via lama
+        >>> features = model.feature_select() # Feature selection
         >>> results, quality, df_matched = model.estimate(features=some_features) # Performs matching
         >>>
         >>> model.validate_result()
@@ -146,7 +153,7 @@ class Matcher:
             verbose:
                 Flag to show process stages. Defaults to 2
             use_algos:
-                List of names of LAMA algorithms for feature selection. Defaults to ["lgb"]
+                List of names of algorithms for feature selection. Defaults to catboost
             same_target_threshold:
                 Threshold for correlation coefficient filter (Spearman). Default to 0.7
             interquartile_coeff:
@@ -165,8 +172,12 @@ class Matcher:
             pbar:
                 Display progress bar while get index
         """
-        if use_algos is None:
-            use_algos = USE_ALGOS
+        self.short_features_df = None
+        self.detailed_features_df = None
+        use_algos = DEFAULT_FEATURE_SELECT_ALGO if use_algos is None else use_algos
+        self.feature_selection_method = FEATURE_SELECT_ALGO.get(use_algos, None)
+        if self.feature_selection_method is None:
+            raise Exception(f"Unknown input algorithm used on feature_selector: {use_algos}")
         self.input_data = input_data
         if outcome is None:
             outcome = list()
@@ -335,42 +346,31 @@ class Matcher:
                                       self.input_data.loc[np.concatenate(filtred_matches.values)]])
         return matched_data
 
-    def lama_feature_select(self) -> pd.DataFrame:
+    def feature_select(self) -> pd.DataFrame:
         """Calculates the importance of each feature.
 
-        This method use LamaFeatureSelector to rank the importance of each feature in the dataset
+        This use one of FeatureSelector methods to rank the importance of each feature in the dataset
         The features are then sorted by their importance with the most important feature first
 
         Returns:
-            The feature importances, sorted in descending order
+            The feature importance, sorted in descending order
         """
         self._log("Counting feature importance")
 
         feat_select = FeatureSelector(
-            outcome=self.outcomes[0],
-            outcome_type=self.outcome_type,
+            outcome=self.outcomes,
             treatment=self.treatment,
-            timeout=self.timeout,
-            n_threads=self.n_threads,
-            n_folds=self.n_folds,
-            verbose=self.verbose,
-            generate_report=self.generate_report,
-            report_dir=self.report_feat_select_dir,
-            use_algos=self.use_algos,
+            feature_selection_method=self.feature_selection_method,
         )
         df = self.input_data if self.group_col is None else self.input_data.drop(columns=self.group_col)
 
         if self.info_col is not None:
             df = df.drop(columns=self.info_col)
 
-        features = feat_select.perform_selection(df=df)
-        if self.group_col is None:
-            self.features_importance = features
-        else:
-            self.features_importance = features.append(
-                {"Feature": self.group_col, "Importance": features.Importance.max()}, ignore_index=True
-            )
-        return self.features_importance.sort_values("Importance", ascending=False)
+        self.detailed_features_df = feat_select.perform_selection(df=df)
+        self.short_features_df = self.detailed_features_df.loc[:, ['rank']]
+
+        return self.short_features_df
 
     def _create_faiss_matcher(self, df=None, validation=None):
         """Creates a FaissMatcher object.
@@ -538,7 +538,7 @@ class Matcher:
 
         return self.pval_dict
 
-    def estimate(self, features: list = None) -> tuple:
+    def estimate(self, features: Iterable = None) -> tuple:
         """Performs matching via Mahalanobis distance.
 
         Args:
@@ -549,7 +549,11 @@ class Matcher:
             Results of matching and matching quality metrics
         """
         if features is not None:
+            features = list(features)
             self.features_importance = features
+            if self.group_col is not None and self.group_col not in features:
+                features.append(self.group_col)
+
         return self._matching()
 
     def save(self, filename):
