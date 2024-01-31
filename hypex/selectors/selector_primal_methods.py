@@ -42,7 +42,12 @@ def pd_fillna_inplace_by_type(df: pd.DataFrame, col_list: List[str], is_category
         df[col_list] = df[col_list].fillna(fill_values)
 
 
-def pd_input_preproc(
+def pd_fillna_inplace(df, numeric_col_list, category_col_list):
+    pd_fillna_inplace_by_type(df, numeric_col_list, is_category=False)
+    pd_fillna_inplace_by_type(df, category_col_list, is_category=True)
+
+
+def pd_input_preprocing(
         df: pd.DataFrame,
         info_col_list: Optional[List[str]] = None,
         target: Union[str, List[str]] = 'target',
@@ -85,8 +90,7 @@ def pd_input_preproc(
     numeric_col_list = [col for col in feature_col_list if col not in category_col_list]
 
     df[category_col_list] = df[category_col_list].astype('str')
-    pd_fillna_inplace_by_type(df, category_col_list, is_category=True)
-    pd_fillna_inplace_by_type(df, numeric_col_list, is_category=False)
+    pd_fillna_inplace(df, numeric_col_list, category_col_list)
 
     df = df[target_col_list + feature_col_list]
 
@@ -171,7 +175,7 @@ def pd_lgbm_feature_selector(
     Raises:
         ImportError: If LightGBM is not installed.
     """
-    feature_col_list, target_col_list, numeric_col_list, category_col_list, df = pd_input_preproc(
+    feature_col_list, target_col_list, numeric_col_list, category_col_list, df = pd_input_preprocing(
         df,
         info_col_list=info_col_list,
         target=target,
@@ -240,7 +244,7 @@ def pd_catboost_feature_selector(
     Raises:
         ImportError: If CatBoost is not installed.
     """
-    feature_col_list, target_col_list, numeric_col_list, category_col_list, df = pd_input_preproc(
+    feature_col_list, target_col_list, numeric_col_list, category_col_list, df = pd_input_preprocing(
         df,
         info_col_list=info_col_list,
         target=target,
@@ -306,7 +310,7 @@ def pd_ridgecv_feature_selector(
         pd.DataFrame: A DataFrame containing feature weights, their absolute values, and ranks.
 
     """
-    feature_col_list, target_col_list, numeric_col_list, category_col_list, df = pd_input_preproc(
+    feature_col_list, target_col_list, numeric_col_list, category_col_list, df = pd_input_preprocing(
         df,
         info_col_list=info_col_list,
         target=target,
