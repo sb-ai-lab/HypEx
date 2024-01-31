@@ -1,4 +1,4 @@
-from typing import List, Optional, Union, Any
+from typing import List, Optional, Union, Any, Tuple
 
 import numpy as np
 import pandas as pd
@@ -6,7 +6,6 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import RidgeCV
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-
 
 
 def pd_fillna_inplace_by_type(df: pd.DataFrame, col_list: List[str], is_category: bool = False) -> None:
@@ -18,9 +17,9 @@ def pd_fillna_inplace_by_type(df: pd.DataFrame, col_list: List[str], is_category
         for numerical data.
 
         Args:
-            df (pd.DataFrame): The DataFrame in which NaN values will be filled.
-            col_list (List[str]): A list of column names in which NaN values will be filled.
-            is_category (bool, optional): A flag indicating whether the specified columns
+            df: The DataFrame in which NaN values will be filled.
+            col_list: A list of column names in which NaN values will be filled.
+            is_category: A flag indicating whether the specified columns
                                           are categorical. If True, the most frequent value
                                           ('top') is used for filling NaN values. If False,
                                           the median value ('50%') is used. Defaults to False.
@@ -50,7 +49,7 @@ def pd_input_preproc(
         treatment: Optional[Union[str, List[str]]] = None,
         weights_col_list: Optional[List[str]] = None,
         category_col_list: Optional[List[str]] = None
-) -> tuple[List[str], List[str], List[str], List[str], pd.DataFrame]:
+) -> Tuple[List[str], List[str], List[str], List[str], pd.DataFrame]:
     """
     Processes the input DataFrame by marking and converting column types and filling NaNs.
 
@@ -153,7 +152,7 @@ def pd_lgbm_feature_selector(
         weights_col_list: Optional[List[str]] = None,
         category_col_list: Optional[List[str]] = None,
         model: Optional = None
-        ) -> pd.DataFrame:
+) -> pd.DataFrame:
     """
     Processes input data and uses LightGBM to select feature importance.
 

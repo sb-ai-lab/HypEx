@@ -1,6 +1,5 @@
 """Feature selection class."""
 import logging
-from typing import List
 
 import pandas as pd
 
@@ -15,8 +14,7 @@ logging.basicConfig(
 
 
 class FeatureSelector:
-    """Class of Feature selector. Select top features. By default, use LGM.
-    # TODO: write some feature selector"""
+    """Class of Feature selector. Select top features. By default, use LGM."""
 
     def __init__(
             self,
@@ -31,7 +29,7 @@ class FeatureSelector:
                 The target column
             treatment:
                 The column that determines control and test groups
-            use_algos:
+            feature_selection_method:
                 List of names of algorithms for feature selection
         """
         self.outcome = outcome
@@ -51,10 +49,6 @@ class FeatureSelector:
             A DataFrame containing the feature scores from the model
 
         """
-        roles = {
-            "target": self.outcome,
-            "drop": [self.treatment],
-        }
         report_df = self.feature_selection_method(
             df=df,
             info_col_list=None,
