@@ -592,7 +592,7 @@ class FaissMatcher:
             temp = temp.loc[:, (temp != 0).any(axis=0)].drop(columns=self.group_col)
             treated, untreated = self._get_split(temp)
     
-            std_treated_np, std_untreated_np = _transform_to_np(treated, untreated, self.weights)
+            std_treated_np, std_untreated_np = _transform_to_np(treated, untreated, self.weights, self.validation)
     
             if self.pbar:
                 self.tqdm.set_description(desc=f"Get untreated index by group {group}")
@@ -646,7 +646,7 @@ class FaissMatcher:
         df = self.df[self.columns_match]
         treated, untreated = self._get_split(df)
 
-        std_treated_np, std_untreated_np = _transform_to_np(treated, untreated, self.weights)
+        std_treated_np, std_untreated_np = _transform_to_np(treated, untreated, self.weights, self.validation)
 
         if self.pbar:
             self.tqdm = tqdm(total=len(std_treated_np) + len(std_untreated_np))
@@ -748,7 +748,7 @@ def _get_index(base: np.ndarray, new: np.ndarray, n_neighbors: int) -> list:
     return indexes
 
 
-def _transform_to_np(treated: pd.DataFrame, untreated: pd.DataFrame, weights: dict) -> Tuple[np.ndarray, np.ndarray]:
+def _transform_to_np(treated: pd.DataFrame, untreated: pd.DataFrame, weights: dict, validation: bool) -> Tuple[np.ndarray, np.ndarray]:
     """Transforms df to numpy and transform via Cholesky decomposition.
     If there are features that cannot be decomposed Cholesky, these features are removed.
 
@@ -781,9 +781,9 @@ def _transform_to_np(treated: pd.DataFrame, untreated: pd.DataFrame, weights: di
 
         treated_duplicated = list(treated.columns[treated.T.duplicated()].values)
         untreated_duplicated = list(untreated.columns[untreated.T.duplicated()].values)
-        if treated_duplicated is not [] and not self.validation:
+        if treated_duplicated is not [] and not validation:
             logger.info(f'The data has the duplicate columns: {treated_duplicated} in test group')
-        if untreated_duplicated is not [] and not self.validation:
+        if untreated_duplicated is not [] and not validation:
             logger.info(f'The data has the duplicate columns: {untreated_duplicated} in control group')
 
         columns_duplicated = set(treated_duplicated + untreated_duplicated)
