@@ -1,9 +1,9 @@
 import datetime
-from typing import Union, Any
+from typing import Any, Union
 
 import numpy as np
 
-StratificationRoleTypes = Union[int, str, datetime.datetime]
-TreatmentRoleTypes = Union[int, bool, str]
-TargetRoleTypes = PreTargetRoleTypes = Union[np.float64, int, bool]
+StratificationRoleTypes = Union[np.float64, str, datetime.datetime]
+TreatmentRoleTypes = Union[np.float64, bool, str]
+TargetRoleTypes = Union[np.float64, int, bool]
 ABCRoleTypes = Union[Any]
