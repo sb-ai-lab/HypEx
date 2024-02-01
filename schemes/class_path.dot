@@ -55,7 +55,6 @@ digraph ClassPath{
         StatsAA[label="Stats"]
         SpliterAAPipeline[label="Spliter"]
         AnalyzerAASplit[label="Analyzer"]
-        SelectorAASplit[label="Selector"]
         MetricsAASplit[label="Metrics"]
         StatsAASplit[label="Stats"]
         AnalyzerAA[label="Analyzer"]
@@ -147,9 +146,7 @@ digraph ClassPath{
 
         SpliterAAOne -> SpliterAAPipeline [arrowhead=box ltail=cluster_split]
         SpliterAAPipeline -> AnalyzerAASplit
-        AnalyzerAASplit -> SelectorAASplit
-        SelectorAASplit -> MetricsAASplit
-        SelectorAASplit -> StatsAASplit
+        AnalyzerAASplit -> {MetricsAASplit StatsAASplit}
         {MetricsAASplit StatsAASplit} -> ReportAABest
         ReportAABest -> AnalyzerAA
     }

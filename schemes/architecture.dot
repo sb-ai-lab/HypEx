@@ -16,9 +16,19 @@ digraph Architecture{
         // -------
         multiexperiment_experiment[label="Experiment"]
         multiexperiment[label="MultiExperiment"]
-        multiexperiment_execte_executor[label="Executor"]
+        multiexperiment_execte_experiment[label="Experiment"]
         // -------
         spliter_executor[label="Spliter"]
+        // -------
+        stat_executor[label="Stat"]
+        // -------
+        analyzer_executor[label="Analyzer"]
+        // -------
+        transformer_executor[label="Transformer"]
+        // -------
+        operator_executor[label="Operator"]
+        // -------
+        report_experiment[label="Experiment"]
     }
 
     subgraph methods{
@@ -36,6 +46,16 @@ digraph Architecture{
         multiexperiment_execute_data_append[label="append"]
         // -------
         spliter_execute[label="execute"]
+        // -------
+        stat_execute[label="execute"]
+        // -------
+        analyzer_execute[label="execute"]
+        // -------
+        transformer_execute[label="execute"]
+        // -------
+        operator_execute[label="execute"]
+        // -------
+        report_execute[label="execute"]
     }
 
     subgraph data{
@@ -53,19 +73,116 @@ digraph Architecture{
         multiexperiment_executor_experiment_data[label="ExperimentData i"]
         multiexperiment_executor_result_data[label="ExperimentData"]
         // -------
-        spliter_data[shape=record label="Dataset | group column"]
+        spliter_data[label="Dataset"]
+        spliter_out_data[shape=record label="Dataset | group column"]
+        // -------
+        stat_data[shape=record label="Dataset | stat target column"]
+        stat_experiment_data[label="ExperimentData"]
+        // -------
+        analyzer_in_data[label="ExperimentData"]
+        analyzer_out_data[label="ExperimentData"]
+        // -------
+        transformer_in_data[label="Dataset"]
+        transformer_out_data[label="Dataset"]
+        // -------
+        operator_in_data[shape=record label="Dataset | x1 | x2"]
+        operator_out_data[label="ExperimentData"]
+        // -------
+        report_in_data[label="ExperimentData"]
+        report_out_data[label="Report artifact"]
     }
 
     subgraph atributes{
         node[shape=record, fillcolor=lightpink]
         experiment_executor_list_attribute[label="List[Executor]"]
+        report_backend[label="Backend"]
     }
 
-    subgraph cluster_executor{
-        graph[style=dashed, label="Executor"]
+    subgraph cluster_executors{
+        graph[label="Executors"]
 
-        executor_legend_data -> executor_execute_legend
-        executor_legend -> executor_execute_legend [arrowhead=none]
+        subgraph cluster_executor{
+            graph[style=dashed, label="Executor"]
+
+            executor_legend_data -> executor_execute_legend
+            executor_legend -> executor_execute_legend [arrowhead=none]
+        }
+
+        subgraph cluster_spliter{
+            graph[style=dashed, label="Spliter"]
+
+            spliter_executor -> spliter_execute [arrowhead=none]
+            spliter_execute -> spliter_out_data
+            spliter_data -> spliter_execute
+        }
+
+        executor_legend -> spliter_executor [
+            style="dotted"
+            arrowhead=curve
+            ltail=cluster_executor
+            lhead=cluster_spliter
+        ]
+
+        subgraph cluster_stats{
+            graph[style=dashed, label="Stats"]
+
+            stat_executor -> stat_execute [arrowhead=none]
+            stat_data -> stat_execute
+            stat_execute -> stat_experiment_data
+        }
+
+        executor_legend -> stat_executor [
+            style="dotted"
+            arrowhead=curve
+            ltail=cluster_executor
+            lhead=cluster_stats
+        ]
+
+        subgraph cluster_analyser{
+            graph[style=dashed, label="Analyser"]
+
+            analyzer_executor -> analyzer_execute [arrowhead=none]
+            analyzer_in_data -> analyzer_execute
+            analyzer_execute -> analyzer_out_data
+        }
+
+        executor_legend -> analyzer_executor [
+            style="dotted"
+            arrowhead=curve
+            ltail=cluster_executor
+            lhead=cluster_analyser
+        ]
+
+        subgraph cluster_transformer{
+            graph[style=dashed, label="Transformer"]
+
+            transformer_executor -> transformer_execute [arrowhead=none]
+            transformer_in_data -> transformer_execute
+            transformer_execute -> transformer_out_data
+        }
+
+        executor_legend -> transformer_executor [
+            style="dotted"
+            arrowhead=curve
+            ltail=cluster_executor
+            lhead=cluster_transformer
+        ]
+
+        subgraph cluster_operator{
+            graph[style=dashed, label="Operator"]
+
+            operator_executor -> operator_execute [arrowhead=none]
+            operator_in_data -> operator_execute
+            operator_execute -> operator_out_data
+        }
+
+        executor_legend -> operator_executor [
+            style="dotted"
+            arrowhead=curve
+            ltail=cluster_executor
+            lhead=cluster_operator
+        ]
+
     }
 
     subgraph cluster_experiment{
@@ -95,7 +212,9 @@ digraph Architecture{
     }
 
     executor_legend -> experiment_legend [
-        ltail=cluster_executor, 
+        style="dotted"
+        arrowhead=curve
+        ltail=cluster_executor
         lhead=cluster_experiment
     ]
 
@@ -108,28 +227,32 @@ digraph Architecture{
         subgraph cluster_multiexperiment_execute{
             graph[style=dotted, label="execute"]
             
-            multiexperiment_execte_executor -> multiexperiment_executor_execute [arrowhead=none]
+            multiexperiment_execte_experiment -> multiexperiment_executor_execute [arrowhead=none]
             multiexperiment_executor_execute -> multiexperiment_executor_experiment_data
             multiexperiment_executor_experiment_data -> multiexperiment_execute_data_append
             multiexperiment_execute_data_append -> multiexperiment_executor_result_data
 
-            multiexperiment_executor_result_data -> multiexperiment_executor_execute [style=dashed]
+            multiexperiment_execute_data_append -> multiexperiment_executor_execute [
+                style=dashed
+                label="n times"
+            ]
         }
+
+        multiexperiment_execute -> multiexperiment_executor_execute [
+            arrowhead=none
+            lhead=cluster_multiexperiment_execute
+        ]
     }
 
     experiment_legend -> multiexperiment [
-        ltail=cluster_experiment, 
+        style="dotted"
+        arrowhead=curve
+        ltail=cluster_experiment
         lhead=cluster_multiexperiment
     ]
 
-    subgraph cluster_spliter{
-        graph[style=dashed, label="Spliter"]
+    subgraph cluster_report{
+        graph[style=dashed, label="Report"]
 
-        spliter_executor -> spliter_execute -> spliter_data
     }
-
-    experiment_legend -> spliter_executor [
-        ltail=cluster_experiment, 
-        lhead=cluster_spliter
-    ]
 }
