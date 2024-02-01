@@ -254,5 +254,16 @@ digraph Architecture{
     subgraph cluster_report{
         graph[style=dashed, label="Report"]
 
+        report_backend -> report_experiment [arrowhead=none]
+        report_experiment -> report_execute [arrowhead=none]
+        report_in_data -> report_execute
+        report_execute -> report_out_data
     }
+
+    experiment_legend -> report_experiment [
+        style="dotted"
+        arrowhead=curve
+        ltail=cluster_experiment
+        lhead=cluster_report
+    ]
 }
