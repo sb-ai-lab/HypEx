@@ -3,33 +3,21 @@ from typing import Dict, Optional, Union
 from pandas import DataFrame
 
 from hypex.dataset.base import DatasetBase, select_dataset
-from hypex.dataset.roles import ABCRole, default_roles
-
-
-def parse_roles(roles: Dict) -> Dict[str, ABCRole]:
-    new_roles = {}
-    for role in roles:
-        r = default_roles.get(role, role)
-        if isinstance(roles[role], list):
-            for i in roles[role]:
-                new_roles[i] = r
-        else:
-            new_roles[roles[role]] = r
-    return new_roles or roles
+from hypex.dataset.roles import ABCRole
+from hypex.dataset.utils import parse_roles
 
 
 class Dataset(DatasetBase):
-    def set_data(self, data: DataFrame, roles):
-        self.roles = parse_roles(roles) or {}
+    def set_data(self, data: Union[DataFrame, str] = None, roles=None):
+        self.roles = parse_roles(roles)
         self.data = select_dataset(data)
 
     def __init__(
         self,
-        data: Optional[DataFrame] = None,
+        data: Union[DataFrame, str, None] = None,
         roles: Optional[Dict[ABCRole, Union[list[str], str]]] = None,
     ):
-        if data is not None:
-            self.set_data(data, roles)
+        self.set_data(data, roles)
 
     def __repr__(self):
         return self.data.__repr__()
