@@ -1005,7 +1005,7 @@ class AATest:
         best_results, best_split = None, None
 
         if not self.target_fields:
-            self.target_fields = labeling["target_fields"]
+            self.target_fields = labeling["target_field"]
 
         if optimize_groups:
             max_score = -1

@@ -1,7 +1,6 @@
 """Module for AB tests"""
 from typing import Dict
 import pandas as pd
-from IPython.display import display
 import numpy as np
 from scipy.stats import ttest_ind, mannwhitneyu
 
@@ -307,8 +306,3 @@ class ABTest:
         self.results = results
 
         return results
-
-    def show_beautiful_result(self):
-        """Shows results of 'execute' function - dict as dataframes."""
-        for k in self.results.keys():
-            display(pd.DataFrame(self.results[k], index=[k]).T)
