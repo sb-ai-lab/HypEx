@@ -47,7 +47,6 @@ class Dataset(DatasetBase):
         return self.data.map(func, na_action, **kwargs)
 
 
-
 class ExperimentData(Dataset):
     def __init__(self, data):
         self.additional_fields = DataFrame()
@@ -87,12 +86,3 @@ class ExperimentData(Dataset):
                 raise Exception(
                     f"{item} not in additional_fields and not in stats_fields"
                 )
-
-
-if __name__ == "__main__":
-    df = DataFrame({"f1": [1, 2], "f2": [3, 4]}, index=[1, 2])
-    df_data = Dataset(df)
-    experiment_data = ExperimentData(df)
-    experiment_data.add_to_stats_fields(DataFrame({"stat1": [7]}, index=["f2"]))
-    experiment_data.add_to_additional_fields(DataFrame({"del1": [986]}, index=[1]))
-    print(experiment_data["f2", "stat1"])
