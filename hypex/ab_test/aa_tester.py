@@ -14,156 +14,6 @@ from statsmodels.stats.power import TTestIndPower
 from tqdm.auto import tqdm
 
 
-def merge_groups(
-    control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
-    test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
-) -> pd.DataFrame:
-    """Merges test and control groups in one DataFrame and creates column "group".
-    Column "group" contains of "test" and "control" values.
-
-    Args:
-        control_group:
-            Data of control group
-        test_group:
-            Data of target group
-    Returns:
-        merged_data:
-            Contacted DataFrame
-    """
-    control_group.loc[:, "group"] = "control"
-    test_group.loc[:, "group"] = "test"
-
-    return pd.concat([test_group, control_group], ignore_index=True)
-
-
-def split_splited_data(splitted_data: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-    """Splits a pandas DataFrame into two separate dataframes based on a specified group field.
-
-    Args:
-        splitted_data:
-            The input dataframe to be split
-
-    Returns:
-        A dictionary containing two dataframes, 'test' and 'control', where 'test' contains rows where the
-        group field is 'test', and 'control' contains rows where the group field is 'control'.
-    """
-    return {
-        "control": splitted_data[splitted_data["group"] == "control"],
-        "test": splitted_data[splitted_data["group"] == "test"],
-    }
-
-
-def calc_mde(
-    test_group: pd.Series,
-    control_group: pd.Series,
-    reliability: float = 0.95,
-    power: float = 0.8,
-) -> float:
-    """Calculates the minimum detectable effect (MDE) for a given test and control groups.
-
-    Args:
-        test_group:
-            The test group as a pandas Series
-        control_group:
-            The control group as a pandas Series
-        reliability:
-            The reliability of the test
-        power:
-            The power of the test
-
-    Returns:
-        The minimum detectable effect
-    """
-
-    m = norm.ppf(1 - (1 - reliability) / 2) + norm.ppf(power)
-
-    n_test, n_control = len(test_group), len(control_group)
-    proportion = n_test / (n_test + n_control)
-    p = np.sqrt(1 / (proportion * (1 - proportion)))
-
-    var_test, var_control = np.var(test_group, ddof=1), np.var(control_group, ddof=1)
-    s = np.sqrt(var_test / n_test + var_control / n_control)
-
-    return p * m * s
-
-
-def calc_sample_size(
-    control_group: pd.Series,
-    test_group: pd.Series,
-    mde,
-    significance: float = 0.05,
-    power: float = 0.8,
-) -> float:
-    """Calculates sample size of dataframe depends on mde and power.
-
-    Args:
-        control_group:
-            Numpy Series with data from control group
-        test_group:
-            Numpy Series with data from test group
-        mde:
-            Minimum detectable effect
-        significance:
-            Level of significance (alpha)
-        power:
-            Power of criterion
-
-    Returns:
-        Sample_size of dataframe
-    """
-    if isinstance(mde, Iterable):
-        z_alpha = norm.ppf((2 - significance) / 2)
-        z_beta = norm.ppf(power)
-
-        p1 = mde[0]
-        p2 = mde[1]
-
-        return (
-            (z_alpha + z_beta) ** 2 * (p1 * (1 - p1) + p2 * (1 - p2)) / (p1 - p2) ** 2
-        )
-    else:
-        control_std = control_group.std()
-        test_std = test_group.std()
-
-        test_proportion = len(test_group) / (len(test_group) + len(control_group))
-        control_proportion = 1 - test_proportion
-
-        d = ((norm.ppf(1 - significance / 2) + norm.ppf(power)) / mde) ** 2
-        s = test_std**2 / test_proportion + control_std**2 / control_proportion
-        return d * s
-
-
-def calc_power(
-    effect_size: float,
-    control_size: float,
-    test_size: float,
-    significance: float = 0.05,
-) -> float:
-    """Statistical power calculations for t-test for two independent sample and known significance.
-
-    Args:
-        effect_size:
-            Size of the effect
-        control_size:
-            Size of control group
-        test_size:
-            Size of test group
-        significance:
-            Level of significance (alpha)
-
-    Returns:
-        Statistical power
-    """
-    analysis = TTestIndPower()
-    ratio = test_size / control_size
-    return analysis.power(
-        effect_size=effect_size,
-        nobs1=test_size,
-        ratio=ratio,
-        alpha=significance,
-    )
-
-
 class AATest:
     """
     A class for conducting AA testing (random split testing) to assess the
@@ -189,6 +39,8 @@ class AATest:
             Internal method to create a simple random split of the data.
         split(data, random_state, test_size):
             Splits the dataset into test and control groups.
+        merge_groups(control_group, test_group):
+            Merges test and control groups in one DataFrame and creates column "group".
         _postprep_data(data, spit_indexes):
             Combines the index markup obtained at the split step.
         calc_ab_delta(a_mean, b_mean, mode):
@@ -390,7 +242,28 @@ class AATest:
         return result
 
     @staticmethod
-    def _postprep_data(data, spit_indexes: Dict = None) -> pd.DataFrame:
+    def merge_groups(
+        control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
+        test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
+    ) -> pd.DataFrame:
+        """Merges test and control groups in one DataFrame and creates column "group".
+        Column "group" contains of "test" and "control" values.
+
+        Args:
+            control_group:
+                Data of control group
+            test_group:
+                Data of target group
+        Returns:
+            merged_data:
+                Contacted DataFrame
+        """
+        control_group.loc[:, "group"] = "control"
+        test_group.loc[:, "group"] = "test"
+
+        return pd.concat([test_group, control_group], ignore_index=True)
+
+    def _postprep_data(self, data, spit_indexes: Dict = None) -> pd.DataFrame:
         """Prepares data to show user.
         Adds info_cols and decode binary variables.
 
@@ -405,12 +278,12 @@ class AATest:
         """
         test = data.loc[spit_indexes["test_indexes"]]
         control = data.loc[spit_indexes["control_indexes"]]
-        data = merge_groups(control, test)
+        data = self.merge_groups(control, test)
 
         return data
 
     @staticmethod
-    def calc_ab_delta(a_mean: float, b_mean: float, mode: str = "percentile")->float:
+    def calc_ab_delta(a_mean: float, b_mean: float, mode: str = "percentile") -> float:
         """Calculates target delta between A and B groups.
 
         Args:
@@ -889,6 +762,176 @@ class AATest:
         figure.suptitle(f"{control_data.name}", fontsize=kwargs.get("title_size", 20))
         plt.show()
 
+    def __get_test_and_control_series(
+        self,
+        test_group: pd.Series = None,
+        control_group: pd.Series = None,
+        data: pd.DataFrame = None,
+        target_field: str = None,
+    ):
+        if test_group is None and control_group is None:
+            if data is None or target_field is None:
+                raise ValueError(
+                    "test_group and control_group cannot be None if data and target_field are None"
+                )
+            splited_data = self.split_splited_data(data)
+            test_group = splited_data["test"][target_field]
+            control_group = splited_data["control"][target_field]
+        return {"test_group": test_group, "control_group": control_group}
+
+    def calc_mde(
+        self,
+        test_group: pd.Series = None,
+        control_group: pd.Series = None,
+        data: pd.DataFrame = None,
+        target_field: str = None,
+        reliability: float = 0.95,
+        power: float = 0.8,
+    ) -> float:
+        """Calculates the minimum detectable effect (MDE) for a given test and control groups.
+
+        Args:
+            test_group:
+                The test group as a pandas Series
+            control_group:
+                The control group as a pandas Series
+            data:
+                The input data as a pandas DataFrame used if test_group and control_group are None
+            target_field:
+                The target field used if given data is a DataFrame
+            reliability:
+                The reliability of the test
+            power:
+                The power of the test
+
+        Returns:
+            The minimum detectable effect
+        """
+
+        m = norm.ppf(1 - (1 - reliability) / 2) + norm.ppf(power)
+
+        groups = self.__get_test_and_control_series(
+            test_group=test_group,
+            control_group=control_group,
+            data=data,
+            target_field=target_field,
+        )
+        test_group = groups["test_group"]
+        control_group = groups["control_group"]
+
+        n_test, n_control = len(test_group), len(control_group)
+        proportion = n_test / (n_test + n_control)
+        p = np.sqrt(1 / (proportion * (1 - proportion)))
+
+        var_test, var_control = np.var(test_group, ddof=1), np.var(
+            control_group, ddof=1
+        )
+        s = np.sqrt(var_test / n_test + var_control / n_control)
+
+        return p * m * s
+
+    def calc_sample_size(
+        self,
+        test_group: pd.Series = None,
+        control_group: pd.Series = None,
+        data: pd.DataFrame = None,
+        target_field: str = None,
+        group_col: str = "group",
+        mde=None,
+        significance: float = 0.05,
+        power: float = 0.8,
+    ) -> float:
+        """Calculates sample size of dataframe depends on mde and power.
+
+        Args:
+            test_group:
+                The test group as a pandas Series
+            control_group:
+                The control group as a pandas Series
+            data:
+                The input data as a pandas DataFrame used if test_group and control_group are None
+            target_field:
+                The target field used if given data is a DataFrame
+            mde:
+                Minimum detectable effect. If None, it will be calculated. If it is a tuple, it will be used as relative mde
+            significance:
+                Level of significance (alpha)
+            power:
+                Power of criterion
+
+        Returns:
+            Sample_size of dataframe
+        """
+        if isinstance(mde, Iterable):
+            z_alpha = norm.ppf((2 - significance) / 2)
+            z_beta = norm.ppf(power)
+
+            p1 = mde[0]
+            p2 = mde[1]
+
+            return (
+                (z_alpha + z_beta) ** 2
+                * (p1 * (1 - p1) + p2 * (1 - p2))
+                / (p1 - p2) ** 2
+            )
+        else:
+            groups = self.__get_test_and_control_series(
+                test_group=test_group,
+                control_group=control_group,
+                data=data,
+                target_field=target_field,
+            )
+            control_group = groups["control_group"]
+            test_group = groups["test_group"]
+
+            mde = mde or self.calc_mde(
+                test_group=test_group,
+                control_group=control_group,
+                reliability=1 - significance,
+                power=power,
+            )
+
+            control_std = control_group.std()
+            test_std = test_group.std()
+
+            test_proportion = len(test_group) / (len(test_group) + len(control_group))
+            control_proportion = 1 - test_proportion
+
+            d = ((norm.ppf(1 - significance / 2) + norm.ppf(power)) / mde) ** 2
+            s = test_std**2 / test_proportion + control_std**2 / control_proportion
+            return d * s
+
+    @staticmethod
+    def calc_power(
+        effect_size: float,
+        control_size: float,
+        test_size: float,
+        significance: float = 0.05,
+    ) -> float:
+        """Statistical power calculations for t-test for two independent sample and known significance.
+
+        Args:
+            effect_size:
+                Size of the effect
+            control_size:
+                Size of control group
+            test_size:
+                Size of test group
+            significance:
+                Level of significance (alpha)
+
+        Returns:
+            Statistical power
+        """
+        analysis = TTestIndPower()
+        ratio = test_size / control_size
+        return analysis.power(
+            effect_size=effect_size,
+            nobs1=test_size,
+            ratio=ratio,
+            alpha=significance,
+        )
+
     def experiment_result_transform(self, experiment: pd.Series):
         """
         Transform experiments results into readable view.
@@ -906,7 +949,28 @@ class AATest:
             for i in experiment.index:
                 if i.startswith(f"{tf} "):
                     targets_dict[tf][i[len(tf) + 1 :]] = experiment[i]
-        return pd.DataFrame(targets_dict).T, experiment.iloc[-9:]
+
+        return {
+            "best_experiment_stat": pd.DataFrame(targets_dict).T,
+            "best_split_stat": experiment.iloc[-9:],
+        }
+
+    @staticmethod
+    def split_splited_data(splitted_data: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+        """Splits a pandas DataFrame into two separate dataframes based on a specified group field.
+
+        Args:
+            splitted_data:
+                The input dataframe to be split
+
+        Returns:
+            A dictionary containing two dataframes, 'test' and 'control', where 'test' contains rows where the
+            group field is 'test', and 'control' contains rows where the group field is 'control'.
+        """
+        return {
+            "control": splitted_data[splitted_data["group"] == "control"],
+            "test": splitted_data[splitted_data["group"] == "test"],
+        }
 
     def split_analysis(self, splited_data: pd.DataFrame, **kwargs):
         """Conducts a full splitting analysis.
@@ -967,9 +1031,9 @@ class AATest:
         data: pd.DataFrame,
         optimize_groups: bool = False,
         iterations: int = 2000,
-        show_plots: bool=True,
-        test_size: float=0.5,
-        pbar: bool=True,
+        show_plots: bool = True,
+        test_size: float = 0.5,
+        pbar: bool = True,
         **kwargs,
     ):
         """Main function for AATest estimation.
@@ -1059,9 +1123,11 @@ class AATest:
             if show_plots:
                 self.split_analysis(final_split, **kwargs)
 
-            best_experiment_stat, best_split_stat = self.experiment_result_transform(
+            transformed_results = self.experiment_result_transform(
                 best_results[best_results["random_state"] == best_rs].iloc[0]
             )
+            best_experiment_stat = transformed_results["best_experiment_stat"]
+            best_split_stat = transformed_results["best_split_stat"]
             resume = self.get_resume(aa_scores, best_experiment_stat)
         else:
             aa_scores = None

@@ -119,3 +119,8 @@ def test_unbalanced_groups(data, iterations, info_col):
 def test_aa_empty_unbalanced_process(data, iterations):
     model = AATest()
     model.process(data, iterations=iterations, show_plots=False, pbar=False, test_size=0.05)
+
+def test_calc_sample_size(data, iterations, info_col):
+    model = AATest(target_fields=["pre_spends", "post_spends"], info_cols=info_col)
+    splitted_data = model.sampling_metrics(data)['data_from_experiment'][None]
+    model.calc_sample_size(data=splitted_data, target_field='post_spends')
