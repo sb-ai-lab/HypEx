@@ -1,5 +1,6 @@
 from typing import Dict, Optional, Union
 
+import pandas as pd
 from pandas import DataFrame
 
 from hypex.dataset.base import DatasetBase, select_dataset
@@ -55,18 +56,18 @@ class ExperimentData(Dataset):
         # that user want to make, but I don't understand their format
         self.create_fields(data)
 
-    def create_fields(self, data):
+    def create_fields(self, data: pd.DataFrame):
         self.stats_fields.index = list(data.columns)
         self.additional_fields.index = data.index
         # can add keys for analysis_tables and columns for stats_fields
 
-    def add_to_analysis_tables(self, key: str, data):
+    def add_to_analysis_tables(self, key: str, data: pd.DataFrame):
         self.analysis_tables[key] = data
 
-    def add_to_stats_fields(self, data):
+    def add_to_stats_fields(self, data: pd.DataFrame):
         self.stats_fields = self.stats_fields.join(data, on=self.stats_fields.index)
 
-    def add_to_additional_fields(self, data):
+    def add_to_additional_fields(self, data: pd.DataFrame):
         self.additional_fields = self.additional_fields.join(
             data, on=self.additional_fields.index
         )
