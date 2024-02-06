@@ -39,9 +39,60 @@ class Dataset(DatasetBase):
         result_type=None,
         args=(),
         by_row="compat",
-        **kwargs
+        **kwargs,
     ):
         return self.data.apply(func, axis, raw, result_type, args, by_row, **kwargs)
 
     def map(self, func, na_action=None, **kwargs):
         return self.data.map(func, na_action, **kwargs)
+
+
+
+class ExperimentData(Dataset):
+    def __init__(self, data):
+        self.additional_fields = DataFrame()
+        self.stats_fields = DataFrame()
+        self.analysis_tables = {}  # I think, we will know about analysis and stats,
+        # that user want to make, but I don't understand their format
+        self.create_fields(data)
+
+    def create_fields(self, data):
+        self.stats_fields.index = list(data.columns)
+        self.additional_fields.index = data.index
+        # can add keys for analysis_tables and columns for stats_fields
+
+    def add_to_analysis_tables(self, key: str, data):
+        self.analysis_tables[key] = data
+
+    def add_to_stats_fields(self, data):
+        self.stats_fields = self.stats_fields.join(data, on=self.stats_fields.index)
+
+    def add_to_additional_fields(self, data):
+        self.additional_fields = self.additional_fields.join(
+            data, on=self.additional_fields.index
+        )
+
+    def __repr__(self):
+        return self.additional_fields.__repr__()
+
+    def __getitem__(self, item):
+        # can do experiment_data[index, column] or experiment_data[column],
+        # try to find in stats_fields and additional_fields
+        try:
+            return self.stats_fields.loc[item]
+        except:
+            try:
+                return self.additional_fields.loc[item]
+            except:
+                raise Exception(
+                    f"{item} not in additional_fields and not in stats_fields"
+                )
+
+
+if __name__ == "__main__":
+    df = DataFrame({"f1": [1, 2], "f2": [3, 4]}, index=[1, 2])
+    df_data = Dataset(df)
+    experiment_data = ExperimentData(df)
+    experiment_data.add_to_stats_fields(DataFrame({"stat1": [7]}, index=["f2"]))
+    experiment_data.add_to_additional_fields(DataFrame({"del1": [986]}, index=[1]))
+    print(experiment_data["f2", "stat1"])
