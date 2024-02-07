@@ -3,9 +3,29 @@ from typing import Dict, Optional, Union
 import pandas as pd
 from pandas import DataFrame
 
-from hypex.dataset.base import DatasetBase, select_dataset
+from hypex.dataset.backends.pandas_backend import PandasDataset
+from hypex.dataset.base import DatasetBase
 from hypex.dataset.roles import ABCRole
 from hypex.dataset.utils import parse_roles
+
+
+def select_dataset(data):
+    if isinstance(data, pd.DataFrame):
+        return PandasDataset(data)
+    if isinstance(data, str):
+        check_data = check_file_extension(data)
+        if check_data is not None:
+            return PandasDataset(check_data)
+    return None
+
+
+def check_file_extension(file_path):
+    read_functions = {"csv": pd.read_csv, "xlsx": pd.read_excel, "json": pd.read_json}
+    extension = file_path.split(".")[-1].lower()
+    if extension in read_functions:
+        read_function = read_functions[extension]
+        return read_function(file_path)
+    return None
 
 
 class Dataset(DatasetBase):
@@ -74,6 +94,7 @@ class ExperimentData(Dataset):
 
     def __repr__(self):
         return self.additional_fields.__repr__()
+
 
 # как получать данные из stats_fields в формате [feature, stat]?
 # пока идея только через loc. либо я могу хранить транспонированную матрицу, колонки - фичи, индексы - статистики
