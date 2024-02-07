@@ -46,3 +46,18 @@ class MetricRelativeDelta(MetricComparator):
     @staticmethod
     def calc(x1, x2):
         return 1 - x1 / x2
+
+class MetricRatio(MetricComparator):
+    @staticmethod
+    def calc(x1, x2):
+        return x1 / x2
+
+class MetricLogRatio(MetricComparator):
+    @staticmethod
+    def calc(x1, x2):
+        return np.log(x1 / x2)
+
+class MetricPercentageRatio(MetricComparator):
+    @staticmethod
+    def calc(x1, x2):
+        return (1 - x1 / x2) * 100
