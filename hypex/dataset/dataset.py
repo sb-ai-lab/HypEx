@@ -38,6 +38,8 @@ class Dataset(DatasetBase):
         data: Union[DataFrame, str, None] = None,
         roles: Optional[Dict[ABCRole, Union[list[str], str]]] = None,
     ):
+        self.data = None
+        self.roles = None
         self.set_data(data, roles)
 
     def __repr__(self):
@@ -74,9 +76,9 @@ class ExperimentData(Dataset):
         self.stats_fields = DataFrame()
         self.analysis_tables = {}  # I think, we will know about analysis and stats,
         # that user want to make, but I don't understand their format
-        self.create_fields(data)
+        self._create_fields(data)
 
-    def create_fields(self, data: pd.DataFrame):
+    def _create_fields(self, data: pd.DataFrame):
         self.stats_fields.index = list(data.columns)
         self.additional_fields.index = data.index
         # can add keys for analysis_tables and columns for stats_fields
@@ -92,9 +94,12 @@ class ExperimentData(Dataset):
             data, on=self.additional_fields.index
         )
 
-    def __repr__(self):
-        return self.additional_fields.__repr__()
-
+    def __str__(self):
+        return "stats fields\n{}\nadditional fields\n{}\nanalysis tables\n{}".format(
+            self.stats_fields.__str__(),
+            self.additional_fields.__str__(),
+            self.analysis_tables.__str__(),
+        )
 
 # как получать данные из stats_fields в формате [feature, stat]?
 # пока идея только через loc. либо я могу хранить транспонированную матрицу, колонки - фичи, индексы - статистики
