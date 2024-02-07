@@ -2,11 +2,10 @@ from abc import ABC, abstractmethod
 from typing import Union, Sequence, Iterable
 
 import pandas as pd
-from pandas import DataFrame
 
 
 def select_dataset(data):
-    if isinstance(data, DataFrame):
+    if isinstance(data, pd.DataFrame):
         return PandasDataset(data)
     if isinstance(data, str):
         check_data = check_file_extension(data)
@@ -51,7 +50,7 @@ class DatasetBase(ABC):
 
 
 class PandasDataset(DatasetBase):
-    def __init__(self, data: DataFrame):
+    def __init__(self, data: pd.DataFrame):
         self.data = data
 
     def _get_column_index(
