@@ -75,15 +75,5 @@ class ExperimentData(Dataset):
     def __repr__(self):
         return self.additional_fields.__repr__()
 
-    def __getitem__(self, item):
-        # can do experiment_data[index, column] or experiment_data[column],
-        # try to find in stats_fields and additional_fields
-        try:
-            return self.stats_fields.loc[item]
-        except:
-            try:
-                return self.additional_fields.loc[item]
-            except:
-                raise Exception(
-                    f"{item} not in additional_fields and not in stats_fields"
-                )
+# как получать данные из stats_fields в формате [feature, stat]?
+# пока идея только через loc. либо я могу хранить транспонированную матрицу, колонки - фичи, индексы - статистики
