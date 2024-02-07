@@ -15,8 +15,10 @@ digraph Architecture{
         experiment_executor_n_in_list[label="Executor n"]
         // -------
         multiexperiment_experiment[label="Experiment"]
+        multiexperiment_analyzer[label="Analyzer"]
         multiexperiment[label="MultiExperiment"]
-        multiexperiment_execte_experiment[label="Experiment"]
+        multiexperiment_execute_experiment[label="Experiment"]
+        multiexperiment_execute_analyzer[label="Analyzer"]
         // -------
         spliter_executor[label="Spliter"]
         // -------
@@ -43,7 +45,7 @@ digraph Architecture{
         // -------
         multiexperiment_execute[label="execute"]
         multiexperiment_executor_execute[label="execute"]
-        multiexperiment_execute_data_append[label="append"]
+        multiexperiment_analyzer_execute[label="execute"]
         // -------
         spliter_execute[label="execute"]
         // -------
@@ -220,19 +222,21 @@ digraph Architecture{
 
     subgraph cluster_multiexperiment{
         graph[style=dashed, label="MultiExperiment"]
-        multiexperiment_experiment -> multiexperiment [arrowhead=none]
+        {multiexperiment_experiment multiexperiment_analyzer} -> multiexperiment [arrowhead=none]
         multiexperiment -> multiexperiment_execute [arrowhead=none]
         multiexperiment_data -> multiexperiment_execute
 
         subgraph cluster_multiexperiment_execute{
             graph[style=dotted, label="execute"]
             
-            multiexperiment_execte_experiment -> multiexperiment_executor_execute [arrowhead=none]
+            multiexperiment_execute_experiment -> multiexperiment_executor_execute [arrowhead=none]
+            multiexperiment_execute_analyzer -> multiexperiment_analyzer_execute [arrowhead=none]
             multiexperiment_executor_execute -> multiexperiment_executor_experiment_data
-            multiexperiment_executor_experiment_data -> multiexperiment_execute_data_append
-            multiexperiment_execute_data_append -> multiexperiment_executor_result_data
+            multiexperiment_executor_experiment_data -> multiexperiment_analyzer_execute
 
-            multiexperiment_execute_data_append -> multiexperiment_executor_execute [
+            multiexperiment_analyzer_execute -> multiexperiment_executor_result_data
+
+            multiexperiment_executor_result_data -> multiexperiment_executor_execute [
                 style=dashed
                 label="n times"
             ]
@@ -243,6 +247,13 @@ digraph Architecture{
             lhead=cluster_multiexperiment_execute
         ]
     }
+
+    analyzer_executor -> multiexperiment_analyzer [
+        style="dotted"
+        arrowhead=curve
+        ltail=cluster_analyser
+        lhead=cluster_multiexperiment
+    ]
 
     experiment_legend -> multiexperiment [
         style="dotted"
