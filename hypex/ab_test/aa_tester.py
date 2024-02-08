@@ -836,7 +836,6 @@ class AATest:
         control_group: pd.Series = None,
         data: pd.DataFrame = None,
         target_field: str = None,
-        group_col: str = "group",
         mde=None,
         significance: float = 0.05,
         power: float = 0.8,
@@ -981,7 +980,7 @@ class AATest:
             **kwargs:
                 Some extra keyword arguments for plots in visualization
         """
-        ssp = split_splited_data(splited_data)
+        ssp = self.split_splited_data(splited_data)
         for nf in self.target_fields:
             self.num_feature_uniform_analysis(
                 ssp["control"][nf], ssp["test"][nf], **kwargs
@@ -990,7 +989,7 @@ class AATest:
             self.cat_feature_uniform_analysis(
                 ssp["control"][cf], ssp["test"][cf], **kwargs
             )
-
+ 
     def get_resume(self, aa_score: pd.DataFrame, best_experiment_stat: pd.DataFrame):
         """Format results into clear format for understanding.
 
