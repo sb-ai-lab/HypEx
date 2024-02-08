@@ -2,19 +2,37 @@ from abc import ABC, abstractmethod
 from typing import Iterable
 from copy import deepcopy
 
-from hypex.dataset.base import Dataset
+# from ..dataset.base import Dataset
+
+class Dataset:
+    pass
+
+class Analyzer():
+    pass
 
 class Executor(ABC):
-    pass
+    full_name: str
+    _id: int
+
+    @abstractmethod
+    def generate_full_name(self) -> str:
+        pass
+
+    def __init__(self, full_name: str = None):
+        self.full_name = full_name or self.generate_full_name()
+        self._id = id(self)
 
     @abstractmethod
     def execute(self, data: Dataset) -> Dataset:
         pass
 
 class Experiment(Executor):
+    def generate_full_name(self) -> str:
+        return f"Experiment({len(self.executors)})"
 
-    def __init__(self, executors: Iterable[Executor]):
+    def __init__(self, executors: Iterable[Executor], full_name: str = None):
         self.executors : Iterable[Executor] = executors
+        super().__init__(full_name)
 
     def execute(self, data: Dataset) -> Dataset:
         experiment_data: Dataset = data
@@ -23,15 +41,19 @@ class Experiment(Executor):
         return experiment_data
 
 class CycledExperiment(Executor):
-    def __init__(self, inner_experiment: Experiment, n_iterations: int, analyzer: Analyzer):
+    def generate_full_name(self) -> str:
+        return f"CycledExperiment({self.inner_experiment.full_name} x {self.n_iterations})"
+
+    def __init__(self, inner_experiment: Experiment, n_iterations: int, analyzer: Analyzer, full_name: str = None):
         self.inner_experiment: Experiment = inner_experiment
         self.n_iterations: int = n_iterations
         self.analyzer: Analyzer = analyzer
+        super().__init__(full_name)
 
     def execute(self, data: Dataset) -> Dataset:
         for _ in range(self.n_iterations):
             data = self.analyzer.execute(self.inner_experiment.execute(data))
         return data
-    
 
-print(Experiment(None).id)
+print(Experiment([])._id)
+print(Experiment([])._id)
