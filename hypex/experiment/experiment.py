@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Iterable
+from copy import deepcopy
 
 from hypex.dataset.base import Dataset
 
@@ -22,13 +23,15 @@ class Experiment(Executor):
         return experiment_data
 
 class CycledExperiment(Executor):
-    pass
-    # def __init__(self, inner_experiment: Experiment, n_iterations: int):
-    #     self.inner_experiment: Experiment = inner_experiment
-    #     self.n_iterations: int = n_iterations
+    def __init__(self, inner_experiment: Experiment, n_iterations: int, analyzer: Analyzer):
+        self.inner_experiment: Experiment = inner_experiment
+        self.n_iterations: int = n_iterations
+        self.analyzer: Analyzer = analyzer
 
-    # def execute(self, data: Dataset) -> Dataset:
-
-    #     for i in range(self.n_iterations):
-    #     return [self.inner_experiment.execute(data) for _ in range(self.n_iterations)]
+    def execute(self, data: Dataset) -> Dataset:
+        for _ in range(self.n_iterations):
+            data = self.analyzer.execute(self.inner_experiment.execute(data))
+        return data
     
+
+print(Experiment(None).id)
