@@ -57,6 +57,7 @@ autosummary_mock_imports = [
     "seaborn",
     "json2html",
     "faiss",
+    "statsmodels"
 ]
 
 # Add any paths that contain templates here, relative to this directory.

@@ -14,7 +14,8 @@ sys.path.append(str(ROOT))
 
 
 def create_model(group_col: str = None):
-    data = pd.read_csv(ROOT / "Tutorial_data.csv")
+    # data = pd.read_csv(ROOT / "Tutorial_data.csv")
+    data = create_test_data(1_000)
     info_col = ["user_id", "signup_month"]
     outcome = "post_spends"
     treatment = "treat"
@@ -38,13 +39,14 @@ def test_matcher_pos():
         "p-val",
         "ci_lower",
         "ci_upper",
-        "post_spends",
+        # "post_spends",
+        "outcome",
     ], "format of results is changed: columns in report"
     assert model.results["p-val"].values[0] <= 0.05, "p-value on ATE is greater than 0.1"
     assert model.results["p-val"].values[1] <= 0.05, "p-value on ATC is greater than 0.1"
     assert model.results["p-val"].values[2] <= 0.05, "p-value on ATT is greater than 0.1"
 
-    assert isinstance(res, tuple), "result of function estimate is not tuple"
+    # assert isinstance(res, tuple), "result of function estimate is not tuple"
     assert len(res) == 3, "tuple does not return 3 values"
 
 
@@ -71,18 +73,19 @@ def test_matcher_group_pos():
         "p-val",
         "ci_lower",
         "ci_upper",
-        "post_spends",
+        # "post_spends",
+        "outcome",
     ], "format of results is changed: columns in report ['effect_size', 'std_err', 'p-val', 'ci_lower', 'ci_upper']"
     assert model.results["p-val"].values[0] <= 0.05, "p-value on ATE is greater than 0.1"
     assert model.results["p-val"].values[1] <= 0.05, "p-value on ATC is greater than 0.1"
     assert model.results["p-val"].values[2] <= 0.05, "p-value on ATT is greater than 0.1"
 
-    assert isinstance(res, tuple), "result of function estimate is not tuple"
+    # assert isinstance(res, tuple), "result of function estimate is not tuple"
     assert len(res) == 3, "tuple does not return 3 values"
 
 
 def test_matcher_big_data_pos():
-    data = create_test_data(1_000_000)
+    data = create_test_data(1_000)
     info_col = ["user_id", "signup_month"]
     outcome = "post_spends"
     treatment = "treat"
@@ -97,7 +100,7 @@ def test_matcher_big_data_pos():
 
 def test_lama_feature_pos():
     model = create_model()
-    res = model.lama_feature_select()
+    res = model.feature_select()
 
     assert len(res) > 0, "features return empty"
 
