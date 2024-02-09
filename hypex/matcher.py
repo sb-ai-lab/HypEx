@@ -8,10 +8,10 @@ import numpy as np
 import pandas as pd
 
 try:
-    from tqdm import tqdm
+    from tqdm.auto import tqdm
 except Exception as e:
     try:
-        from tqdm.auto import tqdm
+        from tqdm import tqdm
     except:
         raise Exception("Can not import tqdm")
 
