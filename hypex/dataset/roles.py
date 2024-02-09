@@ -1,10 +1,10 @@
 from abc import ABC
 
-from hypex.utils.hypex_typings import *
+import numpy as np
 
-MatchingRoles = []
-AARoles = []
-ABRoles = []
+from hypex.utils.hypex_typings import (ABCRoleTypes, Any,
+                                       StratificationRoleTypes,
+                                       TargetRoleTypes, TreatmentRoleTypes)
 
 
 class ABCRole(ABC):
@@ -50,7 +50,7 @@ class FeatureRole(ABCRole):
 class PreTargetRole(TargetRole):
     _role_name = "PreTarget"
 
-    def __init__(self, data_type: PreTargetRoleTypes):
+    def __init__(self, data_type: TargetRoleTypes):
         super().__init__(data_type)
 
 
@@ -58,13 +58,13 @@ class DropRole(ABCRole):
     _role_name = "DropRole"
 
 
-roles = {
+default_roles = {
     "info": InfoRole(),
     "feature": FeatureRole(),
-    "treatment": TreatmentRole(TreatmentRoleTypes),
+    "treatment": TreatmentRole(np.float64),
     "grouping": GroupingRole(),
-    "target": TargetRole(TargetRoleTypes),
-    "pretarget": PreTargetRole(PreTargetRoleTypes),
+    "target": TargetRole(np.float64),
+    "pretarget": PreTargetRole(np.float64),
     "drop": DropRole(),
-    "stratification": StratificationRole(StratificationRoleTypes)
+    "stratification": StratificationRole(np.float64),
 }

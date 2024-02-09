@@ -1,24 +1,44 @@
-from typing import Optional, Dict, Union
+from typing import Dict, Optional, Union
 
+import pandas as pd
 from pandas import DataFrame
 
-from hypex.dataset.base import select_dataset, DatasetBase
+from hypex.dataset.backends.pandas_backend import PandasDataset
+from hypex.dataset.base import DatasetBase
 from hypex.dataset.roles import ABCRole
+from hypex.dataset.utils import parse_roles
+
+
+def select_dataset(data):
+    if isinstance(data, pd.DataFrame):
+        return PandasDataset(data)
+    if isinstance(data, str):
+        check_data = check_file_extension(data)
+        if check_data is not None:
+            return PandasDataset(check_data)
+    return None
+
+
+def check_file_extension(file_path):
+    read_functions = {"csv": pd.read_csv, "xlsx": pd.read_excel, "json": pd.read_json}
+    extension = file_path.split(".")[-1].lower()
+    if extension in read_functions:
+        read_function = read_functions[extension]
+        return read_function(file_path)
+    return None
 
 
 class Dataset(DatasetBase):
-
-    def set_data(self, data: DataFrame, roles):
-        self.roles = roles or {}
+    def set_data(self, data: Union[DataFrame, str] = None, roles=None):
+        self.roles = parse_roles(roles)
         self.data = select_dataset(data)
 
     def __init__(
         self,
-        data: Optional[DataFrame] = None,
+        data: Union[DataFrame, str, None] = None,
         roles: Optional[Dict[ABCRole, Union[list[str], str]]] = None,
     ):
-        if data is not None:
-            self.set_data(data, roles)
+        self.set_data(data, roles)
 
     def __repr__(self):
         return self.data.__repr__()
@@ -40,9 +60,41 @@ class Dataset(DatasetBase):
         result_type=None,
         args=(),
         by_row="compat",
-        **kwargs
+        **kwargs,
     ):
         return self.data.apply(func, axis, raw, result_type, args, by_row, **kwargs)
 
     def map(self, func, na_action=None, **kwargs):
         return self.data.map(func, na_action, **kwargs)
+
+
+class ExperimentData(Dataset):
+    def __init__(self, data):
+        self.additional_fields = DataFrame()
+        self.stats_fields = DataFrame()
+        self.analysis_tables = {}  # I think, we will know about analysis and stats,
+        # that user want to make, but I don't understand their format
+        self.create_fields(data)
+
+    def create_fields(self, data: pd.DataFrame):
+        self.stats_fields.index = list(data.columns)
+        self.additional_fields.index = data.index
+        # can add keys for analysis_tables and columns for stats_fields
+
+    def add_to_analysis_tables(self, key: str, data: pd.DataFrame):
+        self.analysis_tables[key] = data
+
+    def add_to_stats_fields(self, data: pd.DataFrame):
+        self.stats_fields = self.stats_fields.join(data, on=self.stats_fields.index)
+
+    def add_to_additional_fields(self, data: pd.DataFrame):
+        self.additional_fields = self.additional_fields.join(
+            data, on=self.additional_fields.index
+        )
+
+    def __repr__(self):
+        return self.additional_fields.__repr__()
+
+
+# как получать данные из stats_fields в формате [feature, stat]?
+# пока идея только через loc. либо я могу хранить транспонированную матрицу, колонки - фичи, индексы - статистики
