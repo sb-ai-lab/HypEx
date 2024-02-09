@@ -1,11 +1,19 @@
 """Base Matcher class."""
+
 import logging
 import pickle
+from typing import Union, Iterable
 
 import numpy as np
 import pandas as pd
-from typing import Union, Iterable
-from tqdm.auto import tqdm
+
+try:
+    from tqdm.auto import tqdm
+except:
+    try:
+        from tqdm import tqdm
+    except:
+        raise Exception("Can't import tqdm")
 
 from .algorithms.faiss_matcher import FaissMatcher
 from .algorithms.no_replacement_matching import MatcherNoReplacement
@@ -13,8 +21,11 @@ from .selectors.feature_selector import FeatureSelector
 from .selectors.spearman_filter import SpearmanFilter
 from .selectors.outliers_filter import OutliersFilter
 from .selectors.base_filtration import const_filtration, nan_filtration
-from hypex.selectors.selector_primal_methods import pd_lgbm_feature_selector,\
-    pd_catboost_feature_selector, pd_ridgecv_feature_selector
+from hypex.selectors.selector_primal_methods import (
+    pd_lgbm_feature_selector,
+    pd_catboost_feature_selector,
+    pd_ridgecv_feature_selector,
+)
 from .utils.validators import random_feature
 from .utils.validators import random_treatment
 from .utils.validators import subset_refuter
@@ -177,7 +188,9 @@ class Matcher:
         use_algos = DEFAULT_FEATURE_SELECT_ALGO if use_algos is None else use_algos
         self.feature_selection_method = FEATURE_SELECT_ALGO.get(use_algos, None)
         if self.feature_selection_method is None:
-            raise Exception(f"Unknown input algorithm used on feature_selector: {use_algos}")
+            raise Exception(
+                f"Unknown input algorithm used on feature_selector: {use_algos}"
+            )
         self.input_data = input_data
         if outcome is None:
             outcome = list()
@@ -235,12 +248,20 @@ class Matcher:
         group_col = [self.group_col] if self.group_col is not None else []
         columns_to_drop = info_col + group_col + self.outcomes + [self.treatment]
         if self.base_filtration:
-            filtered_features = nan_filtration(self.input_data.drop(columns=columns_to_drop))
-            self.dropped_features = [f for f in self.input_data.columns if f not in filtered_features + columns_to_drop]
+            filtered_features = nan_filtration(
+                self.input_data.drop(columns=columns_to_drop)
+            )
+            self.dropped_features = [
+                f
+                for f in self.input_data.columns
+                if f not in filtered_features + columns_to_drop
+            ]
             self.input_data = self.input_data[filtered_features + columns_to_drop]
         nan_counts = self.input_data.isna().sum().sum()
         if nan_counts != 0:
-            self._log(f"Number of NaN values filled with zeros: {nan_counts}", silent=False)
+            self._log(
+                f"Number of NaN values filled with zeros: {nan_counts}", silent=False
+            )
             self.input_data = self.input_data.fillna(0)
 
         if self.group_col is not None:
@@ -256,11 +277,17 @@ class Matcher:
             self.input_data = pd.concat([self.input_data, info_col], axis=1)
 
         if self.base_filtration:
-            filtered_features = const_filtration(self.input_data.drop(columns=columns_to_drop))
+            filtered_features = const_filtration(
+                self.input_data.drop(columns=columns_to_drop)
+            )
             self.dropped_features = np.concatenate(
                 (
                     self.dropped_features,
-                    [f for f in self.input_data.columns if f not in filtered_features + columns_to_drop],
+                    [
+                        f
+                        for f in self.input_data.columns
+                        if f not in filtered_features + columns_to_drop
+                    ],
                 )
             )
             self.input_data = self.input_data[filtered_features + columns_to_drop]
@@ -285,8 +312,12 @@ class Matcher:
         This method uses the Spearman filter to eliminate features from the dataset
         that are highly correlated with the outcome columns, based on a pre-set threshold
         """
-        self._log("Applying filter by spearman test - drop columns correlated with outcome")
-        self._apply_filter(SpearmanFilter, self.outcomes[0], self.treatment, self.same_target_threshold)
+        self._log(
+            "Applying filter by spearman test - drop columns correlated with outcome"
+        )
+        self._apply_filter(
+            SpearmanFilter, self.outcomes[0], self.treatment, self.same_target_threshold
+        )
 
     def outliers_filter(self):
         """Removes outlier values from the dataset.
@@ -304,10 +335,16 @@ class Matcher:
         )
 
         self._apply_filter(
-            OutliersFilter, self.interquartile_coeff, self.mode_percentile, self.min_percentile, self.max_percentile
+            OutliersFilter,
+            self.interquartile_coeff,
+            self.mode_percentile,
+            self.min_percentile,
+            self.max_percentile,
         )
 
-    def match_no_rep(self, threshold: float = 0.1, approximate_match: bool = False) -> pd.DataFrame:
+    def match_no_rep(
+        self, threshold: float = 0.1, approximate_match: bool = False
+    ) -> pd.DataFrame:
         """Matching groups with no replacement.
 
         It's done by optimizing the linear sum of
@@ -325,25 +362,47 @@ class Matcher:
         if self.info_col is not None:
             X = X.drop(columns=self.info_col)
 
-        index_matched = MatcherNoReplacement(X, a, self.weights, approximate_match).match()
-        filtred_matches = index_matched.loc[1].iloc[self.input_data[a == 1].index].matches[index_matched.loc[1].iloc[self.input_data[a == 1].index].matches.apply(lambda x: x != [])]
+        index_matched = MatcherNoReplacement(
+            X, a, self.weights, approximate_match
+        ).match()
+        filtred_matches = (
+            index_matched.loc[1]
+            .iloc[self.input_data[a == 1].index]
+            .matches[
+                index_matched.loc[1]
+                .iloc[self.input_data[a == 1].index]
+                .matches.apply(lambda x: x != [])
+            ]
+        )
 
         if self.weights is not None:
             weighted_features = [f for f in self.weights.keys()]
             index_dict = dict()
             for w in weighted_features:
-                source = self.input_data.loc[np.concatenate(filtred_matches.values)][w].values
+                source = self.input_data.loc[np.concatenate(filtred_matches.values)][
+                    w
+                ].values
                 target = self.input_data.loc[filtred_matches.index.to_list()][w].values
                 index = abs(source - target) <= abs(source) * threshold
                 index_dict.update({w: index})
             index_filtered = sum(index_dict.values()) == len(self.weights)
             matched_data = pd.concat(
-                [self.input_data.loc[filtred_matches.index.to_list()].iloc[index_filtered],
-                 self.input_data.loc[np.concatenate(filtred_matches.values)].iloc[index_filtered]]
+                [
+                    self.input_data.loc[filtred_matches.index.to_list()].iloc[
+                        index_filtered
+                    ],
+                    self.input_data.loc[np.concatenate(filtred_matches.values)].iloc[
+                        index_filtered
+                    ],
+                ]
             )
         else:
-            matched_data = pd.concat([self.input_data.loc[filtred_matches.index.to_list()],
-                                      self.input_data.loc[np.concatenate(filtred_matches.values)]])
+            matched_data = pd.concat(
+                [
+                    self.input_data.loc[filtred_matches.index.to_list()],
+                    self.input_data.loc[np.concatenate(filtred_matches.values)],
+                ]
+            )
         return matched_data
 
     def feature_select(self) -> pd.DataFrame:
@@ -362,13 +421,17 @@ class Matcher:
             treatment=self.treatment,
             feature_selection_method=self.feature_selection_method,
         )
-        df = self.input_data if self.group_col is None else self.input_data.drop(columns=self.group_col)
+        df = (
+            self.input_data
+            if self.group_col is None
+            else self.input_data.drop(columns=self.group_col)
+        )
 
         if self.info_col is not None:
             df = df.drop(columns=self.info_col)
 
         self.detailed_features_df = feat_select.perform_selection(df=df)
-        self.short_features_df = self.detailed_features_df.loc[:, ['rank']]
+        self.short_features_df = self.detailed_features_df.loc[:, ["rank"]]
 
         return self.short_features_df
 
@@ -437,7 +500,11 @@ class Matcher:
         return self.results, self.quality_result, df_matched
 
     def validate_result(
-        self, refuter: str = "random_feature", effect_type: str = "ate", n_sim: int = 10, fraction: float = 0.8
+        self,
+        refuter: str = "random_feature",
+        effect_type: str = "ate",
+        n_sim: int = 10,
+        fraction: float = 0.8,
     ) -> dict:
         """Validates estimated ATE (Average Treatment Effect).
 
@@ -477,7 +544,9 @@ class Matcher:
         for i in tqdm(range(n_sim)):
             if refuter in ["random_treatment", "random_feature"]:
                 if refuter == "random_treatment":
-                    self.input_data, orig_treatment, self.validate = random_treatment(self.input_data, self.treatment)
+                    self.input_data, orig_treatment, self.validate = random_treatment(
+                        self.input_data, self.treatment
+                    )
                 elif refuter == "random_feature":
                     self.input_data, self.validate = random_feature(self.input_data)
                     if self.features_importance is not None and i == 0:
@@ -495,7 +564,9 @@ class Matcher:
                     pbar=False,
                 )
             elif refuter == "subset_refuter":
-                df, self.validate = subset_refuter(self.input_data, self.treatment, fraction)
+                df, self.validate = subset_refuter(
+                    self.input_data, self.treatment, fraction
+                )
                 self.matcher = FaissMatcher(
                     df,
                     self.outcomes,
@@ -525,7 +596,9 @@ class Matcher:
             self.pval_dict.update({outcome: [np.mean(self.val_dict[outcome])]})
             self.pval_dict[outcome].append(
                 test_significance(
-                    self.results.query("outcome==@outcome").loc[effect_type.upper()]["effect_size"],
+                    self.results.query("outcome==@outcome").loc[effect_type.upper()][
+                        "effect_size"
+                    ],
                     self.val_dict[outcome],
                 )
             )
