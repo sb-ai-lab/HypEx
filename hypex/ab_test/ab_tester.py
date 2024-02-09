@@ -1,12 +1,18 @@
 import warnings
 from copy import copy
-
-from IPython.display import display
 from pathlib import Path
-from sklearn.utils import shuffle
 from typing import Iterable, Union, Optional, Dict, Any, Tuple
 
-from tqdm.auto import tqdm
+from IPython.display import display
+from sklearn.utils import shuffle
+
+try:
+    from tqdm.auto import tqdm
+except Exception as e:
+    try:
+        from tqdm import tqdm
+    except:
+        raise Exception("Can not import tqdm")
 
 import pandas as pd
 import numpy as np
@@ -14,7 +20,8 @@ from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu
 
 
 def merge_groups(
-    test_group: Union[Iterable[pd.DataFrame], pd.DataFrame], control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
+    test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
+    control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
 ) -> pd.DataFrame:
     """Merges test and control groups in one DataFrame and creates column "group".
 
@@ -44,7 +51,9 @@ class AATest:
         quant_field: str = None,
         mode: str = "simple",
     ):
-        self.target_fields = [target_fields] if isinstance(target_fields, str) else target_fields
+        self.target_fields = (
+            [target_fields] if isinstance(target_fields, str) else target_fields
+        )
         self.info_cols = [info_cols] if isinstance(info_cols, str) else info_cols
         self.group_cols = [group_cols] if isinstance(group_cols, str) else group_cols
         self.quant_field = quant_field
@@ -68,15 +77,23 @@ class AATest:
             dont_binarize_cols.append(self.quant_field)
 
         # if self.group_cols is not None:
-        prep_data = pd.get_dummies(prep_data.drop(columns=dont_binarize_cols), dummy_na=True)
-        prep_data = prep_data.merge(data[dont_binarize_cols], left_index=True, right_index=True)
+        prep_data = pd.get_dummies(
+            prep_data.drop(columns=dont_binarize_cols), dummy_na=True
+        )
+        prep_data = prep_data.merge(
+            data[dont_binarize_cols], left_index=True, right_index=True
+        )
 
         # fix if dummy_na is const=0
         dummies_cols = set(prep_data.columns) - set(init_cols)
-        const_columns = [col for col in dummies_cols if prep_data[col].nunique() <= 1]  # choose constant_columns
+        const_columns = [
+            col for col in dummies_cols if prep_data[col].nunique() <= 1
+        ]  # choose constant_columns
 
         # drop constant dummy columns and info columns
-        cols_to_drop = const_columns + (self.info_cols if self.info_cols is not None else [])
+        cols_to_drop = const_columns + (
+            self.info_cols if self.info_cols is not None else []
+        )
         clean_data = prep_data.drop(columns=cols_to_drop)
 
         return clean_data
@@ -97,10 +114,16 @@ class AATest:
         result = {"test_indexes": [], "control_indexes": []}
 
         if self.quant_field:
-            random_ids = shuffle(data[self.quant_field].unique(), random_state=random_state)
+            random_ids = shuffle(
+                data[self.quant_field].unique(), random_state=random_state
+            )
             edge = len(random_ids) // 2
-            result["test_indexes"] = list(data[data[self.quant_field].isin(random_ids[:edge])].index)
-            result["control_indexes"] = list(data[data[self.quant_field].isin(random_ids[edge:])].index)
+            result["test_indexes"] = list(
+                data[data[self.quant_field].isin(random_ids[:edge])].index
+            )
+            result["control_indexes"] = list(
+                data[data[self.quant_field].isin(random_ids[edge:])].index
+            )
 
         else:
             addition_indexes = list(shuffle(data.index, random_state=random_state))
@@ -110,7 +133,12 @@ class AATest:
 
         return result
 
-    def split(self, data: pd.DataFrame, preprocessing_data: bool = True, random_state: int = None) -> Dict:
+    def split(
+        self,
+        data: pd.DataFrame,
+        preprocessing_data: bool = True,
+        random_state: int = None,
+    ) -> Dict:
         """Divides sample on two groups.
 
         Args:
@@ -141,10 +169,16 @@ class AATest:
 
                 elif self.mode == "balanced":
                     if self.quant_field:
-                        random_ids = shuffle(gd[self.quant_field].unique(), random_state=random_state)
-                        addition_indexes = list(gd[gd[self.quant_field].isin(random_ids)].index)
+                        random_ids = shuffle(
+                            gd[self.quant_field].unique(), random_state=random_state
+                        )
+                        addition_indexes = list(
+                            gd[gd[self.quant_field].isin(random_ids)].index
+                        )
                     else:
-                        addition_indexes = list(shuffle(gd.index, random_state=random_state))
+                        addition_indexes = list(
+                            shuffle(gd.index, random_state=random_state)
+                        )
 
                     if len(result["control_indexes"]) > len(result["test_indexes"]):
                         result["test_indexes"] += addition_indexes
@@ -154,7 +188,8 @@ class AATest:
         else:
             if self.mode != "simple":
                 warnings.warn(
-                    f"The mode '{self.mode}' is not supported for regular division. " f"Implemented mode 'simple'."
+                    f"The mode '{self.mode}' is not supported for regular division. "
+                    f"Implemented mode 'simple'."
                 )
 
             t_result = self.__simple_mode(data, random_state)
@@ -212,7 +247,11 @@ class AATest:
             return result
 
     def sampling_metrics(
-        self, data: pd.DataFrame, alpha: float = 0.05, random_state: int = None, preprocessed_data: pd.DataFrame = None
+        self,
+        data: pd.DataFrame,
+        alpha: float = 0.05,
+        random_state: int = None,
+        preprocessed_data: pd.DataFrame = None,
     ):
         """Calculates metrics of one sampling.
 
@@ -252,11 +291,16 @@ class AATest:
             t_result[f"{tf} ab delta %"] = self.calc_ab_delta(
                 t_result[f"{tf} a mean"], t_result[f"{tf} b mean"], "percentile"
             )
-            t_result[f"{tf} t_test p_value"] = ttest_ind(ta, tb, nan_policy="omit").pvalue
+            t_result[f"{tf} t_test p_value"] = ttest_ind(
+                ta, tb, nan_policy="omit"
+            ).pvalue
             t_result[f"{tf} ks_test p_value"] = ks_2samp(ta, tb).pvalue
             t_result[f"{tf} t_test passed"] = t_result[f"{tf} t_test p_value"] > alpha
             t_result[f"{tf} ks_test passed"] = t_result[f"{tf} ks_test p_value"] > alpha
-            scores.append((t_result[f"{tf} t_test p_value"] + t_result[f"{tf} ks_test p_value"]) / 2)
+            scores.append(
+                (t_result[f"{tf} t_test p_value"] + t_result[f"{tf} ks_test p_value"])
+                / 2
+            )
 
         t_result["mean_tests_score"] = np.mean(scores)
         result = {"metrics": t_result, "data_from_experiment": data_from_sampling_dict}
@@ -305,17 +349,26 @@ class AATest:
         preprocessed_data = self._preprocessing_data(data)
 
         if write_mode not in ("full", "all", "any"):
-            warnings.warn(f"Write mode '{write_mode}' is not supported. Mode 'full' will be used")
+            warnings.warn(
+                f"Write mode '{write_mode}' is not supported. Mode 'full' will be used"
+            )
             write_mode = "full"
 
-        for i, rs in tqdm(enumerate(random_states), total=len(random_states), disable=not pbar):
-            res = self.sampling_metrics(data, alpha=alpha, random_state=rs, preprocessed_data=preprocessed_data)
+        for i, rs in tqdm(
+            enumerate(random_states), total=len(random_states), disable=not pbar
+        ):
+            res = self.sampling_metrics(
+                data, alpha=alpha, random_state=rs, preprocessed_data=preprocessed_data
+            )
             data_from_sampling.update(res["data_from_experiment"])
 
             # write to file
             passed = []
             for tf in self.target_fields:
-                passed += [res["metrics"][f"{tf} t_test passed"], res["metrics"][f"{tf} ks_test passed"]]
+                passed += [
+                    res["metrics"][f"{tf} t_test passed"],
+                    res["metrics"][f"{tf} ks_test passed"],
+                ]
 
             if write_mode == "all" and all(passed):
                 results.append(res["metrics"])
@@ -328,7 +381,9 @@ class AATest:
                 if i == write_step:
                     pd.DataFrame(results).to_csv(file_name, index=False)
                 elif i % write_step == 0:
-                    pd.DataFrame(results).to_csv(file_name, index=False, header=False, mode="a")
+                    pd.DataFrame(results).to_csv(
+                        file_name, index=False, header=False, mode="a"
+                    )
                     results = []
 
         if file_name and write_step:
@@ -343,7 +398,9 @@ class AATest:
 
 class ABTest:
     def __init__(
-        self, calc_difference_method: str = "all", calc_p_value_method: str = "all",
+        self,
+        calc_difference_method: str = "all",
+        calc_p_value_method: str = "all",
     ):
         """Initializes the ABTest class.
 
@@ -386,7 +443,10 @@ class ABTest:
 
     @staticmethod
     def cuped(
-        test_data: pd.DataFrame, control_data: pd.DataFrame, target_field: str, target_field_before: str
+        test_data: pd.DataFrame,
+        control_data: pd.DataFrame,
+        target_field: str,
+        target_field_before: str,
     ) -> float:
         """Counts CUPED (Controlled-Experiment using Pre-Experiment Data) in absolute values.
 
@@ -424,9 +484,9 @@ class ABTest:
         test = test_data[target_field]
         test_before = test_data[target_field_before]
 
-        theta = (np.cov(control, control_before)[0, 1] + np.cov(test, test_before)[0, 1]) / (
-            np.var(control_before) + np.var(test_before)
-        )
+        theta = (
+            np.cov(control, control_before)[0, 1] + np.cov(test, test_before)[0, 1]
+        ) / (np.var(control_before) + np.var(test_before))
 
         control_cuped = control - theta * control_before
         test_cuped = test - theta * test_before
@@ -440,7 +500,10 @@ class ABTest:
 
     @staticmethod
     def diff_in_diff(
-        test_data: pd.DataFrame, control_data: pd.DataFrame, target_field: str, target_field_before: str
+        test_data: pd.DataFrame,
+        control_data: pd.DataFrame,
+        target_field: str,
+        target_field_before: str,
     ) -> float:
         """Counts Difference in Difference.
 
@@ -466,7 +529,10 @@ class ABTest:
         return did
 
     def calc_difference(
-        self, splitted_data: Dict[str, pd.DataFrame], target_field: str, target_field_before: str = None
+        self,
+        splitted_data: Dict[str, pd.DataFrame],
+        target_field: str,
+        target_field_before: str = None,
     ) -> Dict[str, float]:
         """Calculates the difference between the target field values of the 'test' and 'control' dataframes.
 
@@ -493,7 +559,8 @@ class ABTest:
 
         if self.calc_difference_method in {"all", "ate"}:
             result["ate"] = (
-                splitted_data["test"][target_field].values - splitted_data["control"][target_field].values
+                splitted_data["test"][target_field].values
+                - splitted_data["control"][target_field].values
             ).mean()
 
         if self.calc_difference_method in {"all", "cuped"}:
@@ -514,7 +581,9 @@ class ABTest:
 
         return result
 
-    def calc_p_value(self, splitted_data: Dict[str, pd.DataFrame], target_field: str) -> Dict[str, float]:
+    def calc_p_value(
+        self, splitted_data: Dict[str, pd.DataFrame], target_field: str
+    ) -> Dict[str, float]:
         """Calculates the p-value for a given data set.
 
         Args:
@@ -531,18 +600,24 @@ class ABTest:
         result = {}
         if self.calc_p_value_method in {"all", "t_test"}:
             result["t_test"] = ttest_ind(
-                splitted_data["test"][target_field], splitted_data["control"][target_field],
+                splitted_data["test"][target_field],
+                splitted_data["control"][target_field],
             ).pvalue
 
         if self.calc_p_value_method in {"all", "mann_whitney"}:
             result["mann_whitney"] = mannwhitneyu(
-                splitted_data["test"][target_field], splitted_data["control"][target_field],
+                splitted_data["test"][target_field],
+                splitted_data["control"][target_field],
             ).pvalue
 
         return result
 
     def execute(
-        self, data: pd.DataFrame, target_field: str, group_field: str, target_field_before: str = None
+        self,
+        data: pd.DataFrame,
+        target_field: str,
+        group_field: str,
+        target_field_before: str = None,
     ) -> Dict[str, Dict[str, float]]:
         """Splits the input data based on the group field and calculates the size, difference, and p-value.
 
@@ -562,8 +637,13 @@ class ABTest:
         splitted_data = self.split_ab(data, group_field)
 
         results = {
-            "size": {"test": len(splitted_data["test"]), "control": len(splitted_data["control"])},
-            "difference": self.calc_difference(splitted_data, target_field, target_field_before),
+            "size": {
+                "test": len(splitted_data["test"]),
+                "control": len(splitted_data["control"]),
+            },
+            "difference": self.calc_difference(
+                splitted_data, target_field, target_field_before
+            ),
             "p_value": self.calc_p_value(splitted_data, target_field),
         }
 
