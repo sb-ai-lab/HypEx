@@ -4,10 +4,7 @@ import datetime as dt
 import functools
 import logging
 import time
-from typing import Any
-from typing import Dict
-from typing import Tuple
-from typing import Union
+from typing import Any, Dict, Tuple, Union
 
 import faiss
 import numpy as np
