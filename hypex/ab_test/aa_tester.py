@@ -1,4 +1,5 @@
 """Module for AA tests"""
+
 import warnings
 from itertools import combinations
 from pathlib import Path
@@ -11,7 +12,14 @@ import seaborn as sns
 from scipy.stats import ttest_ind, ks_2samp, norm
 from sklearn.utils import shuffle
 from statsmodels.stats.power import TTestIndPower
-from tqdm.auto import tqdm
+
+try:
+    from tqdm.auto import tqdm
+except:
+    try:
+        from tqdm import tqdm
+    except:
+        raise Exception("Can't import tqdm")
 
 
 class AATest:
@@ -989,7 +997,7 @@ class AATest:
             self.cat_feature_uniform_analysis(
                 ssp["control"][cf], ssp["test"][cf], **kwargs
             )
- 
+
     def get_resume(self, aa_score: pd.DataFrame, best_experiment_stat: pd.DataFrame):
         """Format results into clear format for understanding.
 
