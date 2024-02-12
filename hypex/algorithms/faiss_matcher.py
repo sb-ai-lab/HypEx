@@ -3,11 +3,8 @@
 import datetime as dt
 import functools
 import logging
-import time
-from typing import Any
-from typing import Dict
-from typing import Tuple
-from typing import Union
+from time import perf_counter
+from typing import Any, Union, Dict, Tuple
 
 import faiss
 import numpy as np
@@ -47,9 +44,9 @@ def timer(func):
 
     @functools.wraps(func)
     def _wrapper(*args, **kwargs):
-        start = time.perf_counter()
+        start = perf_counter()
         result = func(*args, **kwargs)
-        runtime = time.perf_counter() - start
+        runtime = perf_counter() - start
         print(f"{func.__name__} took {runtime:.4f} secs")
         return result
 
@@ -80,7 +77,7 @@ class FaissMatcher:
         treatment: str,
         info_col: list,
         features: [list, pd.DataFrame] = None,
-        group_col: str = None,
+        group_col: Union[str, list] = None,
         weights: dict = None,
         sigma: float = 1.96,
         validation: bool = None,

@@ -2,7 +2,7 @@
 
 import logging
 import pickle
-from typing import Union, Iterable
+from typing import Union, Iterable, List
 
 import numpy as np
 import pandas as pd
@@ -54,6 +54,7 @@ OUT_INTER_COEFF = 1.5
 OUT_MODE_PERCENT = True
 OUT_MIN_PERCENT = 0.02
 OUT_MAX_PERCENT = 0.98
+RARE_CAT_SCENARIO_LIST = ["raise", "drop", "genetic"]
 
 logger = logging.getLogger("hypex")
 console_out = logging.StreamHandler()
@@ -232,7 +233,13 @@ class Matcher:
             Data with categorical variables converted to dummy variables.
         """
         info_col = self.info_col if self.info_col is not None else []
-        group_col = [self.group_col] if self.group_col is not None else []
+
+        if self.group_col is not None and isinstance(self.group_col, str):
+            group_col = [self.group_col]
+        elif self.group_col is not None and isinstance(self.group_col, list):
+            group_col = self.group_col
+        else:
+            group_col = []
 
         columns_to_drop = info_col + group_col
         if columns_to_drop is not None:
@@ -245,7 +252,15 @@ class Matcher:
     def _preprocessing_data(self):
         """Converts categorical features into dummy variables."""
         info_col = self.info_col if self.info_col is not None else []
-        group_col = [self.group_col] if self.group_col is not None else []
+        if self.group_col is not None and isinstance(self.group_col, str):
+            group_col = [self.group_col]
+        elif self.group_col is not None and isinstance(self.group_col, list):
+            group_col = self.group_col
+        else:
+            group_col = []
+        self.input_data = self.validate_groupcol(
+            self.input_data, group_col, self.treatment
+        )
         columns_to_drop = info_col + group_col + self.outcomes + [self.treatment]
         if self.base_filtration:
             filtered_features = nan_filtration(
@@ -265,7 +280,9 @@ class Matcher:
             self.input_data = self.input_data.fillna(0)
 
         if self.group_col is not None:
-            group_col = self.input_data[[self.group_col]]
+            group_col = self.input_data[
+                [self.group_col] if isinstance(self.group_col, str) else self.group_col
+            ]
         if self.info_col is not None:
             info_col = self.input_data[self.info_col]
 
@@ -293,6 +310,62 @@ class Matcher:
             self.input_data = self.input_data[filtered_features + columns_to_drop]
 
         self._log("Categorical features turned into dummy")
+
+    def validate_groupcol(
+        self,
+        df,
+        group_col,
+        treat_col,
+        frequency_th=1,
+        rare_categories_scenario="raise",
+    ):
+        if rare_categories_scenario not in RARE_CAT_SCENARIO_LIST:
+            raise KeyError(
+                f"""Wrong rare_categories_scenario value: {rare_categories_scenario}
+            It should be one of {RARE_CAT_SCENARIO_LIST}"""
+            )
+
+        rare_categories = self.get_rare_categories(
+            df, group_col, treat_col, frequency_th=frequency_th
+        )
+        if len(rare_categories) > 0:
+            if rare_categories_scenario == "raise":
+                raise ValueError(
+                    f"""Next columns have low frequency: {rare_categories}.
+                Try to change rare_categories_scenario for auto process."""
+                )
+            elif rare_categories_scenario == "drop":
+                df = df.loc[~df[group_col].isin(rare_categories)]
+            elif rare_categories_scenario == "genetic":
+                new_group_col = self.genetic_stratification(df, group_col, treat_col)
+                df[group_col] = new_group_col
+        return df.reset_index(drop=True)
+
+    @staticmethod
+    def get_rare_categories(df, group_col, treat_col, frequency_th=1) -> List[str]:
+        """
+        Returns groups which contain less or equal than frequency_th instances.
+        Default frequency_th=1 means "every group_col element exists in the treatment/control group".
+        """
+        frequencies = df.groupby(by=[*group_col, treat_col]).size()
+
+        rare_categories = (
+            frequencies[frequencies <= frequency_th].reset_index().loc[:, group_col]
+        )
+        rare_categories = (
+            rare_categories.unique().tolist() if rare_categories.size > 0 else []
+        )
+
+        return rare_categories
+
+    @staticmethod
+    def genetic_stratification(
+        df, group_col, treat_col, target_col, frequency_th=1
+    ) -> List[str]:
+        """
+        Generates a new_group_col using a genetic algorithm.
+        """
+        raise NotImplementedError
 
     def _apply_filter(self, filter_class, *filter_args):
         """Applies a filter to the input data.
