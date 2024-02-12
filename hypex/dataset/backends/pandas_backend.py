@@ -12,17 +12,16 @@ class PandasDataset(DatasetBase):
     def _get_column_index(
         self, column_name: Union[Sequence[str], str]
     ) -> Union[int, Sequence[int]]:
-        idx = (
+        return (
             self.data.columns.get_loc(column_name)
             if isinstance(column_name, str)
             else self.data.columns.get_indexer(column_name)
         )[0]
-        return idx
 
     def __getitem__(self, item):
-        if isinstance(item, slice) or isinstance(item, int):
+        if isinstance(item, (slice, int)):
             return self.data.iloc[item]
-        if isinstance(item, str) or isinstance(item, list):
+        if isinstance(item, (str, list)):
             return self.data[item]
         raise KeyError("No such column or row")
 

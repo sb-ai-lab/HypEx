@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, List
 
 import pandas as pd
 from pandas import DataFrame
@@ -16,8 +16,6 @@ def select_dataset(data):
         check_data = check_file_extension(data)
         if check_data is not None:
             return PandasDataset(check_data)
-    return None
-
 
 def check_file_extension(file_path):
     read_functions = {"csv": pd.read_csv, "xlsx": pd.read_excel, "json": pd.read_json}
@@ -25,8 +23,6 @@ def check_file_extension(file_path):
     if extension in read_functions:
         read_function = read_functions[extension]
         return read_function(file_path)
-    return None
-
 
 class Dataset(DatasetBase):
     def set_data(self, data: Union[DataFrame, str] = None, roles=None):
@@ -36,7 +32,7 @@ class Dataset(DatasetBase):
     def __init__(
         self,
         data: Union[DataFrame, str, None] = None,
-        roles: Optional[Dict[ABCRole, Union[list[str], str]]] = None,
+        roles: Optional[Dict[ABCRole, Union[List[str], str]]] = None,
     ):
         self.set_data(data, roles)
 
@@ -51,6 +47,10 @@ class Dataset(DatasetBase):
 
     def __setitem__(self, key, value):
         self.data.__setitem__(key, value)
+
+    # TODO
+    def get_columns_by_roles(self, roles:Iterable[ABCRole]) -> List:
+        pass
 
     def apply(
         self,
@@ -70,30 +70,18 @@ class Dataset(DatasetBase):
 
 class ExperimentData(Dataset):
     def __init__(self, data):
-        self.additional_fields = DataFrame()
-        self.stats_fields = DataFrame()
-        self.analysis_tables = {}  # I think, we will know about analysis and stats,
-        # that user want to make, but I don't understand their format
-        self.create_fields(data)
+        self.additional_fields = DataFrame(index=data.index)
+        self.stats_fields = DataFrame(index=list(data.columns))
+        self.analysis_tables = {}
 
-    def create_fields(self, data: pd.DataFrame):
-        self.stats_fields.index = list(data.columns)
-        self.additional_fields.index = data.index
-        # can add keys for analysis_tables and columns for stats_fields
+    def add_to_additional_fields(self, data: pd.DataFrame):
+        self.additional_fields = self.additional_fields.join(data, how="left")
+
+    def add_to_stats_fields(self, data: pd.DataFrame):
+        self.stats_fields = self.stats_fields.join(data, how="left")
 
     def add_to_analysis_tables(self, key: str, data: pd.DataFrame):
         self.analysis_tables[key] = data
-
-    def add_to_stats_fields(self, data: pd.DataFrame):
-        self.stats_fields = self.stats_fields.join(data, on=self.stats_fields.index)
-
-    def add_to_additional_fields(self, data: pd.DataFrame):
-        self.additional_fields = self.additional_fields.join(
-            data, on=self.additional_fields.index
-        )
-
-    def __repr__(self):
-        return self.additional_fields.__repr__()
 
 
 # как получать данные из stats_fields в формате [feature, stat]?

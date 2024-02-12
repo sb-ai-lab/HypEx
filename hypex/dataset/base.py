@@ -1,5 +1,10 @@
 from abc import ABC, abstractmethod
 
+# TODO: needed functions:
+"""
+index getter
+
+"""
 
 class DatasetBase(ABC):
     @abstractmethod
@@ -24,4 +29,25 @@ class DatasetBase(ABC):
 
     @abstractmethod
     def map(self, *args, **kwargs):
+        pass
+
+    # TODO
+    @abstractmethod
+    def unique():
+        pass
+
+    # TODO
+    @abstractmethod
+    @property
+    def index():
+        pass
+
+    # TODO
+    @abstractmethod
+    def isin(values:Iterable)->Iterable[bool]:
+        pass
+
+    # TODO: тут надо разобраться с сигнатурой
+    @abstractmethod
+    def groupby():
         pass

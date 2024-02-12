@@ -2,13 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Iterable
 from copy import deepcopy
 
-# from ..dataset.base import Dataset
-
-class Dataset:
-    pass
-
-class Analyzer():
-    pass
+from hypex.dataset.dataset import Dataset, ExperimentData
+from hypex.analyzer.analyzer import Analyzer
 
 class Executor(ABC):
     full_name: str
@@ -23,7 +18,7 @@ class Executor(ABC):
         self._id = id(self)
 
     @abstractmethod
-    def execute(self, data: Dataset) -> Dataset:
+    def execute(self, data: ExperimentData) -> ExperimentData:
         pass
 
 class Experiment(Executor):
@@ -34,8 +29,8 @@ class Experiment(Executor):
         self.executors : Iterable[Executor] = executors
         super().__init__(full_name)
 
-    def execute(self, data: Dataset) -> Dataset:
-        experiment_data: Dataset = data
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        experiment_data: ExperimentData = data
         for executor in self.executors:
             experiment_data = executor.execute(experiment_data)
         return experiment_data
@@ -50,10 +45,7 @@ class CycledExperiment(Executor):
         self.analyzer: Analyzer = analyzer
         super().__init__(full_name)
 
-    def execute(self, data: Dataset) -> Dataset:
+    def execute(self, data: ExperimentData) -> ExperimentData:
         for _ in range(self.n_iterations):
             data = self.analyzer.execute(self.inner_experiment.execute(data))
         return data
-
-print(Experiment([])._id)
-print(Experiment([])._id)
