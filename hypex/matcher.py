@@ -258,7 +258,7 @@ class Matcher:
             group_col = self.group_col
         else:
             group_col = []
-        self.input_data = self.validate_groupcol(
+        self.input_data = self.validate_group_col(
             self.input_data, group_col, self.treatment
         )
         columns_to_drop = info_col + group_col + self.outcomes + [self.treatment]
@@ -311,14 +311,35 @@ class Matcher:
 
         self._log("Categorical features turned into dummy")
 
-    def validate_groupcol(
+    def validate_group_col(
         self,
-        df,
-        group_col,
-        treat_col,
-        frequency_th=1,
-        rare_categories_scenario="raise",
-    ):
+        df: pd.DataFrame,
+        group_col: Union[str, List[str]],
+        treat_col: str,
+        target_col: str,
+        frequency_th: int = 1,
+        rare_categories_scenario: str = "raise",
+    ) -> pd.DataFrame:
+        """
+        Checking the number of control and test group instances in a grouped dataset.
+        Args:
+            df:
+                input data
+            group_col:
+                column/columns for grouping from input data
+            treat_col:
+                column with treatment categories
+            target_col:
+                column with target values
+            frequency_th:
+                number of samples in each group
+            rare_categories_scenario:
+                the scenario of actions with a small number of objects
+
+        Returns:
+            Input dataframe dependes on the scenario
+
+        """
         if rare_categories_scenario not in RARE_CAT_SCENARIO_LIST:
             raise KeyError(
                 f"""Wrong rare_categories_scenario value: {rare_categories_scenario}
@@ -337,12 +358,19 @@ class Matcher:
             elif rare_categories_scenario == "drop":
                 df = df.loc[~df[group_col].isin(rare_categories)]
             elif rare_categories_scenario == "genetic":
-                new_group_col = self.genetic_stratification(df, group_col, treat_col)
+                new_group_col = self.genetic_stratification(
+                    df, group_col, treat_col, target_col
+                )
                 df[group_col] = new_group_col
         return df.reset_index(drop=True)
 
     @staticmethod
-    def get_rare_categories(df, group_col, treat_col, frequency_th=1) -> List[str]:
+    def get_rare_categories(
+        df: pd.DataFrame,
+        group_col: Union[str, List[str]],
+        treat_col: str,
+        frequency_th: int = 1,
+    ) -> List[str]:
         """
         Returns groups which contain less or equal than frequency_th instances.
         Default frequency_th=1 means "every group_col element exists in the treatment/control group".
@@ -360,7 +388,11 @@ class Matcher:
 
     @staticmethod
     def genetic_stratification(
-        df, group_col, treat_col, target_col, frequency_th=1
+        df: pd.DataFrame,
+        group_col: Union[str, List[str]],
+        treat_col: str,
+        target_col: str,
+        frequency_th: int = 1,
     ) -> List[str]:
         """
         Generates a new_group_col using a genetic algorithm.
