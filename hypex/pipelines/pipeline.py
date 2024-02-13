@@ -2,11 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Iterable
 
 class Executor(ABC):
-    pass
-
     @abstractmethod
     def execute(self, data):
-        pass
+        raise NotImplementedError
 
 class Pipeline(Executor):
 

@@ -19,7 +19,7 @@ class Executor(ABC):
 
     @abstractmethod
     def execute(self, data: ExperimentData) -> ExperimentData:
-        pass
+        raise NotImplementedError
 
 
 class Experiment(Executor):

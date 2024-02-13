@@ -3,24 +3,29 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from hypex.experiment.base import Executor
+from hypex.dataset.dataset import ExperimentData
 
-class MetricComparator(ABC, Executor):
-    def __init__(self, x1_field: str, x2_field: str, out_field: str):
+class BinaryOperator(ABC, Executor):
+    def get_full_name(self):
+        return f"{self.__class__.__name__}({self.x1_field}, {self.x2_field})"
+
+    def __init__(self, x1_field, x2_field, full_name: str = None):
         self.x1_field = x1_field
         self.x2_field = x2_field
-        self.out_field = out_field
+        super().__init__(full_name)
 
+    @staticmethod
     @abstractmethod
     def calc(x1, x2):
-        pass
+        raise NotImplementedError
 
-    def apply(self, data):
+    def apply(self, data: ExperimentData) -> ExperimentData:
         data[self.out_field] = data.apply(
             lambda row: self.calc(row[self.x1_field], row[self.x2_field]), axis=1
         )
         return data
 
-    def execute(self, data):
+    def execute(self, data: ExperimentData) -> ExperimentData:
         data[self.out_field] = self.calc(data[self.x1_field], data[self.x2_field])
         return data
 

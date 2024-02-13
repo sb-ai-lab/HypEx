@@ -26,7 +26,7 @@ class StatHypothesisTesting(ABC, Executor):
         self.passed = self.p_value < self.reliability
 
     def execute(self, data):
-        pass
+        raise NotImplementedError
 
 
 class StatHypothesisTestingWithScipy(StatHypothesisTesting):

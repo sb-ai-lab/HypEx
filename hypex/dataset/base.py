@@ -1,44 +1,44 @@
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 from typing import Iterable
 
 
 class DatasetBase(ABC):
     @abstractmethod
     def __len__(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def __repr__(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def __getitem__(self, idx):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def __setitem__(self, key, value):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def apply(self, *args, **kwargs):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def map(self, *args, **kwargs):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def unique(self):
-        pass
+        raise NotImplementedError
 
-    @property
+    @abstractproperty
     def index(self):
-        return
+        raise NotImplementedError
 
     @abstractmethod
     def isin(self, values: Iterable) -> Iterable[bool]:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def groupby(self):
-        pass
+        raise NotImplementedError

@@ -68,4 +68,4 @@ class SplitterAAWithStratification(SplitterAA):
 
 class SplitterAAMulti(ExperimentMulti):
     def execute(self, data):
-        pass
+        raise NotImplementedError

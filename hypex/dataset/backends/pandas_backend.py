@@ -48,7 +48,7 @@ class PandasDataset(DatasetBase):
         return self.data.index
 
     def isin(self, values: Iterable) -> Iterable[bool]:
-        pass
+        raise NotImplementedError
 
     def groupby(self):
-        pass
+        raise NotImplementedError

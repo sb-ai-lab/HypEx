@@ -80,10 +80,10 @@ class Dataset(DatasetBase):
         return self.backend.unique()
 
     def isin(self, values: Iterable) -> Iterable[bool]:
-        pass
+        raise NotImplementedError
 
     def groupby(self):
-        pass
+        raise NotImplementedError
 
     @property
     def index(self):
@@ -91,7 +91,7 @@ class Dataset(DatasetBase):
 
 
 class ExperimentData(Dataset):
-    def __init__(self, data):
+    def __init__(self, data: Dataset):
         self.additional_fields = Dataset(DataFrame(index=data.index))
         self.stats_fields = Dataset(DataFrame(index=list(data.columns)))
         self.analysis_tables = {}
