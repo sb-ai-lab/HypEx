@@ -92,15 +92,16 @@ class Dataset(DatasetBase):
 
 class ExperimentData(Dataset):
     def __init__(self, data):
-        self.additional_fields = DataFrame(index=data.index)
-        self.stats_fields = DataFrame(index=list(data.columns))
+        self.additional_fields = Dataset(DataFrame(index=data.index))
+        self.stats_fields = Dataset(DataFrame(index=list(data.columns)))
         self.analysis_tables = {}
 
     def add_to_additional_fields(self, data: pd.DataFrame):
-        self.additional_fields = self.additional_fields.join(data, how="left")
+        self.additional_fields = self.additional_fields.data.join(data, how="left")
 
     def add_to_stats_fields(self, data: pd.DataFrame):
-        self.stats_fields = self.stats_fields.join(data, how="left")
+        self.stats_fields = self.stats_fields.data.join(data, how="left")
 
-    def add_to_analysis_tables(self, key: str, data: pd.DataFrame):
-        self.analysis_tables[key] = data
+    def add_to_analysis_tables(self, key: str, data: pd.DataFrame,
+                               roles: Optional[Dict[ABCRole, Union[List[str], str]]] = None):
+        self.analysis_tables[key] = Dataset(data, roles)
