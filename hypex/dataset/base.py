@@ -1,10 +1,6 @@
 from abc import ABC, abstractmethod
+from typing import Iterable
 
-# TODO: needed functions:
-"""
-index getter
-
-"""
 
 class DatasetBase(ABC):
     @abstractmethod
@@ -31,23 +27,18 @@ class DatasetBase(ABC):
     def map(self, *args, **kwargs):
         pass
 
-    # TODO
     @abstractmethod
-    def unique():
+    def unique(self):
         pass
 
-    # TODO
-    @abstractmethod
     @property
-    def index():
+    def index(self):
+        return
+
+    @abstractmethod
+    def isin(self, values: Iterable) -> Iterable[bool]:
         pass
 
-    # TODO
     @abstractmethod
-    def isin(values:Iterable)->Iterable[bool]:
-        pass
-
-    # TODO: тут надо разобраться с сигнатурой
-    @abstractmethod
-    def groupby():
+    def groupby(self):
         pass
