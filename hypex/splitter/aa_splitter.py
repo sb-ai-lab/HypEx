@@ -8,9 +8,11 @@ from hypex.dataset.roles import GroupingRole, StratificationRole
 class SplitterAA(Executor):
     def __init__(
         self,
+        full_name: str = None,
         test_size: float = 0.5,
         random_state: int = None,
     ):
+        super().__init__(full_name)
         self.test_size = test_size
         self.random_state = random_state
 
