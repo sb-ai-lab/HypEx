@@ -41,7 +41,7 @@ class PandasDataset(DatasetBase):
         return self.data.map(*args, **kwargs)
 
     def unique(self):
-        return list(self.data.unique())
+        return self.data.unique()
 
     @property
     def index(self):
