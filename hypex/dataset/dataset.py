@@ -31,6 +31,7 @@ class Dataset(DatasetBase):
         self.roles = parse_roles(roles)
         self.backend = select_backend(data)
         self.data = self.backend.data
+        self.columns = list(self.roles.keys())
 
     def __init__(
         self,
@@ -96,9 +97,11 @@ class ExperimentData(Dataset):
         self.stats_fields = Dataset(DataFrame(index=list(data.columns)))
         self.analysis_tables = {}
 
+    # TODO переделать: обновление данных + обновление ролей
     def add_to_additional_fields(self, data: pd.DataFrame):
-        self.additional_fields = self.additional_fields.data.join(data, how="left")
+        self.additional_fields.data = self.additional_fields.data.join(data, how="left")
 
+    # TODO переделать: обновление данных + обновление ролей
     def add_to_stats_fields(self, data: pd.DataFrame):
         self.stats_fields = self.stats_fields.data.join(data, how="left")
 
