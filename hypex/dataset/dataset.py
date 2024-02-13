@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union, List
+from typing import Dict, Optional, Union, List, Iterable
 
 import pandas as pd
 from pandas import DataFrame
@@ -17,12 +17,14 @@ def select_dataset(data):
         if check_data is not None:
             return PandasDataset(check_data)
 
+
 def check_file_extension(file_path):
     read_functions = {"csv": pd.read_csv, "xlsx": pd.read_excel, "json": pd.read_json}
     extension = file_path.split(".")[-1].lower()
     if extension in read_functions:
         read_function = read_functions[extension]
         return read_function(file_path)
+
 
 class Dataset(DatasetBase):
     def set_data(self, data: Union[DataFrame, str] = None, roles=None):
@@ -48,9 +50,15 @@ class Dataset(DatasetBase):
     def __setitem__(self, key, value):
         self.data.__setitem__(key, value)
 
-    # TODO
-    def get_columns_by_roles(self, roles:Iterable[ABCRole]) -> List:
-        pass
+    def get_columns_by_roles(
+        self, roles: Union[ABCRole, Iterable[ABCRole]]
+    ) -> List[str]:
+        roles = roles if isinstance(roles, Iterable) else [roles]
+        return [
+            column
+            for column, role in self.roles.items()
+            if any(r.__name__ == role.__class__.__name__ for r in roles)
+        ]
 
     def apply(
         self,
@@ -67,6 +75,19 @@ class Dataset(DatasetBase):
     def map(self, func, na_action=None, **kwargs):
         return self.data.map(func, na_action, **kwargs)
 
+    def unique(self):
+        return list(self.data.unique())
+
+    def isin(self, values: Iterable) -> Iterable[bool]:
+        pass
+
+    def groupby(self):
+        pass
+
+    @property
+    def index(self):
+        return list(self.data.index)
+
 
 class ExperimentData(Dataset):
     def __init__(self, data):
@@ -82,7 +103,3 @@ class ExperimentData(Dataset):
 
     def add_to_analysis_tables(self, key: str, data: pd.DataFrame):
         self.analysis_tables[key] = data
-
-
-# как получать данные из stats_fields в формате [feature, stat]?
-# пока идея только через loc. либо я могу хранить транспонированную матрицу, колонки - фичи, индексы - статистики
