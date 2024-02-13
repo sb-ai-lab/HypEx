@@ -9,7 +9,7 @@ from hypex.dataset.roles import ABCRole
 from hypex.dataset.utils import parse_roles
 
 
-def select_dataset(data):
+def select_backend(data):
     if isinstance(data, pd.DataFrame):
         return PandasDataset(data)
     if isinstance(data, str):
@@ -29,7 +29,8 @@ def check_file_extension(file_path):
 class Dataset(DatasetBase):
     def set_data(self, data: Union[DataFrame, str] = None, roles=None):
         self.roles = parse_roles(roles)
-        self.data = select_dataset(data)
+        self.backend = select_backend(data)
+        self.data = self.backend.data
 
     def __init__(
         self,
@@ -39,16 +40,16 @@ class Dataset(DatasetBase):
         self.set_data(data, roles)
 
     def __repr__(self):
-        return self.data.__repr__()
+        return self.backend.__repr__()
 
     def __len__(self):
-        return self.data.__len__()
+        return self.backend.__len__()
 
     def __getitem__(self, item):
-        return self.data.__getitem__(item)
+        return self.backend.__getitem__(item)
 
     def __setitem__(self, key, value):
-        self.data.__setitem__(key, value)
+        self.backend.__setitem__(key, value)
 
     def get_columns_by_roles(
         self, roles: Union[ABCRole, Iterable[ABCRole]]
@@ -57,7 +58,7 @@ class Dataset(DatasetBase):
         return [
             column
             for column, role in self.roles.items()
-            if any(r.__name__ == role.__class__.__name__ for r in roles)
+            if any(isinstance(role, r) for r in roles)
         ]
 
     def apply(
@@ -70,13 +71,13 @@ class Dataset(DatasetBase):
         by_row="compat",
         **kwargs,
     ):
-        return self.data.apply(func, axis, raw, result_type, args, by_row, **kwargs)
+        return self.backend.apply(func, axis, raw, result_type, args, by_row, **kwargs)
 
     def map(self, func, na_action=None, **kwargs):
-        return self.data.map(func, na_action, **kwargs)
+        return self.backend.map(func, na_action, **kwargs)
 
     def unique(self):
-        return list(self.data.unique())
+        return self.backend.unique()
 
     def isin(self, values: Iterable) -> Iterable[bool]:
         pass
@@ -86,7 +87,7 @@ class Dataset(DatasetBase):
 
     @property
     def index(self):
-        return list(self.data.index)
+        return self.backend.index
 
 
 class ExperimentData(Dataset):
