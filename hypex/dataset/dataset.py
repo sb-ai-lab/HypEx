@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union, List
+from typing import Dict, Optional, Union, List, Iterable
 
 import pandas as pd
 from pandas import DataFrame
@@ -9,13 +9,14 @@ from hypex.dataset.roles import ABCRole
 from hypex.dataset.utils import parse_roles
 
 
-def select_dataset(data):
+def select_backend(data):
     if isinstance(data, pd.DataFrame):
         return PandasDataset(data)
     if isinstance(data, str):
         check_data = check_file_extension(data)
         if check_data is not None:
             return PandasDataset(check_data)
+
 
 def check_file_extension(file_path):
     read_functions = {"csv": pd.read_csv, "xlsx": pd.read_excel, "json": pd.read_json}
@@ -24,10 +25,12 @@ def check_file_extension(file_path):
         read_function = read_functions[extension]
         return read_function(file_path)
 
+
 class Dataset(DatasetBase):
     def set_data(self, data: Union[DataFrame, str] = None, roles=None):
         self.roles = parse_roles(roles)
-        self.data = select_dataset(data)
+        self.backend = select_backend(data)
+        self.data = self.backend.data
 
     def __init__(
         self,
@@ -37,20 +40,26 @@ class Dataset(DatasetBase):
         self.set_data(data, roles)
 
     def __repr__(self):
-        return self.data.__repr__()
+        return self.backend.__repr__()
 
     def __len__(self):
-        return self.data.__len__()
+        return self.backend.__len__()
 
     def __getitem__(self, item):
-        return self.data.__getitem__(item)
+        return self.backend.__getitem__(item)
 
     def __setitem__(self, key, value):
-        self.data.__setitem__(key, value)
+        self.backend.__setitem__(key, value)
 
-    # TODO
-    def get_columns_by_roles(self, roles:Iterable[ABCRole]) -> List:
-        pass
+    def get_columns_by_roles(
+        self, roles: Union[ABCRole, Iterable[ABCRole]]
+    ) -> List[str]:
+        roles = roles if isinstance(roles, Iterable) else [roles]
+        return [
+            column
+            for column, role in self.roles.items()
+            if any(isinstance(role, r) for r in roles)
+        ]
 
     def apply(
         self,
@@ -62,27 +71,41 @@ class Dataset(DatasetBase):
         by_row="compat",
         **kwargs,
     ):
-        return self.data.apply(func, axis, raw, result_type, args, by_row, **kwargs)
+        return self.backend.apply(func, axis, raw, result_type, args, by_row, **kwargs)
 
     def map(self, func, na_action=None, **kwargs):
-        return self.data.map(func, na_action, **kwargs)
+        return self.backend.map(func, na_action, **kwargs)
+
+    def unique(self):
+        return self.backend.unique()
+
+    def isin(self, values: Iterable) -> Iterable[bool]:
+        pass
+
+    def groupby(self):
+        pass
+
+    @property
+    def index(self):
+        return self.backend.index
 
 
 class ExperimentData(Dataset):
     def __init__(self, data):
-        self.additional_fields = DataFrame(index=data.index)
-        self.stats_fields = DataFrame(index=list(data.columns))
+        self.additional_fields = Dataset(DataFrame(index=data.index))
+        self.stats_fields = Dataset(DataFrame(index=list(data.columns)))
         self.analysis_tables = {}
 
     def add_to_additional_fields(self, data: pd.DataFrame):
-        self.additional_fields = self.additional_fields.join(data, how="left")
+        self.additional_fields = self.additional_fields.data.join(data, how="left")
 
     def add_to_stats_fields(self, data: pd.DataFrame):
-        self.stats_fields = self.stats_fields.join(data, how="left")
+        self.stats_fields = self.stats_fields.data.join(data, how="left")
 
-    def add_to_analysis_tables(self, key: str, data: pd.DataFrame):
-        self.analysis_tables[key] = data
-
-
-# как получать данные из stats_fields в формате [feature, stat]?
-# пока идея только через loc. либо я могу хранить транспонированную матрицу, колонки - фичи, индексы - статистики
+    def add_to_analysis_tables(
+        self,
+        key: str,
+        data: pd.DataFrame,
+        roles: Optional[Dict[ABCRole, Union[List[str], str]]] = None,
+    ):
+        self.analysis_tables[key] = Dataset(data, roles)

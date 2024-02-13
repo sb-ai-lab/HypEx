@@ -39,3 +39,16 @@ class PandasDataset(DatasetBase):
 
     def map(self, *args, **kwargs):
         return self.data.map(*args, **kwargs)
+
+    def unique(self):
+        return self.data.unique()
+
+    @property
+    def index(self):
+        return self.data.index
+
+    def isin(self, values: Iterable) -> Iterable[bool]:
+        pass
+
+    def groupby(self):
+        pass
