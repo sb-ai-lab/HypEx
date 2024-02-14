@@ -89,7 +89,7 @@ class Dataset(DatasetBase):
         )
 
     def map(self, func, na_action=None, **kwargs):
-        return self.backend.map(func, na_action, **kwargs)
+        return self.backend.map(func=func, na_action=na_action)
 
     def unique(self):
         return self.backend.unique()
