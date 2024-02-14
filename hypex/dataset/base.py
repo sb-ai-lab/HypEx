@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from typing import Iterable
 
 
@@ -20,6 +20,10 @@ class DatasetBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def create_empty(self, indexes=None, columns=None):
+        raise NotImplementedError
+
+    @abstractmethod
     def apply(self, *args, **kwargs):
         raise NotImplementedError
 
@@ -31,8 +35,14 @@ class DatasetBase(ABC):
     def unique(self):
         raise NotImplementedError
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def index(self):
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def columns(self):
         raise NotImplementedError
 
     @abstractmethod

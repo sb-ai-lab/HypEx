@@ -6,7 +6,7 @@ from hypex.dataset.base import DatasetBase
 
 
 class PandasDataset(DatasetBase):
-    def __init__(self, data: pd.DataFrame):
+    def __init__(self, data: pd.DataFrame = None):
         self.data = data
 
     def _get_column_index(
@@ -34,11 +34,15 @@ class PandasDataset(DatasetBase):
     def __repr__(self):
         return self.data.__repr__()
 
-    def apply(self, *args, **kwargs):
-        return self.data.apply(*args, **kwargs)
+    def create_empty(self, indexes=None, columns=None):
+        self.data = pd.DataFrame(index=indexes, columns=columns)
+        return self
 
-    def map(self, *args, **kwargs):
-        return self.data.map(*args, **kwargs)
+    def apply(self, **kwargs):
+        return self.data.apply(**kwargs)
+
+    def map(self, **kwargs):
+        return self.data.map(**kwargs)
 
     def unique(self):
         return self.data.unique()
@@ -46,6 +50,10 @@ class PandasDataset(DatasetBase):
     @property
     def index(self):
         return self.data.index
+
+    @property
+    def columns(self):
+        return self.data.columns
 
     def isin(self, values: Iterable) -> Iterable[bool]:
         raise NotImplementedError
