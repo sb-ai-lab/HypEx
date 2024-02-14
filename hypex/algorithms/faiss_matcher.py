@@ -272,7 +272,6 @@ class FaissMatcher:
             x_match_untreated = np.array(
                 [x_treated[idx].mean(0) for idx in self.untreated_index]
             )
-            print(self.untreated_index)
             bias_coefs_c = bias_coefs(self.untreated_index, y_treated, x_treated)
             bias_coefs_t = bias_coefs(self.treated_index, y_untreated, x_untreated)
             bias_c = bias(x_untreated, x_match_untreated, bias_coefs_c)
