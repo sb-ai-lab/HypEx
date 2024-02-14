@@ -8,25 +8,6 @@ from hypex.dataset.base import DatasetBase
 from hypex.dataset.roles import ABCRole
 from hypex.dataset.utils import parse_roles
 
-BACKENDS = ["pandas", "numpy"]
-
-
-def select_backend(data):
-    if isinstance(data, pd.DataFrame):
-        return PandasDataset(data)
-    if isinstance(data, str):
-        if data in BACKENDS:
-            return select_from_backend(data)
-        check_data = check_file_extension(data)
-        if check_data is not None:
-            return PandasDataset(check_data)
-    return None
-
-
-def select_from_backend(backend: str):
-    if backend == "pandas":
-        return PandasDataset()
-
 
 def check_file_extension(file_path):
     read_functions = {"csv": pd.read_csv, "xlsx": pd.read_excel, "json": pd.read_json}
@@ -39,9 +20,8 @@ def check_file_extension(file_path):
 class Dataset(DatasetBase):
     def set_data(self, data: Union[DataFrame, str] = None, roles=None):
         self.roles = parse_roles(roles)
-        self.backend = select_backend(data)
-        self.data = self.backend.data if self.backend is not None else None
-        self._columns = list(self.roles.keys())
+        self._backend = select_backend(data)
+        self.data = self._backend.data
 
     def __init__(
         self,
@@ -49,22 +29,31 @@ class Dataset(DatasetBase):
         roles: Optional[Dict[ABCRole, Union[List[str], str]]] = None,
     ):
         self.roles = None
-        self.backend = None
+        self._backend = None
         self.data = None
-        self.columns = None
         self.set_data(data, roles)
 
     def __repr__(self):
         return self.data.__repr__()
 
     def __len__(self):
-        return self.backend.__len__()
+        return self._backend.__len__()
 
     def __getitem__(self, item):
-        return self.backend.__getitem__(item)
+        return self._backend.__getitem__(item)
 
     def __setitem__(self, key, value):
-        self.backend.__setitem__(key, value)
+        self._backend.__setitem__(key, value)
+
+    @staticmethod
+    def _select_backend(data):
+        if isinstance(data, pd.DataFrame):
+            return PandasDataset(data)
+        if isinstance(data, str):
+            check_data = check_file_extension(data)
+            if check_data is not None:
+                return PandasDataset(check_data)
+        return None
 
     def get_columns_by_roles(
         self, roles: Union[ABCRole, Iterable[ABCRole]]
@@ -79,20 +68,19 @@ class Dataset(DatasetBase):
     def create_empty(self, indexes=None, columns=None):
         indexes = [] if indexes is None else indexes
         columns = [] if columns is None else columns
-        self.backend = self.backend.create_empty(indexes, columns)
-        self.data = self.backend.data
+        self._backend = self._backend.create_empty(indexes, columns)
+        self.data = self._backend.data
         return self
 
-    def apply(self, func, axis=0, raw=False, result_type=None, by_row="compat"):
-        return self.backend.apply(
-            func=func, axis=axis, raw=raw, result_type=result_type, by_row=by_row
-        )
+    def apply(self, func, axis=0, **kwargs):
+        return self._backend.apply(
+            func=func, axis=axis, **kwargs)
 
     def map(self, func, na_action=None, **kwargs):
-        return self.backend.map(func=func, na_action=na_action)
+        return self._backend.map(func=func, na_action=na_action)
 
     def unique(self):
-        return self.backend.unique()
+        return self._backend.unique()
 
     def isin(self, values: Iterable) -> Iterable[bool]:
         raise NotImplementedError
@@ -102,21 +90,17 @@ class Dataset(DatasetBase):
 
     @property
     def index(self):
-        return self.backend.index
+        return self._backend.index
 
     @property
     def columns(self):
-        return self._columns
-
-    @columns.setter
-    def columns(self, value):
-        self._columns = value
+        return self._backend.columns
 
 
 class ExperimentData(Dataset):
     def __init__(self, data: Union[Dataset, str]):
         if isinstance(data, Dataset):
-            backend = "pandas" if data.backend == PandasDataset else "numpy"
+            backend = "pandas" if isinstance(data._backend, PandasDataset) else "numpy"
             self.additional_fields = Dataset(backend).create_empty(
                 data.index, data.columns
             )
