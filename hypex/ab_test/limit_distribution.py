@@ -2,7 +2,9 @@
 # Хотим выбрать лучшую выборку из k выборок по некоторой целевой метрике
 # Пусть гипотеза H_i - iя выборка лучшая, i = 1, ..., k
 # Пусть гипотеза H_0 - нет лучшей выборки
+from typing import Optional, List, Union
 
+import numpy as np
 from scipy.stats import norm
 
 
@@ -24,7 +26,25 @@ from scipy.stats import norm
 # Функция квантиля предельного распределения случайной величины минимума используется в основных функциях
 
 
-def quantile_of_marginal_distribution(num_samples, quantile_level, variances=None, iteration_size=20000):
+def quantile_of_marginal_distribution(num_samples: int, quantile_level: float, variances: Optional[List, float] = None,
+                                      iteration_size: int = 20000):
+    """Calculate the quantile(s) of the marginal distribution for minimum t-values across multiple comparisons.
+
+    This function generates random samples from a normal distribution and computes t-values for comparisons either
+    with equal variances (if variances are not provided) or with specified unequal variances (if variances are provided).
+    It then determines the quantile of interest for the distribution of the minimum t-values from these comparisons.
+
+    Args:
+        num_samples: The number of samples/groups to compare.
+        quantile_level: The quantile level to compute for the marginal distribution (e.g., 0.95 for the 95th percentile).
+        variances: A list of variances for each sample/group. If None, equal variances are assumed.
+        iteration_size: The number of iterations/random samples to generate for the simulation.
+
+    Returns:
+       The quantile of interest for the marginal distribution of the minimum t-values. Returns
+       a single float if variances are assumed equal (or not provided) or a list of floats
+       with quantiles for each sample if variances are provided and unequal.
+    """
     num_samples_hyp = num_samples if variances else 1
 
     quantiles = []
@@ -46,9 +66,26 @@ def quantile_of_marginal_distribution(num_samples, quantile_level, variances=Non
     return quantiles if variances else quantiles[0]
 
 
-def test_on_marginal_distribution(samples, significance_level=0.05, equal_variance=True, quantiles=None):
-    num_samples = len(samples)  # Число выборок
-    sample_size = len(samples[0])  # Размер выборки
+def test_on_marginal_distribution(samples: List[np.ndarray], significance_level: float = 0.05,
+                                  equal_variance: bool = True,
+                                  quantiles: Optional[Union[float, List[float]]] = None) -> int:
+    """Performs a test on the marginal distribution of minimum t-values across multiple samples/groups.
+
+    This function calculates the means and variances for each sample/group, determines the quantile of interest for
+    the marginal distribution of the minimum t-values, and identifies if any sample's minimum t-value exceeds this
+    quantile. It is used to assess whether there is a statistically significant difference between any of the samples.
+
+    Args:
+        samples: A list of arrays, where each array represents the data of a sample/group.
+        significance_level: The significance level for the test (default is 0.05).
+        equal_variance: A boolean indicating if the samples are assumed to have equal variance (default is True).
+        quantiles: Pre-computed quantiles of the marginal distribution. If None, they will be computed.
+
+    Returns:
+        The index of the first sample that significantly differs from others, or 0 if none are found.
+    """
+    num_samples = len(samples)
+    sample_size = len(samples[0])
 
     means = [np.mean(sample) for sample in samples]
     variances_q = [np.var(sample) * sample_size / (sample_size - 1) for sample in samples] if equal_variance else None
@@ -57,7 +94,7 @@ def test_on_marginal_distribution(samples, significance_level=0.05, equal_varian
     if quantiles is None:
         quantiles = quantile_of_marginal_distribution(num_samples=num_samples,
                                                       quantile_level=1 - significance_level / num_samples,
-                                                      variances=variances_q)  # квантиль предельного распределения
+                                                      variances=variances_q)
     for j in range(num_samples):
         min_t_value = np.inf
         for i in range(num_samples):
@@ -70,8 +107,30 @@ def test_on_marginal_distribution(samples, significance_level=0.05, equal_varian
     return 0
 
 
-def min_sample_size(number_of_samples, minimum_detectable_effect, variances, significance_level=0.05, power_level=0.2,
-                    equal_variance=True, quantile_1=None, quantile_2=None, initial_estimate=None):
+def min_sample_size(number_of_samples: int, minimum_detectable_effect: float, variances: Union[List[float], float],
+                    significance_level: float = 0.05, power_level: float = 0.2, equal_variance: bool = True,
+                    quantile_1: Optional[Union[float, List[float]]] = None, quantile_2: Optional[float] = None,
+                    initial_estimate: Optional[int] = None) -> int:
+    """
+    Calculates the minimum sample size required to detect a given effect with specified power and significance level.
+
+    The function computes the minimum sample size for either equal or unequal variances across samples. It can use
+    pre-computed quantiles of the marginal distribution to speed up calculations.
+
+    Args:
+        number_of_samples: Number of samples or groups to compare.
+        minimum_detectable_effect: The minimum effect size that the test is designed to detect.
+        variances: Variances of the samples. Can be a single value if equal_variance is True, or a list of variances.
+        significance_level: The significance level for hypothesis testing (alpha).
+        power_level: Desired power of the test (1 - beta).
+        equal_variance: Boolean flag indicating whether to assume equal variances across samples.
+        quantile_1: Optional pre-computed quantile for the significance level. Calculated if None.
+        quantile_2: Optional pre-computed quantile for the power level. Calculated if None.
+        initial_estimate: Optional initial estimate for the sample size to speed up calculations.
+
+    Returns:
+        The minimum sample size required per sample/group.
+    """
     random_state = 42
     if equal_variance:
 
