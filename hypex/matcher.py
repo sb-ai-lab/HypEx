@@ -31,7 +31,6 @@ from .utils.validators import random_treatment
 from .utils.validators import subset_refuter
 from .utils.validators import test_significance
 
-
 REPORT_FEAT_SELECT_DIR = "report_feature_selector"
 REPORT_PROP_MATCHER_DIR = "report_matcher"
 NAME_REPORT = "lama_interactive_report.html"
@@ -106,30 +105,30 @@ class Matcher:
     """
 
     def __init__(
-        self,
-        input_data: pd.DataFrame,
-        treatment: str,
-        outcome: Union[str, list] = None,
-        outcome_type: str = "numeric",
-        group_col: Union[str, List[str]] = None,
-        info_col: list = None,
-        weights: dict = None,
-        base_filtration: bool = False,
-        generate_report: bool = GENERATE_REPORT,
-        report_feat_select_dir: str = REPORT_FEAT_SELECT_DIR,
-        timeout: int = TIMEOUT,
-        n_threads: int = N_THREADS,
-        n_folds: int = N_FOLDS,
-        verbose: bool = VERBOSE,
-        use_algos: list = None,
-        same_target_threshold: float = SAME_TARGET_THRESHOLD,
-        interquartile_coeff: float = OUT_INTER_COEFF,
-        drop_outliers_by_percentile: bool = OUT_MODE_PERCENT,
-        min_percentile: float = OUT_MIN_PERCENT,
-        max_percentile: float = OUT_MAX_PERCENT,
-        n_neighbors: int = 1,
-        silent: bool = True,
-        pbar: bool = True,
+            self,
+            input_data: pd.DataFrame,
+            treatment: str,
+            outcome: Union[str, list] = None,
+            outcome_type: str = "numeric",
+            group_col: Union[str, List[str]] = None,
+            info_col: list = None,
+            weights: dict = None,
+            base_filtration: bool = False,
+            generate_report: bool = GENERATE_REPORT,
+            report_feat_select_dir: str = REPORT_FEAT_SELECT_DIR,
+            timeout: int = TIMEOUT,
+            n_threads: int = N_THREADS,
+            n_folds: int = N_FOLDS,
+            verbose: bool = VERBOSE,
+            use_algos: list = None,
+            same_target_threshold: float = SAME_TARGET_THRESHOLD,
+            interquartile_coeff: float = OUT_INTER_COEFF,
+            drop_outliers_by_percentile: bool = OUT_MODE_PERCENT,
+            min_percentile: float = OUT_MIN_PERCENT,
+            max_percentile: float = OUT_MAX_PERCENT,
+            n_neighbors: int = 1,
+            silent: bool = True,
+            pbar: bool = True,
     ):
         """Initialize the Matcher object.
 
@@ -319,33 +318,36 @@ class Matcher:
         self._log("Categorical features turned into dummy")
 
     def validate_group_col(
-        self,
-        df: pd.DataFrame,
-        group_col: Union[str, List[str]],
-        treat_col: str,
-        target_col: str,
-        frequency_th: int = 1,
-        rare_categories_scenario: str = "raise",
+            self,
+            df: pd.DataFrame,
+            group_col: Union[str, List[str]],
+            treat_col: str,
+            target_col: str,
+            frequency_th: int = 1,
+            rare_categories_scenario: str = "raise",
     ) -> pd.DataFrame:
         """
-        Checking the number of control and test group instances in a grouped dataset.
+        Validates the distribution of control and test group instances within each category of a specified grouping column(s) in a DataFrame. It handles rare categories (categories with instances below a specified threshold) according to the defined scenario ('raise', 'drop', or 'genetic').
+
         Args:
-            df:
-                input data
-            group_col:
-                column/columns for grouping from input data
-            treat_col:
-                column with treatment categories
-            target_col:
-                column with target values
-            frequency_th:
-                number of samples in each group
-            rare_categories_scenario:
-                the scenario of actions with a small number of objects
+            df: The DataFrame containing the data to be validated.
+            group_col: The name of the column or list of columns used for grouping data.
+            treat_col: The name of the column indicating treatment groups.
+            target_col: The name of the column containing target values.
+            frequency_th: The minimum number of instances required for a category not to be considered rare. Default is 1.
+            rare_categories_scenario: Defines the action to take when rare categories are found. Options are 'raise' (default), 'drop', or 'genetic'. 'raise' will cause an error; 'drop' will remove rare categories; 'genetic' will apply a genetic stratification method to handle rare categories.
 
         Returns:
-            Input dataframe dependes on the scenario
+            A DataFrame that has been processed based on the specified 'rare_categories_scenario'. If 'drop' is used, rare categories are removed. If 'genetic' is used, the DataFrame is modified accordingly.
 
+        Raises:
+            KeyError: If an invalid 'rare_categories_scenario' is provided.
+            ValueError: If 'raise' is specified for 'rare_categories_scenario' and rare categories are found.
+
+        Example:
+            >>> df_validated = validate_group_col(df, 'Group', 'Treatment', 'Outcome', 1, 'drop')
+            This will drop any groups in 'Group' column that have less than or equal to one instance in
+            either treatment group
         """
         if rare_categories_scenario not in RARE_CAT_SCENARIO_LIST:
             raise KeyError(
@@ -373,17 +375,42 @@ class Matcher:
 
     @staticmethod
     def get_rare_categories(
-        df: pd.DataFrame,
-        group_col: Union[str, List[str]],
-        treat_col: str,
-        frequency_th: int = 1,
+            df: pd.DataFrame,
+            group_col: Union[str, List[str]],
+            treat_col: str,
+            frequency_th: int = 1,
     ) -> List[str]:
         """
-        Returns groups which contain less or equal than frequency_th instances.
-        Default frequency_th=1 means "every group_col element exists in the treatment/control group".
+        Identifies and returns a list of categories within specified grouping columns that
+        occur less than or equal to a specified frequency threshold within each treatment
+        group. This can be useful for filtering out rare categories in treatment/control
+        groups to ensure sufficient sample sizes for analysis.
+
+        Args:
+            df: The dataframe containing the data to be analyzed.
+            group_col: The column(s) used for grouping the data.
+                Can be a single column name or a list of names for multi-level grouping.
+            treat_col: The column specifying the treatment group. This column
+                is used to separate the data into different treatment groups.
+            frequency_th: The frequency threshold. Categories within
+                each treatment group that occur less than or equal to this number
+                will be considered rare. Default is 1, which selects categories that
+                occur only once within each treatment group.
+
+        Returns:
+            A list of the rare categories within the specified grouping columns.
+                If there are no rare categories, an empty list is returned.
+
+        Example:
+            >>> df = pd.DataFrame({
+                    'Group': ['A', 'A', 'B', 'B', 'C'],
+                    'Treatment': [0, 1, 1, 1, 0],
+                    'Data': [5, 6, 7, 8, 9]
+                })
+            >>> get_rare_categories(df, 'Group', 'Treatment', 1)
+            ['C']
         """
         frequencies = df.groupby(by=[*group_col, treat_col]).size()
-
         rare_categories = (
             frequencies[frequencies <= frequency_th].reset_index().loc[:, group_col]
         )
@@ -395,11 +422,11 @@ class Matcher:
 
     @staticmethod
     def genetic_stratification(
-        df: pd.DataFrame,
-        group_col: Union[str, List[str]],
-        treat_col: str,
-        target_col: str,
-        frequency_th: int = 1,
+            df: pd.DataFrame,
+            group_col: Union[str, List[str]],
+            treat_col: str,
+            target_col: str,
+            frequency_th: int = 1,
     ) -> List[str]:
         """
         Generates a new_group_col using a genetic algorithm.
@@ -455,7 +482,7 @@ class Matcher:
         )
 
     def match_no_rep(
-        self, threshold: float = 0.1, approximate_match: bool = False
+            self, threshold: float = 0.1, approximate_match: bool = False
     ) -> pd.DataFrame:
         """Matching groups with no replacement.
 
@@ -482,8 +509,8 @@ class Matcher:
             .iloc[self.input_data[a == 1].index]
             .matches[
                 index_matched.loc[1]
-                .iloc[self.input_data[a == 1].index]
-                .matches.apply(lambda x: x != [])
+            .iloc[self.input_data[a == 1].index]
+            .matches.apply(lambda x: x != [])
             ]
         )
 
@@ -612,11 +639,11 @@ class Matcher:
         return self.results, self.quality_result, df_matched
 
     def validate_result(
-        self,
-        refuter: str = "random_feature",
-        effect_type: str = "ate",
-        n_sim: int = 10,
-        fraction: float = 0.8,
+            self,
+            refuter: str = "random_feature",
+            effect_type: str = "ate",
+            n_sim: int = 10,
+            fraction: float = 0.8,
     ) -> dict:
         """Validates estimated ATE (Average Treatment Effect).
 
