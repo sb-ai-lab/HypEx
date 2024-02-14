@@ -1,29 +1,46 @@
-# Решаем задачу множественного тестирования
-# Хотим выбрать лучшую выборку из k выборок по некоторой целевой метрике
-# Пусть гипотеза H_i - iя выборка лучшая, i = 1, ..., k
-# Пусть гипотеза H_0 - нет лучшей выборки
+"""
+Multiple Hypothesis Testing for Best Sample Selection
+=====================================================
+
+This module outlines a statistical approach developed to select the best sample out of k samples based on a specific target metric. It is designed to adhere to predetermined Type I and Type II error probabilities, leveraging the marginal distribution of the minimum statistic. This documentation provides an overview of the problem, the proposed solution, and detailed descriptions of the main functions implemented.
+
+Problem Statement:
+------------------
+In multiple hypothesis testing, our aim is to identify the superior sample from a set of k samples, each evaluated according to a certain target metric. We denote by H_i the hypothesis that the i-th sample is the best among all, for i = 1, ..., k, and by H_0 the null hypothesis that there is no single best sample among the group.
+
+Methodology:
+------------
+The method is based on the limit distribution theory, allowing us to maintain the predefined probabilities of committing Type I and Type II errors. The core approach involves calculating the minimum sample size required for a reliable comparison and applying a criterion to test the hypotheses, both of which rely on the quantile function of the marginal distribution of the minimum statistic.
+
+Functions Overview:
+-------------------
+1. Quantile of Marginal Distribution: Calculates the quantile of the marginal distribution of the minimum of a set of random variables. Essential for determining the critical values used in the main hypothesis testing and sample size calculation functions.
+
+2. Minimum Sample Size Calculation: Determines the smallest number of observations required in each sample to reliably detect a specified effect size with a given power and significance level.
+
+3. Hypothesis Testing Criterion: Tests whether any of the samples is significantly better than the others based on their target metric distributions.
+
+Implementation:
+---------------
+Implemented in Python, utilizing numpy for numerical computations and scipy.stats for statistical functions. Detailed function descriptions, including input parameters and return values, are documented within the function docstrings in this file.
+
+Mathematical Formulations:
+--------------------------
+The quantile calculation for the marginal distribution of the minimum statistic is based on the following principle:
+
+Q(p; F_1, ..., F_k) = min { q_1(p), ..., q_k(p) }
+
+where Q(p; F_1, ..., F_k) represents the p-th quantile of the marginal distribution of the minimum of k random variables with distribution functions F_1, ..., F_k, and q_i(p) denotes the p-th quantile of the i-th distribution.
+
+Conclusion:
+-----------
+This module provides a robust solution for statistical comparison across multiple samples, ensuring adherence to specified error probabilities through the application of limit distribution theory.
+
+"""
 from typing import Optional, List, Union
 
 import numpy as np
 from scipy.stats import norm
-
-
-# Разработали метод, основанный на предельном распределении
-# Он позволяет придерживаться заложенных вероятностей ошибок 1го и 2го рода
-# Функции минимального размера выборки и критерия являются основными
-# Функция квантиля предельного распределения случайной величины минимума используется в основных функциях
-
-
-# Решаем задачу множественного тестирования
-# Хотим выбрать лучшую выборку из k выборок по некоторой целевой метрике
-# Пусть гипотеза H_i - iя выборка лучшая, i = 1, ..., k
-# Пусть гипотеза H_0 - нет лучшей выборки
-
-# Разработали метод, основанный на предельном распределении
-# Он позволяет придерживаться заложенных вероятностей ошибок 1го и 2го рода
-
-# Функции минимального размера выборки и критерия являются основными
-# Функция квантиля предельного распределения случайной величины минимума используется в основных функциях
 
 
 def quantile_of_marginal_distribution(num_samples: int, quantile_level: float, variances: Optional[List, float] = None,
