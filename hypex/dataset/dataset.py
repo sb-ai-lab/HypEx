@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union, List, Iterable
+from typing import Dict, Optional, Union, List, Iterable, Any
 
 import pandas as pd
 from pandas import DataFrame
@@ -7,15 +7,6 @@ from hypex.dataset.backends.pandas_backend import PandasDataset
 from hypex.dataset.base import DatasetBase
 from hypex.dataset.roles import ABCRole
 from hypex.dataset.utils import parse_roles
-
-
-def select_backend(data):
-    if isinstance(data, pd.DataFrame):
-        return PandasDataset(data)
-    if isinstance(data, str):
-        check_data = check_file_extension(data)
-        if check_data is not None:
-            return PandasDataset(check_data)
 
 
 def check_file_extension(file_path):
@@ -29,27 +20,40 @@ def check_file_extension(file_path):
 class Dataset(DatasetBase):
     def set_data(self, data: Union[DataFrame, str] = None, roles=None):
         self.roles = parse_roles(roles)
-        self.backend = select_backend(data)
-        self.data = self.backend.data
+        self._backend = self._select_backend(data)
+        self.data = self._backend.data
 
     def __init__(
         self,
         data: Union[DataFrame, str, None] = None,
         roles: Optional[Dict[ABCRole, Union[List[str], str]]] = None,
     ):
+        self.roles = None
+        self._backend = None
+        self.data = None
         self.set_data(data, roles)
 
     def __repr__(self):
-        return self.backend.__repr__()
+        return self.data.__repr__()
 
     def __len__(self):
-        return self.backend.__len__()
+        return self._backend.__len__()
 
     def __getitem__(self, item):
-        return self.backend.__getitem__(item)
+        return self._backend.__getitem__(item)
 
     def __setitem__(self, key, value):
-        self.backend.__setitem__(key, value)
+        self._backend.__setitem__(key, value)
+
+    @staticmethod
+    def _select_backend(data):
+        if isinstance(data, pd.DataFrame):
+            return PandasDataset(data)
+        if isinstance(data, str):
+            check_data = check_file_extension(data)
+            if check_data is not None:
+                return PandasDataset(check_data)
+        return None
 
     def get_columns_by_roles(
         self, roles: Union[ABCRole, Iterable[ABCRole]]
@@ -61,23 +65,21 @@ class Dataset(DatasetBase):
             if any(isinstance(role, r) for r in roles)
         ]
 
-    def apply(
-        self,
-        func,
-        axis=0,
-        raw=False,
-        result_type=None,
-        args=(),
-        by_row="compat",
-        **kwargs,
-    ):
-        return self.backend.apply(func, axis, raw, result_type, args, by_row, **kwargs)
+    def create_empty(self, indexes=None, columns=None):
+        indexes = [] if indexes is None else indexes
+        columns = [] if columns is None else columns
+        self._backend = self._backend.create_empty(indexes, columns)
+        self.data = self._backend.data
+        return self
+
+    def apply(self, func, axis=0, **kwargs):
+        return self._backend.apply(func=func, axis=axis, **kwargs)
 
     def map(self, func, na_action=None, **kwargs):
-        return self.backend.map(func, na_action, **kwargs)
+        return self._backend.map(func=func, na_action=na_action)
 
     def unique(self):
-        return self.backend.unique()
+        return self._backend.unique()
 
     def isin(self, values: Iterable) -> Iterable[bool]:
         raise NotImplementedError
@@ -87,18 +89,36 @@ class Dataset(DatasetBase):
 
     @property
     def index(self):
-        return self.backend.index
+        return self._backend.index
+
+    @property
+    def columns(self):
+        return self._backend.columns
 
 
 class ExperimentData(Dataset):
-    def __init__(self, data: Dataset):
-        self.additional_fields = Dataset(DataFrame(index=data.index))
-        self.stats_fields = Dataset(DataFrame(index=list(data.columns)))
-        self.analysis_tables = {}
+    def __init__(self, data: Any):
+        if isinstance(data, Dataset):
+            self.additional_fields = Dataset(data.data).create_empty(
+                data.index, data.columns
+            )
+            self.stats_fields = Dataset(backend).create_empty(data.index, data.columns)
+            self.analysis_tables = {}
+        else:
+            self.additional_fields = Dataset(data)
+            self.stats_fields = Dataset(data)
+            self.analysis_tables = {}
 
+    def create_empty(self, indexes=None, columns=None):
+        self.additional_fields.create_empty(indexes, columns)
+        self.stats_fields.create_empty(indexes, columns)
+        return self
+
+    # TODO переделать: обновление данных + обновление ролей
     def add_to_additional_fields(self, data: pd.DataFrame):
-        self.additional_fields = self.additional_fields.data.join(data, how="left")
+        self.additional_fields.data = self.additional_fields.data.join(data, how="left")
 
+    # TODO переделать: обновление данных + обновление ролей
     def add_to_stats_fields(self, data: pd.DataFrame):
         self.stats_fields = self.stats_fields.data.join(data, how="left")
 
