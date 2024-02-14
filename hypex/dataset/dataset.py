@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union, List, Iterable
+from typing import Dict, Optional, Union, List, Iterable, Any
 
 import pandas as pd
 from pandas import DataFrame
@@ -20,7 +20,7 @@ def check_file_extension(file_path):
 class Dataset(DatasetBase):
     def set_data(self, data: Union[DataFrame, str] = None, roles=None):
         self.roles = parse_roles(roles)
-        self._backend = select_backend(data)
+        self._backend = self._select_backend(data)
         self.data = self._backend.data
 
     def __init__(
@@ -73,8 +73,7 @@ class Dataset(DatasetBase):
         return self
 
     def apply(self, func, axis=0, **kwargs):
-        return self._backend.apply(
-            func=func, axis=axis, **kwargs)
+        return self._backend.apply(func=func, axis=axis, **kwargs)
 
     def map(self, func, na_action=None, **kwargs):
         return self._backend.map(func=func, na_action=na_action)
@@ -98,10 +97,9 @@ class Dataset(DatasetBase):
 
 
 class ExperimentData(Dataset):
-    def __init__(self, data: Union[Dataset, str]):
+    def __init__(self, data: Any):
         if isinstance(data, Dataset):
-            backend = "pandas" if isinstance(data._backend, PandasDataset) else "numpy"
-            self.additional_fields = Dataset(backend).create_empty(
+            self.additional_fields = Dataset(data.data).create_empty(
                 data.index, data.columns
             )
             self.stats_fields = Dataset(backend).create_empty(data.index, data.columns)

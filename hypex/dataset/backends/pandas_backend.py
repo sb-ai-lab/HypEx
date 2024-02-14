@@ -38,11 +38,11 @@ class PandasDataset(DatasetBase):
         self.data = pd.DataFrame(index=indexes, columns=columns)
         return self
 
-    def apply(self, **kwargs):
-        return self.data.apply(**kwargs)
+    def apply(self, func, **kwargs):
+        return self.data.apply(func, **kwargs)
 
-    def map(self, **kwargs):
-        return self.data.map(**kwargs)
+    def map(self, func, **kwargs):
+        return self.data.map(func, **kwargs)
 
     def unique(self):
         return self.data.unique()
