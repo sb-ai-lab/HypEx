@@ -3,11 +3,8 @@
 import datetime as dt
 import functools
 import logging
-import time
-from typing import Any
-from typing import Dict
-from typing import Tuple
-from typing import Union
+from time import perf_counter
+from typing import Any, Union, Dict, Tuple
 
 import faiss
 import numpy as np
@@ -47,9 +44,9 @@ def timer(func):
 
     @functools.wraps(func)
     def _wrapper(*args, **kwargs):
-        start = time.perf_counter()
+        start = perf_counter()
         result = func(*args, **kwargs)
-        runtime = time.perf_counter() - start
+        runtime = perf_counter() - start
         print(f"{func.__name__} took {runtime:.4f} secs")
         return result
 
@@ -80,7 +77,7 @@ class FaissMatcher:
         treatment: str,
         info_col: list,
         features: [list, pd.DataFrame] = None,
-        group_col: str = None,
+        group_col: Union[str, list] = None,
         weights: dict = None,
         sigma: float = 1.96,
         validation: bool = None,
@@ -121,7 +118,8 @@ class FaissMatcher:
         if group_col is None:
             self.df = df
         else:
-            self.df = df.sort_values([treatment, group_col])
+            group_col = group_col if isinstance(group_col, list) else [group_col]
+            self.df = df.sort_values([treatment, group_col[0]])
         self.columns_del = [outcomes]
         if info_col:
             self.info_col = info_col
@@ -359,27 +357,29 @@ class FaissMatcher:
                     self.df[self.treatment] == int(is_treated)
                 ][self.info_col].values.ravel()
         else:
-            df = df.sort_values([self.treatment, self.group_col])
+            df = df.sort_values([self.treatment, self.group_col[0]])
             untreated_index = df[
                 df[self.treatment] == int(not is_treated)
             ].index.to_numpy()
             converted_index = [untreated_index[i] for i in index]
             filtered = df.loc[df[self.treatment] == int(not is_treated)]
-            cols_untreated = [col for col in filtered.columns if col != self.group_col]
-            filtered = filtered.drop(columns=self.group_col).to_numpy()
+            cols_untreated = [
+                col for col in filtered.columns if col != self.group_col[0]
+            ]
+            filtered = filtered.drop(columns=self.group_col[0]).to_numpy()
             untreated_df = pd.DataFrame(
                 data=np.array([filtered[idx].mean(axis=0) for idx in index]),
                 columns=cols_untreated,
             )
             treated_df = df[df[self.treatment] == int(is_treated)].reset_index()
-            grp = treated_df[self.group_col]
-            untreated_df[self.group_col] = grp
+            grp = treated_df[self.group_col[0]]
+            untreated_df[self.group_col[0]] = grp
             if self.info_col is not None and len(self.info_col) != 1:
                 untreated_df["index"] = pd.Series(converted_index)
             else:
                 ids = (
                     self.df[df[self.treatment] == int(not is_treated)]
-                    .sort_values([self.treatment, self.group_col])[self.info_col]
+                    .sort_values([self.treatment, self.group_col[0]])[self.info_col]
                     .values.ravel()
                 )
                 converted_index = [ids[i] for i in index]
@@ -603,11 +603,11 @@ class FaissMatcher:
 
         """
         df = self.df.drop(columns=self.info_col)
-        groups = sorted(df[self.group_col].unique())
+        groups = sorted(df[self.group_col[0]].unique())
         matches_c = []
         matches_t = []
-        group_arr_c = df[df[self.treatment] == 0][self.group_col].to_numpy()
-        group_arr_t = df[df[self.treatment] == 1][self.group_col].to_numpy()
+        group_arr_c = df[df[self.treatment] == 0][self.group_col[0]].to_numpy()
+        group_arr_t = df[df[self.treatment] == 1][self.group_col[0]].to_numpy()
         treat_arr_c = df[df[self.treatment] == 0][self.treatment].to_numpy()
         treat_arr_t = df[df[self.treatment] == 1][self.treatment].to_numpy()
 
@@ -615,9 +615,9 @@ class FaissMatcher:
             self.tqdm = tqdm(total=len(groups) * 2)
 
         for group in groups:
-            df_group = df[df[self.group_col] == group]
-            temp = df_group[self.columns_match + [self.group_col]]
-            temp = temp.loc[:, (temp != 0).any(axis=0)].drop(columns=self.group_col)
+            df_group = df[df[self.group_col[0]] == group]
+            temp = df_group[self.columns_match + [self.group_col[0]]]
+            temp = temp.loc[:, (temp != 0).any(axis=0)].drop(columns=self.group_col[0])
             treated, untreated = self._get_split(temp)
 
             std_treated_np, std_untreated_np = _transform_to_np(
@@ -651,7 +651,7 @@ class FaissMatcher:
         self.untreated_index = matches_c
         self.treated_index = matches_t
 
-        df_group = df[self.columns_match].drop(columns=self.group_col)
+        df_group = df[self.columns_match].drop(columns=self.group_col[0])
         treated, untreated = self._get_split(df_group)
         self._predict_outcome(treated, untreated)
         df_matched = self._create_matched_df()
