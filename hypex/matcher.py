@@ -111,7 +111,7 @@ class Matcher:
         treatment: str,
         outcome: Union[str, list] = None,
         outcome_type: str = "numeric",
-        group_col: str = None,
+        group_col: Union[str, List[str]] = None,
         info_col: list = None,
         weights: dict = None,
         base_filtration: bool = False,
@@ -255,11 +255,19 @@ class Matcher:
         if self.group_col is not None and isinstance(self.group_col, str):
             group_col = [self.group_col]
         elif self.group_col is not None and isinstance(self.group_col, list):
-            group_col = self.group_col
+            group_col = ["!".join(self.group_col)]
+            self.input_data[group_col[0]] = self.input_data[self.group_col].apply(
+                lambda row: "!".join(row.astype(str)), axis=1
+            )
+            self.input_data = self.input_data.drop(self.group_col, axis=1)
+            self.group_col = group_col
         else:
             group_col = []
         self.input_data = self.validate_group_col(
-            self.input_data, group_col, self.treatment
+            self.input_data,
+            group_col,
+            self.treatment,
+            self.outcomes,
         )
         columns_to_drop = info_col + group_col + self.outcomes + [self.treatment]
         if self.base_filtration:
@@ -308,7 +316,6 @@ class Matcher:
                 )
             )
             self.input_data = self.input_data[filtered_features + columns_to_drop]
-
         self._log("Categorical features turned into dummy")
 
     def validate_group_col(
