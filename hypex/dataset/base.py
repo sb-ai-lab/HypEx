@@ -17,7 +17,7 @@ class DatasetBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def __setitem__(self, key, value):
+    def add_column(self, data, role):
         raise NotImplementedError
 
     @abstractmethod

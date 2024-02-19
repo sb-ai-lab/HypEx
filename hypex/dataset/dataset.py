@@ -61,9 +61,6 @@ class Dataset(DatasetBase):
     def __getitem__(self, item):
         return self._backend.__getitem__(item)
 
-    def __setitem__(self, key, value):
-        self._backend.__setitem__(key, value)
-
     @staticmethod
     def _select_backend(data):
         if isinstance(data, pd.DataFrame):
@@ -83,6 +80,10 @@ class Dataset(DatasetBase):
             for column, role in self.roles.items()
             if any(isinstance(role, r) for r in roles)
         ]
+
+    def add_column(self, data, role: Dict):
+        self.roles.update(role)
+        self._backend.add_column(data, list(role.items())[0][0])
 
     def _create_empty(self, indexes=None, columns=None):
         indexes = [] if indexes is None else indexes
