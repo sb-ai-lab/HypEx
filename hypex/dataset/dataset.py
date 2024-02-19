@@ -18,10 +18,27 @@ def check_file_extension(file_path):
 
 
 class Dataset(DatasetBase):
+
+    class Locker:
+        def __init__(self, backend):
+            self.backend = backend
+
+        def __getitem__(self, item):
+            return self.backend.loc(item)
+
+    class ILocker:
+        def __init__(self, backend):
+            self.backend = backend
+
+        def __getitem__(self, item):
+            return self.backend.iloc(item)
+
     def set_data(self, data: Union[DataFrame, str] = None, roles=None):
         self.roles = parse_roles(roles)
         self._backend = self._select_backend(data)
         self.data = self._backend.data
+        self.loc = self.Locker(self._backend)
+        self.iloc = self.ILocker(self._backend)
 
     def __init__(
         self,
@@ -31,6 +48,8 @@ class Dataset(DatasetBase):
         self.roles = None
         self._backend = None
         self.data = None
+        self.loc = None
+        self.iloc = None
         self.set_data(data, roles)
 
     def __repr__(self):
@@ -41,9 +60,6 @@ class Dataset(DatasetBase):
 
     def __getitem__(self, item):
         return self._backend.__getitem__(item)
-
-    def __setitem__(self, key, value):
-        self._backend.__setitem__(key, value)
 
     @staticmethod
     def _select_backend(data):
@@ -65,10 +81,14 @@ class Dataset(DatasetBase):
             if any(isinstance(role, r) for r in roles)
         ]
 
-    def create_empty(self, indexes=None, columns=None):
+    def add_column(self, data, role: Dict):
+        self.roles.update(role)
+        self._backend.add_column(data, list(role.items())[0][0])
+
+    def _create_empty(self, indexes=None, columns=None):
         indexes = [] if indexes is None else indexes
         columns = [] if columns is None else columns
-        self._backend = self._backend.create_empty(indexes, columns)
+        self._backend = self._backend._create_empty(indexes, columns)
         self.data = self._backend.data
         return self
 
@@ -99,19 +119,19 @@ class Dataset(DatasetBase):
 class ExperimentData(Dataset):
     def __init__(self, data: Any):
         if isinstance(data, Dataset):
-            self.additional_fields = Dataset(data.data).create_empty(
+            self.additional_fields = Dataset(data.data)._create_empty(
                 data.index, data.columns
             )
-            self.stats_fields = Dataset(backend).create_empty(data.index, data.columns)
+            self.stats_fields = Dataset(backend)._create_empty(data.index, data.columns)
             self.analysis_tables = {}
         else:
             self.additional_fields = Dataset(data)
             self.stats_fields = Dataset(data)
             self.analysis_tables = {}
 
-    def create_empty(self, indexes=None, columns=None):
-        self.additional_fields.create_empty(indexes, columns)
-        self.stats_fields.create_empty(indexes, columns)
+    def _create_empty(self, indexes=None, columns=None):
+        self.additional_fields._create_empty(indexes, columns)
+        self.stats_fields._create_empty(indexes, columns)
         return self
 
     # TODO переделать: обновление данных + обновление ролей

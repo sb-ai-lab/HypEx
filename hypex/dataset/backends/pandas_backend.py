@@ -6,6 +6,7 @@ from hypex.dataset.base import DatasetBase
 
 
 class PandasDataset(DatasetBase):
+
     def __init__(self, data: pd.DataFrame = None):
         self.data = data
 
@@ -28,15 +29,15 @@ class PandasDataset(DatasetBase):
     def __len__(self):
         return len(self.data)
 
-    def __setitem__(self, key: Union[str, slice], value: Iterable):
-        self.data[key] = value
-
     def __repr__(self):
         return self.data.__repr__()
 
-    def create_empty(self, indexes=None, columns=None):
+    def _create_empty(self, indexes=None, columns=None):
         self.data = pd.DataFrame(index=indexes, columns=columns)
         return self
+
+    def add_column(self, data, role):
+        self.data[role] = data
 
     def apply(self, func, **kwargs):
         return self.data.apply(func, **kwargs)
@@ -60,3 +61,9 @@ class PandasDataset(DatasetBase):
 
     def groupby(self):
         raise NotImplementedError
+
+    def loc(self, items: Iterable) -> Iterable:
+        return self.data.loc[items]
+
+    def iloc(self, items: Iterable) -> Iterable:
+        return self.data.iloc[items]

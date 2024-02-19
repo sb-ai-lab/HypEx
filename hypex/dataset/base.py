@@ -3,6 +3,7 @@ from typing import Iterable
 
 
 class DatasetBase(ABC):
+
     @abstractmethod
     def __len__(self):
         raise NotImplementedError
@@ -16,11 +17,11 @@ class DatasetBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def __setitem__(self, key, value):
+    def add_column(self, data, role):
         raise NotImplementedError
 
     @abstractmethod
-    def create_empty(self, indexes=None, columns=None):
+    def _create_empty(self, indexes=None, columns=None):
         raise NotImplementedError
 
     @abstractmethod
@@ -51,4 +52,10 @@ class DatasetBase(ABC):
 
     @abstractmethod
     def groupby(self):
+        raise NotImplementedError
+
+    def loc(self, values: Iterable) -> Iterable:
+        raise NotImplementedError
+
+    def iloc(self, values: Iterable) -> Iterable:
         raise NotImplementedError
