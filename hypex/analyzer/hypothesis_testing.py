@@ -6,10 +6,6 @@ from hypex.experiment.base import Executor
 
 
 class StatHypothesisTesting(ABC, Executor):
-    statistic: float
-    p_value: float
-    passed: bool
-
     def __init__(
         self,
         target_field: str,
@@ -21,9 +17,6 @@ class StatHypothesisTesting(ABC, Executor):
         self.group_field = group_field
         self.reliability = reliability
         self.power = power
-
-    def check(self):
-        self.passed = self.p_value < self.reliability
 
     def execute(self, data):
         raise NotImplementedError
@@ -43,14 +36,12 @@ class StatHypothesisTestingWithScipy(StatHypothesisTesting):
 
     def execute(self, data):
         grouping_data = list(data.groupby(self.group_field))
-        result_stats = self.scipy_func(
+        result_stats = {grouping_data[i][0]: self.scipy_func(
             grouping_data[0][1][self.target_field],
-            grouping_data[1][1][self.target_field],
-        )
+            grouping_data[i][1][self.target_field],
+        ) for i in range(1, len(grouping_data))}
 
-        self.statistic = result_stats[0]
-        self.p_value = result_stats[1]
-        self.check()
+        # TODO: add p-value
 
 
 class StatTTest(StatHypothesisTestingWithScipy):

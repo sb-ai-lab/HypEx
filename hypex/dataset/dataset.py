@@ -123,11 +123,11 @@ class ExperimentData(Dataset):
                 data.index, data.columns
             )
             self.stats_fields = Dataset(backend)._create_empty(data.index, data.columns)
-            self.analysis_tables = {}
         else:
             self.additional_fields = Dataset(data)
             self.stats_fields = Dataset(data)
-            self.analysis_tables = {}
+
+        self.analysis_tables = {}
 
     def _create_empty(self, indexes=None, columns=None):
         self.additional_fields._create_empty(indexes, columns)
