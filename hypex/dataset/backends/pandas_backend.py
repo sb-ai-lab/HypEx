@@ -57,10 +57,10 @@ class PandasDataset(DatasetBase):
         return self.data.columns
 
     def isin(self, values: Iterable) -> Iterable[bool]:
-        raise NotImplementedError
+        return self.data.isin(values)
 
-    def groupby(self):
-        raise NotImplementedError
+    def groupby(self, by, axis, level):
+        return self.data.groupby(by, axis, level)
 
     def loc(self, items: Iterable) -> Iterable:
         return self.data.loc[items]

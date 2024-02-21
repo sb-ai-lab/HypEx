@@ -108,10 +108,10 @@ class Dataset(DatasetBase):
         return self._backend.unique()
 
     def isin(self, values: Iterable) -> Iterable[bool]:
-        raise NotImplementedError
+        return self._backend.isin(values)
 
-    def groupby(self):
-        raise NotImplementedError
+    def groupby(self, by=None, axis=0, level=None):
+        return self._backend.groupby(by=by, axis=axis, level=level)
 
     @property
     def index(self):
