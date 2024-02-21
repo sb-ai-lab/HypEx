@@ -32,7 +32,7 @@ class PandasDataset(DatasetBase):
     def __repr__(self):
         return self.data.__repr__()
 
-    def _create_empty(self, indexes=None, columns=None):
+    def _create_empty(self, index=None, columns=None):
         self.data = pd.DataFrame(index=indexes, columns=columns)
         return self
 

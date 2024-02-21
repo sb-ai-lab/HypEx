@@ -21,7 +21,7 @@ class DatasetBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def _create_empty(self, indexes=None, columns=None):
+    def _create_empty(self, index=None, columns=None):
         raise NotImplementedError
 
     @abstractmethod
