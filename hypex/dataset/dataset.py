@@ -81,9 +81,9 @@ class Dataset(DatasetBase):
             if any(isinstance(role, r) for r in roles)
         ]
 
-    def add_column(self, data, role: Dict):
-        self.roles.update(role)
-        self._backend.add_column(data, list(role.items())[0][0])
+    def add_column(self, data, name: str, role: ABCRole):
+        self.roles.update({name: role})
+        self._backend.add_column(data, name)
 
     def _create_empty(self, indexes=None, columns=None):
         indexes = [] if indexes is None else indexes
