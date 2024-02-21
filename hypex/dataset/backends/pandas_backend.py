@@ -36,8 +36,8 @@ class PandasDataset(DatasetBase):
         self.data = pd.DataFrame(index=indexes, columns=columns)
         return self
 
-    def add_column(self, data, role):
-        self.data[role] = data
+    def add_column(self, data, name):
+        self.data[name] = data
 
     def apply(self, func, **kwargs):
         return self.data.apply(func, **kwargs)

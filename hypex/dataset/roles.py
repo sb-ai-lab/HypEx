@@ -1,7 +1,5 @@
 from abc import ABC
 
-import numpy as np
-
 from hypex.utils.hypex_typings import (
     ABCRoleTypes,
     Any,
@@ -60,12 +58,12 @@ class StatisticRole(ABCRole):
 
 
 default_roles = {
-    "info": InfoRole(),
-    "feature": FeatureRole(),
-    "treatment": TreatmentRole(np.float64),
-    "grouping": GroupingRole(),
-    "target": TargetRole(np.float64),
-    "pretarget": PreTargetRole(np.float64),
-    "drop": DropRole(),
-    "stratification": StratificationRole(np.float64),
+    "info": InfoRole,
+    "feature": FeatureRole,
+    "treatment": TreatmentRole,
+    "grouping": GroupingRole,
+    "target": TargetRole,
+    "pretarget": PreTargetRole,
+    "stratification": StratificationRole,
+    "statistic": StatisticRole,
 }
