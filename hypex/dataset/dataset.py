@@ -5,7 +5,7 @@ from pandas import DataFrame
 
 from hypex.dataset.backends.pandas_backend import PandasDataset
 from hypex.dataset.base import DatasetBase
-from hypex.dataset.roles import ABCRole
+from hypex.dataset.roles import ABCRole, StatisticRole
 from hypex.dataset.utils import parse_roles
 
 
@@ -18,7 +18,6 @@ def check_file_extension(file_path):
 
 
 class Dataset(DatasetBase):
-
     class Locker:
         def __init__(self, backend):
             self.backend = backend
@@ -128,6 +127,7 @@ class ExperimentData(Dataset):
             self.stats_fields = Dataset(data)
 
         self.analysis_tables = {}
+        self._id_name_mapping = {}
 
     def _create_empty(self, indexes=None, columns=None):
         self.additional_fields._create_empty(indexes, columns)
@@ -149,3 +149,19 @@ class ExperimentData(Dataset):
         roles: Optional[Dict[ABCRole, Union[List[str], str]]] = None,
     ):
         self.analysis_tables[key] = Dataset(data, roles)
+
+    def set_value(
+        self, space: str, executor_id: int, name: str, value: Any, key: str = None
+    ):
+        if space == "additional_fields":
+            self.additional_fields[executor_id] = value
+        elif space == "stats_fields":
+            if executor_id not in self.stats_fields.columns:
+                self.stats_fields.add_column(
+                    data=[None] * len(self.stats_fields),
+                    role={executor_id: StatisticRole},
+                )
+            self.stats_fields[executor_id, key] = value
+        elif space == "analysis_tables":
+            raise NotImplementedError
+        self._id_name_mapping[executor_id] = name
