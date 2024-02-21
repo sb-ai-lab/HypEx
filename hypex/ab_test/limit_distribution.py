@@ -62,6 +62,7 @@ def quantile_of_marginal_distribution(
         quantile_level: The quantile level to compute for the marginal distribution (e.g., 0.95 for the 95th percentile).
         variances: A list of variances for each sample/group. If None, equal variances are assumed.
         iteration_size: The number of iterations/random samples to generate for the simulation.
+        random_state: Optional parameter for data randomisation.
 
     Returns:
        The quantile of interest for the marginal distribution of the minimum t-values. Returns
@@ -73,7 +74,7 @@ def quantile_of_marginal_distribution(
 
     if variances is None:
         j = 0
-        t_j = [
+        t_values = [
             min(
                 [
                     (total[l][j] - total[l][i]) / np.sqrt(2)
@@ -83,11 +84,11 @@ def quantile_of_marginal_distribution(
             )
             for l in range(iteration_size)
         ]
-        return np.quantile(t_j, quantile_level)
+        return np.quantile(t_values, quantile_level)
 
-    c_ = []
+    quantiles = []
     for j in range(num_samples):
-        t_j = [
+        t_values = [
             min(
                 [
                     total[l][j] / np.sqrt(1 + variances[i] / variances[j])
@@ -98,8 +99,8 @@ def quantile_of_marginal_distribution(
             )
             for l in range(iteration_size)
         ]
-        c_ += [np.quantile(t_j, quantile_level)]
-    return c_
+        quantiles += [np.quantile(t_values, quantile_level)]
+    return quantiles
 
 
 def test_on_marginal_distribution(
@@ -123,8 +124,8 @@ def test_on_marginal_distribution(
     Returns:
         The index of the first sample that significantly differs from others, or 0 if none are found.
     """
-    num_samples = len(samples)
-    sample_size = len(samples[0])
+
+    num_samples, sample_size = len(samples), len(samples[0])
 
     means = [np.mean(sample) for sample in samples]
     variances = [np.var(sample) * sample_size / (sample_size - 1) for sample in samples]
@@ -137,17 +138,16 @@ def test_on_marginal_distribution(
             variances=variances_q,
         )
     for j in range(num_samples):
-        min_t_value = np.inf
+        total_j = np.inf
         for i in range(num_samples):
             if i != j:
-                t_value = (
+                total = (
                     np.sqrt(sample_size)
                     * (means[j] - means[i])
                     / np.sqrt(variances[j] + variances[i])
                 )
-                min_t_value = min(min_t_value, t_value)
-
-        if min_t_value > quantiles[j]:
+                total_j = total if total < total_j else total_j
+        if total_j > quantiles[j]:
             return j + 1
     return 0
 
@@ -180,6 +180,7 @@ def min_sample_size(
         quantile_1: Optional pre-computed quantile for the significance level. Calculated if None.
         quantile_2: Optional pre-computed quantile for the power level. Calculated if None.
         initial_estimate: Optional initial estimate for the sample size to speed up calculations.
+        random_state: Optional parameter for data randomisation.
 
     Returns:
         The minimum sample size required per sample/group.
