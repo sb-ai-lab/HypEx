@@ -80,7 +80,7 @@ class Dataset(DatasetBase):
             if any(isinstance(role, r) for r in roles)
         ]
 
-    def add_column(self, data, name: str, role: ABCRole):
+    def add_column(self, data, name: Union[str, int, List], role: ABCRole):
         self.roles.update({name: role})
         self._backend.add_column(data, name)
 
@@ -121,7 +121,9 @@ class ExperimentData(Dataset):
             self.additional_fields = Dataset(data.data)._create_empty(
                 data.index, data.columns
             )
-            self.stats_fields = Dataset(backend)._create_empty(data.index, data.columns)
+            self.stats_fields = Dataset(data.data)._create_empty(
+                data.index, data.columns
+            )
         else:
             self.additional_fields = Dataset(data)
             self.stats_fields = Dataset(data)
@@ -134,34 +136,32 @@ class ExperimentData(Dataset):
         self.stats_fields._create_empty(indexes, columns)
         return self
 
-    # TODO переделать: обновление данных + обновление ролей
-    def add_to_additional_fields(self, data: pd.DataFrame):
-        self.additional_fields.data = self.additional_fields.data.join(data, how="left")
-
-    # TODO переделать: обновление данных + обновление ролей
-    def add_to_stats_fields(self, data: pd.DataFrame):
-        self.stats_fields = self.stats_fields.data.join(data, how="left")
-
     def add_to_analysis_tables(
         self,
-        key: str,
         data: pd.DataFrame,
+        name: Union[str, int],
         roles: Optional[Dict[ABCRole, Union[List[str], str]]] = None,
     ):
-        self.analysis_tables[key] = Dataset(data, roles)
+        self.analysis_tables[name] = Dataset(data, roles)
 
     def set_value(
-        self, space: str, executor_id: int, name: str, value: Any, key: str = None
+        self,
+        space: str,
+        executor_id: int,
+        name: str, value: Any,
+        key: str = None
     ):
         if space == "additional_fields":
-            self.additional_fields[executor_id] = value
+            self.additional_fields.add_column(
+                data=value, name=executor_id, role=StatisticRole
+            )
+            # self.additional_fields[executor_id] = value
         elif space == "stats_fields":
             if executor_id not in self.stats_fields.columns:
                 self.stats_fields.add_column(
-                    data=[None] * len(self.stats_fields),
-                    role={executor_id: StatisticRole},
+                    data=value, name=[executor_id, key], role=StatisticRole
                 )
-            self.stats_fields[executor_id, key] = value
+            # self.stats_fields[executor_id, key] = value
         elif space == "analysis_tables":
-            raise NotImplementedError
+            self.add_to_analysis_tables(value, executor_id, StatisticRole)
         self._id_name_mapping[executor_id] = name
