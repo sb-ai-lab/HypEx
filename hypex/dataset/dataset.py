@@ -1,3 +1,4 @@
+import warnings
 from typing import Dict, Optional, Union, List, Iterable, Any
 
 import pandas as pd
@@ -60,6 +61,12 @@ class Dataset(DatasetBase):
     def __getitem__(self, item):
         return self._backend.__getitem__(item)
 
+    def __setitem__(self, key, value):
+        if key not in self.columns and isinstance(key, str):
+            self.add_column(value, key, StatisticRole)
+            warnings.warn("Column must be added by add_column", category=Warning)
+        self.data[key] = value
+
     @staticmethod
     def _select_backend(data):
         if isinstance(data, pd.DataFrame):
@@ -117,6 +124,7 @@ class Dataset(DatasetBase):
 
 class ExperimentData(Dataset):
     def __init__(self, data: Any):
+        super().__init__(data)
         if isinstance(data, Dataset):
             self.additional_fields = Dataset(data.data)._create_empty(
                 data.index, data.columns
@@ -145,11 +153,7 @@ class ExperimentData(Dataset):
         self.analysis_tables[name] = Dataset(data, roles)
 
     def set_value(
-        self,
-        space: str,
-        executor_id: int,
-        name: str, value: Any,
-        key: str = None
+        self, space: str, executor_id: int, name: str, value: Any, key: str = None
     ):
         if space == "additional_fields":
             self.additional_fields.add_column(
@@ -159,9 +163,11 @@ class ExperimentData(Dataset):
         elif space == "stats_fields":
             if executor_id not in self.stats_fields.columns:
                 self.stats_fields.add_column(
-                    data=value, name=[executor_id, key], role=StatisticRole
+                    data=[None] * len(self.stats_fields),
+                    name=executor_id,
+                    role=StatisticRole,
                 )
-            # self.stats_fields[executor_id, key] = value
+            self.stats_fields[executor_id][key] = value
         elif space == "analysis_tables":
             self.add_to_analysis_tables(value, executor_id, StatisticRole)
         self._id_name_mapping[executor_id] = name
