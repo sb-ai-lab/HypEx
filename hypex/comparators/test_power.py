@@ -7,22 +7,12 @@ from sklearn.utils import shuffle
 from statsmodels.stats.power import TTestIndPower
 
 from hypex.experiment.base import Experiment
+from hypex.dataset.dataset import ExperimentData
+from hypex.dataset.roles import GroupingRole
 
-def split_splited_data(splitted_data:) -> Dict:
-    """Splits a pandas DataFrame into two separate dataframes based on a specified group field.
 
-    Args:
-        splitted_data:
-            The input dataframe to be split
 
-    Returns:
-        A dictionary containing two dataframes, 'test' and 'control', where 'test' contains rows where the
-        group field is 'test', and 'control' contains rows where the group field is 'control'.
-    """
-    return {
-        "control": splitted_data[splitted_data["group"] == "control"],
-        "test": splitted_data[splitted_data["group"] == "test"],
-    }
+# TODO: Replace to groupby
 
 class StatMdeBySize(Experiment):
     mde: float
@@ -31,8 +21,10 @@ class StatMdeBySize(Experiment):
         self.reliability = reliability
         self.power = power
 
-    def execute(self):
-        split_data = split_splited_data(data)
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        group_field = data.get_columns_by_roles(GroupingRole)[0]
+        grouping_data = list(data.groupby(self.group_field))
+
         control_group = split_data["control"]
         test_group = split_data["test"]
 
