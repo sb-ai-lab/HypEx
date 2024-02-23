@@ -8,76 +8,64 @@ from statsmodels.stats.power import TTestIndPower
 
 from hypex.experiment.base import Experiment
 from hypex.dataset.dataset import ExperimentData
-from hypex.dataset.roles import GroupingRole
+from hypex.comparators.comparators import ComparatorInner
 
 
-
-# TODO: Replace to groupby
-
-class StatMdeBySize(Experiment):
-    mde: float
-
-    def __init__(self, reliability: float, power: float):
-        self.reliability = reliability
+class TestPower(ABC, ComparatorInner):
+    def __init__(
+        self,
+        target_field: FieldKey,
+        full_name: str = None,
+        significance: float = 0.95,
+        power: float = 0.8,
+    ):
+        super().__init__(target_field, self.comparison_function, full_name)
+        self.significance = significance
         self.power = power
 
-    def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field = data.get_columns_by_roles(GroupingRole)[0]
-        grouping_data = list(data.groupby(self.group_field))
 
-        control_group = split_data["control"]
-        test_group = split_data["test"]
+class StatMdeBySize(TestPower):
+    def _comparison_function(self, control_data, test_data) -> ExperimentData:
+        m = norm.ppf(1 - self.significance / 2) + norm.ppf(self.power)
 
-        m = norm.ppf(1 - (1 - reliability) / 2) + norm.ppf(power)
-
-        n_test, n_control = len(test_group), len(control_group)
+        n_test, n_control = len(test_data), len(control_data)
         proportion = n_test / (n_test + n_control)
         p = np.sqrt(1 / (proportion * (1 - proportion)))
 
-        var_test, var_control = np.var(test_group, ddof=1), np.var(
-            control_group, ddof=1
-        )
+        var_test, var_control = np.var(test_data, ddof=1), np.var(control_data, ddof=1)
         s = np.sqrt(var_test / n_test + var_control / n_control)
 
-        self.mde = p * m * s
-        return self.mde
+        return p * m * s
 
 
-class StatSampleSizeByMde(Experiment):
-    sample_size: int
-
-    def __init__(self, mde: float, significance: float = 0.05, power: float = 0.8):
+class StatSampleSizeByMde(TestPower):
+    def __init__(
+        self,
+        mde: float,
+        target_field: FieldKey,
+        full_name: str = None,
+        significance: float = 0.05,
+        power: float = 0.8,
+    ):
+        super().__init__(target_field, full_name, significance, power)
         self.mde = mde
-        self.significance = significance
-        self.power = power
 
-    def execute(self, data):
-        split_data = split_splited_data(data)
-        control_group = split_data["control"]
-        test_group = split_data["test"]
+    def _comparison_function(self, control_data, test_data) -> ExperimentData:
+        control_std = control_data.std()
+        test_std = test_data.std()
 
-        control_std = control_group.std()
-        test_std = test_group.std()
-
-        test_proportion = len(test_group) / (len(test_group) + len(control_group))
+        test_proportion = len(test_data) / (len(test_data) + len(control_data))
         control_proportion = 1 - test_proportion
 
-        d = ((norm.ppf(1 - significance / 2) + norm.ppf(power)) / mde) ** 2
+        d = ((norm.ppf(1 - self.significance / 2) + norm.ppf(power)) / self.mde) ** 2
         s = test_std**2 / test_proportion + control_std**2 / control_proportion
-        self.sample_size = int(d * s)
-        return self.sample_size
+        return int(d * s)
 
-class StatPowerByTTestInd(Experiment):
-    power: float
+class StatPowerByTTestInd(TestPower):
 
-    def __init__(self, sample_size: int, significance: float):
-        self.sample_size = sample_size
-        self.significance = significance
-
-    def execute(self, data):
-        split_data = split_splited_data(data)
-        control_size = len(split_data["control"])
-        test_size = len(split_data["test"])
+    def _comparison_function(self, control_data, test_data) -> ExperimentData:
+        control_size = len(control_data)
+        test_size = len(test_data)
 
         analysis = TTestIndPower()
         ratio = test_size / control_size
