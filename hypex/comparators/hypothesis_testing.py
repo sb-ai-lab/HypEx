@@ -6,6 +6,7 @@ from hypex.experiment.base import Executor
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.comparators.comparators import Comparator
 
+# TODO: To Experiment
 class StatHypothesisTestingWithScipy(Comparator):
 
     def __init__(

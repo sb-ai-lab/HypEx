@@ -6,12 +6,12 @@ from hypex.dataset.dataset import ExperimentData
 from hypex.dataset.roles import GroupingRole
 from hypex.utils.hypex_typings import FieldKey
 
-
+# TODO: to Experiment
 class Comparator(Executor):
     def __init__(
         self,
         target_field: FieldKey,
-        comparison_function: Callable,
+        stat: StatDescriptive,
         full_name: str = None,
     ):
         self.target_field = target_field

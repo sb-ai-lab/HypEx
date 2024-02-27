@@ -10,7 +10,7 @@ from hypex.experiment.base import Experiment
 from hypex.dataset.dataset import ExperimentData
 from hypex.comparators.comparators import ComparatorInner
 
-
+# TODO: To Experiment
 class TestPower(ABC, ComparatorInner):
     def __init__(
         self,
