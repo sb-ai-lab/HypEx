@@ -144,6 +144,16 @@ class ExperimentData(Dataset):
         self.stats_fields._create_empty(indexes, columns)
         return self
 
+    def check_hash(self, executor_id: int, space: str) -> bool:
+        if space == "additional_fields":
+            return executor_id in self.additional_fields.columns
+        elif space == "stats_fields":
+            return executor_id in self.stats_fields.columns
+        elif space == "analysis_tables":
+            return executor_id in self.analysis_tables
+        else:
+            raise ValueError(f"{space} is not a valid space")
+
     def set_value(
         self, space: str, executor_id: int, name: str, value: Any, key: str = None
     ):
