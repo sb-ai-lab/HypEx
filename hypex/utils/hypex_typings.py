@@ -5,3 +5,5 @@ StratificationRoleTypes = Union[float, str, datetime.datetime]
 TreatmentRoleTypes = Union[float, bool, str]
 TargetRoleTypes = Union[float, int, bool]
 ABCRoleTypes = Union[Any]
+
+FieldKey = Union[str, int]

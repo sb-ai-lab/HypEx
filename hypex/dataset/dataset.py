@@ -94,10 +94,10 @@ class Dataset(DatasetBase):
     def from_dict(self, data, roles: ABCRole = None):
         raise NotImplementedError
 
-    def _create_empty(self, indexes=None, columns=None):
-        indexes = [] if indexes is None else indexes
+    def _create_empty(self, index=None, columns=None):
+        index = [] if indexes is None else indexes
         columns = [] if columns is None else columns
-        self._backend = self._backend._create_empty(indexes, columns)
+        self._backend = self._backend._create_empty(index, columns)
         self.data = self._backend.data
         return self
 
@@ -111,10 +111,10 @@ class Dataset(DatasetBase):
         return self._backend.unique()
 
     def isin(self, values: Iterable) -> Iterable[bool]:
-        return self._backend.isin(values)
+        raise NotImplementedError
 
-    def groupby(self, by=None, axis=0, level=None):
-        return self._backend.groupby(by=by, axis=axis, level=level)
+    def groupby(self):
+        raise NotImplementedError
 
     @property
     def index(self):

@@ -25,7 +25,7 @@ class DatasetBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def _create_empty(self, indexes=None, columns=None):
+    def _create_empty(self, index=None, columns=None):
         raise NotImplementedError
 
     @abstractmethod
@@ -55,7 +55,7 @@ class DatasetBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def groupby(self, by=None, axis=0, level=None):
+    def groupby(self):
         raise NotImplementedError
 
     def loc(self, values: Iterable) -> Iterable:

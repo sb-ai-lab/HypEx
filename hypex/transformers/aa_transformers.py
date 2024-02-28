@@ -12,5 +12,3 @@ class TransformerSetAAGroup:
         test_data["group"] = "test"
 
         return pd.concat([control_data, test_data])
-
-

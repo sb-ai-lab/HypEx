@@ -18,6 +18,10 @@ class Executor(ABC):
         self._id = id(self)
 
     @abstractmethod
+    def _set_value(self, data: ExperimentData, value) -> ExperimentData:
+        raise NotImplementedError
+
+    @abstractmethod
     def execute(self, data: ExperimentData) -> ExperimentData:
         raise NotImplementedError
 

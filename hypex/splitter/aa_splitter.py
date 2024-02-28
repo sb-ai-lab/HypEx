@@ -4,7 +4,7 @@ from hypex.experiment.experiment import Executor
 from hypex.dataset.dataset import ExperimentData
 from hypex.dataset.roles import GroupingRole, StratificationRole
 
-
+# TODO: To Experiment
 class SplitterAA(Executor):
     def __init__(
         self,
