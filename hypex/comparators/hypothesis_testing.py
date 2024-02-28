@@ -13,8 +13,10 @@ class StatHypothesisTestingWithScipy(ABC, Comparator):
         target_field: str,
         comparison_function: Callable,
         reliability: float = 0.05,
+        full_name: str = None,
+        index: int = 0,
     ):
-        super().__init__(target_field, comparison_function)
+        super().__init__(target_field, comparison_function, full_name, index)
         self.reliability = reliability
 
     def _extract_dataset(self, compare_result: Dict) -> Dataset:

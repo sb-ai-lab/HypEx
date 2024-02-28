@@ -8,11 +8,15 @@ from hypex.experiment.base import Executor
 from hypex.dataset.dataset import ExperimentData
 
 
-class StatDescriptive(Executor):
-    def __init__(self, field, descriptive_func: Callable = None, **kwargs):
+class StatDescriptive(ABC, Executor):
+    def __init__(self, field, full_name=None, index=0, **kwargs):
         self.field = field
-        self.descriptive_func = descriptive_func
         self.kwargs = kwargs
+        super().__init__(full_name, index)
+
+    @abstractmethod
+    def calc(self, data):
+        raise NotImplementedError
 
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
         data.set_value(
@@ -23,50 +27,46 @@ class StatDescriptive(Executor):
     @abstractmethod
     def execute(self, data: ExperimentData) -> ExperimentData:
         return self._set_value(
-            data, self.descriptive_func(data[self.field], **self.kwargs)
+            data, self.calc(data[self.field])
         )
 
 
 class StatMean(StatDescriptive):
-    def __init__(self, field: str):
-        super().__init__(field, np.mean)
-
+    def calc(self, data):
+        return np.mean(data, **self.kwargs)
 
 class StatMedian(StatDescriptive):
-    def __init__(self, field: str):
-        super().__init__(field, np.median)
-
+    def calc(self, data):
+        return np.median(data, **self.kwargs)
 
 class StatMode(StatDescriptive):
-    def __init__(self, field: str):
-        super().__init__(field, mode)
+    def calc(self, data):
+        return mode(data, **self.kwargs)
 
 
 class StatStd(StatDescriptive):
-    def __init__(self, field: str, ddof=0):
-        super().__init__(field, np.std, ddof=ddof)
+    def calc(self, data):
+        return np.std(data, **self.kwargs)
 
 
 class StatVariance(StatDescriptive):
-    def __init__(self, field: str, ddof=0):
-        super().__init__(field, np.var, ddof=ddof)
+    def calc(self, data):
+        return np.var(data, **self.kwargs)
 
 
 class StatMin(StatDescriptive):
-    def __init__(self, field: str):
-        super().__init__(field, np.min)
-
+    def calc(self, data):
+        return np.min(data, **self.kwargs)
 
 class StatMax(StatDescriptive):
-    def __init__(self, field: str):
-        super().__init__(field, np.max)
+    def calc(self, data):
+        return np.max(data, **self.kwargs)
 
 
 class StatRange(StatDescriptive):
     def __init__(self, field: str):
         super().__init__(field, np.ptp)
 
-
 class StatSize(StatDescriptive):
-    def __init__(self, field: str):
-        super().__init__(field, len)
+    def calc(self, data):
+        return len(data, **self.kwargs)

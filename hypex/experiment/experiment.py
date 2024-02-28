@@ -35,9 +35,9 @@ class Experiment(Executor):
     def generate_full_name(self) -> str:
         return f"Experiment({len(self.executors)})"
 
-    def __init__(self, executors: Iterable[Executor], full_name: str = None):
+    def __init__(self, executors: Iterable[Executor], full_name: str = None, index: int = 0):
         self.executors: Iterable[Executor] = executors
-        super().__init__(full_name)
+        super().__init__(full_name, index)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data: ExperimentData = data
@@ -58,11 +58,12 @@ class CycledExperiment(Executor):
         n_iterations: int,
         analyzer: Analyzer,
         full_name: str = None,
+        index: int = 0
     ):
         self.inner_experiment: Experiment = inner_experiment
         self.n_iterations: int = n_iterations
         self.analyzer: Analyzer = analyzer
-        super().__init__(full_name)
+        super().__init__(full_name, index)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         for _ in range(self.n_iterations):

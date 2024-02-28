@@ -11,9 +11,10 @@ class Comparator(ABC, Executor):
         self,
         target_field: FieldKey,
         full_name: str = None,
+        index: int = 0,
     ):
         self.target_field = target_field
-        super().__init__(full_name)
+        super().__init__(full_name, index)
 
     @abstractmethod
     def _comparison_function(self, control_data, test_data) -> ExperimentData:
