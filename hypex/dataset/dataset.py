@@ -91,6 +91,9 @@ class Dataset(DatasetBase):
         self.roles.update({name: role})
         self._backend.add_column(data, name)
 
+    def from_dict(self, data, roles: ABCRole = None):
+        raise NotImplementedError
+
     def _create_empty(self, indexes=None, columns=None):
         indexes = [] if indexes is None else indexes
         columns = [] if columns is None else columns

@@ -21,6 +21,10 @@ class DatasetBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def from_dict(self, data):
+        raise NotImplementedError
+
+    @abstractmethod
     def _create_empty(self, indexes=None, columns=None):
         raise NotImplementedError
 
