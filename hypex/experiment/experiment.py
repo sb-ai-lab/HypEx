@@ -7,15 +7,20 @@ from hypex.analyzer.analyzer import Analyzer
 
 
 class Executor(ABC):
-    full_name: str
-    _id: int
-
     def generate_full_name(self) -> str:
         return self.__class__.__name__
 
-    def __init__(self, full_name: str = None):
+    def generate_params_hash(self) -> str:
+        return ""
+
+    def generate_id(self) -> str:
+        return "|".join([self.full_name, self.params_hash, str(self.index)])
+
+    def __init__(self, full_name: str = None, index: int = 0):
         self.full_name = full_name or self.generate_full_name()
-        self._id = id(self)
+        self.index = index
+        self.params_hash = self.generate_params_hash()
+        self._id = generate_id()
 
     @abstractmethod
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:

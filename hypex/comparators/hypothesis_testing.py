@@ -6,8 +6,7 @@ from hypex.experiment.base import Executor
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.comparators.comparators import Comparator
 
-# TODO: To Experiment
-class StatHypothesisTestingWithScipy(Comparator):
+class StatHypothesisTestingWithScipy(ABC, Comparator):
 
     def __init__(
         self,
@@ -31,13 +30,9 @@ class StatHypothesisTestingWithScipy(Comparator):
         return Dataset(result_stats)
 
 class StatTTest(StatHypothesisTestingWithScipy):
-    def __init__(
-        self,
-        target_field: str,
-        reliability: float = 0.05,
-    ):
-        super().__init__(target_field, ttest_ind, reliability)
+    def _comparison_function(self, control_data, test_data) -> ExperimentData:
+        return ttest_ind(control_data, test_data)
 
 class StatKSTest(StatHypothesisTestingWithScipy):
-    def __init__(self, target_field: str, reliability: float = 0.05):
-        super().__init__(target_field, ks_2samp, reliability)
+    def _comparison_function(self, control_data, test_data) -> ExperimentData:
+        return ttest_ind(control_data, test_data)

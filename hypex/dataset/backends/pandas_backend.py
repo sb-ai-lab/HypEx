@@ -33,7 +33,7 @@ class PandasDataset(DatasetBase):
         return self.data.__repr__()
 
     def _create_empty(self, index=None, columns=None):
-        self.data = pd.DataFrame(index=indexes, columns=columns)
+        self.data = pd.DataFrame(index=index, columns=columns)
         return self
 
     def add_column(self, data, name):

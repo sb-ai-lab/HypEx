@@ -10,7 +10,6 @@ from hypex.experiment.base import Experiment
 from hypex.dataset.dataset import ExperimentData
 from hypex.comparators.comparators import ComparatorInner
 
-# TODO: To Experiment
 class TestPower(ABC, ComparatorInner):
     def __init__(
         self,
@@ -50,6 +49,7 @@ class StatSampleSizeByMde(TestPower):
         super().__init__(target_field, full_name, significance, power)
         self.mde = mde
 
+    # TODO: rework by ExperimentData checking
     def _comparison_function(self, control_data, test_data) -> ExperimentData:
         control_std = control_data.std()
         test_std = test_data.std()

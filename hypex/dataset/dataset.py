@@ -92,7 +92,7 @@ class Dataset(DatasetBase):
         self._backend.add_column(data, name)
 
     def _create_empty(self, index=None, columns=None):
-        index = [] if indexes is None else indexes
+        index = [] if index is None else index
         columns = [] if columns is None else columns
         self._backend = self._backend._create_empty(index, columns)
         self.data = self._backend.data
@@ -127,7 +127,7 @@ class ExperimentData(Dataset):
         super().__init__(data)
         if isinstance(data, Dataset):
             self.additional_fields = Dataset(data.data)._create_empty(
-                indexes=data.index
+                index==data.index
             )
             self.stats_fields = Dataset(data.data)._create_empty(
                 index=data.columns
@@ -139,9 +139,9 @@ class ExperimentData(Dataset):
         self.analysis_tables = {}
         self._id_name_mapping = {}
 
-    def _create_empty(self, indexes=None, columns=None):
-        self.additional_fields._create_empty(indexes, columns)
-        self.stats_fields._create_empty(indexes, columns)
+    def _create_empty(self, index=None, columns=None):
+        self.additional_fields._create_empty(index, columns)
+        self.stats_fields._create_empty(index, columns)
         return self
 
     def check_hash(self, executor_id: int, space: str) -> bool:

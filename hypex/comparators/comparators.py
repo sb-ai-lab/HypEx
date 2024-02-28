@@ -6,7 +6,6 @@ from hypex.dataset.dataset import ExperimentData
 from hypex.dataset.roles import GroupingRole
 from hypex.utils.hypex_typings import FieldKey
 
-# TODO: to Experiment
 class Comparator(ABC, Executor):
     def __init__(
         self,
