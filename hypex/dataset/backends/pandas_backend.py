@@ -1,4 +1,4 @@
-from typing import Sequence, Union, Iterable, Dict
+from typing import Sequence, Union, Iterable, List, Dict
 
 import pandas as pd
 
@@ -36,8 +36,8 @@ class PandasDataset(DatasetBase):
         self.data = pd.DataFrame(index=indexes, columns=columns)
         return self
 
-    def from_dict(self, data: Dict):
-        self.data = pd.DataFrame(data)
+    def from_dict(self, data: List[Dict]):
+        self.data = pd.DataFrame().from_records(data)
         return self
 
     def add_column(self, data, name):
