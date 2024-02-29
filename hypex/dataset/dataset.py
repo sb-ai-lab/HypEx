@@ -1,5 +1,5 @@
 import warnings
-from typing import Dict, Optional, Union, List, Iterable, Any
+from typing import Dict, Optional, Union, List, Iterable, Any, Type
 
 import pandas as pd
 from pandas import DataFrame
@@ -33,9 +33,15 @@ class Dataset(DatasetBase):
         def __getitem__(self, item):
             return self.backend.iloc(item)
 
-    def set_data(self, data: Union[DataFrame, str] = None, roles=None):
+    def set_data(
+        self, data: Union[DataFrame, str, Type] = None, roles: Union[Dict] = None
+    ):
+        data = data() if isinstance(data, type) else data
         self.roles = parse_roles(roles)
-        self._backend = self._select_backend(data)
+        if isinstance(data, PandasDataset):
+            self._backend = data
+        else:
+            self._backend = self._select_backend(data)
         self.data = self._backend.data
         self.loc = self.Locker(self._backend)
         self.iloc = self.ILocker(self._backend)
@@ -91,6 +97,11 @@ class Dataset(DatasetBase):
         self.roles.update({name: role})
         self._backend.add_column(data, name)
 
+    def from_dict(self, data):
+        self._backend = self._backend.from_dict(data)
+        self.data = self._backend.data
+        return self
+
     def _create_empty(self, index=None, columns=None):
         index = [] if index is None else index
         columns = [] if columns is None else columns
@@ -108,10 +119,10 @@ class Dataset(DatasetBase):
         return self._backend.unique()
 
     def isin(self, values: Iterable) -> Iterable[bool]:
-        raise NotImplementedError
+        return self._backend.isin(values)
 
-    def groupby(self):
-        raise NotImplementedError
+    def groupby(self, by=None, axis=0, level=None):
+        return self._backend.groupby(by=by, axis=axis, level=level)
 
     @property
     def index(self):
@@ -126,6 +137,8 @@ class ExperimentData(Dataset):
     def __init__(self, data: Any):
         super().__init__(data)
         if isinstance(data, Dataset):
+            self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
+            self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
             self.additional_fields = Dataset(data.data)._create_empty(
                 index==data.index
             )
@@ -153,6 +166,11 @@ class ExperimentData(Dataset):
             return executor_id in self.analysis_tables
         else:
             raise ValueError(f"{space} is not a valid space")
+
+    def _create_empty(self, indexes=None, columns=None):
+        self.additional_fields._create_empty(indexes, columns)
+        self.stats_fields._create_empty(indexes, columns)
+        return self
 
     def set_value(
         self, space: str, executor_id: int, name: str, value: Any, key: str = None
