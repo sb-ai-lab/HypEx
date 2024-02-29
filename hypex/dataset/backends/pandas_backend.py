@@ -30,14 +30,15 @@ class PandasDataset(DatasetBase):
         return len(self.data)
 
     def __repr__(self):
-        return self.data.__repr__()
+        return self.__class__.__name__
 
-    def _create_empty(self, index=None, columns=None):
+    def _create_empty(self, indexes=None, columns=None):
         self.data = pd.DataFrame(index=indexes, columns=columns)
         return self
 
     def from_dict(self, data: Dict):
         self.data = pd.DataFrame(data)
+        return self
 
     def add_column(self, data, name):
         self.data[name] = data
