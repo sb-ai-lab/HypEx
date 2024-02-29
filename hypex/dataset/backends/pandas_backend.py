@@ -1,4 +1,4 @@
-from typing import Sequence, Union, Iterable
+from typing import Sequence, Union, Iterable, List, Dict
 
 import pandas as pd
 
@@ -30,10 +30,14 @@ class PandasDataset(DatasetBase):
         return len(self.data)
 
     def __repr__(self):
-        return self.data.__repr__()
+        return self.data
 
     def _create_empty(self, index=None, columns=None):
         self.data = pd.DataFrame(index=index, columns=columns)
+        return self
+
+    def from_dict(self, data: List[Dict]):
+        self.data = pd.DataFrame().from_records(data)
         return self
 
     def add_column(self, data, name):
@@ -57,10 +61,10 @@ class PandasDataset(DatasetBase):
         return self.data.columns
 
     def isin(self, values: Iterable) -> Iterable[bool]:
-        raise NotImplementedError
+        return self.data.isin(values)
 
-    def groupby(self):
-        raise NotImplementedError
+    def groupby(self, by, axis, **kwargs):
+        return self.data.groupby(by, axis, **kwargs)
 
     def loc(self, items: Iterable) -> Iterable:
         return self.data.loc[items]
