@@ -139,12 +139,23 @@ class ExperimentData(Dataset):
         if isinstance(data, Dataset):
             self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
             self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
+            self.additional_fields = Dataset(data.data)._create_empty(
+                index==data.index
+            )
+            self.stats_fields = Dataset(data.data)._create_empty(
+                index=data.columns
+            )
         else:
             self.additional_fields = Dataset(data)
             self.stats_fields = Dataset(data)
 
         self.analysis_tables = {}
         self._id_name_mapping = {}
+
+    def _create_empty(self, index=None, columns=None):
+        self.additional_fields._create_empty(index, columns)
+        self.stats_fields._create_empty(index, columns)
+        return self
 
     def check_hash(self, executor_id: int, space: str) -> bool:
         if space == "additional_fields":

@@ -5,14 +5,16 @@ from hypex.dataset.dataset import ExperimentData
 from hypex.dataset.roles import GroupingRole, StratificationRole
 
 # TODO: To Experiment
+# TODO: Set group
 class SplitterAA(Executor):
     def __init__(
         self,
-        full_name: str = None,
         test_size: float = 0.5,
         random_state: int = None,
+        full_name: str = None,
+        index: int = 0
     ):
-        super().__init__(full_name)
+        super().__init__(full_name, index)
         self.test_size = test_size
         self.random_state = random_state
 
@@ -50,9 +52,11 @@ class SplitterAAWithStratification(SplitterAA):
         inner_splitter: SplitterAA,
         test_size: float = 0.5,
         random_state: int = None,
+        full_name: str = None,
+        index: int = 0
     ):
         self.inner_splitter = inner_splitter
-        super().__init__(test_size, random_state)
+        super().__init__(test_size, random_state, full_name, index)
 
     def execute(self, data):
         control_indexes = []
