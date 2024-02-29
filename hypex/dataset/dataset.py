@@ -127,7 +127,7 @@ class ExperimentData(Dataset):
         super().__init__(data)
         if isinstance(data, Dataset):
             self.additional_fields = Dataset(data.data)._create_empty(
-                index==data.index
+                index=data.index
             )
             self.stats_fields = Dataset(data.data)._create_empty(
                 index=data.columns
