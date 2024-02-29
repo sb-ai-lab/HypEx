@@ -30,10 +30,10 @@ class PandasDataset(DatasetBase):
         return len(self.data)
 
     def __repr__(self):
-        return self.__class__.__name__
+        return self.data
 
-    def _create_empty(self, indexes=None, columns=None):
-        self.data = pd.DataFrame(index=indexes, columns=columns)
+    def _create_empty(self, index=None, columns=None):
+        self.data = pd.DataFrame(index=index, columns=columns)
         return self
 
     def from_dict(self, data: List[Dict]):
@@ -63,8 +63,8 @@ class PandasDataset(DatasetBase):
     def isin(self, values: Iterable) -> Iterable[bool]:
         return self.data.isin(values)
 
-    def groupby(self, by, axis, level):
-        return self.data.groupby(by, axis, level)
+    def groupby(self, by, axis, **kwargs):
+        return self.data.groupby(by, axis, **kwargs)
 
     def loc(self, items: Iterable) -> Iterable:
         return self.data.loc[items]

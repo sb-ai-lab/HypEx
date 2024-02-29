@@ -1,5 +1,5 @@
 import warnings
-from typing import Dict, Optional, Union, List, Iterable, Any, Type, AnyStr
+from typing import Dict, Optional, Union, List, Iterable, Any, Type
 
 import pandas as pd
 from pandas import DataFrame
@@ -33,8 +33,10 @@ class Dataset(DatasetBase):
         def __getitem__(self, item):
             return self.backend.iloc(item)
 
-    def set_data(self, data: Union[DataFrame, AnyStr, Type] = None, roles: Dict = None):
-        data = data() if isinstance(data, Type) else data
+    def set_data(
+        self, data: Union[DataFrame, str, Type] = None, roles: Union[Dict] = None
+    ):
+        data = data() if isinstance(data, type) else data
         self.roles = parse_roles(roles)
         if isinstance(data, PandasDataset):
             self._backend = data
@@ -81,11 +83,6 @@ class Dataset(DatasetBase):
                 return PandasDataset(check_data)
         return None
 
-    @staticmethod
-    def _dataset_from_backend(data):
-        if data == PandasDataset:
-            return PandasDataset
-
     def get_columns_by_roles(
         self, roles: Union[ABCRole, Iterable[ABCRole]]
     ) -> List[str]:
@@ -105,8 +102,8 @@ class Dataset(DatasetBase):
         self.data = self._backend.data
         return self
 
-    def _create_empty(self, indexes=None, columns=None):
-        index = [] if indexes is None else indexes
+    def _create_empty(self, index=None, columns=None):
+        index = [] if index is None else index
         columns = [] if columns is None else columns
         self._backend = self._backend._create_empty(index, columns)
         self.data = self._backend.data
@@ -140,12 +137,8 @@ class ExperimentData(Dataset):
     def __init__(self, data: Any):
         super().__init__(data)
         if isinstance(data, Dataset):
-            self.additional_fields = Dataset(data.data)._create_empty(
-                data.index, data.columns
-            )
-            self.stats_fields = Dataset(data.data)._create_empty(
-                data.index, data.columns
-            )
+            self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
+            self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
         else:
             self.additional_fields = Dataset(data)
             self.stats_fields = Dataset(data)
@@ -153,18 +146,20 @@ class ExperimentData(Dataset):
         self.analysis_tables = {}
         self._id_name_mapping = {}
 
+    def check_hash(self, executor_id: int, space: str) -> bool:
+        if space == "additional_fields":
+            return executor_id in self.additional_fields.columns
+        elif space == "stats_fields":
+            return executor_id in self.stats_fields.columns
+        elif space == "analysis_tables":
+            return executor_id in self.analysis_tables
+        else:
+            raise ValueError(f"{space} is not a valid space")
+
     def _create_empty(self, indexes=None, columns=None):
         self.additional_fields._create_empty(indexes, columns)
         self.stats_fields._create_empty(indexes, columns)
         return self
-
-    def add_to_analysis_tables(
-        self,
-        data: pd.DataFrame,
-        name: Union[str, int],
-        roles: Optional[Dict[ABCRole, Union[List[str], str]]] = None,
-    ):
-        self.analysis_tables[name] = Dataset(data, roles)
 
     def set_value(
         self, space: str, executor_id: int, name: str, value: Any, key: str = None
@@ -173,7 +168,8 @@ class ExperimentData(Dataset):
             self.additional_fields.add_column(
                 data=value, name=executor_id, role=StatisticRole
             )
-            # self.additional_fields[executor_id] = value
+        elif space == "analysis_tables":
+            self.analysis_tables[name] = value
         elif space == "stats_fields":
             if executor_id not in self.stats_fields.columns:
                 self.stats_fields.add_column(
@@ -182,6 +178,4 @@ class ExperimentData(Dataset):
                     role=StatisticRole,
                 )
             self.stats_fields[executor_id][key] = value
-        elif space == "analysis_tables":
-            self.add_to_analysis_tables(value, executor_id, StatisticRole)
         self._id_name_mapping[executor_id] = name
