@@ -10,16 +10,16 @@ from hypex.experiment.base import Experiment
 from hypex.dataset.dataset import ExperimentData
 from hypex.comparators.comparators import ComparatorInner
 
-# TODO: To Experiment
 class TestPower(ABC, ComparatorInner):
     def __init__(
         self,
         target_field: FieldKey,
-        full_name: str = None,
         significance: float = 0.95,
         power: float = 0.8,
+        full_name: str = None,
+        index: int = 0
     ):
-        super().__init__(target_field, self.comparison_function, full_name)
+        super().__init__(target_field, self.comparison_function, full_name, index)
         self.significance = significance
         self.power = power
 
@@ -43,13 +43,15 @@ class StatSampleSizeByMde(TestPower):
         self,
         mde: float,
         target_field: FieldKey,
-        full_name: str = None,
         significance: float = 0.05,
         power: float = 0.8,
+        full_name: str = None,
+        index: int = 0
     ):
-        super().__init__(target_field, full_name, significance, power)
+        super().__init__(target_field, significance, power, full_name, index)
         self.mde = mde
 
+    # TODO: rework by ExperimentData checking
     def _comparison_function(self, control_data, test_data) -> ExperimentData:
         control_std = control_data.std()
         test_std = test_data.std()
