@@ -22,9 +22,19 @@ class Executor(ABC):
         self.params_hash = self.generate_params_hash()
         self._id = generate_id()
 
+    @property
+    def __is_transformer(self) -> bool:
+        return False
+
     @abstractmethod
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
         raise NotImplementedError
+
+    def __is_transformer(self):
+        return False
+
+    def reverse(self, data: ExperimentData) -> ExperimentData:
+        return data
 
     @abstractmethod
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -35,9 +45,17 @@ class Experiment(Executor):
     def generate_full_name(self) -> str:
         return f"Experiment({len(self.executors)})"
 
-    def __init__(self, executors: Iterable[Executor], full_name: str = None, index: int = 0):
+    def __init__(
+        self, executors: Iterable[Executor], transform_mode: str = None, full_name: str = None, index: int = 0
+    ):
         self.executors: Iterable[Executor] = executors
         super().__init__(full_name, index)
+
+    def reverse(self, data: ExperimentData) -> ExperimentData:
+        for executor in reversed(self.executors):
+            if executor.__is_transformer():
+                data = executor.reverse(data)
+        return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data: ExperimentData = data
@@ -58,7 +76,7 @@ class CycledExperiment(Executor):
         n_iterations: int,
         analyzer: Analyzer,
         full_name: str = None,
-        index: int = 0
+        index: int = 0,
     ):
         self.inner_experiment: Experiment = inner_experiment
         self.n_iterations: int = n_iterations
