@@ -168,6 +168,7 @@ class FaissMatcher:
         self.results = {}
         self.ATE = None
         self.refuter = refuter
+        self.delta_t = None
         self.sigma = sigma
         self.quality_dict = {}
         self.rep_dict = None
@@ -281,6 +282,8 @@ class FaissMatcher:
 
             y_match_treated_bias = y_treated - y_match_treated + bias_t
             y_match_untreated_bias = y_match_untreated - y_untreated - bias_c
+
+            self.delta_t = round(abs(bias_t.mean()) * 100 / abs(y_match_treated_bias.mean()), 1)
 
             self.dict_outcome_untreated[outcome] = y_untreated
             self.dict_outcome_untreated[outcome + POSTFIX] = y_match_untreated
@@ -766,6 +769,8 @@ class FaissMatcher:
             DataFrame containing ATE, ATC, and ATT results
         """
         result = (self.ATE, self.ATC, self.ATT)
+        if not self.validation:
+            logger.info(f"The entry of bias into the ATT is {str(self.delta_t) + '%'}")
 
         for outcome in self.outcomes:
             res = pd.DataFrame(
