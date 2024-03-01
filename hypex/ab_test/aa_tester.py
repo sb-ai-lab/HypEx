@@ -908,6 +908,47 @@ class AATest:
             s = test_std**2 / test_proportion + control_std**2 / control_proportion
             return d * s
 
+    def calc_imbalanced_sample_size(
+            self,
+            target_data: pd.Series,
+            expected_mean: float,
+            proportion: float = 0.5,
+            power: float = 0.8
+    ) -> Tuple:
+        """Calculates imbalanced sample size for control and test group.
+
+        Args:
+            target_data:
+                The control group as a pandas Series
+            expected_mean:
+                Expected conversion of test group
+            proportion:
+                Proportion of control group
+            power:
+                Power of criterion
+
+        Returns:
+            Tuple with size for control and test group
+        """
+        target_mean = target_data.mean()
+
+        if target_mean == expected_mean:
+            raise ValueError('Current conversion and expected conversion are equal!')
+
+        proportion = (1 - proportion) / proportion
+        z_alpha = norm.ppf(1 - self.alpha / 2)
+        z_power = norm.ppf(power)
+        if target_data.nunique() == 2:
+            h_cohen = 2 * np.arcsin(target_mean ** .5) - 2 * np.arcsin(expected_mean ** .5)
+            control_size = (1 + proportion) / proportion * ((z_alpha + z_power) / h_cohen) ** 2
+        else:
+            mde = abs(expected_mean - target_mean)
+            control_size = (1 + proportion) / proportion * (target_data.std() ** 2) \
+                           * (z_alpha + z_power) ** 2 / mde ** 2
+        test_size = proportion * control_size
+
+        return np.int32(np.ceil(control_size)), np.int32(np.ceil(test_size))
+
     @staticmethod
     def calc_power(
         effect_size: float,
