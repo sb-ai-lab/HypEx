@@ -122,7 +122,7 @@ def create_test_data(
     # Setting the signup month (for ease of analysis)
     i = 3
     data = (
-        data[data.signup_month.isin([0, i])]
+        data
         .groupby(["user_id", "signup_month", "treat"])
         .apply(
             lambda x: pd.Series(
