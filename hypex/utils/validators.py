@@ -91,14 +91,14 @@ def test_significance(estimate: float, simulations: List) -> float:
     return p_value
 
 
-def emissions(df: pd.DataFrame, treatment: str, treat: int, outcome: str, low: float, high: float) -> tuple:
+def emissions(df: pd.DataFrame, treatment: str, is_treated: int, outcome: str, low: float, high: float) -> tuple:
     """
     Removes outliers in the target beyond the 1st and 99th percentiles.
 
     Args:
         df: The initial dataframe.
         treatment: Column name representing the treatment.
-        treat: Value indicating whether a row is treated or not.
+        is_treated: Value indicating whether a row is treated or not.
         outcome: Column name with the target.
         low: Lower threshold for removing emissions.
         high: Upper threshold for removing emissions.
@@ -109,12 +109,12 @@ def emissions(df: pd.DataFrame, treatment: str, treat: int, outcome: str, low: f
             - The number of emissions removed.
             - The percentage of emissions removed.
     """
-    df_treat = df.loc[df[treatment] == treat].copy()
+    df_treat = df.loc[df[treatment] == is_treated].copy()
     Q3, Q1 = np.nanpercentile(df_treat[outcome], [high, low])
     df_new = df_treat.loc[df_treat[outcome].between(Q1, Q3)]
 
     count = df_treat.shape[0] - df_new.shape[0]
     percent = round(count * 100 / df_treat.shape[0], 1)
-    frames = [df_new, df[df[treatment] != treat]]
+    frames = [df_new, df[df[treatment] != is_treated]]
     df_full = pd.concat(frames, axis=0)
     return df_full, count, percent
