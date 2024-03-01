@@ -71,19 +71,20 @@ class FaissMatcher:
     """A class used to match instances using Faiss library."""
 
     def __init__(
-        self,
-        df: pd.DataFrame,
-        outcomes: str,
-        treatment: str,
-        info_col: list,
-        features: [list, pd.DataFrame] = None,
-        group_col: Union[str, list] = None,
-        weights: dict = None,
-        sigma: float = 1.96,
-        validation: bool = None,
-        n_neighbors: int = 10,
-        silent: bool = True,
-        pbar: bool = True,
+            self,
+            df: pd.DataFrame,
+            outcomes: str,
+            treatment: str,
+            info_col: list,
+            features: [list, pd.DataFrame] = None,
+            group_col: Union[str, list] = None,
+            weights: dict = None,
+            sigma: float = 1.96,
+            validation: bool = None,
+            refuter: str = "random_feature",
+            n_neighbors: int = 10,
+            silent: bool = True,
+            pbar: bool = True,
     ):
         """Construct all the necessary attributes.
 
@@ -166,6 +167,7 @@ class FaissMatcher:
         self.orig_untreated_index = None
         self.results = {}
         self.ATE = None
+        self.refuter = refuter
         self.sigma = sigma
         self.quality_dict = {}
         self.rep_dict = None
@@ -658,7 +660,10 @@ class FaissMatcher:
         self._calculate_ate_all_target(df_matched)
 
         if self.validation:
-            return self.val_dict
+            if self.refuter == "emissions":
+                return self.report_view()
+            else:
+                return self.val_dict
 
         return self.report_view(), df_matched
 
@@ -704,7 +709,10 @@ class FaissMatcher:
         self._calculate_ate_all_target(df_matched)
 
         if self.validation:
-            return self.val_dict
+            if self.refuter == "emissions":
+                return self.report_view()
+            else:
+                return self.val_dict
 
         return self.report_view(), df_matched
 
