@@ -597,6 +597,52 @@ class FaissMatcher:
 
         return self.quality_dict
 
+    def _group_match_attribute(self) -> pd.DataFrame:
+        """Modifies the dataframe, removing categories for grouping for which it
+         is impossible to perform a Cholesky decomposition.
+
+        Returns:
+            Dataframe with deleted categories.
+
+        """
+        df = self.df.drop(columns=self.info_col)
+        groups = sorted(df[self.group_col].unique())
+        group_error = []
+
+        for group in groups:
+            df_group = df[df[self.group_col] == group]
+            temp = df_group[self.columns_match + [self.group_col]]
+            temp = temp.loc[:, (temp != 0).any(axis=0)].drop(columns=self.group_col)
+
+            treated, untreated = self._get_split(temp)
+
+            xc = untreated.to_numpy()
+            xt = treated.to_numpy()
+
+            cov_c = np.cov(xc, rowvar=False, ddof=0)
+            cov_t = np.cov(xt, rowvar=False, ddof=0)
+            cov = (cov_c + cov_t) / 2
+
+            epsilon = 1e-3
+            cov = cov + np.eye(cov.shape[0]) * epsilon
+            try:
+                np.linalg.cholesky(cov)
+            except:
+                if not self.validation:
+                    logger.info(f'Grouping by attribute {group} is not possible')
+                group_error.append(group)
+
+                treated_duplicated = treated.columns[treated.T.duplicated()].values
+                untreated_duplicated = untreated.columns[untreated.T.duplicated()].values
+                if treated_duplicated is not [] and not self.validation:
+                    logger.info(f'The data has the duplicate columns: {treated_duplicated} in test group')
+                if untreated_duplicated is not [] and not self.validation:
+                    logger.info(f'The data has the duplicate columns: {untreated_duplicated} in control group')
+
+        df_group_positive = self.df[~self.df[self.group_col].isin(group_error)]
+
+        return df_group_positive
+
     def group_match(self):
         """Matches the dataframe if it divided by groups.
 
@@ -604,6 +650,7 @@ class FaissMatcher:
             A tuple containing the matched dataframe and metrics such as ATE, ATT and ATC
 
         """
+        self.df = self._group_match_attribute()
         df = self.df.drop(columns=self.info_col)
         groups = sorted(df[self.group_col[0]].unique())
         matches_c = []
@@ -622,9 +669,7 @@ class FaissMatcher:
             temp = temp.loc[:, (temp != 0).any(axis=0)].drop(columns=self.group_col[0])
             treated, untreated = self._get_split(temp)
 
-            std_treated_np, std_untreated_np = _transform_to_np(
-                treated, untreated, self.weights
-            )
+            std_treated_np, std_untreated_np = _transform_to_np(treated, untreated, self.weights, self.validation)
 
             if self.pbar:
                 self.tqdm.set_description(desc=f"Get untreated index by group {group}")
@@ -680,9 +725,7 @@ class FaissMatcher:
         df = self.df[self.columns_match]
         treated, untreated = self._get_split(df)
 
-        std_treated_np, std_untreated_np = _transform_to_np(
-            treated, untreated, self.weights
-        )
+        std_treated_np, std_untreated_np = _transform_to_np(treated, untreated, self.weights, self.validation)
 
         if self.pbar:
             self.tqdm = tqdm(total=len(std_treated_np) + len(std_untreated_np))
@@ -794,10 +837,10 @@ def _get_index(base: np.ndarray, new: np.ndarray, n_neighbors: int) -> list:
     return indexes
 
 
-def _transform_to_np(
-    treated: pd.DataFrame, untreated: pd.DataFrame, weights: dict
-) -> Tuple[np.ndarray, np.ndarray]:
+def _transform_to_np(treated: pd.DataFrame, untreated: pd.DataFrame, weights: dict, validation: bool) -> Tuple[
+    np.ndarray, np.ndarray]:
     """Transforms df to numpy and transform via Cholesky decomposition.
+    If there are features that cannot be decomposed Cholesky, these features are removed.
 
     Args:
         treated:
@@ -806,19 +849,52 @@ def _transform_to_np(
             Control subset DataFrame to be transformed
         weights:
             Dict with weights for each feature. By default is 1
+        validation:
+            Flag is validation
+
 
     Returns:
         A tuple of transformed numpy arrays for treated and untreated data respectively
     """
+    ## TODO: Create one more function for calculating cov
     xc = untreated.to_numpy()
     xt = treated.to_numpy()
 
-    cov = conditional_covariance(xc, xt)
+    cov_c = np.cov(xc, rowvar=False, ddof=0)
+    cov_t = np.cov(xt, rowvar=False, ddof=0)
+    cov = (cov_c + cov_t) / 2
 
     epsilon = 1e-3
-    cov = cov + np.eye(cov.shape[0]) * epsilon
 
-    L = np.linalg.cholesky(cov)
+    cov = cov + np.eye(cov.shape[0]) * epsilon
+    try:
+        L = np.linalg.cholesky(cov)
+
+    except:  # Вносим заглушку для удаления колонок без группировки, если таковые имеются
+
+        treated_duplicated = list(treated.columns[treated.T.duplicated()].values)
+        untreated_duplicated = list(untreated.columns[untreated.T.duplicated()].values)
+        if treated_duplicated is not [] and not validation:
+            logger.info(f'The data has the duplicate columns: {treated_duplicated} in test group')
+        if untreated_duplicated is not [] and not validation:
+            logger.info(f'The data has the duplicate columns: {untreated_duplicated} in control group')
+
+        columns_duplicated = set(treated_duplicated + untreated_duplicated)
+        treated = treated.drop(columns=columns_duplicated)
+        untreated = untreated.drop(columns=columns_duplicated)
+
+        xc = untreated.to_numpy()
+        xt = treated.to_numpy()
+
+        cov_c = np.cov(xc, rowvar=False, ddof=0)
+        cov_t = np.cov(xt, rowvar=False, ddof=0)
+        cov = (cov_c + cov_t) / 2
+
+        epsilon = 1e-3
+
+        cov = cov + np.eye(cov.shape[0]) * epsilon
+        L = np.linalg.cholesky(cov)
+
     mahalanobis_transform = np.linalg.inv(L)
     if weights is not None:
         features = treated.columns
