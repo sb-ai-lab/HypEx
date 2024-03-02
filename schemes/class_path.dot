@@ -1,0 +1,170 @@
+digraph ClassPath{
+    compound=true
+
+    subgraph abstracts{
+        node [shape=egg style=filled fillcolor=silver]
+        abstract_class[label="abstract"]
+        abstract_object[label="abstract object"]
+
+        Executor
+        AbstractHypothesis
+    }
+
+    subgraph modules{
+        node [shape=box style=filled fillcolor=cornflowerblue]
+        module
+        factory_legend[label="Factory"]
+        created_object[label="created object"]
+        inner_object[label="inner object"]
+        implementation
+
+
+        Dataset
+        Factory
+        Experiment
+        Pipeline
+        Hypothesis
+
+        // --------------------------------------
+        Matcher
+        ReportMatcher [label="Report"]
+        TransformerMatchingValidation [label="Transformer"]
+        MatherMatchingValidation [label="Matcher"]
+        ReportMatchingValidation [label="Report"]
+        // --------------------------------------
+        SpliterAAOne[label="Spliter"]
+        ReportAAOneSplit [label="Report"]
+        ReportAABest [label="Report"]
+
+    }
+
+    subgraph pipelines{
+        node [shape=box3d, style=filled, fillcolor=violet]
+        pipeline
+        complex_object[label="complex object"]
+
+        // --------------------------------------
+        SelectorsMatching[label="Selectors"]
+        StatsMatcher[label="Stats"]
+        MetricsMatcher[label="Metrics"]
+        ValidationMatching[label="Validation"]
+        AnalyzerMatching[label="Analyzer"]
+        MetricMatchingValidation [label="Metric"]
+        StatsMatchingValidation [label="Stats"]
+        // --------------------------------------
+        StatsAA[label="Stats"]
+        SpliterAAPipeline[label="Spliter"]
+        AnalyzerAASplit[label="Analyzer"]
+        MetricsAASplit[label="Metrics"]
+        StatsAASplit[label="Stats"]
+        AnalyzerAA[label="Analyzer"]
+        // --------------------------------------
+        SelectorAB[label="Selector"]
+        MetricsAB[label="Metrics"]
+        StatsAB[label="Stats"]
+        AnalyzerAB[label="Analyzer"]
+        ReportAB[label="Report"]
+    }
+
+    subgraph cluster_legend{
+        graph[label="legend", style=filled, fillcolor=whitesmoke]
+
+        subgraph cluster_nodes{
+            graph[label="nodes", style=dashed]
+            abstract_class
+            module
+            pipeline
+        }
+
+        subgraph cluster_edges{
+            graph[label="edges", style=dashed]
+        
+            factory_legend -> created_object [arrowhead=crow, label="create"]
+            inner_object -> complex_object [arrowhead=box, label="in"]
+            abstract_object -> implementation [arrowhead=curve, label="implement"]
+        }
+
+
+
+    }
+
+// -----------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------
+
+
+    Executor -> Pipeline [arrowhead=curved]
+    AbstractHypothesis -> Hypothesis [arrowhead=curved]
+
+    Hypothesis -> Factory [arrowhead=box]
+    Factory -> Experiment [arrowhead=crow label="object"]
+    Factory -> Pipeline [arrowhead=crow label="object"]
+
+    subgraph cluster_experiment{
+        graph[label="experiment structure" style=dotted]
+        Pipeline -> Experiment [arrowhead=box]
+        Dataset -> Experiment [arrowhead=box]
+    }
+
+// -----------------------------------------------------------------------------------
+
+    subgraph cluster_matcher{
+        graph[label="Matcher process", style=dashed, style=filled, fillcolor=mistyrose]
+
+        SelectorsMatching -> Matcher
+        Matcher -> MetricsMatcher
+        Matcher -> StatsMatcher
+        Matcher -> ValidationMatching
+        {
+            MetricsMatcher
+            StatsMatcher
+            ValidationMatching
+        } -> ReportMatcher
+
+        subgraph cluster_matching_validation{
+            graph[label="Validation process" style=dotted]
+            TransformerMatchingValidation -> MatherMatchingValidation
+            MatherMatchingValidation -> 
+            {MetricMatchingValidation StatsMatchingValidation} -> ReportMatchingValidation
+            ReportMatchingValidation -> TransformerMatchingValidation [label="n times"]
+        }
+        TransformerMatchingValidation -> ValidationMatching [ltail=cluster_matching_validation, arrowhead=box]
+        ReportMatcher -> AnalyzerMatching
+    }
+
+    Experiment -> SelectorsMatching [lhead=cluster_matcher]
+
+// -----------------------------------------------------------------------------------
+
+    subgraph cluster_AA{
+        graph[label="AA process", style=dashed, style=filled, fillcolor=lavender]
+        
+        subgraph cluster_split{
+            graph[label="Split process" style=dotted]
+            SpliterAAOne -> StatsAA -> ReportAAOneSplit
+            ReportAAOneSplit -> SpliterAAOne [label="n times"]
+        }
+
+        SpliterAAOne -> SpliterAAPipeline [arrowhead=box ltail=cluster_split]
+        SpliterAAPipeline -> AnalyzerAASplit
+        AnalyzerAASplit -> {MetricsAASplit StatsAASplit}
+        {MetricsAASplit StatsAASplit} -> ReportAABest
+        ReportAABest -> AnalyzerAA
+    }
+
+    Experiment -> SpliterAAPipeline [lhead=cluster_AA]
+
+// -----------------------------------------------------------------------------------
+
+    subgraph cluster_AB{
+        graph[label="AB process", style=dashed, style=filled, fillcolor=honeydew]
+
+        SelectorAB -> MetricsAB
+        SelectorAB -> StatsAB
+        {MetricsAB StatsAB} -> AnalyzerAB
+        AnalyzerAB -> ReportAB
+
+    }
+
+    Experiment -> SelectorAB [lhead=cluster_AB]
+
+}
