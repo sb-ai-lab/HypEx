@@ -30,12 +30,6 @@ class Executor(ABC):
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
         raise NotImplementedError
 
-    def __is_transformer(self):
-        return False
-
-    def reverse(self, data: ExperimentData) -> ExperimentData:
-        return data
-
     @abstractmethod
     def execute(self, data: ExperimentData) -> ExperimentData:
         raise NotImplementedError
@@ -45,17 +39,21 @@ class Experiment(Executor):
     def generate_full_name(self) -> str:
         return f"Experiment({len(self.executors)})"
 
+    def __detect_transformer(self) -> bool:
+        return False
+
     def __init__(
-        self, executors: Iterable[Executor], transform_mode: str = None, full_name: str = None, index: int = 0
+        self,
+        executors: Iterable[Executor],
+        transformer: bool = None,
+        full_name: str = None,
+        index: int = 0,
     ):
         self.executors: Iterable[Executor] = executors
+        self.transformer: bool = (
+            transformer if transformer is not None else self.__detect_transformer()
+        )
         super().__init__(full_name, index)
-
-    def reverse(self, data: ExperimentData) -> ExperimentData:
-        for executor in reversed(self.executors):
-            if executor.__is_transformer():
-                data = executor.reverse(data)
-        return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data: ExperimentData = data
