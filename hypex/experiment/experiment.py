@@ -88,3 +88,7 @@ class CycledExperiment(Executor):
         for _ in range(self.n_iterations):
             data = self.analyzer.execute(self.inner_experiment.execute(data))
         return data
+
+# TODO: implement
+class CollectionExperiment(Executor):
+    pass

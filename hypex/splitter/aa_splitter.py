@@ -39,8 +39,6 @@ class SplitterAA(Experiment):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data: ExperimentData = super().execute(data)
-        group_fields = data.get_columns_by_roles(GroupingRole)
-        stratification_fields = data.get_columns_by_roles(StratificationRole)
 
         addition_indexes = list(experiment_data.index)
         edge = int(len(addition_indexes) * self.test_size)
@@ -50,6 +48,7 @@ class SplitterAA(Experiment):
 
         return data
 
+# TODO: Unique is comparator?
 class SplitterAAWithGrouping(SplitterAA):
     def execute(self, data: ExperimentData):
         group_field = data.get_columns_by_roles(GroupingRole)
