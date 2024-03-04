@@ -1,7 +1,7 @@
 from typing import List
 
 from hypex.experiment.experiment import Executor, Experiment
-from hypex.dataset.dataset import ExperimentData
+from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import GroupingRole, StratificationRole
 from hypex.transformers.transformers import Shuffle
 
@@ -27,28 +27,25 @@ class SplitterAA(Experiment):
             index,
         )
 
+    @property
+    def _is_transformer(self):
+        return True
 
-class SplitterAA(Executor):
-    def __init__(
-        self,
-        test_size: float = 0.5,
-        random_state: int = None,
-        full_name: str = None,
-        index: int = 0,
-    ):
-        super().__init__(full_name, index)
-        self.test_size = test_size
-        self.random_state = random_state
+    def generate_params_hash(self) -> str:
+        return f"{self.random_state}"
+
+    def _set_value(self, data: ExperimentData, value) -> ExperimentData:
+        return data.set_value("additional_fields", self._id, self.get_full_name(), value, role=GroupingRole)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        addition_indexes = list(shuffle(data.index, random_state=self.random_state))
+        experiment_data: ExperimentData = super().execute(data)
+        addition_indexes = list(experiment_data.index)
         edge = int(len(addition_indexes) * self.test_size)
 
-        data["treatment"] = 0
-        test_indexes = addition_indexes[:edge]
-        data["treatment"][test_indexes] = 1
-        return data
+        result_group = ['A' if i < edge else 'B' for i in addition_indexes]
+        data = self._set_value(data, result_group)
 
+        return data
 
 class SplitterAAWithGrouping(SplitterAA):
     def execute(self, data: ExperimentData):

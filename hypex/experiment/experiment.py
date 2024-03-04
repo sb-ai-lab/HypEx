@@ -23,7 +23,7 @@ class Executor(ABC):
         self._id = generate_id()
 
     @property
-    def __is_transformer(self) -> bool:
+    def _is_transformer(self) -> bool:
         return False
 
     @abstractmethod
@@ -35,11 +35,11 @@ class Executor(ABC):
         raise NotImplementedError
 
 
-class Experiment(Executor):
+class Experiment(ABC, Executor):
     def generate_full_name(self) -> str:
         return f"Experiment({len(self.executors)})"
 
-    def __detect_transformer(self) -> bool:
+    def _detect_transformer(self) -> bool:
         return False
 
     def __init__(
@@ -55,8 +55,11 @@ class Experiment(Executor):
         )
         super().__init__(full_name, index)
 
+    def _extract_result(self, original_data: ExperimentData, experiment_data: ExperimentData):
+        return experiment_data
+
     def execute(self, data: ExperimentData) -> ExperimentData:
-        experiment_data: ExperimentData = data
+        experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
             experiment_data = executor.execute(experiment_data)
         return experiment_data

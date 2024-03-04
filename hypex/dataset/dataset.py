@@ -173,11 +173,11 @@ class ExperimentData(Dataset):
         return self
 
     def set_value(
-        self, space: str, executor_id: int, name: str, value: Any, key: str = None
+        self, space: str, executor_id: int, name: str, value: Any, key: str = None, role=None
     ):
         if space == "additional_fields":
             self.additional_fields.add_column(
-                data=value, name=executor_id, role=StatisticRole
+                data=value, name=executor_id, role=role
             )
         elif space == "analysis_tables":
             self.analysis_tables[name] = value
