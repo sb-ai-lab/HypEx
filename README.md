@@ -31,32 +31,46 @@ Diff-in-Diff) and CUPED methods, to rigorously test hypotheses and validate expe
   to suit your specific research needs
 
 ## Warnings
-Некоторые функции HypEx могут облегчить решение определенных сопутствующих задач, но не могут автоматизированно принимать решения о дизайне эксперимента. Ниже будут рассмотрены функции, которые реализованы в HypEx, но не автоматизируют дизайн эксперимента.
+
+Some functions in HypEx can facilitate solving specific auxiliary tasks but cannot automate decisions on experiment
+design. Below, we will discuss features that are implemented in HypEx but do not automate the design of experiments.
 
 ### Feature Selection
-Feature selection моделирует значимость признаков для точности аппроксимации таргета, однако не исключается возможность не учтенных признаков, комплексное влияние признаков на описание таргета, а так же значимость признаков с точки зрения бизнес-логики. Алгоритм не будет правильно работать при наличии ликов.
 
-На что следует обращать внимание при отборе признаков:
-* Лики - их не должно быть
-* Влияние на распределение тритмента - признаки не должны влиять на распределение тритмента
-* Таргет должен описываться признаками
-* Должны быть включены все существенно влияющие на таргет признаки
-* Бизнес смысл признаков
+**Feature selection** models the significance of features for the accuracy of target approximation. However, it does not
+rule out the possibility of overlooked features, the complex impact of features on target description, or the
+significance of features from a business logic perspective. The algorithm will not function correctly if there are data
+leaks.
 
-Функция feature selection может быть полезна для решения этих задачь, но не решает их и не снимает ответственность с пользователя за их отбор, как и не обосновывает его.
+Points to consider when selecting features:
+
+* Data leaks - these should not be present.
+* Influence on treatment distribution - features should not affect the treatment distribution.
+* The target should be describable by features.
+* All features significantly affecting the target should be included.
+* The business rationale of features.
+* The feature selection function can be useful for addressing these tasks, but it does not solve them nor does it
+  absolve the user of the responsibility for their selection, nor does it justify it.
 
 ### Multitarget
-**Мультитаргет** - исследование воздействия на несколько таргетов. 
 
-Алгоритм реализован, как повторение одного и того же мэтчинга на одном и том же признаковом пространстве, выборках, но с разными таргетами. Для обеспечения корректности работы такого алгоритма необходимо гарантировать независимость таргетов друг от друга.
+**Multitarget** involves studying the impact on multiple targets.
 
-Лучшим решением будет проведение нескольких независимых экспериментов со своим набором признаков для каждого таргета.
+The algorithm is implemented as a repetition of the same matching on the same feature space and samples, but with
+different targets. To ensure the algorithm's correct operation, it's necessary to guarantee the independence of the
+targets from each other.
+
+The best solution would be to conduct several independent experiments, each with its own set of features for each
+target.
 
 ### Random Treatment и Random Feature
-**Random Treatment** алгоритм случайно перемешивают реальное воздействие. Ожидается, что зависимость воздействия на таргет будет длизка к 0.
-**Random Feature** добавляет признак со случайными значениями. Ожидается, что при добавлении случайного признака, влияние воздействия на таргет окажется прежним.
 
-Эти методы не являются достаточно точныыми маркерами того, что эксперимент прошел успешно.
+**Random Treatment** algorithm randomly shuffles the actual treatment. It is expected that the treatment's effect on the
+target will be close to 0.
+**Random Feature** adds a feature with random values. It is expected that adding a random feature will maintain the same
+impact of the treatment on the target.
+
+These methods are not sufficiently accurate markers of a successful experiment.
 
 ## Quick Start
 
@@ -112,9 +126,9 @@ data = create_test_data(rs=52, na_step=10, nan_cols=['age', 'gender'])
 
 model = ABTest()
 results = model.execute(
-    data=data, 
-    target_field='post_spends', 
-    target_field_before='pre_spends', 
+    data=data,
+    target_field='post_spends',
+    target_field_before='pre_spends',
     group_field='group'
 )
 
