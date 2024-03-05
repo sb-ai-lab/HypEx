@@ -73,22 +73,43 @@ class CycledExperiment(Executor):
 
     def __init__(
         self,
-        inner_experiment: Experiment,
+        inner_executor: Executor,
         n_iterations: int,
         analyzer: Analyzer,
         full_name: str = None,
         index: int = 0,
     ):
-        self.inner_experiment: Experiment = inner_experiment
+        self.inner_executor: Executor = inner_executor
         self.n_iterations: int = n_iterations
         self.analyzer: Analyzer = analyzer
         super().__init__(full_name, index)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         for _ in range(self.n_iterations):
-            data = self.analyzer.execute(self.inner_experiment.execute(data))
+            data = self.analyzer.execute(self.inner_executor.execute(data))
         return data
 
-# TODO: implement
 class CollectionExperiment(Executor):
-    pass
+    def generate_full_name(self) -> str:
+        return (
+            f"CollectionExperiment({self.inner_experiment.full_name})"
+        )
+
+    def __init__(
+        self,
+        inner_executor: Executor,
+        n_iterations: int,
+        analyzer: Analyzer,
+        full_name: str = None,
+        index: int = 0,
+    ):
+        self.inner_executor: Executor = inner_executor
+        self.n_iterations: int = n_iterations
+        self.analyzer: Analyzer = analyzer
+        super().__init__(full_name, index)
+
+# TODO: implement
+    # def execute(self, data: ExperimentData) -> ExperimentData:
+    #     for _ in range(self.n_iterations):
+    #         data = self.analyzer.execute(self.inner_experiment.execute(data))
+    #     return data

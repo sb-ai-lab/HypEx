@@ -121,6 +121,7 @@ class Dataset(DatasetBase):
     def isin(self, values: Iterable) -> Iterable[bool]:
         return self._backend.isin(values)
 
+    # TODO: implement wrap to Dataset
     def groupby(self, by=None, axis=0, level=None):
         return self._backend.groupby(by=by, axis=axis, level=level)
 
