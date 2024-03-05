@@ -1,4 +1,5 @@
 """Validators."""
+
 from typing import List
 
 import numpy as np
@@ -62,7 +63,9 @@ def subset_refuter(df: pd.DataFrame, treatment: str, fraction: float = 0.8):
         The subset of the dataframe
         A validation flag
     """
-    df = df.groupby(treatment, group_keys=False).apply(lambda x: x.sample(frac=fraction))
+    df = df.groupby(treatment, group_keys=False).apply(
+        lambda x: x.sample(frac=fraction)
+    )
     validate = 1
     return df, validate
 

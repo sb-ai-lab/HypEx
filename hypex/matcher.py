@@ -2,6 +2,7 @@
 
 import logging
 import pickle
+import warnings
 from typing import Union, Iterable, List
 
 import numpy as np
@@ -33,6 +34,7 @@ from .utils.validators import random_feature
 from .utils.validators import random_treatment
 from .utils.validators import subset_refuter
 from .utils.validators import test_significance
+
 
 REPORT_FEAT_SELECT_DIR = "report_feature_selector"
 REPORT_PROP_MATCHER_DIR = "report_matcher"
@@ -185,6 +187,14 @@ class Matcher:
                 Write logs in debug mode
             pbar:
                 Display progress bar while get index
+
+        ..warnings::
+            Multitarget involves studying the impact on multiple targets.
+            The algorithm is implemented as a repetition of the same matching on the same feature space and samples, but with
+            different targets. To ensure the algorithm's correct operation, it's necessary to guarantee the independence of the
+            targets from each other.
+            The best solution would be to conduct several independent experiments, each with its own set of features for each
+            target.
         """
         self.short_features_df = None
         self.detailed_features_df = None
@@ -253,6 +263,10 @@ class Matcher:
 
     def _preprocessing_data(self):
         """Converts categorical features into dummy variables."""
+        if isinstance(self.outcomes, list) and len(self.outcomes) > 1:
+            warnings.warn(
+                "To ensure the multitarget's correct operation, it's necessary to guarantee the independence of the targets from each other."
+            )
         info_col = self.info_col if self.info_col is not None else []
         if self.group_col is not None and isinstance(self.group_col, str):
             group_col = [self.group_col]
@@ -654,6 +668,12 @@ class Matcher:
         """Validates estimated ATE (Average Treatment Effect).
 
         Validates estimated effect:
+                                    1) by replacing real treatment with random placebo treatment.
+                                     Estimated effect must be droped to zero, p-val > 0.05;
+                                    2) by adding random feature (`random_feature`). Estimated effect shouldn't change
+                                    significantly, p-val < 0.05;
+                                    3) estimates effect on subset of data (default fraction is 0.8). Estimated effect
+                                    shouldn't change significantly, p-val < 0.05.
 
         Args:
             refuter:
@@ -672,6 +692,14 @@ class Matcher:
         Returns:
             Dictionary of outcome_name (mean_effect on validation, p-value)
             or dataframe with effects after outliers are removed
+
+        ..warnings::
+            Random Treatment algorithm randomly shuffles the actual treatment.
+            It is expected that the treatment's effect on the target will be close to 0.
+            Random Feature adds a feature with random values.
+            It is expected that adding a random feature will maintain the same impact of the treatment on the target.
+
+            These methods are not sufficiently accurate markers of a successful experiment.
         """
         if self.silent:
             logger.debug("Applying validation of result")

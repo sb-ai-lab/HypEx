@@ -1,5 +1,7 @@
 """Feature selection class."""
+
 import logging
+import warnings
 
 import pandas as pd
 
@@ -17,10 +19,10 @@ class FeatureSelector:
     """Class of Feature selector. Select top features. By default, use LGM."""
 
     def __init__(
-            self,
-            outcome: str,
-            treatment: str,
-            feature_selection_method,
+        self,
+        outcome: str,
+        treatment: str,
+        feature_selection_method,
     ):
         """Initialize the FeatureSelector.
 
@@ -31,7 +33,17 @@ class FeatureSelector:
                 The column that determines control and test groups
             feature_selection_method:
                 List of names of algorithms for feature selection
+
+        ..warnings::
+            FeatureSelector does not rule out the possibility of overlooked features,
+            the complex impact of features on target description, or
+            the significance of features from a business logic perspective.
         """
+        warnings.warn(
+            "FeatureSelector does not rule out the possibility of overlooked features, "
+            "the complex impact of features on target description, or "
+            "the significance of features from a business logic perspective."
+        )
         self.outcome = outcome
         self.treatment = treatment
         self.feature_selection_method = feature_selection_method
