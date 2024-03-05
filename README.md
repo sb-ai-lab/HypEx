@@ -67,6 +67,7 @@ target.
 
 **Random Treatment** algorithm randomly shuffles the actual treatment. It is expected that the treatment's effect on the
 target will be close to 0.
+
 **Random Feature** adds a feature with random values. It is expected that adding a random feature will maintain the same
 impact of the treatment on the target.
 
