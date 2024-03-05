@@ -694,7 +694,7 @@ class AATest:
                 color="red",
             )
             axs[ax_count].legend(["control", "test"])
-            axs[ax_count].set_title("Cumulative destribution")
+            axs[ax_count].set_title("Cumulative distribution")
             ax_count += 1
 
         if "percentile" in plot_set:
@@ -713,7 +713,7 @@ class AATest:
             axs[ax_count].legend(["control", "test"])
             axs[ax_count].set_xticks(np.arange(0, 101))
             axs[ax_count].set_xticklabels(np.arange(0, 101), rotation=45)
-            axs[ax_count].set_title("Percentile destribution")
+            axs[ax_count].set_title("Percentile distribution")
 
         fig_title = f"""{control_data.name}
 
@@ -909,11 +909,11 @@ class AATest:
             return d * s
 
     def calc_imbalanced_sample_size(
-            self,
-            target_data: pd.Series,
-            expected_mean: float,
-            proportion: float = 0.5,
-            power: float = 0.8
+        self,
+        target_data: pd.Series,
+        expected_mean: float,
+        proportion: float = 0.5,
+        power: float = 0.8,
     ) -> Tuple:
         """Calculates imbalanced sample size for control and test group.
 
@@ -933,18 +933,27 @@ class AATest:
         target_mean = target_data.mean()
 
         if target_mean == expected_mean:
-            raise ValueError('Current conversion and expected conversion are equal!')
+            raise ValueError("Current conversion and expected conversion are equal!")
 
         proportion = (1 - proportion) / proportion
         z_alpha = norm.ppf(1 - self.alpha / 2)
         z_power = norm.ppf(power)
         if target_data.nunique() == 2:
-            h_cohen = 2 * np.arcsin(target_mean ** .5) - 2 * np.arcsin(expected_mean ** .5)
-            control_size = (1 + proportion) / proportion * ((z_alpha + z_power) / h_cohen) ** 2
+            h_cohen = 2 * np.arcsin(target_mean**0.5) - 2 * np.arcsin(
+                expected_mean**0.5
+            )
+            control_size = (
+                (1 + proportion) / proportion * ((z_alpha + z_power) / h_cohen) ** 2
+            )
         else:
             mde = abs(expected_mean - target_mean)
-            control_size = (1 + proportion) / proportion * (target_data.std() ** 2) \
-                           * (z_alpha + z_power) ** 2 / mde ** 2
+            control_size = (
+                (1 + proportion)
+                / proportion
+                * (target_data.std() ** 2)
+                * (z_alpha + z_power) ** 2
+                / mde**2
+            )
         test_size = proportion * control_size
 
         return np.int32(np.ceil(control_size)), np.int32(np.ceil(test_size))
