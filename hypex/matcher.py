@@ -2,6 +2,7 @@
 
 import logging
 import pickle
+import warnings
 from typing import Union, Iterable
 
 import numpy as np
@@ -182,6 +183,14 @@ class Matcher:
                 Write logs in debug mode
             pbar:
                 Display progress bar while get index
+
+        ..warnings::
+            Multitarget involves studying the impact on multiple targets.
+            The algorithm is implemented as a repetition of the same matching on the same feature space and samples, but with
+            different targets. To ensure the algorithm's correct operation, it's necessary to guarantee the independence of the
+            targets from each other.
+            The best solution would be to conduct several independent experiments, each with its own set of features for each
+            target.
         """
         self.short_features_df = None
         self.detailed_features_df = None
@@ -244,6 +253,10 @@ class Matcher:
 
     def _preprocessing_data(self):
         """Converts categorical features into dummy variables."""
+        if isinstance(self.outcomes, list) and len(self.outcomes) > 1:
+            warnings.warn(
+                "To ensure the multitarget's correct operation, it's necessary to guarantee the independence of the targets from each other."
+            )
         info_col = self.info_col if self.info_col is not None else []
         group_col = [self.group_col] if self.group_col is not None else []
         columns_to_drop = info_col + group_col + self.outcomes + [self.treatment]
@@ -528,6 +541,14 @@ class Matcher:
 
         Returns:
             Dictionary of outcome_name (mean_effect on validation, p-value)
+
+        ..warnings::
+            Random Treatment algorithm randomly shuffles the actual treatment.
+            It is expected that the treatment's effect on the target will be close to 0.
+            Random Feature adds a feature with random values.
+            It is expected that adding a random feature will maintain the same impact of the treatment on the target.
+
+            These methods are not sufficiently accurate markers of a successful experiment.
         """
         if self.silent:
             logger.debug("Applying validation of result")
@@ -543,6 +564,10 @@ class Matcher:
 
         for i in tqdm(range(n_sim)):
             if refuter in ["random_treatment", "random_feature"]:
+                warnings.warn(
+                    "This methods are not sufficiently accurate markers of a successful experiment. "
+                    "Read more here https://hypex.readthedocs.io/en/latest/pages/modules/utils.html#validators"
+                )
                 if refuter == "random_treatment":
                     self.input_data, orig_treatment, self.validate = random_treatment(
                         self.input_data, self.treatment
