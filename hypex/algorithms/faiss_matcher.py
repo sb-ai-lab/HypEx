@@ -71,20 +71,20 @@ class FaissMatcher:
     """A class used to match instances using Faiss library."""
 
     def __init__(
-            self,
-            df: pd.DataFrame,
-            outcomes: str,
-            treatment: str,
-            info_col: list,
-            features: [list, pd.DataFrame] = None,
-            group_col: Union[str, list] = None,
-            weights: dict = None,
-            sigma: float = 1.96,
-            validation: bool = None,
-            refuter: str = "random_feature",
-            n_neighbors: int = 10,
-            silent: bool = True,
-            pbar: bool = True,
+        self,
+        df: pd.DataFrame,
+        outcomes: str,
+        treatment: str,
+        info_col: list,
+        features: [list, pd.DataFrame] = None,
+        group_col: Union[str, list] = None,
+        weights: dict = None,
+        sigma: float = 1.96,
+        validation: bool = None,
+        refuter: str = "random_feature",
+        n_neighbors: int = 10,
+        silent: bool = True,
+        pbar: bool = True,
     ):
         """Construct all the necessary attributes.
 
@@ -283,7 +283,9 @@ class FaissMatcher:
             y_match_treated_bias = y_treated - y_match_treated + bias_t
             y_match_untreated_bias = y_match_untreated - y_untreated - bias_c
 
-            self.delta_t = round(abs(bias_t.mean()) * 100 / abs(y_match_treated_bias.mean()), 1)
+            self.delta_t = round(
+                abs(bias_t.mean()) * 100 / abs(y_match_treated_bias.mean()), 1
+            )
 
             self.dict_outcome_untreated[outcome] = y_untreated
             self.dict_outcome_untreated[outcome + POSTFIX] = y_match_untreated
@@ -609,12 +611,12 @@ class FaissMatcher:
 
         """
         df = self.df.drop(columns=self.info_col)
-        groups = sorted(df[self.group_col].unique())
+        groups = sorted(df[self.group_col[0]].unique())
         group_error = []
 
         for group in groups:
             df_group = df[df[self.group_col] == group]
-            temp = df_group[self.columns_match + [self.group_col]]
+            temp = df_group[self.columns_match + self.group_col]
             temp = temp.loc[:, (temp != 0).any(axis=0)].drop(columns=self.group_col)
 
             treated, untreated = self._get_split(temp)
@@ -632,17 +634,23 @@ class FaissMatcher:
                 np.linalg.cholesky(cov)
             except:
                 if not self.validation:
-                    logger.info(f'Grouping by attribute {group} is not possible')
+                    logger.info(f"Grouping by attribute {group} is not possible")
                 group_error.append(group)
 
                 treated_duplicated = treated.columns[treated.T.duplicated()].values
-                untreated_duplicated = untreated.columns[untreated.T.duplicated()].values
+                untreated_duplicated = untreated.columns[
+                    untreated.T.duplicated()
+                ].values
                 if treated_duplicated is not [] and not self.validation:
-                    logger.info(f'The data has the duplicate columns: {treated_duplicated} in test group')
+                    logger.info(
+                        f"The data has the duplicate columns: {treated_duplicated} in test group"
+                    )
                 if untreated_duplicated is not [] and not self.validation:
-                    logger.info(f'The data has the duplicate columns: {untreated_duplicated} in control group')
+                    logger.info(
+                        f"The data has the duplicate columns: {untreated_duplicated} in control group"
+                    )
 
-        df_group_positive = self.df[~self.df[self.group_col].isin(group_error)]
+        df_group_positive = self.df[~self.df[self.group_col[0]].isin(group_error)]
 
         return df_group_positive
 
@@ -672,7 +680,9 @@ class FaissMatcher:
             temp = temp.loc[:, (temp != 0).any(axis=0)].drop(columns=self.group_col[0])
             treated, untreated = self._get_split(temp)
 
-            std_treated_np, std_untreated_np = _transform_to_np(treated, untreated, self.weights, self.validation)
+            std_treated_np, std_untreated_np = _transform_to_np(
+                treated, untreated, self.weights, self.validation
+            )
 
             if self.pbar:
                 self.tqdm.set_description(desc=f"Get untreated index by group {group}")
@@ -728,7 +738,9 @@ class FaissMatcher:
         df = self.df[self.columns_match]
         treated, untreated = self._get_split(df)
 
-        std_treated_np, std_untreated_np = _transform_to_np(treated, untreated, self.weights, self.validation)
+        std_treated_np, std_untreated_np = _transform_to_np(
+            treated, untreated, self.weights, self.validation
+        )
 
         if self.pbar:
             self.tqdm = tqdm(total=len(std_treated_np) + len(std_untreated_np))
@@ -842,8 +854,9 @@ def _get_index(base: np.ndarray, new: np.ndarray, n_neighbors: int) -> list:
     return indexes
 
 
-def _transform_to_np(treated: pd.DataFrame, untreated: pd.DataFrame, weights: dict, validation: bool) -> Tuple[
-    np.ndarray, np.ndarray]:
+def _transform_to_np(
+    treated: pd.DataFrame, untreated: pd.DataFrame, weights: dict, validation: bool
+) -> Tuple[np.ndarray, np.ndarray]:
     """Transforms df to numpy and transform via Cholesky decomposition.
     If there are features that cannot be decomposed Cholesky, these features are removed.
 
@@ -880,9 +893,13 @@ def _transform_to_np(treated: pd.DataFrame, untreated: pd.DataFrame, weights: di
         treated_duplicated = list(treated.columns[treated.T.duplicated()].values)
         untreated_duplicated = list(untreated.columns[untreated.T.duplicated()].values)
         if treated_duplicated is not [] and not validation:
-            logger.info(f'The data has the duplicate columns: {treated_duplicated} in test group')
+            logger.info(
+                f"The data has the duplicate columns: {treated_duplicated} in test group"
+            )
         if untreated_duplicated is not [] and not validation:
-            logger.info(f'The data has the duplicate columns: {untreated_duplicated} in control group')
+            logger.info(
+                f"The data has the duplicate columns: {untreated_duplicated} in control group"
+            )
 
         columns_duplicated = set(treated_duplicated + untreated_duplicated)
         treated = treated.drop(columns=columns_duplicated)
@@ -1104,7 +1121,7 @@ def bias_coefs(matches, Y_m, X_m):
     X[:, 0] = 1  # intercept term
     X[:, 1:] = X_m[flat_idx]
 
-    return np.linalg.lstsq(X, Y)[0][1:]  # don't need intercept coef
+    return np.linalg.lstsq(X, Y, rcond=-1)[0][1:]  # don't need intercept coef
 
 
 def bias(X, X_m, coefs):
