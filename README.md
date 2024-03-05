@@ -52,6 +52,8 @@ Points to consider when selecting features:
 * The feature selection function can be useful for addressing these tasks, but it does not solve them nor does it
   absolve the user of the responsibility for their selection, nor does it justify it.
 
+[Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/selectors.html#selector-classes)
+
 ### Multitarget
 
 **Multitarget** involves studying the impact on multiple targets.
@@ -63,6 +65,8 @@ targets from each other.
 The best solution would be to conduct several independent experiments, each with its own set of features for each
 target.
 
+[Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/matcher.html#matcher)
+
 ### Random Treatment и Random Feature
 
 **Random Treatment** algorithm randomly shuffles the actual treatment. It is expected that the treatment's effect on the
@@ -71,6 +75,8 @@ target will be close to 0.
 impact of the treatment on the target.
 
 These methods are not sufficiently accurate markers of a successful experiment.
+
+[Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/utils.html#validators)
 
 ## Quick Start
 
