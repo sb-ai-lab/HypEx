@@ -2,7 +2,8 @@
 
 import logging
 import pickle
-from typing import Union, Iterable
+import warnings
+from typing import Union, Iterable, List
 
 import numpy as np
 import pandas as pd
@@ -17,7 +18,9 @@ except:
 
 from .algorithms.faiss_matcher import FaissMatcher
 from .algorithms.no_replacement_matching import MatcherNoReplacement
+from .selectors.base_filtration import const_filtration, nan_filtration
 from .selectors.feature_selector import FeatureSelector
+from .selectors.outliers_filter import OutliersFilter
 from .selectors.spearman_filter import SpearmanFilter
 from .selectors.outliers_filter import OutliersFilter
 from .selectors.base_filtration import const_filtration, nan_filtration
@@ -26,6 +29,7 @@ from hypex.selectors.selector_primal_methods import (
     pd_catboost_feature_selector,
     pd_ridgecv_feature_selector,
 )
+from .utils.validators import emissions
 from .utils.validators import random_feature
 from .utils.validators import random_treatment
 from .utils.validators import subset_refuter
@@ -54,6 +58,7 @@ OUT_INTER_COEFF = 1.5
 OUT_MODE_PERCENT = True
 OUT_MIN_PERCENT = 0.02
 OUT_MAX_PERCENT = 0.98
+RARE_CAT_SCENARIO_LIST = ["raise", "drop", "genetic"]
 
 logger = logging.getLogger("hypex")
 console_out = logging.StreamHandler()
@@ -105,30 +110,30 @@ class Matcher:
     """
 
     def __init__(
-        self,
-        input_data: pd.DataFrame,
-        treatment: str,
-        outcome: Union[str, list] = None,
-        outcome_type: str = "numeric",
-        group_col: str = None,
-        info_col: list = None,
-        weights: dict = None,
-        base_filtration: bool = False,
-        generate_report: bool = GENERATE_REPORT,
-        report_feat_select_dir: str = REPORT_FEAT_SELECT_DIR,
-        timeout: int = TIMEOUT,
-        n_threads: int = N_THREADS,
-        n_folds: int = N_FOLDS,
-        verbose: bool = VERBOSE,
-        use_algos: list = None,
-        same_target_threshold: float = SAME_TARGET_THRESHOLD,
-        interquartile_coeff: float = OUT_INTER_COEFF,
-        drop_outliers_by_percentile: bool = OUT_MODE_PERCENT,
-        min_percentile: float = OUT_MIN_PERCENT,
-        max_percentile: float = OUT_MAX_PERCENT,
-        n_neighbors: int = 1,
-        silent: bool = True,
-        pbar: bool = True,
+            self,
+            input_data: pd.DataFrame,
+            treatment: str,
+            outcome: Union[str, list] = None,
+            outcome_type: str = "numeric",
+            group_col: Union[str, List[str]] = None,
+            info_col: list = None,
+            weights: dict = None,
+            base_filtration: bool = False,
+            generate_report: bool = GENERATE_REPORT,
+            report_feat_select_dir: str = REPORT_FEAT_SELECT_DIR,
+            timeout: int = TIMEOUT,
+            n_threads: int = N_THREADS,
+            n_folds: int = N_FOLDS,
+            verbose: bool = VERBOSE,
+            use_algos: list = None,
+            same_target_threshold: float = SAME_TARGET_THRESHOLD,
+            interquartile_coeff: float = OUT_INTER_COEFF,
+            drop_outliers_by_percentile: bool = OUT_MODE_PERCENT,
+            min_percentile: float = OUT_MIN_PERCENT,
+            max_percentile: float = OUT_MAX_PERCENT,
+            n_neighbors: int = 1,
+            silent: bool = True,
+            pbar: bool = True,
     ):
         """Initialize the Matcher object.
 
@@ -182,6 +187,14 @@ class Matcher:
                 Write logs in debug mode
             pbar:
                 Display progress bar while get index
+
+        ..warnings::
+            Multitarget involves studying the impact on multiple targets.
+            The algorithm is implemented as a repetition of the same matching on the same feature space and samples, but with
+            different targets. To ensure the algorithm's correct operation, it's necessary to guarantee the independence of the
+            targets from each other.
+            The best solution would be to conduct several independent experiments, each with its own set of features for each
+            target.
         """
         self.short_features_df = None
         self.detailed_features_df = None
@@ -232,7 +245,13 @@ class Matcher:
             Data with categorical variables converted to dummy variables.
         """
         info_col = self.info_col if self.info_col is not None else []
-        group_col = [self.group_col] if self.group_col is not None else []
+
+        if self.group_col is not None and isinstance(self.group_col, str):
+            group_col = [self.group_col]
+        elif self.group_col is not None and isinstance(self.group_col, list):
+            group_col = self.group_col
+        else:
+            group_col = []
 
         columns_to_drop = info_col + group_col
         if columns_to_drop is not None:
@@ -244,8 +263,28 @@ class Matcher:
 
     def _preprocessing_data(self):
         """Converts categorical features into dummy variables."""
+        if isinstance(self.outcomes, list) and len(self.outcomes) > 1:
+            warnings.warn(
+                "To ensure the multitarget's correct operation, it's necessary to guarantee the independence of the targets from each other."
+            )
         info_col = self.info_col if self.info_col is not None else []
-        group_col = [self.group_col] if self.group_col is not None else []
+        if self.group_col is not None and isinstance(self.group_col, str):
+            group_col = [self.group_col]
+        elif self.group_col is not None and isinstance(self.group_col, list):
+            group_col = ["!".join(self.group_col)]
+            self.input_data[group_col[0]] = self.input_data[self.group_col].apply(
+                lambda row: "!".join(row.astype(str)), axis=1
+            )
+            self.input_data = self.input_data.drop(self.group_col, axis=1)
+            self.group_col = group_col
+        else:
+            group_col = []
+        self.input_data = self.validate_group_col(
+            self.input_data,
+            group_col,
+            self.treatment,
+            self.outcomes,
+        )
         columns_to_drop = info_col + group_col + self.outcomes + [self.treatment]
         if self.base_filtration:
             filtered_features = nan_filtration(
@@ -265,7 +304,9 @@ class Matcher:
             self.input_data = self.input_data.fillna(0)
 
         if self.group_col is not None:
-            group_col = self.input_data[[self.group_col]]
+            group_col = self.input_data[
+                [self.group_col] if isinstance(self.group_col, str) else self.group_col
+            ]
         if self.info_col is not None:
             info_col = self.input_data[self.info_col]
 
@@ -291,8 +332,123 @@ class Matcher:
                 )
             )
             self.input_data = self.input_data[filtered_features + columns_to_drop]
-
         self._log("Categorical features turned into dummy")
+
+    def validate_group_col(
+            self,
+            df: pd.DataFrame,
+            group_col: Union[str, List[str]],
+            treat_col: str,
+            target_col: str,
+            frequency_th: int = 1,
+            rare_categories_scenario: str = "raise",
+    ) -> pd.DataFrame:
+        """
+        Validates the distribution of control and test group instances within each category of a specified grouping column(s) in a DataFrame. It handles rare categories (categories with instances below a specified threshold) according to the defined scenario ('raise', 'drop', or 'genetic').
+
+        Args:
+            df: The DataFrame containing the data to be validated.
+            group_col: The name of the column or list of columns used for grouping data.
+            treat_col: The name of the column indicating treatment groups.
+            target_col: The name of the column containing target values.
+            frequency_th: The minimum number of instances required for a category not to be considered rare. Default is 1.
+            rare_categories_scenario: Defines the action to take when rare categories are found. Options are 'raise' (default), 'drop', or 'genetic'. 'raise' will cause an error; 'drop' will remove rare categories; 'genetic' will apply a genetic stratification method to handle rare categories.
+
+        Returns:
+            A DataFrame that has been processed based on the specified 'rare_categories_scenario'. If 'drop' is used, rare categories are removed. If 'genetic' is used, the DataFrame is modified accordingly.
+
+        Raises:
+            KeyError: If an invalid 'rare_categories_scenario' is provided.
+            ValueError: If 'raise' is specified for 'rare_categories_scenario' and rare categories are found.
+
+        Example:
+            >>> df_validated = validate_group_col(df, 'Group', 'Treatment', 'Outcome', 1, 'drop')
+            This will drop any groups in 'Group' column that have less than or equal to one instance in
+            either treatment group
+        """
+        if rare_categories_scenario not in RARE_CAT_SCENARIO_LIST:
+            raise KeyError(
+                f"""Wrong rare_categories_scenario value: {rare_categories_scenario}
+            It should be one of {RARE_CAT_SCENARIO_LIST}"""
+            )
+
+        rare_categories = self.get_rare_categories(
+            df, group_col, treat_col, frequency_th=frequency_th
+        )
+        if len(rare_categories) > 0:
+            if rare_categories_scenario == "raise":
+                raise ValueError(
+                    f"""Next columns have low frequency: {rare_categories}.
+                Try to change rare_categories_scenario for auto process."""
+                )
+            elif rare_categories_scenario == "drop":
+                df = df.loc[~df[group_col].isin(rare_categories)]
+            elif rare_categories_scenario == "genetic":
+                new_group_col = self.genetic_stratification(
+                    df, group_col, treat_col, target_col
+                )
+                df[group_col] = new_group_col
+        return df.reset_index(drop=True)
+
+    @staticmethod
+    def get_rare_categories(
+            df: pd.DataFrame,
+            group_col: Union[str, List[str]],
+            treat_col: str,
+            frequency_th: int = 1,
+    ) -> List[str]:
+        """
+        Identifies and returns a list of categories within specified grouping columns that
+        occur less than or equal to a specified frequency threshold within each treatment
+        group. This can be useful for filtering out rare categories in treatment/control
+        groups to ensure sufficient sample sizes for analysis.
+
+        Args:
+            df: The dataframe containing the data to be analyzed.
+            group_col: The column(s) used for grouping the data.
+                Can be a single column name or a list of names for multi-level grouping.
+            treat_col: The column specifying the treatment group. This column
+                is used to separate the data into different treatment groups.
+            frequency_th: The frequency threshold. Categories within
+                each treatment group that occur less than or equal to this number
+                will be considered rare. Default is 1, which selects categories that
+                occur only once within each treatment group.
+
+        Returns:
+            A list of the rare categories within the specified grouping columns.
+                If there are no rare categories, an empty list is returned.
+
+        Example:
+            >>> df = pd.DataFrame({
+                    'Group': ['A', 'A', 'B', 'B', 'C'],
+                    'Treatment': [0, 1, 1, 1, 0],
+                    'Data': [5, 6, 7, 8, 9]
+                })
+            >>> get_rare_categories(df, 'Group', 'Treatment', 1)
+            ['C']
+        """
+        frequencies = df.groupby(by=[*group_col, treat_col]).size()
+        rare_categories = (
+            frequencies[frequencies <= frequency_th].reset_index().loc[:, group_col]
+        )
+        rare_categories = (
+            rare_categories.unique().tolist() if rare_categories.size > 0 else []
+        )
+
+        return rare_categories
+
+    @staticmethod
+    def genetic_stratification(
+            df: pd.DataFrame,
+            group_col: Union[str, List[str]],
+            treat_col: str,
+            target_col: str,
+            frequency_th: int = 1,
+    ) -> List[str]:
+        """
+        Generates a new_group_col using a genetic algorithm.
+        """
+        raise NotImplementedError
 
     def _apply_filter(self, filter_class, *filter_args):
         """Applies a filter to the input data.
@@ -343,7 +499,7 @@ class Matcher:
         )
 
     def match_no_rep(
-        self, threshold: float = 0.1, approximate_match: bool = False
+            self, threshold: float = 0.1, approximate_match: bool = False
     ) -> pd.DataFrame:
         """Matching groups with no replacement.
 
@@ -370,8 +526,8 @@ class Matcher:
             .iloc[self.input_data[a == 1].index]
             .matches[
                 index_matched.loc[1]
-                .iloc[self.input_data[a == 1].index]
-                .matches.apply(lambda x: x != [])
+            .iloc[self.input_data[a == 1].index]
+            .matches.apply(lambda x: x != [])
             ]
         )
 
@@ -435,7 +591,7 @@ class Matcher:
 
         return self.short_features_df
 
-    def _create_faiss_matcher(self, df=None, validation=None):
+    def _create_faiss_matcher(self, df=None, validation=None, refuter=None):
         """Creates a FaissMatcher object.
 
         Args:
@@ -455,6 +611,7 @@ class Matcher:
             features=self.features_importance,
             group_col=self.group_col,
             validation=validation,
+            refuter=refuter,
             n_neighbors=self.n_neighbors,
             pbar=False if validation else self.pbar,
         )
@@ -500,11 +657,13 @@ class Matcher:
         return self.results, self.quality_result, df_matched
 
     def validate_result(
-        self,
-        refuter: str = "random_feature",
-        effect_type: str = "ate",
-        n_sim: int = 10,
-        fraction: float = 0.8,
+            self,
+            refuter: str = "random_feature",
+            effect_type: str = "ate",
+            n_sim: int = 10,
+            fraction: float = 0.8,
+            low: float = 1.0,
+            high: float = 99.0
     ) -> dict:
         """Validates estimated ATE (Average Treatment Effect).
 
@@ -518,16 +677,29 @@ class Matcher:
 
         Args:
             refuter:
-                Refuter type (`random_treatment`, `random_feature`, `subset_refuter`)
+                Refuter type (`random_treatment`, `random_feature`, `subset_refuter`, `emissions`)
             effect_type:
                 Which effect to validate (`ate`, `att`, `atc`)
             n_sim:
                 Number of simulations
             fraction:
                 Subset fraction for subset refuter only
+            low:
+                The lower percentile value for removing outliers (default = 1)
+            high:
+                The upper percentile value for removing outliers (default = 99)
 
         Returns:
             Dictionary of outcome_name (mean_effect on validation, p-value)
+            or dataframe with effects after outliers are removed
+
+        ..warnings::
+            Random Treatment algorithm randomly shuffles the actual treatment.
+            It is expected that the treatment's effect on the target will be close to 0.
+            Random Feature adds a feature with random values.
+            It is expected that adding a random feature will maintain the same impact of the treatment on the target.
+
+            These methods are not sufficiently accurate markers of a successful experiment.
         """
         if self.silent:
             logger.debug("Applying validation of result")
@@ -541,56 +713,89 @@ class Matcher:
 
         assert effect_type in effect_dict.keys()
 
-        for i in tqdm(range(n_sim)):
-            if refuter in ["random_treatment", "random_feature"]:
-                if refuter == "random_treatment":
-                    self.input_data, orig_treatment, self.validate = random_treatment(
-                        self.input_data, self.treatment
-                    )
-                elif refuter == "random_feature":
-                    self.input_data, self.validate = random_feature(self.input_data)
-                    if self.features_importance is not None and i == 0:
-                        self.features_importance.append("random_feature")
+        if refuter == "emissions":
 
-                self.matcher = FaissMatcher(
-                    self.input_data,
-                    self.outcomes,
-                    self.treatment,
-                    info_col=self.info_col,
-                    features=self.features_importance,
-                    group_col=self.group_col,
-                    validation=self.validate,
-                    n_neighbors=self.n_neighbors,
-                    pbar=False,
-                )
-            elif refuter == "subset_refuter":
-                df, self.validate = subset_refuter(
-                    self.input_data, self.treatment, fraction
-                )
-                self.matcher = FaissMatcher(
-                    df,
-                    self.outcomes,
-                    self.treatment,
-                    info_col=self.info_col,
-                    features=self.features_importance,
-                    group_col=self.group_col,
-                    validation=self.validate,
-                    n_neighbors=self.n_neighbors,
-                    pbar=False,
-                )
-            else:
-                logger.error("Incorrect refuter name")
-                raise NameError(
-                    "Incorrect refuter name! Available refuters: `random_feature`, `random_treatment`, `subset_refuter`"
-                )
-
+            self._create_faiss_matcher(self.input_data, validation=True, refuter="emissions")
             if self.group_col is None:
-                sim = self.matcher.match()
+                results = self.matcher.match()
             else:
-                sim = self.matcher.group_match()
+                results = self.matcher.group_match()
+            ATE, ATC, ATT = results['effect_size']
 
-            for key in self.val_dict.keys():
-                self.val_dict[key].append(sim[key][0])
+            df_full_test, count_test, percent_test = emissions(self.input_data, 1, self.outcomes[0], low, high)
+            self._create_faiss_matcher(df_full_test, validation=True, refuter="emissions")
+            if self.group_col is None:
+                results_test = self.matcher.match()
+            else:
+                results_test = self.matcher.group_match()
+            ATE_test, ATC_test, ATT_test = results_test['effect_size']
+
+            df_full_control, count_control, percent_control = emissions(self.input_data, 0, self.outcomes[0], low, high)
+            self._create_faiss_matcher(df_full_control, validation=True, refuter="emissions")
+            if self.group_col is None:
+                results_control = self.matcher.match()
+            else:
+                results_control = self.matcher.group_match()
+            ATE_control, ATC_control, ATT_control = results_control['effect_size']
+
+            dict_metrics = {'ATE': [ATE, ATE_test, ATE_control],
+                            'ATC': [ATC, ATC_test, ATC_control],
+                            'ATT': [ATT, ATT_test, ATT_control]
+                            }
+            rslt_emissions = pd.DataFrame(dict_metrics, index=['Data with outliers',
+                                                               f'Metric for deleting {count_test} rows ({percent_test}%) from the test',
+                                                               f'Metric for deleting {count_control} rows ({percent_control}%) from the control'])
+            return rslt_emissions
+
+        else:
+
+            for i in tqdm(range(n_sim)):
+                if refuter in ["random_treatment", "random_feature"]:
+                    if refuter == "random_treatment":
+                        self.input_data, orig_treatment, self.validate = random_treatment(self.input_data,
+                                                                                          self.treatment)
+                    elif refuter == "random_feature":
+                        self.input_data, self.validate = random_feature(self.input_data)
+                        if self.features_importance is not None and i == 0:
+                            self.features_importance.append("random_feature")
+
+                    self.matcher = FaissMatcher(
+                        self.input_data,
+                        self.outcomes,
+                        self.treatment,
+                        info_col=self.info_col,
+                        features=self.features_importance,
+                        group_col=self.group_col,
+                        validation=self.validate,
+                        n_neighbors=self.n_neighbors,
+                        pbar=False,
+                    )
+                elif refuter == "subset_refuter":
+                    df, self.validate = subset_refuter(self.input_data, self.treatment, fraction)
+                    self.matcher = FaissMatcher(
+                        df,
+                        self.outcomes,
+                        self.treatment,
+                        info_col=self.info_col,
+                        features=self.features_importance,
+                        group_col=self.group_col,
+                        validation=self.validate,
+                        n_neighbors=self.n_neighbors,
+                        pbar=False,
+                    )
+                else:
+                    logger.error("Incorrect refuter name")
+                    raise NameError(
+                        "Incorrect refuter name! Available refuters: `random_feature`, `random_treatment`, `subset_refuter`"
+                    )
+
+                if self.group_col is None:
+                    sim = self.matcher.match()
+                else:
+                    sim = self.matcher.group_match()
+
+                for key in self.val_dict.keys():
+                    self.val_dict[key].append(sim[key][0])
 
         for outcome in self.outcomes:
             self.pval_dict.update({outcome: [np.mean(self.val_dict[outcome])]})

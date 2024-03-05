@@ -65,3 +65,6 @@ Validators
     random_feature
     subset_refuter
     test_significance
+
+.. warnings::
+    random_treatment and random_feature methods are not sufficiently accurate markers of a successful experiment.

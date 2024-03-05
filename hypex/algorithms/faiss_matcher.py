@@ -3,11 +3,8 @@
 import datetime as dt
 import functools
 import logging
-import time
-from typing import Any
-from typing import Dict
-from typing import Tuple
-from typing import Union
+from time import perf_counter
+from typing import Any, Union, Dict, Tuple
 
 import faiss
 import numpy as np
@@ -47,9 +44,9 @@ def timer(func):
 
     @functools.wraps(func)
     def _wrapper(*args, **kwargs):
-        start = time.perf_counter()
+        start = perf_counter()
         result = func(*args, **kwargs)
-        runtime = time.perf_counter() - start
+        runtime = perf_counter() - start
         print(f"{func.__name__} took {runtime:.4f} secs")
         return result
 
@@ -74,19 +71,20 @@ class FaissMatcher:
     """A class used to match instances using Faiss library."""
 
     def __init__(
-        self,
-        df: pd.DataFrame,
-        outcomes: str,
-        treatment: str,
-        info_col: list,
-        features: [list, pd.DataFrame] = None,
-        group_col: str = None,
-        weights: dict = None,
-        sigma: float = 1.96,
-        validation: bool = None,
-        n_neighbors: int = 10,
-        silent: bool = True,
-        pbar: bool = True,
+            self,
+            df: pd.DataFrame,
+            outcomes: str,
+            treatment: str,
+            info_col: list,
+            features: [list, pd.DataFrame] = None,
+            group_col: Union[str, list] = None,
+            weights: dict = None,
+            sigma: float = 1.96,
+            validation: bool = None,
+            refuter: str = "random_feature",
+            n_neighbors: int = 10,
+            silent: bool = True,
+            pbar: bool = True,
     ):
         """Construct all the necessary attributes.
 
@@ -121,7 +119,8 @@ class FaissMatcher:
         if group_col is None:
             self.df = df
         else:
-            self.df = df.sort_values([treatment, group_col])
+            group_col = group_col if isinstance(group_col, list) else [group_col]
+            self.df = df.sort_values([treatment, group_col[0]])
         self.columns_del = [outcomes]
         if info_col:
             self.info_col = info_col
@@ -168,6 +167,8 @@ class FaissMatcher:
         self.orig_untreated_index = None
         self.results = {}
         self.ATE = None
+        self.refuter = refuter
+        self.delta_t = None
         self.sigma = sigma
         self.quality_dict = {}
         self.rep_dict = None
@@ -282,6 +283,8 @@ class FaissMatcher:
             y_match_treated_bias = y_treated - y_match_treated + bias_t
             y_match_untreated_bias = y_match_untreated - y_untreated - bias_c
 
+            self.delta_t = round(abs(bias_t.mean()) * 100 / abs(y_match_treated_bias.mean()), 1)
+
             self.dict_outcome_untreated[outcome] = y_untreated
             self.dict_outcome_untreated[outcome + POSTFIX] = y_match_untreated
             self.dict_outcome_untreated[outcome + POSTFIX_BIAS] = y_match_untreated_bias
@@ -359,27 +362,29 @@ class FaissMatcher:
                     self.df[self.treatment] == int(is_treated)
                 ][self.info_col].values.ravel()
         else:
-            df = df.sort_values([self.treatment, self.group_col])
+            df = df.sort_values([self.treatment, self.group_col[0]])
             untreated_index = df[
                 df[self.treatment] == int(not is_treated)
             ].index.to_numpy()
             converted_index = [untreated_index[i] for i in index]
             filtered = df.loc[df[self.treatment] == int(not is_treated)]
-            cols_untreated = [col for col in filtered.columns if col != self.group_col]
-            filtered = filtered.drop(columns=self.group_col).to_numpy()
+            cols_untreated = [
+                col for col in filtered.columns if col != self.group_col[0]
+            ]
+            filtered = filtered.drop(columns=self.group_col[0]).to_numpy()
             untreated_df = pd.DataFrame(
                 data=np.array([filtered[idx].mean(axis=0) for idx in index]),
                 columns=cols_untreated,
             )
             treated_df = df[df[self.treatment] == int(is_treated)].reset_index()
-            grp = treated_df[self.group_col]
-            untreated_df[self.group_col] = grp
+            grp = treated_df[self.group_col[0]]
+            untreated_df[self.group_col[0]] = grp
             if self.info_col is not None and len(self.info_col) != 1:
                 untreated_df["index"] = pd.Series(converted_index)
             else:
                 ids = (
                     self.df[df[self.treatment] == int(not is_treated)]
-                    .sort_values([self.treatment, self.group_col])[self.info_col]
+                    .sort_values([self.treatment, self.group_col[0]])[self.info_col]
                     .values.ravel()
                 )
                 converted_index = [ids[i] for i in index]
@@ -595,6 +600,52 @@ class FaissMatcher:
 
         return self.quality_dict
 
+    def _group_match_attribute(self) -> pd.DataFrame:
+        """Modifies the dataframe, removing categories for grouping for which it
+         is impossible to perform a Cholesky decomposition.
+
+        Returns:
+            Dataframe with deleted categories.
+
+        """
+        df = self.df.drop(columns=self.info_col)
+        groups = sorted(df[self.group_col].unique())
+        group_error = []
+
+        for group in groups:
+            df_group = df[df[self.group_col] == group]
+            temp = df_group[self.columns_match + [self.group_col]]
+            temp = temp.loc[:, (temp != 0).any(axis=0)].drop(columns=self.group_col)
+
+            treated, untreated = self._get_split(temp)
+
+            xc = untreated.to_numpy()
+            xt = treated.to_numpy()
+
+            cov_c = np.cov(xc, rowvar=False, ddof=0)
+            cov_t = np.cov(xt, rowvar=False, ddof=0)
+            cov = (cov_c + cov_t) / 2
+
+            epsilon = 1e-3
+            cov = cov + np.eye(cov.shape[0]) * epsilon
+            try:
+                np.linalg.cholesky(cov)
+            except:
+                if not self.validation:
+                    logger.info(f'Grouping by attribute {group} is not possible')
+                group_error.append(group)
+
+                treated_duplicated = treated.columns[treated.T.duplicated()].values
+                untreated_duplicated = untreated.columns[untreated.T.duplicated()].values
+                if treated_duplicated is not [] and not self.validation:
+                    logger.info(f'The data has the duplicate columns: {treated_duplicated} in test group')
+                if untreated_duplicated is not [] and not self.validation:
+                    logger.info(f'The data has the duplicate columns: {untreated_duplicated} in control group')
+
+        df_group_positive = self.df[~self.df[self.group_col].isin(group_error)]
+
+        return df_group_positive
+
     def group_match(self):
         """Matches the dataframe if it divided by groups.
 
@@ -602,12 +653,13 @@ class FaissMatcher:
             A tuple containing the matched dataframe and metrics such as ATE, ATT and ATC
 
         """
+        self.df = self._group_match_attribute()
         df = self.df.drop(columns=self.info_col)
-        groups = sorted(df[self.group_col].unique())
+        groups = sorted(df[self.group_col[0]].unique())
         matches_c = []
         matches_t = []
-        group_arr_c = df[df[self.treatment] == 0][self.group_col].to_numpy()
-        group_arr_t = df[df[self.treatment] == 1][self.group_col].to_numpy()
+        group_arr_c = df[df[self.treatment] == 0][self.group_col[0]].to_numpy()
+        group_arr_t = df[df[self.treatment] == 1][self.group_col[0]].to_numpy()
         treat_arr_c = df[df[self.treatment] == 0][self.treatment].to_numpy()
         treat_arr_t = df[df[self.treatment] == 1][self.treatment].to_numpy()
 
@@ -615,14 +667,12 @@ class FaissMatcher:
             self.tqdm = tqdm(total=len(groups) * 2)
 
         for group in groups:
-            df_group = df[df[self.group_col] == group]
-            temp = df_group[self.columns_match + [self.group_col]]
-            temp = temp.loc[:, (temp != 0).any(axis=0)].drop(columns=self.group_col)
+            df_group = df[df[self.group_col[0]] == group]
+            temp = df_group[self.columns_match + [self.group_col[0]]]
+            temp = temp.loc[:, (temp != 0).any(axis=0)].drop(columns=self.group_col[0])
             treated, untreated = self._get_split(temp)
 
-            std_treated_np, std_untreated_np = _transform_to_np(
-                treated, untreated, self.weights
-            )
+            std_treated_np, std_untreated_np = _transform_to_np(treated, untreated, self.weights, self.validation)
 
             if self.pbar:
                 self.tqdm.set_description(desc=f"Get untreated index by group {group}")
@@ -651,14 +701,17 @@ class FaissMatcher:
         self.untreated_index = matches_c
         self.treated_index = matches_t
 
-        df_group = df[self.columns_match].drop(columns=self.group_col)
+        df_group = df[self.columns_match].drop(columns=self.group_col[0])
         treated, untreated = self._get_split(df_group)
         self._predict_outcome(treated, untreated)
         df_matched = self._create_matched_df()
         self._calculate_ate_all_target(df_matched)
 
         if self.validation:
-            return self.val_dict
+            if self.refuter == "emissions":
+                return self.report_view()
+            else:
+                return self.val_dict
 
         return self.report_view(), df_matched
 
@@ -675,9 +728,7 @@ class FaissMatcher:
         df = self.df[self.columns_match]
         treated, untreated = self._get_split(df)
 
-        std_treated_np, std_untreated_np = _transform_to_np(
-            treated, untreated, self.weights
-        )
+        std_treated_np, std_untreated_np = _transform_to_np(treated, untreated, self.weights, self.validation)
 
         if self.pbar:
             self.tqdm = tqdm(total=len(std_treated_np) + len(std_untreated_np))
@@ -704,7 +755,10 @@ class FaissMatcher:
         self._calculate_ate_all_target(df_matched)
 
         if self.validation:
-            return self.val_dict
+            if self.refuter == "emissions":
+                return self.report_view()
+            else:
+                return self.val_dict
 
         return self.report_view(), df_matched
 
@@ -715,6 +769,8 @@ class FaissMatcher:
             DataFrame containing ATE, ATC, and ATT results
         """
         result = (self.ATE, self.ATC, self.ATT)
+        if not self.validation:
+            logger.info(f"The entry of bias into the ATT is {str(self.delta_t) + '%'}")
 
         for outcome in self.outcomes:
             res = pd.DataFrame(
@@ -786,10 +842,10 @@ def _get_index(base: np.ndarray, new: np.ndarray, n_neighbors: int) -> list:
     return indexes
 
 
-def _transform_to_np(
-    treated: pd.DataFrame, untreated: pd.DataFrame, weights: dict
-) -> Tuple[np.ndarray, np.ndarray]:
+def _transform_to_np(treated: pd.DataFrame, untreated: pd.DataFrame, weights: dict, validation: bool) -> Tuple[
+    np.ndarray, np.ndarray]:
     """Transforms df to numpy and transform via Cholesky decomposition.
+    If there are features that cannot be decomposed Cholesky, these features are removed.
 
     Args:
         treated:
@@ -798,19 +854,52 @@ def _transform_to_np(
             Control subset DataFrame to be transformed
         weights:
             Dict with weights for each feature. By default is 1
+        validation:
+            Flag is validation
+
 
     Returns:
         A tuple of transformed numpy arrays for treated and untreated data respectively
     """
+    ## TODO: Create one more function for calculating cov
     xc = untreated.to_numpy()
     xt = treated.to_numpy()
 
-    cov = conditional_covariance(xc, xt)
+    cov_c = np.cov(xc, rowvar=False, ddof=0)
+    cov_t = np.cov(xt, rowvar=False, ddof=0)
+    cov = (cov_c + cov_t) / 2
 
     epsilon = 1e-3
-    cov = cov + np.eye(cov.shape[0]) * epsilon
 
-    L = np.linalg.cholesky(cov)
+    cov = cov + np.eye(cov.shape[0]) * epsilon
+    try:
+        L = np.linalg.cholesky(cov)
+
+    except:  # Вносим заглушку для удаления колонок без группировки, если таковые имеются
+
+        treated_duplicated = list(treated.columns[treated.T.duplicated()].values)
+        untreated_duplicated = list(untreated.columns[untreated.T.duplicated()].values)
+        if treated_duplicated is not [] and not validation:
+            logger.info(f'The data has the duplicate columns: {treated_duplicated} in test group')
+        if untreated_duplicated is not [] and not validation:
+            logger.info(f'The data has the duplicate columns: {untreated_duplicated} in control group')
+
+        columns_duplicated = set(treated_duplicated + untreated_duplicated)
+        treated = treated.drop(columns=columns_duplicated)
+        untreated = untreated.drop(columns=columns_duplicated)
+
+        xc = untreated.to_numpy()
+        xt = treated.to_numpy()
+
+        cov_c = np.cov(xc, rowvar=False, ddof=0)
+        cov_t = np.cov(xt, rowvar=False, ddof=0)
+        cov = (cov_c + cov_t) / 2
+
+        epsilon = 1e-3
+
+        cov = cov + np.eye(cov.shape[0]) * epsilon
+        L = np.linalg.cholesky(cov)
+
     mahalanobis_transform = np.linalg.inv(L)
     if weights is not None:
         features = treated.columns
