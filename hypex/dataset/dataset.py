@@ -34,22 +34,30 @@ class Dataset(DatasetBase):
             return self.backend.iloc(item)
 
     def set_data(
-        self, data: Union[DataFrame, str, Type] = None, roles: Union[Dict] = None
+        self,
+        data: Union[DataFrame, str, Type],
+        roles: Union[Dict] = None,
+        backend: str = None,
     ):
         data = data() if isinstance(data, type) else data
         self.roles = parse_roles(roles)
         if isinstance(data, PandasDataset):
             self._backend = data
         else:
-            self._backend = self._select_backend(data)
+            self._backend = (
+                self._select_backend_from_data(data)
+                if not backend
+                else self._select_backend_from_str(data, backend)
+            )
         self.data = self._backend.data
         self.loc = self.Locker(self._backend)
         self.iloc = self.ILocker(self._backend)
 
     def __init__(
         self,
-        data: Union[DataFrame, str, None] = None,
+        data: Union[DataFrame, str],
         roles: Optional[Dict[ABCRole, Union[List[str], str]]] = None,
+        backend: str = None,
     ):
         self.roles = None
         self._backend = None
@@ -74,14 +82,15 @@ class Dataset(DatasetBase):
         self.data[key] = value
 
     @staticmethod
-    def _select_backend(data):
+    def _select_backend_from_data(data):
         if isinstance(data, pd.DataFrame):
             return PandasDataset(data)
-        if isinstance(data, str):
-            check_data = check_file_extension(data)
-            if check_data is not None:
-                return PandasDataset(check_data)
-        return None
+        return PandasDataset(data)
+
+    @staticmethod
+    def _select_backend_from_str(data, backend):
+        if backend == "pandas":
+            return PandasDataset(data)
 
     def get_columns_by_roles(
         self, roles: Union[ABCRole, Iterable[ABCRole]]
@@ -140,12 +149,8 @@ class ExperimentData(Dataset):
         if isinstance(data, Dataset):
             self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
             self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
-            self.additional_fields = Dataset(data.data)._create_empty(
-                index=data.index
-            )
-            self.stats_fields = Dataset(data.data)._create_empty(
-                index=data.columns
-            )
+            self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
+            self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
         else:
             self.additional_fields = Dataset(data)
             self.stats_fields = Dataset(data)
@@ -174,12 +179,16 @@ class ExperimentData(Dataset):
         return self
 
     def set_value(
-        self, space: str, executor_id: int, name: str, value: Any, key: str = None, role=None
+        self,
+        space: str,
+        executor_id: int,
+        name: str,
+        value: Any,
+        key: str = None,
+        role=None,
     ):
         if space == "additional_fields":
-            self.additional_fields.add_column(
-                data=value, name=executor_id, role=role
-            )
+            self.additional_fields.add_column(data=value, name=executor_id, role=role)
         elif space == "analysis_tables":
             self.analysis_tables[name] = value
         elif space == "stats_fields":
