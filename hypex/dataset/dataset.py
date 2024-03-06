@@ -121,6 +121,7 @@ class Dataset(DatasetBase):
     def isin(self, values: Iterable) -> Iterable[bool]:
         return self._backend.isin(values)
 
+    # TODO: implement wrap to Dataset
     def groupby(self, by=None, axis=0, level=None):
         return self._backend.groupby(by=by, axis=axis, level=level)
 
@@ -140,7 +141,7 @@ class ExperimentData(Dataset):
             self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
             self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
             self.additional_fields = Dataset(data.data)._create_empty(
-                index==data.index
+                index=data.index
             )
             self.stats_fields = Dataset(data.data)._create_empty(
                 index=data.columns
@@ -173,11 +174,11 @@ class ExperimentData(Dataset):
         return self
 
     def set_value(
-        self, space: str, executor_id: int, name: str, value: Any, key: str = None
+        self, space: str, executor_id: int, name: str, value: Any, key: str = None, role=None
     ):
         if space == "additional_fields":
             self.additional_fields.add_column(
-                data=value, name=executor_id, role=StatisticRole
+                data=value, name=executor_id, role=role
             )
         elif space == "analysis_tables":
             self.analysis_tables[name] = value
