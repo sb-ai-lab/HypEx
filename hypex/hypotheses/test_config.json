@@ -1,0 +1,17 @@
+{
+  "dataset": {
+    "path": "data.csv",
+    "roles": {
+      "role_names": [
+        "InfoRole"
+      ],
+      "columns": [
+        "a",
+        "b"
+      ]
+    },
+    "backend": "pandas"
+  },
+  "experiment": {},
+  "report": {}
+}
