@@ -37,10 +37,7 @@ class Hypothesis:
         self.report = self._parse_report()
 
     def _parse_dataset(self):
-        if "data" in self.dataset.keys():
-            data = self.dataset["data"]
-        else:
-            data = self.dataset["path"]
+        data = self.dataset["data"] if "data" in self.dataset.keys() else data = self.dataset["path"]
         roles = {
             i: default_roles.get(j.lower())
             for i, j in zip(
