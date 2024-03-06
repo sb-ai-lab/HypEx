@@ -54,8 +54,3 @@ class Hypothesis:
 
     def _parse_report(self):
         pass
-
-
-if __name__ == "__main__":
-    hypo = Hypothesis("test_config.json")
-    print(hypo.dataset)
