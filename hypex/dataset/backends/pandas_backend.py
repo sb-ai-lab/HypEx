@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Sequence, Union, Iterable, List, Dict
 
 import pandas as pd
@@ -7,8 +8,25 @@ from hypex.dataset.base import DatasetBase
 
 class PandasDataset(DatasetBase):
 
-    def __init__(self, data: pd.DataFrame = None):
-        self.data = data
+    def __init__(self, data: Union[pd.DataFrame, Dict, str] = None):
+        if isinstance(data, pd.DataFrame):
+            self.data = data
+        elif isinstance(data, Dict):
+            self.data = pd.DataFrame(
+                data=data["data"], index=data["index"], columns=data["columns"]
+            )
+        elif isinstance(data, str):
+            self.data = self._read_file(data)
+
+    @staticmethod
+    def _read_file(filename: str) -> pd.DataFrame:
+        file_extension = Path(filename).suffix
+        if file_extension == ".csv":
+            return pd.read_csv(filename)
+        elif file_extension == ".xlsx":
+            return pd.read_excel(filename)
+        else:
+            raise ValueError(f"Unsupported file extension {file_extension}")
 
     def _get_column_index(
         self, column_name: Union[Sequence[str], str]
@@ -71,3 +89,9 @@ class PandasDataset(DatasetBase):
 
     def iloc(self, items: Iterable) -> Iterable:
         return self.data.iloc[items]
+
+    def to_json(self):
+        columns = list(self.columns)
+        index = list(self.index)
+        data = self.data.values.tolist()
+        return {"columns": columns, "index": index, "data": data}

@@ -1,151 +1,160 @@
 {
-    "type": "object",
-    "default": {},
-    "title": "Root Schema",
-    "required": [
-        "dataset",
-        "experiment",
-        "report"
-    ],
-    "properties": {
-        "dataset": {
-            "type": "object",
-            "default": {},
-            "title": "The dataset Schema",
-            "required": [
-                "path",
-                "backend",
-                "roles"
-            ],
-            "properties": {
-                "data": {
-                    "type": "object",
-                    "title": "The data Schema"
-                },
-                "path": {
-                    "type": "string",
-                    "default": "",
-                    "title": "The path Schema",
-                    "pattern": "\\.txt$|\\.csv$",
-                    "examples": [
-                        "path/to/file"
-                    ]
-                },
-                "backend": {
-                    "enum": [
-                        "pandas",
-                        "pyspark"
-                    ]
-                },
-                "roles": {
-                    "type": "object",
-                    "title": "The roles Schema",
-                    "required": [
-                        "role_names",
-                        "columns"
-                    ],
-                    "properties": {
-                        "role_names": {
-                            "type": "array",
-                            "minItems": 1,
-                            "default": [],
-                            "title": "The role_names Schema",
-                            "items": {
-                                "type": "string",
-                                "enum": [
-                                    "InfoRole",
-                                    "TargetRole"
-                                ]
-                            }
-                        },
-                        "columns": {
-                            "type": "array",
-                            "minItems": 1,
-                            "uniqueItems": true,
-                            "default": [],
-                            "title": "The columns Schema",
-                            "items": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                },
-                "args": {
-                    "type": "object",
-                    "default": {},
-                    "title": "The args Schema",
-                    "properties": {
-                        "delimiter": {
-                            "type": "string",
-                            "default": "",
-                            "title": "The delimiter Schema",
-                            "examples": [
-                                ","
-                            ]
-                        },
-                        "encoding": {
-                            "type": "string",
-                            "default": "",
-                            "title": "The encoding Schema",
-                            "examples": [
-                                "utf-8"
-                            ]
-                        }
-                    },
-                    "examples": [
-                        {
-                            "delimiter": ",",
-                            "encoding": "utf-8"
-                        }
-                    ]
-                }
-            },
-            "examples": [
-                {
-                    "data": "future",
-                    "path": "path/to/file",
-                    "backend": "pandas",
-                    "roles": {
-                        "columnname": "role"
-                    },
-                    "args": {
-                        "delimiter": ",",
-                        "encoding": "utf-8"
-                    }
-                }
-            ]
-        },
-        "experiment": {
-            "type": "object",
-            "default": {},
-            "title": "The experiment Schema",
-            "required": [],
-            "properties": {}
-        },
-        "report": {
-            "type": "object",
-            "default": {},
-            "title": "The report Schema",
-            "required": [],
-            "properties": {}
-        }
-    },
-    "examples": [
+  "type": "object",
+  "default": {},
+  "title": "Root Schema",
+  "required": [
+    "dataset",
+    "experiment",
+    "report"
+  ],
+  "properties": {
+    "dataset": {
+      "type": "object",
+      "default": {},
+      "title": "The dataset Schema",
+      "oneOf": [
         {
-            "dataset": {
-                "data": "future",
-                "path": "path/to/file",
-                "backend": "pandas",
-                "roles": {
-                    "columnname": "role"
-                },
-                "args": {
-                    "delimiter": ",",
-                    "encoding": "utf-8"
-                }
-            },
-            "experiment": {},
-            "report": {}
+          "required": [
+            "path",
+            "backend"
+          ]
+        },
+        {
+          "required": [
+            "data",
+            "backend"
+          ]
         }
-    ]
+      ],
+      "properties": {
+        "data": {
+          "type": "object",
+          "title": "The data Schema",
+          "properties": {
+            "index": {
+              "type": "array",
+              "items": {}
+            },
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "data": {
+              "type": "array",
+              "items": {
+                "type": "array"
+              }
+            }
+          }
+        },
+        "path": {
+          "type": "string",
+          "default": "",
+          "title": "The path Schema",
+          "examples": [
+            "path/to/file"
+          ]
+        },
+        "backend": {
+          "enum": [
+            "pandas",
+            "pyspark"
+          ],
+          "default": "pandas"
+        },
+        "roles": {
+          "type": "object",
+          "title": "The roles Schema",
+          "required": [
+            "role_names",
+            "columns"
+          ],
+          "properties": {
+            "role_names": {
+              "type": "array",
+              "minItems": 1,
+              "title": "The role_names Schema",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Info",
+                  "Target"
+                ]
+              }
+            },
+            "columns": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "default": [],
+              "title": "The columns Schema",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "args": {
+          "type": "object",
+          "default": {},
+          "title": "The args Schema",
+          "properties": {},
+          "examples": [
+            {
+              "delimiter": ",",
+              "encoding": "utf-8"
+            }
+          ]
+        }
+      },
+      "examples": [
+        {
+          "data": "future",
+          "path": "path/to/file",
+          "backend": "pandas",
+          "roles": {
+            "columnname": "role"
+          },
+          "args": {
+            "delimiter": ",",
+            "encoding": "utf-8"
+          }
+        }
+      ]
+    },
+    "experiment": {
+      "type": "object",
+      "default": {},
+      "title": "The experiment Schema",
+      "required": [],
+      "properties": {}
+    },
+    "report": {
+      "type": "object",
+      "default": {},
+      "title": "The report Schema",
+      "required": [],
+      "properties": {}
+    }
+  },
+  "examples": [
+    {
+      "dataset": {
+        "data": "future",
+        "path": "path/to/file",
+        "backend": "pandas",
+        "roles": {
+          "columnname": "role"
+        },
+        "args": {
+          "delimiter": ",",
+          "encoding": "utf-8"
+        }
+      },
+      "experiment": {},
+      "report": {}
+    }
+  ]
 }

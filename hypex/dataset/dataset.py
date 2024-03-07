@@ -10,14 +10,6 @@ from hypex.dataset.roles import ABCRole, StatisticRole
 from hypex.dataset.utils import parse_roles
 
 
-def check_file_extension(file_path):
-    read_functions = {"csv": pd.read_csv, "xlsx": pd.read_excel, "json": pd.read_json}
-    extension = file_path.split(".")[-1].lower()
-    if extension in read_functions:
-        read_function = read_functions[extension]
-        return read_function(file_path)
-
-
 class Dataset(DatasetBase):
     class Locker:
         def __init__(self, backend):
@@ -40,7 +32,6 @@ class Dataset(DatasetBase):
         backend: str = None,
     ):
         data = data() if isinstance(data, type) else data
-        self.roles = parse_roles(roles)
         if isinstance(data, PandasDataset):
             self._backend = data
         else:
@@ -49,6 +40,12 @@ class Dataset(DatasetBase):
                 if not backend
                 else self._select_backend_from_str(data, backend)
             )
+        if not all(i in self._backend.columns for i in list(roles.keys())):
+            raise ValueError(
+                "Check your roles. All of them must be names of data columns. \n"
+                f"Now roles have {list(roles.keys())} values and columns have {self._backend.columns} values"
+            )
+        self.roles = parse_roles(roles)
         self.data = self._backend.data
         self.loc = self.Locker(self._backend)
         self.iloc = self.ILocker(self._backend)
@@ -64,7 +61,7 @@ class Dataset(DatasetBase):
         self.data = None
         self.loc = None
         self.iloc = None
-        self.set_data(data, roles)
+        self.set_data(data, roles, backend)
 
     def __repr__(self):
         return self.data.__repr__()
@@ -141,6 +138,18 @@ class Dataset(DatasetBase):
     @property
     def columns(self):
         return self._backend.columns
+
+    def to_json(self):
+        return {
+            "backend": str(self._backend.__class__.__name__).lower()[:-7],
+            "roles": {
+                "role_names": list(
+                    map(lambda x: x._role_name, list(self.roles.keys()))
+                ),
+                "columns": list(self.roles.values()),
+            },
+            "data": self._backend.to_json(),
+        }
 
 
 class ExperimentData(Dataset):

@@ -1,13 +1,12 @@
 {
   "dataset": {
-    "path": "data.csv",
+    "path": "C:\\job_placement.csv",
     "roles": {
       "role_names": [
-        "InfoRole"
+        "Info"
       ],
       "columns": [
-        "a",
-        "b"
+        "id"
       ]
     },
     "backend": "pandas"

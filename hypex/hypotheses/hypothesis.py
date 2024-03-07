@@ -37,7 +37,11 @@ class Hypothesis:
         self.report = self._parse_report()
 
     def _parse_dataset(self):
-        data = self.dataset["data"] if "data" in self.dataset.keys() else data = self.dataset["path"]
+        data = (
+            self.dataset["data"]
+            if "data" in self.dataset.keys()
+            else self.dataset["path"]
+        )
         roles = {
             i: default_roles.get(j.lower())
             for i, j in zip(
@@ -51,3 +55,22 @@ class Hypothesis:
 
     def _parse_report(self):
         pass
+
+    def to_json(self, file=None):
+        # return json.dumps(self.dataset.to_json(), self.experiment.to_json(), self.report.to_json())
+        if file:
+            with open(file, "w") as f:
+                json.dump(
+                    {"dataset": self.dataset.to_json(), "experiment": {}, "report": {}},
+                    f,
+                    indent=4,
+                )
+        return json.dumps(
+            {"dataset": self.dataset.to_json(), "experiment": {}, "report": {}}
+        )
+
+
+if __name__ == "__main__":
+    hypex = Hypothesis("test_config.json")
+    print(hypex.dataset)
+    hypex.to_json("output.json")
