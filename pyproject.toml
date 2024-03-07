@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Fast and customizable framework for Causal Inference"
 authors = [
     "Dmitry Tikhomirov <dimasta00@gmail.com>",
+    "Dmitry Bulychev <dmatryus.sqrt49@yandex.ru>",
+    "Ksenia Vasilieva <vasilievaxeniaa@gmail.com>"
 ]
 readme = "README.md"
 license = "Apache-2.0"
