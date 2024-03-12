@@ -798,7 +798,7 @@ class Matcher:
                     self.val_dict[key].append(sim[key][0])
 
         for outcome in self.outcomes:
-            self.pval_dict.update({outcome: [np.mean(self.val_dict[outcome])]})
+            self.pval_dict.update({outcome: [np.sort(self.val_dict[outcome])]})
             self.pval_dict[outcome].append(
                 test_significance(
                     self.results.query("outcome==@outcome").loc[effect_type.upper()][
