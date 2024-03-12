@@ -58,6 +58,12 @@ class PandasDataset(DatasetBase):
         self.data = pd.DataFrame().from_records(data)
         return self
 
+    def to_dict(self):
+        columns = list(self.columns)
+        index = list(self.index)
+        data = self.data.values.tolist()
+        return {"columns": columns, "index": index, "data": data}
+
     def add_column(self, data, name):
         self.data[name] = data
 
@@ -89,9 +95,3 @@ class PandasDataset(DatasetBase):
 
     def iloc(self, items: Iterable) -> Iterable:
         return self.data.iloc[items]
-
-    def to_json(self):
-        columns = list(self.columns)
-        index = list(self.index)
-        data = self.data.values.tolist()
-        return {"columns": columns, "index": index, "data": data}

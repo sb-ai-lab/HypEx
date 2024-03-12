@@ -108,6 +108,18 @@ class Dataset(DatasetBase):
         self.data = self._backend.data
         return self
 
+    def to_dict(self):
+        return {
+            "backend": str(self._backend.__class__.__name__).lower()[:-7],
+            "roles": {
+                "role_names": list(
+                    map(lambda x: x._role_name, list(self.roles.keys()))
+                ),
+                "columns": list(self.roles.values()),
+            },
+            "data": self._backend.to_dict(),
+        }
+
     def _create_empty(self, index=None, columns=None):
         index = [] if index is None else index
         columns = [] if columns is None else columns
@@ -138,18 +150,6 @@ class Dataset(DatasetBase):
     @property
     def columns(self):
         return self._backend.columns
-
-    def to_json(self):
-        return {
-            "backend": str(self._backend.__class__.__name__).lower()[:-7],
-            "roles": {
-                "role_names": list(
-                    map(lambda x: x._role_name, list(self.roles.keys()))
-                ),
-                "columns": list(self.roles.values()),
-            },
-            "data": self._backend.to_json(),
-        }
 
 
 class ExperimentData(Dataset):

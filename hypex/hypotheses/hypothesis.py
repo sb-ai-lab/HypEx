@@ -61,12 +61,12 @@ class Hypothesis:
         if file:
             with open(file, "w") as f:
                 json.dump(
-                    {"dataset": self.dataset.to_json(), "experiment": {}, "report": {}},
+                    {"dataset": self.dataset.to_dict(), "experiment": {}, "report": {}},
                     f,
                     indent=4,
                 )
         return json.dumps(
-            {"dataset": self.dataset.to_json(), "experiment": {}, "report": {}}
+            {"dataset": self.dataset.to_dict(), "experiment": {}, "report": {}}
         )
 
 
