@@ -658,9 +658,9 @@ class Matcher:
 
     def validate_result(
             self,
-            refuter: str = "random_feature",
-            effect_type: str = "ate",
-            n_sim: int = 10,
+            refuter: str = "random_treatment",
+            effect_type: str = "att",
+            n_sim: int = 500,
             fraction: float = 0.8,
             low: float = 1.0,
             high: float = 99.0
