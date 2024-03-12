@@ -89,27 +89,39 @@ class CycledExperiment(Executor):
             data = self.analyzer.execute(self.inner_executor.execute(data))
         return data
 
-class CollectionExperiment(Executor):
+class GroupExperiment(Executor):
     def generate_full_name(self) -> str:
         return (
-            f"CollectionExperiment({self.inner_experiment.full_name})"
+            f"{}({self.inner_experiment.full_name})"
         )
 
     def __init__(
         self,
+        grop_field: FieldKey,
         inner_executor: Executor,
-        n_iterations: int,
-        analyzer: Analyzer,
         full_name: str = None,
         index: int = 0,
     ):
+        self.grop_field = grop_field
         self.inner_executor: Executor = inner_executor
-        self.n_iterations: int = n_iterations
-        self.analyzer: Analyzer = analyzer
         super().__init__(full_name, index)
 
-# TODO: implement
-    # def execute(self, data: ExperimentData) -> ExperimentData:
-    #     for _ in range(self.n_iterations):
-    #         data = self.analyzer.execute(self.inner_experiment.execute(data))
-    #     return data
+    def extract_result(self, data: ExperimentData) -> Dataset:
+        return data.analysis_tables[self.inner_executor._id]
+
+    def insert_result(self, data: ExperimentData, result_list: List[Dataset]) -> ExperimentData:
+        result = result_list[0]
+        for i in range(1, len(result_list)):
+            result = result.append(result_list[i])
+        data.analysis_tables[self._id] = result
+        return data
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        result_list = []
+        for grop, group_data in data.data.groupby(self.grop_field):
+            temp_data = ExperimentData(group_data)
+            temp_data = self.inner_executor.execute(temp_data)
+            result_list.append(self.extract_result(temp_data))
+        return self.insert_result(data, result_list)
+
+
