@@ -63,7 +63,6 @@ class PandasDataset(DatasetBase):
 
     def to_dict(self):
         data = self.data.to_dict()
-        print(data)
         for key, value in data.items():
             data[key] = list(data[key].values())
         index = list(self.index)

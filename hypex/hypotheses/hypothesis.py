@@ -74,9 +74,3 @@ class Hypothesis:
         return json.dumps(
             {"dataset": self.dataset.to_dict(), "experiment": {}, "report": {}}
         )
-
-
-if __name__ == "__main__":
-    hypex = Hypothesis("test_config.json")
-    print(hypex.dataset)
-    hypex.to_json("output.json")
