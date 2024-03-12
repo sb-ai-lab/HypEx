@@ -14,3 +14,7 @@ Matching classes
     :template: classtemplate.rst
 
     Matcher
+
+.. warnings::
+    To ensure the multitarget's correct operation, it's necessary to guarantee the independence of the
+    targets from each other.

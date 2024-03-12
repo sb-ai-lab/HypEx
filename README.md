@@ -30,6 +30,55 @@ Diff-in-Diff) and CUPED methods, to rigorously test hypotheses and validate expe
 - **Weights support**:  Empower your analysis by assigning custom weights to features, enhancing the matching precision
   to suit your specific research needs
 
+## Warnings
+
+Some functions in HypEx can facilitate solving specific auxiliary tasks but cannot automate decisions on experiment
+design. Below, we will discuss features that are implemented in HypEx but do not automate the design of experiments.
+
+### Feature Selection
+
+**Feature selection** models the significance of features for the accuracy of target approximation. However, it does not
+rule out the possibility of overlooked features, the complex impact of features on target description, or the
+significance of features from a business logic perspective. The algorithm will not function correctly if there are data
+leaks.
+
+Points to consider when selecting features:
+
+* Data leaks - these should not be present.
+* Influence on treatment distribution - features should not affect the treatment distribution.
+* The target should be describable by features.
+* All features significantly affecting the target should be included.
+* The business rationale of features.
+* The feature selection function can be useful for addressing these tasks, but it does not solve them nor does it
+  absolve the user of the responsibility for their selection, nor does it justify it.
+
+[Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/selectors.html#selector-classes)
+
+### Multitarget
+
+**Multitarget** involves studying the impact on multiple targets.
+
+The algorithm is implemented as a repetition of the same matching on the same feature space and samples, but with
+different targets. To ensure the algorithm's correct operation, it's necessary to guarantee the independence of the
+targets from each other.
+
+The best solution would be to conduct several independent experiments, each with its own set of features for each
+target.
+
+[Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/matcher.html#matcher)
+
+### Random Treatment и Random Feature
+
+**Random Treatment** algorithm randomly shuffles the actual treatment. It is expected that the treatment's effect on the
+target will be close to 0.
+
+**Random Feature** adds a feature with random values. It is expected that adding a random feature will maintain the same
+impact of the treatment on the target.
+
+These methods are not sufficiently accurate markers of a successful experiment.
+
+[Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/utils.html#validators)
+
 ## Quick Start
 
 Explore usage examples and tutorials [here](https://github.com/sb-ai-lab/Hypex/blob/master/examples/tutorials/).
@@ -84,9 +133,9 @@ data = create_test_data(rs=52, na_step=10, nan_cols=['age', 'gender'])
 
 model = ABTest()
 results = model.execute(
-    data=data, 
-    target_field='post_spends', 
-    target_field_before='pre_spends', 
+    data=data,
+    target_field='post_spends',
+    target_field_before='pre_spends',
     group_field='group'
 )
 

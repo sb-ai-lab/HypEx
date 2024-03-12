@@ -198,8 +198,6 @@ def min_sample_size(
                 num_samples=number_of_samples, quantile_level=power_level
             )  # quantile of the marginal distribution beta
 
-        print(f"{quantile_1 = }, {quantile_2 = }")
-
         return (
             int(
                 2

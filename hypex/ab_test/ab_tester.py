@@ -1,4 +1,5 @@
 """Module for AB tests"""
+
 from typing import Dict
 import pandas as pd
 import numpy as np
@@ -7,57 +8,57 @@ from scipy.stats import ttest_ind, mannwhitneyu
 
 class ABTest:
     """
-       A class for conducting A/B testing using statistical methods.
+    A class for conducting A/B testing using statistical methods.
 
-       This class provides methods for splitting data into test and control groups,
-       calculating various metrics to compare these groups, and computing p-values
-       to assess the statistical significance of the observed differences.
+    This class provides methods for splitting data into test and control groups,
+    calculating various metrics to compare these groups, and computing p-values
+    to assess the statistical significance of the observed differences.
 
-       Attributes:
-           calc_difference_method (str): Method used for calculating the difference
-               between test and control groups. Options include 'all' (default),
-               'ate' (average treatment effect), 'diff_in_diff' (difference in
-               differences), and 'cuped' (Controlled-Experiment using Pre-Experiment
-               Data).
-           calc_p_value_method (str): Method used for calculating the p-value.
-               Options include 'all' (default), 't-test', and 'mann_whitney'.
-           results (dict or None): Stores the results of the executed tests. Each
-               key (like 'size', 'difference', 'p-value') maps to a corresponding
-               result.
+    Attributes:
+        calc_difference_method (str): Method used for calculating the difference
+            between test and control groups. Options include 'all' (default),
+            'ate' (average treatment effect), 'diff_in_diff' (difference in
+            differences), and 'cuped' (Controlled-Experiment using Pre-Experiment
+            Data).
+        calc_p_value_method (str): Method used for calculating the p-value.
+            Options include 'all' (default), 't-test', and 'mann_whitney'.
+        results (dict or None): Stores the results of the executed tests. Each
+            key (like 'size', 'difference', 'p-value') maps to a corresponding
+            result.
 
-       Methods:
-           split_ab(data, group_field):
-               Splits a DataFrame into test and control groups based on a group field.
-           cuped(test_data, control_data, target_field, target_field_before):
-               Calculates the Controlled-Experiment using Pre-Experiment Data (CUPED)
-               metric.
-           diff_in_diff(test_data, control_data, target_field, target_field_before):
-               Computes the Difference in Differences (DiD) metric.
-           calc_difference(splitted_data, target_field, target_field_before):
-               Calculates the difference in the target field between test and control.
-           calc_p_value(splitted_data, target_field):
-               Calculates the p-value for the difference between test and control groups.
-           execute(data, target_field, group_field, target_field_before):
-               Executes the A/B test, splitting the data and calculating size,
-               difference, and p-value.
-           show_beautiful_result():
-               Displays the results in an easy-to-read format.
+    Methods:
+        split_ab(data, group_field):
+            Splits a DataFrame into test and control groups based on a group field.
+        cuped(test_data, control_data, target_field, target_field_before):
+            Calculates the Controlled-Experiment using Pre-Experiment Data (CUPED)
+            metric.
+        diff_in_diff(test_data, control_data, target_field, target_field_before):
+            Computes the Difference in Differences (DiD) metric.
+        calc_difference(splitted_data, target_field, target_field_before):
+            Calculates the difference in the target field between test and control.
+        calc_p_value(splitted_data, target_field):
+            Calculates the p-value for the difference between test and control groups.
+        execute(data, target_field, group_field, target_field_before):
+            Executes the A/B test, splitting the data and calculating size,
+            difference, and p-value.
+        show_beautiful_result():
+            Displays the results in an easy-to-read format.
 
-       Example:
-        >>> model = ABTest()
-        >>> results = model.execute(
-        >>>     data=data_ab,
-        >>>     target_field='post_spends',
-        >>>     target_field_before='pre_spends',
-        >>>     group_field='group'
-        >>>)
-        >>> results
-       """
+    Example:
+     >>> model = ABTest()
+     >>> results = model.execute(
+     >>>     data=data_ab,
+     >>>     target_field='post_spends',
+     >>>     target_field_before='pre_spends',
+     >>>     group_field='group'
+     >>>)
+     >>> results
+    """
 
     def __init__(
-            self,
-            calc_difference_method: str = "all",
-            calc_p_value_method: str = "all",
+        self,
+        calc_difference_method: str = "all",
+        calc_p_value_method: str = "all",
     ):
         """Initializes the ABTest class.
 
@@ -98,10 +99,10 @@ class ABTest:
 
     @staticmethod
     def cuped(
-            test_data: pd.DataFrame,
-            control_data: pd.DataFrame,
-            target_field: str,
-            target_field_before: str,
+        test_data: pd.DataFrame,
+        control_data: pd.DataFrame,
+        target_field: str,
+        target_field_before: str,
     ) -> float:
         """Counts CUPED (Controlled-Experiment using Pre-Experiment Data) in absolute values.
 
@@ -139,8 +140,8 @@ class ABTest:
         test_before = test_data[target_field_before]
 
         theta = (
-                        np.cov(control, control_before)[0, 1] + np.cov(test, test_before)[0, 1]
-                ) / (np.var(control_before) + np.var(test_before))
+            np.cov(control, control_before)[0, 1] + np.cov(test, test_before)[0, 1]
+        ) / (np.var(control_before) + np.var(test_before))
 
         control_cuped = control - theta * control_before
         test_cuped = test - theta * test_before
@@ -152,10 +153,10 @@ class ABTest:
 
     @staticmethod
     def diff_in_diff(
-            test_data: pd.DataFrame,
-            control_data: pd.DataFrame,
-            target_field: str,
-            target_field_before: str,
+        test_data: pd.DataFrame,
+        control_data: pd.DataFrame,
+        target_field: str,
+        target_field_before: str,
     ) -> float:
         """Counts Difference in Difference.
 
@@ -183,10 +184,10 @@ class ABTest:
         return (mean_test - mean_control) - (mean_test_before - mean_control_before)
 
     def calc_difference(
-            self,
-            splitted_data: Dict[str, pd.DataFrame],
-            target_field: str,
-            target_field_before: str = None,
+        self,
+        splitted_data: Dict[str, pd.DataFrame],
+        target_field: str,
+        target_field_before: str = None,
     ) -> Dict[str, float]:
         """Calculates the difference between the target field values of the 'test' and 'control' dataframes.
 
@@ -204,8 +205,8 @@ class ABTest:
         """
         result = {}
         if (
-                self.calc_difference_method in {"all", "diff_in_diff", "cuped"}
-                and target_field_before is None
+            self.calc_difference_method in {"all", "diff_in_diff", "cuped"}
+            and target_field_before is None
         ):
             raise ValueError(
                 "For calculation metrics 'cuped' or 'diff_in_diff' field 'target_field_before' is required.\n"
@@ -213,8 +214,8 @@ class ABTest:
             )
         if self.calc_difference_method in {"all", "ate"}:
             result["ate"] = (
-                    splitted_data["test"][target_field].values
-                    - splitted_data["control"][target_field].values
+                splitted_data["test"][target_field].values
+                - splitted_data["control"][target_field].values
             ).mean()
 
         if self.calc_difference_method in {"all", "cuped"}:
@@ -236,7 +237,7 @@ class ABTest:
         return result
 
     def calc_p_value(
-            self, splitted_data: Dict[str, pd.DataFrame], target_field: str
+        self, splitted_data: Dict[str, pd.DataFrame], target_field: str
     ) -> Dict[str, float]:
         """Calculates the p-value for a given dataset.
 
@@ -266,11 +267,11 @@ class ABTest:
         return result
 
     def execute(
-            self,
-            data: pd.DataFrame,
-            target_field: str,
-            group_field: str,
-            target_field_before: str = None,
+        self,
+        data: pd.DataFrame,
+        target_field: str,
+        group_field: str,
+        target_field_before: str = None,
     ) -> Dict[str, Dict[str, float]]:
         """Splits the input data based on the group field and calculates the size, difference, and p-value.
 
