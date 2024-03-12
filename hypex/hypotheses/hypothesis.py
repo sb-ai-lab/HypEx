@@ -49,9 +49,9 @@ class Hypothesis:
             else self.dataset["path"]
         )
         roles = {
-            i: default_roles.get(j.lower())
+            default_roles.get(j.lower()): i
             for i, j in zip(
-                self.dataset["roles"]["columns"], self.dataset["roles"]["role_names"]
+                self.dataset["roles"]["role_names"], self.dataset["roles"]["columns"]
             )
         }
         return Dataset(data=data, roles=roles, backend=self.dataset["backend"])

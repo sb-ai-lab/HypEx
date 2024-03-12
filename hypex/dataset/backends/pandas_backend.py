@@ -18,6 +18,8 @@ class PandasDataset(DatasetBase):
                 self.data = pd.DataFrame(data=data["data"])
         elif isinstance(data, str):
             self.data = self._read_file(data)
+        else:
+            self.data = None
 
     @staticmethod
     def _read_file(filename: str) -> pd.DataFrame:
@@ -91,7 +93,11 @@ class PandasDataset(DatasetBase):
         return self.data.isin(values)
 
     def groupby(self, by, axis, **kwargs):
-        return self.data.groupby(by, axis, **kwargs)
+        groups = self.data[by].unique()
+        return [
+            (group, self.data[self.data[by] == group].drop(by, axis=1))
+            for group in groups
+        ]
 
     def loc(self, items: Iterable) -> Iterable:
         return self.data.loc[items]

@@ -31,16 +31,13 @@ class Dataset(DatasetBase):
         roles: Union[Dict] = None,
         backend: str = None,
     ):
-        data = data() if isinstance(data, type) else data
-        if isinstance(data, PandasDataset):
-            self._backend = data
-        else:
-            self._backend = (
-                self._select_backend_from_data(data)
-                if not backend
-                else self._select_backend_from_str(data, backend)
-            )
-        if not all(i in self._backend.columns for i in list(roles.keys())):
+        self._backend = (
+            self._select_backend_from_data(data)
+            if not backend
+            else self._select_backend_from_str(data, backend)
+        )
+
+        if roles and not all(i in self._backend.columns for i in list(roles.values())):
             raise ValueError(
                 "Check your roles. All of them must be names of data columns. \n"
                 f"Now roles have {list(roles.keys())} values and columns have {self._backend.columns} values"
@@ -52,7 +49,7 @@ class Dataset(DatasetBase):
 
     def __init__(
         self,
-        data: Union[DataFrame, str],
+        data: Union[DataFrame, str] = None,
         roles: Optional[Dict[ABCRole, Union[List[str], str]]] = None,
         backend: str = None,
     ):
@@ -141,7 +138,11 @@ class Dataset(DatasetBase):
 
     # TODO: implement wrap to Dataset
     def groupby(self, by=None, axis=0, level=None):
-        return self._backend.groupby(by=by, axis=axis, level=level)
+        datasets = [
+            (i[0], Dataset(data=i[1]))
+            for i in self._backend.groupby(by=by, axis=axis, level=level)
+        ]
+        return datasets
 
     @property
     def index(self):
