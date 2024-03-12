@@ -12,9 +12,10 @@ class PandasDataset(DatasetBase):
         if isinstance(data, pd.DataFrame):
             self.data = data
         elif isinstance(data, Dict):
-            self.data = pd.DataFrame(
-                data=data["data"], index=data["index"], columns=data["columns"]
-            )
+            if "index" in data.keys():
+                self.data = pd.DataFrame(data=data["data"], index=data["index"])
+            else:
+                self.data = pd.DataFrame(data=data["data"])
         elif isinstance(data, str):
             self.data = self._read_file(data)
 
@@ -59,10 +60,12 @@ class PandasDataset(DatasetBase):
         return self
 
     def to_dict(self):
-        columns = list(self.columns)
+        data = self.data.to_dict()
+        print(data)
+        for key, value in data.items():
+            data[key] = list(data[key].values())
         index = list(self.index)
-        data = self.data.values.tolist()
-        return {"columns": columns, "index": index, "data": data}
+        return {"data": data, "index": index}
 
     def add_column(self, data, name):
         self.data[name] = data

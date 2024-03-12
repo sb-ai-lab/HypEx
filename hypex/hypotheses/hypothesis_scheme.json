@@ -30,23 +30,36 @@
         "data": {
           "type": "object",
           "title": "The data Schema",
+          "required": [
+            "data"
+          ],
           "properties": {
             "index": {
               "type": "array",
               "items": {}
             },
-            "columns": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
             "data": {
-              "type": "array",
-              "items": {
-                "type": "array"
+              "type": "object",
+              "minItems": 1,
+              "example": {
+                "column": [
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "column2": [
+                  5,
+                  6,
+                  7,
+                  8
+                ]
               }
             }
+          },
+          "index": {
+            "type": "array",
+            "default": []
           }
         },
         "path": {
