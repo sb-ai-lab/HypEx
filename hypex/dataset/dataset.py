@@ -1,5 +1,6 @@
+import json
 import warnings
-from typing import Dict, Optional, Union, List, Iterable, Any, Type
+from typing import Dict, Optional, Union, List, Iterable, Any, Type, Callable
 
 import pandas as pd
 from pandas import DataFrame
@@ -117,6 +118,12 @@ class Dataset(DatasetBase):
             "data": self._backend.to_dict(),
         }
 
+    def to_json(self, filename: str = None):
+        if filename is None:
+            return json.dumps(self.to_dict())
+        with open(filename, "w") as file:
+            json.dump(self.to_dict(), file)
+
     def _create_empty(self, index=None, columns=None):
         index = [] if index is None else index
         columns = [] if columns is None else columns
@@ -137,7 +144,14 @@ class Dataset(DatasetBase):
         return self._backend.isin(values)
 
     # TODO: implement wrap to Dataset
-    def groupby(self, by=None, axis=0, level=None):
+    def groupby(
+        self,
+        by: Union[str, List],
+        axis: int = 0,
+        level=None,
+        func: Callable = None,
+        field_list: List = None,
+    ):
         datasets = [
             (i[0], Dataset(data=i[1]))
             for i in self._backend.groupby(by=by, axis=axis, level=level)
