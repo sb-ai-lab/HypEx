@@ -1,48 +1,66 @@
-from typing import List
+from typing import List, Dict
+import warnings
 
 from hypex.experiment.experiment import Executor, Experiment
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import GroupingRole, StratificationRole
 from hypex.transformers.transformers import Shuffle
+from hypex.describers.describers import Unique
 
 # TODO: To Experiment
 # TODO: Set group
 
 
-class SplitterAA(Experiment):
+class SplitterAA(ComplexExecutor):
+    def get_inner_executors(
+        self, inner_executors: Dict[str, Executor] = None
+    ) -> Dict[str, Executor]:
+        if inner_executors and "shuffle" not in inner_executors:
+            warnings.warn(
+                "Shuffle executor not found in inner_executors. Will shuffle will be used by default",
+                category=Warning,
+            )
+            inner_executors = {}
+        if not inner_executors:
+            inner_executors = {"shuffle": Shuffle(self.random_state)}
+        return inner_executors
+
     def __init__(
         self,
         control_size: float = 0.5,
         random_state: int = None,
+        inner_executors: Dict[str, Executor] = None,
         full_name: str = None,
         index: int = 0,
     ):
         self.control_size = control_size
         self.random_state = random_state
-        super().__init__(
-            [
-                Shuffle(random_state=self.random_state),
-            ],
-            full_name,
-            index,
-        )
+
+        super().__init__(self.get_inner_executors(inner_executors), full_name, index)
 
     def generate_params_hash(self) -> str:
         return f"{self.random_state}"
 
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
-        return data.set_value("additional_fields", self._id, self.get_full_name(), value, role=GroupingRole)
+        return data.set_value(
+            "additional_fields",
+            self._id,
+            self.full_name,
+            value,
+            role=GroupingRole,
+        )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        experiment_data: ExperimentData = super().execute(data)
+        experiment_data: ExperimentData = self.inner_executors["shuffle"].execute(data)
 
         addition_indexes = list(experiment_data.index)
         edge = int(len(addition_indexes) * self.control_size)
 
-        result_group = ['A' if i < edge else 'B' for i in addition_indexes]
+        result_group = ["A" if i < edge else "B" for i in addition_indexes]
         data = self._set_value(data, result_group)
 
         return data
+
 
 # TODO: Implement
 class SplitterAAWithGrouping(SplitterAA):

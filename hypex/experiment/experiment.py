@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Iterable
+from typing import Iterable, Dict
 from copy import deepcopy
 
 from hypex.dataset.dataset import Dataset, ExperimentData
@@ -14,7 +14,7 @@ class Executor(ABC):
         return ""
 
     def generate_id(self) -> str:
-        return "\u2570".join([self.full_name, self.params_hash.replace('\u2570', '|'), str(self.index)])
+        return "\u2570".join([self.__class__.__name__, self.params_hash.replace('\u2570', '|'), str(self.index)])
 
     def __init__(self, full_name: str = None, index: int = 0):
         self.full_name = full_name or self.generate_full_name()
@@ -34,6 +34,10 @@ class Executor(ABC):
     def execute(self, data: ExperimentData) -> ExperimentData:
         raise NotImplementedError
 
+class ComplexExecutor(ABC, Executor):
+    def __init__(self, inner_executors: Dict[str, Executor] = None, full_name: str = None, index: int = 0):
+        super().__init__(full_name=full_name, index=index)
+        self.inner_executors = inner_executors or {}
 
 class Experiment(ABC, Executor):
     def generate_full_name(self) -> str:
