@@ -62,12 +62,31 @@ class SplitterAA(ComplexExecutor):
         return data
 
 
-# TODO: Implement
+# TODO: groupby instead of unique
 class SplitterAAWithGrouping(SplitterAA):
+    def __init__(
+        self,
+        control_size: float = 0.5,
+        random_state: int = None,
+        inner_executors: Dict[str, Executor] = None,
+        full_name: str = None,
+        index: int = 0,
+    ):
+        super().__init__(control_size, random_state, inner_executors, full_name, index)
+        self.inner_executors["unique"] = Unique()
+
     def execute(self, data: ExperimentData):
         group_field = data.get_columns_by_roles(GroupingRole)
-        random_ids = shuffle(data[group_field].unique(), random_state=self.random_state)
+        self.inner_executors["unique"].target_field = group_field
+        unique_groups = ExperimentData(
+            self.inner_executors["unique"]
+            .execute(data)
+            .additional_fields[self.inner_executors["unique"].id]
+        )
+        random_ids = self.inner_executors["shuffle"].execute(unique_groups)
         edge = int(len(random_ids) * self.control_size)
+
+        result_group = ["A" if i < edge else "B" for i in addition_indexes]
 
         data["treatment"] = 0
         test_indexes = list(data[data[group_field].isin(random_ids[:edge])].index)
@@ -102,3 +121,5 @@ class SplitterAAWithStratification(SplitterAA):
 class SplitterAAMulti(ExperimentMulti):
     def execute(self, data):
         raise NotImplementedError
+
+

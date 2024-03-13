@@ -5,7 +5,7 @@ from hypex.experiment.experiment import Executor
 from hypex.dataset.dataset import Dataset, ExperimentData
 
 
-class Descraber(Executor):
+class Describer(Executor):
     def __init__(self, target_field: FieldKey, full_name: str = None, index: int = 0):
         self.target_field = target_field
         super().__init__(full_name, index)
@@ -14,7 +14,7 @@ class Descraber(Executor):
         return data.set_value("analysis_tables", self._id, self.get_full_name(), value)
 
 
-class Unique(Executor):
+class Unique(Describer):
     def _convert_to_dataset(self, data: Iterable) -> Dataset:
         # TODO: implement
         return Dataset().from_dict(data)
