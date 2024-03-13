@@ -14,7 +14,7 @@ class Executor(ABC):
         return ""
 
     def generate_id(self) -> str:
-        return "|".join([self.full_name, self.params_hash, str(self.index)])
+        return "\u2570".join([self.full_name, self.params_hash.replace('\u2570', '|'), str(self.index)])
 
     def __init__(self, full_name: str = None, index: int = 0):
         self.full_name = full_name or self.generate_full_name()
@@ -66,10 +66,8 @@ class Experiment(ABC, Executor):
 
 
 class CycledExperiment(Executor):
-    def generate_full_name(self) -> str:
-        return (
-            f"CycledExperiment({self.inner_experiment.full_name} x {self.n_iterations})"
-        )
+    def generate_params_hash(self) -> str:
+        return f"{self.inner_experiment.full_name} x {self.n_iterations}"
 
     def __init__(
         self,
@@ -90,10 +88,8 @@ class CycledExperiment(Executor):
         return data
 
 class GroupExperiment(Executor):
-    def generate_full_name(self) -> str:
-        return (
-            f"{}({self.inner_experiment.full_name})"
-        )
+    def generate_params_hash(self) -> str:
+        return f"{self.grop_field}->{self.inner_executor._id.replace('|', '')}"
 
     def __init__(
         self,

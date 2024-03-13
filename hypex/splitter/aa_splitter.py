@@ -12,12 +12,12 @@ from hypex.transformers.transformers import Shuffle
 class SplitterAA(Experiment):
     def __init__(
         self,
-        test_size: float = 0.5,
+        control_size: float = 0.5,
         random_state: int = None,
         full_name: str = None,
         index: int = 0,
     ):
-        self.test_size = test_size
+        self.control_size = control_size
         self.random_state = random_state
         super().__init__(
             [
@@ -26,10 +26,6 @@ class SplitterAA(Experiment):
             full_name,
             index,
         )
-
-    @property
-    def _is_transformer(self):
-        return True
 
     def generate_params_hash(self) -> str:
         return f"{self.random_state}"
@@ -41,19 +37,19 @@ class SplitterAA(Experiment):
         experiment_data: ExperimentData = super().execute(data)
 
         addition_indexes = list(experiment_data.index)
-        edge = int(len(addition_indexes) * self.test_size)
+        edge = int(len(addition_indexes) * self.control_size)
 
         result_group = ['A' if i < edge else 'B' for i in addition_indexes]
         data = self._set_value(data, result_group)
 
         return data
 
-# TODO: Unique is comparator?
+# TODO: Implement
 class SplitterAAWithGrouping(SplitterAA):
     def execute(self, data: ExperimentData):
         group_field = data.get_columns_by_roles(GroupingRole)
         random_ids = shuffle(data[group_field].unique(), random_state=self.random_state)
-        edge = int(len(random_ids) * self.test_size)
+        edge = int(len(random_ids) * self.control_size)
 
         data["treatment"] = 0
         test_indexes = list(data[data[group_field].isin(random_ids[:edge])].index)
@@ -65,13 +61,13 @@ class SplitterAAWithStratification(SplitterAA):
     def __init__(
         self,
         inner_splitter: SplitterAA,
-        test_size: float = 0.5,
+        control_size: float = 0.5,
         random_state: int = None,
         full_name: str = None,
         index: int = 0,
     ):
         self.inner_splitter = inner_splitter
-        super().__init__(test_size, random_state, full_name, index)
+        super().__init__(control_size, random_state, full_name, index)
 
     def execute(self, data):
         control_indexes = []

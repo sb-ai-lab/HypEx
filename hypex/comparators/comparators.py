@@ -2,11 +2,12 @@ from abc import ABC, abstractmethod
 from typing import Callable
 
 from hypex.experiment.base import Executor
-from hypex.dataset.dataset import ExperimentData
+from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole
 from hypex.utils.hypex_typings import FieldKey
 
-class Comparator(ABC, Executor):
+# TODO: Rework it!
+class GroupComparator(ABC, Executor):
     def __init__(
         self,
         target_field: FieldKey,
@@ -37,7 +38,7 @@ class Comparator(ABC, Executor):
 
     def _extract_dataset(self, compare_result: Dict) -> Dataset:
         # TODO: not implemented
-        return Dataset([compare_result])
+        return Dataset().from_dict(compare_result)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         compare_result = self._compare(data)
