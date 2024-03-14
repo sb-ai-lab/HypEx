@@ -10,10 +10,10 @@ class BinaryOperator(ABC, Executor):
     def get_full_name(self):
         return f"{self.__class__.__name__}({self.x1_field}, {self.x2_field})"
 
-    def __init__(self, x1_field, x2_field, full_name: str = None):
+    def __init__(self, x1_field, x2_field, full_name: str = None, index: int = 0):
         self.x1_field = x1_field
         self.x2_field = x2_field
-        super().__init__(full_name)
+        super().__init__(full_name, index)
 
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
         data.set_value("additional_fields", self._id, self.get_full_name(), value)

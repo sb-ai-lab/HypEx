@@ -11,7 +11,7 @@ from hypex.describers.describers import Unique
 # TODO: Set group
 
 
-class SplitterAA(ComplexExecutor):
+class AASplitter(ComplexExecutor):
     def get_inner_executors(
         self, inner_executors: Dict[str, Executor] = None
     ) -> Dict[str, Executor]:
@@ -62,8 +62,7 @@ class SplitterAA(ComplexExecutor):
         return data
 
 
-# TODO: groupby instead of unique
-class SplitterAAWithGrouping(SplitterAA):
+class AASplitterWithGrouping(AASplitter):
     def execute(self, data: ExperimentData):
         group_field = data.get_columns_by_roles(GroupingRole)
         groups = list(data.groupby(group_field))
@@ -82,7 +81,7 @@ class SplitterAAWithGrouping(SplitterAA):
         return data
 
 
-class SplitterAAWithStratification(SplitterAA):
+class AASplitterWithStratification(SplitterAA):
     def __init__(
         self,
         control_size: float = 0.5,

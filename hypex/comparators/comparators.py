@@ -6,7 +6,6 @@ from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole
 from hypex.utils.hypex_typings import FieldKey
 
-# TODO: Rework it!
 class GroupComparator(ABC, Executor):
     def __init__(
         self,
@@ -22,7 +21,7 @@ class GroupComparator(ABC, Executor):
         raise NotImplementedError
 
     def _compare(self, data: ExperimentData) -> bool:
-        group_field = data.get_columns_by_roles(GroupingRole)[0]
+        group_field = data.data.get_columns_by_roles(GroupingRole)[0]
         grouping_data = list(data.groupby(self.group_field))
         return {
             grouping_data[i][0]: self._comparison_function(
@@ -35,12 +34,15 @@ class GroupComparator(ABC, Executor):
     def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
         data.set_value("analysis_tables", self._id, self.get_full_name(), value)
         return data
-
-    def _extract_dataset(self, compare_result: Dict) -> Dataset:
-        # TODO: not implemented
-        return Dataset().from_dict(compare_result)
+ 
+    def _extract_dataset(self, compare_result: Dict, roles=None) -> Dataset:
+        return Dataset(roles=roles).from_dict(compare_result)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         compare_result = self._compare(data)
         result_dataset = self._extract_dataset(compare_result)
         return self._set_value(data, result_dataset)
+
+# TODO: Implement
+def GroupDifference(ABC, GroupComparator):
+    pass

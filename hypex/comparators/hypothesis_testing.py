@@ -4,14 +4,13 @@ from scipy.stats import ttest_ind, ks_2samp
 
 from hypex.experiment.base import Executor
 from hypex.dataset.dataset import ExperimentData, Dataset
-from hypex.comparators.comparators import Comparator
+from hypex.comparators.comparators import GroupComparator
 
-class StatHypothesisTestingWithScipy(ABC, Comparator):
+class StatHypothesisTestingWithScipy(ABC, GroupComparator):
 
     def __init__(
         self,
         target_field: str,
-        comparison_function: Callable,
         reliability: float = 0.05,
         full_name: str = None,
         index: int = 0,
@@ -28,13 +27,12 @@ class StatHypothesisTestingWithScipy(ABC, Comparator):
                 "pass": stats.pvalue < self.reliability,
             } for group, stats in result_stats.items()
         ]
-        # TODO: not implemented
-        return Dataset(result_stats)
+        return super()._extract_dataset(result_stats)
 
-class StatTTest(StatHypothesisTestingWithScipy):
+class TTest(StatHypothesisTestingWithScipy):
     def _comparison_function(self, control_data, test_data) -> ExperimentData:
         return ttest_ind(control_data, test_data)
 
-class StatKSTest(StatHypothesisTestingWithScipy):
+class KSTest(StatHypothesisTestingWithScipy):
     def _comparison_function(self, control_data, test_data) -> ExperimentData:
         return ttest_ind(control_data, test_data)
