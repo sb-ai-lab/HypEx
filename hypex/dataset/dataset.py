@@ -181,8 +181,19 @@ class Dataset(DatasetBase):
         return self._backend.columns
 
     def mean(self):
-        print(self._backend.__class__)
         return self._backend.mean()
+
+    def max(self):
+        return self._backend.max()
+
+    def min(self):
+        return self._backend.min()
+
+    def count(self):
+        return self._backend.count()
+
+    def sum(self):
+        return self._backend.sum()
 
 
 class ExperimentData(Dataset):

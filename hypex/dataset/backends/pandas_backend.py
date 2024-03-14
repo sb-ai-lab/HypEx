@@ -110,3 +110,15 @@ class PandasDataset(DatasetBase):
 
     def mean(self):
         return self.data.mean()
+
+    def max(self):
+        return self.data.max()
+
+    def min(self):
+        return self.data.min()
+
+    def count(self):
+        return self.data.count()
+
+    def sum(self):
+        return self.data.sum()
