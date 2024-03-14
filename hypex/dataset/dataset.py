@@ -1,9 +1,8 @@
 import json
 import warnings
-from typing import Dict, Optional, Union, List, Iterable, Any, Type, Callable
+from typing import Dict, Optional, Union, List, Iterable, Any, Type
 
 import pandas as pd
-from pandas import DataFrame
 
 from hypex.dataset.backends.pandas_backend import PandasDataset
 from hypex.dataset.base import DatasetBase
@@ -17,18 +16,18 @@ class Dataset(DatasetBase):
             self.backend = backend
 
         def __getitem__(self, item):
-            return self.backend.loc(item)
+            return Dataset(data=self.backend.loc(item))
 
     class ILocker:
         def __init__(self, backend):
             self.backend = backend
 
         def __getitem__(self, item):
-            return self.backend.iloc(item)
+            return Dataset(data=self.backend.iloc(item))
 
     def set_data(
         self,
-        data: Union[DataFrame, str, Type],
+        data: Union[pd.DataFrame, str, Type],
         roles: Union[Dict] = None,
         backend: str = None,
     ):
@@ -50,7 +49,7 @@ class Dataset(DatasetBase):
 
     def __init__(
         self,
-        data: Union[DataFrame, str] = None,
+        data: Union[pd.DataFrame, str] = None,
         roles: Optional[Dict[ABCRole, Union[List[str], str]]] = None,
         backend: str = None,
     ):
@@ -99,10 +98,12 @@ class Dataset(DatasetBase):
 
     def add_column(self, data, name: Union[str, int, List], role: ABCRole):
         self.roles.update({name: role})
+        if isinstance(data, Dataset):
+            data = data._backend.data[list(data._backend.data.columns)[0]]
         self._backend.add_column(data, name)
 
-    def from_dict(self, data):
-        self._backend = self._backend.from_dict(data)
+    def from_dict(self, data, index=None):
+        self._backend = self._backend.from_dict(data, index)
         self.data = self._backend.data
         return self
 
@@ -132,7 +133,7 @@ class Dataset(DatasetBase):
         return self
 
     def apply(self, func, axis=0, **kwargs):
-        return self._backend.apply(func=func, axis=axis, **kwargs)
+        return Dataset(data=self._backend.apply(func=func, axis=axis, **kwargs))
 
     def map(self, func, na_action=None, **kwargs):
         return self._backend.map(func=func, na_action=na_action)
@@ -140,23 +141,36 @@ class Dataset(DatasetBase):
     def unique(self):
         return self._backend.unique()
 
-    def isin(self, values: Iterable) -> Iterable[bool]:
-        return self._backend.isin(values)
+    def isin(self, values: Iterable):
+        return Dataset(data=self._backend.isin(values))
 
-    # TODO: implement wrap to Dataset
     def groupby(
         self,
         by: Union[str, List],
         axis: int = 0,
         level=None,
-        func: Callable = None,
-        field_list: List = None,
+        func: str = None,
+        fields_list: List = None,
     ):
         datasets = [
             (i[0], Dataset(data=i[1]))
             for i in self._backend.groupby(by=by, axis=axis, level=level)
         ]
-        return datasets
+        if func:
+            if fields_list:
+                datasets = [
+                    (
+                        i[0],
+                        Dataset(data=eval("i[1][{}].{}()".format(fields_list, func))),
+                    )
+                    for i in datasets
+                ]
+            else:
+                datasets = [
+                    (i[0], Dataset(data=eval("i[1].loc[:, :].{}()".format(func))))
+                    for i in datasets
+                ]
+        return iter(datasets)
 
     @property
     def index(self):
@@ -165,6 +179,10 @@ class Dataset(DatasetBase):
     @property
     def columns(self):
         return self._backend.columns
+
+    def mean(self):
+        print(self._backend.__class__)
+        return self._backend.mean()
 
 
 class ExperimentData(Dataset):

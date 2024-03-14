@@ -11,6 +11,8 @@ class PandasDataset(DatasetBase):
     def __init__(self, data: Union[pd.DataFrame, Dict, str] = None):
         if isinstance(data, pd.DataFrame):
             self.data = data
+        elif isinstance(data, pd.Series):
+            self.data = pd.DataFrame(data)
         elif isinstance(data, Dict):
             if "index" in data.keys():
                 self.data = pd.DataFrame(data=data["data"], index=data["index"])
@@ -57,8 +59,10 @@ class PandasDataset(DatasetBase):
         self.data = pd.DataFrame(index=index, columns=columns)
         return self
 
-    def from_dict(self, data: List[Dict]):
+    def from_dict(self, data: List[Dict], index=None):
         self.data = pd.DataFrame().from_records(data)
+        if index:
+            self.data.index = index
         return self
 
     def to_dict(self):
@@ -103,3 +107,6 @@ class PandasDataset(DatasetBase):
 
     def iloc(self, items: Iterable) -> Iterable:
         return self.data.iloc[items]
+
+    def mean(self):
+        return self.data.mean()
