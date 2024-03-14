@@ -59,6 +59,15 @@ class PandasDataset(DatasetBase):
             else self.data.columns.get_indexer(column_name)
         )[0]
 
+    def add_column(self, data, name):
+        self.data[name] = data
+
+    def append(self, other, index=None):
+        new_data = pd.concat([self.data, other.data])
+        if index:
+            new_data.index = index
+        return new_data
+
     @property
     def index(self):
         return self.data.index
@@ -79,9 +88,6 @@ class PandasDataset(DatasetBase):
             data[key] = list(data[key].values())
         index = list(self.index)
         return {"data": data, "index": index}
-
-    def add_column(self, data, name):
-        self.data[name] = data
 
     def apply(self, func, **kwargs):
         return self.data.apply(func, **kwargs)

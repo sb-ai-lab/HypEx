@@ -117,6 +117,19 @@ class Dataset(DatasetBase):
             data = data._backend.data[list(data._backend.data.columns)[0]]
         self._backend.add_column(data, name)
 
+    def append(self, other, index=None):
+        if not isinstance(other, Dataset):
+            raise TypeError(
+                "Can only append Dataset to Dataset. Got {}".format(type(other))
+            )
+        if type(other._backend) != type(self._backend):
+            raise TypeError(
+                "Can only append datas with the same backends. Got {} expected {}".format(
+                    type(other._backend), type(self._backend)
+                )
+            )
+        return Dataset(data=self._backend.append(other._backend, index))
+
     def from_dict(self, data, index=None):
         self._backend = self._backend.from_dict(data, index)
         self.data = self._backend.data
