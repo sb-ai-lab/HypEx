@@ -3,7 +3,7 @@ import warnings
 
 from hypex.experiment.experiment import Executor, Experiment
 from hypex.dataset.dataset import ExperimentData, Dataset
-from hypex.dataset.roles import GroupingRole, StratificationRole
+from hypex.dataset.roles import GroupingRole, StratificationRole, TreatmentRole
 from hypex.transformers.transformers import Shuffle
 from hypex.describers.describers import Unique
 
@@ -47,7 +47,7 @@ class SplitterAA(ComplexExecutor):
             self._id,
             self.full_name,
             value,
-            role=GroupingRole,
+            role=TreatmentRole,
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -64,46 +64,32 @@ class SplitterAA(ComplexExecutor):
 
 # TODO: groupby instead of unique
 class SplitterAAWithGrouping(SplitterAA):
-    def __init__(
-        self,
-        control_size: float = 0.5,
-        random_state: int = None,
-        inner_executors: Dict[str, Executor] = None,
-        full_name: str = None,
-        index: int = 0,
-    ):
-        super().__init__(control_size, random_state, inner_executors, full_name, index)
-        self.inner_executors["unique"] = Unique()
-
     def execute(self, data: ExperimentData):
         group_field = data.get_columns_by_roles(GroupingRole)
-        self.inner_executors["unique"].target_field = group_field
-        unique_groups = ExperimentData(
-            self.inner_executors["unique"]
-            .execute(data)
-            .additional_fields[self.inner_executors["unique"].id]
-        )
-        random_ids = self.inner_executors["shuffle"].execute(unique_groups)
-        edge = int(len(random_ids) * self.control_size)
-
-        result_group = ["A" if i < edge else "B" for i in addition_indexes]
-
-        data["treatment"] = 0
-        test_indexes = list(data[data[group_field].isin(random_ids[:edge])].index)
-        data["treatment"][test_indexes] = 1
+        groups = list(data.groupby(group_field))
+        edge = len(groups) // 2
+        result = None
+        for i, group in enumerate(groups):
+            group_ds = Dataset(roles=[GroupingRole, TreatmentRole]).from_dict(
+                [{"group_for_split": group[0], "group": "A" if i < edge else "B"}]
+                * len(group[1]),
+                index=group[1].index,
+            )
+            result = group_ds if result is None else result.append(group_ds)
+        
+        # TODO: check index
+        self._set_value(data, result["group"])
         return data
 
 
 class SplitterAAWithStratification(SplitterAA):
     def __init__(
         self,
-        inner_splitter: SplitterAA,
         control_size: float = 0.5,
         random_state: int = None,
         full_name: str = None,
         index: int = 0,
     ):
-        self.inner_splitter = inner_splitter
         super().__init__(control_size, random_state, full_name, index)
 
     def execute(self, data):
@@ -112,14 +98,17 @@ class SplitterAAWithStratification(SplitterAA):
         stratification_columns = data.get_columns_by_roles(StratificationRole)
 
         groups = data.groupby(stratification_columns)
+        result = None
         for _, gd in groups:
-            self.inner_splitter.execute(data)
-            self.control_indexes.extend(self.inner_splitter.control_indexes)
-            self.test_indexes.extend(self.inner_splitter.test_indexes)
+            ged = ExperimentData(gd)
+            ged = self.super().execute(ged)
+            
+            result = ged if result is None else result.append(ged)
+        # TODO: check index
+        self._set_value(data, result["group"])
+        return data
 
-
-class SplitterAAMulti(ExperimentMulti):
-    def execute(self, data):
-        raise NotImplementedError
-
-
+# As idea
+# class SplitterAAMulti(ExperimentMulti):
+#     def execute(self, data):
+#         raise NotImplementedError
