@@ -47,6 +47,17 @@ class Dataset(DatasetBase):
         self.loc = self.Locker(self._backend)
         self.iloc = self.ILocker(self._backend)
 
+    @staticmethod
+    def _select_backend_from_data(data):
+        if isinstance(data, pd.DataFrame):
+            return PandasDataset(data)
+        return PandasDataset(data)
+
+    @staticmethod
+    def _select_backend_from_str(data, backend):
+        if backend == "pandas":
+            return PandasDataset(data)
+
     def __init__(
         self,
         data: Union[pd.DataFrame, str] = None,
@@ -75,16 +86,12 @@ class Dataset(DatasetBase):
             warnings.warn("Column must be added by add_column", category=Warning)
         self.data[key] = value
 
-    @staticmethod
-    def _select_backend_from_data(data):
-        if isinstance(data, pd.DataFrame):
-            return PandasDataset(data)
-        return PandasDataset(data)
-
-    @staticmethod
-    def _select_backend_from_str(data, backend):
-        if backend == "pandas":
-            return PandasDataset(data)
+    def _create_empty(self, index=None, columns=None):
+        index = [] if index is None else index
+        columns = [] if columns is None else columns
+        self._backend = self._backend._create_empty(index, columns)
+        self.data = self._backend.data
+        return self
 
     def get_columns_by_roles(
         self, roles: Union[ABCRole, Iterable[ABCRole]]
@@ -95,6 +102,14 @@ class Dataset(DatasetBase):
             for column, role in self.roles.items()
             if any(isinstance(role, r) for r in roles)
         ]
+
+    @property
+    def index(self):
+        return self._backend.index
+
+    @property
+    def columns(self):
+        return self._backend.columns
 
     def add_column(self, data, name: Union[str, int, List], role: ABCRole):
         self.roles.update({name: role})
@@ -124,13 +139,6 @@ class Dataset(DatasetBase):
             return json.dumps(self.to_dict())
         with open(filename, "w") as file:
             json.dump(self.to_dict(), file)
-
-    def _create_empty(self, index=None, columns=None):
-        index = [] if index is None else index
-        columns = [] if columns is None else columns
-        self._backend = self._backend._create_empty(index, columns)
-        self.data = self._backend.data
-        return self
 
     def apply(self, func, axis=0, **kwargs):
         return Dataset(data=self._backend.apply(func=func, axis=axis, **kwargs))
@@ -171,14 +179,6 @@ class Dataset(DatasetBase):
                     for i in datasets
                 ]
         return iter(datasets)
-
-    @property
-    def index(self):
-        return self._backend.index
-
-    @property
-    def columns(self):
-        return self._backend.columns
 
     def mean(self):
         return self._backend.mean()
