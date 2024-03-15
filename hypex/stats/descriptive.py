@@ -7,6 +7,7 @@ from scipy.stats import mode
 from hypex.experiment.base import Executor
 from hypex.dataset.dataset import ExperimentData
 
+# TODO: replace field on subroles
 
 class StatDescriptive(ABC, Executor):
     def __init__(self, field, full_name=None, index=0, **kwargs):

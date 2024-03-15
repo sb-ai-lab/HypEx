@@ -7,9 +7,6 @@ from hypex.dataset.roles import GroupingRole, StratificationRole, TreatmentRole
 from hypex.transformers.transformers import Shuffle
 from hypex.describers.describers import Unique
 
-# TODO: To Experiment
-# TODO: Set group
-
 
 class AASplitter(ComplexExecutor):
     def get_inner_executors(
@@ -76,7 +73,6 @@ class AASplitterWithGrouping(AASplitter):
             )
             result = group_ds if result is None else result.append(group_ds)
         
-        # TODO: check index
         self._set_value(data, result["group"])
         return data
 
@@ -103,7 +99,7 @@ class AASplitterWithStratification(SplitterAA):
             ged = self.super().execute(ged)
             
             result = ged if result is None else result.append(ged)
-        # TODO: check index
+
         self._set_value(data, result["group"])
         return data
 

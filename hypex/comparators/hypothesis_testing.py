@@ -6,8 +6,8 @@ from hypex.experiment.base import Executor
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.comparators.comparators import GroupComparator
 
+# TODO: replace target_field on subroles
 class StatHypothesisTestingWithScipy(ABC, GroupComparator):
-
     def __init__(
         self,
         target_field: str,

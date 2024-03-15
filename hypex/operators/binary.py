@@ -5,7 +5,7 @@ import numpy as np
 from hypex.experiment.experiment import Executor
 from hypex.dataset.dataset import ExperimentData
 
-
+# TODO: replace x1_field and x2_field on subroles
 class BinaryOperator(ABC, Executor):
     def get_full_name(self):
         return f"{self.__class__.__name__}({self.x1_field}, {self.x2_field})"

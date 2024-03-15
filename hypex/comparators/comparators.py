@@ -6,6 +6,7 @@ from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole
 from hypex.utils.hypex_typings import FieldKey
 
+# TODO: replace target_field on subroles
 class GroupComparator(ABC, Executor):
     def __init__(
         self,

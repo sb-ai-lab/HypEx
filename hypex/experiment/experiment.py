@@ -91,6 +91,7 @@ class CycledExperiment(Executor):
             data = self.analyzer.execute(self.inner_executor.execute(data))
         return data
 
+# TODO: replace grop_field on subroles
 class GroupExperiment(Executor):
     def generate_params_hash(self) -> str:
         return f"{self.grop_field}->{self.inner_executor._id.replace('|', '')}"
