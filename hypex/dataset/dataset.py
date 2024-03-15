@@ -111,7 +111,7 @@ class Dataset(DatasetBase):
     def columns(self):
         return self._backend.columns
 
-    def add_column(self, data, name: Union[str, int, List], role: ABCRole):
+    def add_column(self, data, name: Union[str, int, List], role: ABCRole, index=None):
         self.roles.update({name: role})
         if isinstance(data, Dataset):
             data = data._backend.data[list(data._backend.data.columns)[0]]
@@ -218,9 +218,11 @@ class ExperimentData(Dataset):
             self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
             self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
         else:
-            self.additional_fields = Dataset(data)
-            self.stats_fields = Dataset(data)
+            data = Dataset(data)
+            self.additional_fields = data
+            self.stats_fields = data
 
+        self.data = data
         self.analysis_tables = {}
         self._id_name_mapping = {}
 
