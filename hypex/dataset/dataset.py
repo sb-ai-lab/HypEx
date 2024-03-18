@@ -65,6 +65,7 @@ class Dataset(DatasetBase):
         backend: str = None,
     ):
         self.roles = None
+        self.tmp_roles: Union[None, Dict[Union[List[str], str], ABCRole]] = None
         self._backend = None
         self.data = None
         self.loc = None
@@ -104,6 +105,16 @@ class Dataset(DatasetBase):
         return [
             column
             for column, role in self.roles.items()
+            if any(isinstance(role, r) for r in roles)
+        ]
+
+    def get_column_by_tmp_role(
+        self, roles: Union[ABCRole, Iterable[ABCRole]]
+    ) -> List[str]:
+        roles = roles if isinstance(roles, Iterable) else [roles]
+        return [
+            column
+            for column, role in self.tmp_roles.items()
             if any(isinstance(role, r) for r in roles)
         ]
 
