@@ -130,7 +130,7 @@ class Dataset(DatasetBase):
         self.roles.update({name: role})
         if isinstance(data, Dataset):
             data = data._backend.data[list(data._backend.data.columns)[0]]
-        self._backend.add_column(data, name)
+        self._backend.add_column(data, name, index)
 
     def append(self, other, index=None):
         if not isinstance(other, Dataset):

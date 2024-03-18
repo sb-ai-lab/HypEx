@@ -59,8 +59,13 @@ class PandasDataset(DatasetBase):
             else self.data.columns.get_indexer(column_name)
         )[0]
 
-    def add_column(self, data, name):
-        self.data[name] = data
+    def add_column(self, data, name, index=None):
+        if index:
+            self.data[name] = [None] * len(data)
+            for i, value in zip(index, data):
+                self.data[name][i] = value
+        else:
+            self.data[name] = data
 
     def append(self, other, index=None):
         new_data = pd.concat([self.data, other.data])
