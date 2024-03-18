@@ -6,7 +6,7 @@ import pandas as pd
 
 from hypex.dataset.backends.pandas_backend import PandasDataset
 from hypex.dataset.base import DatasetBase
-from hypex.dataset.roles import ABCRole, StatisticRole
+from hypex.dataset.roles import ABCRole, StatisticRole, InfoRole
 from hypex.dataset.utils import parse_roles
 
 
@@ -78,11 +78,15 @@ class Dataset(DatasetBase):
         return self._backend.__len__()
 
     def __getitem__(self, item):
-        return self._backend.__getitem__(item)
+        if item in self.columns:
+            roles = {self.roles[item]: item}
+        else:
+            roles = {InfoRole: item}
+        return Dataset(data=self._backend.__getitem__(item), roles=roles)
 
     def __setitem__(self, key, value):
         if key not in self.columns and isinstance(key, str):
-            self.add_column(value, key, StatisticRole)
+            self.add_column(value, key, InfoRole)
             warnings.warn("Column must be added by add_column", category=Warning)
         self.data[key] = value
 
