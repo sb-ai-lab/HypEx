@@ -140,18 +140,16 @@ def test_on_marginal_distribution(samples: List[np.ndarray],
     return 0
 
 
-def min_sample_size(
-        number_of_samples: int,
-        minimum_detectable_effect: float,
-        variances: Union[List[float], float],
-        significance_level: float = 0.05,
-        power_level: float = 0.2,
-        equal_variance: bool = True,
-        quantile_1: Optional[Union[float, List[float]]] = None,
-        quantile_2: Optional[float] = None,
-        initial_estimate: Optional[int] = None,
-        random_state: int = 42,
-) -> int:
+def min_sample_size(number_of_samples: int,
+                    minimum_detectable_effect: float,
+                    variances: Union[List[float], float],
+                    significance_level: Optional[float] = 0.05,
+                    power_level: Optional[float] = 0.2,
+                    equal_variance: Optional[bool] = True,
+                    quantile_1: Optional[Union[float, List[float]]] = None,
+                    quantile_2: Optional[Union[float, List[float]]] = None,
+                    initial_estimate: Optional[int] = None,
+                    random_state: Optional[int] = 42) -> int:
     """
     Calculates the minimum sample size required to detect a given effect with specified power and significance level.
 
@@ -168,62 +166,49 @@ def min_sample_size(
         quantile_1: Optional pre-computed quantile for the significance level. Calculated if None.
         quantile_2: Optional pre-computed quantile for the power level. Calculated if None.
         initial_estimate: Optional initial estimate for the sample size to speed up calculations.
-        random_state: Optional parameter for data randomisation.
+        random_state: Random state. (default is 42)
 
     Returns:
         The minimum sample size required per sample/group.
     """
+    if type(quantile_1) is float:
+        quantile_1 = np.full(number_of_samples, quantile_1).tolist()
+    if type(quantile_2) is float:
+        quantile_2 = np.full(number_of_samples, quantile_2).tolist()
+
+    if quantile_1 is None:
+        quantile_1 = quantile_of_marginal_distribution(num_samples=number_of_samples,
+                                                       quantile_level=1 - significance_level / number_of_samples,
+                                                       variances=variances,
+                                                       equal_variance=equal_variance,
+                                                       random_state=random_state)
+    if quantile_2 is None:
+        quantile_2 = quantile_of_marginal_distribution(num_samples=number_of_samples,
+                                                       quantile_level=power_level,
+                                                       random_state=random_state)
+
     if equal_variance:
-
-        if quantile_1 is None:
-            quantile_1 = quantile_of_marginal_distribution(
-                num_samples=number_of_samples,
-                quantile_level=1 - significance_level / number_of_samples,
-            )  # quantile of the marginal distribution 1-alpha/k
-
-        if quantile_2 is None:
-            quantile_2 = quantile_of_marginal_distribution(
-                num_samples=number_of_samples, quantile_level=power_level
-            )  # quantile of the marginal distribution beta
-
-        return (
-                int(
-                    2
-                    * variances
-                    * ((quantile_1 - quantile_2) / minimum_detectable_effect) ** 2
-                )
-                + 1
-        )
+        return int(2 * variances * ((quantile_1[0] - quantile_2[0]) / minimum_detectable_effect) ** 2) + 1
     else:
-        iteration_size = 3000  # number of iterations
-        if quantile_1 is None:
-            quantile_1 = quantile_of_marginal_distribution(
-                num_samples=number_of_samples,
-                quantile_level=1 - significance_level / number_of_samples,
-                variances=variances,
-            )  # set of quantiles of the marginal distribution
-        sample_sizes = []  # for sample sizes
-        for j in range(number_of_samples):
+        iteration_size = 3000
+        sample_sizes = []
+        for sample_index in range(number_of_samples):
             sample_size = initial_estimate or 0
-            current_power = 0  # power
+            current_power = 0
             while current_power < 1 - power_level:
                 sample_size += 100
                 current_power = 0
-                total_samples = norm.rvs(
-                    size=[iteration_size, number_of_samples], random_state=random_state
-                )
+                total_samples = norm.rvs(size=[iteration_size, number_of_samples], random_state=random_state)
                 for sample in total_samples:
                     min_t_value = np.inf
                     for i in range(number_of_samples):
-                        if i != j:
-                            t_value = (
-                                    sample[j] / np.sqrt(1 + variances[i] / variances[j])
-                                    - sample[i] / np.sqrt(1 + variances[j] / variances[i])
-                                    + minimum_detectable_effect
-                                    * np.sqrt(sample_size / (variances[j] + variances[i]))
-                            )
+                        if i != sample_index:
+                            t_value = sample[sample_index] / np.sqrt(1 + variances[i] / variances[sample_index]) - \
+                                      sample[i] / np.sqrt(
+                                1 + variances[sample_index] / variances[i]) + minimum_detectable_effect * np.sqrt(
+                                sample_size / (variances[sample_index] + variances[i]))
                             min_t_value = min(min_t_value, t_value)
-                    if min_t_value > quantile_1[j]:
+                    if min_t_value > quantile_1[sample_index]:
                         current_power += 1
                 current_power /= iteration_size
             sample_sizes.append(sample_size)
