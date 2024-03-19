@@ -149,7 +149,8 @@ def min_sample_size(number_of_samples: int,
                     quantile_1: Optional[Union[float, List[float]]] = None,
                     quantile_2: Optional[Union[float, List[float]]] = None,
                     initial_estimate: Optional[int] = None,
-                    random_state: Optional[int] = 42) -> int:
+                    random_state: Optional[int] = 42,
+                    iteration_size: Optional[int] = 3000) -> int:
     """
     Calculates the minimum sample size required to detect a given effect with specified power and significance level.
 
@@ -167,6 +168,7 @@ def min_sample_size(number_of_samples: int,
         quantile_2: Optional pre-computed quantile for the power level. Calculated if None.
         initial_estimate: Optional initial estimate for the sample size to speed up calculations.
         random_state: Random state. (default is 42)
+        iteration_size: Number of iteration for check hypothesis (default is 3000)
 
     Returns:
         The minimum sample size required per sample/group.
@@ -190,7 +192,6 @@ def min_sample_size(number_of_samples: int,
     if equal_variance:
         return int(2 * variances * ((quantile_1[0] - quantile_2[0]) / minimum_detectable_effect) ** 2) + 1
     else:
-        iteration_size = 3000
         sample_sizes = []
         for sample_index in range(number_of_samples):
             sample_size = initial_estimate or 0
