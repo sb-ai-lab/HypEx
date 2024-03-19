@@ -18,9 +18,7 @@ except:
 
 from .algorithms.faiss_matcher import FaissMatcher
 from .algorithms.no_replacement_matching import MatcherNoReplacement
-from .selectors.base_filtration import const_filtration, nan_filtration
 from .selectors.feature_selector import FeatureSelector
-from .selectors.outliers_filter import OutliersFilter
 from .selectors.spearman_filter import SpearmanFilter
 from .selectors.outliers_filter import OutliersFilter
 from .selectors.base_filtration import const_filtration, nan_filtration
@@ -34,7 +32,6 @@ from .utils.validators import random_feature
 from .utils.validators import random_treatment
 from .utils.validators import subset_refuter
 from .utils.validators import test_significance
-
 
 REPORT_FEAT_SELECT_DIR = "report_feature_selector"
 REPORT_PROP_MATCHER_DIR = "report_matcher"
@@ -94,6 +91,7 @@ class Matcher:
         Common usecase - base pipeline for matching
 
         >>> # Base info
+        >>> data = create_test_data()
         >>> treatment = "treatment" # Column name with info about 'treatment' 0 or 1
         >>> target = "target" # Column name with target
         >>>
@@ -104,7 +102,7 @@ class Matcher:
         >>> # Matching
         >>> model = Matcher(data, outcome=target, treatment=treatment, info_col=info_col, group_col=group_col)
         >>> features = model.feature_select() # Feature selection
-        >>> results, quality, df_matched = model.estimate(features=some_features) # Performs matching
+        >>> results, quality, df_matched = model.estimate(features=['some_features', 'some_features_2']) # Performs matching
         >>>
         >>> model.validate_result()
     """

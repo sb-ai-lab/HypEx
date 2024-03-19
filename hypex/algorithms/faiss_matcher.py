@@ -71,20 +71,20 @@ class FaissMatcher:
     """A class used to match instances using Faiss library."""
 
     def __init__(
-        self,
-        df: pd.DataFrame,
-        outcomes: str,
-        treatment: str,
-        info_col: list,
-        features: [list, pd.DataFrame] = None,
-        group_col: Union[str, list] = None,
-        weights: dict = None,
-        sigma: float = 1.96,
-        validation: bool = None,
-        refuter: str = "random_feature",
-        n_neighbors: int = 10,
-        silent: bool = True,
-        pbar: bool = True,
+            self,
+            df: pd.DataFrame,
+            outcomes: str,
+            treatment: str,
+            info_col: list,
+            features: [list, pd.DataFrame] = None,
+            group_col: Union[str, list] = None,
+            weights: dict = None,
+            sigma: float = 1.96,
+            validation: bool = None,
+            refuter: str = "random_feature",
+            n_neighbors: int = 10,
+            silent: bool = True,
+            pbar: bool = True,
     ):
         """Construct all the necessary attributes.
 
@@ -145,7 +145,7 @@ class FaissMatcher:
         else:
             try:
                 self.columns_match = (
-                    features["Feature"].tolist() + [self.treatment] + self.outcomes
+                        features["Feature"].tolist() + [self.treatment] + self.outcomes
                 )
             except TypeError:
                 self.columns_match = features + [self.treatment] + self.outcomes
@@ -302,7 +302,7 @@ class FaissMatcher:
         logger.debug(f"end -- [work time{total}]")
 
     def _create_outcome_matched_df(
-        self, dict_outcome: dict, is_treated: bool
+            self, dict_outcome: dict, is_treated: bool
     ) -> pd.DataFrame:
         """Creates dataframe with outcomes values and treatment.
 
@@ -323,7 +323,7 @@ class FaissMatcher:
         return df_pred
 
     def _create_features_matched_df(
-        self, index: np.ndarray, is_treated: bool
+            self, index: np.ndarray, is_treated: bool
     ) -> pd.DataFrame:
         """Creates matched dataframe with features.
 
@@ -343,7 +343,7 @@ class FaissMatcher:
         if self.group_col is None:
             untreated_index = df[
                 df[self.treatment] == int(not is_treated)
-            ].index.to_numpy()
+                ].index.to_numpy()
             converted_index = [untreated_index[i] for i in index]
             filtered = df.loc[df[self.treatment] == int(not is_treated)].values
             untreated_df = pd.DataFrame(
@@ -362,12 +362,12 @@ class FaissMatcher:
                 treated_df = df[df[self.treatment] == int(is_treated)].reset_index()
                 treated_df["index"] = self.df[
                     self.df[self.treatment] == int(is_treated)
-                ][self.info_col].values.ravel()
+                    ][self.info_col].values.ravel()
         else:
             df = df.sort_values([self.treatment, self.group_col[0]])
             untreated_index = df[
                 df[self.treatment] == int(not is_treated)
-            ].index.to_numpy()
+                ].index.to_numpy()
             converted_index = [untreated_index[i] for i in index]
             filtered = df.loc[df[self.treatment] == int(not is_treated)]
             cols_untreated = [
@@ -393,7 +393,7 @@ class FaissMatcher:
                 untreated_df["index"] = pd.Series(converted_index)
                 treated_df["index"] = self.df[
                     self.df[self.treatment] == int(is_treated)
-                ][self.info_col].values.ravel()
+                    ][self.info_col].values.ravel()
         untreated_df.columns = [col + POSTFIX for col in untreated_df.columns]
 
         x = pd.concat([treated_df, untreated_df], axis=1).drop(
@@ -855,7 +855,7 @@ def _get_index(base: np.ndarray, new: np.ndarray, n_neighbors: int) -> list:
 
 
 def _transform_to_np(
-    treated: pd.DataFrame, untreated: pd.DataFrame, weights: dict, validation: bool
+        treated: pd.DataFrame, untreated: pd.DataFrame, weights: dict, validation: bool
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Transforms df to numpy and transform via Cholesky decomposition.
     If there are features that cannot be decomposed Cholesky, these features are removed.
@@ -874,7 +874,6 @@ def _transform_to_np(
     Returns:
         A tuple of transformed numpy arrays for treated and untreated data respectively
     """
-    ## TODO: Create one more function for calculating cov
     xc = untreated.to_numpy()
     xt = treated.to_numpy()
 
@@ -932,7 +931,7 @@ def _transform_to_np(
 
 
 def calc_atx_var(
-    vars_c: np.ndarray, vars_t: np.ndarray, weights_c: np.ndarray, weights_t: np.ndarray
+        vars_c: np.ndarray, vars_t: np.ndarray, weights_c: np.ndarray, weights_t: np.ndarray
 ) -> float:
     """Calculates Average Treatment Effect for the treated (ATT) variance.
 
@@ -951,14 +950,14 @@ def calc_atx_var(
 
     """
     N_c, N_t = len(vars_c), len(vars_t)
-    summands_c = weights_c**2 * vars_c
-    summands_t = weights_t**2 * vars_t
+    summands_c = weights_c ** 2 * vars_c
+    summands_t = weights_t ** 2 * vars_t
 
-    return summands_t.sum() / N_t**2 + summands_c.sum() / N_c**2
+    return summands_t.sum() / N_t ** 2 + summands_c.sum() / N_c ** 2
 
 
 def calc_atc_se(
-    vars_c: np.ndarray, vars_t: np.ndarray, scaled_counts_t: np.ndarray
+        vars_c: np.ndarray, vars_t: np.ndarray, scaled_counts_t: np.ndarray
 ) -> float:
     """Calculates Average Treatment Effect for the control group (ATC) standard error.
 
@@ -992,7 +991,7 @@ def conditional_covariance(xc, xt):
 
 
 def calc_att_se(
-    vars_c: np.ndarray, vars_t: np.ndarray, scaled_counts_c: np.ndarray
+        vars_c: np.ndarray, vars_t: np.ndarray, scaled_counts_c: np.ndarray
 ) -> float:
     """Calculates Average Treatment Effect for the treated (ATT) standard error.
 
@@ -1017,10 +1016,10 @@ def calc_att_se(
 
 
 def calc_ate_se(
-    vars_c: np.ndarray,
-    vars_t: np.ndarray,
-    scaled_counts_c: np.ndarray,
-    scaled_counts_t: np.ndarray,
+        vars_c: np.ndarray,
+        vars_t: np.ndarray,
+        scaled_counts_c: np.ndarray,
+        scaled_counts_t: np.ndarray,
 ) -> float:
     """Calculates Average Treatment Effect for the control group (ATC) standard error.
 
