@@ -44,13 +44,12 @@ import numpy as np
 from scipy.stats import norm
 
 
-def quantile_of_marginal_distribution(
-    num_samples: int,
-    quantile_level: float,
-    variances: Optional[Union[List, float]] = None,
-    iteration_size: int = 20000,
-    random_state: int = 42,
-):
+def quantile_of_marginal_distribution(num_samples: int,
+                                      quantile_level: float,
+                                      variances: Optional[List[float]] = None,
+                                      equal_variance: Optional[bool] = True,
+                                      iteration_size: Optional[int] = 20000,
+                                      random_state: Optional[int] = 42) -> List[float]:
     """Calculate the quantile(s) of the marginal distribution for minimum t-values across multiple comparisons.
 
     This function generates random samples from a normal distribution and computes t-values for comparisons either
@@ -61,46 +60,37 @@ def quantile_of_marginal_distribution(
         num_samples: The number of samples/groups to compare.
         quantile_level: The quantile level to compute for the marginal distribution (e.g., 0.95 for the 95th percentile).
         variances: A list of variances for each sample/group. If None, equal variances are assumed.
+        equal_variance: A boolean indicating if the samples are assumed to have equal variance (default is True).
         iteration_size: The number of iterations/random samples to generate for the simulation.
-        random_state: Optional parameter for data randomisation.
+        random_state: Random state. (Default is 42)
 
     Returns:
        The quantile of interest for the marginal distribution of the minimum t-values. Returns
-       a single float if variances are assumed equal (or not provided) or a list of floats
-       with quantiles for each sample if variances are provided and unequal.
+       a list of floats with quantiles for each sample.
     """
-    np.random.seed(random_state)
-    total = norm.rvs(size=[iteration_size, num_samples])
 
     if variances is None:
-        j = 0
-        t_values = [
-            min(
-                [
-                    (total[l][j] - total[l][i]) / np.sqrt(2)
-                    for i in range(num_samples)
-                    if i != j
-                ]
-            )
-            for l in range(iteration_size)
-        ]
-        return np.quantile(t_values, quantile_level)
+        equal_variance = True
+
+    num_samples_hyp = 1 if equal_variance else num_samples
 
     quantiles = []
-    for j in range(num_samples):
-        t_values = [
-            min(
-                [
-                    total[l][j] / np.sqrt(1 + variances[i] / variances[j])
-                    - total[l][i] / np.sqrt(1 + variances[j] / variances[i])
-                    for i in range(num_samples)
-                    if i != j
-                ]
-            )
-            for l in range(iteration_size)
-        ]
-        quantiles += [np.quantile(t_values, quantile_level)]
-    return quantiles
+    for j in range(num_samples_hyp):
+        t_values = []
+        random_samples = norm.rvs(size=[iteration_size, num_samples], random_state=random_state)
+        for sample in random_samples:
+            min_t_value = np.inf
+            for i in range(num_samples):
+                if i != j:
+                    if equal_variance:
+                        t_value = (sample[j] - sample[i]) / np.sqrt(2)
+                    else:
+                        t_value = sample[j] / np.sqrt(1 + variances[i] / variances[j]) - sample[i] / np.sqrt(
+                            1 + variances[j] / variances[i])
+                    min_t_value = min(min_t_value, t_value)
+            t_values.append(min_t_value)
+        quantiles.append(np.quantile(t_values, quantile_level))
+    return np.full(num_samples, quantiles[0]).tolist() if equal_variance else quantiles
 
 
 def test_on_marginal_distribution(
