@@ -44,12 +44,14 @@ import numpy as np
 from scipy.stats import norm
 
 
-def quantile_of_marginal_distribution(num_samples: int,
-                                      quantile_level: float,
-                                      variances: Optional[List[float]] = None,
-                                      equal_variance: Optional[bool] = True,
-                                      iteration_size: Optional[int] = 20000,
-                                      random_state: Optional[int] = 42) -> List[float]:
+def quantile_of_marginal_distribution(
+        num_samples: int,
+        quantile_level: float,
+        variances: Optional[List[float]] = None,
+        equal_variance: Optional[bool] = True,
+        iteration_size: Optional[int] = 20000,
+        random_state: Optional[int] = 42
+) -> List[float]:
     """Calculate the quantile(s) of the marginal distribution for minimum t-values across multiple comparisons.
 
     This function generates random samples from a normal distribution and computes t-values for comparisons either
@@ -93,11 +95,13 @@ def quantile_of_marginal_distribution(num_samples: int,
     return np.full(num_samples, quantiles[0]).tolist() if equal_variance else quantiles
 
 
-def test_on_marginal_distribution(samples: List[np.ndarray],
-                                  significance_level: Optional[float] = 0.05,
-                                  equal_variance: Optional[bool] = True,
-                                  quantiles: Optional[Union[float, List[float]]] = None,
-                                  random_state: Optional[int] = 42) -> int:
+def test_on_marginal_distribution(
+        samples: List[np.ndarray],
+        significance_level: Optional[float] = 0.05,
+        equal_variance: Optional[bool] = True,
+        quantiles: Optional[Union[float, List[float]]] = None,
+        random_state: Optional[int] = 42
+) -> int:
     """Performs a test on the marginal distribution of minimum t-values across multiple samples/groups.
 
     This function calculates the means and variances for each sample/group, determines the quantile of interest for
@@ -140,17 +144,19 @@ def test_on_marginal_distribution(samples: List[np.ndarray],
     return 0
 
 
-def min_sample_size(number_of_samples: int,
-                    minimum_detectable_effect: float,
-                    variances: Union[List[float], float],
-                    significance_level: Optional[float] = 0.05,
-                    power_level: Optional[float] = 0.2,
-                    equal_variance: Optional[bool] = True,
-                    quantile_1: Optional[Union[float, List[float]]] = None,
-                    quantile_2: Optional[Union[float, List[float]]] = None,
-                    initial_estimate: Optional[int] = None,
-                    random_state: Optional[int] = 42,
-                    iteration_size: Optional[int] = 3000) -> int:
+def min_sample_size(
+        number_of_samples: int,
+        minimum_detectable_effect: float,
+        variances: Union[List[float], float],
+        significance_level: Optional[float] = 0.05,
+        power_level: Optional[float] = 0.2,
+        equal_variance: Optional[bool] = True,
+        quantile_1: Optional[Union[float, List[float]]] = None,
+        quantile_2: Optional[Union[float, List[float]]] = None,
+        initial_estimate: Optional[int] = None,
+        iteration_size: Optional[int] = 3000,
+        random_state: Optional[int] = 42,
+) -> int:
     """
     Calculates the minimum sample size required to detect a given effect with specified power and significance level.
 
@@ -167,8 +173,8 @@ def min_sample_size(number_of_samples: int,
         quantile_1: Optional pre-computed quantile for the significance level. Calculated if None.
         quantile_2: Optional pre-computed quantile for the power level. Calculated if None.
         initial_estimate: Optional initial estimate for the sample size to speed up calculations.
-        random_state: Random state. (default is 42)
         iteration_size: Number of iteration for check hypothesis (default is 3000)
+        random_state: Random state. (default is 42)
 
     Returns:
         The minimum sample size required per sample/group.
