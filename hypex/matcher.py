@@ -119,6 +119,7 @@ class Matcher:
             info_col: list = None,
             weights: dict = None,
             base_filtration: bool = False,
+            rare_categories_scenario: str = "raise",
             generate_report: bool = GENERATE_REPORT,
             report_feat_select_dir: str = REPORT_FEAT_SELECT_DIR,
             timeout: int = TIMEOUT,
@@ -156,6 +157,8 @@ class Matcher:
             base_filtration:
                 To use or not base filtration of features in order to remove all constant or almost all constant, bool.
                 Default is False.
+            rare_categories_scenario:
+                /
             generate_report:
                 Flag to create report. Defaults to True
             report_feat_select_dir:
@@ -204,12 +207,41 @@ class Matcher:
             raise Exception(
                 f"Unknown input algorithm used on feature_selector: {use_algos}"
             )
-        self.input_data = input_data
+
+        self.input_data = input_data.copy()
+
+        # transform group_col to list
+        if group_col is not None and isinstance(group_col, str):
+            group_col = [group_col]
+        elif group_col is not None and isinstance(group_col, list):
+            group_col = group_col
+        else:
+            group_col = []
+
+        # check group_col onto null-values
+        null_contained_group_cols = self.input_data.loc[:, group_col].pipe(pd.isnull).any(axis=0)
+        null_contained_group_cols = null_contained_group_cols[null_contained_group_cols].index
+        if null_contained_group_cols.shape[0] != 0:
+            raise ValueError(
+                f"Next group columns contain NULLs: {null_contained_group_cols}"
+            )
+
+        # join group_cols
+        self.group_col = group_col if group_col == [] else ['|'.join(group_col)]
+        if len(group_col) > 1:
+            self.input_data[self.group_col[0]] = (
+                self.input_data
+                    .loc[:, group_col]
+                    .apply(lambda x: '|'.join(x.values.tolist()), axis=1)
+            )
+            self.input_data.drop(columns=group_col, inplace=True)
+        # self.group_col = None if group_col == [] else group_col
+        del input_data
+
         if outcome is None:
             outcome = list()
         self.outcomes = outcome if type(outcome) == list else [outcome]
         self.treatment = treatment
-        self.group_col = group_col
         self.info_col = info_col
         self.outcome_type = outcome_type
         self.weights = weights
@@ -226,6 +258,7 @@ class Matcher:
         self.min_percentile = min_percentile
         self.max_percentile = max_percentile
         self.base_filtration = base_filtration
+        self.rare_categories_scenario = rare_categories_scenario
         self.features_importance = None
         self.matcher = None
         self.val_dict = None
@@ -246,14 +279,7 @@ class Matcher:
         """
         info_col = self.info_col if self.info_col is not None else []
 
-        if self.group_col is not None and isinstance(self.group_col, str):
-            group_col = [self.group_col]
-        elif self.group_col is not None and isinstance(self.group_col, list):
-            group_col = self.group_col
-        else:
-            group_col = []
-
-        columns_to_drop = info_col + group_col
+        columns_to_drop = self.info_col + self.group_col
         if columns_to_drop is not None:
             data = self.input_data.drop(columns=columns_to_drop)
         else:
@@ -268,24 +294,16 @@ class Matcher:
                 "To ensure the multitarget's correct operation, it's necessary to guarantee the independence of the targets from each other."
             )
         info_col = self.info_col if self.info_col is not None else []
-        if self.group_col is not None and isinstance(self.group_col, str):
-            group_col = [self.group_col]
-        elif self.group_col is not None and isinstance(self.group_col, list):
-            group_col = ["!".join(self.group_col)]
-            self.input_data[group_col[0]] = self.input_data[self.group_col].apply(
-                lambda row: "!".join(row.astype(str)), axis=1
+        if self.group_col is not None:
+            self.input_data = self.validate_group_col(
+                self.input_data,
+                self.group_col,
+                self.treatment,
+                self.outcomes,
+                1,
+                self.rare_categories_scenario
             )
-            self.input_data = self.input_data.drop(self.group_col, axis=1)
-            self.group_col = group_col
-        else:
-            group_col = []
-        self.input_data = self.validate_group_col(
-            self.input_data,
-            group_col,
-            self.treatment,
-            self.outcomes,
-        )
-        columns_to_drop = info_col + group_col + self.outcomes + [self.treatment]
+        columns_to_drop = self.info_col + self.group_col + self.outcomes + [self.treatment]
         if self.base_filtration:
             filtered_features = nan_filtration(
                 self.input_data.drop(columns=columns_to_drop)
@@ -337,7 +355,7 @@ class Matcher:
     def validate_group_col(
             self,
             df: pd.DataFrame,
-            group_col: Union[str, List[str]],
+            group_col: List[str],
             treat_col: str,
             target_col: str,
             frequency_th: int = 1,
@@ -348,7 +366,7 @@ class Matcher:
 
         Args:
             df: The DataFrame containing the data to be validated.
-            group_col: The name of the column or list of columns used for grouping data.
+            group_col: The name of the column used for grouping data.
             treat_col: The name of the column indicating treatment groups.
             target_col: The name of the column containing target values.
             frequency_th: The minimum number of instances required for a category not to be considered rare. Default is 1.
@@ -372,28 +390,29 @@ class Matcher:
             It should be one of {RARE_CAT_SCENARIO_LIST}"""
             )
 
-        rare_categories = self.get_rare_categories(
-            df, group_col, treat_col, frequency_th=frequency_th
-        )
-        if len(rare_categories) > 0:
-            if rare_categories_scenario == "raise":
-                raise ValueError(
-                    f"""Next columns have low frequency: {rare_categories}.
-                Try to change rare_categories_scenario for auto process."""
-                )
-            elif rare_categories_scenario == "drop":
-                df = df.loc[~df[group_col].isin(rare_categories)]
-            elif rare_categories_scenario == "genetic":
-                new_group_col = self.genetic_stratification(
-                    df, group_col, treat_col, target_col
-                )
-                df[group_col] = new_group_col
+        if group_col:
+            rare_categories = self.get_rare_categories(
+                df, group_col, treat_col, frequency_th=frequency_th
+            )
+            if len(rare_categories) > 0:
+                if rare_categories_scenario == "raise":
+                    raise ValueError(
+                        f"""Next columns have low frequency: {rare_categories}.
+                    Try to change rare_categories_scenario for one of {RARE_CAT_SCENARIO_LIST} for auto process."""
+                    )
+                elif rare_categories_scenario == "drop":
+                    df = df.loc[~df[group_col[0]].isin(rare_categories)]
+                elif rare_categories_scenario == "genetic":
+                    new_group_col = self.genetic_stratification(
+                        df, group_col[0], treat_col, target_col
+                    )
+                    df[group_col[0]] = new_group_col
         return df.reset_index(drop=True)
 
     @staticmethod
     def get_rare_categories(
             df: pd.DataFrame,
-            group_col: Union[str, List[str]],
+            group_col: str,
             treat_col: str,
             frequency_th: int = 1,
     ) -> List[str]:
@@ -405,8 +424,7 @@ class Matcher:
 
         Args:
             df: The dataframe containing the data to be analyzed.
-            group_col: The column(s) used for grouping the data.
-                Can be a single column name or a list of names for multi-level grouping.
+            group_col: The column used for grouping the data.
             treat_col: The column specifying the treatment group. This column
                 is used to separate the data into different treatment groups.
             frequency_th: The frequency threshold. Categories within
@@ -427,13 +445,21 @@ class Matcher:
             >>> get_rare_categories(df, 'Group', 'Treatment', 1)
             ['C']
         """
-        frequencies = df.groupby(by=[*group_col, treat_col]).size()
+        if isinstance(group_col, list) and len(group_col) == 1:
+            group_col = group_col[0]
+        else:
+            raise ValueError(f'Wrong group_col format: {group_col}')
+        frequencies = df\
+            .groupby(by=[group_col, treat_col])\
+            .size()\
+            .groupby(group_col)\
+            .agg(lambda x: (len(x) == 2) * x.min())
         rare_categories = (
-            frequencies[frequencies <= frequency_th].reset_index().loc[:, group_col]
-        )
-        rare_categories = (
-            rare_categories.unique().tolist() if rare_categories.size > 0 else []
-        )
+            frequencies[frequencies < frequency_th].reset_index().loc[:, group_col]
+        ).tolist()
+        # rare_categories = (
+        #     rare_categories.unique().tolist() if rare_categories.size > 0 else []
+        # )
 
         return rare_categories
 
@@ -618,7 +644,7 @@ class Matcher:
 
     def _perform_validation(self):
         """Performs validation using the FaissMatcher."""
-        if self.group_col is None:
+        if self.group_col in [None, []]:
             sim = self.matcher.match()
         else:
             sim = self.matcher.group_match()
@@ -716,7 +742,7 @@ class Matcher:
         if refuter == "emissions":
 
             self._create_faiss_matcher(self.input_data, validation=True, refuter="emissions")
-            if self.group_col is None:
+            if self.group_col == []:
                 results = self.matcher.match()
             else:
                 results = self.matcher.group_match()
@@ -724,7 +750,7 @@ class Matcher:
 
             df_full_test, count_test, percent_test = emissions(self.input_data, 1, self.outcomes[0], low, high)
             self._create_faiss_matcher(df_full_test, validation=True, refuter="emissions")
-            if self.group_col is None:
+            if self.group_col == []:
                 results_test = self.matcher.match()
             else:
                 results_test = self.matcher.group_match()
@@ -732,7 +758,7 @@ class Matcher:
 
             df_full_control, count_control, percent_control = emissions(self.input_data, 0, self.outcomes[0], low, high)
             self._create_faiss_matcher(df_full_control, validation=True, refuter="emissions")
-            if self.group_col is None:
+            if self.group_col == []:
                 results_control = self.matcher.match()
             else:
                 results_control = self.matcher.group_match()
@@ -830,8 +856,7 @@ class Matcher:
             features = list(features)
             self.features_importance = features
             if self.group_col is not None and self.group_col not in features:
-                features.append(self.group_col)
-
+                features.extend(self.group_col)
         return self._matching()
 
     def save(self, filename):

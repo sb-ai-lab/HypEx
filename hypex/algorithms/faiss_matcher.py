@@ -120,7 +120,7 @@ class FaissMatcher:
             self.df = df
         else:
             group_col = group_col if isinstance(group_col, list) else [group_col]
-            self.df = df.sort_values([treatment, group_col[0]])
+            self.df = df.sort_values([treatment] + group_col)
         self.columns_del = [outcomes]
         if info_col:
             self.info_col = info_col
@@ -340,7 +340,7 @@ class FaissMatcher:
         """
         df = self.df.drop(columns=self.outcomes + self.info_col)
 
-        if self.group_col is None:
+        if self.group_col == []:
             untreated_index = df[
                 df[self.treatment] == int(not is_treated)
             ].index.to_numpy()
@@ -615,7 +615,7 @@ class FaissMatcher:
         group_error = []
 
         for group in groups:
-            df_group = df[df[self.group_col] == group]
+            df_group = df[df[self.group_col[0]] == group]
             temp = df_group[self.columns_match + self.group_col]
             temp = temp.loc[:, (temp != 0).any(axis=0)].drop(columns=self.group_col)
 
@@ -649,9 +649,7 @@ class FaissMatcher:
                     logger.info(
                         f"The data has the duplicate columns: {untreated_duplicated} in control group"
                     )
-
         df_group_positive = self.df[~self.df[self.group_col[0]].isin(group_error)]
-
         return df_group_positive
 
     def group_match(self):
@@ -732,7 +730,7 @@ class FaissMatcher:
             A tuple containing the matched dataframe and metrics such as ATE, ATT and ATC
 
         """
-        if self.group_col is not None:
+        if self.group_col != []:
             return self.group_match()
 
         df = self.df[self.columns_match]
