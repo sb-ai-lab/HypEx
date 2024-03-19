@@ -114,8 +114,8 @@ def test_on_marginal_distribution(samples: List[np.ndarray],
     Returns:
         The index of the first sample that significantly differs from others, or 0 if none are found.
     """
-    num_samples = len(samples)  # Число выборок
-    sample_size = len(samples[0])  # Размер выборки
+    num_samples = len(samples)
+    sample_size = len(samples[0])
 
     means = [np.mean(sample) for sample in samples]
     variances = [np.var(sample) * sample_size / (sample_size - 1) for sample in samples]
