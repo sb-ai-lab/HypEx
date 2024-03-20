@@ -83,6 +83,11 @@ These methods are not sufficiently accurate markers of a successful experiment.
 
 Explore usage examples and tutorials [here](https://github.com/sb-ai-lab/Hypex/blob/master/examples/tutorials/).
 
+Find more information about HypEx and matching in Kaggle:     
+[Matching with HypEx: Simple Guide](https://www.kaggle.com/code/kseniavasilieva/matching-with-hypex-simple-guide)   
+[Matching with HypEx: Grouping](https://www.kaggle.com/code/kseniavasilieva/matching-with-hypex-grouping)     
+[HypEx vs Causal Inference and DoWhy](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-and-dowhy)
+
 ## Installation
 
 ```bash
