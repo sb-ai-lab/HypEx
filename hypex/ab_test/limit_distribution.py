@@ -50,7 +50,7 @@ def quantile_of_marginal_distribution(
         variances: Optional[List[float]] = None,
         equal_variance: Optional[bool] = True,
         iteration_size: Optional[int] = 20000,
-        random_state: Optional[int] = 42
+        random_state: Optional[int] = None
 ) -> List[float]:
     """Calculate the quantile(s) of the marginal distribution for minimum t-values across multiple comparisons.
 
@@ -64,7 +64,7 @@ def quantile_of_marginal_distribution(
         variances: A list of variances for each sample/group. If None, equal variances are assumed.
         equal_variance: A boolean indicating if the samples are assumed to have equal variance (default is True).
         iteration_size: The number of iterations/random samples to generate for the simulation.
-        random_state: Random state. (Default is 42)
+        random_state: Random state. (Default is None)
 
     Returns:
        The quantile of interest for the marginal distribution of the minimum t-values. Returns
@@ -100,7 +100,7 @@ def test_on_marginal_distribution(
         significance_level: Optional[float] = 0.05,
         equal_variance: Optional[bool] = True,
         quantiles: Optional[Union[float, List[float]]] = None,
-        random_state: Optional[int] = 42
+        random_state: Optional[int] = None
 ) -> int:
     """Performs a test on the marginal distribution of minimum t-values across multiple samples/groups.
 
@@ -113,7 +113,7 @@ def test_on_marginal_distribution(
         significance_level: The significance level for the test (default is 0.05).
         equal_variance: A boolean indicating if the samples are assumed to have equal variance (default is True).
         quantiles: Pre-computed quantiles of the marginal distribution. If None, they will be computed.
-        random_state: Random state. (default is 42)
+        random_state: Random state. (default is None)
 
     Returns:
         The index of the first sample that significantly differs from others, or 0 if none are found.
@@ -155,7 +155,7 @@ def min_sample_size(
         quantile_2: Optional[Union[float, List[float]]] = None,
         initial_estimate: Optional[int] = None,
         iteration_size: Optional[int] = 3000,
-        random_state: Optional[int] = 42,
+        random_state: Optional[int] = None,
 ) -> int:
     """
     Calculates the minimum sample size required to detect a given effect with specified power and significance level.
@@ -174,7 +174,7 @@ def min_sample_size(
         quantile_2: Optional pre-computed quantile for the power level. Calculated if None.
         initial_estimate: Optional initial estimate for the sample size to speed up calculations.
         iteration_size: Number of iteration for check hypothesis (default is 3000)
-        random_state: Random state. (default is 42)
+        random_state: Random state. (default is None)
 
     Returns:
         The minimum sample size required per sample/group.
