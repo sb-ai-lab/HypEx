@@ -79,10 +79,13 @@ class Dataset(DatasetBase):
         return self._backend.__len__()
 
     def __getitem__(self, item):
-        if item in self.columns:
-            roles = {self.roles[item]: item}
-        else:
-            roles = {InfoRole: item}
+        items = [item] if not isinstance(item, Iterable) else item
+        roles = {}
+        for column in items:
+            if column in self.columns and self.roles.get(column, 0):
+                roles[self.roles[column]] = column
+            else:
+                roles[InfoRole] = column
         return Dataset(data=self._backend.__getitem__(item), roles=roles)
 
     def __setitem__(self, key, value):
@@ -99,22 +102,13 @@ class Dataset(DatasetBase):
         return self
 
     def get_columns_by_roles(
-        self, roles: Union[ABCRole, Iterable[ABCRole]]
+        self, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role=False
     ) -> List[str]:
         roles = roles if isinstance(roles, Iterable) else [roles]
+        get_roles = self.roles if not tmp_role else self.tmp_roles
         return [
             column
-            for column, role in self.roles.items()
-            if any(isinstance(role, r) for r in roles)
-        ]
-
-    def get_column_by_tmp_role(
-        self, roles: Union[ABCRole, Iterable[ABCRole]]
-    ) -> List[str]:
-        roles = roles if isinstance(roles, Iterable) else [roles]
-        return [
-            column
-            for column, role in self.tmp_roles.items()
+            for column, role in get_roles.items()
             if any(isinstance(role, r) for r in roles)
         ]
 
@@ -195,15 +189,12 @@ class Dataset(DatasetBase):
         if func:
             if fields_list:
                 datasets = [
-                    (
-                        i[0],
-                        Dataset(data=eval("i[1][{}].{}()".format(fields_list, func))),
-                    )
+                    (i[0], Dataset(data=i[1][fields_list].agg(func).data))
                     for i in datasets
                 ]
             else:
                 datasets = [
-                    (i[0], Dataset(data=eval("i[1].loc[:, :].{}()".format(func))))
+                    (i[0], Dataset(data=i[1].loc[:, :].agg(func).data))
                     for i in datasets
                 ]
         return iter(datasets)
@@ -222,6 +213,9 @@ class Dataset(DatasetBase):
 
     def sum(self):
         return self._backend.sum()
+
+    def agg(self, func: Union[str, List]):
+        return Dataset(data=self._backend.agg(func))
 
 
 class ExperimentData(Dataset):

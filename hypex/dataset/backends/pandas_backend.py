@@ -18,7 +18,7 @@ class PandasDataset(DatasetBase):
         else:
             raise ValueError(f"Unsupported file extension {file_extension}")
 
-    def __init__(self, data: Union[pd.DataFrame, Dict, str] = None):
+    def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series] = None):
         if isinstance(data, pd.DataFrame):
             self.data = data
         elif isinstance(data, pd.Series):
@@ -67,10 +67,10 @@ class PandasDataset(DatasetBase):
         else:
             self.data[name] = data
 
-    def append(self, other, index=None):
+    def append(self, other, index=False):
         new_data = pd.concat([self.data, other.data])
         if index:
-            new_data.index = index
+            new_data.reset_index()
         return new_data
 
     @property
@@ -107,11 +107,8 @@ class PandasDataset(DatasetBase):
         return self.data.isin(values)
 
     def groupby(self, by, axis, **kwargs) -> List[Tuple]:
-        groups = self.data[by].unique()
-        return [
-            (group, self.data[self.data[by] == group].drop(by, axis=1))
-            for group in groups
-        ]
+        groups = self.data.groupby(by, axis, **kwargs)
+        return list(groups)
 
     def loc(self, items: Iterable) -> Iterable:
         return self.data.loc[items]
@@ -133,3 +130,6 @@ class PandasDataset(DatasetBase):
 
     def sum(self):
         return self.data.sum()
+
+    def agg(self, func):
+        return self.data.agg(func)
