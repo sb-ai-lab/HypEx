@@ -45,12 +45,13 @@ from scipy.stats import norm
 
 
 def quantile_of_marginal_distribution(
-    num_samples: int,
-    quantile_level: float,
-    variances: Optional[Union[List, float]] = None,
-    iteration_size: int = 20000,
-    random_state: int = 42,
-):
+        num_samples: int,
+        quantile_level: float,
+        variances: Optional[List[float]] = None,
+        equal_variance: Optional[bool] = True,
+        iteration_size: Optional[int] = 20000,
+        random_state: Optional[int] = None
+) -> List[float]:
     """Calculate the quantile(s) of the marginal distribution for minimum t-values across multiple comparisons.
 
     This function generates random samples from a normal distribution and computes t-values for comparisons either
@@ -61,53 +62,45 @@ def quantile_of_marginal_distribution(
         num_samples: The number of samples/groups to compare.
         quantile_level: The quantile level to compute for the marginal distribution (e.g., 0.95 for the 95th percentile).
         variances: A list of variances for each sample/group. If None, equal variances are assumed.
+        equal_variance: A boolean indicating if the samples are assumed to have equal variance (default is True).
         iteration_size: The number of iterations/random samples to generate for the simulation.
-        random_state: Optional parameter for data randomisation.
+        random_state: Random state. (Default is None)
 
     Returns:
        The quantile of interest for the marginal distribution of the minimum t-values. Returns
-       a single float if variances are assumed equal (or not provided) or a list of floats
-       with quantiles for each sample if variances are provided and unequal.
+       a list of floats with quantiles for each sample.
     """
-    np.random.seed(random_state)
-    total = norm.rvs(size=[iteration_size, num_samples])
 
     if variances is None:
-        j = 0
-        t_values = [
-            min(
-                [
-                    (total[l][j] - total[l][i]) / np.sqrt(2)
-                    for i in range(num_samples)
-                    if i != j
-                ]
-            )
-            for l in range(iteration_size)
-        ]
-        return np.quantile(t_values, quantile_level)
+        equal_variance = True
+
+    num_samples_hyp = 1 if equal_variance else num_samples
 
     quantiles = []
-    for j in range(num_samples):
-        t_values = [
-            min(
-                [
-                    total[l][j] / np.sqrt(1 + variances[i] / variances[j])
-                    - total[l][i] / np.sqrt(1 + variances[j] / variances[i])
-                    for i in range(num_samples)
-                    if i != j
-                ]
-            )
-            for l in range(iteration_size)
-        ]
-        quantiles += [np.quantile(t_values, quantile_level)]
-    return quantiles
+    for j in range(num_samples_hyp):
+        t_values = []
+        random_samples = norm.rvs(size=[iteration_size, num_samples], random_state=random_state)
+        for sample in random_samples:
+            min_t_value = np.inf
+            for i in range(num_samples):
+                if i != j:
+                    if equal_variance:
+                        t_value = (sample[j] - sample[i]) / np.sqrt(2)
+                    else:
+                        t_value = sample[j] / np.sqrt(1 + variances[i] / variances[j]) - sample[i] / np.sqrt(
+                            1 + variances[j] / variances[i])
+                    min_t_value = min(min_t_value, t_value)
+            t_values.append(min_t_value)
+        quantiles.append(np.quantile(t_values, quantile_level))
+    return np.full(num_samples, quantiles[0]).tolist() if equal_variance else quantiles
 
 
 def test_on_marginal_distribution(
-    samples: List[np.ndarray],
-    significance_level: float = 0.05,
-    equal_variance: bool = True,
-    quantiles: Optional[Union[float, List[float]]] = None,
+        samples: List[np.ndarray],
+        significance_level: Optional[float] = 0.05,
+        equal_variance: Optional[bool] = True,
+        quantiles: Optional[Union[float, List[float]]] = None,
+        random_state: Optional[int] = None
 ) -> int:
     """Performs a test on the marginal distribution of minimum t-values across multiple samples/groups.
 
@@ -120,49 +113,49 @@ def test_on_marginal_distribution(
         significance_level: The significance level for the test (default is 0.05).
         equal_variance: A boolean indicating if the samples are assumed to have equal variance (default is True).
         quantiles: Pre-computed quantiles of the marginal distribution. If None, they will be computed.
+        random_state: Random state. (default is None)
 
     Returns:
         The index of the first sample that significantly differs from others, or 0 if none are found.
     """
-
-    num_samples, sample_size = len(samples), len(samples[0])
+    num_samples = len(samples)
+    sample_size = len(samples[0])
 
     means = [np.mean(sample) for sample in samples]
     variances = [np.var(sample) * sample_size / (sample_size - 1) for sample in samples]
-    variances_q = variances if equal_variance else None
 
-    if quantiles is None or isinstance(quantiles, float):
-        quantiles = quantile_of_marginal_distribution(
-            num_samples=num_samples,
-            quantile_level=1 - significance_level / num_samples,
-            variances=variances_q,
-        )
+    if type(quantiles) is float:
+        quantiles = np.full(num_samples, quantiles).tolist()
+
+    if quantiles is None:
+        quantiles = quantile_of_marginal_distribution(num_samples=num_samples,
+                                                      quantile_level=1 - significance_level / num_samples,
+                                                      variances=variances,
+                                                      equal_variance=equal_variance,
+                                                      random_state=random_state)
     for j in range(num_samples):
-        total_j = np.inf
+        min_t_value = np.inf
         for i in range(num_samples):
             if i != j:
-                total = (
-                    np.sqrt(sample_size)
-                    * (means[j] - means[i])
-                    / np.sqrt(variances[j] + variances[i])
-                )
-                total_j = total if total < total_j else total_j
-        if total_j > quantiles[j]:
+                t_value = np.sqrt(sample_size) * (means[j] - means[i]) / np.sqrt(variances[j] + variances[i])
+                min_t_value = min(min_t_value, t_value)
+        if min_t_value > quantiles[j]:
             return j + 1
     return 0
 
 
 def min_sample_size(
-    number_of_samples: int,
-    minimum_detectable_effect: float,
-    variances: Union[List[float], float],
-    significance_level: float = 0.05,
-    power_level: float = 0.2,
-    equal_variance: bool = True,
-    quantile_1: Optional[Union[float, List[float]]] = None,
-    quantile_2: Optional[float] = None,
-    initial_estimate: Optional[int] = None,
-    random_state: int = 42,
+        number_of_samples: int,
+        minimum_detectable_effect: float,
+        variances: Union[List[float], float],
+        significance_level: Optional[float] = 0.05,
+        power_level: Optional[float] = 0.2,
+        equal_variance: Optional[bool] = True,
+        quantile_1: Optional[Union[float, List[float]]] = None,
+        quantile_2: Optional[Union[float, List[float]]] = None,
+        initial_estimate: Optional[int] = None,
+        iteration_size: Optional[int] = 3000,
+        random_state: Optional[int] = None,
 ) -> int:
     """
     Calculates the minimum sample size required to detect a given effect with specified power and significance level.
@@ -180,62 +173,49 @@ def min_sample_size(
         quantile_1: Optional pre-computed quantile for the significance level. Calculated if None.
         quantile_2: Optional pre-computed quantile for the power level. Calculated if None.
         initial_estimate: Optional initial estimate for the sample size to speed up calculations.
-        random_state: Optional parameter for data randomisation.
+        iteration_size: Number of iteration for check hypothesis (default is 3000)
+        random_state: Random state. (default is None)
 
     Returns:
         The minimum sample size required per sample/group.
     """
+    if type(quantile_1) is float:
+        quantile_1 = np.full(number_of_samples, quantile_1).tolist()
+    if type(quantile_2) is float:
+        quantile_2 = np.full(number_of_samples, quantile_2).tolist()
+
+    if quantile_1 is None:
+        quantile_1 = quantile_of_marginal_distribution(num_samples=number_of_samples,
+                                                       quantile_level=1 - significance_level / number_of_samples,
+                                                       variances=variances,
+                                                       equal_variance=equal_variance,
+                                                       random_state=random_state)
+    if quantile_2 is None:
+        quantile_2 = quantile_of_marginal_distribution(num_samples=number_of_samples,
+                                                       quantile_level=power_level,
+                                                       random_state=random_state)
+
     if equal_variance:
-
-        if quantile_1 is None:
-            quantile_1 = quantile_of_marginal_distribution(
-                num_samples=number_of_samples,
-                quantile_level=1 - significance_level / number_of_samples,
-            )  # quantile of the marginal distribution 1-alpha/k
-
-        if quantile_2 is None:
-            quantile_2 = quantile_of_marginal_distribution(
-                num_samples=number_of_samples, quantile_level=power_level
-            )  # quantile of the marginal distribution beta
-
-        return (
-            int(
-                2
-                * variances
-                * ((quantile_1 - quantile_2) / minimum_detectable_effect) ** 2
-            )
-            + 1
-        )
+        return int(2 * variances * ((quantile_1[0] - quantile_2[0]) / minimum_detectable_effect) ** 2) + 1
     else:
-        iteration_size = 3000  # number of iterations
-        if quantile_1 is None:
-            quantile_1 = quantile_of_marginal_distribution(
-                num_samples=number_of_samples,
-                quantile_level=1 - significance_level / number_of_samples,
-                variances=variances,
-            )  # set of quantiles of the marginal distribution
-        sample_sizes = []  # for sample sizes
-        for j in range(number_of_samples):
+        sample_sizes = []
+        for sample_index in range(number_of_samples):
             sample_size = initial_estimate or 0
-            current_power = 0  # power
+            current_power = 0
             while current_power < 1 - power_level:
                 sample_size += 100
                 current_power = 0
-                total_samples = norm.rvs(
-                    size=[iteration_size, number_of_samples], random_state=random_state
-                )
+                total_samples = norm.rvs(size=[iteration_size, number_of_samples], random_state=random_state)
                 for sample in total_samples:
                     min_t_value = np.inf
                     for i in range(number_of_samples):
-                        if i != j:
-                            t_value = (
-                                sample[j] / np.sqrt(1 + variances[i] / variances[j])
-                                - sample[i] / np.sqrt(1 + variances[j] / variances[i])
-                                + minimum_detectable_effect
-                                * np.sqrt(sample_size / (variances[j] + variances[i]))
-                            )
+                        if i != sample_index:
+                            t_value = sample[sample_index] / np.sqrt(1 + variances[i] / variances[sample_index]) - \
+                                      sample[i] / np.sqrt(
+                                1 + variances[sample_index] / variances[i]) + minimum_detectable_effect * np.sqrt(
+                                sample_size / (variances[sample_index] + variances[i]))
                             min_t_value = min(min_t_value, t_value)
-                    if min_t_value > quantile_1[j]:
+                    if min_t_value > quantile_1[sample_index]:
                         current_power += 1
                 current_power /= iteration_size
             sample_sizes.append(sample_size)
