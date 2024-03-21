@@ -29,7 +29,7 @@ def parse_directory(directory):
                                                     target.attr
                                                     for target in call.targets
                                                     if isinstance(target, ast.Attribute)
-                                                    and target.value.id == "self" and target.value.
+                                                    and target.value.id == "self"
                                                 ]
                                             )
 
