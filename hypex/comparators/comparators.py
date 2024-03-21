@@ -5,6 +5,7 @@ from hypex.experiment.base import Executor
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole
 from hypex.utils.hypex_typings import FieldKey
+from hypex.stats.descriptive import Mean
 
 
 class GroupComparator(ABC, Executor):
@@ -16,11 +17,11 @@ class GroupComparator(ABC, Executor):
         super().__init__(full_name, index)
 
     @abstractmethod
-    def _comparison_function(self, control_data, test_data) -> ExperimentData:
+    def _comparison_function(self, control_data, test_data):
         raise NotImplementedError
 
-    def _compare(self, data: ExperimentData) -> bool:
-        group_field = data.data.get_columns_by_roles(GroupingRole)[0]
+    def _compare(self, data: ExperimentData) -> Dict:
+        group_field = data.data.get_columns_by_roles(GroupingRole)
         target_field = data.data.get_columns_by_roles(TempTargetRole, tmp_role=True)[0]
         grouping_data = list(data.groupby(self.group_field))
         return {
@@ -44,6 +45,17 @@ class GroupComparator(ABC, Executor):
         return self._set_value(data, result_dataset)
 
 
-# TODO: Implement
-def GroupDifference(ABC, GroupComparator):
-    pass
+def GroupDifference(ComplexExecutor, GroupComparator):
+    default_inner_executors: Dict[str, Executor] = {
+        "mean": Mean(),
+    }
+
+    def _comparison_function(self, control_data, test_data) -> Dataset:
+        mean_a = self._inner_executors["mean"].execute(control_data)
+        mean_b = self._inner_executors["mean"].execute(test_data)
+        return {
+            "test mean": mean_a,
+            "control mean": mean_b,
+            "difference": mean_b - mean_a,
+            "difference %": (mean_b / mean_a - 1) * 100,
+        }

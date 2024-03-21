@@ -31,42 +31,42 @@ class StatDescriptive(ABC, Executor):
         )
 
 
-class StatMean(StatDescriptive):
+class Mean(StatDescriptive):
     def calc(self, data):
         return np.mean(data, **self.kwargs)
 
-class StatMedian(StatDescriptive):
+class Median(StatDescriptive):
     def calc(self, data):
         return np.median(data, **self.kwargs)
 
-class StatMode(StatDescriptive):
+class Mode(StatDescriptive):
     def calc(self, data):
         return mode(data, **self.kwargs)
 
 
-class StatStd(StatDescriptive):
+class Std(StatDescriptive):
     def calc(self, data):
         return np.std(data, **self.kwargs)
 
 
-class StatVariance(StatDescriptive):
+class Variance(StatDescriptive):
     def calc(self, data):
         return np.var(data, **self.kwargs)
 
 
-class StatMin(StatDescriptive):
+class Min(StatDescriptive):
     def calc(self, data):
         return np.min(data, **self.kwargs)
 
-class StatMax(StatDescriptive):
+class Max(StatDescriptive):
     def calc(self, data):
         return np.max(data, **self.kwargs)
 
 
-class StatRange(StatDescriptive):
+class Range(StatDescriptive):
     def __init__(self, field: str):
         super().__init__(field, np.ptp)
 
-class StatSize(StatDescriptive):
+class Size(StatDescriptive):
     def calc(self, data):
         return len(data, **self.kwargs)

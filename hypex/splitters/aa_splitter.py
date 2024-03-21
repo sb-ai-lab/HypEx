@@ -1,7 +1,7 @@
 from typing import List, Dict
 import warnings
 
-from hypex.experiment.experiment import Executor, Experiment
+from hypex.experiment.experiment import Executor, Experiment, ComplexExecutor
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import GroupingRole, StratificationRole, TreatmentRole
 from hypex.transformers.transformers import Shuffle
@@ -33,7 +33,7 @@ class AASplitter(ComplexExecutor):
         self.control_size = control_size
         self.random_state = random_state
 
-        super().__init__(self.get_inner_executors(inner_executors), full_name, index)
+        super().__init__(inner_executors, full_name, index)
 
     def generate_params_hash(self) -> str:
         return f"{self.random_state}"
