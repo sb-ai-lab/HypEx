@@ -53,6 +53,22 @@ class PreTargetRole(TargetRole):
     _role_name = "PreTarget"
 
 
+class TempTargetRole(TargetRole):
+    _role_name = "TempTarget"
+
+
+class TempGroupingRole(GroupingRole):
+    _role_name = "TempGrouping"
+
+
+class Arg1Role:
+    _role_name = "Arg1"
+
+
+class Arg2Role:
+    _role_name = "Arg2"
+
+
 class StatisticRole(ABCRole):
     _role_name = "Statistic"
 
