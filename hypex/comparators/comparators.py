@@ -5,10 +5,10 @@ from hypex.experiment.base import Executor
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole
 from hypex.utils.hypex_typings import FieldKey
-from hypex.stats.descriptive import Mean
+from hypex.stats.descriptive import Mean, Size
 
 
-class GroupComparator(ABC, Executor):
+class GroupComparator(ABC, ComplexExecutor):
     def __init__(
         self,
         full_name: str = None,
@@ -45,17 +45,35 @@ class GroupComparator(ABC, Executor):
         return self._set_value(data, result_dataset)
 
 
-def GroupDifference(ComplexExecutor, GroupComparator):
+def GroupDifference(GroupComparator):
     default_inner_executors: Dict[str, Executor] = {
         "mean": Mean(),
     }
 
     def _comparison_function(self, control_data, test_data) -> Dataset:
+        target_field = data.data.get_columns_by_roles(TempTargetRole, tmp_role=True)[0]
         mean_a = self._inner_executors["mean"].execute(control_data)
         mean_b = self._inner_executors["mean"].execute(test_data)
+
         return {
-            "test mean": mean_a,
-            "control mean": mean_b,
-            "difference": mean_b - mean_a,
-            "difference %": (mean_b / mean_a - 1) * 100,
+            f"{target_field} control mean": mean_a,
+            f"{target_field} test mean": mean_b,
+            f"{target_field} difference": mean_b - mean_a,
+            f"{target_field} difference %": (mean_b / mean_a - 1) * 100,
+        }
+
+def GroupSizes(GroupComparator):
+    default_inner_executors: Dict[str, Executor] = {
+        "mean": Size(),
+    }
+
+    def _comparison_function(self, control_data, test_data) -> Dataset:
+        size_a = self._inner_executors["size"].execute(control_data)
+        size_b = self._inner_executors["size"].execute(test_data)
+
+        return {
+            "control size": size_a,
+            "test size": size_b,
+            "control size %": (size_a / (size_a + size_b)) * 100,
+            "test size %": (size_b / (size_a + size_b)) * 100,
         }

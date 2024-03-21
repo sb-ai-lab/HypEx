@@ -9,19 +9,6 @@ from hypex.describers.describers import Unique
 
 
 class AASplitter(ComplexExecutor):
-    def get_inner_executors(
-        self, inner_executors: Dict[str, Executor] = None
-    ) -> Dict[str, Executor]:
-        if inner_executors and "shuffle" not in inner_executors:
-            warnings.warn(
-                "Shuffle executor not found in inner_executors. Will shuffle will be used by default",
-                category=Warning,
-            )
-            inner_executors = {}
-        if not inner_executors:
-            inner_executors = {"shuffle": Shuffle(self.random_state)}
-        return inner_executors
-
     def __init__(
         self,
         control_size: float = 0.5,
@@ -32,6 +19,7 @@ class AASplitter(ComplexExecutor):
     ):
         self.control_size = control_size
         self.random_state = random_state
+        self.default_inner_executors = {"shuffle": Shuffle(self.random_state)}
 
         super().__init__(inner_executors, full_name, index)
 

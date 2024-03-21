@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Iterable, Dict
+from typing import Iterable, Dict, Union
 from copy import deepcopy
 import warnings
 
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.analyzer.analyzer import Analyzer
-from hypex.dataset.roles import TempGroupingRole
+from hypex.dataset.roles import TempGroupingRole, TempTargetRole
 
 
 class Executor(ABC):
@@ -52,7 +52,9 @@ class ComplexExecutor(ABC, Executor):
         result = {}
         for key, executor in self.default_inner_executors.items():
             if key not in inner_executors:
-                warnings.warn(f"{key} executor not found in inner_executors. Will {key} will be used by default." )
+                warnings.warn(
+                    f"{key} executor not found in inner_executors. Will {key} will be used by default."
+                )
                 result[key] = executor
             else:
                 result[key] = inner_executors[key]
@@ -74,6 +76,17 @@ class Experiment(ABC, Executor):
 
     def _detect_transformer(self) -> bool:
         return False
+
+    def get_executor_ids(self, searched_classes=None) -> Union[Dict[type, str], List[str]]:
+        if searched_classes is None:
+            return [executor._id for executor in self.executors]
+
+        searched_classes = (
+            searched_classes if isinstance(searched_classes, Iterable) else [searched_classes]
+        )
+        for sc in searched_classes:
+            return {sc: [executor._id for executor in self.executors if isinstance(executor, sc)]}
+
 
     def __init__(
         self,
@@ -157,3 +170,12 @@ class GroupExperiment(Executor):
             temp_data = self.inner_executor.execute(temp_data)
             result_list.append(self.extract_result(temp_data))
         return self.insert_result(data, result_list)
+
+
+class OnTargetExperiment(Experiment):
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        for field in data.data.get_columns_by_roles(TargetRole):
+            data.data.tmp_roles = {field: TempTargetRole()}
+            data = super().execute(data)
+            data.data.tmp_roles = {}
+        return data
