@@ -16,7 +16,6 @@ class Describer(Executor):
 
 class Unique(Describer):
     def _convert_to_dataset(self, data: Iterable) -> Dataset:
-        # TODO: implement
         return Dataset().from_dict(data)
 
     def execute(self, data: ExperimentData) -> ExperimentData:

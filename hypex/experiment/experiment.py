@@ -4,6 +4,7 @@ from copy import deepcopy
 
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.analyzer.analyzer import Analyzer
+from hypex.dataset.roles import TempGroupingRole
 
 
 class Executor(ABC):
@@ -14,7 +15,13 @@ class Executor(ABC):
         return ""
 
     def generate_id(self) -> str:
-        return "\u2570".join([self.__class__.__name__, self.params_hash.replace('\u2570', '|'), str(self.index)])
+        return "\u2570".join(
+            [
+                self.__class__.__name__,
+                self.params_hash.replace("\u2570", "|"),
+                str(self.index),
+            ]
+        )
 
     def __init__(self, full_name: str = None, index: int = 0):
         self.full_name = full_name or self.generate_full_name()
@@ -34,10 +41,17 @@ class Executor(ABC):
     def execute(self, data: ExperimentData) -> ExperimentData:
         raise NotImplementedError
 
+
 class ComplexExecutor(ABC, Executor):
-    def __init__(self, inner_executors: Dict[str, Executor] = None, full_name: str = None, index: int = 0):
+    def __init__(
+        self,
+        inner_executors: Dict[str, Executor] = None,
+        full_name: str = None,
+        index: int = 0,
+    ):
         super().__init__(full_name=full_name, index=index)
         self.inner_executors = inner_executors or {}
+
 
 class Experiment(ABC, Executor):
     def generate_full_name(self) -> str:
@@ -59,7 +73,9 @@ class Experiment(ABC, Executor):
         )
         super().__init__(full_name, index)
 
-    def _extract_result(self, original_data: ExperimentData, experiment_data: ExperimentData):
+    def _extract_result(
+        self, original_data: ExperimentData, experiment_data: ExperimentData
+    ):
         return experiment_data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -91,6 +107,7 @@ class CycledExperiment(Executor):
             data = self.analyzer.execute(self.inner_executor.execute(data))
         return data
 
+
 # TODO: replace grop_field on subroles
 class GroupExperiment(Executor):
     def generate_params_hash(self) -> str:
@@ -98,19 +115,19 @@ class GroupExperiment(Executor):
 
     def __init__(
         self,
-        grop_field: FieldKey,
         inner_executor: Executor,
         full_name: str = None,
         index: int = 0,
     ):
-        self.grop_field = grop_field
         self.inner_executor: Executor = inner_executor
         super().__init__(full_name, index)
 
     def extract_result(self, data: ExperimentData) -> Dataset:
         return data.analysis_tables[self.inner_executor._id]
 
-    def insert_result(self, data: ExperimentData, result_list: List[Dataset]) -> ExperimentData:
+    def insert_result(
+        self, data: ExperimentData, result_list: List[Dataset]
+    ) -> ExperimentData:
         result = result_list[0]
         for i in range(1, len(result_list)):
             result = result.append(result_list[i])
@@ -119,10 +136,10 @@ class GroupExperiment(Executor):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result_list = []
-        for grop, group_data in data.data.groupby(self.grop_field):
+        group_field = data.data.get_columns_by_roles(TempGroupingRole, tmp_role=True)[0]
+
+        for group, group_data in data.data.groupby():
             temp_data = ExperimentData(group_data)
             temp_data = self.inner_executor.execute(temp_data)
             result_list.append(self.extract_result(temp_data))
         return self.insert_result(data, result_list)
-
-

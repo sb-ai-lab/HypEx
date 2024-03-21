@@ -6,12 +6,10 @@ from scipy.stats import mode
 
 from hypex.experiment.base import Executor
 from hypex.dataset.dataset import ExperimentData
-
-# TODO: replace field on subroles
+from hypex.dataset.roles import TempTargetRole
 
 class StatDescriptive(ABC, Executor):
-    def __init__(self, field, full_name=None, index=0, **kwargs):
-        self.field = field
+    def __init__(self, full_name=None, index=0, **kwargs):
         self.kwargs = kwargs
         super().__init__(full_name, index)
 
@@ -27,8 +25,9 @@ class StatDescriptive(ABC, Executor):
 
     @abstractmethod
     def execute(self, data: ExperimentData) -> ExperimentData:
+        target = data.data.get_columns_by_roles(TempTargetRole, tmp_role=True)[0]
         return self._set_value(
-            data, self.calc(data[self.field])
+            data, self.calc(data[target])
         )
 
 

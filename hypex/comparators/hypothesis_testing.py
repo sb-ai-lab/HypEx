@@ -6,16 +6,14 @@ from hypex.experiment.base import Executor
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.comparators.comparators import GroupComparator
 
-# TODO: replace target_field on subroles
 class StatHypothesisTestingWithScipy(ABC, GroupComparator):
     def __init__(
         self,
-        target_field: str,
         reliability: float = 0.05,
         full_name: str = None,
         index: int = 0,
     ):
-        super().__init__(target_field, comparison_function, full_name, index)
+        super().__init__(full_name, index)
         self.reliability = reliability
 
     def _extract_dataset(self, compare_result: Dict) -> Dataset:
