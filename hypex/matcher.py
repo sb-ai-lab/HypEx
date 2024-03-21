@@ -133,6 +133,7 @@ class Matcher:
             n_neighbors: int = 1,
             silent: bool = True,
             pbar: bool = True,
+            max_cut: int = 30,
     ):
         """Initialize the Matcher object.
 
@@ -188,6 +189,8 @@ class Matcher:
                 Write logs in debug mode
             pbar:
                 Display progress bar while get index
+            max_cut: 
+                The maximum number of categories. Default to 30.
 
         ..warnings::
             Multitarget involves studying the impact on multiple targets.
@@ -267,6 +270,7 @@ class Matcher:
         self.n_neighbors = n_neighbors
         self.silent = silent
         self.pbar = pbar
+        self.max_cut = max_cut
         self._preprocessing_data()
 
     def _convert_categorical_to_dummy(self):
@@ -282,6 +286,13 @@ class Matcher:
             data = self.input_data.drop(columns=columns_to_drop)
         else:
             data = self.input_data
+            
+        col_cut = [x for x in data.select_dtypes(include=['category','object']).columns if len(data[x].unique()) > self.max_cut]
+        if col_cut is not None and col_cut != []:
+            logger.error("There are too many categories!")
+            raise NameError(
+                        f"There are too many categories in columns {col_cut}! Check your data or change the parameter 'max_cut' describing the maximum number of categories."
+                    )
         dummy_data = pd.get_dummies(data, drop_first=True, dtype=np.uint8)
         return dummy_data
 
