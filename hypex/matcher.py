@@ -22,7 +22,7 @@ from .selectors.feature_selector import FeatureSelector
 from .selectors.spearman_filter import SpearmanFilter
 from .selectors.outliers_filter import OutliersFilter
 from .selectors.base_filtration import const_filtration, nan_filtration
-from hypex.selectors.selector_primal_methods import (
+from .selectors.selector_primal_methods import (
     pd_lgbm_feature_selector,
     pd_catboost_feature_selector,
     pd_ridgecv_feature_selector,
@@ -133,7 +133,7 @@ class Matcher:
             n_neighbors: int = 1,
             silent: bool = True,
             pbar: bool = True,
-            max_cut: int = 30,
+            max_cut: int = 100,
     ):
         """Initialize the Matcher object.
 
@@ -190,7 +190,7 @@ class Matcher:
             pbar:
                 Display progress bar while get index
             max_cut: 
-                The maximum number of categories. Default to 30.
+                The maximum number of categories. Default to 100.
 
         ..warnings::
             Multitarget involves studying the impact on multiple targets.
@@ -281,17 +281,17 @@ class Matcher:
         """
         info_col = self.info_col if self.info_col is not None else []
 
-        columns_to_drop = self.info_col + self.group_col
+        columns_to_drop = info_col + self.group_col
         if columns_to_drop is not None:
             data = self.input_data.drop(columns=columns_to_drop)
         else:
             data = self.input_data
-            
+                
         col_cut = [x for x in data.select_dtypes(include=['category','object']).columns if len(data[x].unique()) > self.max_cut]
         if col_cut is not None and col_cut != []:
             logger.error("There are too many categories!")
             raise NameError(
-                        f"There are too many categories in columns {col_cut}! Check your data or change the parameter 'max_cut' describing the maximum number of categories."
+                        f"There are too many categories in columns {data[col_cut].dtypes.index}! Check your data or change the parameter 'max_cut' describing the maximum number of categories."
                     )
         dummy_data = pd.get_dummies(data, drop_first=True, dtype=np.uint8)
         return dummy_data
@@ -311,8 +311,9 @@ class Matcher:
                 self.outcomes,
                 1,
                 self.rare_categories_scenario
-            )
-        columns_to_drop = self.info_col + self.group_col + self.outcomes + [self.treatment]
+            )  
+        columns_to_drop = info_col + self.group_col + self.outcomes + [self.treatment]
+        
         if self.base_filtration:
             filtered_features = nan_filtration(
                 self.input_data.drop(columns=columns_to_drop)
@@ -323,12 +324,16 @@ class Matcher:
                 if f not in filtered_features + columns_to_drop
             ]
             self.input_data = self.input_data[filtered_features + columns_to_drop]
+            
         nan_counts = self.input_data.isna().sum().sum()
         if nan_counts != 0:
             self._log(
                 f"Number of NaN values filled with zeros: {nan_counts}", silent=False
             )
-            self.input_data = self.input_data.fillna(0)
+            if pd.__version__ < '2.2.0':
+                self.input_data = self.input_data.fillna(0, downcast=False)
+            else:
+                self.input_data = self.input_data.fillna(0)
 
         if self.group_col is not None:
             group_col = self.input_data[
