@@ -1,6 +1,16 @@
 from abc import ABC
+from typing import Iterable, Dict
 
-from hypex.experiment.experiment import Experiment, ComplexExecutor
+from hypex.comparators.comparators import GroupDifference, GroupSizes
+from hypex.comparators.hypothesis_testing import TTest, KSTest
+from hypex.dataset.dataset import ExperimentData
+from hypex.experiment.experiment import (
+    Experiment,
+    ComplexExecutor,
+    OnTargetExperiment,
+    Executor,
+)
+from hypex.splitters.aa_splitter import AASplitter
 from hypex.stats.descriptive import Mean
 
 
@@ -14,9 +24,7 @@ class Analyzer(ABC, Experiment, ComplexExecutor):
         full_name: str = None,
         index: int = 0,
     ):
-        self.inner_executors: Dict[str, Executor] = (
-            self.get_inner_executors(inner_executors),
-        )
+        self.inner_executors: Dict[str, Executor] = self.get_inner_executors(inner_executors)
         self.executors = executors or self.default_executors
 
         super().__init__(
@@ -48,6 +56,6 @@ class OneAASplit(Analyzer):
             result[f"{key.__name__} p-value"] = self.inner_executors["mean"].calc(
                 value["p-value"]
             )
-            result[f"{key.__name__} passed %"] = self.inner_executors["mean"].calc(
-                value["passed"]
-            )*100
+            result[f"{key.__name__} passed %"] = (
+                self.inner_executors["mean"].calc(value["passed"]) * 100
+            )

@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Callable
 
 from hypex.experiment.base import Executor
+
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole
-from hypex.utils.hypex_typings import FieldKey
 from hypex.stats.descriptive import Mean, Size
 
 
@@ -45,7 +44,7 @@ class GroupComparator(ABC, ComplexExecutor):
         return self._set_value(data, result_dataset)
 
 
-def GroupDifference(GroupComparator):
+class GroupDifference(GroupComparator):
     default_inner_executors: Dict[str, Executor] = {
         "mean": Mean(),
     }
@@ -62,7 +61,7 @@ def GroupDifference(GroupComparator):
             f"{target_field} difference %": (mean_b / mean_a - 1) * 100,
         }
 
-def GroupSizes(GroupComparator):
+class GroupSizes(GroupComparator):
     default_inner_executors: Dict[str, Executor] = {
         "mean": Size(),
     }
