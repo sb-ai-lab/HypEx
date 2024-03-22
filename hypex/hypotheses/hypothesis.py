@@ -12,7 +12,7 @@ class Hypothesis:
         if isinstance(config, str):
             with open(config, "rb") as file:
                 config = json.load(file)
-        with open("hypothesis_scheme.json", "rb") as file:
+        with open("dataset_scheme.json", "rb") as file:
             self.scheme = json.load(file)
         self.config = config
         self.dataset = config["dataset"]
@@ -22,7 +22,7 @@ class Hypothesis:
         self._parse_config()
 
     def validate_config(self):
-        validate(self.config, self.scheme)
+        validate(self.dataset, self.scheme)
         if (
             "data" in self.dataset.keys()
             and "path" not in self.dataset.keys()

@@ -1,0 +1,93 @@
+{
+    "Analyzer": [
+        "default_executors",
+        "executors"
+    ],
+    "OneAASplit": [
+        "default_executors",
+        "default_inner_executors"
+    ],
+    "GroupComparator": [],
+    "StatHypothesisTestingWithScipy": [
+        "reliability"
+    ],
+    "TTest": [],
+    "KSTest": [],
+    "TestPower": [
+        "significance",
+        "power"
+    ],
+    "StatMdeBySize": [],
+    "StatSampleSizeByMde": [
+        "mde"
+    ],
+    "StatPowerByTTestInd": [],
+    "DatasetBase": [],
+    "Dataset": [
+        "roles",
+        "data",
+        "loc",
+        "iloc"
+    ],
+    "ExperimentData": [
+        "data",
+        "analysis_tables"
+    ],
+    "Describer": [
+        "target_field"
+    ],
+    "Unique": [],
+    "RoleError": [],
+    "MethodError": [],
+    "Executor": [
+        "full_name",
+        "index",
+        "params_hash"
+    ],
+    "ComplexExecutor": [
+        "inner_executors"
+    ],
+    "Experiment": [],
+    "CycledExperiment": [],
+    "GroupExperiment": [],
+    "OnTargetExperiment": [],
+    "Factory": [
+        "hypothesis"
+    ],
+    "Hypothesis": [
+        "config",
+        "dataset",
+        "experiment",
+        "report"
+    ],
+    "BinaryOperator": [],
+    "MetricDelta": [],
+    "MetricPercentageDelta": [],
+    "MetricAbsoluteDelta": [],
+    "MetricRelativeDelta": [],
+    "MetricRatio": [],
+    "MetricLogRatio": [],
+    "MetricPercentageRatio": [],
+    "AASplitter": [
+        "control_size",
+        "random_state",
+        "default_inner_executors"
+    ],
+    "AASplitterWithGrouping": [],
+    "AASplitterWithStratification": [],
+    "StatDescriptive": [
+        "kwargs"
+    ],
+    "Mean": [],
+    "Median": [],
+    "Mode": [],
+    "Std": [],
+    "Variance": [],
+    "Min": [],
+    "Max": [],
+    "Range": [],
+    "Size": [],
+    "Shuffle": [
+        "random_state"
+    ]
+}
