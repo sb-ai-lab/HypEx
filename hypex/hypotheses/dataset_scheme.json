@@ -3,9 +3,7 @@
   "default": {},
   "title": "Root Schema",
   "required": [
-    "dataset",
-    "experiment",
-    "report"
+    "dataset"
   ],
   "properties": {
     "dataset": {
@@ -165,9 +163,7 @@
           "delimiter": ",",
           "encoding": "utf-8"
         }
-      },
-      "experiment": {},
-      "report": {}
+      }
     }
   ]
 }
