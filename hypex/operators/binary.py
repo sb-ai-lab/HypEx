@@ -15,7 +15,7 @@ class BinaryOperator(ABC, Executor):
         super().__init__(full_name, index)
 
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
-        data.set_value("additional_fields", self._id, self.get_full_name(), value)
+        data.set_value("additional_fields", self._id, self.full_name, value)
         return data
 
     @staticmethod

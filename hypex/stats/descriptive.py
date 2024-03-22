@@ -19,7 +19,7 @@ class StatDescriptive(ABC, Executor):
 
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
         data.set_value(
-            "stats_fields", self._id, self.get_full_name(), value, key=self.field
+            "stats_fields", self._id, self.full_name, value, key=self.field
         )
         return data
 

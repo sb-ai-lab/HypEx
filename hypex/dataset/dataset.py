@@ -4,6 +4,7 @@ from typing import Dict, Optional, Union, List, Iterable, Any, Type
 
 import pandas as pd
 
+from hypex.experiment.experiment import Experiment
 from hypex.dataset.backends.pandas_backend import PandasDataset
 from hypex.dataset.base import DatasetBase
 from hypex.dataset.roles import ABCRole, StatisticRole, InfoRole
@@ -103,7 +104,7 @@ class Dataset(DatasetBase):
         self, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role=False
     ) -> List[str]:
         roles = roles if isinstance(roles, Iterable) else [roles]
-        get_roles = self.roles if not tmp_role else self.tmp_roles
+        get_roles = self.tmp_roles if tmp_role else self.roles
         return [
             column
             for column, role in get_roles.items()
@@ -271,3 +272,28 @@ class ExperimentData(Dataset):
                 )
             self.stats_fields[executor_id][key] = value
         self._id_name_mapping[executor_id] = name
+
+    # TODO: discuss 
+    def get_ids(self, classes: Union[type, List[type]]):
+        classes = classes if isinstance(classes, Iterable) else [classes]
+        return {
+            c: {
+                "stats": [
+                    _id
+                    for _id in self.stats_fields.columns
+                    if _id.split(Experiment._split_symbol)[0] == c.__name__
+                ],
+                "additional_fields": [
+                    _id
+                    for _id in self.additional_fields.columns
+                    if _id.split(Experiment._split_symbol)[0] == c.__name__
+                ],
+                "analysis_tables": [
+                    _id
+                    for _id in self.analysis_tables
+                    if _id.split(Experiment._split_symbol)[0] == c.__name__
+                ],
+            }
+            for c in classes
+        }
+

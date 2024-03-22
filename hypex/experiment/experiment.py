@@ -9,6 +9,10 @@ from hypex.dataset.roles import TempGroupingRole, TempTargetRole
 
 
 class Executor(ABC):
+    @property
+    def _split_symbol(self) -> str:
+        return "\u2570"
+
     def generate_full_name(self) -> str:
         return self.__class__.__name__
 
@@ -16,10 +20,10 @@ class Executor(ABC):
         return ""
 
     def generate_id(self) -> str:
-        return "\u2570".join(
+        return self._split_symbol.join(
             [
                 self.__class__.__name__,
-                self.params_hash.replace("\u2570", "|"),
+                self.params_hash.replace(self._split_symbol, "|"),
                 str(self.index),
             ]
         )
@@ -70,7 +74,7 @@ class ComplexExecutor(ABC, Executor):
         self.inner_executors = self.get_inner_executors(inner_executors)
 
 
-class Experiment(ABC, Executor):
+class Experiment(Executor):
     def generate_full_name(self) -> str:
         return f"Experiment({len(self.executors)})"
 
@@ -114,21 +118,21 @@ class Experiment(ABC, Executor):
 
 
 class CycledExperiment(Executor):
-    def generate_params_hash(self) -> str:
-        return f"{self.inner_experiment.full_name} x {self.n_iterations}"
-
     def __init__(
         self,
         inner_executor: Executor,
         n_iterations: int,
         analyzer: Analyzer,
-        full_name: str = None,
+        full_name: Union[str, None] = None,
         index: int = 0,
     ):
         self.inner_executor: Executor = inner_executor
         self.n_iterations: int = n_iterations
         self.analyzer: Analyzer = analyzer
         super().__init__(full_name, index)
+
+    def generate_params_hash(self) -> str:
+        return f"{self.inner_executor.full_name} x {self.n_iterations}"
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         for _ in range(self.n_iterations):

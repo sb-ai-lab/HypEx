@@ -11,7 +11,7 @@ class Describer(Executor):
         super().__init__(full_name, index)
 
     def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
-        return data.set_value("analysis_tables", self._id, self.get_full_name(), value)
+        return data.set_value("analysis_tables", self._id, self.full_name, value)
 
 
 class Unique(Describer):

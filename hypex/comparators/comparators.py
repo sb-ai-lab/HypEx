@@ -32,7 +32,7 @@ class GroupComparator(ABC, ComplexExecutor):
         }
 
     def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
-        data.set_value("analysis_tables", self._id, self.get_full_name(), value)
+        data.set_value("analysis_tables", self._id, self.full_name, value)
         return data
 
     def _extract_dataset(self, compare_result: Dict, roles=None) -> Dataset:
