@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Iterable
+from typing import Iterable, Dict, Union
 from copy import deepcopy
+import warnings
 
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.analyzer.analyzer import Analyzer
+from hypex.dataset.roles import TempGroupingRole, TempTargetRole
 
 
 class Executor(ABC):
@@ -14,7 +16,13 @@ class Executor(ABC):
         return ""
 
     def generate_id(self) -> str:
-        return "|".join([self.full_name, self.params_hash, str(self.index)])
+        return "\u2570".join(
+            [
+                self.__class__.__name__,
+                self.params_hash.replace("\u2570", "|"),
+                str(self.index),
+            ]
+        )
 
     def __init__(self, full_name: str = None, index: int = 0):
         self.full_name = full_name or self.generate_full_name()
@@ -35,12 +43,50 @@ class Executor(ABC):
         raise NotImplementedError
 
 
+class ComplexExecutor(ABC, Executor):
+    default_inner_executors: Dict[str, Executor] = {}
+
+    def get_inner_executors(
+        self, inner_executors: Dict[str, Executor] = None
+    ) -> Dict[str, Executor]:
+        result = {}
+        for key, executor in self.default_inner_executors.items():
+            if key not in inner_executors:
+                warnings.warn(
+                    f"{key} executor not found in inner_executors. Will {key} will be used by default."
+                )
+                result[key] = executor
+            else:
+                result[key] = inner_executors[key]
+        return inner_executors
+
+    def __init__(
+        self,
+        inner_executors: Dict[str, Executor] = None,
+        full_name: str = None,
+        index: int = 0,
+    ):
+        super().__init__(full_name=full_name, index=index)
+        self.inner_executors = self.get_inner_executors(inner_executors)
+
+
 class Experiment(ABC, Executor):
     def generate_full_name(self) -> str:
         return f"Experiment({len(self.executors)})"
 
     def _detect_transformer(self) -> bool:
         return False
+
+    def get_executor_ids(self, searched_classes=None) -> Union[Dict[type, str], List[str]]:
+        if searched_classes is None:
+            return [executor._id for executor in self.executors]
+
+        searched_classes = (
+            searched_classes if isinstance(searched_classes, Iterable) else [searched_classes]
+        )
+        for sc in searched_classes:
+            return {sc: [executor._id for executor in self.executors if isinstance(executor, sc)]}
+
 
     def __init__(
         self,
@@ -55,7 +101,9 @@ class Experiment(ABC, Executor):
         )
         super().__init__(full_name, index)
 
-    def _extract_result(self, original_data: ExperimentData, experiment_data: ExperimentData):
+    def _extract_result(
+        self, original_data: ExperimentData, experiment_data: ExperimentData
+    ):
         return experiment_data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -66,10 +114,8 @@ class Experiment(ABC, Executor):
 
 
 class CycledExperiment(Executor):
-    def generate_full_name(self) -> str:
-        return (
-            f"CycledExperiment({self.inner_experiment.full_name} x {self.n_iterations})"
-        )
+    def generate_params_hash(self) -> str:
+        return f"{self.inner_experiment.full_name} x {self.n_iterations}"
 
     def __init__(
         self,
@@ -89,27 +135,47 @@ class CycledExperiment(Executor):
             data = self.analyzer.execute(self.inner_executor.execute(data))
         return data
 
-class CollectionExperiment(Executor):
-    def generate_full_name(self) -> str:
-        return (
-            f"CollectionExperiment({self.inner_experiment.full_name})"
-        )
+
+class GroupExperiment(Executor):
+    def generate_params_hash(self) -> str:
+        return f"{self.grop_field}->{self.inner_executor._id.replace('|', '')}"
 
     def __init__(
         self,
         inner_executor: Executor,
-        n_iterations: int,
-        analyzer: Analyzer,
         full_name: str = None,
         index: int = 0,
     ):
         self.inner_executor: Executor = inner_executor
-        self.n_iterations: int = n_iterations
-        self.analyzer: Analyzer = analyzer
         super().__init__(full_name, index)
 
-# TODO: implement
-    # def execute(self, data: ExperimentData) -> ExperimentData:
-    #     for _ in range(self.n_iterations):
-    #         data = self.analyzer.execute(self.inner_experiment.execute(data))
-    #     return data
+    def extract_result(self, data: ExperimentData) -> Dataset:
+        return data.analysis_tables[self.inner_executor._id]
+
+    def insert_result(
+        self, data: ExperimentData, result_list: List[Dataset]
+    ) -> ExperimentData:
+        result = result_list[0]
+        for i in range(1, len(result_list)):
+            result = result.append(result_list[i])
+        data.analysis_tables[self._id] = result
+        return data
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        result_list = []
+        group_field = data.data.get_columns_by_roles(TempGroupingRole, tmp_role=True)
+
+        for group, group_data in data.data.groupby(group_field):
+            temp_data = ExperimentData(group_data)
+            temp_data = self.inner_executor.execute(temp_data)
+            result_list.append(self.extract_result(temp_data))
+        return self.insert_result(data, result_list)
+
+
+class OnTargetExperiment(Experiment):
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        for field in data.data.get_columns_by_roles(TargetRole):
+            data.data.tmp_roles = {field: TempTargetRole()}
+            data = super().execute(data)
+            data.data.tmp_roles = {}
+        return data

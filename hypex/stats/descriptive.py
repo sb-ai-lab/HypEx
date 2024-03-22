@@ -6,11 +6,10 @@ from scipy.stats import mode
 
 from hypex.experiment.base import Executor
 from hypex.dataset.dataset import ExperimentData
-
+from hypex.dataset.roles import TempTargetRole
 
 class StatDescriptive(ABC, Executor):
-    def __init__(self, field, full_name=None, index=0, **kwargs):
-        self.field = field
+    def __init__(self, full_name=None, index=0, **kwargs):
         self.kwargs = kwargs
         super().__init__(full_name, index)
 
@@ -26,47 +25,48 @@ class StatDescriptive(ABC, Executor):
 
     @abstractmethod
     def execute(self, data: ExperimentData) -> ExperimentData:
+        target = data.data.get_columns_by_roles(TempTargetRole, tmp_role=True)[0]
         return self._set_value(
-            data, self.calc(data[self.field])
+            data, self.calc(data[target])
         )
 
 
-class StatMean(StatDescriptive):
+class Mean(StatDescriptive):
     def calc(self, data):
         return np.mean(data, **self.kwargs)
 
-class StatMedian(StatDescriptive):
+class Median(StatDescriptive):
     def calc(self, data):
         return np.median(data, **self.kwargs)
 
-class StatMode(StatDescriptive):
+class Mode(StatDescriptive):
     def calc(self, data):
         return mode(data, **self.kwargs)
 
 
-class StatStd(StatDescriptive):
+class Std(StatDescriptive):
     def calc(self, data):
         return np.std(data, **self.kwargs)
 
 
-class StatVariance(StatDescriptive):
+class Variance(StatDescriptive):
     def calc(self, data):
         return np.var(data, **self.kwargs)
 
 
-class StatMin(StatDescriptive):
+class Min(StatDescriptive):
     def calc(self, data):
         return np.min(data, **self.kwargs)
 
-class StatMax(StatDescriptive):
+class Max(StatDescriptive):
     def calc(self, data):
         return np.max(data, **self.kwargs)
 
 
-class StatRange(StatDescriptive):
+class Range(StatDescriptive):
     def __init__(self, field: str):
         super().__init__(field, np.ptp)
 
-class StatSize(StatDescriptive):
+class Size(StatDescriptive):
     def calc(self, data):
         return len(data, **self.kwargs)

@@ -32,12 +32,12 @@ class Dataset(DatasetBase):
         backend: str = None,
     ):
         self._backend = (
-            self._select_backend_from_data(data)
-            if not backend
-            else self._select_backend_from_str(data, backend)
+            self._select_backend_from_str(data, backend)
+            if backend
+            else self._select_backend_from_data(data)
         )
 
-        if roles and not all(i in self._backend.columns for i in list(roles.values())):
+        if roles and any(i not in self._backend.columns for i in list(roles.values())):
             raise ValueError(
                 "Check your roles. All of them must be names of data columns. \n"
                 f"Now roles have {list(roles.keys())} values and columns have {self._backend.columns} values"
@@ -49,8 +49,6 @@ class Dataset(DatasetBase):
 
     @staticmethod
     def _select_backend_from_data(data):
-        if isinstance(data, pd.DataFrame):
-            return PandasDataset(data)
         return PandasDataset(data)
 
     @staticmethod
@@ -79,7 +77,7 @@ class Dataset(DatasetBase):
         return self._backend.__len__()
 
     def __getitem__(self, item):
-        items = [item] if not isinstance(item, Iterable) else item
+        items = item if isinstance(item, Iterable) else [item]
         roles = {}
         for column in items:
             if column in self.columns and self.roles.get(column, 0):
@@ -128,14 +126,10 @@ class Dataset(DatasetBase):
 
     def append(self, other, index=None):
         if not isinstance(other, Dataset):
-            raise TypeError(
-                "Can only append Dataset to Dataset. Got {}".format(type(other))
-            )
+            raise TypeError(f"Can only append Dataset to Dataset. Got {type(other)}")
         if type(other._backend) != type(self._backend):
             raise TypeError(
-                "Can only append datas with the same backends. Got {} expected {}".format(
-                    type(other._backend), type(self._backend)
-                )
+                f"Can only append datas with the same backends. Got {type(other._backend)} expected {type(self._backend)}"
             )
         return Dataset(data=self._backend.append(other._backend, index))
 

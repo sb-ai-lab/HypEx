@@ -10,6 +10,8 @@ from hypex.experiment.base import Experiment
 from hypex.dataset.dataset import ExperimentData
 from hypex.comparators.comparators import ComparatorInner
 
+#TODO: Rework ALL
+
 class TestPower(ABC, ComparatorInner):
     def __init__(
         self,
@@ -37,7 +39,7 @@ class StatMdeBySize(TestPower):
 
         return p * m * s
 
-
+# TODO: replace target_field on subroles
 class StatSampleSizeByMde(TestPower):
     def __init__(
         self,
