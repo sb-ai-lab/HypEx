@@ -1,11 +1,11 @@
-from abc import ABC, abstractmethod
-from typing import Iterable, Dict, Union
-from copy import deepcopy
 import warnings
+from abc import ABC, abstractmethod
+from copy import deepcopy
+from typing import Iterable, Dict, Union
 
-from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.analyzer.analyzer import Analyzer
-from hypex.dataset.roles import TempGroupingRole, TempTargetRole
+from hypex.dataset.dataset import Dataset, ExperimentData
+from hypex.dataset.roles import TempGroupingRole, TempTargetRole, TargetRole
 
 
 class Executor(ABC):
@@ -77,16 +77,25 @@ class Experiment(ABC, Executor):
     def _detect_transformer(self) -> bool:
         return False
 
-    def get_executor_ids(self, searched_classes=None) -> Union[Dict[type, str], List[str]]:
+    def get_executor_ids(
+        self, searched_classes=None
+    ) -> Union[Dict[type, str], List[str]]:
         if searched_classes is None:
             return [executor._id for executor in self.executors]
 
         searched_classes = (
-            searched_classes if isinstance(searched_classes, Iterable) else [searched_classes]
+            searched_classes
+            if isinstance(searched_classes, Iterable)
+            else [searched_classes]
         )
         for sc in searched_classes:
-            return {sc: [executor._id for executor in self.executors if isinstance(executor, sc)]}
-
+            return {
+                sc: [
+                    executor._id
+                    for executor in self.executors
+                    if isinstance(executor, sc)
+                ]
+            }
 
     def __init__(
         self,
@@ -175,7 +184,7 @@ class GroupExperiment(Executor):
 class OnTargetExperiment(Experiment):
     def execute(self, data: ExperimentData) -> ExperimentData:
         for field in data.data.get_columns_by_roles(TargetRole):
-            data.data.tmp_roles = {field: TempTargetRole()}
+            data.data.tmp_roles = {field: TempTargetRole}
             data = super().execute(data)
             data.data.tmp_roles = {}
         return data

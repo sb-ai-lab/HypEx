@@ -24,7 +24,9 @@ class Analyzer(ABC, Experiment, ComplexExecutor):
         full_name: str = None,
         index: int = 0,
     ):
-        self.inner_executors: Dict[str, Executor] = self.get_inner_executors(inner_executors)
+        self.inner_executors: Dict[str, Executor] = self.get_inner_executors(
+            inner_executors
+        )
         self.executors = executors or self.default_executors
 
         super().__init__(

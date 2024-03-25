@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Dict, Any
 
 from hypex.experiment.base import Executor
 
@@ -61,12 +62,13 @@ class GroupDifference(GroupComparator):
             f"{target_field} difference %": (mean_b / mean_a - 1) * 100,
         }
 
+
 class GroupSizes(GroupComparator):
     default_inner_executors: Dict[str, Executor] = {
         "mean": Size(),
     }
 
-    def _comparison_function(self, control_data, test_data) -> Dataset:
+    def _comparison_function(self, control_data, test_data) -> dict[str, int | Any]:
         size_a = self._inner_executors["size"].execute(control_data)
         size_b = self._inner_executors["size"].execute(test_data)
 
