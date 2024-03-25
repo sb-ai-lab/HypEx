@@ -229,18 +229,18 @@ class Matcher:
             raise ValueError(
                 f"Next group columns contain NULLs: {null_contained_group_cols}. Process these columns or set 'fill_gaps = True'."
             )
-            
+
         if fill_gaps == True:
             for column in group_col:
                 self.input_data[column] = self.input_data[column].fillna(f'unknown_{column}')
-          
+
         # join group_cols
         self.group_col = group_col if group_col == [] else ['|'.join(group_col)]
         if len(group_col) > 1:
             self.input_data[self.group_col[0]] = (
                 self.input_data
-                    .loc[:, group_col]
-                    .apply(lambda x: '|'.join(x.values.tolist()), axis=1)
+                .loc[:, group_col]
+                .apply(lambda x: '|'.join(x.values.tolist()), axis=1)
             )
             self.input_data.drop(columns=group_col, inplace=True)
         # self.group_col = None if group_col == [] else group_col
@@ -293,13 +293,14 @@ class Matcher:
             data = self.input_data.drop(columns=columns_to_drop)
         else:
             data = self.input_data
-                
-        col_cut = [x for x in data.select_dtypes(include=['category','object']).columns if len(data[x].unique()) > self.max_categories]
+
+        col_cut = [x for x in data.select_dtypes(include=['category', 'object']).columns if
+                   len(data[x].unique()) > self.max_categories]
         if col_cut is not None and col_cut != []:
             logger.error("There are too many categories!")
             raise NameError(
-                        f"There are too many categories in columns {data[col_cut].dtypes.index}! Check your data or change the parameter 'max_cut' describing the maximum number of categories."
-                    )
+                f"There are too many categories in columns {data[col_cut].dtypes.index}! Check your data or change the parameter 'max_cut' describing the maximum number of categories."
+            )
         dummy_data = pd.get_dummies(data, drop_first=True, dtype=np.uint8)
         return dummy_data
 
@@ -321,9 +322,9 @@ class Matcher:
                 self.outcomes,
                 1,
                 self.rare_categories_scenario
-            )  
+            )
         columns_to_drop = info_col + self.group_col + self.outcomes + [self.treatment]
-        
+
         if self.base_filtration:
             filtered_features = nan_filtration(
                 self.input_data.drop(columns=columns_to_drop)
@@ -334,7 +335,7 @@ class Matcher:
                 if f not in filtered_features + columns_to_drop
             ]
             self.input_data = self.input_data[filtered_features + columns_to_drop]
-            
+
         nan_counts = self.input_data.isna().sum().sum()
         if nan_counts != 0:
             self._log(
@@ -473,10 +474,10 @@ class Matcher:
             group_col = group_col[0]
         else:
             raise ValueError(f'Wrong group_col format: {group_col}')
-        frequencies = df\
-            .groupby(by=[group_col, treat_col])\
-            .size()\
-            .groupby(group_col)\
+        frequencies = df \
+            .groupby(by=[group_col, treat_col]) \
+            .size() \
+            .groupby(group_col) \
             .agg(lambda x: (len(x) == 2) * x.min())
         rare_categories = (
             frequencies[frequencies < frequency_th].reset_index().loc[:, group_col]
