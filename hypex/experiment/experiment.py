@@ -4,12 +4,9 @@ from copy import deepcopy
 import warnings
 
 from hypex.dataset.dataset import Dataset, ExperimentData
-from hypex.analyzer.analyzer import Analyzer
 from hypex.dataset.roles import TempGroupingRole, TempTargetRole, TargetRole
 
 # TODO: discus generators and properties
-
-
 class Executor(ABC):
     @property
     def _split_symbol(self) -> str:
@@ -155,13 +152,13 @@ class CycledExperiment(Executor):
         self,
         inner_executor: Executor,
         n_iterations: int,
-        analyzer: Analyzer,
+        analyzer: Executor,
         full_name: Union[str, None] = None,
         key: Any = 0,
     ):
         self.inner_executor: Executor = inner_executor
         self.n_iterations: int = n_iterations
-        self.analyzer: Analyzer = analyzer
+        self.analyzer: Executor = analyzer
         super().__init__(full_name, key)
 
     def generate_params_hash(self) -> str:

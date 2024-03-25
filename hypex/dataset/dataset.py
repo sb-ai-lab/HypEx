@@ -29,8 +29,8 @@ class Dataset(DatasetBase):
     def set_data(
         self,
         data: Union[pd.DataFrame, str, Type],
-        roles: Union[Dict] = None,
-        backend: str = None,
+        roles: Union[Dict[Any, type], None] = None,
+        backend: Union[str, None] = None,
     ):
         self._backend = (
             self._select_backend_from_str(data, backend)
@@ -253,10 +253,10 @@ class ExperimentData(Dataset):
     def set_value(
         self,
         space: str,
-        executor_id: int,
+        executor_id: str,
         name: str,
         value: Any,
-        key: str = None,
+        key: Union[str, None] = None,
         role=None,
     ):
         if space == "additional_fields":

@@ -33,10 +33,10 @@ class GroupComparator(ComplexExecutor):
         }
 
     def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
-        data.set_value("analysis_tables", self._id, self.full_name, value)
+        data.set_value("analysis_tables", self.id, self.full_name, value)
         return data
 
-    def _extract_dataset(self, compare_result: Dict, roles=None) -> Dataset:
+    def _extract_dataset(self, compare_result: Dict, roles: Union[Dict[Any, type], None]=None) -> Dataset:
         return Dataset(roles=roles).from_dict(compare_result)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
