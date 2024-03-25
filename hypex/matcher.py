@@ -133,6 +133,7 @@ class Matcher:
             n_neighbors: int = 1,
             silent: bool = True,
             pbar: bool = True,
+            max_categories: int = 100,
             fill_gaps: bool = False,
     ):
         """Initialize the Matcher object.
@@ -189,6 +190,8 @@ class Matcher:
                 Write logs in debug mode
             pbar:
                 Display progress bar while get index
+            max_categories: 
+                The maximum number of categories. Default to 100.
             fill_gaps:
                 Determines whether to automatically fill NaN values in categorical columns used for grouping.
 
@@ -274,6 +277,7 @@ class Matcher:
         self.n_neighbors = n_neighbors
         self.silent = silent
         self.pbar = pbar
+        self.max_categories = max_categories
         self._preprocessing_data()
 
     def _convert_categorical_to_dummy(self):
@@ -284,11 +288,18 @@ class Matcher:
         """
         info_col = self.info_col if self.info_col is not None else []
 
-        columns_to_drop = self.info_col + self.group_col
+        columns_to_drop = info_col + self.group_col
         if columns_to_drop is not None:
             data = self.input_data.drop(columns=columns_to_drop)
         else:
             data = self.input_data
+                
+        col_cut = [x for x in data.select_dtypes(include=['category','object']).columns if len(data[x].unique()) > self.max_categories]
+        if col_cut is not None and col_cut != []:
+            logger.error("There are too many categories!")
+            raise NameError(
+                        f"There are too many categories in columns {data[col_cut].dtypes.index}! Check your data or change the parameter 'max_cut' describing the maximum number of categories."
+                    )
         dummy_data = pd.get_dummies(data, drop_first=True, dtype=np.uint8)
         return dummy_data
 
@@ -307,8 +318,9 @@ class Matcher:
                 self.outcomes,
                 1,
                 self.rare_categories_scenario
-            )
-        columns_to_drop = self.info_col + self.group_col + self.outcomes + [self.treatment]
+            )  
+        columns_to_drop = info_col + self.group_col + self.outcomes + [self.treatment]
+        
         if self.base_filtration:
             filtered_features = nan_filtration(
                 self.input_data.drop(columns=columns_to_drop)
@@ -319,12 +331,16 @@ class Matcher:
                 if f not in filtered_features + columns_to_drop
             ]
             self.input_data = self.input_data[filtered_features + columns_to_drop]
+            
         nan_counts = self.input_data.isna().sum().sum()
         if nan_counts != 0:
             self._log(
                 f"Number of NaN values filled with zeros: {nan_counts}", silent=False
             )
-            self.input_data = self.input_data.fillna(0)
+            if pd.__version__ < '2.2.0':
+                self.input_data = self.input_data.fillna(0, downcast=False)
+            else:
+                self.input_data = self.input_data.fillna(0)
 
         if self.group_col is not None:
             group_col = self.input_data[
