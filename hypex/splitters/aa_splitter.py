@@ -59,7 +59,7 @@ class AASplitterWithGrouping(AASplitter):
                 index=group[1].index,
             )
             result = group_ds if result is None else result.append(group_ds)
-        
+
         self._set_value(data, result["group"])
         return data
 
@@ -84,11 +84,12 @@ class AASplitterWithStratification(SplitterAA):
         for _, gd in groups:
             ged = ExperimentData(gd)
             ged = self.super().execute(ged)
-            
+
             result = ged if result is None else result.append(ged)
 
         self._set_value(data, result["group"])
         return data
+
 
 # As idea
 # class SplitterAAMulti(ExperimentMulti):

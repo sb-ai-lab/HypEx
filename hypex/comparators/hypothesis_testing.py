@@ -23,13 +23,16 @@ class StatHypothesisTestingWithScipy(ABC, GroupComparator):
                 "statistic": stats.statistic,
                 "p-value": stats.pvalue,
                 "pass": stats.pvalue < self.reliability,
-            } for group, stats in result_stats.items()
+            }
+            for group, stats in result_stats.items()
         ]
         return super()._extract_dataset(result_stats)
+
 
 class TTest(StatHypothesisTestingWithScipy):
     def _comparison_function(self, control_data, test_data) -> ExperimentData:
         return ttest_ind(control_data, test_data)
+
 
 class KSTest(StatHypothesisTestingWithScipy):
     def _comparison_function(self, control_data, test_data) -> ExperimentData:
