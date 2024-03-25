@@ -1,6 +1,6 @@
 import json
 import warnings
-from typing import Dict, Optional, Union, List, Iterable, Any, Type
+from typing import Dict, Union, List, Iterable, Any, Type
 
 import pandas as pd
 
@@ -15,6 +15,7 @@ from hypex.errors.errors import (
     SpaceError,
 )
 from hypex.utils.hypex_enums import ExperimentDataEnum, BackendsEnum
+from hypex.utils.hypex_typings import RolesType
 
 
 class Dataset(DatasetBase):
@@ -35,7 +36,7 @@ class Dataset(DatasetBase):
     def set_data(
         self,
         data: Union[pd.DataFrame, str, Type],
-        roles: Union[Dict] = None,
+        roles: RolesType = None,
         backend: str = None,
     ):
         self._backend = (
@@ -43,7 +44,7 @@ class Dataset(DatasetBase):
             if backend
             else self._select_backend_from_data(data)
         )
-
+        # TODO check with two variant
         if roles and any(i not in self._backend.columns for i in list(roles.values())):
             raise RoleColumnError(list(roles.keys()), self._backend.columns)
         self.roles = parse_roles(roles)
@@ -63,7 +64,7 @@ class Dataset(DatasetBase):
     def __init__(
         self,
         data: Union[pd.DataFrame, str] = None,
-        roles: Optional[Dict[ABCRole, Union[List[str], str]]] = None,
+        roles: RolesType = None,
         backend: str = None,
     ):
         self.roles = None
@@ -92,7 +93,7 @@ class Dataset(DatasetBase):
 
     def __setitem__(self, key, value):
         if key not in self.columns and isinstance(key, str):
-            self.add_column(value, key, InfoRole)
+            self.add_column(value, key, InfoRole())
             warnings.warn("Column must be added by add_column", category=Warning)
         self.data[key] = value
 
@@ -269,7 +270,7 @@ class ExperimentData(Dataset):
                 self.stats_fields.add_column(
                     data=[None] * len(self.stats_fields),
                     name=executor_id,
-                    role=StatisticRole,
+                    role=StatisticRole(),
                 )
             self.stats_fields[executor_id][key] = value
         self._id_name_mapping[executor_id] = name

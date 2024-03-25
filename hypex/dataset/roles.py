@@ -1,8 +1,8 @@
 from abc import ABC
+from typing import Union
 
 from hypex.utils.hypex_typings import (
     ABCRoleTypes,
-    Any,
     StratificationRoleTypes,
     TargetRoleTypes,
     TreatmentRoleTypes,
@@ -12,7 +12,7 @@ from hypex.utils.hypex_typings import (
 class ABCRole(ABC):
     _role_name = "Abstract"
 
-    def __init__(self, data_type: ABCRoleTypes = Any):
+    def __init__(self, data_type: Union[ABCRoleTypes, None] = None):
         self.data_type = data_type
 
 
@@ -23,7 +23,7 @@ class InfoRole(ABCRole):
 class StratificationRole(ABCRole):
     _role_name = "Stratification"
 
-    def __init__(self, data_type: StratificationRoleTypes):
+    def __init__(self, data_type: Union[StratificationRoleTypes, None] = None):
         super().__init__(data_type)
 
 
@@ -34,14 +34,14 @@ class GroupingRole(ABCRole):
 class TreatmentRole(ABCRole):
     _role_name = "Treatment"
 
-    def __init__(self, data_type: TreatmentRoleTypes):
+    def __init__(self, data_type: Union[TreatmentRoleTypes, None] = None):
         super().__init__(data_type)
 
 
 class TargetRole(ABCRole):
     _role_name = "Target"
 
-    def __init__(self, data_type: TargetRoleTypes):
+    def __init__(self, data_type: Union[TargetRoleTypes, None] = None):
         super().__init__(data_type)
 
 
