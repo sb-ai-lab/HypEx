@@ -23,6 +23,8 @@ class OneAASplit(ComplexExecutor):
         analysis_tests: List[Executor] = [TTest, KSTest]
         executor_ids = data.get_ids(analysis_tests)
 
+        #TODO: rework with new keys
+
         analysis_data = {}
         for c, spaces in executor_ids.items():
             t_data = pd.concat(spaces.get("analysis_tables", []))

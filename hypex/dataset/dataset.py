@@ -37,8 +37,8 @@ class Dataset(DatasetBase):
     def set_data(
         self,
         data: Union[pd.DataFrame, str, Type],
-        roles: RolesType = None,
-        backend: str = None,
+        roles: Union[RolesType, None] = None,
+        backend: Union[str, None] = None,
     ):
         self._backend = (
             self._select_backend_from_str(data, backend)
@@ -48,6 +48,7 @@ class Dataset(DatasetBase):
 
         if roles and any(i not in self._backend.columns for i in list(roles.values())):
             raise RoleColumnError(list(roles.keys()), self._backend.columns)
+
         self.roles = parse_roles(roles)
         self.data = self._backend.data
         self.loc = self.Locker(self._backend)
@@ -65,7 +66,7 @@ class Dataset(DatasetBase):
     def __init__(
         self,
         data: Union[pd.DataFrame, str] = None,
-        roles: RolesType = None,
+        roles: Union[RolesType, None] = None,
         backend: str = None,
     ):
         self.roles = None
@@ -137,7 +138,7 @@ class Dataset(DatasetBase):
             raise ConcatBackendError(type(other._backend), type(self._backend))
         return Dataset(data=self._backend.append(other._backend, index))
 
-    def from_dict(self, data, index=None):
+    def from_dict(self, data: FromDictType, index=None):
         self._backend = self._backend.from_dict(data, index)
         self.data = self._backend.data
         return self
@@ -230,8 +231,8 @@ class ExperimentData(Dataset):
             self.stats_fields = data
 
         self.data = data
-        self.analysis_tables = {}
-        self._id_name_mapping = {}
+        self.analysis_tables: Dict[str, Dataset] = {}
+        self._id_name_mapping: Dict[str, str] = {}
 
     def _create_empty(self, index=None, columns=None):
         self.additional_fields._create_empty(index, columns)
@@ -248,18 +249,13 @@ class ExperimentData(Dataset):
         else:
             raise SpaceError(space)
 
-    def _create_empty(self, indexes=None, columns=None):
-        self.additional_fields._create_empty(indexes, columns)
-        self.stats_fields._create_empty(indexes, columns)
-        return self
-
     def set_value(
         self,
         space: ExperimentDataEnum,
-        executor_id: int,
+        executor_id: str,
         name: str,
         value: Any,
-        key: str = None,
+        key: Union[str, None] = None,
         role=None,
     ):
         if space == ExperimentDataEnum.additional_fields:

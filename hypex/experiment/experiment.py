@@ -9,6 +9,7 @@ from hypex.dataset.roles import TempGroupingRole, TempTargetRole, TargetRole
 
 # TODO: discus generators and properties
 class Executor(ABC):
+    # TODO: replace to constants file
     @property
     def _split_symbol(self) -> str:
         return "\u2570"

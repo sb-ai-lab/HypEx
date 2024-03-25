@@ -74,12 +74,12 @@ class StatisticRole(ABCRole):
 
 
 default_roles = {
-    "info": InfoRole,
-    "feature": FeatureRole,
-    "treatment": TreatmentRole,
-    "grouping": GroupingRole,
-    "target": TargetRole,
-    "pretarget": PreTargetRole,
-    "stratification": StratificationRole,
-    "statistic": StatisticRole,
+    "info": InfoRole(),
+    "feature": FeatureRole(),
+    "treatment": TreatmentRole(),
+    "grouping": GroupingRole(),
+    "target": TargetRole(),
+    "pretarget": PreTargetRole(),
+    "stratification": StratificationRole(),
+    "statistic": StatisticRole(),
 }

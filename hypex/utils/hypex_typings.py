@@ -11,3 +11,4 @@ ABCRoleTypes = Union[Any]
 FieldKey = Union[str, int]
 
 RolesType = Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
+FromDictType = Union[Dict[str, List[Any]], List[Dict[Any, Any]]]

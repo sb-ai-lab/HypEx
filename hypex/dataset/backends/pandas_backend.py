@@ -81,7 +81,7 @@ class PandasDataset(DatasetBase):
     def columns(self):
         return self.data.columns
 
-    def from_dict(self, data: List[Dict], index=None):
+    def from_dict(self, data: FromDictType, index=None):
         self.data = pd.DataFrame().from_records(data)
         if index:
             self.data.index = index

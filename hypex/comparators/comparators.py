@@ -4,10 +4,9 @@ from typing import Dict, Union, Any
 from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole
-from hypex.utils.hypex_typings import FieldKey
 from hypex.stats.descriptive import Mean, Size
 from hypex.utils.hypex_enums import ExperimentDataEnum
-
+from hypex.utils.hypex_typings import RolesType, FieldKey, FromDictType
 
 class GroupComparator(ComplexExecutor):
     def __init__(
@@ -24,6 +23,7 @@ class GroupComparator(ComplexExecutor):
 
     def _compare(self, data: ExperimentData) -> Dict:
         group_field = data.data.get_columns_by_roles(GroupingRole)
+        self.key = str(group_field)
         target_field = data.data.get_columns_by_roles(TempTargetRole, tmp_role=True)[0]
         grouping_data = list(data.groupby(group_field))
         return {
@@ -40,7 +40,7 @@ class GroupComparator(ComplexExecutor):
         )
         return data
 
-    def _extract_dataset(self, compare_result: Dict, roles: Union[Dict[Any, type], None]=None) -> Dataset:
+    def _extract_dataset(self, compare_result: FromDictType, roles: Union[RolesType, None]=None) -> Dataset:
         return Dataset(roles=roles).from_dict(compare_result)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
