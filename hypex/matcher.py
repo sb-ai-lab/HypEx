@@ -134,6 +134,7 @@ class Matcher:
             silent: bool = True,
             pbar: bool = True,
             max_categories: int = 100,
+            fill_gaps: bool = False,
     ):
         """Initialize the Matcher object.
 
@@ -191,6 +192,8 @@ class Matcher:
                 Display progress bar while get index
             max_categories: 
                 The maximum number of categories. Default to 100.
+            fill_gaps:
+                Determines whether to automatically fill NaN values in categorical columns used for grouping.
 
         ..warnings::
             Multitarget involves studying the impact on multiple targets.
@@ -222,11 +225,15 @@ class Matcher:
         # check group_col onto null-values
         null_contained_group_cols = self.input_data.loc[:, group_col].pipe(pd.isnull).any(axis=0)
         null_contained_group_cols = null_contained_group_cols[null_contained_group_cols].index
-        if null_contained_group_cols.shape[0] != 0:
+        if null_contained_group_cols.shape[0] != 0 and fill_gaps == False:
             raise ValueError(
-                f"Next group columns contain NULLs: {null_contained_group_cols}"
+                f"Next group columns contain NULLs: {null_contained_group_cols}. Process these columns or set 'fill_gaps = True'."
             )
-
+            
+        if fill_gaps == True:
+            for column in group_col:
+                self.input_data[column] = self.input_data[column].fillna(f'unknown_{column}')
+          
         # join group_cols
         self.group_col = group_col if group_col == [] else ['|'.join(group_col)]
         if len(group_col) > 1:
