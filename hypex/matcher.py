@@ -309,6 +309,9 @@ class Matcher:
             warnings.warn(
                 "To ensure the multitarget's correct operation, it's necessary to guarantee the independence of the targets from each other."
             )
+            raise NotImplementedError(
+                "We are working on it"
+            )
         info_col = self.info_col if self.info_col is not None else []
         if self.group_col is not None:
             self.input_data = self.validate_group_col(
@@ -748,6 +751,9 @@ class Matcher:
 
             These methods are not sufficiently accurate markers of a successful experiment.
         """
+        raise NotImplementedError(
+            "We have found that old validation is not mathematically correct. So now we are working on new method."
+        )
         if self.silent:
             logger.debug("Applying validation of result")
         else:
