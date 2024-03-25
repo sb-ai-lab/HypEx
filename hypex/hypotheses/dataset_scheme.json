@@ -134,20 +134,6 @@
           }
         }
       ]
-    },
-    "experiment": {
-      "type": "object",
-      "default": {},
-      "title": "The experiment Schema",
-      "required": [],
-      "properties": {}
-    },
-    "report": {
-      "type": "object",
-      "default": {},
-      "title": "The report Schema",
-      "required": [],
-      "properties": {}
     }
   },
   "examples": [

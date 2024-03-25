@@ -5,7 +5,7 @@ from typing import Iterable, Dict, Union, List
 
 from hypex.analyzer.analyzer import Analyzer
 from hypex.dataset.dataset import Dataset, ExperimentData
-from hypex.dataset.roles import TempGroupingRole, TempTargetRole
+from hypex.dataset.roles import TempGroupingRole, TempTargetRole, TargetRole
 
 
 class Executor(ABC):
@@ -185,7 +185,7 @@ class GroupExperiment(Executor):
 class OnTargetExperiment(Experiment):
     def execute(self, data: ExperimentData) -> ExperimentData:
         for field in data.data.get_columns_by_roles(TargetRole):
-            data.data.tmp_roles = {field: TempTargetRole()}
+            data.data.tmp_roles = {field: TempTargetRole}
             data = super().execute(data)
             data.data.tmp_roles = {}
         return data
