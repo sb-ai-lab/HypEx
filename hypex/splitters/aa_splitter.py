@@ -4,7 +4,7 @@ from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import GroupingRole, StratificationRole, TreatmentRole
 from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.transformers.transformers import Shuffle
-from hypex.utils.hypex_enums import ExperimentDataEnum
+from hypex.utils.enums import ExperimentDataEnum
 
 
 class AASplitter(ComplexExecutor):

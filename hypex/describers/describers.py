@@ -4,8 +4,8 @@ import numpy as np
 
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.experiment.experiment import Executor
-from hypex.utils.hypex_enums import ExperimentDataEnum
-from hypex.utils.hypex_typings import FieldKey
+from hypex.utils.enums import ExperimentDataEnum
+from hypex.utils.typings import FieldKey
 
 
 class Describer(Executor):
