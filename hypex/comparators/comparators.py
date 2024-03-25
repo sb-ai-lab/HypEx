@@ -4,7 +4,9 @@ from typing import Dict, Union, Any
 from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole
+from hypex.utils.hypex_typings import FieldKey
 from hypex.stats.descriptive import Mean, Size
+from hypex.utils.hypex_enums import ExperimentDataEnum
 
 
 class GroupComparator(ComplexExecutor):
@@ -33,7 +35,9 @@ class GroupComparator(ComplexExecutor):
         }
 
     def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
-        data.set_value("analysis_tables", self.id, self.full_name, value)
+        data.set_value(
+            ExperimentDataEnum.analysis_tables, self.id, self.full_name, value
+        )
         return data
 
     def _extract_dataset(self, compare_result: Dict, roles: Union[Dict[Any, type], None]=None) -> Dataset:

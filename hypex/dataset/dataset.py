@@ -1,6 +1,6 @@
 import json
 import warnings
-from typing import Dict, Optional, Union, List, Iterable, Any, Type
+from typing import Dict, Union, List, Iterable, Any, Type
 
 import pandas as pd
 
@@ -9,6 +9,14 @@ from hypex.dataset.backends.pandas_backend import PandasDataset
 from hypex.dataset.base import DatasetBase
 from hypex.dataset.roles import ABCRole, StatisticRole, InfoRole
 from hypex.dataset.utils import parse_roles
+from hypex.errors.errors import (
+    RoleColumnError,
+    ConcatDataError,
+    ConcatBackendError,
+    SpaceError,
+)
+from hypex.utils.hypex_enums import ExperimentDataEnum, BackendsEnum
+from hypex.utils.hypex_typings import RolesType
 
 
 class Dataset(DatasetBase):
@@ -29,8 +37,8 @@ class Dataset(DatasetBase):
     def set_data(
         self,
         data: Union[pd.DataFrame, str, Type],
-        roles: Union[Dict[Any, type], None] = None,
-        backend: Union[str, None] = None,
+        roles: RolesType = None,
+        backend: str = None,
     ):
         self._backend = (
             self._select_backend_from_str(data, backend)
@@ -39,10 +47,7 @@ class Dataset(DatasetBase):
         )
 
         if roles and any(i not in self._backend.columns for i in list(roles.values())):
-            raise ValueError(
-                "Check your roles. All of them must be names of data columns. \n"
-                f"Now roles have {list(roles.keys())} values and columns have {self._backend.columns} values"
-            )
+            raise RoleColumnError(list(roles.keys()), self._backend.columns)
         self.roles = parse_roles(roles)
         self.data = self._backend.data
         self.loc = self.Locker(self._backend)
@@ -54,13 +59,13 @@ class Dataset(DatasetBase):
 
     @staticmethod
     def _select_backend_from_str(data, backend):
-        if backend == "pandas":
+        if backend == BackendsEnum.pandas:
             return PandasDataset(data)
 
     def __init__(
         self,
         data: Union[pd.DataFrame, str] = None,
-        roles: Optional[Dict[ABCRole, Union[List[str], str]]] = None,
+        roles: RolesType = None,
         backend: str = None,
     ):
         self.roles = None
@@ -89,7 +94,7 @@ class Dataset(DatasetBase):
 
     def __setitem__(self, key, value):
         if key not in self.columns and isinstance(key, str):
-            self.add_column(value, key, InfoRole)
+            self.add_column(value, key, InfoRole())
             warnings.warn("Column must be added by add_column", category=Warning)
         self.data[key] = value
 
@@ -127,11 +132,9 @@ class Dataset(DatasetBase):
 
     def append(self, other, index=None):
         if not isinstance(other, Dataset):
-            raise TypeError(f"Can only append Dataset to Dataset. Got {type(other)}")
+            raise ConcatDataError(type(other))
         if type(other._backend) != type(self._backend):
-            raise TypeError(
-                f"Can only append datas with the same backends. Got {type(other._backend)} expected {type(self._backend)}"
-            )
+            raise ConcatBackendError(type(other._backend), type(self._backend))
         return Dataset(data=self._backend.append(other._backend, index))
 
     def from_dict(self, data, index=None):
@@ -236,14 +239,14 @@ class ExperimentData(Dataset):
         return self
 
     def check_hash(self, executor_id: int, space: str) -> bool:
-        if space == "additional_fields":
+        if space == ExperimentDataEnum.additional_fields:
             return executor_id in self.additional_fields.columns
-        elif space == "stats_fields":
+        elif space == ExperimentDataEnum.stats_fields:
             return executor_id in self.stats_fields.columns
-        elif space == "analysis_tables":
+        elif space == ExperimentDataEnum.analysis_tables:
             return executor_id in self.analysis_tables
         else:
-            raise ValueError(f"{space} is not a valid space")
+            raise SpaceError(space)
 
     def _create_empty(self, indexes=None, columns=None):
         self.additional_fields._create_empty(indexes, columns)
@@ -252,27 +255,28 @@ class ExperimentData(Dataset):
 
     def set_value(
         self,
-        space: str,
-        executor_id: str,
+        space: ExperimentDataEnum,
+        executor_id: int,
         name: str,
         value: Any,
-        key: Union[str, None] = None,
+        key: str = None,
         role=None,
     ):
-        if space == "additional_fields":
+        if space == ExperimentDataEnum.additional_fields:
             self.additional_fields.add_column(data=value, name=executor_id, role=role)
-        elif space == "analysis_tables":
+        elif space == ExperimentDataEnum.analysis_tables:
             self.analysis_tables[name] = value
-        elif space == "stats_fields":
+        elif space == ExperimentDataEnum.stats_fields:
             if executor_id not in self.stats_fields.columns:
                 self.stats_fields.add_column(
                     data=[None] * len(self.stats_fields),
                     name=executor_id,
-                    role=StatisticRole,
+                    role=StatisticRole(),
                 )
             self.stats_fields[executor_id][key] = value
         self._id_name_mapping[executor_id] = name
 
+    # TODO circular imports
     def get_ids(self, classes: Union[type, List[type]]) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
         return {
@@ -281,7 +285,7 @@ class ExperimentData(Dataset):
                     str(_id)
                     for _id in self.stats_fields.columns
                     if _id.split(Experiment._split_symbol)[0] == c.__name__
-                ], 
+                ],
                 "additional_fields": [
                     str(_id)
                     for _id in self.additional_fields.columns

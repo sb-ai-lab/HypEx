@@ -1,14 +1,15 @@
 from typing import Dict, Any
 
 import numpy as np
-import pandas as pd
-from scipy.stats import ttest_ind, ks_2samp, norm
-from sklearn.utils import shuffle
+from scipy.stats import norm
 from statsmodels.stats.power import TTestIndPower
 
-from hypex.experiment.base import Experiment
 from hypex.dataset.dataset import ExperimentData
 from hypex.comparators.comparators import ComparatorInner
+from hypex.utils.hypex_typings import FieldKey
+
+
+# from hypex.comparators.comparators import ComparatorInner
 
 #TODO: Rework ALL
 
@@ -39,6 +40,7 @@ class StatMdeBySize(TestPower):
 
         return p * m * s
 
+
 # TODO: replace target_field on subroles
 class StatSampleSizeByMde(TestPower):
     def __init__(
@@ -64,6 +66,7 @@ class StatSampleSizeByMde(TestPower):
         d = ((norm.ppf(1 - self.significance / 2) + norm.ppf(power)) / self.mde) ** 2
         s = test_std**2 / test_proportion + control_std**2 / control_proportion
         return int(d * s)
+
 
 class StatPowerByTTestInd(TestPower):
 

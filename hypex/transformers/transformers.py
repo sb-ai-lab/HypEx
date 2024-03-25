@@ -1,7 +1,7 @@
 import numpy as np
 
-from hypex.experiment.experiment import Executor
 from hypex.dataset.dataset import ExperimentData
+from hypex.experiment.experiment import Executor
 
 
 class Shuffle(Executor):
@@ -18,5 +18,5 @@ class Shuffle(Executor):
 
     def execute(self, data: ExperimentData):
         np.random.seed(self.random_state)
-        data.data = np.random.shuffle(data.data)
+        np.random.shuffle(data.data)
         return data

@@ -3,9 +3,7 @@
   "default": {},
   "title": "Root Schema",
   "required": [
-    "dataset",
-    "experiment",
-    "report"
+    "dataset"
   ],
   "properties": {
     "dataset": {
@@ -136,20 +134,6 @@
           }
         }
       ]
-    },
-    "experiment": {
-      "type": "object",
-      "default": {},
-      "title": "The experiment Schema",
-      "required": [],
-      "properties": {}
-    },
-    "report": {
-      "type": "object",
-      "default": {},
-      "title": "The report Schema",
-      "required": [],
-      "properties": {}
     }
   },
   "examples": [
@@ -165,9 +149,7 @@
           "delimiter": ",",
           "encoding": "utf-8"
         }
-      },
-      "experiment": {},
-      "report": {}
+      }
     }
   ]
 }

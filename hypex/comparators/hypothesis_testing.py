@@ -1,11 +1,11 @@
 from abc import ABC
 from typing import Dict, Union, Any
 
-from scipy.stats import ttest_ind, ks_2samp
+from scipy.stats import ttest_ind
 
-from hypex.experiment.base import Executor
-from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.comparators.comparators import GroupComparator
+from hypex.dataset.dataset import ExperimentData, Dataset
+
 
 
 class StatHypothesisTestingWithScipy(GroupComparator):

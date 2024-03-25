@@ -1,11 +1,10 @@
-from typing import List, Dict
-import warnings
+from typing import Dict
 
-from hypex.experiment.experiment import Executor, Experiment, ComplexExecutor
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import GroupingRole, StratificationRole, TreatmentRole
+from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.transformers.transformers import Shuffle
-from hypex.describers.describers import Unique
+from hypex.utils.hypex_enums import ExperimentDataEnum
 
 
 class AASplitter(ComplexExecutor):
@@ -28,7 +27,7 @@ class AASplitter(ComplexExecutor):
 
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
         return data.set_value(
-            "additional_fields",
+            ExperimentDataEnum.additional_fields,
             self._id,
             self.full_name,
             value,
@@ -60,7 +59,7 @@ class AASplitterWithGrouping(AASplitter):
                 index=group[1].index,
             )
             result = group_ds if result is None else result.append(group_ds)
-        
+
         self._set_value(data, result["group"])
         return data
 
@@ -85,11 +84,12 @@ class AASplitterWithStratification(SplitterAA):
         for _, gd in groups:
             ged = ExperimentData(gd)
             ged = self.super().execute(ged)
-            
+
             result = ged if result is None else result.append(ged)
 
         self._set_value(data, result["group"])
         return data
+
 
 # As idea
 # class SplitterAAMulti(ExperimentMulti):

@@ -1,10 +1,11 @@
+import warnings
 from abc import ABC, abstractmethod
 from typing import Iterable, Dict, Union, Any, List
 from copy import deepcopy
-import warnings
 
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import TempGroupingRole, TempTargetRole, TargetRole
+
 
 # TODO: discus generators and properties
 class Executor(ABC):

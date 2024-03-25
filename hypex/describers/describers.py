@@ -1,8 +1,10 @@
 import numpy as np
 from typing import Iterable
 
-from hypex.experiment.experiment import Executor
 from hypex.dataset.dataset import Dataset, ExperimentData
+from hypex.experiment.experiment import Executor
+from hypex.utils.hypex_enums import ExperimentDataEnum
+from hypex.utils.hypex_typings import FieldKey
 
 
 class Describer(Executor):
@@ -11,11 +13,14 @@ class Describer(Executor):
         super().__init__(full_name, key)
 
     def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
-        return data.set_value("analysis_tables", self._id, self.full_name, value)
+        return data.set_value(
+            ExperimentDataEnum.analysis_tables, self._id, self.get_full_name(), value
+        )
 
 
 class Unique(Describer):
-    def _convert_to_dataset(self, data: Iterable) -> Dataset:
+    @staticmethod
+    def _convert_to_dataset(data: Iterable) -> Dataset:
         return Dataset().from_dict(data)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
