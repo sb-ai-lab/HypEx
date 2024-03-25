@@ -4,6 +4,7 @@ from typing import Dict, Optional, Union, List, Iterable, Any, Type
 
 import pandas as pd
 
+from hypex.experiment.experiment import Experiment
 from hypex.dataset.backends.pandas_backend import PandasDataset
 from hypex.dataset.base import DatasetBase
 from hypex.dataset.roles import ABCRole, StatisticRole, InfoRole
@@ -28,8 +29,8 @@ class Dataset(DatasetBase):
     def set_data(
         self,
         data: Union[pd.DataFrame, str, Type],
-        roles: Union[Dict] = None,
-        backend: str = None,
+        roles: Union[Dict[Any, type], None] = None,
+        backend: Union[str, None] = None,
     ):
         self._backend = (
             self._select_backend_from_str(data, backend)
@@ -103,7 +104,7 @@ class Dataset(DatasetBase):
         self, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role=False
     ) -> List[str]:
         roles = roles if isinstance(roles, Iterable) else [roles]
-        get_roles = self.roles if not tmp_role else self.tmp_roles
+        get_roles = self.tmp_roles if tmp_role else self.roles
         return [
             column
             for column, role in get_roles.items()
@@ -252,10 +253,10 @@ class ExperimentData(Dataset):
     def set_value(
         self,
         space: str,
-        executor_id: int,
+        executor_id: str,
         name: str,
         value: Any,
-        key: str = None,
+        key: Union[str, None] = None,
         role=None,
     ):
         if space == "additional_fields":
@@ -271,3 +272,27 @@ class ExperimentData(Dataset):
                 )
             self.stats_fields[executor_id][key] = value
         self._id_name_mapping[executor_id] = name
+
+    def get_ids(self, classes: Union[type, List[type]]) -> Dict[type, Dict[str, List[str]]]:
+        classes = classes if isinstance(classes, Iterable) else [classes]
+        return {
+            c: {
+                "stats": [
+                    str(_id)
+                    for _id in self.stats_fields.columns
+                    if _id.split(Experiment._split_symbol)[0] == c.__name__
+                ], 
+                "additional_fields": [
+                    str(_id)
+                    for _id in self.additional_fields.columns
+                    if _id.split(Experiment._split_symbol)[0] == c.__name__
+                ],
+                "analysis_tables": [
+                    str(_id)
+                    for _id in self.analysis_tables
+                    if _id.split(Experiment._split_symbol)[0] == c.__name__
+                ],
+            }
+            for c in classes
+        }
+

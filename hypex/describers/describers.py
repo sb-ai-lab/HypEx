@@ -6,12 +6,12 @@ from hypex.dataset.dataset import Dataset, ExperimentData
 
 
 class Describer(Executor):
-    def __init__(self, target_field: FieldKey, full_name: str = None, index: int = 0):
+    def __init__(self, target_field: FieldKey, full_name: str = None, key: Any = 0):
         self.target_field = target_field
-        super().__init__(full_name, index)
+        super().__init__(full_name, key)
 
     def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
-        return data.set_value("analysis_tables", self._id, self.get_full_name(), value)
+        return data.set_value("analysis_tables", self._id, self.full_name, value)
 
 
 class Unique(Describer):

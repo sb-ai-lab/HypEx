@@ -9,9 +9,9 @@ from hypex.dataset.dataset import ExperimentData
 from hypex.dataset.roles import TempTargetRole
 
 class StatDescriptive(ABC, Executor):
-    def __init__(self, full_name=None, index=0, **kwargs):
+    def __init__(self, full_name=None, key=0, **kwargs):
         self.kwargs = kwargs
-        super().__init__(full_name, index)
+        super().__init__(full_name, key)
 
     @abstractmethod
     def calc(self, data):
@@ -19,7 +19,7 @@ class StatDescriptive(ABC, Executor):
 
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
         data.set_value(
-            "stats_fields", self._id, self.get_full_name(), value, key=self.field
+            "stats_fields", self._id, self.full_name, value, key=self.field
         )
         return data
 

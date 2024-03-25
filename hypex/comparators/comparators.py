@@ -1,20 +1,20 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Union, Any
 
-from hypex.experiment.base import Executor
-
+from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole
 from hypex.stats.descriptive import Mean, Size
 
 
-class GroupComparator(ABC, ComplexExecutor):
+class GroupComparator(ComplexExecutor):
     def __init__(
         self,
-        full_name: str = None,
-        index: int = 0,
+        inner_executors: Union[Dict[str, Executor], None] = None,
+        full_name: Union[str, None] = None,
+        key: Any = 0,
     ):
-        super().__init__(full_name, index)
+        super().__init__(inner_executors=inner_executors, full_name=full_name, key=key)
 
     @abstractmethod
     def _comparison_function(self, control_data, test_data):
@@ -23,7 +23,7 @@ class GroupComparator(ABC, ComplexExecutor):
     def _compare(self, data: ExperimentData) -> Dict:
         group_field = data.data.get_columns_by_roles(GroupingRole)
         target_field = data.data.get_columns_by_roles(TempTargetRole, tmp_role=True)[0]
-        grouping_data = list(data.groupby(self.group_field))
+        grouping_data = list(data.groupby(group_field))
         return {
             grouping_data[i][0]: self._comparison_function(
                 grouping_data[0][1][target_field],
@@ -33,10 +33,10 @@ class GroupComparator(ABC, ComplexExecutor):
         }
 
     def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
-        data.set_value("analysis_tables", self._id, self.get_full_name(), value)
+        data.set_value("analysis_tables", self.id, self.full_name, value)
         return data
 
-    def _extract_dataset(self, compare_result: Dict, roles=None) -> Dataset:
+    def _extract_dataset(self, compare_result: Dict, roles: Union[Dict[Any, type], None]=None) -> Dataset:
         return Dataset(roles=roles).from_dict(compare_result)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -62,13 +62,12 @@ class GroupDifference(GroupComparator):
             f"{target_field} difference %": (mean_b / mean_a - 1) * 100,
         }
 
-
 class GroupSizes(GroupComparator):
     default_inner_executors: Dict[str, Executor] = {
         "mean": Size(),
     }
 
-    def _comparison_function(self, control_data, test_data) -> dict[str, int | Any]:
+    def _comparison_function(self, control_data, test_data) -> Dataset:
         size_a = self._inner_executors["size"].execute(control_data)
         size_b = self._inner_executors["size"].execute(test_data)
 
