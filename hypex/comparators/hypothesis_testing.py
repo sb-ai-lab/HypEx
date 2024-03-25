@@ -1,13 +1,14 @@
 from abc import ABC
 from typing import Dict, Union, Any, List
 
+# mypy import-untyped
 from scipy.stats import ttest_ind
 
 from hypex.experiment.experiment import Executor
 from hypex.comparators.comparators import GroupComparator
 from hypex.dataset.dataset import ExperimentData, Dataset
-from hypex.dataset.roles import RolesType, FromDictType, StatisticRole
-
+from hypex.dataset.roles import ABCRole, StatisticRole
+from hypex.utils.hypex_typings import RolesType, FromDictType
 
 
 class StatHypothesisTestingWithScipy(GroupComparator):
@@ -22,7 +23,8 @@ class StatHypothesisTestingWithScipy(GroupComparator):
         self.reliability = reliability
 
     # excessive override
-    def _extract_dataset(self, compare_result: FromDictType, roles: Union[RolesType, None]=None) -> Dataset:
+    def _local_extract_dataset(self, compare_result: Dict[Any, Any]) -> Dataset:
+        # stats type
         result_stats: List[Dict[str, Any]] = [
             {
                 "group": group,

@@ -17,6 +17,9 @@ class GroupComparator(ComplexExecutor):
     ):
         super().__init__(inner_executors=inner_executors, full_name=full_name, key=key)
 
+    def _local_extract_dataset(self, compare_result: Dict[Any, Any]) -> Dataset:
+        return self._extract_dataset(compare_result)
+
     @abstractmethod
     def _comparison_function(self, control_data, test_data):
         raise NotImplementedError
