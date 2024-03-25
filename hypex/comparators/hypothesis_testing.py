@@ -6,14 +6,14 @@ from hypex.experiment.base import Executor
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.comparators.comparators import GroupComparator
 
-class StatHypothesisTestingWithScipy(ABC, GroupComparator):
+class StatHypothesisTestingWithScipy(GroupComparator):
     def __init__(
         self,
         reliability: float = 0.05,
         full_name: str = None,
-        index: int = 0,
+        key: int = 0,
     ):
-        super().__init__(full_name, index)
+        super().__init__(full_name, key)
         self.reliability = reliability
 
     def _extract_dataset(self, compare_result: Dict) -> Dataset:

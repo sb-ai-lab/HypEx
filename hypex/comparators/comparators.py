@@ -1,19 +1,20 @@
 from abc import ABC, abstractmethod
+from typing import Dict, Union, Any
 
-from hypex.experiment.base import Executor
-
+from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole
 from hypex.stats.descriptive import Mean, Size
 
 
-class GroupComparator(ABC, ComplexExecutor):
+class GroupComparator(ComplexExecutor):
     def __init__(
         self,
-        full_name: str = None,
-        index: int = 0,
+        inner_executors: Union[Dict[str, Executor], None] = None,
+        full_name: Union[str, None] = None,
+        key: Any = 0,
     ):
-        super().__init__(full_name, index)
+        super().__init__(inner_executors=inner_executors, full_name=full_name, key=key)
 
     @abstractmethod
     def _comparison_function(self, control_data, test_data):
@@ -22,7 +23,7 @@ class GroupComparator(ABC, ComplexExecutor):
     def _compare(self, data: ExperimentData) -> Dict:
         group_field = data.data.get_columns_by_roles(GroupingRole)
         target_field = data.data.get_columns_by_roles(TempTargetRole, tmp_role=True)[0]
-        grouping_data = list(data.groupby(self.group_field))
+        grouping_data = list(data.groupby(group_field))
         return {
             grouping_data[i][0]: self._comparison_function(
                 grouping_data[0][1][target_field],

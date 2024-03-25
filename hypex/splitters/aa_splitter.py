@@ -15,13 +15,13 @@ class AASplitter(ComplexExecutor):
         random_state: int = None,
         inner_executors: Dict[str, Executor] = None,
         full_name: str = None,
-        index: int = 0,
+        key: Any = 0,
     ):
         self.control_size = control_size
         self.random_state = random_state
         self.default_inner_executors = {"shuffle": Shuffle(self.random_state)}
 
-        super().__init__(inner_executors, full_name, index)
+        super().__init__(inner_executors, full_name, key)
 
     def generate_params_hash(self) -> str:
         return f"{self.random_state}"
@@ -71,9 +71,9 @@ class AASplitterWithStratification(SplitterAA):
         control_size: float = 0.5,
         random_state: int = None,
         full_name: str = None,
-        index: int = 0,
+        key: Any = 0,
     ):
-        super().__init__(control_size, random_state, full_name, index)
+        super().__init__(control_size, random_state, full_name, key)
 
     def execute(self, data):
         control_indexes = []

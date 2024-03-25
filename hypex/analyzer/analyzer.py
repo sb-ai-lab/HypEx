@@ -1,5 +1,7 @@
 from abc import ABC
-from typing import Iterable, Dict
+from typing import Iterable, Dict, List
+
+import pandas as pd
 
 from hypex.comparators.comparators import GroupDifference, GroupSizes
 from hypex.comparators.hypothesis_testing import TTest, KSTest
@@ -17,10 +19,20 @@ from hypex.stats.descriptive import Mean
 class OneAASplit(ComplexExecutor):
     default_inner_executors = {"mean": Mean()}
 
-    # TODO: implement
     def execute(self, data: ExperimentData) -> ExperimentData:
-        # TODO: class or text?
-        executor_ids = data.get_ids([TTest, KSTest])
+        analysis_tests: List[Executor] = [TTest, KSTest]
+        executor_ids = data.get_ids(analysis_tests)
+
+        analysis_data = {}
+        for c, spaces in executor_ids.items():
+            t_data = pd.concat(spaces.get("analysis_tables", []))
+            for f in ["p-value", "pass"]:
+                analysis_data[f"{c.__name__} {f}"] = self.inner_executors["mean"].calc(
+                    list(t_data[f])
+                )
+        analysis_ids = {}
+
+        analysis_ids = executor_ids[TTest]["analysis_tables"]
 
         # meta_data = {
         #     TTest: {"p-value": [], "passed": []},

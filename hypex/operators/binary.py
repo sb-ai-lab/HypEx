@@ -11,8 +11,8 @@ class BinaryOperator(ABC, Executor):
     def get_full_name(self):
         return f"{self.__class__.__name__}"
 
-    def __init__(self, full_name: str = None, index: int = 0):
-        super().__init__(full_name, index)
+    def __init__(self, full_name: str = None, key: Any = 0):
+        super().__init__(full_name, key)
 
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
         data.set_value("additional_fields", self._id, self.full_name, value)

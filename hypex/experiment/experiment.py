@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Iterable, Dict, Union
+from typing import Iterable, Dict, Union, Any, List
 from copy import deepcopy
 import warnings
 
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.analyzer.analyzer import Analyzer
-from hypex.dataset.roles import TempGroupingRole, TempTargetRole
+from hypex.dataset.roles import TempGroupingRole, TempTargetRole, TargetRole
+
+# TODO: discus generators and properties
 
 
 class Executor(ABC):
@@ -13,26 +15,53 @@ class Executor(ABC):
     def _split_symbol(self) -> str:
         return "\u2570"
 
-    def generate_full_name(self) -> str:
-        return self.__class__.__name__
+    def _generate_params_hash(self):
+        self._params_hash = ""
 
-    def generate_params_hash(self) -> str:
-        return ""
-
-    def generate_id(self) -> str:
-        return self._split_symbol.join(
+    def _generate_id(self):
+        self.id = self._split_symbol.join(
             [
                 self.__class__.__name__,
                 self.params_hash.replace(self._split_symbol, "|"),
-                str(self.index),
+                str(self._key),
             ]
         )
 
-    def __init__(self, full_name: str = None, index: int = 0):
-        self.full_name = full_name or self.generate_full_name()
-        self.index = index
-        self.params_hash = self.generate_params_hash()
-        self._id = generate_id()
+    @property
+    def id(self) -> str:
+        return self._id
+
+    @property
+    def full_name(self) -> Union[str, None]:
+        return self._full_name
+
+    @full_name.setter
+    def full_name(self, value: Union[str, None]):
+        self._full_name = str(value or self.__class__.__name__)
+
+    @property
+    def key(self) -> Any:
+        return self._key
+
+    @key.setter
+    def key(self, value: Any):
+        self._key = value
+        self._generate_id()
+
+    @property
+    def params_hash(self) -> str:
+        return self._params_hash
+
+    def refresh_params_hash(self):
+        self._generate_params_hash()
+        self._generate_id()
+
+    def __init__(self, full_name: Union[str, None] = None, key: Any = 0):
+        self._id: str = ""
+        self.full_name = full_name
+
+        self.key: Any = key
+        self._generate_params_hash()
 
     @property
     def _is_transformer(self) -> bool:
@@ -47,13 +76,14 @@ class Executor(ABC):
         raise NotImplementedError
 
 
-class ComplexExecutor(ABC, Executor):
+class ComplexExecutor(Executor):
     default_inner_executors: Dict[str, Executor] = {}
 
     def get_inner_executors(
-        self, inner_executors: Dict[str, Executor] = None
+        self, inner_executors: Union[Dict[str, Executor], None] = None
     ) -> Dict[str, Executor]:
         result = {}
+        inner_executors = inner_executors or {}
         for key, executor in self.default_inner_executors.items():
             if key not in inner_executors:
                 warnings.warn(
@@ -66,44 +96,47 @@ class ComplexExecutor(ABC, Executor):
 
     def __init__(
         self,
-        inner_executors: Dict[str, Executor] = None,
-        full_name: str = None,
-        index: int = 0,
+        inner_executors: Union[Dict[str, Executor], None] = None,
+        full_name: Union[str, None] = None,
+        key: Any = 0,
     ):
-        super().__init__(full_name=full_name, index=index)
+        super().__init__(full_name=full_name, key=key)
         self.inner_executors = self.get_inner_executors(inner_executors)
 
 
 class Experiment(Executor):
-    def generate_full_name(self) -> str:
-        return f"Experiment({len(self.executors)})"
-
     def _detect_transformer(self) -> bool:
         return False
 
-    def get_executor_ids(self, searched_classes=None) -> Union[Dict[type, str], List[str]]:
+    def get_executor_ids(
+        self, searched_classes: Union[type, Iterable[type], None] = None
+    ) -> Dict[type, List[str]]:
         if searched_classes is None:
-            return [executor._id for executor in self.executors]
+            return {}
 
         searched_classes = (
-            searched_classes if isinstance(searched_classes, Iterable) else [searched_classes]
+            searched_classes
+            if isinstance(searched_classes, Iterable)
+            else [searched_classes]
         )
-        for sc in searched_classes:
-            return {sc: [executor._id for executor in self.executors if isinstance(executor, sc)]}
-
+        return {
+            sc: [executor.id for executor in self.executors if isinstance(executor, sc)]
+            for sc in searched_classes
+        }
 
     def __init__(
         self,
-        executors: Iterable[Executor],
-        transformer: bool = None,
-        full_name: str = None,
-        index: int = 0,
+        executors: List[Executor],
+        transformer: Union[bool, None] = None,
+        full_name: Union[str, None] = None,
+        key: Any = 0,
     ):
-        self.executors: Iterable[Executor] = executors
+        self.executors: List[Executor] = executors
         self.transformer: bool = (
-            transformer if transformer is not None else self.__detect_transformer()
+            transformer if transformer is not None else self._detect_transformer()
         )
-        super().__init__(full_name, index)
+        full_name = str(full_name or f"Experiment({len(self.executors)})")
+        super().__init__(full_name, key)
 
     def _extract_result(
         self, original_data: ExperimentData, experiment_data: ExperimentData
@@ -124,12 +157,12 @@ class CycledExperiment(Executor):
         n_iterations: int,
         analyzer: Analyzer,
         full_name: Union[str, None] = None,
-        index: int = 0,
+        key: Any = 0,
     ):
         self.inner_executor: Executor = inner_executor
         self.n_iterations: int = n_iterations
         self.analyzer: Analyzer = analyzer
-        super().__init__(full_name, index)
+        super().__init__(full_name, key)
 
     def generate_params_hash(self) -> str:
         return f"{self.inner_executor.full_name} x {self.n_iterations}"
@@ -142,16 +175,16 @@ class CycledExperiment(Executor):
 
 class GroupExperiment(Executor):
     def generate_params_hash(self) -> str:
-        return f"{self.grop_field}->{self.inner_executor._id.replace('|', '')}"
+        return f"GroupExperiment: {self.inner_executor._id.replace('|', '')}"
 
     def __init__(
         self,
         inner_executor: Executor,
-        full_name: str = None,
-        index: int = 0,
+        full_name: Union[str, None] = None,
+        key: Any = 0,
     ):
         self.inner_executor: Executor = inner_executor
-        super().__init__(full_name, index)
+        super().__init__(full_name, key)
 
     def extract_result(self, data: ExperimentData) -> Dataset:
         return data.analysis_tables[self.inner_executor._id]
@@ -179,7 +212,7 @@ class GroupExperiment(Executor):
 class OnTargetExperiment(Experiment):
     def execute(self, data: ExperimentData) -> ExperimentData:
         for field in data.data.get_columns_by_roles(TargetRole):
-            data.data.tmp_roles = {field: TempTargetRole()}
+            data.data.tmp_roles = {field: TempTargetRole}
             data = super().execute(data)
             data.data.tmp_roles = {}
         return data

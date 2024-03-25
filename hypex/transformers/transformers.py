@@ -5,8 +5,8 @@ from hypex.dataset.dataset import ExperimentData
 
 
 class Shuffle(Executor):
-    def __init__(self, random_state: int = None, full_name: str = None, index: int = 0):
-        super().__init__(full_name, index)
+    def __init__(self, random_state: int = None, full_name: str = None, key: Any = 0):
+        super().__init__(full_name, key)
         self.random_state = random_state
 
     def generate_params_hash(self):

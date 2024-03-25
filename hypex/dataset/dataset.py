@@ -273,23 +273,22 @@ class ExperimentData(Dataset):
             self.stats_fields[executor_id][key] = value
         self._id_name_mapping[executor_id] = name
 
-    # TODO: discuss 
-    def get_ids(self, classes: Union[type, List[type]]):
+    def get_ids(self, classes: Union[type, List[type]]) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
         return {
             c: {
                 "stats": [
-                    _id
+                    str(_id)
                     for _id in self.stats_fields.columns
                     if _id.split(Experiment._split_symbol)[0] == c.__name__
-                ],
+                ], 
                 "additional_fields": [
-                    _id
+                    str(_id)
                     for _id in self.additional_fields.columns
                     if _id.split(Experiment._split_symbol)[0] == c.__name__
                 ],
                 "analysis_tables": [
-                    _id
+                    str(_id)
                     for _id in self.analysis_tables
                     if _id.split(Experiment._split_symbol)[0] == c.__name__
                 ],
