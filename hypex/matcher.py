@@ -189,6 +189,8 @@ class Matcher:
                 Write logs in debug mode
             pbar:
                 Display progress bar while get index
+            fill_gaps:
+                Determines whether to automatically fill NaN values in categorical columns used for grouping.
 
         ..warnings::
             Multitarget involves studying the impact on multiple targets.
