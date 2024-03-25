@@ -5,7 +5,7 @@ from scipy.stats import norm
 from statsmodels.stats.power import TTestIndPower
 
 from hypex.dataset.dataset import ExperimentData
-from hypex.utils.hypex_typings import FieldKey
+from hypex.utils.typings import FieldKey
 
 
 # from hypex.comparators.comparators import ComparatorInner
