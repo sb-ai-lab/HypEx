@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import Union
 
-from hypex.utils.hypex_typings import (
+from hypex.utils.typings import (
     ABCRoleTypes,
     StratificationRoleTypes,
     TargetRoleTypes,

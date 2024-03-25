@@ -1,12 +1,12 @@
 import json
 import warnings
-from typing import Dict, Union, List, Iterable, Any, Type
+from typing import Union, List, Iterable, Any, Type, Dict
 
 import pandas as pd
 
 from hypex.dataset.backends.pandas_backend import PandasDataset
 from hypex.dataset.base import DatasetBase
-from hypex.dataset.roles import ABCRole, StatisticRole, InfoRole
+from hypex.dataset.roles import StatisticRole, InfoRole, ABCRole
 from hypex.dataset.utils import parse_roles
 from hypex.errors.errors import (
     RoleColumnError,
@@ -14,8 +14,7 @@ from hypex.errors.errors import (
     ConcatBackendError,
     SpaceError,
 )
-from hypex.utils.hypex_enums import ExperimentDataEnum, BackendsEnum
-from hypex.utils.hypex_typings import RolesType
+from hypex.utils.enums import ExperimentDataEnum
 
 
 class Dataset(DatasetBase):
@@ -35,19 +34,24 @@ class Dataset(DatasetBase):
 
     def set_data(
         self,
-        data: Union[pd.DataFrame, str, Type],
-        roles: RolesType = None,
-        backend: str = None,
+        data: Union[pd.DataFrame, str, Type] = None,
+        roles: Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]] = None,
+        backend: Union[str, None] = None,
     ):
         self._backend = (
             self._select_backend_from_str(data, backend)
             if backend
             else self._select_backend_from_data(data)
         )
-        # TODO check with two variant
-        if roles and any(i not in self._backend.columns for i in list(roles.values())):
+        roles = roles or {}
+        roles = (
+            parse_roles(roles)
+            if any(isinstance(role, type) for role in roles.keys())
+            else roles
+        )
+        if roles and any(i not in self._backend.columns for i in list(roles.keys())):
             raise RoleColumnError(list(roles.keys()), self._backend.columns)
-        self.roles = parse_roles(roles)
+        self.roles = roles
         self.data = self._backend.data
         self.loc = self.Locker(self._backend)
         self.iloc = self.ILocker(self._backend)
@@ -58,17 +62,22 @@ class Dataset(DatasetBase):
 
     @staticmethod
     def _select_backend_from_str(data, backend):
-        if backend == BackendsEnum.pandas:
+        if backend == "pandas":
             return PandasDataset(data)
+        return PandasDataset(data)
 
     def __init__(
         self,
         data: Union[pd.DataFrame, str] = None,
-        roles: RolesType = None,
-        backend: str = None,
+        roles: Union[
+            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
+        ] = None,
+        backend: Union[str, None] = None,
     ):
         self.roles = None
-        self.tmp_roles: Union[None, Dict[Union[List[str], str], ABCRole]] = None
+        self.tmp_roles: Union[
+            None, Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
+        ] = None
         self._backend = None
         self.data = None
         self.loc = None
@@ -86,9 +95,9 @@ class Dataset(DatasetBase):
         roles = {}
         for column in items:
             if column in self.columns and self.roles.get(column, 0):
-                roles[self.roles[column]] = column
+                roles[column] = self.roles[column]
             else:
-                roles[InfoRole] = column
+                roles[column] = InfoRole()
         return Dataset(data=self._backend.__getitem__(item), roles=roles)
 
     def __setitem__(self, key, value):
@@ -123,7 +132,9 @@ class Dataset(DatasetBase):
     def columns(self):
         return self._backend.columns
 
-    def add_column(self, data, name: Union[str, int, List], role: ABCRole, index=None):
+    def add_column(
+        self, data, name: Union[str, int, List], role: ABCRole(), index=None
+    ):
         self.roles.update({name: role})
         if isinstance(data, Dataset):
             data = data._backend.data[list(data._backend.data.columns)[0]]
@@ -166,7 +177,7 @@ class Dataset(DatasetBase):
         return self._backend.map(func=func, na_action=na_action)
 
     def unique(self):
-        return self._backend.unique()
+        return Dataset(data=self._backend.unique())
 
     def isin(self, values: Iterable):
         return Dataset(data=self._backend.isin(values))
@@ -197,19 +208,19 @@ class Dataset(DatasetBase):
         return iter(datasets)
 
     def mean(self):
-        return self._backend.mean()
+        return Dataset(data=self._backend.mean())
 
     def max(self):
-        return self._backend.max()
+        return Dataset(data=self._backend.max())
 
     def min(self):
-        return self._backend.min()
+        return Dataset(data=self._backend.min())
 
     def count(self):
-        return self._backend.count()
+        return Dataset(data=self._backend.count())
 
     def sum(self):
-        return self._backend.sum()
+        return Dataset(data=self._backend.sum())
 
     def agg(self, func: Union[str, List]):
         return Dataset(data=self._backend.agg(func))
@@ -217,7 +228,7 @@ class Dataset(DatasetBase):
 
 class ExperimentData(Dataset):
     def __init__(self, data: Any):
-        super().__init__(data)
+        super().__init__()
         if isinstance(data, Dataset):
             self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
             self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
