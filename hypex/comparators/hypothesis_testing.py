@@ -1,10 +1,10 @@
 from abc import ABC
 
-from scipy.stats import ttest_ind, ks_2samp
+from scipy.stats import ttest_ind
 
-from hypex.experiment.base import Executor
-from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.comparators.comparators import GroupComparator
+from hypex.dataset.dataset import ExperimentData, Dataset
+
 
 class StatHypothesisTestingWithScipy(ABC, GroupComparator):
     def __init__(

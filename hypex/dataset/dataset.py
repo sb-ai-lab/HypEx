@@ -8,6 +8,13 @@ from hypex.dataset.backends.pandas_backend import PandasDataset
 from hypex.dataset.base import DatasetBase
 from hypex.dataset.roles import ABCRole, StatisticRole, InfoRole
 from hypex.dataset.utils import parse_roles
+from hypex.errors.errors import (
+    RoleColumnError,
+    ConcatDataError,
+    ConcatBackendError,
+    SpaceError,
+)
+from hypex.utils.hypex_enums import ExperimentDataEnum, BackendsEnum
 
 
 class Dataset(DatasetBase):
@@ -38,10 +45,7 @@ class Dataset(DatasetBase):
         )
 
         if roles and any(i not in self._backend.columns for i in list(roles.values())):
-            raise ValueError(
-                "Check your roles. All of them must be names of data columns. \n"
-                f"Now roles have {list(roles.keys())} values and columns have {self._backend.columns} values"
-            )
+            raise RoleColumnError(list(roles.keys()), self._backend.columns)
         self.roles = parse_roles(roles)
         self.data = self._backend.data
         self.loc = self.Locker(self._backend)
@@ -53,7 +57,7 @@ class Dataset(DatasetBase):
 
     @staticmethod
     def _select_backend_from_str(data, backend):
-        if backend == "pandas":
+        if backend == BackendsEnum.pandas:
             return PandasDataset(data)
 
     def __init__(
@@ -126,11 +130,9 @@ class Dataset(DatasetBase):
 
     def append(self, other, index=None):
         if not isinstance(other, Dataset):
-            raise TypeError(f"Can only append Dataset to Dataset. Got {type(other)}")
+            raise ConcatDataError(type(other))
         if type(other._backend) != type(self._backend):
-            raise TypeError(
-                f"Can only append datas with the same backends. Got {type(other._backend)} expected {type(self._backend)}"
-            )
+            raise ConcatBackendError(type(other._backend), type(self._backend))
         return Dataset(data=self._backend.append(other._backend, index))
 
     def from_dict(self, data, index=None):
@@ -235,14 +237,14 @@ class ExperimentData(Dataset):
         return self
 
     def check_hash(self, executor_id: int, space: str) -> bool:
-        if space == "additional_fields":
+        if space == ExperimentDataEnum.additional_fields:
             return executor_id in self.additional_fields.columns
-        elif space == "stats_fields":
+        elif space == ExperimentDataEnum.stats_fields:
             return executor_id in self.stats_fields.columns
-        elif space == "analysis_tables":
+        elif space == ExperimentDataEnum.analysis_tables:
             return executor_id in self.analysis_tables
         else:
-            raise ValueError(f"{space} is not a valid space")
+            raise SpaceError(space)
 
     def _create_empty(self, indexes=None, columns=None):
         self.additional_fields._create_empty(indexes, columns)
@@ -251,18 +253,18 @@ class ExperimentData(Dataset):
 
     def set_value(
         self,
-        space: str,
+        space: ExperimentDataEnum,
         executor_id: int,
         name: str,
         value: Any,
         key: str = None,
         role=None,
     ):
-        if space == "additional_fields":
+        if space == ExperimentDataEnum.additional_fields:
             self.additional_fields.add_column(data=value, name=executor_id, role=role)
-        elif space == "analysis_tables":
+        elif space == ExperimentDataEnum.analysis_tables:
             self.analysis_tables[name] = value
-        elif space == "stats_fields":
+        elif space == ExperimentDataEnum.stats_fields:
             if executor_id not in self.stats_fields.columns:
                 self.stats_fields.add_column(
                     data=[None] * len(self.stats_fields),

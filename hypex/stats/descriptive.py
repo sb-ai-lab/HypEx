@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Callable
 
 import numpy as np
 from scipy.stats import mode
 
-from hypex.experiment.base import Executor
 from hypex.dataset.dataset import ExperimentData
 from hypex.dataset.roles import TempTargetRole
+from hypex.experiment.experiment import Executor
+from hypex.utils.hypex_enums import ExperimentDataEnum
+
 
 class StatDescriptive(ABC, Executor):
     def __init__(self, full_name=None, index=0, **kwargs):
@@ -19,7 +20,7 @@ class StatDescriptive(ABC, Executor):
 
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
         data.set_value(
-            "stats_fields", self._id, self.get_full_name(), value, key=self.field
+            ExperimentDataEnum.stats_fields, self._id, self.get_full_name(), value, key=self.field
         )
         return data
 
@@ -69,4 +70,4 @@ class Range(StatDescriptive):
 
 class Size(StatDescriptive):
     def calc(self, data):
-        return len(data, **self.kwargs)
+        return len(data)

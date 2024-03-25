@@ -1,10 +1,10 @@
-from abc import ABC, abstractmethod
-from typing import Iterable, Dict, Union
-from copy import deepcopy
 import warnings
+from abc import ABC, abstractmethod
+from copy import deepcopy
+from typing import Iterable, Dict, Union, List
 
-from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.analyzer.analyzer import Analyzer
+from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import TempGroupingRole, TempTargetRole
 
 
@@ -28,7 +28,7 @@ class Executor(ABC):
         self.full_name = full_name or self.generate_full_name()
         self.index = index
         self.params_hash = self.generate_params_hash()
-        self._id = generate_id()
+        self._id = self.generate_id()
 
     @property
     def _is_transformer(self) -> bool:
@@ -74,19 +74,29 @@ class Experiment(ABC, Executor):
     def generate_full_name(self) -> str:
         return f"Experiment({len(self.executors)})"
 
-    def _detect_transformer(self) -> bool:
+    @staticmethod
+    def _detect_transformer() -> bool:
         return False
 
-    def get_executor_ids(self, searched_classes=None) -> Union[Dict[type, str], List[str]]:
+    def get_executor_ids(
+        self, searched_classes=None
+    ) -> Union[Dict[type, Union[str, List[str]]], List[str]]:
         if searched_classes is None:
             return [executor._id for executor in self.executors]
 
         searched_classes = (
-            searched_classes if isinstance(searched_classes, Iterable) else [searched_classes]
+            searched_classes
+            if isinstance(searched_classes, Iterable)
+            else [searched_classes]
         )
         for sc in searched_classes:
-            return {sc: [executor._id for executor in self.executors if isinstance(executor, sc)]}
-
+            return {
+                sc: [
+                    executor._id
+                    for executor in self.executors
+                    if isinstance(executor, sc)
+                ]
+            }
 
     def __init__(
         self,

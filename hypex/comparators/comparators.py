@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Dict
 
-from hypex.experiment.base import Executor
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole
-from hypex.utils.hypex_typings import FieldKey
+from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.stats.descriptive import Mean, Size
+from hypex.utils.hypex_enums import ExperimentDataEnum
 
 
 class GroupComparator(ABC, ComplexExecutor):
@@ -33,7 +33,9 @@ class GroupComparator(ABC, ComplexExecutor):
         }
 
     def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
-        data.set_value("analysis_tables", self._id, self.get_full_name(), value)
+        data.set_value(
+            ExperimentDataEnum.analysis_tables, self._id, self.get_full_name(), value
+        )
         return data
 
     def _extract_dataset(self, compare_result: Dict, roles=None) -> Dataset:
@@ -61,6 +63,7 @@ def GroupDifference(GroupComparator):
             f"{target_field} difference": mean_b - mean_a,
             f"{target_field} difference %": (mean_b / mean_a - 1) * 100,
         }
+
 
 def GroupSizes(GroupComparator):
     default_inner_executors: Dict[str, Executor] = {

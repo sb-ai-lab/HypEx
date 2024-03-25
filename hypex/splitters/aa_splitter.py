@@ -1,11 +1,10 @@
-from typing import List, Dict
-import warnings
+from typing import Dict
 
-from hypex.experiment.experiment import Executor, Experiment, ComplexExecutor
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import GroupingRole, StratificationRole, TreatmentRole
+from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.transformers.transformers import Shuffle
-from hypex.describers.describers import Unique
+from hypex.utils.hypex_enums import ExperimentDataEnum
 
 
 class AASplitter(ComplexExecutor):
@@ -28,7 +27,7 @@ class AASplitter(ComplexExecutor):
 
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
         return data.set_value(
-            "additional_fields",
+            ExperimentDataEnum.additional_fields,
             self._id,
             self.full_name,
             value,

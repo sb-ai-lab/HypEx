@@ -1,16 +1,17 @@
-from typing import Dict
+from abc import ABC
 
 import numpy as np
-import pandas as pd
-from scipy.stats import ttest_ind, ks_2samp, norm
-from sklearn.utils import shuffle
+from scipy.stats import norm
 from statsmodels.stats.power import TTestIndPower
 
-from hypex.experiment.base import Experiment
 from hypex.dataset.dataset import ExperimentData
-from hypex.comparators.comparators import ComparatorInner
+from hypex.utils.hypex_typings import FieldKey
 
-#TODO: Rework ALL
+
+# from hypex.comparators.comparators import ComparatorInner
+
+# TODO: Rework ALL
+
 
 class TestPower(ABC, ComparatorInner):
     def __init__(
@@ -19,7 +20,7 @@ class TestPower(ABC, ComparatorInner):
         significance: float = 0.95,
         power: float = 0.8,
         full_name: str = None,
-        index: int = 0
+        index: int = 0,
     ):
         super().__init__(target_field, self.comparison_function, full_name, index)
         self.significance = significance
@@ -39,6 +40,7 @@ class StatMdeBySize(TestPower):
 
         return p * m * s
 
+
 # TODO: replace target_field on subroles
 class StatSampleSizeByMde(TestPower):
     def __init__(
@@ -48,7 +50,7 @@ class StatSampleSizeByMde(TestPower):
         significance: float = 0.05,
         power: float = 0.8,
         full_name: str = None,
-        index: int = 0
+        index: int = 0,
     ):
         super().__init__(target_field, significance, power, full_name, index)
         self.mde = mde
@@ -64,6 +66,7 @@ class StatSampleSizeByMde(TestPower):
         d = ((norm.ppf(1 - self.significance / 2) + norm.ppf(power)) / self.mde) ** 2
         s = test_std**2 / test_proportion + control_std**2 / control_proportion
         return int(d * s)
+
 
 class StatPowerByTTestInd(TestPower):
 
