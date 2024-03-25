@@ -1,0 +1,442 @@
+{
+  "type": "object",
+  "default": {},
+  "title": "Root Schema",
+  "required": [
+    "dataset"
+  ],
+  "properties": {
+    "dataset": {
+      "type": "object",
+      "default": {},
+      "title": "The dataset Schema",
+      "oneOf": [
+        {
+          "required": [
+            "path",
+            "backend"
+          ]
+        },
+        {
+          "required": [
+            "data",
+            "backend"
+          ]
+        }
+      ],
+      "properties": {
+        "data": {
+          "type": "object",
+          "title": "The data Schema",
+          "required": [
+            "data"
+          ],
+          "properties": {
+            "index": {
+              "type": "array",
+              "items": {}
+            },
+            "data": {
+              "type": "object",
+              "minItems": 1,
+              "example": {
+                "column": [
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "column2": [
+                  5,
+                  6,
+                  7,
+                  8
+                ]
+              }
+            }
+          },
+          "index": {
+            "type": "array",
+            "default": []
+          }
+        },
+        "path": {
+          "type": "string",
+          "default": "",
+          "title": "The path Schema",
+          "examples": [
+            "path/to/file"
+          ]
+        },
+        "backend": {
+          "enum": [
+            "pandas",
+            "pyspark"
+          ],
+          "default": "pandas"
+        },
+        "roles": {
+          "type": "object",
+          "title": "The roles Schema",
+          "required": [
+            "role_names",
+            "columns"
+          ],
+          "properties": {
+            "role_names": {
+              "type": "array",
+              "minItems": 1,
+              "title": "The role_names Schema",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Info",
+                  "Target"
+                ]
+              }
+            },
+            "columns": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "default": [],
+              "title": "The columns Schema",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "args": {
+          "type": "object",
+          "default": {},
+          "title": "The args Schema",
+          "properties": {},
+          "examples": [
+            {
+              "delimiter": ",",
+              "encoding": "utf-8"
+            }
+          ]
+        }
+      },
+      "examples": [
+        {
+          "data": "future",
+          "path": "path/to/file",
+          "backend": "pandas",
+          "roles": {
+            "columnname": "role"
+          },
+          "args": {
+            "delimiter": ",",
+            "encoding": "utf-8"
+          }
+        }
+      ]
+    }
+  },
+  "experiment": {
+    "type": "object",
+    "default": {},
+    "title": "The experiment Schema",
+    "properties": {
+      "AASplitter": {
+        "type": "object",
+        "default": {},
+        "required": [
+          "control_size",
+          "random_state"
+        ],
+        "properties": {
+          "control_size": {
+            "type": "",
+            "default": {},
+            "title": "The control_size Schema"
+          },
+          "random_state": {
+            "type": "",
+            "default": {},
+            "title": "The random_state Schema"
+          }
+        }
+      },
+      "AASplitterWithGrouping": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "AASplitterWithStratification": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "Analyzer": {
+        "type": "object",
+        "default": {},
+        "required": [
+          "executors"
+        ],
+        "properties": {
+          "executors": {
+            "type": "",
+            "default": {},
+            "title": "The executors Schema"
+          }
+        }
+      },
+      "BinaryOperator": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "Describer": {
+        "type": "object",
+        "default": {},
+        "required": [
+          "target_field"
+        ],
+        "properties": {
+          "target_field": {
+            "type": "",
+            "default": {},
+            "title": "The target_field Schema"
+          }
+        }
+      },
+      "GroupComparator": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "KSTest": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "Max": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "Mean": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "Median": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "MetricAbsoluteDelta": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "MetricDelta": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "MetricLogRatio": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "MetricPercentageDelta": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "MetricPercentageRatio": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "MetricRatio": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "MetricRelativeDelta": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "Min": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "Mode": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "OneAASplit": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "Range": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "Shuffle": {
+        "type": "object",
+        "default": {},
+        "required": [
+          "random_state"
+        ],
+        "properties": {
+          "random_state": {
+            "type": "",
+            "default": {},
+            "title": "The random_state Schema"
+          }
+        }
+      },
+      "Size": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "StatDescriptive": {
+        "type": "object",
+        "default": {},
+        "required": [
+          "kwargs"
+        ],
+        "properties": {
+          "kwargs": {
+            "type": "",
+            "default": {},
+            "title": "The kwargs Schema"
+          }
+        }
+      },
+      "StatHypothesisTestingWithScipy": {
+        "type": "object",
+        "default": {},
+        "required": [
+          "reliability"
+        ],
+        "properties": {
+          "reliability": {
+            "type": "",
+            "default": {},
+            "title": "The reliability Schema"
+          }
+        }
+      },
+      "StatMdeBySize": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "StatPowerByTTestInd": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "StatSampleSizeByMde": {
+        "type": "object",
+        "default": {},
+        "required": [
+          "mde"
+        ],
+        "properties": {
+          "mde": {
+            "type": "",
+            "default": {},
+            "title": "The mde Schema"
+          }
+        }
+      },
+      "Std": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "TTest": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "TestPower": {
+        "type": "object",
+        "default": {},
+        "required": [
+          "significance",
+          "power"
+        ],
+        "properties": {
+          "significance": {
+            "type": "",
+            "default": {},
+            "title": "The significance Schema"
+          },
+          "power": {
+            "type": "",
+            "default": {},
+            "title": "The power Schema"
+          }
+        }
+      },
+      "Unique": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      },
+      "Variance": {
+        "type": "object",
+        "default": {},
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "examples": [
+    {
+      "dataset": {
+        "data": "future",
+        "path": "path/to/file",
+        "backend": "pandas",
+        "roles": {
+          "columnname": "role"
+        },
+        "args": {
+          "delimiter": ",",
+          "encoding": "utf-8"
+        }
+      }
+    }
+  ]
+}

@@ -10,7 +10,10 @@ def get_class_attributes(node):
     required = []
     objects = {}
     for func in node.body:
-        if isinstance(func, ast.Assign) and not func.targets[0].id.startswith("_"):
+        if isinstance(func, ast.Assign) and not (
+            func.targets[0].id.startswith("_")
+            or func.targets[0].id.startswith("default")
+        ):
             required.append(func.targets[0].id)
             objects[func.targets[0].id] = {
                 "type": "",
@@ -24,7 +27,10 @@ def get_class_attributes(node):
                         if (
                             isinstance(target, ast.Attribute)
                             and target.value.id == "self"
-                            and not target.attr.startswith("_")
+                            and not (
+                                target.attr.startswith("_")
+                                or target.attr.startswith("default")
+                            )
                         ):
                             required.append(target.attr)
                             objects[target.attr] = {
@@ -69,7 +75,7 @@ def make_json():
             }
         },
     }
-    with open("hypex/hypotheses/experiment_scheme_test.json", "w") as file:
+    with open("hypex/hypotheses/experiment_scheme.json", "w") as file:
         json.dump(template, file, indent=4)
 
 
