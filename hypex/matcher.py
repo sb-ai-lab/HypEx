@@ -133,7 +133,7 @@ class Matcher:
             n_neighbors: int = 1,
             silent: bool = True,
             pbar: bool = True,
-            max_cut: int = 100,
+            max_categories: int = 100,
     ):
         """Initialize the Matcher object.
 
@@ -189,7 +189,7 @@ class Matcher:
                 Write logs in debug mode
             pbar:
                 Display progress bar while get index
-            max_cut: 
+            max_categories: 
                 The maximum number of categories. Default to 100.
 
         ..warnings::
@@ -270,7 +270,7 @@ class Matcher:
         self.n_neighbors = n_neighbors
         self.silent = silent
         self.pbar = pbar
-        self.max_cut = max_cut
+        self.max_categories = max_categories
         self._preprocessing_data()
 
     def _convert_categorical_to_dummy(self):
@@ -287,7 +287,7 @@ class Matcher:
         else:
             data = self.input_data
                 
-        col_cut = [x for x in data.select_dtypes(include=['category','object']).columns if len(data[x].unique()) > self.max_cut]
+        col_cut = [x for x in data.select_dtypes(include=['category','object']).columns if len(data[x].unique()) > self.max_categories]
         if col_cut is not None and col_cut != []:
             logger.error("There are too many categories!")
             raise NameError(
