@@ -4,7 +4,7 @@ from typing import Iterable, Dict, Union, Any, List
 from copy import deepcopy
 
 from hypex.dataset.dataset import Dataset, ExperimentData
-from hypex.dataset.roles import TempGroupingRole, TempTargetRole, TargetRole
+from hypex.dataset.roles import TempGroupingRole, TempTargetRole, TargetRole, ABCRole
 
 
 # TODO: discus generators and properties
@@ -208,9 +208,20 @@ class GroupExperiment(Executor):
         return self.insert_result(data, result_list)
 
 
-class OnTargetExperiment(Experiment):
+class OnRoleExperiment(Experiment):
+    def __init__(
+        self,
+        executors: List[Executor],
+        role: ABCRole,
+        transformer: Union[bool, None] = None,
+        full_name: Union[str, None] = None,
+        key: Any = 0,
+    ):
+        self.role: ABCRole = role
+        super().__init__(executors, transformer, full_name, key)
+
     def execute(self, data: ExperimentData) -> ExperimentData:
-        for field in data.data.get_columns_by_roles(TargetRole):
+        for field in data.data.get_columns_by_roles(self.role):
             data.data.tmp_roles = {field: TempTargetRole}
             data = super().execute(data)
             data.data.tmp_roles = {}
