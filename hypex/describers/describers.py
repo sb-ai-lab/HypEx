@@ -1,5 +1,6 @@
+from typing import Iterable, Any, Union
+
 import numpy as np
-from typing import Iterable
 
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.experiment.experiment import Executor
@@ -8,7 +9,9 @@ from hypex.utils.typings import FieldKey
 
 
 class Describer(Executor):
-    def __init__(self, target_field: FieldKey, full_name: str = None, key: Any = 0):
+    def __init__(
+        self, target_field: FieldKey, full_name: Union[str, None] = None, key: Any = 0
+    ):
         self.target_field = target_field
         super().__init__(full_name, key)
 

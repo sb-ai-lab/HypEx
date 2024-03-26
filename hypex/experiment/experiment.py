@@ -1,10 +1,10 @@
 import warnings
 from abc import ABC, abstractmethod
-from typing import Iterable, Dict, Union, Any, List
 from copy import deepcopy
+from typing import Iterable, Dict, Union, Any, List
 
 from hypex.dataset.dataset import Dataset, ExperimentData
-from hypex.dataset.roles import TempGroupingRole, TempTargetRole, TargetRole, ABCRole
+from hypex.dataset.roles import TempGroupingRole, TempTargetRole, ABCRole
 
 
 class Executor(ABC):
@@ -103,7 +103,8 @@ class ComplexExecutor(Executor):
 
 
 class Experiment(Executor):
-    def _detect_transformer(self) -> bool:
+    @staticmethod
+    def _detect_transformer() -> bool:
         return False
 
     def get_executor_ids(

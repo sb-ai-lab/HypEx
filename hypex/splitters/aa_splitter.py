@@ -51,7 +51,7 @@ class AASplitterWithGrouping(AASplitter):
         group_field = data.get_columns_by_roles(GroupingRole)
         groups = list(data.groupby(group_field))
         edge = len(groups) // 2
-        result = None
+        result = []
         for i, group in enumerate(groups):
             group_ds = Dataset(roles=[GroupingRole, TreatmentRole]).from_dict(
                 [{"group_for_split": group[0], "group": "A" if i < edge else "B"}]
@@ -64,7 +64,7 @@ class AASplitterWithGrouping(AASplitter):
         return data
 
 
-class AASplitterWithStratification(SplitterAA):
+class AASplitterWithStratification(AASplitter):
     def __init__(
         self,
         control_size: float = 0.5,

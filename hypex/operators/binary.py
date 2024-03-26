@@ -1,15 +1,15 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
+from typing import Any
 
 import numpy as np
 
-from hypex.experiment.experiment import Executor
 from hypex.dataset.dataset import ExperimentData
 from hypex.dataset.roles import Arg1Role, Arg2Role
 from hypex.experiment.experiment import Executor
 from hypex.utils.enums import ExperimentDataEnum
 
 
-class BinaryOperator(ABC, Executor):
+class BinaryOperator(Executor):
     def get_full_name(self):
         return f"{self.__class__.__name__}"
 
@@ -41,43 +41,43 @@ class BinaryOperator(ABC, Executor):
         return self._set_value(data, self.calc(data[arg1], data[arg2]))
 
 
-class MetricDelta(MetricComparator):
+class MetricDelta(BinaryOperator):
     @staticmethod
     def calc(x1, x2):
         return x2 - x1
 
 
-class MetricPercentageDelta(MetricComparator):
+class MetricPercentageDelta(BinaryOperator):
     @staticmethod
     def calc(x1, x2):
         return (1 - x1 / x2) * 100
 
 
-class MetricAbsoluteDelta(MetricComparator):
+class MetricAbsoluteDelta(BinaryOperator):
     @staticmethod
     def calc(x1, x2):
         return np.abs(x2 - x1)
 
 
-class MetricRelativeDelta(MetricComparator):
+class MetricRelativeDelta(BinaryOperator):
     @staticmethod
     def calc(x1, x2):
         return 1 - x1 / x2
 
 
-class MetricRatio(MetricComparator):
+class MetricRatio(BinaryOperator):
     @staticmethod
     def calc(x1, x2):
         return x1 / x2
 
 
-class MetricLogRatio(MetricComparator):
+class MetricLogRatio(BinaryOperator):
     @staticmethod
     def calc(x1, x2):
         return np.log(x1 / x2)
 
 
-class MetricPercentageRatio(MetricComparator):
+class MetricPercentageRatio(BinaryOperator):
     @staticmethod
     def calc(x1, x2):
         return (1 - x1 / x2) * 100

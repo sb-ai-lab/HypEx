@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 import numpy as np
 from scipy.stats import mode
@@ -66,11 +66,6 @@ class Min(StatDescriptive):
 class Max(StatDescriptive):
     def calc(self, data):
         return np.max(data, **self.kwargs)
-
-
-class Range(StatDescriptive):
-    def __init__(self, field: str):
-        super().__init__(field, np.ptp)
 
 
 class Size(StatDescriptive):
