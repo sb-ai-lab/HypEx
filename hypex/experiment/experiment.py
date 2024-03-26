@@ -7,7 +7,6 @@ from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import TempGroupingRole, TempTargetRole, TargetRole, ABCRole
 
 
-# TODO: discus generators and properties
 class Executor(ABC):
     # TODO: replace to constants file
     @property
@@ -36,7 +35,7 @@ class Executor(ABC):
 
     @full_name.setter
     def full_name(self, value: Union[str, None]):
-        self._full_name = str(value or self.__class__.__name__)
+        self._full_name: str = str(value or self.__class__.__name__)
 
     @property
     def key(self) -> Any:
@@ -55,6 +54,7 @@ class Executor(ABC):
         self._generate_params_hash()
         self._generate_id()
 
+    # TODO: 0 is not the best idea (replace it)
     def __init__(self, full_name: Union[str, None] = None, key: Any = 0):
         self._id: str = ""
         self.full_name = full_name
@@ -66,9 +66,8 @@ class Executor(ABC):
     def _is_transformer(self) -> bool:
         return False
 
-    @abstractmethod
-    def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
-        raise NotImplementedError
+    def _set_value(self, data: ExperimentData, value=None, key=None) -> ExperimentData:
+        return data
 
     @abstractmethod
     def execute(self, data: ExperimentData) -> ExperimentData:

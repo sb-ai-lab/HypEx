@@ -22,7 +22,7 @@ from hypex.dataset.roles import StatisticRole
 class OneAASplitAnalyzer(ComplexExecutor):
     default_inner_executors: Dict[str, Executor] = {"mean": Mean()}
 
-    def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
+    def _set_value(self, data: ExperimentData, value=None, key=None) -> ExperimentData:
         return data.set_value(
             ExperimentDataEnum.analysis_tables,
             self.id,

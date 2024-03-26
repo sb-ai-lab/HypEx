@@ -272,7 +272,6 @@ class ExperimentData(Dataset):
             self.stats_fields[executor_id][key] = value
         self._id_name_mapping[executor_id] = name
 
-    # TODO circular imports
     def get_ids(self, classes: Union[type, List[type]]) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
         return {

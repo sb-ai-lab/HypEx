@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Any, Union
 
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import GroupingRole, StratificationRole, TreatmentRole
@@ -11,9 +11,9 @@ class AASplitter(ComplexExecutor):
     def __init__(
         self,
         control_size: float = 0.5,
-        random_state: int = None,
-        inner_executors: Dict[str, Executor] = None,
-        full_name: str = None,
+        random_state: Union[int, None] = None,
+        inner_executors: Union[Dict[str, Executor], None] = None,
+        full_name: Union[str, None] = None,
         key: Any = 0,
     ):
         self.control_size = control_size
@@ -25,13 +25,13 @@ class AASplitter(ComplexExecutor):
     def generate_params_hash(self) -> str:
         return f"{self.random_state}"
 
-    def _set_value(self, data: ExperimentData, value) -> ExperimentData:
+    def _set_value(self, data: ExperimentData, value=None, key=None) -> ExperimentData:
         return data.set_value(
             ExperimentDataEnum.additional_fields,
             self._id,
-            self.full_name,
+            str(self.full_name),
             value,
-            role=TreatmentRole,
+            role=TreatmentRole(),
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:

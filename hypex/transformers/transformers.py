@@ -1,3 +1,5 @@
+from typing import Any, Union
+
 import numpy as np
 
 from hypex.dataset.dataset import ExperimentData
@@ -5,7 +7,12 @@ from hypex.experiment.experiment import Executor
 
 
 class Shuffle(Executor):
-    def __init__(self, random_state: int = None, full_name: str = None, key: Any = 0):
+    def __init__(
+        self,
+        random_state: Union[int, None] = None,
+        full_name: Union[None, str] = None,
+        key: Any = 0,
+    ):
         super().__init__(full_name, key)
         self.random_state = random_state
 
