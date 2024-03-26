@@ -4,6 +4,7 @@ from typing import Sequence, Union, Iterable, List, Dict, Tuple
 import pandas as pd
 
 from hypex.dataset.base import DatasetBase
+from hypex.utils.typings import FromDictType
 
 
 class PandasDataset(DatasetBase):
