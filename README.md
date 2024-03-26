@@ -158,11 +158,18 @@ our [Contributing Guidelines](https://github.com/sb-ai-lab/Hypex/blob/master/.gi
 
 ## More Information & Resources
 
-[Habr (ru)](https://habr.com/ru/companies/sberbank/articles/778774/) |
-[Matching with HypEx: Simple Guide](https://www.kaggle.com/code/kseniavasilieva/matching-with-hypex-simple-guide) |
-[Matching with HypEx: Grouping](https://www.kaggle.com/code/kseniavasilieva/matching-with-hypex-grouping) |
-[HypEx vs Causal Inference and DoWhy](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-and-dowhy) |
-[HypEx vs Causal Inference and DoWhy: part 2](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-part-2)
+[Habr (ru)](https://habr.com/ru/companies/sberbank/articles/778774/) - discover how HypEx is revolutionizing causal
+inference in various fields.      
+[A/B testing seminar](https://www.youtube.com/watch?v=B9BE_yk8CjA&t=53s&ab_channel=NoML) - Seminar in NoML about
+matching and A/B testing       
+[Matching with HypEx: Simple Guide](https://www.kaggle.com/code/kseniavasilieva/matching-with-hypex-simple-guide) -
+Simple matching guide with explanation           
+[Matching with HypEx: Grouping](https://www.kaggle.com/code/kseniavasilieva/matching-with-hypex-grouping) - Matching
+with grouping guide    
+[HypEx vs Causal Inference and DoWhy](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-and-dowhy) -
+discover why HypEx is the best solution for causal inference           
+[HypEx vs Causal Inference and DoWhy: part 2](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-part-2) -
+discover why HypEx is the best solution for causal inference
 
 ## Join Our Community
 
@@ -174,3 +181,5 @@ and the developers.
 HypEx stands as an indispensable resource for data analysts and researchers delving into causal inference and AB
 testing. With its automated capabilities, sophisticated matching techniques, and thorough validation procedures, HypEx
 is poised to unravel causal relationships in complex datasets with unprecedented speed and precision.
+
+##       
