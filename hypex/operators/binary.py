@@ -6,7 +6,7 @@ from hypex.experiment.experiment import Executor
 from hypex.dataset.dataset import ExperimentData
 from hypex.dataset.roles import Arg1Role, Arg2Role
 from hypex.experiment.experiment import Executor
-from hypex.utils.hypex_enums import ExperimentDataEnum
+from hypex.utils.enums import ExperimentDataEnum
 
 
 class BinaryOperator(ABC, Executor):

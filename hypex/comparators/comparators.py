@@ -5,7 +5,7 @@ from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole
 from hypex.stats.descriptive import Mean, Size
-from hypex.utils.hypex_enums import ExperimentDataEnum
+from hypex.utils.enums import ExperimentDataEnum
 from hypex.utils.hypex_typings import RolesType, FieldKey, FromDictType
 
 class GroupComparator(ComplexExecutor):

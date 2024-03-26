@@ -26,6 +26,10 @@
     },
     "backend": "pandas"
   },
-  "experiment": {},
+  "experiment": {
+    "Analyzer": {
+      "executors": "sdjsd"
+    }
+  },
   "report": {}
 }

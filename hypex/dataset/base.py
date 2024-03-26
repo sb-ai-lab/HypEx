@@ -55,7 +55,7 @@ class DatasetBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def groupby(self):
+    def groupby(self, by, axis, **kwargs):
         raise NotImplementedError
 
     def loc(self, values: Iterable) -> Iterable:

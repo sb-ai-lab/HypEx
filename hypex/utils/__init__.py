@@ -1,1 +1,1 @@
-__all__ = ["hypex_typings"]
+__all__ = ["typings.py"]

@@ -1,5 +1,5 @@
 import json
-from typing import Union, Dict
+from typing import Union, Dict, Any
 
 from jsonschema import validate
 
@@ -8,11 +8,11 @@ from hypex.dataset.roles import default_roles
 
 
 class Hypothesis:
-    def __init__(self, config: Union[Dict, str]):
+    def __init__(self, config: Union[Dict[str, Any], str]):
         if isinstance(config, str):
             with open(config, "rb") as file:
                 config = json.load(file)
-        with open("dataset_scheme.json", "rb") as file:
+        with open("scheme.json", "rb") as file:
             self.scheme = json.load(file)
         self.config = config
         self.dataset = config["dataset"]
@@ -22,7 +22,7 @@ class Hypothesis:
         self._parse_config()
 
     def validate_config(self):
-        validate(self.dataset, self.scheme)
+        validate(self.config, self.scheme)
         if (
             "data" in self.dataset.keys()
             and "path" not in self.dataset.keys()
@@ -49,7 +49,7 @@ class Hypothesis:
             else self.dataset["path"]
         )
         roles = {
-            default_roles.get(j.lower()): i
+            default_roles.get(i.lower()): j
             for i, j in zip(
                 self.dataset["roles"]["role_names"], self.dataset["roles"]["columns"]
             )
@@ -57,7 +57,7 @@ class Hypothesis:
         return Dataset(data=data, roles=roles, backend=self.dataset["backend"])
 
     def _parse_experiment(self):
-        pass
+        print(self.experiment)
 
     def _parse_report(self):
         pass
@@ -74,3 +74,8 @@ class Hypothesis:
         return json.dumps(
             {"dataset": self.dataset.to_dict(), "experiment": {}, "report": {}}
         )
+
+
+if __name__ == "__main__":
+    hypo = Hypothesis("test_config.json")
+    print(hypo.dataset)

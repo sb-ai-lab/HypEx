@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import Union
 
-from hypex.utils.hypex_typings import (
+from hypex.utils.typings import (
     ABCRoleTypes,
     StratificationRoleTypes,
     TargetRoleTypes,
@@ -14,6 +14,10 @@ class ABCRole(ABC):
 
     def __init__(self, data_type: Union[ABCRoleTypes, None] = None):
         self.data_type = data_type
+
+    @property
+    def role_name(self) -> str:
+        return self._role_name
 
 
 class InfoRole(ABCRole):

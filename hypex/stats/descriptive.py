@@ -6,7 +6,7 @@ from scipy.stats import mode
 from hypex.dataset.dataset import ExperimentData
 from hypex.dataset.roles import TempTargetRole
 from hypex.experiment.experiment import Executor
-from hypex.utils.hypex_enums import ExperimentDataEnum
+from hypex.utils.enums import ExperimentDataEnum
 
 
 class StatDescriptive(Executor):
