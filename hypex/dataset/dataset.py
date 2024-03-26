@@ -115,7 +115,7 @@ class Dataset(DatasetBase):
 
     def get_columns_by_roles(
         self, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role=False
-    ) -> List[str]:
+    ) -> List[Union[str, ABCRole]]:
         roles = roles if isinstance(roles, Iterable) else [roles]
         get_roles = self.roles if not tmp_role else self.tmp_roles
         return [
@@ -156,16 +156,14 @@ class Dataset(DatasetBase):
         return {
             "backend": str(self._backend.__class__.__name__).lower()[:-7],
             "roles": {
-                "role_names": list(
-                    map(lambda x: x._role_name, list(self.roles.keys()))
-                ),
+                "role_names": list(map(lambda x: x.role_name, list(self.roles.keys()))),
                 "columns": list(self.roles.values()),
             },
             "data": self._backend.to_dict(),
         }
 
-    def to_json(self, filename: str = None):
-        if filename is None:
+    def to_json(self, filename: Union[str, None] = None):
+        if not filename:
             return json.dumps(self.to_dict())
         with open(filename, "w") as file:
             json.dump(self.to_dict(), file)
@@ -187,8 +185,8 @@ class Dataset(DatasetBase):
         by: Union[str, List],
         axis: int = 0,
         level=None,
-        func: str = None,
-        fields_list: List = None,
+        func: Union[str, None] = None,
+        fields_list: Union[List, str, None] = None,
     ):
         datasets = [
             (i[0], Dataset(data=i[1]))
@@ -196,6 +194,9 @@ class Dataset(DatasetBase):
         ]
         if func:
             if fields_list:
+                fields_list = (
+                    fields_list if isinstance(fields_list, Iterable) else [fields_list]
+                )
                 datasets = [
                     (i[0], Dataset(data=i[1][fields_list].agg(func).data))
                     for i in datasets
