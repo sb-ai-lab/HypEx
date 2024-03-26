@@ -67,7 +67,7 @@ class Executor(ABC):
         return False
 
     @abstractmethod
-    def _set_value(self, data: ExperimentData, value) -> ExperimentData:
+    def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         raise NotImplementedError
 
     @abstractmethod

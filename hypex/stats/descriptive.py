@@ -9,7 +9,7 @@ from hypex.experiment.experiment import Executor
 from hypex.utils.hypex_enums import ExperimentDataEnum
 
 
-class StatDescriptive(ABC, Executor):
+class StatDescriptive(Executor):
     def __init__(self, full_name=None, key=0, **kwargs):
         self.kwargs = kwargs
         super().__init__(full_name, key)
@@ -18,20 +18,19 @@ class StatDescriptive(ABC, Executor):
     def calc(self, data):
         raise NotImplementedError
 
-    def _set_value(self, data: ExperimentData, value) -> ExperimentData:
+    def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         data.set_value(
             ExperimentDataEnum.stats_fields,
             self.id,
-            self.full_name,
+            str(self.full_name),
             value,
-            key=self.field,
+            key=key,
         )
         return data
 
-    @abstractmethod
     def execute(self, data: ExperimentData) -> ExperimentData:
         target = data.data.get_columns_by_roles(TempTargetRole, tmp_role=True)[0]
-        return self._set_value(data, self.calc(data[target]))
+        return self._set_value(data, self.calc(data[target]), target)
 
 
 class Mean(StatDescriptive):

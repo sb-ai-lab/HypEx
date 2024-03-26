@@ -5,7 +5,7 @@ import pandas as pd
 
 from hypex.comparators.comparators import GroupDifference, GroupSizes
 from hypex.comparators.hypothesis_testing import TTest, KSTest
-from hypex.dataset.dataset import ExperimentData
+from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.experiment.experiment import (
     Experiment,
     ComplexExecutor,
@@ -14,27 +14,47 @@ from hypex.experiment.experiment import (
 )
 from hypex.splitters.aa_splitter import AASplitter
 from hypex.stats.descriptive import Mean
+from hypex.utils.hypex_enums import ExperimentDataEnum
+from hypex.dataset.roles import StatisticRole
 
 
-class OneAASplit(ComplexExecutor):
-    default_inner_executors = {"mean": Mean()}
+
+class OneAASplitAnalyzer(ComplexExecutor):
+    default_inner_executors: Dict[str, Executor] = {"mean": Mean()}
+
+    def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
+        return data.set_value(
+            ExperimentDataEnum.analysis_tables,
+            self.id,
+            str(self.full_name),
+            value,
+        )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        analysis_tests: List[Executor] = [TTest, KSTest]
+        analysis_tests: List[type] = [TTest, KSTest]
         executor_ids = data.get_ids(analysis_tests)
-
-        #TODO: rework with new keys
 
         analysis_data = {}
         for c, spaces in executor_ids.items():
-            t_data = pd.concat(spaces.get("analysis_tables", []))
+            analysis_ids = spaces.get("analysis_tables", [])
+            if len(analysis_ids) == 0:
+                continue
+            t_data = data.analysis_tables[analysis_ids[0]]
+            for aid in analysis_ids[1:]:
+                t_data = t_data.append(data.analysis_tables[aid])
+
             for f in ["p-value", "pass"]:
                 analysis_data[f"{c.__name__} {f}"] = self.inner_executors["mean"].calc(
                     list(t_data[f])
                 )
-        analysis_ids = {}
+        analysis_data["mean test score"] = (
+            analysis_data["TTest p-value"] + 2 * analysis_data["KSTest p-value"]
+        ) / 3
+        analysis_data = Dataset(
+            roles={f: StatisticRole() for f in analysis_data}
+        ).from_dict([analysis_data])
 
-        analysis_ids = executor_ids[TTest]["analysis_tables"]
+        return self._set_value(data, analysis_data)
 
         # meta_data = {
         #     TTest: {"p-value": [], "passed": []},
@@ -53,5 +73,5 @@ class OneAASplit(ComplexExecutor):
         #     result[f"{key.__name__} passed %"] = (
         #         self.inner_executors["mean"].calc(value["passed"]) * 100
         #     )
-        
+
         # return data
