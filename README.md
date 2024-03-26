@@ -82,15 +82,6 @@ These methods are not sufficiently accurate markers of a successful experiment.
 
 [Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/utils.html#validators)
 
-## Quick Start
-
-Explore usage examples and tutorials [here](https://github.com/sb-ai-lab/Hypex/blob/master/examples/tutorials/).
-
-Find more information about HypEx and matching in Kaggle:     
-[Matching with HypEx: Simple Guide](https://www.kaggle.com/code/kseniavasilieva/matching-with-hypex-simple-guide)   
-[Matching with HypEx: Grouping](https://www.kaggle.com/code/kseniavasilieva/matching-with-hypex-grouping)     
-[HypEx vs Causal Inference and DoWhy](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-and-dowhy)
-
 ## Installation
 
 ```bash
@@ -98,6 +89,8 @@ pip install hypex
 ```
 
 ## Quick start
+
+Explore usage examples and tutorials [here](https://github.com/sb-ai-lab/Hypex/blob/master/examples/tutorials/).
 
 ### Matching example
 
@@ -158,15 +151,18 @@ our [documentation on ReadTheDocs](https://hypex.readthedocs.io/en/latest/).
 You'll find comprehensive guides and tutorials that will help you get started with HypEx, as well as detailed API
 documentation for advanced use cases.
 
-## Community and Contributions
+## Contributions
 
 Join our vibrant community! For guidelines on contributing, reporting issues, or seeking support, please refer to
 our [Contributing Guidelines](https://github.com/sb-ai-lab/Hypex/blob/master/.github/CONTRIBUTING.md).
 
-## Success Stories
+## More Information & Resources
 
-Discover how HypEx is revolutionizing causal inference in various fields. Check out our featured article
-on [Habr (ru)](https://habr.com/ru/companies/sberbank/articles/778774/).
+[Habr (ru)](https://habr.com/ru/companies/sberbank/articles/778774/) |
+[Matching with HypEx: Simple Guide](https://www.kaggle.com/code/kseniavasilieva/matching-with-hypex-simple-guide) |
+[Matching with HypEx: Grouping](https://www.kaggle.com/code/kseniavasilieva/matching-with-hypex-grouping) |
+[HypEx vs Causal Inference and DoWhy](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-and-dowhy) |
+[HypEx vs Causal Inference and DoWhy: part 2](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-part-2)
 
 ## Join Our Community
 
