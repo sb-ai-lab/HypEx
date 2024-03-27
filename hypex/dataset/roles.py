@@ -19,6 +19,9 @@ class ABCRole(ABC):
     def role_name(self) -> str:
         return self._role_name
 
+    def __str__(self) -> str:
+        return self._role_name
+
 
 class InfoRole(ABCRole):
     _role_name = "Info"
