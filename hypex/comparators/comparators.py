@@ -1,10 +1,10 @@
 from abc import abstractmethod
 from typing import Dict, Union, Any
 
-from hypex.utils.hypex_typings import RolesType, FromDictType
+from hypex.utils.typings import FromDictType
 
 from hypex.dataset.dataset import Dataset, ExperimentData
-from hypex.dataset.roles import GroupingRole, TempTargetRole
+from hypex.dataset.roles import GroupingRole, TempTargetRole, ABCRole
 from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.stats.descriptive import Mean, Size
 from hypex.utils.enums import ExperimentDataEnum
@@ -46,7 +46,7 @@ class GroupComparator(ComplexExecutor):
         return data
 
     def _extract_dataset(
-        self, compare_result: FromDictType, roles: Union[RolesType, None] = None
+        self, compare_result: FromDictType, roles: Union[ABCRole, None] = None
     ) -> Dataset:
         return Dataset(roles=roles).from_dict(compare_result)
 

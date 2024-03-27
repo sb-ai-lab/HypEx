@@ -230,21 +230,15 @@ class Dataset(DatasetBase):
 
 
 class ExperimentData(Dataset):
-    def __init__(self, data: Any):
+    def __init__(self, data: Dataset):
         super().__init__(data)
-        if isinstance(data, Dataset):
-            self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
-            self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
-            self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
-            self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
-        else:
-            data = Dataset(data)
-            self.additional_fields = data
-            self.stats_fields = data
-
-        self.data = data
+        self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
+        self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
+        self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
         self.analysis_tables: Dict[str, Dataset] = {}
         self._id_name_mapping: Dict[str, str] = {}
+
+        super().__init__(data=data.data, roles=data.roles)
 
     def _create_empty(self, index=None, columns=None):
         self.additional_fields._create_empty(index, columns)

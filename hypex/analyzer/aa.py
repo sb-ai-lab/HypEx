@@ -9,12 +9,12 @@ from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.experiment.experiment import (
     Experiment,
     ComplexExecutor,
-    OnTargetExperiment,
+    OnRoleExperiment,
     Executor,
 )
 from hypex.splitters.aa_splitter import AASplitter
 from hypex.stats.descriptive import Mean
-from hypex.utils.hypex_enums import ExperimentDataEnum
+from hypex.utils.enums import ExperimentDataEnum
 from hypex.dataset.roles import StatisticRole
 
 

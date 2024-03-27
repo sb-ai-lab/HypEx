@@ -1,0 +1,1 @@
+ID_SPLIT_SYMBOL = "\u2570"

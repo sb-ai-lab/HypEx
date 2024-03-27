@@ -8,7 +8,7 @@ from hypex.experiment.experiment import Executor
 from hypex.comparators.comparators import GroupComparator
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import ABCRole, StatisticRole
-from hypex.utils.hypex_typings import RolesType, FromDictType
+from hypex.utils.typings import FromDictType
 
 
 class StatHypothesisTestingWithScipy(GroupComparator):

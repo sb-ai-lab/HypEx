@@ -24,6 +24,5 @@ class Shuffle(Executor):
         return True
 
     def execute(self, data: ExperimentData):
-        np.random.seed(self.random_state)
-        np.random.shuffle(data.data)
+        data.data = data.data.sample(frac=1, random_state=self.random_state)
         return data
