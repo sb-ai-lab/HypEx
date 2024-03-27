@@ -67,7 +67,7 @@ class AATest:
             Analyzes and plots numerical feature distributions in control and test data.
         cat_feature_uniform_analysis(control_data, test_data):
             Analyzes and plots categorical feature distributions in control and test data.
-        mde_unbalanced_group(data, target_col, group_flag_col, power):
+        calc_mde_unbalanced_group(data, target_col, group_flag_col, power):
             Finds minimum detectable effect (MDE) and effect size for unbalanced groups.
         experiment_result_transform(experiment):
             Transforms the result of an experiment into a readable format.
@@ -911,7 +911,7 @@ class AATest:
             float(Decimal(float(cohen_d)).quantize(Decimal("1.00")))
         )
 
-    def mde_unbalanced_group(
+    def calc_mde_unbalanced_group(
             self,
             data: pd.DataFrame,
             target_col: str,
