@@ -23,6 +23,6 @@ class Shuffle(Executor):
     def __is_transformer(self):
         return True
 
-    def execute(self, data: ExperimentData):
+    def execute(self, data: ExperimentData) -> ExperimentData:
         data.data = data.data.sample(frac=1, random_state=self.random_state)
         return data

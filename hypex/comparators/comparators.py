@@ -27,9 +27,9 @@ class GroupComparator(ComplexExecutor):
         raise NotImplementedError
 
     def _compare(self, data: ExperimentData) -> Dict:
-        group_field = data.data.get_columns_by_roles(GroupingRole)
+        group_field = data.get_columns_by_roles(GroupingRole)
         self.key = str(group_field)
-        target_field = data.data.get_columns_by_roles(TempTargetRole, tmp_role=True)[0]
+        target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)[0]
         grouping_data = list(data.groupby(group_field))
         return {
             grouping_data[i][0]: self._comparison_function(
@@ -62,7 +62,7 @@ class GroupDifference(GroupComparator):
     }
 
     def _comparison_function(self, control_data, test_data) -> Dataset:
-        target_field = control_data.data.get_columns_by_roles(
+        target_field = control_data.get_columns_by_roles(
             TempTargetRole, tmp_role=True
         )[0]
         mean_a = self._inner_executors["mean"].execute(control_data)
