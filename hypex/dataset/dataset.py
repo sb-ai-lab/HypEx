@@ -34,8 +34,10 @@ class Dataset(DatasetBase):
 
     def set_data(
         self,
-        data: Union[pd.DataFrame, str, Type] = None,
-        roles: Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]] = None,
+        data: Union[pd.DataFrame, str, Type, None] = None,
+        roles: Union[
+            Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole], None
+        ] = None,
         backend: Union[str, None] = None,
     ):
         self._backend = (
@@ -68,9 +70,9 @@ class Dataset(DatasetBase):
 
     def __init__(
         self,
-        data: Union[pd.DataFrame, str] = None,
+        data: Union[pd.DataFrame, str, None] = None,
         roles: Union[
-            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
+            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]], None
         ] = None,
         backend: Union[str, None] = None,
     ):
@@ -90,9 +92,9 @@ class Dataset(DatasetBase):
     def __len__(self):
         return self._backend.__len__()
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: Union[Iterable, str, int]):
         items = item if isinstance(item, Iterable) else [item]
-        roles = {}
+        roles: Dict = {}
         for column in items:
             if column in self.columns and self.roles.get(column, 0):
                 roles[column] = self.roles[column]
@@ -100,7 +102,7 @@ class Dataset(DatasetBase):
                 roles[column] = InfoRole()
         return Dataset(data=self._backend.__getitem__(item), roles=roles)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Any):
         if key not in self.columns and isinstance(key, str):
             self.add_column(value, key, InfoRole())
             warnings.warn("Column must be added by add_column", category=Warning)
