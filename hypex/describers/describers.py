@@ -17,7 +17,7 @@ class Describer(Executor):
 
     def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
         return data.set_value(
-            ExperimentDataEnum.analysis_tables, self._id, self.get_full_name(), value
+            ExperimentDataEnum.analysis_tables, self._id, self.full_name, value
         )
 
 
