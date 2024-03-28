@@ -163,9 +163,9 @@ estimate results by yourself.
 | Group size             | 32 768   | 65 536     | 131 072   | 262 144   | 524 288    | 1 048 576   | 2 097 152    | 4 194 304     |
 |------------------------|---------|-----------|----------|----------|-----------|-----------|------------|-------------|
 | Causal Inference       | 46s | 169s | None     | None     | None      | None      | None       | None        |
-| DoWhy                  | 9s | 19s  | 40s | 77s | 159s | 312s | 615s  | 1235s  |
-| HypEx with grouping    | 2s | 6s   | 16s | 42s | 167s | 509s | 1932s | 7248s  |
-| HypEx without grouping | 2s  | 7s   | 21s | 101s | 273s | 982s | 3750s | 14720s |
+| DoWhy                  | 9s | 19s  | 40s | 77s | 159s | 312s | 615s  | 1 235s  |
+| HypEx with grouping    | 2s | 6s   | 16s | 42s | 167s | 509s | 1 932s | 7 248s  |
+| HypEx without grouping | 2s  | 7s   | 21s | 101s | 273s | 982s | 3 750s | 14 720s |
 
 ## Join Our Community
 
