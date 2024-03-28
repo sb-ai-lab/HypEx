@@ -1,15 +1,16 @@
 from pathlib import Path
-from typing import Sequence, Union, Iterable, List, Dict, Tuple
+from typing import Sequence, Union, Iterable, List, Dict, Tuple, Sized, Callable
 
 import pandas as pd
 
 from hypex.dataset.base import DatasetBase
+from hypex.utils.typings import FromDictType
 
 
 class PandasDataset(DatasetBase):
 
     @staticmethod
-    def _read_file(filename: str) -> pd.DataFrame:
+    def _read_file(filename: Union[str, Path]) -> pd.DataFrame:
         file_extension = Path(filename).suffix
         if file_extension == ".csv":
             return pd.read_csv(filename)
@@ -46,7 +47,9 @@ class PandasDataset(DatasetBase):
     def __repr__(self):
         return self.data.__repr__()
 
-    def _create_empty(self, index=None, columns=None):
+    def _create_empty(
+        self, index: Union[Iterable, None] = None, columns: [Iterable[str], None] = None
+    ):
         self.data = pd.DataFrame(index=index, columns=columns)
         return self
 
@@ -59,7 +62,12 @@ class PandasDataset(DatasetBase):
             else self.data.columns.get_indexer(column_name)
         )[0]
 
-    def add_column(self, data, name, index=None):
+    def add_column(
+        self,
+        data: Union[Sized, Iterable],
+        name: str,
+        index: Union[Sized, Iterable, None] = None,
+    ):
         if index:
             self.data[name] = [None] * len(data)
             for i, value in zip(index, data):
@@ -67,7 +75,7 @@ class PandasDataset(DatasetBase):
         else:
             self.data[name] = data
 
-    def append(self, other, index=False):
+    def append(self, other, index: bool = False):
         new_data = pd.concat([self.data, other.data])
         if index:
             new_data.reset_index()
@@ -81,7 +89,7 @@ class PandasDataset(DatasetBase):
     def columns(self):
         return self.data.columns
 
-    def from_dict(self, data: FromDictType, index=None):
+    def from_dict(self, data: FromDictType, index: Union[Iterable, Sized, None] = None):
         self.data = pd.DataFrame().from_records(data)
         if index:
             self.data.index = index
@@ -94,10 +102,10 @@ class PandasDataset(DatasetBase):
         index = list(self.index)
         return {"data": data, "index": index}
 
-    def apply(self, func, **kwargs):
+    def apply(self, func: Callable, **kwargs):
         return self.data.apply(func, **kwargs)
 
-    def map(self, func, **kwargs):
+    def map(self, func: Callable, **kwargs):
         return self.data.map(func, **kwargs)
 
     def unique(self):
@@ -106,7 +114,9 @@ class PandasDataset(DatasetBase):
     def isin(self, values: Iterable) -> Iterable[bool]:
         return self.data.isin(values)
 
-    def groupby(self, by, axis, **kwargs) -> List[Tuple]:
+    def groupby(
+        self, by: Union[str, Iterable[str]], axis: int, **kwargs
+    ) -> List[Tuple]:
         groups = self.data.groupby(by, axis, **kwargs)
         return list(groups)
 

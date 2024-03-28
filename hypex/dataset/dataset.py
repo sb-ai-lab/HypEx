@@ -21,23 +21,29 @@ from hypex.utils.typings import FromDictType
 
 class Dataset(DatasetBase):
     class Locker:
-        def __init__(self, backend):
+        def __init__(self, backend, roles):
             self.backend = backend
+            self.roles = roles
 
+        # TODO add roles
         def __getitem__(self, item):
             return Dataset(data=self.backend.loc(item))
 
     class ILocker:
-        def __init__(self, backend):
+        def __init__(self, backend, roles):
             self.backend = backend
+            self.roles = roles
 
+        # TODO add roles
         def __getitem__(self, item):
             return Dataset(data=self.backend.iloc(item))
 
     def set_data(
         self,
-        data: Union[pd.DataFrame, str, Type] = None,
-        roles: Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]] = None,
+        data: Union[pd.DataFrame, str, Type, None] = None,
+        roles: Union[
+            Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole], None
+        ] = None,
         backend: Union[str, None] = None,
     ):
         self._backend = (
@@ -45,13 +51,22 @@ class Dataset(DatasetBase):
             if backend
             else self._select_backend_from_data(data)
         )
-        roles = roles or {}
+        if not roles:
+            roles = {}
+            warnings.warn(
+                "Didn't add roles for experiment estimation. "
+                "This fact can lead to incorrect operation of the pipeline. "
+            )
         roles = (
             parse_roles(roles)
             if any(isinstance(role, type) for role in roles.keys())
             else roles
         )
-        if roles and any(i not in self._backend.columns for i in list(roles.keys())):
+        if (
+            roles
+            and data is not None
+            and any(i not in self._backend.columns for i in list(roles.keys()))
+        ):
             raise RoleColumnError(list(roles.keys()), self._backend.columns)
         self.roles = roles
         self.data = self._backend.data
@@ -70,9 +85,9 @@ class Dataset(DatasetBase):
 
     def __init__(
         self,
-        data: Union[pd.DataFrame, str] = None,
+        data: Union[pd.DataFrame, str, None] = None,
         roles: Union[
-            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
+            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]], None
         ] = None,
         backend: Union[str, None] = None,
     ):
@@ -92,9 +107,9 @@ class Dataset(DatasetBase):
     def __len__(self):
         return self._backend.__len__()
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: Union[Iterable, str, int]):
         items = item if isinstance(item, Iterable) else [item]
-        roles = {}
+        roles: Dict = {}
         for column in items:
             if column in self.columns and self.roles.get(column, 0):
                 roles[column] = self.roles[column]
@@ -102,7 +117,7 @@ class Dataset(DatasetBase):
                 roles[column] = InfoRole()
         return Dataset(data=self._backend.__getitem__(item), roles=roles)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Any):
         if key not in self.columns and isinstance(key, str):
             self.add_column(value, key, InfoRole())
             warnings.warn("Column must be added by add_column", category=Warning)
@@ -134,9 +149,7 @@ class Dataset(DatasetBase):
     def columns(self):
         return self._backend.columns
 
-    def add_column(
-        self, data, name: Union[str, int, List], role: ABCRole(), index=None
-    ):
+    def add_column(self, data, name: Union[str, int, List], role: ABCRole, index=None):
         self.roles.update({name: role})
         if isinstance(data, Dataset):
             data = data._backend.data[list(data._backend.data.columns)[0]]
@@ -151,6 +164,10 @@ class Dataset(DatasetBase):
 
     def from_dict(self, data: FromDictType, index=None):
         self._backend = self._backend.from_dict(data, index)
+        if self.roles and any(
+            i not in self._backend.columns for i in list(self.roles.keys())
+        ):
+            raise RoleColumnError(list(self.roles.keys()), self._backend.columns)
         self.data = self._backend.data
         return self
 
@@ -170,18 +187,23 @@ class Dataset(DatasetBase):
         with open(filename, "w") as file:
             json.dump(self.to_dict(), file)
 
+    # TODO add roles
     def apply(self, func, axis=0, **kwargs):
         return Dataset(data=self._backend.apply(func=func, axis=axis, **kwargs))
 
+    # TODO add roles
     def map(self, func, na_action=None, **kwargs):
         return self._backend.map(func=func, na_action=na_action)
 
+    # TODO add roles
     def unique(self):
         return Dataset(data=self._backend.unique())
 
+    # TODO add roles
     def isin(self, values: Iterable):
         return Dataset(data=self._backend.isin(values))
 
+    # TODO add roles
     def groupby(
         self,
         by: Union[str, List],
@@ -210,41 +232,41 @@ class Dataset(DatasetBase):
                 ]
         return iter(datasets)
 
+    # TODO add roles
     def mean(self):
         return Dataset(data=self._backend.mean())
 
+    # TODO add roles
     def max(self):
         return Dataset(data=self._backend.max())
 
+    # TODO add roles
     def min(self):
         return Dataset(data=self._backend.min())
 
+    # TODO add roles
     def count(self):
         return Dataset(data=self._backend.count())
 
+    # TODO add roles
     def sum(self):
         return Dataset(data=self._backend.sum())
 
+    # TODO add roles
     def agg(self, func: Union[str, List]):
         return Dataset(data=self._backend.agg(func))
 
 
 class ExperimentData(Dataset):
-    def __init__(self, data: Any):
-        super().__init__(data)
-        if isinstance(data, Dataset):
-            self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
-            self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
-            self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
-            self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
-        else:
-            data = Dataset(data)
-            self.additional_fields = data
-            self.stats_fields = data
+    def __init__(self, data: Dataset):
+        super().__init__(data.data, data.roles)
+        self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
+        self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
+        self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
+        self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
 
-        self.data = data
-        self.analysis_tables: Dict[str, Dataset] = {}
-        self._id_name_mapping: Dict[str, str] = {}
+        self.analysis_tables = {}
+        self._id_name_mapping = {}
 
     def _create_empty(self, index=None, columns=None):
         self.additional_fields._create_empty(index, columns)
