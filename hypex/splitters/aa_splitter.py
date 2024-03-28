@@ -26,13 +26,14 @@ class AASplitter(ComplexExecutor):
         return f"{self.random_state}"
 
     def _set_value(self, data: ExperimentData, value=None, key=None) -> ExperimentData:
-        return data.set_value(
+        data = data.set_value(
             ExperimentDataEnum.additional_fields,
             self._id,
             str(self.full_name),
             value,
             role=TreatmentRole(),
         )
+        return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data: ExperimentData = self.inner_executors["shuffle"].execute(data)

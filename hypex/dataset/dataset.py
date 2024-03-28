@@ -14,9 +14,9 @@ from hypex.errors.errors import (
     ConcatBackendError,
     SpaceError,
 )
+from hypex.experiment.experiment import Experiment
 from hypex.utils.enums import ExperimentDataEnum
 from hypex.utils.typings import FromDictType
-
 
 
 class Dataset(DatasetBase):
@@ -93,8 +93,8 @@ class Dataset(DatasetBase):
     ):
         self.roles = None
         self.tmp_roles: Union[
-            None, Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
-        ] = None
+            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
+        ] = {}
         self._backend = None
         self.data = None
         self.loc = None
@@ -134,11 +134,19 @@ class Dataset(DatasetBase):
         self, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role=False
     ) -> List[Union[str, ABCRole]]:
         roles = roles if isinstance(roles, Iterable) else [roles]
-        get_roles = self.tmp_roles if tmp_role else self.roles
+        roles_for_search = self.tmp_roles if tmp_role else self.roles
+        print("roles", roles_for_search)
+        print(
+            [
+                column
+                for column, role in roles_for_search.items()
+                if any(isinstance(r, role.__class__) for r in roles)
+            ]
+        )
         return [
             column
-            for column, role in get_roles.items()
-            if any(isinstance(role, r) for r in roles)
+            for column, role in roles_for_search.items()
+            if any(isinstance(r, role.__class__) for r in roles)
         ]
 
     @property
@@ -259,14 +267,13 @@ class Dataset(DatasetBase):
 
 class ExperimentData(Dataset):
     def __init__(self, data: Dataset):
-        super().__init__(data.data, data.roles)
         self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
         self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
         self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
-        self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
+        self.analysis_tables: Dict[str, Dataset] = {}
+        self._id_name_mapping: Dict[str, str] = {}
 
-        self.analysis_tables = {}
-        self._id_name_mapping = {}
+        super().__init__(data=data.data, roles=data.roles)
 
     def _create_empty(self, index=None, columns=None):
         self.additional_fields._create_empty(index, columns)
@@ -305,8 +312,12 @@ class ExperimentData(Dataset):
                 )
             self.stats_fields[executor_id][key] = value
         self._id_name_mapping[executor_id] = name
+        return self
 
-    def get_ids(self, classes: Union[type, List[type]]) -> Dict[type, Dict[str, List[str]]]:
+    # TODO import from const
+    def get_ids(
+        self, classes: Union[type, List[type]]
+    ) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
         return {
             c: {
@@ -328,4 +339,3 @@ class ExperimentData(Dataset):
             }
             for c in classes
         }
-

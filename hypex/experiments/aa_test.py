@@ -3,7 +3,7 @@ from hypex.splitters.aa_splitter import AASplitter
 from hypex.comparators.hypothesis_testing import TTest, KSTest
 from hypex.comparators.comparators import GroupDifference, GroupSizes
 from hypex.dataset.roles import TargetRole
-from hypex.analyzers.aa import OneAASplitAnalyzer
+from hypex.analyzer.aa import OneAASplitAnalyzer
 
 AA_TEST = Experiment(
     executors=[

@@ -5,22 +5,18 @@ from typing import Iterable, Dict, Union, Any, List
 
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import TempGroupingRole, TempTargetRole, ABCRole
+from hypex.utils.constants import ID_SPLIT_SYMBOL
 
 
 class Executor(ABC):
-    # TODO: replace to constants file
-    @property
-    def _split_symbol(self) -> str:
-        return "\u2570"
-
     def _generate_params_hash(self):
         self._params_hash = ""
 
     def _generate_id(self):
-        self.id = self._split_symbol.join(
+        self._id = ID_SPLIT_SYMBOL.join(
             [
                 self.__class__.__name__,
-                self.params_hash.replace(self._split_symbol, "|"),
+                self.params_hash.replace(ID_SPLIT_SYMBOL, "|"),
                 str(self._key),
             ]
         )
@@ -57,6 +53,7 @@ class Executor(ABC):
     # TODO: 0 is not the best idea (replace it)
     def __init__(self, full_name: Union[str, None] = None, key: Any = 0):
         self._id: str = ""
+        self._params_hash = ""
         self.full_name = full_name
 
         self.key: Any = key
@@ -84,13 +81,14 @@ class ComplexExecutor(Executor):
         inner_executors = inner_executors or {}
         for key, executor in self.default_inner_executors.items():
             if key not in inner_executors:
-                warnings.warn(
-                    f"{key} executor not found in inner_executors. Will {key} will be used by default."
-                )
+                if len(inner_executors):
+                    warnings.warn(
+                        f"{key} executor not found in inner_executors. Will {key} will be used by default."
+                    )
                 result[key] = executor
             else:
                 result[key] = inner_executors[key]
-        return inner_executors
+        return result
 
     def __init__(
         self,
@@ -199,9 +197,9 @@ class GroupExperiment(Executor):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result_list = []
-        group_field = data.data.get_columns_by_roles(TempGroupingRole, tmp_role=True)
+        group_field = data.get_columns_by_roles(TempGroupingRole, tmp_role=True)
 
-        for group, group_data in data.data.groupby(group_field):
+        for group, group_data in data.groupby(group_field):
             temp_data = ExperimentData(group_data)
             temp_data = self.inner_executor.execute(temp_data)
             result_list.append(self.extract_result(temp_data))
@@ -221,7 +219,7 @@ class OnRoleExperiment(Experiment):
         super().__init__(executors, transformer, full_name, key)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        for field in data.data.get_columns_by_roles(self.role):
+        for field in data.get_columns_by_roles(self.role):
             data.data.tmp_roles = {field: TempTargetRole}
             data = super().execute(data)
             data.data.tmp_roles = {}
