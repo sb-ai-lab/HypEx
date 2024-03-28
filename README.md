@@ -26,7 +26,7 @@ Diff-in-Diff) and CUPED methods, to rigorously test hypotheses and validate expe
 - **Result Validation**: Offers multiple validation methods, including random treatment, feature, and subset
   validations.
 - **Data Tests**: Incorporates SMD, KS, PSI, and Repeats tests to affirm the robustness of effect estimations.
-- **Automated Feature Selection**: Employs LGBM feature selection to pinpoint the most impactful features for causal
+- **Feature Selection**: Employs LGBM and Catboost feature selection to pinpoint the most impactful features for causal
   analysis.
 - **AB Testing Suite**: Features a suite of AB testing tools for comprehensive hypothesis evaluation.
 - **Stratification support**: Stratify groups for nuanced analysis
@@ -57,28 +57,12 @@ Points to consider when selecting features:
 
 [Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/selectors.html#selector-classes)
 
-### Multitarget
-
-**Multitarget** involves studying the impact on multiple targets.
-
-The algorithm is implemented as a repetition of the same matching on the same feature space and samples, but with
-different targets. To ensure the algorithm's correct operation, it's necessary to guarantee the independence of the
-targets from each other.
-
-The best solution would be to conduct several independent experiments, each with its own set of features for each
-target.
-
-[Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/matcher.html#matcher)
-
-### Random Treatment и Random Feature
+### Random Treatment
 
 **Random Treatment** algorithm randomly shuffles the actual treatment. It is expected that the treatment's effect on the
 target will be close to 0.
 
-**Random Feature** adds a feature with random values. It is expected that adding a random feature will maintain the same
-impact of the treatment on the target.
-
-These methods are not sufficiently accurate markers of a successful experiment.
+These method is not sufficiently accurate marker of a successful experiment.
 
 [Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/utils.html#validators)
 
@@ -176,40 +160,12 @@ discover why HypEx is the best solution for causal inference
 Visit [this](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-part-2) notebook ain Kaggle and
 estimate results by yourself.
 
-| Data Size | Library                | Estimation Time | ATT    |
-|-----------|------------------------|-----------------|--------|
-| 32768     | Causal Inference       | 46.0853         | 63.391 |
-| 32768     | DoWhy                  | 9.75585         | 63.546 |
-| 32768     | HypEx with grouping    | 2.47912         | 63.542 |
-| 32768     | HypEx without grouping | 2.6543          | 63.526 |
-| 65536     | Causal Inference       | 169.29483       | 63.69  |
-| 65536     | DoWhy                  | 19.13385        | 63.887 |
-| 65536     | HypEx with grouping    | 6.06445         | 63.729 |
-| 65536     | HypEx without grouping | 7.59533         | 63.731 |
-| 131072    | Causal Inference       | None            | None   |
-| 131072    | DoWhy                  | 40.33783        | 63.99  |
-| 131072    | HypEx with grouping    | 16.04607        | 63.887 |
-| 131072    | HypEx without grouping | 21.92333        | 63.918 |
-| 262144    | Causal Inference       | None            | None   |
-| 262144    | DoWhy                  | 77.97566        | 63.668 |
-| 262144    | HypEx with grouping    | 42.41343        | 63.745 |
-| 262144    | HypEx without grouping | 101.0387        | 63.753 |
-| 524288    | Causal Inference       | None            | None   |
-| 524288    | DoWhy                  | 159.39864       | 63.601 |
-| 524288    | HypEx with grouping    | 167.49331       | 63.637 |
-| 524288    | HypEx without grouping | 273.01422       | 63.638 |
-| 1048576   | Causal Inference       | None            | None   |
-| 1048576   | DoWhy                  | 312.73558       | 63.696 |
-| 1048576   | HypEx with grouping    | 509.08943       | 63.746 |
-| 1048576   | HypEx without grouping | 982.99217       | 63.746 |
-| 2097152   | Causal Inference       | None            | None   |
-| 2097152   | DoWhy                  | 615.31422       | 63.606 |
-| 2097152   | HypEx with grouping    | 1932.24495      | 63.604 |
-| 2097152   | HypEx without grouping | 3750.89241      | 63.607 |
-| 4194304   | Causal Inference       | None            | None   |
-| 4194304   | DoWhy                  | 1235.81405      | 63.649 |
-| 4194304   | HypEx with grouping    | 7248.08575      | 63.614 |
-| 4194304   | HypEx without grouping | 14720.51614     | 63.612 |
+| Group size             | 32768   | 65536     | 131072   | 262144   | 524288    | 1048576   | 2097152    | 4194304     |
+|------------------------|---------|-----------|----------|----------|-----------|-----------|------------|-------------|
+| Causal Inference       | 46.0853 | 169.29483 | None     | None     | None      | None      | None       | None        |
+| DoWhy                  | 9.75585 | 19.13385  | 40.33783 | 77.97566 | 159.39864 | 312.73558 | 615.31422  | 1235.81405  |
+| HypEx with grouping    | 2.47912 | 6.06445   | 16.04607 | 42.41343 | 167.49331 | 509.08943 | 1932.24495 | 7248.08575  |
+| HypEx without grouping | 2.6543  | 7.59533   | 21.92333 | 101.0387 | 273.01422 | 982.99217 | 3750.89241 | 14720.51614 |
 
 ## Join Our Community
 
@@ -222,4 +178,4 @@ HypEx stands as an indispensable resource for data analysts and researchers delv
 testing. With its automated capabilities, sophisticated matching techniques, and thorough validation procedures, HypEx
 is poised to unravel causal relationships in complex datasets with unprecedented speed and precision.
 
-##                                                                          
+##                                                                              
