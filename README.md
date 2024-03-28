@@ -1,9 +1,10 @@
 # HypEx: Advanced Causal Inference and AB Testing Toolkit
 
-[![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/hypexchat)
 ![Last release](https://img.shields.io/badge/pypi-v0.1.1-darkgreen)
-![Python versions](https://img.shields.io/badge/python-3.8_|_3.9_|_3.10_|_3.11_|_3.12-blue)
+[![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/hypexchat)
 ![Pypi downloads](https://img.shields.io/badge/downloads-5K-1E782B)
+![Python versions](https://img.shields.io/badge/python-3.8_|_3.9_|_3.10_|_3.11_|_3.12-blue)
+![Pypi downloads\month](https://img.shields.io/badge/downloads\month->1K-1E782B)
 
 ## Introduction
 
