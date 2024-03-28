@@ -160,12 +160,12 @@ discover why HypEx is the best solution for causal inference
 Visit [this](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-part-2) notebook ain Kaggle and
 estimate results by yourself.
 
-| Group size             | 32768   | 65536     | 131072   | 262144   | 524288    | 1048576   | 2097152    | 4194304     |
+| Group size             | 32 768   | 65 536     | 131 072   | 262 144   | 524 288    | 1 048 576   | 2 097 152    | 4 194 304     |
 |------------------------|---------|-----------|----------|----------|-----------|-----------|------------|-------------|
-| Causal Inference       | 46.0853 | 169.29483 | None     | None     | None      | None      | None       | None        |
-| DoWhy                  | 9.75585 | 19.13385  | 40.33783 | 77.97566 | 159.39864 | 312.73558 | 615.31422  | 1235.81405  |
-| HypEx with grouping    | 2.47912 | 6.06445   | 16.04607 | 42.41343 | 167.49331 | 509.08943 | 1932.24495 | 7248.08575  |
-| HypEx without grouping | 2.6543  | 7.59533   | 21.92333 | 101.0387 | 273.01422 | 982.99217 | 3750.89241 | 14720.51614 |
+| Causal Inference       | 46s | 169s | None     | None     | None      | None      | None       | None        |
+| DoWhy                  | 9s | 19s  | 40s | 77s | 159s | 312s | 615s  | 1235s  |
+| HypEx with grouping    | 2s | 6s   | 16s | 42s | 167s | 509s | 1932s | 7248s  |
+| HypEx without grouping | 2s  | 7s   | 21s | 101s | 273s | 982s | 3750s | 14720s |
 
 ## Join Our Community
 
