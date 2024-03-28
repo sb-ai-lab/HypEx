@@ -14,7 +14,6 @@ from hypex.errors.errors import (
     ConcatBackendError,
     SpaceError,
 )
-from hypex.experiment.experiment import Experiment
 from hypex.utils.enums import ExperimentDataEnum
 from hypex.utils.typings import FromDictType
 
@@ -25,18 +24,18 @@ class Dataset(DatasetBase):
             self.backend = backend
             self.roles = roles
 
-        # TODO add roles
         def __getitem__(self, item):
-            return Dataset(data=self.backend.loc(item))
+            t_data = self.backend.loc(item)
+            return Dataset(data=t_data, roles={k: v for k, v in self.roles.items() if k in t_data.columns})
 
     class ILocker:
         def __init__(self, backend, roles):
             self.backend = backend
             self.roles = roles
 
-        # TODO add roles
         def __getitem__(self, item):
-            return Dataset(data=self.backend.iloc(item))
+            t_data = self.backend.iloc(item)
+            return Dataset(data=t_data, roles={k: v for k, v in self.roles.items() if k in t_data.columns})
 
     def set_data(
         self,
@@ -70,8 +69,8 @@ class Dataset(DatasetBase):
             raise RoleColumnError(list(roles.keys()), self._backend.columns)
         self.roles = roles
         self.data = self._backend.data
-        self.loc = self.Locker(self._backend)
-        self.iloc = self.ILocker(self._backend)
+        self.loc = self.Locker(self._backend, self.roles)
+        self.iloc = self.ILocker(self._backend, self.roles)
 
     @staticmethod
     def _select_backend_from_data(data):
@@ -211,7 +210,6 @@ class Dataset(DatasetBase):
     def isin(self, values: Iterable):
         return Dataset(data=self._backend.isin(values))
 
-    # TODO add roles
     def groupby(
         self,
         by: Union[str, List],
@@ -221,8 +219,8 @@ class Dataset(DatasetBase):
         fields_list: Union[List, str, None] = None,
     ):
         datasets = [
-            (i[0], Dataset(data=i[1]))
-            for i in self._backend.groupby(by=by, axis=axis, level=level)
+            (i, Dataset(data=data, roles=self.roles))
+            for i, data in self._backend.groupby(by=by, axis=axis, level=level)
         ]
         if func:
             if fields_list:
@@ -230,13 +228,13 @@ class Dataset(DatasetBase):
                     fields_list if isinstance(fields_list, Iterable) else [fields_list]
                 )
                 datasets = [
-                    (i[0], Dataset(data=i[1][fields_list].agg(func).data))
-                    for i in datasets
+                    (i, Dataset(data=data[fields_list].agg(func).data, roles={k: v for k, v in self.roles.items() if k in fields_list}))
+                    for i, data in datasets
                 ]
             else:
                 datasets = [
-                    (i[0], Dataset(data=i[1].loc[:, :].agg(func).data))
-                    for i in datasets
+                    (i, Dataset(data=data.loc[:, :].agg(func).data, roles=self.roles))
+                    for i, data in datasets
                 ]
         return iter(datasets)
 
@@ -314,7 +312,6 @@ class ExperimentData(Dataset):
         self._id_name_mapping[executor_id] = name
         return self
 
-    # TODO import from const
     def get_ids(
         self, classes: Union[type, List[type]]
     ) -> Dict[type, Dict[str, List[str]]]:
@@ -324,17 +321,17 @@ class ExperimentData(Dataset):
                 "stats": [
                     str(_id)
                     for _id in self.stats_fields.columns
-                    if _id.split(Experiment._split_symbol)[0] == c.__name__
+                    if _id.split(ID_SPLIT_SYMBOL)[0] == c.__name__
                 ],
                 "additional_fields": [
                     str(_id)
                     for _id in self.additional_fields.columns
-                    if _id.split(Experiment._split_symbol)[0] == c.__name__
+                    if _id.split(ID_SPLIT_SYMBOL)[0] == c.__name__
                 ],
                 "analysis_tables": [
                     str(_id)
                     for _id in self.analysis_tables
-                    if _id.split(Experiment._split_symbol)[0] == c.__name__
+                    if _id.split(ID_SPLIT_SYMBOL)[0] == c.__name__
                 ],
             }
             for c in classes

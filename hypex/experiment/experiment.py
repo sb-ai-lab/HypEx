@@ -3,9 +3,9 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Iterable, Dict, Union, Any, List
 
-from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import TempGroupingRole, TempTargetRole, ABCRole
 from hypex.utils.constants import ID_SPLIT_SYMBOL
+from hypex.dataset.dataset import ExperimentData, Dataset
 
 
 class Executor(ABC):
