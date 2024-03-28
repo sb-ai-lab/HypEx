@@ -1,6 +1,9 @@
 # HypEx: Advanced Causal Inference and AB Testing Toolkit
 
 [![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/hypexchat)
+![Last release](https://img.shields.io/badge/pypi-v0.1.1-darkgreen)
+![Python versions](https://img.shields.io/badge/python-3.8_|_3.9_|_3.10_|_3.11_|_3.12-blue)
+![Pypi downloads](https://img.shields.io/badge/downloads-5K-1E782B)
 
 ## Introduction
 
@@ -23,7 +26,7 @@ Diff-in-Diff) and CUPED methods, to rigorously test hypotheses and validate expe
 - **Result Validation**: Offers multiple validation methods, including random treatment, feature, and subset
   validations.
 - **Data Tests**: Incorporates SMD, KS, PSI, and Repeats tests to affirm the robustness of effect estimations.
-- **Automated Feature Selection**: Employs LGBM feature selection to pinpoint the most impactful features for causal
+- **Feature Selection**: Employs LGBM and Catboost feature selection to pinpoint the most impactful features for causal
   analysis.
 - **AB Testing Suite**: Features a suite of AB testing tools for comprehensive hypothesis evaluation.
 - **Stratification support**: Stratify groups for nuanced analysis
@@ -54,34 +57,14 @@ Points to consider when selecting features:
 
 [Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/selectors.html#selector-classes)
 
-### Multitarget
-
-**Multitarget** involves studying the impact on multiple targets.
-
-The algorithm is implemented as a repetition of the same matching on the same feature space and samples, but with
-different targets. To ensure the algorithm's correct operation, it's necessary to guarantee the independence of the
-targets from each other.
-
-The best solution would be to conduct several independent experiments, each with its own set of features for each
-target.
-
-[Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/matcher.html#matcher)
-
-### Random Treatment и Random Feature
+### Random Treatment
 
 **Random Treatment** algorithm randomly shuffles the actual treatment. It is expected that the treatment's effect on the
 target will be close to 0.
 
-**Random Feature** adds a feature with random values. It is expected that adding a random feature will maintain the same
-impact of the treatment on the target.
-
-These methods are not sufficiently accurate markers of a successful experiment.
+These method is not sufficiently accurate marker of a successful experiment.
 
 [Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/utils.html#validators)
-
-## Quick Start
-
-Explore usage examples and tutorials [here](https://github.com/sb-ai-lab/Hypex/blob/master/examples/tutorials/).
 
 ## Installation
 
@@ -90,6 +73,8 @@ pip install hypex
 ```
 
 ## Quick start
+
+Explore usage examples and tutorials [here](https://github.com/sb-ai-lab/Hypex/blob/master/examples/tutorials/).
 
 ### Matching example
 
@@ -150,15 +135,37 @@ our [documentation on ReadTheDocs](https://hypex.readthedocs.io/en/latest/).
 You'll find comprehensive guides and tutorials that will help you get started with HypEx, as well as detailed API
 documentation for advanced use cases.
 
-## Community and Contributions
+## Contributions
 
 Join our vibrant community! For guidelines on contributing, reporting issues, or seeking support, please refer to
 our [Contributing Guidelines](https://github.com/sb-ai-lab/Hypex/blob/master/.github/CONTRIBUTING.md).
 
-## Success Stories
+## More Information & Resources
 
-Discover how HypEx is revolutionizing causal inference in various fields. Check out our featured article
-on [Habr (ru)](https://habr.com/ru/companies/sberbank/articles/778774/).
+[Habr (ru)](https://habr.com/ru/companies/sberbank/articles/778774/) - discover how HypEx is revolutionizing causal
+inference in various fields.      
+[A/B testing seminar](https://www.youtube.com/watch?v=B9BE_yk8CjA&t=53s&ab_channel=NoML) - Seminar in NoML about
+matching and A/B testing       
+[Matching with HypEx: Simple Guide](https://www.kaggle.com/code/kseniavasilieva/matching-with-hypex-simple-guide) -
+Simple matching guide with explanation           
+[Matching with HypEx: Grouping](https://www.kaggle.com/code/kseniavasilieva/matching-with-hypex-grouping) - Matching
+with grouping guide    
+[HypEx vs Causal Inference and DoWhy](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-and-dowhy) -
+discover why HypEx is the best solution for causal inference           
+[HypEx vs Causal Inference and DoWhy: part 2](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-part-2) -
+discover why HypEx is the best solution for causal inference
+
+### Testing different libraries for the speed of matching
+
+Visit [this](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-part-2) notebook ain Kaggle and
+estimate results by yourself.
+
+| Group size             | 32 768   | 65 536     | 131 072   | 262 144   | 524 288    | 1 048 576   | 2 097 152    | 4 194 304     |
+|------------------------|---------|-----------|----------|----------|-----------|-----------|------------|-------------|
+| Causal Inference       | 46s | 169s | None     | None     | None      | None      | None       | None        |
+| DoWhy                  | 9s | 19s  | 40s | 77s | 159s | 312s | 615s  | 1 235s  |
+| HypEx with grouping    | 2s | 6s   | 16s | 42s | 167s | 509s | 1 932s | 7 248s  |
+| HypEx without grouping | 2s  | 7s   | 21s | 101s | 273s | 982s | 3 750s | 14 720s |
 
 ## Join Our Community
 
@@ -170,3 +177,5 @@ and the developers.
 HypEx stands as an indispensable resource for data analysts and researchers delving into causal inference and AB
 testing. With its automated capabilities, sophisticated matching techniques, and thorough validation procedures, HypEx
 is poised to unravel causal relationships in complex datasets with unprecedented speed and precision.
+
+##                                                                              
