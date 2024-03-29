@@ -29,13 +29,13 @@ class StatDescriptive(Executor):
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        target = data.get_columns_by_roles(TempTargetRole, tmp_role=True)[0]
+        target = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)[0]
         return self._set_value(data, self.calc(data[target]), target)
 
 
 class Mean(StatDescriptive):
     def calc(self, data):
-        return np.mean(data, **self.kwargs)
+        return data.data.mean()
 
 
 class Median(StatDescriptive):

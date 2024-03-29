@@ -9,14 +9,19 @@ from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.stats.descriptive import Mean, Size
 from hypex.utils.enums import ExperimentDataEnum
 
-
+# TODO: replace space om Enum
 class GroupComparator(ComplexExecutor):
     def __init__(
         self,
+        grouping_role: Union[ABCRole, None] = None,
+        space: str = "auto",
         inner_executors: Union[Dict[str, Executor], None] = None,
         full_name: Union[str, None] = None,
         key: Any = 0,
     ):
+        self.grouping_role = grouping_role or GroupingRole()
+        self.space = space
+        self.__additional_mode = space == "additional"
         super().__init__(inner_executors=inner_executors, full_name=full_name, key=key)
 
     def _local_extract_dataset(self, compare_result: Dict[Any, Any]) -> Dataset:
@@ -26,18 +31,42 @@ class GroupComparator(ComplexExecutor):
     def _comparison_function(self, control_data, test_data):
         raise NotImplementedError
 
+    def __group_field_searching(self, data: ExperimentData):
+        group_field = []
+        if self.space in ["auto", "data"]:
+            group_field = data.get_columns_by_roles(self.grouping_role)
+        if self.space in ["auto", "additional"]:
+            group_field = data.additional_fields.get_columns_by_roles(self.grouping_role)
+            self.__additional_mode = True
+        if len(group_field) == 0:
+            raise ValueError(f"No columns found by role {self.grouping_role}")
+        return group_field
+
+    def __get_grouping_data(self, data: ExperimentData, group_field):
+        if self.__additional_mode:
+            t_groups = list(data.additional_fields.groupby(group_field))
+            return [(group, data.loc[subdata.index]) for (group, subdata) in t_groups]
+        return list(data.groupby(group_field))
+
+
     def _compare(self, data: ExperimentData) -> Dict:
-        group_field = data.get_columns_by_roles(GroupingRole)
-        self.key = str(group_field)
+        group_field = self.__group_field_searching(data)
+        self.key = str(group_field) if self.__additional_mode else str(self._id_name_mapping.get(group_field, group_field))
         target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)[0]
-        grouping_data = list(data.groupby(group_field))
-        return {
-            grouping_data[i][0]: self._comparison_function(
+        grouping_data = self.__get_grouping_data(data, group_field)
+        if len(grouping_data) > 1:
+            grouping_data[0][1].tmp_roles = data.tmp_roles
+        else:
+            raise ValueError(f"Group field {group_field} is not suitable for comparison")
+
+        result = {}
+        for i in range(1, len(grouping_data)):
+            grouping_data[i][1].tmp_roles = data.tmp_roles
+            result[grouping_data[i][0]] = self._comparison_function(
                 grouping_data[0][1][target_field],
                 grouping_data[i][1][target_field],
             )
-            for i in range(1, len(grouping_data))
-        }
+        return result
 
     def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
         data.set_value(
@@ -63,10 +92,10 @@ class GroupDifference(GroupComparator):
 
     def _comparison_function(self, control_data, test_data) -> Dataset:
         target_field = control_data.get_columns_by_roles(
-            TempTargetRole, tmp_role=True
+            TempTargetRole(), tmp_role=True
         )[0]
-        mean_a = self._inner_executors["mean"].execute(control_data)
-        mean_b = self._inner_executors["mean"].execute(test_data)
+        mean_a = self.inner_executors["mean"].calc(control_data).iloc[0]
+        mean_b = self.inner_executors["mean"].calc(test_data).iloc[0]
 
         return {
             f"{target_field} control mean": mean_a,
@@ -82,8 +111,8 @@ class GroupSizes(GroupComparator):
     }
 
     def _comparison_function(self, control_data, test_data) -> Dataset:
-        size_a = self._inner_executors["size"].execute(control_data)
-        size_b = self._inner_executors["size"].execute(test_data)
+        size_a = self.inner_executors["size"].execute(control_data)
+        size_b = self.inner_executors["size"].execute(test_data)
 
         return {
             "control size": size_a,

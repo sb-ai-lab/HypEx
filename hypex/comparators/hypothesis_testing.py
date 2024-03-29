@@ -14,12 +14,14 @@ from hypex.utils.typings import FromDictType
 class StatHypothesisTestingWithScipy(GroupComparator):
     def __init__(
         self,
+        grouping_role: Union[ABCRole, None] = None,
+        space: str = "auto",
         reliability: float = 0.05,
         inner_executors: Union[Dict[str, Executor], None] = None,
         full_name: Union[str, None] = None,
         key: Any = 0,
     ):
-        super().__init__(inner_executors, full_name, key)
+        super().__init__(grouping_role, space, inner_executors, full_name, key)
         self.reliability = reliability
 
     # excessive override

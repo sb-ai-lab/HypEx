@@ -26,7 +26,10 @@ class Dataset(DatasetBase):
 
         def __getitem__(self, item):
             t_data = self.backend.loc(item)
-            return Dataset(data=t_data, roles={k: v for k, v in self.roles.items() if k in t_data.columns})
+            return Dataset(
+                data=t_data,
+                roles={k: v for k, v in self.roles.items() if k in t_data.columns},
+            )
 
     class ILocker:
         def __init__(self, backend, roles):
@@ -35,7 +38,10 @@ class Dataset(DatasetBase):
 
         def __getitem__(self, item):
             t_data = self.backend.iloc(item)
-            return Dataset(data=t_data, roles={k: v for k, v in self.roles.items() if k in t_data.columns})
+            return Dataset(
+                data=t_data,
+                roles={k: v for k, v in self.roles.items() if k in t_data.columns},
+            )
 
     def set_data(
         self,
@@ -107,14 +113,16 @@ class Dataset(DatasetBase):
         return self._backend.__len__()
 
     def __getitem__(self, item: Union[Iterable, str, int]):
-        items = item if isinstance(item, Iterable) else [item]
-        roles: Dict = {}
-        for column in items:
-            if column in self.columns and self.roles.get(column, 0):
-                roles[column] = self.roles[column]
-            else:
-                roles[column] = InfoRole()
-        return Dataset(data=self._backend.__getitem__(item), roles=roles)
+        items = [item] if isinstance(item, str) or not isinstance(item, Iterable) else item
+        roles: Dict = {
+            column: self.roles[column]
+            if column in self.columns and self.roles.get(column, 0)
+            else InfoRole()
+            for column in items
+        }
+        result = Dataset(data=self._backend.__getitem__(item), roles=roles)
+        result.tmp_roles = self.tmp_roles
+        return result
 
     def __setitem__(self, key: str, value: Any):
         if key not in self.columns and isinstance(key, str):
@@ -134,14 +142,6 @@ class Dataset(DatasetBase):
     ) -> List[Union[str, ABCRole]]:
         roles = roles if isinstance(roles, Iterable) else [roles]
         roles_for_search = self.tmp_roles if tmp_role else self.roles
-        print("roles", roles_for_search)
-        print(
-            [
-                column
-                for column, role in roles_for_search.items()
-                if any(isinstance(r, role.__class__) for r in roles)
-            ]
-        )
         return [
             column
             for column, role in roles_for_search.items()
@@ -236,7 +236,9 @@ class Dataset(DatasetBase):
                     (i, Dataset(data=data.loc[:, :].agg(func).data, roles=self.roles))
                     for i, data in datasets
                 ]
-        return iter(datasets)
+        for i in range(len(datasets)):
+            datasets[i][1].temp_roles = self.tmp_roles
+        return datasets
 
     # TODO add roles
     def mean(self):

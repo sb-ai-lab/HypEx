@@ -220,7 +220,7 @@ class OnRoleExperiment(Experiment):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         for field in data.get_columns_by_roles(self.role):
-            data.data.tmp_roles = {field: TempTargetRole}
+            data.tmp_roles = {field: TempTargetRole()}
             data = super().execute(data)
-            data.data.tmp_roles = {}
+            data.tmp_roles = {}
         return data
