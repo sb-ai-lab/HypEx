@@ -45,14 +45,19 @@ class GroupComparator(ComplexExecutor):
     def __get_grouping_data(self, data: ExperimentData, group_field):
         if self.__additional_mode:
             t_groups = list(data.additional_fields.groupby(group_field))
-            return [(group, data.loc[subdata.index]) for (group, subdata) in t_groups]
-        return list(data.groupby(group_field))
+            result = [(group, data.loc[subdata.index]) for (group, subdata) in t_groups]
+        else:
+            result = list(data.groupby(group_field))
+        
+        result = [(group[0] if len(group) == 1 else group, subdata) for (group, subdata) in result]
+        return result
 
 
     def _compare(self, data: ExperimentData) -> Dict:
         group_field = self.__group_field_searching(data)
-        self.key = str(group_field) if self.__additional_mode else str(self._id_name_mapping.get(group_field, group_field))
+        group_name = str(group_field) if not self.__additional_mode else str(data._id_name_mapping.get(group_field[0], group_field))
         target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)[0]
+        self.key = f"{target_field}[{group_name}]"
         grouping_data = self.__get_grouping_data(data, group_field)
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
@@ -77,11 +82,12 @@ class GroupComparator(ComplexExecutor):
     def _extract_dataset(
         self, compare_result: FromDictType, roles: Union[ABCRole, None] = None
     ) -> Dataset:
+    #TODO: change
         return Dataset(roles=roles).from_dict(compare_result)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         compare_result = self._compare(data)
-        result_dataset = self._extract_dataset(compare_result)
+        result_dataset = self._local_extract_dataset(compare_result)
         return self._set_value(data, result_dataset)
 
 

@@ -42,11 +42,12 @@ class OneAASplitAnalyzer(ComplexExecutor):
             t_data = data.analysis_tables[analysis_ids[0]]
             for aid in analysis_ids[1:]:
                 t_data = t_data.append(data.analysis_tables[aid])
+            t_data.data.index = analysis_ids
 
             for f in ["p-value", "pass"]:
                 analysis_data[f"{c.__name__} {f}"] = self.inner_executors["mean"].calc(
-                    list(t_data[f])
-                )
+                    t_data[f]
+                ).iloc[0]
         analysis_data["mean test score"] = (
             analysis_data["TTest p-value"] + 2 * analysis_data["KSTest p-value"]
         ) / 3

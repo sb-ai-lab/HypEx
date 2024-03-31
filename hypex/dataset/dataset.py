@@ -16,6 +16,7 @@ from hypex.errors.errors import (
 )
 from hypex.utils.enums import ExperimentDataEnum
 from hypex.utils.typings import FromDictType
+from hypex.utils.constants import ID_SPLIT_SYMBOL
 
 
 class Dataset(DatasetBase):
@@ -302,7 +303,7 @@ class ExperimentData(Dataset):
         if space == ExperimentDataEnum.additional_fields:
             self.additional_fields.add_column(data=value, name=executor_id, role=role)
         elif space == ExperimentDataEnum.analysis_tables:
-            self.analysis_tables[name] = value
+            self.analysis_tables[executor_id] = value
         elif space == ExperimentDataEnum.stats_fields:
             if executor_id not in self.stats_fields.columns:
                 self.stats_fields.add_column(

@@ -2,7 +2,7 @@ from abc import ABC
 from typing import Dict, Union, Any, List
 
 # mypy import-untyped
-from scipy.stats import ttest_ind
+from scipy.stats import ttest_ind, ks_2samp
 
 from hypex.experiment.experiment import Executor
 from hypex.comparators.comparators import GroupComparator
@@ -50,9 +50,9 @@ class StatHypothesisTestingWithScipy(GroupComparator):
 
 class TTest(StatHypothesisTestingWithScipy):
     def _comparison_function(self, control_data, test_data) -> ExperimentData:
-        return ttest_ind(control_data, test_data)
+        return ttest_ind(control_data.data.values.flatten(), test_data.data.values.flatten())
 
 
 class KSTest(StatHypothesisTestingWithScipy):
     def _comparison_function(self, control_data, test_data) -> ExperimentData:
-        return ttest_ind(control_data, test_data)
+        return ks_2samp(control_data.data.values.flatten(), test_data.data.values.flatten())

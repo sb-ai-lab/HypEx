@@ -17,7 +17,7 @@ class Executor(ABC):
             [
                 self.__class__.__name__,
                 self.params_hash.replace(ID_SPLIT_SYMBOL, "|"),
-                str(self._key),
+                str(self._key).replace(ID_SPLIT_SYMBOL, "|"),
             ]
         )
 
