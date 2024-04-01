@@ -120,12 +120,14 @@ class Dataset(DatasetBase):
             warnings.warn("Column must be added by add_column", category=Warning)
         self.data[key] = value
 
-    def _create_empty(self, index=None, columns=None):
+    @staticmethod
+    def _create_empty(roles: Dict[Any, ABCRole], backend='pandas', index=None):
         index = [] if index is None else index
-        columns = [] if columns is None else columns
-        self._backend = self._backend._create_empty(index, columns)
-        self.data = self._backend.data
-        return self
+        columns = [key for key in list(roles.keys())]
+        ds = Dataset(roles=roles, backend=backend)
+        ds._backend = ds._backend._create_empty(index, columns)
+        ds.data = ds._backend.data
+        return ds
 
     def get_columns_by_roles(
         self, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role=False
@@ -279,18 +281,18 @@ class Dataset(DatasetBase):
 
 class ExperimentData(Dataset):
     def __init__(self, data: Dataset):
-        self.additional_fields = Dataset({})._create_empty(index=data.index)
-        self.stats_fields = Dataset({})._create_empty(index=data.columns)
-        self.additional_fields = Dataset({})._create_empty(index=data.index)
+        self.additional_fields = Dataset._create_empty(roles={}, index=data.index)
+        self.stats_fields = Dataset._create_empty(roles={}, index=data.columns)
+        self.additional_fields = Dataset._create_empty(roles={}, index=data.index)
         self.analysis_tables: Dict[str, Dataset] = {}
         self._id_name_mapping: Dict[str, str] = {}
 
         super().__init__(data=data.data, roles=data.roles)
 
-    def _create_empty(self, index=None, columns=None):
-        self.additional_fields._create_empty(index, columns)
-        self.stats_fields._create_empty(index, columns)
-        return self
+    @staticmethod
+    def _create_empty(roles: Dict[Any, ABCRole], backend='pandas', index=None):
+        ds = Dataset._create_empty(roles, backend, index)
+        return ExperimentData(ds)
 
     def check_hash(self, executor_id: int, space: str) -> bool:
         if space == ExperimentDataEnum.additional_fields:
