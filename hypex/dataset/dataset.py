@@ -279,9 +279,9 @@ class Dataset(DatasetBase):
 
 class ExperimentData(Dataset):
     def __init__(self, data: Dataset):
-        self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
-        self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
-        self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
+        self.additional_fields = Dataset({})._create_empty(index=data.index)
+        self.stats_fields = Dataset({})._create_empty(index=data.columns)
+        self.additional_fields = Dataset({})._create_empty(index=data.index)
         self.analysis_tables: Dict[str, Dataset] = {}
         self._id_name_mapping: Dict[str, str] = {}
 
@@ -312,15 +312,14 @@ class ExperimentData(Dataset):
         role=None,
     ):
         if space == ExperimentDataEnum.additional_fields:
-            self.additional_fields.add_column(data=value, name=executor_id, role=role)
+            self.additional_fields.add_column(data=value, role={executor_id: role})
         elif space == ExperimentDataEnum.analysis_tables:
             self.analysis_tables[executor_id] = value
         elif space == ExperimentDataEnum.stats_fields:
             if executor_id not in self.stats_fields.columns:
                 self.stats_fields.add_column(
                     data=[None] * len(self.stats_fields),
-                    name=executor_id,
-                    role=StatisticRole(),
+                    role={executor_id: StatisticRole()},
                 )
             self.stats_fields[executor_id][key] = value
         self._id_name_mapping[executor_id] = name

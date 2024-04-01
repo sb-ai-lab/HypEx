@@ -51,9 +51,9 @@ class OneAASplitAnalyzer(ComplexExecutor):
         analysis_data["mean test score"] = (
             analysis_data["TTest p-value"] + 2 * analysis_data["KSTest p-value"]
         ) / 3
-        analysis_data = Dataset(
-            roles={f: StatisticRole() for f in analysis_data}
-        ).from_dict([analysis_data])
+        analysis_data = Dataset.from_dict(
+            [analysis_data], {f: StatisticRole() for f in analysis_data}, 'pandas'
+        )
 
         return self._set_value(data, analysis_data)
 

@@ -1,10 +1,10 @@
 from abc import abstractmethod
-from typing import Dict, Union, Any
+from typing import Dict, Union, Any, List
 
 from hypex.utils.typings import FromDictType
 
 from hypex.dataset.dataset import Dataset, ExperimentData
-from hypex.dataset.roles import GroupingRole, TempTargetRole, ABCRole
+from hypex.dataset.roles import GroupingRole, TempTargetRole, ABCRole, StatisticRole
 from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.stats.descriptive import Mean, Size
 from hypex.utils.enums import ExperimentDataEnum
@@ -24,8 +24,8 @@ class GroupComparator(ComplexExecutor):
         self.__additional_mode = space == "additional"
         super().__init__(inner_executors=inner_executors, full_name=full_name, key=key)
 
-    def _local_extract_dataset(self, compare_result: Dict[Any, Any]) -> Dataset:
-        return self._extract_dataset(compare_result)
+    def _local_extract_dataset(self, compare_result: Dict[Any, Any], roles: Dict[Any, ABCRole]) -> Dataset:
+        return self._extract_dataset(compare_result, roles)
 
     @abstractmethod
     def _comparison_function(self, control_data, test_data):
@@ -80,14 +80,12 @@ class GroupComparator(ComplexExecutor):
         return data
 
     def _extract_dataset(
-        self, compare_result: FromDictType, roles: Union[ABCRole, None] = None
-    ) -> Dataset:
-    #TODO: change
-        return Dataset(roles=roles).from_dict(compare_result)
+        self, compare_result: FromDictType, roles: Dict[Any, ABCRole]) -> Dataset:
+        return Dataset.from_dict(compare_result, roles, 'pandas')
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         compare_result = self._compare(data)
-        result_dataset = self._local_extract_dataset(compare_result)
+        result_dataset = self._local_extract_dataset(compare_result, {key: StatisticRole() for key, _ in compare_result.items()})
         return self._set_value(data, result_dataset)
 
 

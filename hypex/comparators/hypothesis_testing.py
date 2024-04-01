@@ -25,7 +25,7 @@ class StatHypothesisTestingWithScipy(GroupComparator):
         self.reliability = reliability
 
     # excessive override
-    def _local_extract_dataset(self, compare_result: Dict[Any, Any]) -> Dataset:
+    def _local_extract_dataset(self, compare_result: Dict[Any, Any], roles = None) -> Dataset:
         # stats type
         result_stats: List[Dict[str, Any]] = [
             {
