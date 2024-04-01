@@ -1,4 +1,3 @@
-from abc import ABC
 from typing import Dict, Union, Any, List
 
 # mypy import-untyped
@@ -8,14 +7,14 @@ from hypex.experiment.experiment import Executor
 from hypex.comparators.comparators import GroupComparator
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import ABCRole, StatisticRole
-from hypex.utils.typings import FromDictType
+from hypex.utils.enums import SpaceEnum
 
 
 class StatHypothesisTestingWithScipy(GroupComparator):
     def __init__(
         self,
         grouping_role: Union[ABCRole, None] = None,
-        space: str = "auto",
+        space: SpaceEnum = SpaceEnum.auto,
         reliability: float = 0.05,
         inner_executors: Union[Dict[str, Executor], None] = None,
         full_name: Union[str, None] = None,

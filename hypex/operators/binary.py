@@ -28,16 +28,16 @@ class BinaryOperator(Executor):
         raise NotImplementedError
 
     def apply(self, data: ExperimentData) -> ExperimentData:
-        arg1 = data.get_columns_by_roles(Arg1Role, tmp_role=True)[0]
-        arg2 = data.get_columns_by_roles(Arg2Role, tmp_role=True)[0]
+        arg1 = data.get_columns_by_roles(Arg1Role(), tmp_role=True)[0]
+        arg2 = data.get_columns_by_roles(Arg2Role(), tmp_role=True)[0]
         return self._set_value(
             data,
             data.apply(lambda row: self.calc(row[arg1], row[arg2]), axis=1),
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        arg1 = data.get_columns_by_roles(Arg1Role, tmp_role=True)[0]
-        arg2 = data.get_columns_by_roles(Arg2Role, tmp_role=True)[0]
+        arg1 = data.get_columns_by_roles(Arg1Role(), tmp_role=True)[0]
+        arg2 = data.get_columns_by_roles(Arg2Role(), tmp_role=True)[0]
         return self._set_value(data, self.calc(data[arg1], data[arg2]))
 
 

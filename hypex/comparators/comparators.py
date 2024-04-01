@@ -1,30 +1,31 @@
 from abc import abstractmethod
-from typing import Dict, Union, Any, List
-
-from hypex.utils.typings import FromDictType
+from typing import Dict, Union, Any
 
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole, ABCRole, StatisticRole
 from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.stats.descriptive import Mean, Size
-from hypex.utils.enums import ExperimentDataEnum
+from hypex.utils.enums import ExperimentDataEnum, SpaceEnum, BackendsEnum
+from hypex.utils.typings import FromDictType
 
-# TODO: replace space om Enum
+
 class GroupComparator(ComplexExecutor):
     def __init__(
         self,
         grouping_role: Union[ABCRole, None] = None,
-        space: str = "auto",
+        space: SpaceEnum = SpaceEnum.auto,
         inner_executors: Union[Dict[str, Executor], None] = None,
         full_name: Union[str, None] = None,
         key: Any = 0,
     ):
         self.grouping_role = grouping_role or GroupingRole()
         self.space = space
-        self.__additional_mode = space == "additional"
+        self.__additional_mode = space == SpaceEnum.additional
         super().__init__(inner_executors=inner_executors, full_name=full_name, key=key)
 
-    def _local_extract_dataset(self, compare_result: Dict[Any, Any], roles: Dict[Any, ABCRole]) -> Dataset:
+    def _local_extract_dataset(
+        self, compare_result: Dict[Any, Any], roles: Dict[Any, ABCRole]
+    ) -> Dataset:
         return self._extract_dataset(compare_result, roles)
 
     @abstractmethod
@@ -33,10 +34,12 @@ class GroupComparator(ComplexExecutor):
 
     def __group_field_searching(self, data: ExperimentData):
         group_field = []
-        if self.space in ["auto", "data"]:
+        if self.space in [SpaceEnum.auto.value, SpaceEnum.data.value]:
             group_field = data.get_columns_by_roles(self.grouping_role)
-        if self.space in ["auto", "additional"]:
-            group_field = data.additional_fields.get_columns_by_roles(self.grouping_role)
+        if self.space in [SpaceEnum.auto.value, SpaceEnum.additional.value]:
+            group_field = data.additional_fields.get_columns_by_roles(
+                self.grouping_role
+            )
             self.__additional_mode = True
         if len(group_field) == 0:
             raise ValueError(f"No columns found by role {self.grouping_role}")
@@ -48,21 +51,29 @@ class GroupComparator(ComplexExecutor):
             result = [(group, data.loc[subdata.index]) for (group, subdata) in t_groups]
         else:
             result = list(data.groupby(group_field))
-        
-        result = [(group[0] if len(group) == 1 else group, subdata) for (group, subdata) in result]
-        return result
 
+        result = [
+            (group[0] if len(group) == 1 else group, subdata)
+            for (group, subdata) in result
+        ]
+        return result
 
     def _compare(self, data: ExperimentData) -> Dict:
         group_field = self.__group_field_searching(data)
-        group_name = str(group_field) if not self.__additional_mode else str(data._id_name_mapping.get(group_field[0], group_field))
+        group_name = (
+            str(group_field)
+            if not self.__additional_mode
+            else str(data._id_name_mapping.get(group_field[0], group_field))
+        )
         target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)[0]
         self.key = f"{target_field}[{group_name}]"
         grouping_data = self.__get_grouping_data(data, group_field)
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
-            raise ValueError(f"Group field {group_field} is not suitable for comparison")
+            raise ValueError(
+                f"Group field {group_field} is not suitable for comparison"
+            )
 
         result = {}
         for i in range(1, len(grouping_data)):
@@ -80,12 +91,15 @@ class GroupComparator(ComplexExecutor):
         return data
 
     def _extract_dataset(
-        self, compare_result: FromDictType, roles: Dict[Any, ABCRole]) -> Dataset:
-        return Dataset.from_dict(compare_result, roles, 'pandas')
+        self, compare_result: FromDictType, roles: Dict[Any, ABCRole]
+    ) -> Dataset:
+        return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         compare_result = self._compare(data)
-        result_dataset = self._local_extract_dataset(compare_result, {key: StatisticRole() for key, _ in compare_result.items()})
+        result_dataset = self._local_extract_dataset(
+            compare_result, {key: StatisticRole() for key, _ in compare_result.items()}
+        )
         return self._set_value(data, result_dataset)
 
 

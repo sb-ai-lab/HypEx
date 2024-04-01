@@ -197,7 +197,7 @@ class GroupExperiment(Executor):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result_list = []
-        group_field = data.get_columns_by_roles(TempGroupingRole, tmp_role=True)
+        group_field = data.get_columns_by_roles(TempGroupingRole(), tmp_role=True)
 
         for group, group_data in data.groupby(group_field):
             temp_data = ExperimentData(group_data)

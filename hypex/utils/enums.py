@@ -6,6 +6,12 @@ class ExperimentDataEnum(enum.Enum):
     analysis_tables = "analysis_tables"
     stats_fields = "stats_fields"
 
-
+@enum.unique
 class BackendsEnum(enum.Enum):
     pandas = "pandas"
+
+@enum.unique
+class SpaceEnum(enum.Enum):
+    auto = "auto"
+    additional = "additional"
+    data = "data"

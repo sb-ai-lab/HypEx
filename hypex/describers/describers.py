@@ -22,9 +22,10 @@ class Describer(Executor):
 
 
 class Unique(Describer):
+    # TODO add roles to from_dict
     @staticmethod
     def _convert_to_dataset(data: Iterable) -> Dataset:
-        return Dataset().from_dict(data)
+        return Dataset.from_dict(data)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result_dataset = self._convert_to_dataset(

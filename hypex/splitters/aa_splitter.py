@@ -49,14 +49,15 @@ class AASplitter(ComplexExecutor):
 
 class AASplitterWithGrouping(AASplitter):
     def execute(self, data: ExperimentData):
-        group_field = data.get_columns_by_roles(GroupingRole)
+        group_field = data.get_columns_by_roles(GroupingRole())
         groups = list(data.groupby(group_field))
         edge = len(groups) // 2
         result = []
         for i, group in enumerate(groups):
-            group_ds = Dataset(roles=[GroupingRole, TreatmentRole]).from_dict(
+            group_ds = Dataset.from_dict(
                 [{"group_for_split": group[0], "group": "A" if i < edge else "B"}]
                 * len(group[1]),
+                roles={"group_for_split": GroupingRole(), "group": TreatmentRole()},
                 index=group[1].index,
             )
             result = group_ds if result is None else result.append(group_ds)
@@ -76,9 +77,7 @@ class AASplitterWithStratification(AASplitter):
         super().__init__(control_size, random_state, full_name, key)
 
     def execute(self, data):
-        control_indexes = []
-        test_indexes = []
-        stratification_columns = data.get_columns_by_roles(StratificationRole)
+        stratification_columns = data.get_columns_by_roles(StratificationRole())
 
         groups = data.groupby(stratification_columns)
         result = None

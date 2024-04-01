@@ -15,9 +15,8 @@ from hypex.errors.errors import (
     SpaceError,
 )
 from hypex.utils.constants import ID_SPLIT_SYMBOL
-from hypex.utils.enums import ExperimentDataEnum
+from hypex.utils.enums import ExperimentDataEnum, BackendsEnum
 from hypex.utils.typings import FromDictType
-from hypex.utils.constants import ID_SPLIT_SYMBOL
 
 
 class Dataset(DatasetBase):
@@ -76,7 +75,7 @@ class Dataset(DatasetBase):
 
     @staticmethod
     def _select_backend_from_str(data, backend):
-        if backend == "pandas":
+        if backend == BackendsEnum.pandas:
             return PandasDataset(data)
         return PandasDataset(data)
 
@@ -84,7 +83,7 @@ class Dataset(DatasetBase):
         self,
         roles: Union[Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]],
         data: Union[pd.DataFrame, str, None] = None,
-        backend: Union[str, None] = None,
+        backend: Union[BackendsEnum, None] = None,
     ):
         self.roles = None
         self.tmp_roles: Union[
@@ -103,11 +102,15 @@ class Dataset(DatasetBase):
         return self._backend.__len__()
 
     def __getitem__(self, item: Union[Iterable, str, int]):
-        items = [item] if isinstance(item, str) or not isinstance(item, Iterable) else item
+        items = (
+            [item] if isinstance(item, str) or not isinstance(item, Iterable) else item
+        )
         roles: Dict = {
-            column: self.roles[column]
-            if column in self.columns and self.roles.get(column, 0)
-            else InfoRole()
+            column: (
+                self.roles[column]
+                if column in self.columns and self.roles.get(column, 0)
+                else InfoRole()
+            )
             for column in items
         }
         result = Dataset(data=self._backend.__getitem__(item), roles=roles)
@@ -121,7 +124,9 @@ class Dataset(DatasetBase):
         self.data[key] = value
 
     @staticmethod
-    def _create_empty(roles: Dict[Any, ABCRole], backend='pandas', index=None):
+    def _create_empty(
+        roles: Dict[Any, ABCRole], backend=BackendsEnum.pandas, index=None
+    ):
         index = [] if index is None else index
         columns = [key for key in list(roles.keys())]
         ds = Dataset(roles=roles, backend=backend)
@@ -175,7 +180,7 @@ class Dataset(DatasetBase):
     def from_dict(
         data: FromDictType,
         roles: Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]],
-        backend: str,
+        backend: BackendsEnum = BackendsEnum.pandas,
         index=None,
     ):
         ds = Dataset(roles=roles, backend=backend)
@@ -290,7 +295,7 @@ class ExperimentData(Dataset):
         super().__init__(data=data.data, roles=data.roles)
 
     @staticmethod
-    def _create_empty(roles: Dict[Any, ABCRole], backend='pandas', index=None):
+    def _create_empty(roles: Dict[Any, ABCRole], backend="pandas", index=None):
         ds = Dataset._create_empty(roles, backend, index)
         return ExperimentData(ds)
 
