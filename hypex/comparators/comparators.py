@@ -34,9 +34,9 @@ class GroupComparator(ComplexExecutor):
 
     def __group_field_searching(self, data: ExperimentData):
         group_field = []
-        if self.space in [SpaceEnum.auto.value, SpaceEnum.data.value]:
+        if self.space in [SpaceEnum.auto, SpaceEnum.data]:
             group_field = data.get_columns_by_roles(self.grouping_role)
-        if self.space in [SpaceEnum.auto.value, SpaceEnum.additional.value]:
+        if self.space in [SpaceEnum.auto, SpaceEnum.additional]:
             group_field = data.additional_fields.get_columns_by_roles(
                 self.grouping_role
             )
