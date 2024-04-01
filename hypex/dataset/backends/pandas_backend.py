@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Sequence, Union, Iterable, List, Dict, Tuple, Sized, Callable
 
 import pandas as pd
+from pandas import Series
 
 from hypex.dataset.base import DatasetBase
 from hypex.utils.typings import FromDictType
@@ -121,10 +122,16 @@ class PandasDataset(DatasetBase):
         return list(groups)
 
     def loc(self, items: Iterable) -> Iterable:
-        return self.data.loc[items]
+        data = self.data.loc[items]
+        if isinstance(data, Series):
+            data = pd.DataFrame(data)
+        return data
 
     def iloc(self, items: Iterable) -> Iterable:
-        return self.data.iloc[items]
+        data = self.data.iloc[items]
+        if isinstance(data, Series):
+            data = pd.DataFrame(data)
+        return data
 
     def mean(self):
         return self.data.mean()

@@ -39,10 +39,8 @@ class Dataset(DatasetBase):
 
     def set_data(
         self,
+        roles: Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]],
         data: Union[pd.DataFrame, str, Type, None] = None,
-        roles: Union[
-            Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole], None
-        ] = None,
         backend: Union[str, None] = None,
     ):
         self._backend = (
@@ -50,21 +48,13 @@ class Dataset(DatasetBase):
             if backend
             else self._select_backend_from_data(data)
         )
-        if not roles:
-            roles = {}
-            warnings.warn(
-                "Didn't add roles for experiment estimation. "
-                "This fact can lead to incorrect operation of the pipeline. "
-            )
         roles = (
             parse_roles(roles)
             if any(isinstance(role, type) for role in roles.keys())
             else roles
         )
-        if (
-            roles
-            and data is not None
-            and any(i not in self._backend.columns for i in list(roles.keys()))
+        if data is not None and any(
+            i not in self._backend.columns for i in list(roles.keys())
         ):
             raise RoleColumnError(list(roles.keys()), self._backend.columns)
         self.roles = roles
@@ -84,10 +74,8 @@ class Dataset(DatasetBase):
 
     def __init__(
         self,
+        roles: Union[Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]],
         data: Union[pd.DataFrame, str, None] = None,
-        roles: Union[
-            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]], None
-        ] = None,
         backend: Union[str, None] = None,
     ):
         self.roles = None
@@ -98,7 +86,7 @@ class Dataset(DatasetBase):
         self.data = None
         self.loc = None
         self.iloc = None
-        self.set_data(data, roles, backend)
+        self.set_data(roles, data, backend)
 
     def __repr__(self):
         return self.data.__repr__()
@@ -134,14 +122,6 @@ class Dataset(DatasetBase):
     ) -> List[Union[str, ABCRole]]:
         roles = roles if isinstance(roles, Iterable) else [roles]
         roles_for_search = self.tmp_roles if tmp_role else self.roles
-        print("roles", roles_for_search)
-        print(
-            [
-                column
-                for column, role in roles_for_search.items()
-                if any(isinstance(r, role.__class__) for r in roles)
-            ]
-        )
         return [
             column
             for column, role in roles_for_search.items()
@@ -169,14 +149,17 @@ class Dataset(DatasetBase):
             raise ConcatBackendError(type(other._backend), type(self._backend))
         return Dataset(data=self._backend.append(other._backend, index))
 
-    def from_dict(self, data: FromDictType, index=None):
-        self._backend = self._backend.from_dict(data, index)
-        if self.roles and any(
-            i not in self._backend.columns for i in list(self.roles.keys())
-        ):
-            raise RoleColumnError(list(self.roles.keys()), self._backend.columns)
-        self.data = self._backend.data
-        return self
+    @staticmethod
+    def from_dict(
+        data: FromDictType,
+        roles: Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]],
+        backend: str,
+        index=None,
+    ):
+        ds = Dataset(roles=roles, backend=backend)
+        ds._backend = ds._backend.from_dict(data, index)
+        ds.data = ds._backend.data
+        return ds
 
     def to_dict(self):
         return {
@@ -195,20 +178,25 @@ class Dataset(DatasetBase):
             json.dump(self.to_dict(), file)
 
     # TODO add roles
-    def apply(self, func, axis=0, **kwargs):
-        return Dataset(data=self._backend.apply(func=func, axis=axis, **kwargs))
+    def apply(
+        self,
+        func,
+        role,
+        axis=0,
+        **kwargs,
+    ):
+        return Dataset(
+            data=self._backend.apply(func=func, axis=axis, **kwargs), roles={}
+        )
 
-    # TODO add roles
     def map(self, func, na_action=None, **kwargs):
         return self._backend.map(func=func, na_action=na_action)
 
-    # TODO add roles
     def unique(self):
         return Dataset(data=self._backend.unique())
 
-    # TODO add roles
     def isin(self, values: Iterable):
-        return Dataset(data=self._backend.isin(values))
+        return Dataset(roles=self.roles, data=self._backend.isin(values))
 
     def groupby(
         self,
@@ -219,7 +207,7 @@ class Dataset(DatasetBase):
         fields_list: Union[List, str, None] = None,
     ):
         datasets = [
-            (i, Dataset(data=data, roles=self.roles))
+            (i, Dataset(roles=self.roles, data=data))
             for i, data in self._backend.groupby(by=by, axis=axis, level=level)
         ]
         if func:
@@ -228,43 +216,46 @@ class Dataset(DatasetBase):
                     fields_list if isinstance(fields_list, Iterable) else [fields_list]
                 )
                 datasets = [
-                    (i, Dataset(data=data[fields_list].agg(func).data, roles={k: v for k, v in self.roles.items() if k in fields_list}))
+                    (
+                        i,
+                        Dataset(
+                            roles={
+                                k: v for k, v in self.roles.items() if k in fields_list
+                            },
+                            data=data[fields_list].agg(func).data,
+                        ),
+                    )
                     for i, data in datasets
                 ]
             else:
                 datasets = [
-                    (i, Dataset(data=data.loc[:, :].agg(func).data, roles=self.roles))
+                    (i, Dataset(roles=self.roles, data=data.loc[:, :].agg(func).data))
                     for i, data in datasets
                 ]
         return iter(datasets)
 
-    # TODO add roles
     def mean(self):
         return Dataset(data=self._backend.mean())
 
-    # TODO add roles
     def max(self):
         return Dataset(data=self._backend.max())
 
-    # TODO add roles
     def min(self):
         return Dataset(data=self._backend.min())
 
-    # TODO add roles
     def count(self):
         return Dataset(data=self._backend.count())
 
-    # TODO add roles
     def sum(self):
         return Dataset(data=self._backend.sum())
 
-    # TODO add roles
     def agg(self, func: Union[str, List]):
         return Dataset(data=self._backend.agg(func))
 
 
 class ExperimentData(Dataset):
     def __init__(self, data: Dataset):
+
         self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
         self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
         self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
