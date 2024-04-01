@@ -20,7 +20,6 @@ class DatasetBase(ABC):
     def add_column(self, data, name):
         raise NotImplementedError
 
-    @abstractmethod
     def from_dict(self, data):
         raise NotImplementedError
 
@@ -54,8 +53,7 @@ class DatasetBase(ABC):
     def isin(self, values: Iterable) -> Iterable[bool]:
         raise NotImplementedError
 
-    @abstractmethod
-    def groupby(self, by, axis, **kwargs):
+    def groupby(self, by, **kwargs):
         raise NotImplementedError
 
     def loc(self, values: Iterable) -> Iterable:

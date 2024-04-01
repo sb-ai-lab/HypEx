@@ -114,10 +114,8 @@ class PandasDataset(DatasetBase):
     def isin(self, values: Iterable) -> Iterable[bool]:
         return self.data.isin(values)
 
-    def groupby(
-        self, by: Union[str, Iterable[str]], axis: int, **kwargs
-    ) -> List[Tuple]:
-        groups = self.data.groupby(by, axis, **kwargs)
+    def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> List[Tuple]:
+        groups = self.data.groupby(by, **kwargs)
         return list(groups)
 
     def loc(self, items: Iterable) -> Iterable:
@@ -127,19 +125,19 @@ class PandasDataset(DatasetBase):
         return self.data.iloc[items]
 
     def mean(self):
-        return self.data.mean()
+        return self.data.agg(["mean"])
 
     def max(self):
-        return self.data.max()
+        return self.data.agg(["max"])
 
     def min(self):
-        return self.data.min()
+        return self.data.agg(["min"])
 
     def count(self):
-        return self.data.count()
+        return self.data.agg(["count"])
 
     def sum(self):
-        return self.data.sum()
+        return self.data.agg(["sum"])
 
     def agg(self, func):
         return self.data.agg(func)
