@@ -14,6 +14,7 @@ from hypex.errors.errors import (
     ConcatBackendError,
     SpaceError,
 )
+from hypex.utils.constants import ID_SPLIT_SYMBOL
 from hypex.utils.enums import ExperimentDataEnum
 from hypex.utils.typings import FromDictType
 
@@ -273,7 +274,6 @@ class Dataset(DatasetBase):
 
 class ExperimentData(Dataset):
     def __init__(self, data: Dataset):
-
         self.additional_fields = Dataset(data.data)._create_empty(index=data.index)
         self.stats_fields = Dataset(data.data)._create_empty(index=data.columns)
         self.additional_fields = Dataset(data.data)._create_empty(index=data.index)

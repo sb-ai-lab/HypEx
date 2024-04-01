@@ -19,7 +19,7 @@ class ABCRole(ABC):
     def role_name(self) -> str:
         return self._role_name
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return self._role_name
 
 
