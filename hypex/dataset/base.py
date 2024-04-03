@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Iterable
 
 
+# TODO добавить базовый класс для бэкенда
 class DatasetBase(ABC):
 
     @abstractmethod

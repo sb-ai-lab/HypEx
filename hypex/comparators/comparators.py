@@ -29,7 +29,7 @@ class GroupComparator(ComplexExecutor):
         return self._extract_dataset(compare_result, roles)
 
     @abstractmethod
-    def _comparison_function(self, control_data, test_data):
+    def _comparison_function(self, control_data, test_data) -> Dict[str: Any]:
         raise NotImplementedError
 
     def __group_field_searching(self, data: ExperimentData):
@@ -42,6 +42,7 @@ class GroupComparator(ComplexExecutor):
             )
             self.__additional_mode = True
         if len(group_field) == 0:
+            # TODO вынеси ERROR
             raise ValueError(f"No columns found by role {self.grouping_role}")
         return group_field
 
@@ -60,6 +61,7 @@ class GroupComparator(ComplexExecutor):
 
     def _compare(self, data: ExperimentData) -> Dict:
         group_field = self.__group_field_searching(data)
+        # TODO об этом надо подумать data._id_name_mapping
         group_name = (
             str(group_field)
             if not self.__additional_mode
@@ -71,6 +73,7 @@ class GroupComparator(ComplexExecutor):
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
+            # TODO вынеси ERROR
             raise ValueError(
                 f"Group field {group_field} is not suitable for comparison"
             )
@@ -90,6 +93,7 @@ class GroupComparator(ComplexExecutor):
         )
         return data
 
+    # TODO Method '_extract_dataset' may be 'static'
     def _extract_dataset(
         self, compare_result: FromDictType, roles: Dict[Any, ABCRole]
     ) -> Dataset:
@@ -108,7 +112,7 @@ class GroupDifference(GroupComparator):
         "mean": Mean(),
     }
 
-    def _comparison_function(self, control_data, test_data) -> Dataset:
+    def _comparison_function(self, control_data, test_data) -> Dict[str: Any]:
         target_field = control_data.get_columns_by_roles(
             TempTargetRole(), tmp_role=True
         )[0]
@@ -128,7 +132,7 @@ class GroupSizes(GroupComparator):
         "mean": Size(),
     }
 
-    def _comparison_function(self, control_data, test_data) -> Dataset:
+    def _comparison_function(self, control_data, test_data) -> Dict[str: Any]:
         size_a = self.inner_executors["size"].execute(control_data)
         size_b = self.inner_executors["size"].execute(test_data)
 

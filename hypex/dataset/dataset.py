@@ -1,6 +1,6 @@
 import json
 import warnings
-from typing import Union, List, Iterable, Any, Type, Dict, Callable
+from typing import Union, List, Iterable, Any, Type, Dict, Callable, Hashable
 
 import pandas as pd
 
@@ -44,12 +44,31 @@ class Dataset(DatasetBase):
                 roles={k: v for k, v in self.roles.items() if k in t_data.columns},
             )
 
+    @staticmethod
+    def _select_backend_from_data(data):
+        """
+        Выбирает бэкенд исходя из типа пришедших данных
+        """
+        return PandasDataset(data)
+
+    @staticmethod
+    def _select_backend_from_str(data, backend):
+        """
+        Выбирает бэкенд исходя из строкового описания бэкенда
+        """
+        if backend == BackendsEnum.pandas:
+            return PandasDataset(data)
+        return PandasDataset(data)
+
     def set_data(
         self,
         roles: Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]],
         data: Union[pd.DataFrame, str, Type, None] = None,
-        backend: Union[str, None] = None,
+        backend: Union[BackendsEnum, None] = None,
     ):
+        """
+        Заполняет атрибуты класса
+        """
         self._backend = (
             self._select_backend_from_str(data, backend)
             if backend
@@ -69,30 +88,20 @@ class Dataset(DatasetBase):
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
 
-    @staticmethod
-    def _select_backend_from_data(data):
-        return PandasDataset(data)
-
-    @staticmethod
-    def _select_backend_from_str(data, backend):
-        if backend == BackendsEnum.pandas:
-            return PandasDataset(data)
-        return PandasDataset(data)
-
     def __init__(
         self,
         roles: Union[Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]],
         data: Union[pd.DataFrame, str, None] = None,
         backend: Union[BackendsEnum, None] = None,
     ):
-        self.roles = None
+        self.roles: Dict[ABCRole, str] = {}
         self.tmp_roles: Union[
             Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
         ] = {}
-        self._backend = None
-        self.data = None
-        self.loc = None
-        self.iloc = None
+        self._backend: Union[PandasDataset, None] = None
+        self.data: Any = None
+        self.loc: Union[Dataset.Locker, None] = None
+        self.iloc: Union[Dataset.ILocker, None] = None
         self.set_data(roles, data, backend)
 
     def __repr__(self):
@@ -123,6 +132,7 @@ class Dataset(DatasetBase):
             warnings.warn("Column must be added by add_column", category=Warning)
         self.data[key] = value
 
+    # TODO reformat signature
     @staticmethod
     def _create_empty(
         roles: Dict[Any, ABCRole], backend=BackendsEnum.pandas, index=None
@@ -153,8 +163,13 @@ class Dataset(DatasetBase):
     def columns(self):
         return self._backend.columns
 
-    def add_column(self, data, role: Dict[str, ABCRole] = None, index=None):
-        if role is None:
+    def add_column(
+        self,
+        data,
+        role: Union[Dict[str, ABCRole], None] = None,
+        index: Union[Iterable[Hashable], None] = None,
+    ):
+        if role is None:  # если данные - датасет
             if isinstance(data, Dataset):
                 self.roles.update(data.roles)
                 self._backend.add_column(
@@ -173,7 +188,7 @@ class Dataset(DatasetBase):
             raise ConcatDataError(type(other))
         if type(other._backend) != type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
-        roles = {**self.roles, **other.roles}
+        roles = {**self.roles, **other.roles}  # TODO через union
         return Dataset(roles=roles, data=self._backend.append(other._backend, index))
 
     @staticmethod
@@ -189,6 +204,7 @@ class Dataset(DatasetBase):
         return ds
 
     def to_dict(self):
+        # TODO добавить имя класса в бэкенд
         return {
             "backend": str(self._backend.__class__.__name__).lower()[:-7],
             "roles": {
@@ -227,9 +243,10 @@ class Dataset(DatasetBase):
     def isin(self, values: Iterable):
         return Dataset(roles=self.roles, data=self._backend.isin(values))
 
+    # TODO убрать level и добавить кварги
     def groupby(
         self,
-        by: Union[str, List],
+        by: Any,
         level=None,
         func: Union[str, List, None] = None,
         fields_list: Union[List, str, None] = None,
@@ -299,7 +316,8 @@ class ExperimentData(Dataset):
         ds = Dataset._create_empty(roles, backend, index)
         return ExperimentData(ds)
 
-    def check_hash(self, executor_id: int, space: str) -> bool:
+    # TODO добавить проверку во всех пространствах
+    def check_hash(self, executor_id: int, space: ExperimentDataEnum) -> bool:
         if space == ExperimentDataEnum.additional_fields:
             return executor_id in self.additional_fields.columns
         elif space == ExperimentDataEnum.stats_fields:
@@ -332,27 +350,28 @@ class ExperimentData(Dataset):
         self._id_name_mapping[executor_id] = name
         return self
 
+    # TODO заменить на enum
     def get_ids(
         self, classes: Union[type, List[type]]
     ) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
         return {
-            c: {
+            class_: {
                 "stats": [
                     str(_id)
                     for _id in self.stats_fields.columns
-                    if _id.split(ID_SPLIT_SYMBOL)[0] == c.__name__
+                    if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
                 ],
                 "additional_fields": [
                     str(_id)
                     for _id in self.additional_fields.columns
-                    if _id.split(ID_SPLIT_SYMBOL)[0] == c.__name__
+                    if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
                 ],
                 "analysis_tables": [
                     str(_id)
                     for _id in self.analysis_tables
-                    if _id.split(ID_SPLIT_SYMBOL)[0] == c.__name__
+                    if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
                 ],
             }
-            for c in classes
+            for class_ in classes
         }

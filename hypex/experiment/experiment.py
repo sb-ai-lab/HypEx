@@ -3,9 +3,9 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Iterable, Dict, Union, Any, List
 
+from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import TempGroupingRole, TempTargetRole, ABCRole
 from hypex.utils.constants import ID_SPLIT_SYMBOL
-from hypex.dataset.dataset import ExperimentData, Dataset
 
 
 class Executor(ABC):
@@ -57,7 +57,7 @@ class Executor(ABC):
         self.full_name = full_name
 
         self.key: Any = key
-        self._generate_params_hash()
+        self.refresh_params_hash()
 
     @property
     def _is_transformer(self) -> bool:
@@ -71,6 +71,7 @@ class Executor(ABC):
         raise NotImplementedError
 
 
+# TODO Class ComplexExecutor must implement all abstract methods
 class ComplexExecutor(Executor):
     default_inner_executors: Dict[str, Executor] = {}
 
@@ -82,6 +83,7 @@ class ComplexExecutor(Executor):
         for key, executor in self.default_inner_executors.items():
             if key not in inner_executors:
                 if len(inner_executors):
+                    # TODO вынести ворнинг
                     warnings.warn(
                         f"{key} executor not found in inner_executors. Will {key} will be used by default."
                     )
@@ -101,6 +103,7 @@ class ComplexExecutor(Executor):
 
 
 class Experiment(Executor):
+    # TODO допиши
     @staticmethod
     def _detect_transformer() -> bool:
         return False
@@ -108,7 +111,8 @@ class Experiment(Executor):
     def get_executor_ids(
         self, searched_classes: Union[type, Iterable[type], None] = None
     ) -> Dict[type, List[str]]:
-        if searched_classes is None:
+        # странно
+        if not searched_classes:
             return {}
 
         searched_classes = (
@@ -117,8 +121,12 @@ class Experiment(Executor):
             else [searched_classes]
         )
         return {
-            sc: [executor.id for executor in self.executors if isinstance(executor, sc)]
-            for sc in searched_classes
+            searched_class: [
+                executor.id
+                for executor in self.executors
+                if isinstance(executor, searched_class)
+            ]
+            for searched_class in searched_classes
         }
 
     def __init__(
@@ -135,6 +143,7 @@ class Experiment(Executor):
         full_name = str(full_name or f"Experiment({len(self.executors)})")
         super().__init__(full_name, key)
 
+    # может быть удален?
     def _extract_result(
         self, original_data: ExperimentData, experiment_data: ExperimentData
     ):
@@ -171,6 +180,7 @@ class CycledExperiment(Executor):
 
 
 class GroupExperiment(Executor):
+    # TODO подредачь replace
     def generate_params_hash(self) -> str:
         return f"GroupExperiment: {self.inner_executor._id.replace('|', '')}"
 
@@ -183,6 +193,7 @@ class GroupExperiment(Executor):
         self.inner_executor: Executor = inner_executor
         super().__init__(full_name, key)
 
+    # TODO реши, должен он быть защищенным или публичным
     def extract_result(self, data: ExperimentData) -> Dataset:
         return data.analysis_tables[self.inner_executor._id]
 
@@ -192,6 +203,7 @@ class GroupExperiment(Executor):
         result = result_list[0]
         for i in range(1, len(result_list)):
             result = result.append(result_list[i])
+        # TODO сделать через set_value
         data.analysis_tables[self._id] = result
         return data
 

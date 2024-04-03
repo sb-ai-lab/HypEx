@@ -8,9 +8,6 @@ from hypex.dataset.dataset import ExperimentData
 from hypex.utils.typings import FieldKey
 from hypex.comparators.comparators import ComparatorInner
 
-
-# from hypex.comparators.comparators import ComparatorInner
-
 #TODO: Rework ALL
 
 class TestPower(ComparatorInner):

@@ -68,11 +68,11 @@ class TempGroupingRole(GroupingRole):
     _role_name = "TempGrouping"
 
 
-class Arg1Role:
+class Arg1Role(ABCRole):
     _role_name = "Arg1"
 
 
-class Arg2Role:
+class Arg2Role(ABCRole):
     _role_name = "Arg2"
 
 

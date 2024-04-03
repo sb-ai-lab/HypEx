@@ -10,15 +10,13 @@ from hypex.utils.enums import ExperimentDataEnum
 
 
 class BinaryOperator(Executor):
-    def get_full_name(self):
-        return f"{self.__class__.__name__}"
 
     def __init__(self, full_name: str = None, key: Any = 0):
         super().__init__(full_name, key)
 
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
         data.set_value(
-            ExperimentDataEnum.additional_fields, self._id, self.get_full_name(), value
+            ExperimentDataEnum.additional_fields, self._id, self.full_name, value
         )
         return data
 
@@ -30,6 +28,7 @@ class BinaryOperator(Executor):
     def apply(self, data: ExperimentData) -> ExperimentData:
         arg1 = data.get_columns_by_roles(Arg1Role(), tmp_role=True)[0]
         arg2 = data.get_columns_by_roles(Arg2Role(), tmp_role=True)[0]
+        # TODO добавь роли
         return self._set_value(
             data,
             data.apply(lambda row: self.calc(row[arg1], row[arg2]), axis=1),

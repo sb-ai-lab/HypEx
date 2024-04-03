@@ -7,7 +7,7 @@ from hypex.experiment.experiment import Executor
 from hypex.utils.enums import ExperimentDataEnum
 from hypex.utils.typings import FieldKey
 
-
+# TODO Class Describer must implement all abstract methods
 class Describer(Executor):
     def __init__(
         self, target_field: FieldKey, full_name: Union[str, None] = None, key: Any = 0
@@ -25,7 +25,7 @@ class Unique(Describer):
     # TODO add roles to from_dict
     @staticmethod
     def _convert_to_dataset(data: Iterable) -> Dataset:
-        return Dataset.from_dict(data)
+        return Dataset.from_dict(data) # TODO добавь роли
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result_dataset = self._convert_to_dataset(

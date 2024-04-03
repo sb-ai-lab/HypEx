@@ -9,7 +9,7 @@ from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import ABCRole, StatisticRole
 from hypex.utils.enums import SpaceEnum
 
-
+# TODO Class StatHypothesisTestingWithScipy must implement all abstract methods
 class StatHypothesisTestingWithScipy(GroupComparator):
     def __init__(
         self,
