@@ -29,7 +29,7 @@ class GroupComparator(ComplexExecutor):
         return self._extract_dataset(compare_result, roles)
 
     @abstractmethod
-    def _comparison_function(self, control_data, test_data) -> Dict[str:Any]:
+    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
         raise NotImplementedError
 
     def __group_field_searching(self, data: ExperimentData):
@@ -112,7 +112,7 @@ class GroupDifference(GroupComparator):
         "mean": Mean(),
     }
 
-    def _comparison_function(self, control_data, test_data) -> Dict[str:Any]:
+    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
         target_field = control_data.get_columns_by_roles(
             TempTargetRole(), tmp_role=True
         )[0]
@@ -132,7 +132,7 @@ class GroupSizes(GroupComparator):
         "mean": Size(),
     }
 
-    def _comparison_function(self, control_data, test_data) -> Dict[str:Any]:
+    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
         size_a = self.inner_executors["size"].execute(control_data)
         size_b = self.inner_executors["size"].execute(test_data)
 
