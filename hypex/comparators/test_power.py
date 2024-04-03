@@ -8,7 +8,8 @@ from hypex.dataset.dataset import ExperimentData
 from hypex.utils.typings import FieldKey
 from hypex.comparators.comparators import ComparatorInner
 
-#TODO: Rework ALL
+# TODO: Rework ALL
+
 
 class TestPower(ComparatorInner):
     def __init__(
@@ -17,7 +18,7 @@ class TestPower(ComparatorInner):
         significance: float = 0.95,
         power: float = 0.8,
         full_name: str = None,
-        key: Any = 0
+        key: Any = 0,
     ):
         super().__init__(target_field, self.comparison_function, full_name, key)
         self.significance = significance
@@ -47,7 +48,7 @@ class StatSampleSizeByMde(TestPower):
         significance: float = 0.05,
         power: float = 0.8,
         full_name: str = None,
-        key: Any = 0
+        key: Any = 0,
     ):
         super().__init__(target_field, significance, power, full_name, key)
         self.mde = mde

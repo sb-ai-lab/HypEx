@@ -9,6 +9,7 @@ from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import ABCRole, StatisticRole
 from hypex.utils.enums import SpaceEnum
 
+
 # TODO Class StatHypothesisTestingWithScipy must implement all abstract methods
 class StatHypothesisTestingWithScipy(GroupComparator):
     def __init__(
@@ -24,7 +25,9 @@ class StatHypothesisTestingWithScipy(GroupComparator):
         self.reliability = reliability
 
     # excessive override
-    def _local_extract_dataset(self, compare_result: Dict[Any, Any], roles = None) -> Dataset:
+    def _local_extract_dataset(
+        self, compare_result: Dict[Any, Any], roles=None
+    ) -> Dataset:
         # stats type
         result_stats: List[Dict[str, Any]] = [
             {
@@ -35,7 +38,7 @@ class StatHypothesisTestingWithScipy(GroupComparator):
             }
             for group, stats in compare_result.items()
         ]
-        # mypy does not see an heir 
+        # mypy does not see an heir
         # return super()._extract_dataset(
         #     result_stats,
         #     roles={StatisticRole(): ["group", "statistic", "p-value", "pass"]}
@@ -43,15 +46,21 @@ class StatHypothesisTestingWithScipy(GroupComparator):
 
         return super()._extract_dataset(
             result_stats,
-            roles={f: StatisticRole() for f in ["group", "statistic", "p-value", "pass"]}
+            roles={
+                f: StatisticRole() for f in ["group", "statistic", "p-value", "pass"]
+            },
         )
 
 
 class TTest(StatHypothesisTestingWithScipy):
     def _comparison_function(self, control_data, test_data) -> ExperimentData:
-        return ttest_ind(control_data.data.values.flatten(), test_data.data.values.flatten())
+        return ttest_ind(
+            control_data.data.values.flatten(), test_data.data.values.flatten()
+        )
 
 
 class KSTest(StatHypothesisTestingWithScipy):
     def _comparison_function(self, control_data, test_data) -> ExperimentData:
-        return ks_2samp(control_data.data.values.flatten(), test_data.data.values.flatten())
+        return ks_2samp(
+            control_data.data.values.flatten(), test_data.data.values.flatten()
+        )
