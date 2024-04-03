@@ -8,7 +8,7 @@ from hypex.dataset.backends.pandas_backend import PandasDataset
 from hypex.dataset.base import DatasetBase
 from hypex.dataset.roles import StatisticRole, InfoRole, ABCRole
 from hypex.dataset.utils import parse_roles
-from hypex.errors.errors import (
+from hypex.utils.errors import (
     RoleColumnError,
     ConcatDataError,
     ConcatBackendError,
