@@ -4,7 +4,7 @@ import enum
 class ExperimentDataEnum(enum.Enum):
     additional_fields = "additional_fields"
     analysis_tables = "analysis_tables"
-    stats_fields = "stats_fields"
+    stats = "stats"
 
 @enum.unique
 class BackendsEnum(enum.Enum):

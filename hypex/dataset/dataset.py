@@ -129,16 +129,15 @@ class Dataset(DatasetBase):
     def __setitem__(self, key: str, value: Any):
         if key not in self.columns and isinstance(key, str):
             self.add_column(value, {key: InfoRole()})
-            warnings.warn("Column must be added by add_column", category=Warning)
+            warnings.warn("Column must be added by add_column", category=SyntaxWarning)
         self.data[key] = value
 
-    # TODO reformat signature
     @staticmethod
     def _create_empty(
         roles: Dict[Any, ABCRole], backend=BackendsEnum.pandas, index=None
     ):
         index = [] if index is None else index
-        columns = [key for key in list(roles.keys())]
+        columns = list(roles.keys())
         ds = Dataset(roles=roles, backend=backend)
         ds._backend = ds._backend._create_empty(index, columns)
         ds.data = ds._backend.data
@@ -170,15 +169,14 @@ class Dataset(DatasetBase):
         index: Union[Iterable[Hashable], None] = None,
     ):
         if role is None:  # если данные - датасет
-            if isinstance(data, Dataset):
-                self.roles.update(data.roles)
-                self._backend.add_column(
-                    data._backend.data[list(data._backend.data.columns)[0]],
-                    list(data.roles.keys())[0],
-                    index,
-                )
-            else:
+            if not isinstance(data, Dataset):
                 raise ValueError("Козьёль")
+            self.roles.update(data.roles)
+            self._backend.add_column(
+                data._backend.data[list(data._backend.data.columns)[0]],
+                list(data.roles.keys())[0],
+                index,
+            )
         else:
             self.roles.update(role)
             self._backend.add_column(data, list(role.keys())[0], index)
@@ -188,7 +186,7 @@ class Dataset(DatasetBase):
             raise ConcatDataError(type(other))
         if type(other._backend) != type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
-        roles = {**self.roles, **other.roles}  # TODO через union
+        self.roles.update(other.roles)
         return Dataset(roles=roles, data=self._backend.append(other._backend, index))
 
     @staticmethod
@@ -204,9 +202,8 @@ class Dataset(DatasetBase):
         return ds
 
     def to_dict(self):
-        # TODO добавить имя класса в бэкенд
         return {
-            "backend": str(self._backend.__class__.__name__).lower()[:-7],
+            "backend": self._backend.name,
             "roles": {
                 "role_names": list(map(lambda x: x.role_name, list(self.roles.keys()))),
                 "columns": list(self.roles.values()),
@@ -243,17 +240,16 @@ class Dataset(DatasetBase):
     def isin(self, values: Iterable):
         return Dataset(roles=self.roles, data=self._backend.isin(values))
 
-    # TODO убрать level и добавить кварги
     def groupby(
         self,
         by: Any,
-        level=None,
         func: Union[str, List, None] = None,
         fields_list: Union[List, str, None] = None,
+        **kwargs
     ):
         datasets = [
             (i, Dataset(roles=self.roles, data=data))
-            for i, data in self._backend.groupby(by=by, level=level)
+            for i, data in self._backend.groupby(by=by, **kwargs)
         ]
         if func:
             if fields_list:
@@ -277,8 +273,8 @@ class Dataset(DatasetBase):
                     (i, Dataset(roles=self.roles, data=data.agg(func).data))
                     for i, data in datasets
                 ]
-        for i in range(len(datasets)):
-            datasets[i][1].temp_roles = self.tmp_roles
+        for dataset in datasets:
+            dataset[1].temp_roles = self.tmp_roles
         return datasets
 
     def mean(self):
@@ -304,10 +300,10 @@ class Dataset(DatasetBase):
 class ExperimentData(Dataset):
     def __init__(self, data: Dataset):
         self.additional_fields = Dataset._create_empty(roles={}, index=data.index)
-        self.stats_fields = Dataset._create_empty(roles={}, index=data.columns)
+        self.stats = Dataset._create_empty(roles={}, index=data.columns)
         self.additional_fields = Dataset._create_empty(roles={}, index=data.index)
         self.analysis_tables: Dict[str, Dataset] = {}
-        self._id_name_mapping: Dict[str, str] = {}
+        self.id_name_mapping: Dict[str, str] = {}
 
         super().__init__(data=data.data, roles=data.roles)
 
@@ -316,16 +312,15 @@ class ExperimentData(Dataset):
         ds = Dataset._create_empty(roles, backend, index)
         return ExperimentData(ds)
 
-    # TODO добавить проверку во всех пространствах
     def check_hash(self, executor_id: int, space: ExperimentDataEnum) -> bool:
         if space == ExperimentDataEnum.additional_fields:
             return executor_id in self.additional_fields.columns
-        elif space == ExperimentDataEnum.stats_fields:
-            return executor_id in self.stats_fields.columns
+        elif space == ExperimentDataEnum.stats:
+            return executor_id in self.stats.columns
         elif space == ExperimentDataEnum.analysis_tables:
             return executor_id in self.analysis_tables
         else:
-            raise SpaceError(space)
+            return any(self.check_hash(executor_id, s) for s in ExperimentDataEnum)
 
     def set_value(
         self,
@@ -340,34 +335,33 @@ class ExperimentData(Dataset):
             self.additional_fields.add_column(data=value, role={executor_id: role})
         elif space == ExperimentDataEnum.analysis_tables:
             self.analysis_tables[executor_id] = value
-        elif space == ExperimentDataEnum.stats_fields:
-            if executor_id not in self.stats_fields.columns:
-                self.stats_fields.add_column(
-                    data=[None] * len(self.stats_fields),
+        elif space == ExperimentDataEnum.stats:
+            if executor_id not in self.stats.columns:
+                self.stats.add_column(
+                    data=[None] * len(self.stats),
                     role={executor_id: StatisticRole()},
                 )
-            self.stats_fields[executor_id][key] = value
-        self._id_name_mapping[executor_id] = name
+            self.stats[executor_id][key] = value
+        self.id_name_mapping[executor_id] = name
         return self
 
-    # TODO заменить на enum
     def get_ids(
         self, classes: Union[type, List[type]]
     ) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
         return {
             class_: {
-                "stats": [
+                ExperimentDataEnum.stats: [
                     str(_id)
-                    for _id in self.stats_fields.columns
+                    for _id in self.stats.columns
                     if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
                 ],
-                "additional_fields": [
+                ExperimentDataEnum.additional_fields: [
                     str(_id)
                     for _id in self.additional_fields.columns
                     if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
                 ],
-                "analysis_tables": [
+                ExperimentDataEnum.analysis_tables: [
                     str(_id)
                     for _id in self.analysis_tables
                     if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__

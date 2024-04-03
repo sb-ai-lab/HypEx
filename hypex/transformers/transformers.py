@@ -9,7 +9,7 @@ class Shuffle(Executor):
         self,
         random_state: Union[int, None] = None,
         full_name: Union[None, str] = None,
-        key: Any = 0,
+        key: Any = "",
     ):
         super().__init__(full_name, key)
         self.random_state = random_state

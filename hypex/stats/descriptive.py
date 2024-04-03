@@ -20,7 +20,7 @@ class StatDescriptive(Executor):
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         data.set_value(
-            ExperimentDataEnum.stats_fields,
+            ExperimentDataEnum.stats,
             self.id,
             str(self.full_name),
             value,

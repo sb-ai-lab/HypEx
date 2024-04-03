@@ -4,19 +4,19 @@ from typing import Any
 import numpy as np
 
 from hypex.dataset.dataset import ExperimentData
-from hypex.dataset.roles import Arg1Role, Arg2Role
+from hypex.dataset.roles import Arg1Role, Arg2Role, StatisticRole
 from hypex.experiment.experiment import Executor
 from hypex.utils.enums import ExperimentDataEnum
 
 
 class BinaryOperator(Executor):
 
-    def __init__(self, full_name: str = None, key: Any = 0):
+    def __init__(self, full_name: str = None, key: Any = ""):
         super().__init__(full_name, key)
 
     def _set_value(self, data: ExperimentData, value) -> ExperimentData:
         data.set_value(
-            ExperimentDataEnum.additional_fields, self._id, self.full_name, value
+            ExperimentDataEnum.additional_fields, self._id, self.full_name, value, role=StatisticRole()
         )
         return data
 
@@ -28,7 +28,6 @@ class BinaryOperator(Executor):
     def apply(self, data: ExperimentData) -> ExperimentData:
         arg1 = data.get_columns_by_roles(Arg1Role(), tmp_role=True)[0]
         arg2 = data.get_columns_by_roles(Arg2Role(), tmp_role=True)[0]
-        # TODO добавь роли
         return self._set_value(
             data,
             data.apply(lambda row: self.calc(row[arg1], row[arg2]), axis=1),

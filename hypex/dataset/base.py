@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import Iterable
 
 
-# TODO добавить базовый класс для бэкенда
 class DatasetBase(ABC):
 
     @abstractmethod
@@ -61,3 +60,8 @@ class DatasetBase(ABC):
 
     def iloc(self, values: Iterable) -> Iterable:
         raise NotImplementedError
+
+class DatasetBackend(DatasetBase):
+    @property
+    def name(self):
+        return str(self.__class__.__name__).lower().replace("dataset", "")

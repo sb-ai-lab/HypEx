@@ -1,3 +1,4 @@
+from abc import ABC
 from typing import Dict, Union, Any, List
 
 # mypy import-untyped
@@ -10,8 +11,7 @@ from hypex.dataset.roles import ABCRole, StatisticRole
 from hypex.utils.enums import SpaceEnum
 
 
-# TODO Class StatHypothesisTestingWithScipy must implement all abstract methods
-class StatHypothesisTestingWithScipy(GroupComparator):
+class StatHypothesisTestingWithScipy(GroupComparator, ABC):
     def __init__(
         self,
         grouping_role: Union[ABCRole, None] = None,
@@ -19,7 +19,7 @@ class StatHypothesisTestingWithScipy(GroupComparator):
         reliability: float = 0.05,
         inner_executors: Union[Dict[str, Executor], None] = None,
         full_name: Union[str, None] = None,
-        key: Any = 0,
+        key: Any = "",
     ):
         super().__init__(grouping_role, space, inner_executors, full_name, key)
         self.reliability = reliability

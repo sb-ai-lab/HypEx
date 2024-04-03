@@ -3,11 +3,11 @@ from typing import Sequence, Union, Iterable, List, Dict, Tuple, Sized, Callable
 
 import pandas as pd
 
-from hypex.dataset.base import DatasetBase
+from hypex.dataset.base import DatasetBackend
 from hypex.utils.typings import FromDictType
 
 
-class PandasDataset(DatasetBase):
+class PandasDataset(DatasetBackend):
 
     @staticmethod
     def _read_file(filename: Union[str, Path]) -> pd.DataFrame:

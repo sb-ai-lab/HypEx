@@ -7,6 +7,7 @@ from hypex.experiment.experiment import Executor, ComplexExecutor
 from hypex.stats.descriptive import Mean, Size
 from hypex.utils.enums import ExperimentDataEnum, SpaceEnum, BackendsEnum
 from hypex.utils.typings import FromDictType
+from hypex.utils.errors import NoColumnsError, ComparisonNotSuitableFieldError
 
 
 class GroupComparator(ComplexExecutor):
@@ -16,7 +17,7 @@ class GroupComparator(ComplexExecutor):
         space: SpaceEnum = SpaceEnum.auto,
         inner_executors: Union[Dict[str, Executor], None] = None,
         full_name: Union[str, None] = None,
-        key: Any = 0,
+        key: Any = "",
     ):
         self.grouping_role = grouping_role or GroupingRole()
         self.space = space
@@ -42,8 +43,7 @@ class GroupComparator(ComplexExecutor):
             )
             self.__additional_mode = True
         if len(group_field) == 0:
-            # TODO вынеси ERROR
-            raise ValueError(f"No columns found by role {self.grouping_role}")
+            raise NoColumnsError(self.grouping_role)
         return group_field
 
     def __get_grouping_data(self, data: ExperimentData, group_field):
@@ -61,22 +61,14 @@ class GroupComparator(ComplexExecutor):
 
     def _compare(self, data: ExperimentData) -> Dict:
         group_field = self.__group_field_searching(data)
-        # TODO об этом надо подумать data._id_name_mapping
         group_name = (
-            str(group_field)
-            if not self.__additional_mode
-            else str(data._id_name_mapping.get(group_field[0], group_field))
-        )
-        target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)[0]
+            str(data.id_name_mapping.get(group_field[0], group_field)) if self.__additional_mode else str(group_field)=True)[0]
         self.key = f"{target_field}[{group_name}]"
         grouping_data = self.__get_grouping_data(data, group_field)
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
-            # TODO вынеси ERROR
-            raise ValueError(
-                f"Group field {group_field} is not suitable for comparison"
-            )
+            raise ComparisonNotSuitableFieldError(group_field)
 
         result = {}
         for i in range(1, len(grouping_data)):
@@ -93,7 +85,7 @@ class GroupComparator(ComplexExecutor):
         )
         return data
 
-    # TODO Method '_extract_dataset' may be 'static'
+    @staticmethod
     def _extract_dataset(
         self, compare_result: FromDictType, roles: Dict[Any, ABCRole]
     ) -> Dataset:

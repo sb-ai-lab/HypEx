@@ -14,7 +14,7 @@ class AASplitter(ComplexExecutor):
         random_state: Union[int, None] = None,
         inner_executors: Union[Dict[str, Executor], None] = None,
         full_name: Union[str, None] = None,
-        key: Any = 0,
+        key: Any = "",
     ):
         self.control_size = control_size
         self.random_state = random_state
@@ -72,7 +72,7 @@ class AASplitterWithStratification(AASplitter):
         control_size: float = 0.5,
         random_state: int = None,
         full_name: str = None,
-        key: Any = 0,
+        key: Any = "",
     ):
         super().__init__(control_size, random_state, full_name, key)
 

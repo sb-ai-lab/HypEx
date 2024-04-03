@@ -50,8 +50,7 @@ class Executor(ABC):
         self._generate_params_hash()
         self._generate_id()
 
-    # TODO: 0 is not the best idea (replace it)
-    def __init__(self, full_name: Union[str, None] = None, key: Any = 0):
+    def __init__(self, full_name: Union[str, None] = None, key: Any = ""):
         self._id: str = ""
         self._params_hash = ""
         self.full_name = full_name
@@ -71,11 +70,10 @@ class Executor(ABC):
         raise NotImplementedError
 
 
-# TODO Class ComplexExecutor must implement all abstract methods
-class ComplexExecutor(Executor):
+class ComplexExecutor(Executor, ABC):
     default_inner_executors: Dict[str, Executor] = {}
 
-    def get_inner_executors(
+    def _get_inner_executors(
         self, inner_executors: Union[Dict[str, Executor], None] = None
     ) -> Dict[str, Executor]:
         result = {}
@@ -83,7 +81,6 @@ class ComplexExecutor(Executor):
         for key, executor in self.default_inner_executors.items():
             if key not in inner_executors:
                 if len(inner_executors):
-                    # TODO вынести ворнинг
                     warnings.warn(
                         f"{key} executor not found in inner_executors. Will {key} will be used by default."
                     )
@@ -96,17 +93,16 @@ class ComplexExecutor(Executor):
         self,
         inner_executors: Union[Dict[str, Executor], None] = None,
         full_name: Union[str, None] = None,
-        key: Any = 0,
+        key: Any = "",
     ):
         super().__init__(full_name=full_name, key=key)
-        self.inner_executors = self.get_inner_executors(inner_executors)
+        self.inner_executors = self._get_inner_executors(inner_executors)
 
 
 class Experiment(Executor):
-    # TODO допиши
     @staticmethod
     def _detect_transformer() -> bool:
-        return False
+        return all(executor._is_transformer for executor in self.executors)
 
     def get_executor_ids(
         self, searched_classes: Union[type, Iterable[type], None] = None
@@ -134,7 +130,7 @@ class Experiment(Executor):
         executors: List[Executor],
         transformer: Union[bool, None] = None,
         full_name: Union[str, None] = None,
-        key: Any = 0,
+        key: Any = "",
     ):
         self.executors: List[Executor] = executors
         self.transformer: bool = (
@@ -163,7 +159,7 @@ class CycledExperiment(Executor):
         n_iterations: int,
         analyzer: Executor,
         full_name: Union[str, None] = None,
-        key: Any = 0,
+        key: Any = "",
     ):
         self.inner_executor: Executor = inner_executor
         self.n_iterations: int = n_iterations
@@ -180,31 +176,30 @@ class CycledExperiment(Executor):
 
 
 class GroupExperiment(Executor):
-    # TODO подредачь replace
     def generate_params_hash(self) -> str:
-        return f"GroupExperiment: {self.inner_executor._id.replace('|', '')}"
+        return (
+            f"GroupExperiment: {self.inner_executor._id.replace(ID_SPLIT_SYMBOL, '|')}"
+        )
 
     def __init__(
         self,
         inner_executor: Executor,
         full_name: Union[str, None] = None,
-        key: Any = 0,
+        key: Any = "",
     ):
         self.inner_executor: Executor = inner_executor
         super().__init__(full_name, key)
 
-    # TODO реши, должен он быть защищенным или публичным
-    def extract_result(self, data: ExperimentData) -> Dataset:
+    def _extract_result(self, data: ExperimentData) -> Dataset:
         return data.analysis_tables[self.inner_executor._id]
 
-    def insert_result(
+    def _insert_result(
         self, data: ExperimentData, result_list: List[Dataset]
     ) -> ExperimentData:
         result = result_list[0]
         for i in range(1, len(result_list)):
             result = result.append(result_list[i])
-        # TODO сделать через set_value
-        data.analysis_tables[self._id] = result
+        data.set_value(ExperimentDataEnum.analysis_tables, self._id, self.full_name, result)
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -214,8 +209,8 @@ class GroupExperiment(Executor):
         for group, group_data in data.groupby(group_field):
             temp_data = ExperimentData(group_data)
             temp_data = self.inner_executor.execute(temp_data)
-            result_list.append(self.extract_result(temp_data))
-        return self.insert_result(data, result_list)
+            result_list.append(self._extract_result(temp_data))
+        return self._insert_result(data, result_list)
 
 
 class OnRoleExperiment(Experiment):
@@ -225,7 +220,7 @@ class OnRoleExperiment(Experiment):
         role: ABCRole,
         transformer: Union[bool, None] = None,
         full_name: Union[str, None] = None,
-        key: Any = 0,
+        key: Any = "",
     ):
         self.role: ABCRole = role
         super().__init__(executors, transformer, full_name, key)
