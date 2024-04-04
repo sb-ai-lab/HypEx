@@ -27,6 +27,7 @@ class OneAASplitAnalyzer(ComplexExecutor):
         executor_ids = data.get_ids(analysis_tests)
 
         analysis_data = {}
+        mean_operator: Mean = self.inner_executors["mean"]
         for c, spaces in executor_ids.items():
             analysis_ids = spaces.get("analysis_tables", [])
             if len(analysis_ids) == 0:
@@ -36,10 +37,11 @@ class OneAASplitAnalyzer(ComplexExecutor):
                 t_data = t_data.append(data.analysis_tables[aid])
             t_data.data.index = analysis_ids
 
+            # TODO rework calc to execute
             for f in ["p-value", "pass"]:
-                analysis_data[f"{c.__name__} {f}"] = (
-                    self.inner_executors["mean"].calc(t_data[f]).iloc[0]
-                )
+                analysis_data[f"{c.__name__} {f}"] = mean_operator.calc(t_data[f]).iloc[
+                    0
+                ]
         analysis_data["mean test score"] = (
             analysis_data["TTest p-value"] + 2 * analysis_data["KSTest p-value"]
         ) / 3
@@ -50,23 +52,3 @@ class OneAASplitAnalyzer(ComplexExecutor):
         )
 
         return self._set_value(data, analysis_data)
-
-        # meta_data = {
-        #     TTest: {"p-value": [], "passed": []},
-        #     KSTest: {"p-value": [], "passed": []},
-        # }
-        # for key, value in executor_ids.items():
-        #     for v in value:
-        #         meta_data[key]["p-value"] += list(data.analysis_tables[v]["p-value"])
-        #         meta_data[key]["passed"] += list(data.analysis_tables[v]["pass"])
-
-        # result = {}
-        # for key, value in meta_data.items():
-        #     result[f"{key.__name__} p-value"] = self.inner_executors["mean"].calc(
-        #         value["p-value"]
-        #     )
-        #     result[f"{key.__name__} passed %"] = (
-        #         self.inner_executors["mean"].calc(value["passed"]) * 100
-        #     )
-
-        # return data

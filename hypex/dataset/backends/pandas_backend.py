@@ -19,7 +19,7 @@ class PandasDataset(DatasetBackend):
         else:
             raise ValueError(f"Unsupported file extension {file_extension}")
 
-    def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series] = None):
+    def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series, None] = None):
         if isinstance(data, pd.DataFrame):
             self.data = data
         elif isinstance(data, pd.Series):
