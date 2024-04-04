@@ -35,20 +35,17 @@ class AASplitter(ComplexExecutor):
         )
         return data
 
-    def execute(self, data: ExperimentData) -> ExperimentData:
+    def calc(self, data: Dataset) -> List[str]:
         experiment_data: ExperimentData = self.inner_executors["shuffle"].execute(data)
 
         addition_indexes = list(experiment_data.index)
         edge = int(len(addition_indexes) * self.control_size)
 
-        result_group = ["A" if i < edge else "B" for i in addition_indexes]
-        data = self._set_value(data, result_group)
-
-        return data
+        return ["A" if i < edge else "B" for i in addition_indexes]
 
 
 class AASplitterWithGrouping(AASplitter):
-    def execute(self, data: ExperimentData):
+    def calc(self, data: Dataset):
         group_field = data.get_columns_by_roles(GroupingRole())
         groups = list(data.groupby(group_field))
         edge = len(groups) // 2
@@ -61,9 +58,7 @@ class AASplitterWithGrouping(AASplitter):
                 index=group[1].index,
             )
             result = group_ds if result is None else result.append(group_ds)
-
-        self._set_value(data, result["group"])
-        return data
+        return result["group"]
 
 
 class AASplitterWithStratification(AASplitter):
@@ -76,7 +71,7 @@ class AASplitterWithStratification(AASplitter):
     ):
         super().__init__(control_size, random_state, full_name, key)
 
-    def execute(self, data):
+    def calc(self, data: Dataset):
         stratification_columns = data.get_columns_by_roles(StratificationRole())
 
         groups = data.groupby(stratification_columns)
@@ -86,9 +81,7 @@ class AASplitterWithStratification(AASplitter):
             ged = self.super().execute(ged)
 
             result = ged if result is None else result.append(ged)
-
-        self._set_value(data, result["group"])
-        return data
+        return result["group"]
 
 
 # As idea

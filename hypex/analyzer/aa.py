@@ -9,9 +9,10 @@ from hypex.experiment.experiment import (
 )
 from hypex.stats.descriptive import Mean
 from hypex.utils.enums import ExperimentDataEnum, BackendsEnum
+from hypex.analyzer.analyzer import Analyzer
 
 
-class OneAASplitAnalyzer(ComplexExecutor):
+class OneAASplitAnalyzer(Analyzer):
     default_inner_executors: Dict[str, Executor] = {"mean": Mean()}
 
     def _set_value(self, data: ExperimentData, value=None, key=None) -> ExperimentData:
@@ -37,7 +38,6 @@ class OneAASplitAnalyzer(ComplexExecutor):
                 t_data = t_data.append(data.analysis_tables[aid])
             t_data.data.index = analysis_ids
 
-            # TODO rework calc to execute
             for f in ["p-value", "pass"]:
                 analysis_data[f"{c.__name__} {f}"] = mean_operator.calc(t_data[f]).iloc[
                     0

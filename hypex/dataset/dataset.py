@@ -17,6 +17,9 @@ from hypex.utils.errors import (
 from hypex.utils.constants import ID_SPLIT_SYMBOL
 from hypex.utils.enums import ExperimentDataEnum, BackendsEnum
 from hypex.utils.typings import FromDictType
+from hypex.utils.errors import NotFoundInExperimentDataError
+
+
 
 
 class Dataset(DatasetBase):
@@ -58,7 +61,7 @@ class Dataset(DatasetBase):
         """
         if backend == BackendsEnum.pandas:
             return PandasDataset(data)
-        return PandasDataset(data)
+        # return PandasDataset(data)
 
     def set_data(
         self,
@@ -187,7 +190,7 @@ class Dataset(DatasetBase):
         if type(other._backend) != type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
         self.roles.update(other.roles)
-        return Dataset(roles=roles, data=self._backend.append(other._backend, index))
+        return Dataset(roles=self.roles, data=self._backend.append(other._backend, index))
 
     @staticmethod
     def from_dict(
@@ -205,7 +208,7 @@ class Dataset(DatasetBase):
         return {
             "backend": self._backend.name,
             "roles": {
-                "role_names": list(map(lambda x: x.role_name, list(self.roles.keys()))),
+                "role_names": list(map(lambda x: x, list(self.roles.keys()))),
                 "columns": list(self.roles.values()),
             },
             "data": self._backend.to_dict(),
@@ -369,3 +372,9 @@ class ExperimentData(Dataset):
             }
             for class_ in classes
         }
+    
+    def _get_one_id(self, class_: type, space: ExperimentDataEnum) -> str:
+        result = self.get_ids(class_)
+        if not len(result):
+            raise NotFoundInExperimentDataError(class_)
+        return result[class_][space.value][0]

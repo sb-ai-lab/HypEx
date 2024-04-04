@@ -29,3 +29,8 @@ class NoColumnsError(Exception):
 class ComparisonNotSuitableFieldError(Exception):
      def __init__(self, group_field):
         super().__init__(f"Group field {group_field} is not suitable for comparison")
+
+
+class NotFoundInExperimentDataError(Exception):
+    def __init__(self, class_: type):
+        super().__init__(f"{class_.__name__} id is not found in ExperimentData")

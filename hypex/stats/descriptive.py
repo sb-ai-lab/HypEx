@@ -3,7 +3,7 @@ from abc import abstractmethod
 import numpy as np
 from scipy.stats import mode
 
-from hypex.dataset.dataset import ExperimentData
+from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import TempTargetRole
 from hypex.experiment.experiment import Executor
 from hypex.utils.enums import ExperimentDataEnum
@@ -15,7 +15,7 @@ class StatDescriptive(Executor):
         super().__init__(full_name, key)
 
     @abstractmethod
-    def calc(self, data):
+    def calc(self, data: Dataset):
         raise NotImplementedError
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:

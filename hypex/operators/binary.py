@@ -26,22 +26,9 @@ class BinaryOperator(Executor):
         )
         return data
 
-    @staticmethod
     @abstractmethod
-    def calc(x1, x2):
+    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
         raise NotImplementedError
-
-    def apply(self, data: ExperimentData) -> ExperimentData:
-        arg1 = data.get_columns_by_roles(Arg1Role(), tmp_role=True)[0]
-        arg2 = data.get_columns_by_roles(Arg2Role(), tmp_role=True)[0]
-        return self._set_value(
-            data,
-            data.apply(
-                lambda row: self.calc(row[arg1], row[arg2]),
-                {self.id: StatisticRole()},
-                axis=1,
-            ),
-        )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         arg1 = data.get_columns_by_roles(Arg1Role(), tmp_role=True)[0]
@@ -50,42 +37,35 @@ class BinaryOperator(Executor):
 
 
 class MetricDelta(BinaryOperator):
-    @staticmethod
-    def calc(x1, x2):
-        return x2 - x1
+    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+        return data.data - other.data
 
 
 class MetricPercentageDelta(BinaryOperator):
-    @staticmethod
-    def calc(x1, x2):
-        return (1 - x1 / x2) * 100
+    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+        return (1 - data.data / other.data) * 100
 
 
 class MetricAbsoluteDelta(BinaryOperator):
-    @staticmethod
-    def calc(x1, x2):
-        return np.abs(x2 - x1)
+    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+        return np.abs(data.data - other.data)
 
 
 class MetricRelativeDelta(BinaryOperator):
-    @staticmethod
-    def calc(x1, x2):
-        return 1 - x1 / x2
+    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+        return 1 - data.data / other.data
 
 
 class MetricRatio(BinaryOperator):
-    @staticmethod
-    def calc(x1, x2):
-        return x1 / x2
+    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+        return data.data / other.data
 
 
 class MetricLogRatio(BinaryOperator):
-    @staticmethod
-    def calc(x1, x2):
-        return np.log(x1 / x2)
+    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+        return np.log(data.data / other.data)
 
 
 class MetricPercentageRatio(BinaryOperator):
-    @staticmethod
-    def calc(x1, x2):
-        return (1 - x1 / x2) * 100
+    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+        return (1 - data.data / other.data) * 100
