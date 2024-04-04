@@ -100,8 +100,7 @@ class ComplexExecutor(Executor, ABC):
 
 
 class Experiment(Executor):
-    @staticmethod
-    def _detect_transformer() -> bool:
+    def _detect_transformer(self) -> bool:
         return all(executor._is_transformer for executor in self.executors)
 
     def get_executor_ids(
