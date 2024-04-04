@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any
+from typing import Any, Union
 
 import numpy as np
 
@@ -11,12 +11,18 @@ from hypex.utils.enums import ExperimentDataEnum
 
 class BinaryOperator(Executor):
 
-    def __init__(self, full_name: str = None, key: Any = ""):
+    def __init__(self, full_name: Union[str, None] = None, key: Any = ""):
         super().__init__(full_name, key)
 
-    def _set_value(self, data: ExperimentData, value) -> ExperimentData:
+    def _set_value(
+        self, data: ExperimentData, value: Any = None, key: Any = None
+    ) -> ExperimentData:
         data.set_value(
-            ExperimentDataEnum.additional_fields, self._id, self.full_name, value, role=StatisticRole()
+            ExperimentDataEnum.additional_fields,
+            self._id,
+            str(self.full_name),
+            value,
+            role=StatisticRole(),
         )
         return data
 
@@ -30,7 +36,11 @@ class BinaryOperator(Executor):
         arg2 = data.get_columns_by_roles(Arg2Role(), tmp_role=True)[0]
         return self._set_value(
             data,
-            data.apply(lambda row: self.calc(row[arg1], row[arg2]), axis=1),
+            data.apply(
+                lambda row: self.calc(row[arg1], row[arg2]),
+                {self.id: StatisticRole()},
+                axis=1,
+            ),
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:

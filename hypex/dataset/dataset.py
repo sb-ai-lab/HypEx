@@ -245,7 +245,7 @@ class Dataset(DatasetBase):
         by: Any,
         func: Union[str, List, None] = None,
         fields_list: Union[List, str, None] = None,
-        **kwargs
+        **kwargs,
     ):
         datasets = [
             (i, Dataset(roles=self.roles, data=data))
@@ -351,17 +351,17 @@ class ExperimentData(Dataset):
         classes = classes if isinstance(classes, Iterable) else [classes]
         return {
             class_: {
-                ExperimentDataEnum.stats: [
+                ExperimentDataEnum.stats.value: [
                     str(_id)
                     for _id in self.stats.columns
                     if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
                 ],
-                ExperimentDataEnum.additional_fields: [
+                ExperimentDataEnum.additional_fields.value: [
                     str(_id)
                     for _id in self.additional_fields.columns
                     if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
                 ],
-                ExperimentDataEnum.analysis_tables: [
+                ExperimentDataEnum.analysis_tables.value: [
                     str(_id)
                     for _id in self.analysis_tables
                     if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__

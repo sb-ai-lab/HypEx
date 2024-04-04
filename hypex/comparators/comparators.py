@@ -49,6 +49,7 @@ class GroupComparator(ComplexExecutor):
     def __get_grouping_data(self, data: ExperimentData, group_field):
         if self.__additional_mode:
             t_groups = list(data.additional_fields.groupby(group_field))
+            # TODO check indexable
             result = [(group, data.loc[subdata.index]) for (group, subdata) in t_groups]
         else:
             result = list(data.groupby(group_field))
@@ -62,8 +63,11 @@ class GroupComparator(ComplexExecutor):
     def _compare(self, data: ExperimentData) -> Dict:
         group_field = self.__group_field_searching(data)
         group_name = (
-            str(data.id_name_mapping.get(group_field[0], group_field)) if self.__additional_mode else str(group_field))[0]
-        
+            str(data.id_name_mapping.get(group_field[0], group_field))
+            if self.__additional_mode
+            else str(group_field)
+        )[0]
+
         # TODO: fix it
         self.key = f"{target_field}[{group_name}]"
         grouping_data = self.__get_grouping_data(data, group_field)
@@ -89,7 +93,7 @@ class GroupComparator(ComplexExecutor):
 
     @staticmethod
     def _extract_dataset(
-        self, compare_result: FromDictType, roles: Dict[Any, ABCRole]
+        compare_result: FromDictType, roles: Dict[Any, ABCRole]
     ) -> Dataset:
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 

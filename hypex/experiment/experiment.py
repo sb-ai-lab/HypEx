@@ -62,7 +62,9 @@ class Executor(ABC):
     def _is_transformer(self) -> bool:
         return False
 
-    def _set_value(self, data: ExperimentData, value=None, key=None) -> ExperimentData:
+    def _set_value(
+        self, data: ExperimentData, value: Any = None, key: Any = None
+    ) -> ExperimentData:
         return data
 
     @abstractmethod
@@ -198,7 +200,9 @@ class GroupExperiment(Executor):
         result = result_list[0]
         for i in range(1, len(result_list)):
             result = result.append(result_list[i])
-        data.set_value(ExperimentDataEnum.analysis_tables, self._id, self.full_name, result)
+        data.set_value(
+            ExperimentDataEnum.analysis_tables, self._id, self.full_name, result
+        )
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
