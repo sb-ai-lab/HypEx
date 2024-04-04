@@ -64,7 +64,7 @@ class GroupComparator(ComplexExecutor):
         group_name = (
             str(data.id_name_mapping.get(group_field[0], group_field)) if self.__additional_mode else str(group_field))[0]
         
-        # TODO: fix it
+        target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)[0]
         self.key = f"{target_field}[{group_name}]"
         grouping_data = self.__get_grouping_data(data, group_field)
         if len(grouping_data) > 1:
