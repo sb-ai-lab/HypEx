@@ -11,6 +11,20 @@ def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
+def sigmoid_division(x, dependent_division=True) -> np.ndarray:
+    """
+    Returns binary array.
+    """
+    if dependent_division:
+        division = np.random.binomial(
+            1,
+            sigmoid((x - x.mean()) / x.std())
+        )
+    else:
+        division = np.random.binomial(1, 0.5, size=len(x))
+    return division
+
+
 def gen_special_medicine_df(
         data_size=100,
         *,
@@ -20,7 +34,7 @@ def gen_special_medicine_df(
     """Synthetic dataframe generator.
     Realises dependent/independent group splitting.
     """
-    if not random_state is None:
+    if random_state is not None:
         np.random.seed(random_state)
 
     disease_degree = np.random.choice(
@@ -29,13 +43,7 @@ def gen_special_medicine_df(
         size=data_size
     ).astype(int)
 
-    if dependent_division:
-        experimental_treatment = np.random.binomial(
-            1,
-            sigmoid((disease_degree - disease_degree.mean()) / disease_degree.std())
-        )
-    else:
-        experimental_treatment = np.random.binomial(1, 0.5, size=data_size)
+    experimental_treatment = sigmoid_division(disease_degree, dependent_division)
 
     residual_lifetime = np.random.exponential(13 - 2.5 * disease_degree + 1 * experimental_treatment)
 
@@ -51,49 +59,48 @@ def gen_oracle_df(
         data_size=8,
         *,
         dependent_division=True,
-        treatment_effect_size=150,
-        factual_Y_only=False,
+        factual_y_only=False,
         random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
     Realises factual and contrfactual outcomes.
     """
-    if not random_state is None:
+    if random_state is not None:
         np.random.seed(random_state)
 
-    T = np.random.binomial(1, 0.5, size=data_size)
+    t = np.random.binomial(1, 0.5, size=data_size)
 
     if dependent_division:
-        X = np.random.binomial(
+        x = np.random.binomial(
             1,
-            0.3 + 0.4 * T
+            0.3 + 0.4 * t
         )
     else:
-        X = np.random.binomial(1, 0.5, size=data_size)
+        x = np.random.binomial(1, 0.5, size=data_size)
 
-    Y0 = np.random.uniform(
+    y0 = np.random.uniform(
         low=300,
         high=800,
         size=data_size
     ).round(-2).astype(int)
 
-    Y1 = Y0 + 50 + X * 100
+    y1 = y0 + 50 + x * 100
 
-    if factual_Y_only:
-        Y0 = np.where(1 - T, Y0, np.nan)
-        Y1 = np.where(T, Y1, np.nan)
+    if factual_y_only:
+        y0 = np.where(1 - t, y0, np.nan)
+        y1 = np.where(t, y1, np.nan)
 
-    Y = np.where(T, Y1, Y0).astype('int')
+    y = np.where(t, y1, y0).astype('int')
 
-    TE = Y1 - Y0
+    te = y1 - y0
 
     df = pd.DataFrame(dict(
-        X=X,
-        Y0=Y0,
-        Y1=Y1,
-        T=T,
-        Y=Y,
-        TE=TE,
+        X=x,
+        Y0=y0,
+        Y1=y1,
+        T=t,
+        Y=y,
+        TE=te,
     ))
     return df
 
@@ -106,32 +113,26 @@ def gen_control_variates_df(
         random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
-    Realises 0-variation outcome mixed with linear X dependency.
+    Realises 0-variation outcome mixed with linear x dependency.
     """
-    if not random_state is None:
+    if random_state is not None:
         np.random.seed(random_state)
 
-    X_means = np.random.uniform(0, 5, size=data_size)
+    x_means = np.random.uniform(0, 5, size=data_size)
 
-    X_lag_1 = np.random.normal(X_means, 2)
-    X = np.random.normal(X_means, 2)
+    x_lag_1 = np.random.normal(x_means, 2)
+    x = np.random.normal(x_means, 2)
 
-    if dependent_division:
-        T = np.random.binomial(
-            1,
-            sigmoid((X_lag_1 - X_lag_1.mean()) / X_lag_1.std())
-        )
-    else:
-        T = np.random.binomial(1, 0.5, size=data_size)
+    t = sigmoid_division(x_lag_1, dependent_division)
 
-    Y_lag_1 = 200 + X_lag_1 * 100
-    Y = 200 + X * 100 + T * 10
+    y_lag_1 = 200 + x_lag_1 * 100
+    y = 200 + x * 100 + t * 10
 
     df = pd.DataFrame(dict(
-        X_lag_1=X_lag_1,
-        Y_lag_1=Y_lag_1,
-        X=X,
-        T=T,
-        Y=Y,
+        X_lag_1=x_lag_1,
+        Y_lag_1=y_lag_1,
+        X=x,
+        T=t,
+        Y=y,
     ))
     return df
