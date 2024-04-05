@@ -108,7 +108,6 @@ def gen_oracle_df(
 def gen_control_variates_df(
         data_size=1000,
         *,
-        treatment_effect_size=150,
         dependent_division=True,
         random_state=None
 ) -> pd.DataFrame:
