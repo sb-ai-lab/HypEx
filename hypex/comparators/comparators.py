@@ -4,10 +4,10 @@ from typing import Dict, Union, Any
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole, ABCRole, StatisticRole
 from hypex.experiment.experiment import Executor, ComplexExecutor
-from hypex.stats.descriptive import Mean, Size, StatDescriptive
+from hypex.stats.descriptive import Mean, Size
 from hypex.utils.enums import ExperimentDataEnum, SpaceEnum, BackendsEnum
-from hypex.utils.typings import FromDictType
 from hypex.utils.errors import NoColumnsError, ComparisonNotSuitableFieldError
+from hypex.utils.typings import FromDictType
 
 
 class GroupComparator(ComplexExecutor):
@@ -30,8 +30,7 @@ class GroupComparator(ComplexExecutor):
         return self._extract_dataset(compare_result, roles)
 
     def _one_stat_calculation(self, data, stat: Executor):
-        
-
+        pass
 
     @abstractmethod
     def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
@@ -63,7 +62,7 @@ class GroupComparator(ComplexExecutor):
         ]
         return result
 
-    def _compare(self, data: ExperimentData) -> Dict:
+    def calc(self, data: ExperimentData) -> Dict:
         group_field = self.__group_field_searching(data)
         group_name = (
             str(data.id_name_mapping.get(group_field[0], group_field))
@@ -100,7 +99,7 @@ class GroupComparator(ComplexExecutor):
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        compare_result = self._compare(data)
+        compare_result = self.calc(data)
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key, _ in compare_result.items()}
         )
@@ -116,13 +115,13 @@ class GroupDifference(GroupComparator):
         target_field = control_data.get_columns_by_roles(
             TempTargetRole(), tmp_role=True
         )[0]
-        ed_control = ExperimentData(control_data)
-        ed_test = ExperimentData(test_data)
-        ed_control = self.inner_executors["mean"].execute(ed_control)
-        ed_test = self.inner_executors["mean"].execute(ed_test)
+        # ed_control = ExperimentData(control_data)
+        # ed_test = ExperimentData(test_data)
+        ed_control = self.inner_executors["mean"].calc(control_data)
+        ed_test = self.inner_executors["mean"].calc(test_data)
 
-        mean_a = ed_control.stats[self.inner_executors["mean"].id].iloc[0]
-        mean_b = ed_test.stats[self.inner_executors["mean"].id].iloc[0]
+        mean_a = ed_control.iloc[0]
+        mean_b = ed_test.iloc[0]
 
         return {
             f"{target_field} control mean": mean_a,
@@ -138,8 +137,8 @@ class GroupSizes(GroupComparator):
     }
 
     def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
-        size_a = self.inner_executors["size"].execute(control_data)
-        size_b = self.inner_executors["size"].execute(test_data)
+        size_a = self.inner_executors["size"].calc(control_data)
+        size_b = self.inner_executors["size"].calc(test_data)
 
         return {
             "control size": size_a,

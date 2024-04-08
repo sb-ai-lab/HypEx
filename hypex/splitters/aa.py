@@ -1,4 +1,4 @@
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, List
 
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import GroupingRole, StratificationRole, TreatmentRole

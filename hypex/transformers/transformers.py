@@ -1,5 +1,6 @@
 from typing import Any, Union
 
+from hypex.dataset.dataset import Dataset
 from hypex.dataset.dataset import ExperimentData
 from hypex.experiment.experiment import Executor
 
