@@ -9,9 +9,9 @@ from hypex.utils.enums import SpaceEnum
 AA_TEST = Experiment(
     executors=[
         AASplitter(),
+        GroupSizes(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
         OnRoleExperiment(
             executors=[
-                GroupSizes(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
                 GroupDifference(
                     grouping_role=TreatmentRole(), space=SpaceEnum.additional
                 ),

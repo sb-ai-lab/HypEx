@@ -5,9 +5,9 @@ from hypex.experiments.base import Experiment, OnRoleExperiment
 
 AB_TEST = Experiment(
     executors=[
+        GroupSizes(grouping_role=TreatmentRole()),
         OnRoleExperiment(
             executors=[
-                GroupSizes(grouping_role=TreatmentRole()),
                 GroupDifference(grouping_role=TreatmentRole()),
                 TTest(grouping_role=TreatmentRole()),
                 MannWhitney(grouping_role=TreatmentRole()),

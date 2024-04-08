@@ -40,7 +40,11 @@ class GroupComparator(ComplexExecutor):
         group_field = []
         if self.space in [SpaceEnum.auto, SpaceEnum.data]:
             group_field = data.get_columns_by_roles(self.grouping_role)
-        if self.space in [SpaceEnum.auto, SpaceEnum.additional] and group_field == []:
+        if (
+            self.space in [SpaceEnum.auto, SpaceEnum.additional]
+            and group_field == []
+            and isinstance(data, ExperimentData)
+        ):
             group_field = data.additional_fields.get_columns_by_roles(
                 self.grouping_role
             )
@@ -62,15 +66,18 @@ class GroupComparator(ComplexExecutor):
         ]
         return result
 
-    def calc(self, data: ExperimentData) -> Dict:
+    def calc(self, data: Dataset) -> Dict:
+        target_field = None
         group_field = self.__group_field_searching(data)
+        meta_name = group_field[0] if len(group_field) == 1 else group_field
         group_name = (
-            str(data.id_name_mapping.get(group_field[0], group_field))
-            if self.__additional_mode
-            else str(group_field)
-        )[0]
-        target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)[0]
-        self.key = f"{target_field}[{group_name}]"
+            str(data.id_name_mapping.get(meta_name, meta_name))
+            if (self.__additional_mode and isinstance(data, ExperimentData))
+            else str(meta_name)
+        )
+        if data.tmp_roles:
+            target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)[0]
+            self.key = f"{target_field}[{group_name}]"
         grouping_data = self.__get_grouping_data(data, group_field)
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
@@ -78,17 +85,25 @@ class GroupComparator(ComplexExecutor):
             raise ComparisonNotSuitableFieldError(group_field)
 
         result = {}
-        for i in range(1, len(grouping_data)):
-            grouping_data[i][1].tmp_roles = data.tmp_roles
-            result[grouping_data[i][0]] = self._comparison_function(
-                grouping_data[0][1][target_field],
-                grouping_data[i][1][target_field],
-            )
+        if target_field:
+            for i in range(1, len(grouping_data)):
+                grouping_data[i][1].tmp_roles = data.tmp_roles
+                result[grouping_data[i][0]] = self._comparison_function(
+                    grouping_data[0][1][target_field],
+                    grouping_data[i][1][target_field],
+                )
+        else:
+            for i in range(1, len(grouping_data)):
+                result[grouping_data[i][0]] = self._comparison_function(
+                    grouping_data[0][1], grouping_data[i][1]
+                )
         return result
 
-    def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
+    def _set_value(
+        self, data: ExperimentData, value: Union[Dataset, None] = None, key: Any = None
+    ) -> ExperimentData:
         data.set_value(
-            ExperimentDataEnum.analysis_tables, self.id, self.full_name, value
+            ExperimentDataEnum.analysis_tables, self.id, str(self.full_name), value
         )
         return data
 

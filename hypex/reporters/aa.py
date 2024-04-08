@@ -5,7 +5,7 @@ from hypex.reporters.reporters import DictReporter
 from hypex.splitters.aa import AASplitter
 from hypex.utils.constants import ID_SPLIT_SYMBOL
 from hypex.utils.enums import ExperimentDataEnum
-from hypex.comparators.comparators import GroupDifference
+from hypex.comparators.comparators import GroupDifference, GroupSizes
 
 
 class AADictReporter(DictReporter):
@@ -17,32 +17,23 @@ class AADictReporter(DictReporter):
         return int(aa_id) if aa_id.isdigit() else None
 
     def extract_group_difference(self, data: ExperimentData) -> Dict[str, Any]:
-        aa_splitter_id = data.get_ids(GroupDifference)[GroupDifference][ExperimentDataEnum.analysis_tables.value]
-        t_data = data.analysis_tables[aa_splitter_id[0]]
-        for aid in aa_splitter_id[1:]:
+        group_difference_ids = data.get_ids(GroupDifference)[GroupDifference][ExperimentDataEnum.analysis_tables.value]
+        t_data = data.analysis_tables[group_difference_ids[0]]
+        for aid in group_difference_ids[1:]:
             t_data = t_data.append(data.analysis_tables[aid])
+        return self._extract_from_comparators(t_data)
 
-        
-        group_difference = t_data.to_dict()["data"]
-        group_difference = [
-            {
-                f"{group} {group_difference['index'][i]}": group_difference["data"][
-                    group
-                ][i]
-                for i in range(len(group_difference["index"]))
-            }
-            for group in group_difference["data"]
-        ]
-        result = group_difference[0]
-        for i in range(1, len(group_difference)):
-            result.update(group_difference[i])
-        return result
-
-    
+    def extract_group_sizes(self, data: ExperimentData) -> Dict[str, Any]:
+        group_sizes_id = data._get_one_id(
+            GroupSizes, ExperimentDataEnum.analysis_tables
+        )
+        return self._extract_from_comparators(data.analysis_tables[group_sizes_id])
 
     def extract_data_from_analysis_tables(self, data: ExperimentData) -> Dict[str, Any]:
-        group_difference = self.extract_group_difference(data)
-        return group_difference
+        result = {}
+        result.update(self.extract_group_difference(data))
+        result.update(self.extract_group_sizes(data))
+        return result
 
     def report(self, data: ExperimentData) -> Dict[str, Any]:
         result = {
