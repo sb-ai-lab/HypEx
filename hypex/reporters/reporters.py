@@ -9,6 +9,11 @@ class Reporter(ABC):
         raise NotImplementedError
 
     @staticmethod
+    def extract_from_one_row_dataset(data: Dataset) -> Dict[str, Any]:
+        return {k: v[0] for k, v in data.to_dict()["data"]["data"].items()}
+        
+
+    @staticmethod
     def _extract_from_comparators(data: Dataset) -> Dict[str, Any]:
         group_difference = data.to_dict()["data"]
         group_difference = [

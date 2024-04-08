@@ -6,6 +6,7 @@ from hypex.splitters.aa import AASplitter
 from hypex.utils.constants import ID_SPLIT_SYMBOL
 from hypex.utils.enums import ExperimentDataEnum
 from hypex.comparators.comparators import GroupDifference, GroupSizes
+from hypex.analyzers.aa import OneAASplitAnalyzer
 
 
 class AADictReporter(DictReporter):
@@ -29,10 +30,17 @@ class AADictReporter(DictReporter):
         )
         return self._extract_from_comparators(data.analysis_tables[group_sizes_id])
 
+    def extract_analyzer_data(self, data: ExperimentData) -> Dict[str, Any]:
+        analyzer_id = data._get_one_id(
+            OneAASplitAnalyzer, ExperimentDataEnum.analysis_tables
+        )
+        return self.extract_from_one_row_dataset(data.analysis_tables[analyzer_id])
+
     def extract_data_from_analysis_tables(self, data: ExperimentData) -> Dict[str, Any]:
         result = {}
         result.update(self.extract_group_difference(data))
         result.update(self.extract_group_sizes(data))
+        result.update(self.extract_analyzer_data(data))
         return result
 
     def report(self, data: ExperimentData) -> Dict[str, Any]:
