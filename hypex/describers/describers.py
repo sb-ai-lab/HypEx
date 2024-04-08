@@ -4,7 +4,7 @@ import numpy as np
 
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import StatisticRole
-from hypex.experiment.experiment import Executor
+from hypex.experiments.base import Executor
 from hypex.utils.enums import ExperimentDataEnum
 from hypex.utils.typings import FieldKey
 

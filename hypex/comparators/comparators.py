@@ -3,7 +3,7 @@ from typing import Dict, Union, Any
 
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole, ABCRole, StatisticRole
-from hypex.experiment.experiment import Executor, ComplexExecutor
+from hypex.experiments.base import Executor, ComplexExecutor
 from hypex.stats.descriptive import Mean, Size
 from hypex.utils.enums import ExperimentDataEnum, SpaceEnum, BackendsEnum
 from hypex.utils.errors import NoColumnsError, ComparisonNotSuitableFieldError

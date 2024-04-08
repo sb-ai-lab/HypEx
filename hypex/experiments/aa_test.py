@@ -1,9 +1,9 @@
-from hypex.experiment.experiment import Experiment, OnRoleExperiment
-from hypex.splitters.aa import AASplitter
-from hypex.comparators.hypothesis_testing import TTest, KSTest
+from hypex.analyzers.aa import OneAASplitAnalyzer
 from hypex.comparators.comparators import GroupDifference, GroupSizes
+from hypex.comparators.hypothesis_testing import TTest, KSTest
 from hypex.dataset.roles import TargetRole, TreatmentRole
-from hypex.analyzer.aa import OneAASplitAnalyzer
+from hypex.experiments.base import Experiment, OnRoleExperiment
+from hypex.splitters.aa import AASplitter
 from hypex.utils.enums import SpaceEnum
 
 AA_TEST = Experiment(

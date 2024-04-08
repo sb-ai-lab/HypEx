@@ -5,7 +5,7 @@ from scipy.stats import mode
 
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import TempTargetRole
-from hypex.experiment.experiment import Executor
+from hypex.experiments.base import Executor
 from hypex.utils.enums import ExperimentDataEnum
 
 

@@ -1,7 +1,7 @@
 from hypex.comparators.comparators import GroupDifference, GroupSizes
 from hypex.comparators.hypothesis_testing import TTest, MannWhitney
 from hypex.dataset.roles import TargetRole, TreatmentRole
-from hypex.experiment.experiment import Experiment, OnRoleExperiment
+from hypex.experiments.base import Experiment, OnRoleExperiment
 
 AB_TEST = Experiment(
     executors=[

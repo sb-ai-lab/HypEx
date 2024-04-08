@@ -5,7 +5,7 @@ import numpy as np
 
 from hypex.dataset.dataset import ExperimentData
 from hypex.dataset.roles import Arg1Role, Arg2Role, StatisticRole
-from hypex.experiment.experiment import Executor
+from hypex.experiments.base import Executor
 from hypex.utils.enums import ExperimentDataEnum
 
 
@@ -27,7 +27,7 @@ class BinaryOperator(Executor):
         return data
 
     @abstractmethod
-    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
         raise NotImplementedError
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -37,35 +37,35 @@ class BinaryOperator(Executor):
 
 
 class MetricDelta(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
         return data.data - other.data
 
 
 class MetricPercentageDelta(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
         return (1 - data.data / other.data) * 100
 
 
 class MetricAbsoluteDelta(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
         return np.abs(data.data - other.data)
 
 
 class MetricRelativeDelta(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
         return 1 - data.data / other.data
 
 
 class MetricRatio(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
         return data.data / other.data
 
 
 class MetricLogRatio(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
         return np.log(data.data / other.data)
 
 
 class MetricPercentageRatio(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None]=None):
+    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
         return (1 - data.data / other.data) * 100

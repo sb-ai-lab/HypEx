@@ -2,7 +2,7 @@ from typing import Dict, Any, Union, List
 
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import GroupingRole, StratificationRole, TreatmentRole
-from hypex.experiment.experiment import Executor, ComplexExecutor
+from hypex.experiments.base import Executor, ComplexExecutor
 from hypex.transformers.transformers import Shuffle
 from hypex.utils.enums import ExperimentDataEnum
 

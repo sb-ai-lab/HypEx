@@ -1,15 +1,14 @@
 from typing import Dict, List
 
+from hypex.analyzers.analyzer import Analyzer
 from hypex.comparators.hypothesis_testing import TTest, KSTest
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import StatisticRole
-from hypex.experiment.experiment import (
-    ComplexExecutor,
+from hypex.experiments.base import (
     Executor,
 )
 from hypex.stats.descriptive import Mean
 from hypex.utils.enums import ExperimentDataEnum, BackendsEnum
-from hypex.analyzer.analyzer import Analyzer
 
 
 class OneAASplitAnalyzer(Analyzer):

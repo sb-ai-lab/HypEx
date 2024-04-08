@@ -7,7 +7,7 @@ from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu
 from hypex.comparators.comparators import GroupComparator
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import ABCRole, StatisticRole
-from hypex.experiment.experiment import Executor
+from hypex.experiments.base import Executor
 from hypex.utils.enums import SpaceEnum
 
 
