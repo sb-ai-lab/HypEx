@@ -6,6 +6,7 @@ from typing import Iterable, Dict, Union, Any, List
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import TempGroupingRole, TempTargetRole, ABCRole, GroupingRole
 from hypex.utils.constants import ID_SPLIT_SYMBOL
+from hypex.utils.enums import ExperimentDataEnum
 
 
 class Executor(ABC):
@@ -235,9 +236,7 @@ class GroupExperiment(Executor):
             temp_data = self.inner_executor.execute(temp_data)
             temp_data = temp_data.add_column(
                 [group] * len(temp_data),
-                role={
-                    f"group({self.id_for_name})": GroupingRole()
-                },
+                role={f"group({self.id_for_name})": GroupingRole()},
             )
             result_list.append(self._extract_result(temp_data))
         return self._insert_result(data, result_list)
@@ -256,7 +255,9 @@ class OnRoleExperiment(Experiment):
         super().__init__(executors, transformer, full_name, key)
 
     def calc(self, data: Dataset):
-        return {field: super().calc(data) for field in data.get_columns_by_roles(self.role)}
+        return {
+            field: super().calc(data) for field in data.get_columns_by_roles(self.role)
+        }
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         for field in data.get_columns_by_roles(self.role):

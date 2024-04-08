@@ -40,7 +40,7 @@ class GroupComparator(ComplexExecutor):
         group_field = []
         if self.space in [SpaceEnum.auto, SpaceEnum.data]:
             group_field = data.get_columns_by_roles(self.grouping_role)
-        if self.space in [SpaceEnum.auto, SpaceEnum.additional]:
+        if self.space in [SpaceEnum.auto, SpaceEnum.additional] and group_field == []:
             group_field = data.additional_fields.get_columns_by_roles(
                 self.grouping_role
             )

@@ -2,12 +2,12 @@ from abc import ABC
 from typing import Dict, Union, Any, List
 
 # mypy import-untyped
-from scipy.stats import ttest_ind, ks_2samp
+from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu
 
-from hypex.experiment.experiment import Executor
 from hypex.comparators.comparators import GroupComparator
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import ABCRole, StatisticRole
+from hypex.experiment.experiment import Executor
 from hypex.utils.enums import SpaceEnum
 
 
@@ -62,5 +62,12 @@ class TTest(StatHypothesisTestingWithScipy):
 class KSTest(StatHypothesisTestingWithScipy):
     def _comparison_function(self, control_data, test_data) -> ExperimentData:
         return ks_2samp(
+            control_data.data.values.flatten(), test_data.data.values.flatten()
+        )
+
+
+class MannWhitney(StatHypothesisTestingWithScipy):
+    def _comparison_function(self, control_data, test_data):
+        return mannwhitneyu(
             control_data.data.values.flatten(), test_data.data.values.flatten()
         )
