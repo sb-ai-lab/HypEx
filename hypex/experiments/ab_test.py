@@ -1,3 +1,4 @@
+from hypex.analyzers.ab import ABAnalyzer
 from hypex.comparators.comparators import GroupDifference, GroupSizes
 from hypex.comparators.hypothesis_testing import TTest, MannWhitney
 from hypex.dataset.roles import TargetRole, TreatmentRole
@@ -14,5 +15,6 @@ AB_TEST = Experiment(
             ],
             role=TargetRole(),
         ),
+        ABAnalyzer(),
     ]
 )
