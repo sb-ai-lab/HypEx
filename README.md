@@ -70,7 +70,7 @@ These method is not sufficiently accurate marker of a successful experiment.
 ## Installation
 
 ```bash
-pip install hypex
+pip install -U hypex
 ```
 
 ## Quick start
