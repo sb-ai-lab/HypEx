@@ -45,6 +45,13 @@ class TreatmentRole(ABCRole):
         super().__init__(data_type)
 
 
+class TmpTreatmentRole(ABCRole):
+    _role_name = "TmpTreatment"
+
+    def __init__(self, data_type: Union[TreatmentRoleTypes, None] = None):
+        super().__init__(data_type)
+
+
 class TargetRole(ABCRole):
     _role_name = "Target"
 

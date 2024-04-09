@@ -23,8 +23,8 @@ class Describer(Executor):
 
 
 class Unique(Describer):
-    @staticmethod
-    def _convert_to_dataset(data: Iterable) -> Dataset:
+
+    def _convert_to_dataset(self, data: Iterable) -> Dataset:
         return Dataset.from_dict(data, {self.id: StatisticRole()})
 
     def execute(self, data: ExperimentData) -> ExperimentData:

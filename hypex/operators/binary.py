@@ -3,7 +3,7 @@ from typing import Any, Union
 
 import numpy as np
 
-from hypex.dataset.dataset import ExperimentData
+from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import Arg1Role, Arg2Role, StatisticRole
 from hypex.experiments.base import Executor
 from hypex.utils.enums import ExperimentDataEnum

@@ -1,6 +1,6 @@
 import json
 import warnings
-from typing import Union, List, Iterable, Any, Type, Dict, Callable, Hashable
+from typing import Union, List, Iterable, Any, Dict, Callable, Hashable
 
 import pandas as pd
 
@@ -8,18 +8,15 @@ from hypex.dataset.backends.pandas_backend import PandasDataset
 from hypex.dataset.base import DatasetBase
 from hypex.dataset.roles import StatisticRole, InfoRole, ABCRole
 from hypex.dataset.utils import parse_roles
+from hypex.utils.constants import ID_SPLIT_SYMBOL
+from hypex.utils.enums import ExperimentDataEnum, BackendsEnum
+from hypex.utils.errors import NotFoundInExperimentDataError
 from hypex.utils.errors import (
     RoleColumnError,
     ConcatDataError,
     ConcatBackendError,
-    SpaceError,
 )
-from hypex.utils.constants import ID_SPLIT_SYMBOL
-from hypex.utils.enums import ExperimentDataEnum, BackendsEnum
 from hypex.utils.typings import FromDictType
-from hypex.utils.errors import NotFoundInExperimentDataError
-
-
 
 
 class Dataset(DatasetBase):
@@ -61,17 +58,17 @@ class Dataset(DatasetBase):
         """
         if backend == BackendsEnum.pandas:
             return PandasDataset(data)
-        # return PandasDataset(data)
+        return PandasDataset(data)
 
-    def set_data(
+    def __init__(
         self,
-        roles: Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]],
-        data: Union[pd.DataFrame, str, Type, None] = None,
+        roles: Union[Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]],
+        data: Union[pd.DataFrame, str, None] = None,
         backend: Union[BackendsEnum, None] = None,
     ):
-        """
-        Заполняет атрибуты класса
-        """
+        self.tmp_roles: Union[
+            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
+        ] = {}
         self._backend = (
             self._select_backend_from_str(data, backend)
             if backend
@@ -90,22 +87,6 @@ class Dataset(DatasetBase):
         self.data = self._backend.data
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
-
-    def __init__(
-        self,
-        roles: Union[Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]],
-        data: Union[pd.DataFrame, str, None] = None,
-        backend: Union[BackendsEnum, None] = None,
-    ):
-        self.roles: Dict[ABCRole, str] = {}
-        self.tmp_roles: Union[
-            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
-        ] = {}
-        self._backend: Union[PandasDataset, None] = None
-        self.data: Any = None
-        self.loc: Union[Dataset.Locker, None] = None
-        self.iloc: Union[Dataset.ILocker, None] = None
-        self.set_data(roles, data, backend)
 
     def __repr__(self):
         return self.data.__repr__()
@@ -190,7 +171,9 @@ class Dataset(DatasetBase):
         if type(other._backend) != type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
         self.roles.update(other.roles)
-        return Dataset(roles=self.roles, data=self._backend.append(other._backend, index))
+        return Dataset(
+            roles=self.roles, data=self._backend.append(other._backend, index)
+        )
 
     @staticmethod
     def from_dict(
@@ -372,7 +355,7 @@ class ExperimentData(Dataset):
             }
             for class_ in classes
         }
-    
+
     def _get_one_id(self, class_: type, space: ExperimentDataEnum) -> str:
         result = self.get_ids(class_)
         if not len(result):

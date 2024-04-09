@@ -70,7 +70,7 @@ class GroupComparator(ComplexExecutor):
             else str(group_field)
         )[0]
         target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)[0]
-        self.key = f"{target_field}[{group_name}]"
+        self.key = f"{target_field}[{group_name}]" + self.key
         grouping_data = self.__get_grouping_data(data, group_field)
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles

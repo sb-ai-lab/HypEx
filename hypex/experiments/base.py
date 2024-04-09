@@ -4,7 +4,14 @@ from copy import deepcopy
 from typing import Iterable, Dict, Union, Any, List
 
 from hypex.dataset.dataset import ExperimentData, Dataset
-from hypex.dataset.roles import TempGroupingRole, TempTargetRole, ABCRole, GroupingRole
+from hypex.dataset.roles import (
+    TempGroupingRole,
+    TempTargetRole,
+    ABCRole,
+    GroupingRole,
+    TreatmentRole,
+    TmpTreatmentRole,
+)
 from hypex.utils.constants import ID_SPLIT_SYMBOL
 from hypex.utils.enums import ExperimentDataEnum
 
@@ -161,6 +168,7 @@ class Experiment(Executor):
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
+            executor.key = self.key
             experiment_data = executor.execute(experiment_data)
         return experiment_data
 
@@ -186,8 +194,12 @@ class CycledExperiment(Executor):
         return [self.inner_executor.calc(data) for _ in range(self.n_iterations)]
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        for _ in range(self.n_iterations):
+        for i in range(self.n_iterations):
+            self.analyzer.key = f"{i}"
+            self.inner_executor.key = f"{i}"
             data = self.analyzer.execute(self.inner_executor.execute(data))
+            column = data.additional_fields.get_columns_by_roles(TreatmentRole())[0]
+            data.additional_fields.roles[column] = TmpTreatmentRole()
         return data
 
 
@@ -262,6 +274,7 @@ class OnRoleExperiment(Experiment):
     def execute(self, data: ExperimentData) -> ExperimentData:
         for field in data.get_columns_by_roles(self.role):
             data.tmp_roles = {field: TempTargetRole()}
+
             data = super().execute(data)
             data.tmp_roles = {}
         return data
