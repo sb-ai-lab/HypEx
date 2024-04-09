@@ -1,11 +1,10 @@
 from abc import ABC
 from typing import Dict, Union, Any, List
 
-# mypy import-untyped
-from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu
+from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu  # type: ignore
 
 from hypex.comparators.comparators import GroupComparator
-from hypex.dataset.dataset import ExperimentData, Dataset
+from hypex.dataset.dataset import Dataset
 from hypex.dataset.roles import ABCRole, StatisticRole
 from hypex.experiments.base import Executor
 from hypex.utils.enums import SpaceEnum
@@ -53,14 +52,14 @@ class StatHypothesisTestingWithScipy(GroupComparator, ABC):
 
 
 class TTest(StatHypothesisTestingWithScipy):
-    def _comparison_function(self, control_data, test_data) -> ExperimentData:
+    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
         return ttest_ind(
             control_data.data.values.flatten(), test_data.data.values.flatten()
         )
 
 
 class KSTest(StatHypothesisTestingWithScipy):
-    def _comparison_function(self, control_data, test_data) -> ExperimentData:
+    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
         return ks_2samp(
             control_data.data.values.flatten(), test_data.data.values.flatten()
         )

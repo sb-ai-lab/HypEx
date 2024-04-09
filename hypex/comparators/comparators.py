@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Dict, Union, Any
+from typing import Dict, Any, Optional
 
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole, ABCRole, StatisticRole
@@ -13,10 +13,10 @@ from hypex.utils.typings import FromDictType
 class GroupComparator(ComplexExecutor):
     def __init__(
         self,
-        grouping_role: Union[ABCRole, None] = None,
+        grouping_role: Optional[ABCRole] = None,
         space: SpaceEnum = SpaceEnum.auto,
-        inner_executors: Union[Dict[str, Executor], None] = None,
-        full_name: Union[str, None] = None,
+        inner_executors: Optional[Dict[str, Executor]] = None,
+        full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.grouping_role = grouping_role or GroupingRole()
@@ -86,7 +86,9 @@ class GroupComparator(ComplexExecutor):
             )
         return result
 
-    def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
+    def _set_value(
+        self, data: ExperimentData, value: Optional[Dataset] = None, key=None
+    ) -> ExperimentData:
         data.set_value(
             ExperimentDataEnum.analysis_tables, self.id, self.full_name, value
         )

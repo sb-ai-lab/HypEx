@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
 import numpy as np
-from scipy.stats import mode
+from scipy.stats import mode  # type: ignore
 
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import TempTargetRole

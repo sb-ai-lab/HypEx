@@ -14,7 +14,7 @@ from hypex.utils.enums import ExperimentDataEnum, BackendsEnum
 class OneAASplitAnalyzer(Analyzer):
     default_inner_executors: Dict[str, Executor] = {"mean": Mean()}
 
-    def _set_value(self, data: ExperimentData, value=None, key=None) -> ExperimentData:
+    def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         return data.set_value(
             ExperimentDataEnum.analysis_tables,
             self.id,

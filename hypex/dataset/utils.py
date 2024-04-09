@@ -1,9 +1,9 @@
-from typing import Dict
+from typing import Dict, Union
 
 from hypex.dataset.roles import default_roles, ABCRole
 
 
-def parse_roles(roles: Dict) -> Dict[str, ABCRole]:
+def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
     new_roles = {}
     roles = roles or {}
     for role in roles:

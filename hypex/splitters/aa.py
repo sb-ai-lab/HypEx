@@ -1,4 +1,4 @@
-from typing import Dict, Any, Union, List
+from typing import Dict, Any, List, Optional
 
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import GroupingRole, StratificationRole, TreatmentRole
@@ -11,10 +11,10 @@ class AASplitter(ComplexExecutor):
     def __init__(
         self,
         control_size: float = 0.5,
-        random_state: Union[int, None] = None,
-        inner_executors: Union[Dict[str, Executor], None] = None,
-        full_name: Union[str, None] = None,
+        random_state: Optional[int] = None,
+        full_name: Optional[str] = None,
         key: Any = "",
+        inner_executors: Optional[Dict[str, Executor]] = None,
     ):
         self.control_size = control_size
         self.random_state = random_state
@@ -25,7 +25,7 @@ class AASplitter(ComplexExecutor):
     def generate_params_hash(self) -> str:
         return f"{self.random_state}"
 
-    def _set_value(self, data: ExperimentData, value=None, key=None) -> ExperimentData:
+    def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         data = data.set_value(
             ExperimentDataEnum.additional_fields,
             self._id,
@@ -35,7 +35,7 @@ class AASplitter(ComplexExecutor):
         )
         return data
 
-    def calc(self, data: Dataset) -> List[str]:
+    def calc(self, data: ExperimentData) -> List[str]:
         experiment_data: ExperimentData = self.inner_executors["shuffle"].execute(data)
 
         addition_indexes = list(experiment_data.index)
@@ -49,7 +49,7 @@ class AASplitterWithGrouping(AASplitter):
         group_field = data.get_columns_by_roles(GroupingRole())
         groups = list(data.groupby(group_field))
         edge = len(groups) // 2
-        result: Union[Dataset, None] = None
+        result: Dataset = Dataset._create_empty({})
         for i, group in enumerate(groups):
             group_ds = Dataset.from_dict(
                 [{"group_for_split": group[0], "group": "A" if i < edge else "B"}]
@@ -65,8 +65,8 @@ class AASplitterWithStratification(AASplitter):
     def __init__(
         self,
         control_size: float = 0.5,
-        random_state: Union[int, None] = None,
-        full_name: Union[str, None] = None,
+        random_state: Optional[int] = None,
+        full_name: Optional[str] = None,
         key: Any = "",
     ):
         super().__init__(control_size, random_state, full_name, key)
@@ -75,10 +75,10 @@ class AASplitterWithStratification(AASplitter):
         stratification_columns = data.get_columns_by_roles(StratificationRole())
 
         groups = data.groupby(stratification_columns)
-        result = None
+        result = Dataset._create_empty({})
         for _, gd in groups:
             ged = ExperimentData(gd)
-            ged = self.super().execute(ged)
+            ged = super().execute(ged)
 
             result = ged if result is None else result.append(ged)
         return result["group"]

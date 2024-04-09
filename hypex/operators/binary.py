@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, Union
+from typing import Any, Optional
 
 import numpy as np
 
@@ -11,11 +11,11 @@ from hypex.utils.enums import ExperimentDataEnum
 
 class BinaryOperator(Executor):
 
-    def __init__(self, full_name: Union[str, None] = None, key: Any = ""):
+    def __init__(self, full_name: Optional[str] = None, key: Any = ""):
         super().__init__(full_name, key)
 
     def _set_value(
-        self, data: ExperimentData, value: Any = None, key: Any = None
+        self, data: ExperimentData, value: Any, key: Any = None
     ) -> ExperimentData:
         data.set_value(
             ExperimentDataEnum.additional_fields,
@@ -27,7 +27,7 @@ class BinaryOperator(Executor):
         return data
 
     @abstractmethod
-    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
+    def calc(self, data: Dataset, other: Optional[Dataset] = None):
         raise NotImplementedError
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -37,35 +37,42 @@ class BinaryOperator(Executor):
 
 
 class MetricDelta(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
-        return data.data - other.data
+    def calc(self, data: Dataset, other: Optional[Dataset] = None):
+        if other is not None:
+            return data.data - other.data
 
 
 class MetricPercentageDelta(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
-        return (1 - data.data / other.data) * 100
+    def calc(self, data: Dataset, other: Optional[Dataset] = None):
+        if other is not None:
+            return (1 - data.data / other.data) * 100
 
 
 class MetricAbsoluteDelta(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
-        return np.abs(data.data - other.data)
+    def calc(self, data: Dataset, other: Optional[Dataset] = None):
+        if other is not None:
+            return np.abs(data.data - other.data)
 
 
 class MetricRelativeDelta(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
-        return 1 - data.data / other.data
+    def calc(self, data: Dataset, other: Optional[Dataset] = None):
+        if other is not None:
+            return 1 - data.data / other.data
 
 
 class MetricRatio(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
-        return data.data / other.data
+    def calc(self, data: Dataset, other: Optional[Dataset] = None):
+        if other is not None:
+            return data.data / other.data
 
 
 class MetricLogRatio(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
-        return np.log(data.data / other.data)
+    def calc(self, data: Dataset, other: Optional[Dataset] = None):
+        if other is not None:
+            return np.log(data.data / other.data)
 
 
 class MetricPercentageRatio(BinaryOperator):
-    def calc(self, data: Dataset, other: Union[Dataset, None] = None):
-        return (1 - data.data / other.data) * 100
+    def calc(self, data: Dataset, other: Optional[Dataset] = None):
+        if other is not None:
+            return (1 - data.data / other.data) * 100

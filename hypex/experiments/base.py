@@ -1,7 +1,7 @@
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Iterable, Dict, Union, Any, List
+from typing import Iterable, Dict, Union, Any, List, Optional
 
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import (
@@ -17,6 +17,20 @@ from hypex.utils.enums import ExperimentDataEnum
 
 
 class Executor(ABC):
+    def __init__(
+        self,
+        full_name: Optional[str] = None,
+        key: Any = "",
+        random_state: Optional[int] = None,
+    ):
+        self._id: str = ""
+        self._params_hash = ""
+        self.full_name = full_name
+        self.random_state = random_state
+
+        self.key: Any = key
+        self.refresh_params_hash()
+
     def _generate_params_hash(self):
         self._params_hash = ""
 
@@ -38,7 +52,7 @@ class Executor(ABC):
         return self._full_name
 
     @full_name.setter
-    def full_name(self, value: Union[str, None]):
+    def full_name(self, value: Optional[str]):
         self._full_name: str = str(value or self.__class__.__name__)
 
     @property
@@ -62,20 +76,12 @@ class Executor(ABC):
         self._generate_params_hash()
         self._generate_id()
 
-    def __init__(self, full_name: Union[str, None] = None, key: Any = ""):
-        self._id: str = ""
-        self._params_hash = ""
-        self.full_name = full_name
-
-        self.key: Any = key
-        self.refresh_params_hash()
-
     @property
     def _is_transformer(self) -> bool:
         return False
 
     def _set_value(
-        self, data: ExperimentData, value: Any = None, key: Any = None
+        self, data: ExperimentData, value: Any, key: Any = None
     ) -> ExperimentData:
         return data
 
@@ -92,7 +98,7 @@ class ComplexExecutor(Executor, ABC):
     default_inner_executors: Dict[str, Executor] = {}
 
     def _get_inner_executors(
-        self, inner_executors: Union[Dict[str, Executor], None] = None
+        self, inner_executors: Optional[Dict[str, Executor]] = None
     ) -> Dict[str, Executor]:
         result = {}
         inner_executors = inner_executors or {}
@@ -109,8 +115,8 @@ class ComplexExecutor(Executor, ABC):
 
     def __init__(
         self,
-        inner_executors: Union[Dict[str, Executor], None] = None,
-        full_name: Union[str, None] = None,
+        inner_executors: Optional[Dict[str, Executor]] = None,
+        full_name: Optional[str] = None,
         key: Any = "",
     ):
         super().__init__(full_name=full_name, key=key)
@@ -145,8 +151,8 @@ class Experiment(Executor):
     def __init__(
         self,
         executors: List[Executor],
-        transformer: Union[bool, None] = None,
-        full_name: Union[str, None] = None,
+        transformer: Optional[bool] = None,
+        full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.executors: List[Executor] = executors
@@ -169,6 +175,7 @@ class Experiment(Executor):
         experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
             executor.key = self.key
+            executor.random_state = self.random_state
             experiment_data = executor.execute(experiment_data)
         return experiment_data
 
@@ -179,7 +186,7 @@ class CycledExperiment(Executor):
         inner_executor: Executor,
         n_iterations: int,
         analyzer: Executor,
-        full_name: Union[str, None] = None,
+        full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.inner_executor: Executor = inner_executor
@@ -197,6 +204,7 @@ class CycledExperiment(Executor):
         for i in range(self.n_iterations):
             self.analyzer.key = f"{i}"
             self.inner_executor.key = f"{i}"
+            self.inner_executor.random_state = i
             data = self.analyzer.execute(self.inner_executor.execute(data))
             column = data.additional_fields.get_columns_by_roles(TreatmentRole())[0]
             data.additional_fields.roles[column] = TmpTreatmentRole()
@@ -212,7 +220,7 @@ class GroupExperiment(Executor):
     def __init__(
         self,
         inner_executor: Executor,
-        full_name: Union[str, None] = None,
+        full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.inner_executor: Executor = inner_executor
@@ -228,7 +236,7 @@ class GroupExperiment(Executor):
         for i in range(1, len(result_list)):
             result = result.append(result_list[i])
         data.set_value(
-            ExperimentDataEnum.analysis_tables, self._id, self.full_name, result
+            ExperimentDataEnum.analysis_tables, self._id, str(self.full_name), result
         )
         return data
 
@@ -259,8 +267,8 @@ class OnRoleExperiment(Experiment):
         self,
         executors: List[Executor],
         role: ABCRole,
-        transformer: Union[bool, None] = None,
-        full_name: Union[str, None] = None,
+        transformer: Optional[bool] = None,
+        full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.role: ABCRole = role
@@ -274,7 +282,6 @@ class OnRoleExperiment(Experiment):
     def execute(self, data: ExperimentData) -> ExperimentData:
         for field in data.get_columns_by_roles(self.role):
             data.tmp_roles = {field: TempTargetRole()}
-
             data = super().execute(data)
             data.tmp_roles = {}
         return data

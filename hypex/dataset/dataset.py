@@ -1,6 +1,6 @@
 import json
 import warnings
-from typing import Union, List, Iterable, Any, Dict, Callable, Hashable
+from typing import Union, List, Iterable, Any, Dict, Callable, Hashable, Optional
 
 import pandas as pd
 
@@ -62,9 +62,12 @@ class Dataset(DatasetBase):
 
     def __init__(
         self,
-        roles: Union[Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]],
-        data: Union[pd.DataFrame, str, None] = None,
-        backend: Union[BackendsEnum, None] = None,
+        roles: Union[
+            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
+            Dict[Union[str, int], ABCRole],
+        ],
+        data: Optional[pd.DataFrame, str] = None,
+        backend: Optional[BackendsEnum] = None,
     ):
         self.tmp_roles: Union[
             Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
@@ -83,7 +86,7 @@ class Dataset(DatasetBase):
             i not in self._backend.columns for i in list(roles.keys())
         ):
             raise RoleColumnError(list(roles.keys()), self._backend.columns)
-        self.roles = roles
+        self.roles: Dict[Union[str, int], ABCRole] = roles
         self.data = self._backend.data
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
@@ -129,9 +132,11 @@ class Dataset(DatasetBase):
 
     def get_columns_by_roles(
         self, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role=False
-    ) -> List[Union[str, ABCRole]]:
+    ) -> List[Union[str, int]]:
         roles = roles if isinstance(roles, Iterable) else [roles]
-        roles_for_search = self.tmp_roles if tmp_role else self.roles
+        roles_for_search: Dict[Union[str, int], ABCRole] = (
+            self.tmp_roles if tmp_role else self.roles
+        )
         return [
             column
             for column, role in roles_for_search.items()
@@ -149,8 +154,8 @@ class Dataset(DatasetBase):
     def add_column(
         self,
         data,
-        role: Union[Dict[str, ABCRole], None] = None,
-        index: Union[Iterable[Hashable], None] = None,
+        role: Optional[Dict[str, ABCRole]] = None,
+        index: Optional[Iterable[Hashable]] = None,
     ):
         if role is None:  # если данные - датасет
             if not isinstance(data, Dataset):
@@ -178,7 +183,10 @@ class Dataset(DatasetBase):
     @staticmethod
     def from_dict(
         data: FromDictType,
-        roles: Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]],
+        roles: Union[
+            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
+            Dict[Union[str, int], ABCRole],
+        ],
         backend: BackendsEnum = BackendsEnum.pandas,
         index=None,
     ):
@@ -197,7 +205,7 @@ class Dataset(DatasetBase):
             "data": self._backend.to_dict(),
         }
 
-    def to_json(self, filename: Union[str, None] = None):
+    def to_json(self, filename: Optional[str] = None):
         if not filename:
             return json.dumps(self.to_dict())
         with open(filename, "w") as file:
@@ -206,7 +214,7 @@ class Dataset(DatasetBase):
     def apply(
         self,
         func: Callable,
-        role: Dict[str, ABCRole],
+        role: Dict[Union[str, int], ABCRole],
         axis=0,
         **kwargs,
     ):
@@ -229,8 +237,8 @@ class Dataset(DatasetBase):
     def groupby(
         self,
         by: Any,
-        func: Union[str, List, None] = None,
-        fields_list: Union[List, str, None] = None,
+        func: Optional[Union[str, List]] = None,
+        fields_list: Optional[Union[str, List]] = None,
         **kwargs,
     ):
         datasets = [
@@ -260,7 +268,7 @@ class Dataset(DatasetBase):
                     for i, data in datasets
                 ]
         for dataset in datasets:
-            dataset[1].temp_roles = self.tmp_roles
+            dataset[1].tmp_roles = self.tmp_roles
         return datasets
 
     def mean(self):
@@ -314,7 +322,7 @@ class ExperimentData(Dataset):
         executor_id: str,
         name: str,
         value: Any,
-        key: Union[str, None] = None,
+        key: Optional[str] = None,
         role=None,
     ):
         if space == ExperimentDataEnum.additional_fields:
