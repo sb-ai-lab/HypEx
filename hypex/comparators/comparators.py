@@ -4,6 +4,7 @@ from typing import Dict, Any, Optional
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import GroupingRole, TempTargetRole, ABCRole, StatisticRole
 from hypex.experiments.base import Executor, ComplexExecutor
+from hypex.operators.binary import MetricDelta
 from hypex.stats.descriptive import Mean, Size
 from hypex.utils.enums import ExperimentDataEnum, SpaceEnum, BackendsEnum
 from hypex.utils.errors import NoColumnsError, ComparisonNotSuitableFieldError
@@ -117,8 +118,6 @@ class GroupDifference(GroupComparator):
         target_field = control_data.get_columns_by_roles(
             TempTargetRole(), tmp_role=True
         )[0]
-        # ed_control = ExperimentData(control_data)
-        # ed_test = ExperimentData(test_data)
         ed_control = self.inner_executors["mean"].calc(control_data)
         ed_test = self.inner_executors["mean"].calc(test_data)
 
@@ -148,3 +147,26 @@ class GroupSizes(GroupComparator):
             "control size %": (size_a / (size_a + size_b)) * 100,
             "test size %": (size_b / (size_a + size_b)) * 100,
         }
+
+
+class GroupATE(GroupComparator):
+    default_inner_executors: Dict[str, Executor] = {
+        "delta": MetricDelta(),
+        "mean": Mean(),
+        "size": Size(),
+    }
+
+    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
+        target_field = control_data.get_columns_by_roles(
+            TempTargetRole(), tmp_role=True
+        )[0]
+        size_a = self.inner_executors["size"].calc(control_data)
+        size_b = self.inner_executors["size"].calc(test_data)
+        control_mean = self.inner_executors["mean"].calc(control_data)
+        test_mean = self.inner_executors["mean"].calc(test_data)
+
+        ate = (size_a / (size_a + size_b)) * control_mean + (
+            size_b / (size_a + size_b)
+        ) * test_mean
+
+        return {f"{target_field} ATE": ate.iloc[0]}

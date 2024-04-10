@@ -1,6 +1,7 @@
 from typing import Dict, List
 
 from hypex.analyzers.analyzer import Analyzer
+from hypex.comparators.comparators import GroupATE
 from hypex.comparators.hypothesis_testing import TTest, MannWhitney
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import StatisticRole
@@ -23,7 +24,7 @@ class ABAnalyzer(Analyzer):
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        analysis_tests: List[type] = [TTest, MannWhitney]
+        analysis_tests: List[type] = [TTest, MannWhitney, GroupATE]
         executor_ids = data.get_ids(analysis_tests)
 
         analysis_data = {}
@@ -37,10 +38,18 @@ class ABAnalyzer(Analyzer):
                 t_data = t_data.append(data.analysis_tables[aid])
             t_data.data.index = analysis_ids
 
-            for f in ["p-value", "pass"]:
-                analysis_data[f"{c.__name__} {f}"] = mean_operator.calc(t_data[f]).iloc[
-                    0
-                ]
+            if c.__name__ in ["TTest", "MannWhitney"]:
+                for f in ["p-value", "pass"]:
+                    analysis_data[f"{c.__name__} {f}"] = mean_operator.calc(
+                        t_data[f]
+                    ).iloc[0]
+            else:
+                indexes = t_data.index
+                values = t_data.data.values.tolist()
+                for idx, value in zip(indexes, values):
+                    analysis_data[
+                        f"{c.__name__} {idx.split('╰╰')[1].split('[[]')[0]}"
+                    ] = value[0]
         analysis_data = Dataset.from_dict(
             [analysis_data],
             {f: StatisticRole() for f in analysis_data},

@@ -66,7 +66,7 @@ class Dataset(DatasetBase):
             Dict[ABCRole, Union[List[Union[str, int]], str, int]],
             Dict[Union[str, int], ABCRole],
         ],
-        data: Optional[pd.DataFrame, str] = None,
+        data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
     ):
         self.tmp_roles: Union[
