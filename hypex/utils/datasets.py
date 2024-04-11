@@ -2,18 +2,28 @@ import pandas as pd
 import numpy as np
 
 
-def sigmoid(x):
+def sigmoid(x: np.ndarray) -> np.ndarray:
     """Logistic sigmoid ufunc for ndarrays.
 
     The sigmoid function, also known as the logistic sigmoid function,
     is defined as sigmoid(x) = 1/(1+exp(-x)).
-    It is the inverse of the logit function."""
+    It is the inverse of the logit function.
+    Args:
+        x:
+            Input array
+    """
     return 1 / (1 + np.exp(-x))
 
 
 def sigmoid_division(x, dependent_division=True) -> np.ndarray:
     """
     Returns binary array.
+    Args:
+        x:
+            Input array
+        dependent_division:
+            If True - returns the binary vector dependent on the X.
+            If False - returns the binary vector independent on the X.
     """
     if dependent_division:
         division = np.random.binomial(
@@ -33,6 +43,16 @@ def gen_special_medicine_df(
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
     Realises dependent/independent group splitting.
+    Args:
+        data_size:
+            Length of output Dataframe
+        dependent_division:
+            If True - the returned Dataframe contains a division into
+            groups dependent on the features.
+            If False - the returned Dataframe contains a division into
+            groups independent on the features.
+        random_state:
+            If specified - defines numpy random seed. Defaults to None.
     """
     if random_state is not None:
         np.random.seed(random_state)
@@ -63,7 +83,19 @@ def gen_oracle_df(
         random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
-    Realises factual and contrfactual outcomes.
+    Realises factual and counterfactual outcomes.
+    Args:
+        data_size:
+            Length of output Dataframe
+        dependent_division:
+            If True - the returned Dataframe contains a division into
+            groups dependent on the features.
+            If False - the returned Dataframe contains a division into
+            groups independent on the features.
+        factual_y_only:
+            Defines the display of counterfactual states.
+        random_state:
+            If specified - defines numpy random seed. Defaults to None.
     """
     if random_state is not None:
         np.random.seed(random_state)
@@ -113,6 +145,16 @@ def gen_control_variates_df(
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
     Realises 0-variation outcome mixed with linear x dependency.
+    Args:
+        data_size:
+            Length of output Dataframe
+        dependent_division:
+            If True - the returned Dataframe contains a division into
+            groups dependent on the features.
+            If False - the returned Dataframe contains a division into
+            groups independent on the features.
+        random_state:
+            If specified - defines numpy random seed. Defaults to None.
     """
     if random_state is not None:
         np.random.seed(random_state)
