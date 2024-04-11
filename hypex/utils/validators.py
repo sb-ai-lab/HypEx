@@ -69,9 +69,31 @@ def subset_refuter(df: pd.DataFrame, treatment: str, fraction: float = 0.8):
     validate = 1
     return df, validate
 
+# def test_significance(estimate: float, simulations: List) -> float:
+#     """Performs a significance test for a normal distribution.
+#
+#     Args:
+#         estimate:
+#             The estimated effect
+#         simulations:
+#             A list of estimated effects from each simulation
+#
+#     Returns:
+#         The p-value of the test
+#     """
+#     mean_refute_value = np.mean(simulations)
+#     std_dev_refute_values = np.std(simulations)
+#     z_score = (estimate - mean_refute_value) / std_dev_refute_values
+#
+#     if z_score > 0:  # Right Tail
+#         p_value = 1 - st.norm.cdf(z_score)
+#     else:  # Left Tail
+#         p_value = st.norm.cdf(z_score)
+#
+#     return p_value
 
 def test_significance(estimate: float, simulations: List) -> float:
-    """Performs a significance test for a normal distribution.
+    """Performs a significance test for a permutation test with len(simulations) iterations.
 
     Args:
         estimate:
@@ -83,16 +105,13 @@ def test_significance(estimate: float, simulations: List) -> float:
         The p-value of the test
     """
     mean_refute_value = np.mean(simulations)
-    std_dev_refute_values = np.std(simulations)
-    z_score = (estimate - mean_refute_value) / std_dev_refute_values
 
-    if z_score > 0:  # Right Tail
-        p_value = 1 - st.norm.cdf(z_score)
+    if estimate > mean_refute_value:  # Right Tail
+        p_value = 1 - (estimate > np.array(simulations)).mean()
     else:  # Left Tail
-        p_value = st.norm.cdf(z_score)
+        p_value = 1 - (estimate < np.array(simulations)).mean()
 
     return p_value
-
 
 def emissions(df: pd.DataFrame, treatment: str, is_treated: int, outcome: str, low: float, high: float) -> tuple:
     """
