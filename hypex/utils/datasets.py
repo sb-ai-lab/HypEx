@@ -11,6 +11,8 @@ def sigmoid(x: np.ndarray) -> np.ndarray:
     Args:
         x:
             Input array
+    Rerurns:
+    	Sigmoid function of x
     """
     return 1 / (1 + np.exp(-x))
 
