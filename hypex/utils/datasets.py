@@ -100,38 +100,38 @@ def gen_oracle_df(
     if random_state is not None:
         np.random.seed(random_state)
 
-    t = np.random.binomial(1, 0.5, size=data_size)
+    treatment_flag = np.random.binomial(1, 0.5, size=data_size)
 
     if dependent_division:
-        x = np.random.binomial(
+        feature_x = np.random.binomial(
             1,
-            0.3 + 0.4 * t
+            0.3 + 0.4 * treatment_flag
         )
     else:
-        x = np.random.binomial(1, 0.5, size=data_size)
+        feature_x = np.random.binomial(1, 0.5, size=data_size)
 
-    y0 = np.random.uniform(
+    treated_y = np.random.uniform(
         low=300,
         high=800,
         size=data_size
     ).round(-2).astype(int)
 
-    y1 = y0 + 50 + x * 100
+    untreated_y = treated_y + 50 + feature_x * 100
 
     if factual_y_only:
-        y0 = np.where(1 - t, y0, np.nan)
-        y1 = np.where(t, y1, np.nan)
+        treated_y = np.where(1 - treatment_flag, treated_y, np.nan)
+        y1 = np.where(treatment_flag, untreated_y, np.nan)
 
-    y = np.where(t, y1, y0).astype('int')
+    factual_y = np.where(treatment_flag, untreated_y, treated_y).astype('int')
 
-    te = y1 - y0
+    te = untreated_y - treated_y
 
     df = pd.DataFrame(dict(
-        X=x,
-        Y0=y0,
-        Y1=y1,
-        T=t,
-        Y=y,
+        X=feature_x,
+        Y0=treated_y,
+        Y1=untreated_y,
+        T=treatment_flag,
+        Y=factual_y,
         TE=te,
     ))
     return df
@@ -159,21 +159,21 @@ def gen_control_variates_df(
     if random_state is not None:
         np.random.seed(random_state)
 
-    x_means = np.random.uniform(0, 5, size=data_size)
+    feature_x_means = np.random.uniform(0, 5, size=data_size)
 
-    x_lag_1 = np.random.normal(x_means, 2)
-    x = np.random.normal(x_means, 2)
+    feature_x_lag_1 = np.random.normal(feature_x_means, 2)
+    feature_x = np.random.normal(feature_x_means, 2)
 
-    t = sigmoid_division(x_lag_1, dependent_division)
+    treatment_flag = sigmoid_division(feature_x_lag_1, dependent_division)
 
-    y_lag_1 = 200 + x_lag_1 * 100
-    y = 200 + x * 100 + t * 10
+    y_lag_1 = 200 + feature_x_lag_1 * 100
+    factual_y = 200 + feature_x * 100 + treatment_flag * 10
 
     df = pd.DataFrame(dict(
-        X_lag_1=x_lag_1,
+        X_lag_1=feature_x_lag_1,
         Y_lag_1=y_lag_1,
-        X=x,
-        T=t,
-        Y=y,
+        X=feature_x,
+        T=treatment_flag,
+        Y=factual_y,
     ))
     return df
