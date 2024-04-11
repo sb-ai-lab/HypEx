@@ -8,24 +8,28 @@ def sigmoid(x: np.ndarray) -> np.ndarray:
     The sigmoid function, also known as the logistic sigmoid function,
     is defined as sigmoid(x) = $\fraq{1}{(1+\exp{-x})}$.
     It is the inverse of the logit function.
+
     Args:
         x:
-            Input array
-    Rerurns:
-    	Sigmoid function of x
+            Input array.
+
+    Returns:
+        Sigmoid function of x.
     """
     return 1 / (1 + np.exp(-x))
 
 
 def sigmoid_division(x, dependent_division=True) -> np.ndarray:
     """
-    Returns binary array.
+    Division method via sigmoid function.
+
     Args:
         x:
             Input array
         dependent_division:
             If True - returns the binary vector dependent on the X.
             If False - returns the binary vector independent on the X.
+
     Returns:
         Binary array coordinated with variable x.
     """
@@ -46,7 +50,9 @@ def gen_special_medicine_df(
         random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
+
     Realises dependent/independent group splitting.
+
     Args:
         data_size:
             Length of output Dataframe
@@ -57,6 +63,7 @@ def gen_special_medicine_df(
             groups independent on the features.
         random_state:
             If specified - defines numpy random seed. Defaults to None.
+
     Returns:
         Synthetic dataframe also containing fictional information about patient treatment.
     """
@@ -85,11 +92,13 @@ def gen_oracle_df(
         data_size=8,
         *,
         dependent_division=True,
-        factual_y_only=False,
+        factual_only=False,
         random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
+
     Realises factual and counterfactual outcomes.
+
     Args:
         data_size:
             Length of output Dataframe
@@ -98,10 +107,11 @@ def gen_oracle_df(
             groups dependent on the features.
             If False - the returned Dataframe contains a division into
             groups independent on the features.
-        factual_y_only:
+        factual_only:
             Defines the display of counterfactual states.
         random_state:
             If specified - defines numpy random seed. Defaults to None.
+
     Returns:
         Synthetic dataframe also containing fictional information about
         factual and counterfactual states of the target.
@@ -109,39 +119,39 @@ def gen_oracle_df(
     if random_state is not None:
         np.random.seed(random_state)
 
-    treatment_flag = np.random.binomial(1, 0.5, size=data_size)
+    treatment = np.random.binomial(1, 0.5, size=data_size)
 
     if dependent_division:
-        feature_x = np.random.binomial(
+        target_feature = np.random.binomial(
             1,
-            0.3 + 0.4 * treatment_flag
+            0.3 + 0.4 * treatment
         )
     else:
-        feature_x = np.random.binomial(1, 0.5, size=data_size)
+        x_feature = np.random.binomial(1, 0.5, size=data_size)
 
-    untreated_y = np.random.uniform(
+    target_untreated = np.random.uniform(
         low=300,
         high=800,
         size=data_size
     ).round(-2).astype(int)
 
-    treated_y = untreated_y + 50 + feature_x * 100
+    target_treated = target_untreated + 50 + x_feature * 100
 
-    if factual_y_only:
-        untreated_y = np.where(1 - treatment_flag, untreated_y, np.nan)
-        treated_y = np.where(treatment_flag, treated_y, np.nan)
+    if factual_only:
+        target_untreated = np.where(1 - treatment, target_untreated, np.nan)
+        target_treated = np.where(treatment, target_treated, np.nan)
 
-    factual_y = np.where(treatment_flag, treated_y, untreated_y).astype('int')
+    y_factual = np.where(treatment, target_treated, target_untreated).astype('int')
 
-    te = treated_y - untreated_y
+    treatment_effect = target_treated - target_untreated
 
     df = pd.DataFrame(dict(
-        X=feature_x,
-        Y0=untreated_y,
-        Y1=treated_y,
-        T=treatment_flag,
-        Y=factual_y,
-        TE=te,
+        X=x_feature,
+        Target_untreated=target_untreated,
+        Target_treated=target_treated,
+        Treatment=treatment,
+        Target=y_factual,
+        TE=treatment_effect,
     ))
     return df
 
@@ -153,7 +163,9 @@ def gen_control_variates_df(
         random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
+
     Realises 0-variation outcome mixed with linear x dependency.
+
     Args:
         data_size:
             Length of output Dataframe
@@ -164,6 +176,7 @@ def gen_control_variates_df(
             groups independent on the features.
         random_state:
             If specified - defines numpy random seed. Defaults to None.
+            
     Returns:
         Synthetic dataframe also containing fictional information about
         features and lagged features.
@@ -171,21 +184,21 @@ def gen_control_variates_df(
     if random_state is not None:
         np.random.seed(random_state)
 
-    feature_x_means = np.random.uniform(0, 5, size=data_size)
+    mean_x_feature = np.random.uniform(0, 5, size=data_size)
 
-    feature_x_lag_1 = np.random.normal(feature_x_means, 2)
-    feature_x = np.random.normal(feature_x_means, 2)
+    x_feature_lag_1 = np.random.normal(mean_x_feature, 2)
+    x_feature = np.random.normal(mean_x_feature, 2)
 
-    treatment_flag = sigmoid_division(feature_x_lag_1, dependent_division)
+    treatment = sigmoid_division(x_feature_lag_1, dependent_division)
 
-    y_lag_1 = 200 + feature_x_lag_1 * 100
-    factual_y = 200 + feature_x * 100 + treatment_flag * 10
+    target_lag_1 = 200 + x_feature_lag_1 * 100
+    target_factual = 200 + x_feature * 100 + treatment * 10
 
     df = pd.DataFrame(dict(
-        X_lag_1=feature_x_lag_1,
-        Y_lag_1=y_lag_1,
-        X=feature_x,
-        T=treatment_flag,
-        Y=factual_y,
+        X_lag_1=x_feature_lag_1,
+        Target_lag_1=target_lag_1,
+        X=x_feature,
+        Treatment=treatment,
+        Target=target_factual,
     ))
     return df
