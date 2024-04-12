@@ -709,9 +709,9 @@ class Matcher:
 
     def validate_result(
             self,
-            refuter: str = "random_treatment",
-            effect_type: str = "att",
-            n_sim: int = 500,
+            refuter: str = "random_feature",
+            effect_type: str = "ate",
+            n_sim: int = 10,
             fraction: float = 0.8,
             low: float = 1.0,
             high: float = 99.0
@@ -720,7 +720,7 @@ class Matcher:
 
         Validates estimated effect:
                                     1) by replacing real treatment with random placebo treatment.
-                                     Estimated effect must be droped to zero, p-val < 0.05;
+                                     Estimated effect must be droped to zero, p-val > 0.05;
                                     2) by adding random feature (`random_feature`). Estimated effect shouldn't change
                                     significantly, p-val < 0.05;
                                     3) estimates effect on subset of data (default fraction is 0.8). Estimated effect
@@ -852,7 +852,7 @@ class Matcher:
                     self.val_dict[key].append(sim[key][0])
 
         for outcome in self.outcomes:
-            self.pval_dict.update({outcome: [np.sort(self.val_dict[outcome])]})
+            self.pval_dict.update({outcome: [np.mean(self.val_dict[outcome])]})
             self.pval_dict[outcome].append(
                 test_significance(
                     self.results.query("outcome==@outcome").loc[effect_type.upper()][
