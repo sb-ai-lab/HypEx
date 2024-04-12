@@ -127,7 +127,7 @@ def gen_oracle_df(
             0.3 + 0.4 * treatment
         )
     else:
-        x_feature = np.random.binomial(1, 0.5, size=data_size)
+        target_feature = np.random.binomial(1, 0.5, size=data_size)
 
     target_untreated = np.random.uniform(
         low=300,
@@ -135,7 +135,7 @@ def gen_oracle_df(
         size=data_size
     ).round(-2).astype(int)
 
-    target_treated = target_untreated + 50 + x_feature * 100
+    target_treated = target_untreated + 50 + target_feature * 100
 
     if factual_only:
         target_untreated = np.where(1 - treatment, target_untreated, np.nan)
@@ -146,7 +146,7 @@ def gen_oracle_df(
     treatment_effect = target_treated - target_untreated
 
     df = pd.DataFrame(dict(
-        X=x_feature,
+        X=target_feature,
         Target_untreated=target_untreated,
         Target_treated=target_treated,
         Treatment=treatment,
