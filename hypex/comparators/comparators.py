@@ -76,7 +76,7 @@ class GroupComparator(ComplexExecutor):
             if (self.__additional_mode and isinstance(data, ExperimentData))
             else str(meta_name)
         )[0]
-        target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)[0]
+        target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)
         self.key = f"{target_field}[{group_name}]" + self.key
         grouping_data = self.__get_grouping_data(data, group_field)
         if len(grouping_data) > 1:
@@ -100,7 +100,7 @@ class GroupComparator(ComplexExecutor):
         return result
 
     def _set_value(
-        self, data: ExperimentData, value: Optional[Dataset, None] = None, key: Any = None
+        self, data: ExperimentData, value: Optional[Dataset] = None, key: Any = None
     ) -> ExperimentData:
         data.set_value(
             ExperimentDataEnum.analysis_tables, self.id, str(self.full_name), value
