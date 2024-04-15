@@ -72,7 +72,8 @@ def create_test_data(
         na_step: Union[Iterable[int], int] = None,
         nan_cols: Union[Iterable[str], str] = None,
         file_name: str = None,
-        rs=None
+        exact_ATT: int = 100,
+        rs=None,
 ):
     """Creates data for tutorial.
 
@@ -85,6 +86,7 @@ def create_test_data(
             name of one or several columns to fill with NaN
             If list - iterates accordingly order of na_step
         file_name: name of file to save; doesn't save file if None
+        exact_ATT: an accurate synthetic effect
 
     Returns:
         data: dataframe with
@@ -117,7 +119,7 @@ def create_test_data(
 
     # Simulating a simple treatment effect of 100
     after_signup = (data["signup_month"] < data["month"]) & (data["treat"])
-    data.loc[after_signup, "spend"] = data[after_signup]["spend"] + 100
+    data.loc[after_signup, "spend"] = data[after_signup]["spend"] + exact_ATT
 
     # Setting the signup month (for ease of analysis)
     i = 3
