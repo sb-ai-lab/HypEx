@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Union
+from typing import Optional
 
 from hypex.utils.typings import (
     ABCRoleTypes,
@@ -12,7 +12,7 @@ from hypex.utils.typings import (
 class ABCRole(ABC):
     _role_name = "Abstract"
 
-    def __init__(self, data_type: Union[ABCRoleTypes, None] = None):
+    def __init__(self, data_type: Optional[ABCRoleTypes] = None):
         self.data_type = data_type
 
     @property
@@ -30,7 +30,7 @@ class InfoRole(ABCRole):
 class StratificationRole(ABCRole):
     _role_name = "Stratification"
 
-    def __init__(self, data_type: Union[StratificationRoleTypes, None] = None):
+    def __init__(self, data_type: Optional[StratificationRoleTypes] = None):
         super().__init__(data_type)
 
 
@@ -41,14 +41,21 @@ class GroupingRole(ABCRole):
 class TreatmentRole(ABCRole):
     _role_name = "Treatment"
 
-    def __init__(self, data_type: Union[TreatmentRoleTypes, None] = None):
+    def __init__(self, data_type: Optional[TreatmentRoleTypes] = None):
+        super().__init__(data_type)
+
+
+class TmpTreatmentRole(ABCRole):
+    _role_name = "TmpTreatment"
+
+    def __init__(self, data_type: Optional[TreatmentRoleTypes] = None):
         super().__init__(data_type)
 
 
 class TargetRole(ABCRole):
     _role_name = "Target"
 
-    def __init__(self, data_type: Union[TargetRoleTypes, None] = None):
+    def __init__(self, data_type: Optional[TargetRoleTypes] = None):
         super().__init__(data_type)
 
 
@@ -60,11 +67,11 @@ class PreTargetRole(TargetRole):
     _role_name = "PreTarget"
 
 
-class TempTargetRole(TargetRole):
+class TempTargetRole(ABCRole):
     _role_name = "TempTarget"
 
 
-class TempGroupingRole(GroupingRole):
+class TempGroupingRole(ABCRole):
     _role_name = "TempGrouping"
 
 

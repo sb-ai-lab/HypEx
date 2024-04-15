@@ -1,7 +1,17 @@
 from pathlib import Path
-from typing import Sequence, Union, Iterable, List, Dict, Tuple, Sized, Callable
+from typing import (
+    Sequence,
+    Union,
+    Iterable,
+    List,
+    Dict,
+    Tuple,
+    Sized,
+    Callable,
+    Optional,
+)
 
-import pandas as pd
+import pandas as pd  # type: ignore
 
 from hypex.dataset.base import DatasetBackend
 from hypex.utils.typings import FromDictType
@@ -48,7 +58,9 @@ class PandasDataset(DatasetBackend):
         return self.data.__repr__()
 
     def _create_empty(
-        self, index: Union[Iterable, None] = None, columns: [Iterable[str], None] = None
+        self,
+        index: Optional[Iterable] = None,
+        columns: Optional[Iterable[str]] = None,
     ):
         self.data = pd.DataFrame(index=index, columns=columns)
         return self
@@ -64,9 +76,9 @@ class PandasDataset(DatasetBackend):
 
     def add_column(
         self,
-        data: Union[Sized, Iterable],
+        data: Union[Sequence],
         name: str,
-        index: Union[Sized, Iterable, None] = None,
+        index: Optional[Sequence] = None,
     ):
         if index:
             self.data[name] = [None] * len(data)

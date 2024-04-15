@@ -1,4 +1,4 @@
-from typing import Iterable, Any, Union
+from typing import Iterable, Any, Union, Dict, List, Optional
 
 import numpy as np
 
@@ -11,20 +11,22 @@ from hypex.utils.typings import FieldKey
 
 class Describer(Executor):
     def __init__(
-        self, target_field: FieldKey, full_name: Union[str, None] = None, key: Any = ""
+        self, target_field: FieldKey, full_name: Optional[str] = None, key: Any = ""
     ):
         self.target_field = target_field
         super().__init__(full_name, key)
 
-    def _set_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
+    def _set_value(
+        self, data: ExperimentData, value: Union[Dataset, None] = None, key=None
+    ) -> ExperimentData:
         return data.set_value(
             ExperimentDataEnum.analysis_tables, self._id, str(self.full_name), value
         )
 
 
 class Unique(Describer):
-    @staticmethod
-    def _convert_to_dataset(data: Iterable) -> Dataset:
+
+    def _convert_to_dataset(self, data: Union[List, Dict]) -> Dataset:
         return Dataset.from_dict(data, {self.id: StatisticRole()})
 
     def execute(self, data: ExperimentData) -> ExperimentData:

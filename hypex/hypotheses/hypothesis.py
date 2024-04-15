@@ -1,23 +1,22 @@
 import json
-from typing import Union, Dict, Any
+from typing import Optional
 
-from jsonschema import validate
+from jsonschema import validate  # type: ignore
 
 from hypex.dataset.dataset import Dataset
 from hypex.dataset.roles import default_roles
 
 
 class Hypothesis:
-    def __init__(self, config: Union[Dict[str, Any], str]):
-        if isinstance(config, str):
-            with open(config, "rb") as file:
-                config = json.load(file)
+    def __init__(self, config: str):
+        with open(config, "rb") as file:
+            opened_config = json.load(file)
         with open("scheme.json", "rb") as file:
             self.scheme = json.load(file)
-        self.config = config
-        self.dataset = config["dataset"]
-        self.experiment = config["experiment"]
-        self.report = config["report"]
+        self.config = opened_config
+        self.dataset = self.config.get("dataset")
+        self.experiment = self.config.get("experiment")
+        self.report = self.config.get("report")
         self.validate_config()
         self._parse_config()
 
@@ -62,7 +61,7 @@ class Hypothesis:
     def _parse_report(self):
         pass
 
-    def to_json(self, file=None):
+    def to_json(self, file: Optional[str] = None):
         # return json.dumps(self.dataset.to_json(), self.experiment.to_json(), self.report.to_json())
         if file:
             with open(file, "w") as f:
