@@ -87,7 +87,6 @@ class Dataset(DatasetBase):
         ):
             raise RoleColumnError(list(roles.keys()), self._backend.columns)
         self.roles: Dict[Union[str, int], ABCRole] = roles
-        self.data = self._backend.data
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
 
@@ -146,6 +145,14 @@ class Dataset(DatasetBase):
     @property
     def index(self):
         return self._backend.index
+
+    @property
+    def data(self):
+        return self._backend.data
+
+    @data.setter
+    def data(self, value):
+        self._backend.data = value
 
     @property
     def columns(self):

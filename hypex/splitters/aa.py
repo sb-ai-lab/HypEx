@@ -37,9 +37,10 @@ class AASplitter(ComplexExecutor):
 
     def calc(self, data: ExperimentData) -> List[str]:
         experiment_data: ExperimentData = self.inner_executors["shuffle"].execute(data)
-
+        
         addition_indexes = list(experiment_data.index)
         edge = int(len(addition_indexes) * self.control_size)
+
 
         return ["A" if i < edge else "B" for i in addition_indexes]
 
