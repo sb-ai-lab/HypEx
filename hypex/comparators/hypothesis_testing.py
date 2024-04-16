@@ -1,54 +1,8 @@
-from abc import ABC
-from typing import Dict, Union, Any, List
+from typing import Dict, Any
 
 from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu  # type: ignore
 
-from hypex.comparators.comparators import GroupComparator
-from hypex.dataset.dataset import Dataset
-from hypex.dataset.roles import ABCRole, StatisticRole
-from hypex.experiments.base import Executor
-from hypex.utils.enums import SpaceEnum
-
-
-class StatHypothesisTestingWithScipy(GroupComparator, ABC):
-    def __init__(
-        self,
-        grouping_role: Union[ABCRole, None] = None,
-        space: SpaceEnum = SpaceEnum.auto,
-        reliability: float = 0.05,
-        inner_executors: Union[Dict[str, Executor], None] = None,
-        full_name: Union[str, None] = None,
-        key: Any = "",
-    ):
-        super().__init__(grouping_role, space, inner_executors, full_name, key)
-        self.reliability = reliability
-
-    # excessive override
-    def _local_extract_dataset(
-        self, compare_result: Dict[Any, Any], roles=None
-    ) -> Dataset:
-        # stats type
-        result_stats: List[Dict[str, Any]] = [
-            {
-                "group": group,
-                "statistic": stats.statistic,
-                "p-value": stats.pvalue,
-                "pass": stats.pvalue < self.reliability,
-            }
-            for group, stats in compare_result.items()
-        ]
-        # mypy does not see an heir
-        # return super()._extract_dataset(
-        #     result_stats,
-        #     roles={StatisticRole(): ["group", "statistic", "p-value", "pass"]}
-        # )
-
-        return super()._extract_dataset(
-            result_stats,
-            roles={
-                f: StatisticRole() for f in ["group", "statistic", "p-value", "pass"]
-            },
-        )
+from hypex.comparators.base import StatHypothesisTestingWithScipy
 
 
 class TTest(StatHypothesisTestingWithScipy):
@@ -65,7 +19,7 @@ class KSTest(StatHypothesisTestingWithScipy):
         )
 
 
-class MannWhitney(StatHypothesisTestingWithScipy):
+class UTest(StatHypothesisTestingWithScipy):
     def _comparison_function(self, control_data, test_data):
         return mannwhitneyu(
             control_data.data.values.flatten(), test_data.data.values.flatten()

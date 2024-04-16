@@ -2,12 +2,11 @@ import json
 import warnings
 from typing import Union, List, Iterable, Any, Dict, Callable, Hashable, Optional
 
-import pandas as pd
+import pandas as pd  # type: ignore
 
 from hypex.dataset.backends.pandas_backend import PandasDataset
 from hypex.dataset.base import DatasetBase
-from hypex.dataset.roles import StatisticRole, InfoRole, ABCRole
-from hypex.dataset.utils import parse_roles
+from hypex.dataset.roles import StatisticRole, InfoRole, ABCRole, default_roles
 from hypex.utils.constants import ID_SPLIT_SYMBOL
 from hypex.utils.enums import ExperimentDataEnum, BackendsEnum
 from hypex.utils.errors import NotFoundInExperimentDataError
@@ -17,6 +16,19 @@ from hypex.utils.errors import (
     ConcatBackendError,
 )
 from hypex.utils.typings import FromDictType
+
+
+def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
+    new_roles = {}
+    roles = roles or {}
+    for role in roles:
+        r = default_roles.get(role, role)
+        if isinstance(roles[role], list):
+            for i in roles[role]:
+                new_roles[i] = r
+        else:
+            new_roles[roles[role]] = r
+    return new_roles or roles
 
 
 class Dataset(DatasetBase):

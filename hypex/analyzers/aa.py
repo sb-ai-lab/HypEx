@@ -1,13 +1,13 @@
 from typing import Dict, List
 
-from hypex.analyzers.analyzer import Analyzer
+from hypex.analyzers.base import Analyzer
 from hypex.comparators.hypothesis_testing import TTest, KSTest
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import StatisticRole
 from hypex.experiments.base import (
     Executor,
 )
-from hypex.stats.descriptive import Mean
+from hypex.stats.agg import Mean
 from hypex.utils.enums import ExperimentDataEnum, BackendsEnum
 
 

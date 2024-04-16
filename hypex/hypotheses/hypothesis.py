@@ -11,7 +11,7 @@ class Hypothesis:
     def __init__(self, config: str):
         with open(config, "rb") as file:
             opened_config = json.load(file)
-        with open("scheme.json", "rb") as file:
+        with open("schemes/scheme.json", "rb") as file:
             self.scheme = json.load(file)
         self.config = opened_config
         self.dataset = self.config.get("dataset")

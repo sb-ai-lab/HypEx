@@ -3,6 +3,7 @@ from typing import Dict, Any
 
 from hypex.dataset.dataset import ExperimentData, Dataset
 
+
 class Reporter(ABC):
     @abstractmethod
     def report(self, data: ExperimentData):

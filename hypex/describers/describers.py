@@ -1,36 +1,22 @@
-from typing import Iterable, Any, Union, Dict, List, Optional
+from typing import Union, Dict, List
 
 import numpy as np
 
 from hypex.dataset.dataset import Dataset, ExperimentData
 from hypex.dataset.roles import StatisticRole
-from hypex.experiments.base import Executor
-from hypex.utils.enums import ExperimentDataEnum
-from hypex.utils.typings import FieldKey
-
-
-class Describer(Executor):
-    def __init__(
-        self, target_field: FieldKey, full_name: Optional[str] = None, key: Any = ""
-    ):
-        self.target_field = target_field
-        super().__init__(full_name, key)
-
-    def _set_value(
-        self, data: ExperimentData, value: Union[Dataset, None] = None, key=None
-    ) -> ExperimentData:
-        return data.set_value(
-            ExperimentDataEnum.analysis_tables, self._id, str(self.full_name), value
-        )
+from hypex.describers.base import Describer
 
 
 class Unique(Describer):
+
+    def calc(self, data: Dataset):
+        return self._convert_to_dataset(
+            [{self.full_name: np.unique(data.data[self.target_field])}]
+        )
 
     def _convert_to_dataset(self, data: Union[List, Dict]) -> Dataset:
         return Dataset.from_dict(data, {self.id: StatisticRole()})
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        result_dataset = self._convert_to_dataset(
-            [{self.full_name: np.unique(data.data[self.target_field])}]
-        )
+        result_dataset = self.calc(data)
         return self._set_value(data, result_dataset)

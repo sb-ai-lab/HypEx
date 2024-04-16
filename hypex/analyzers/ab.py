@@ -1,14 +1,14 @@
 from typing import Dict, List
 
-from hypex.analyzers.analyzer import Analyzer
-from hypex.comparators.comparators import GroupATE
-from hypex.comparators.hypothesis_testing import TTest, MannWhitney
+from hypex.analyzers.base import Analyzer
+from hypex.comparators.comparators import ATE
+from hypex.comparators.hypothesis_testing import TTest, UTest
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import StatisticRole
 from hypex.experiments.base import (
     Executor,
 )
-from hypex.stats.descriptive import Mean
+from hypex.stats.agg import Mean
 from hypex.utils.enums import ExperimentDataEnum, BackendsEnum
 
 
@@ -24,7 +24,7 @@ class ABAnalyzer(Analyzer):
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        analysis_tests: List[type] = [TTest, MannWhitney, GroupATE]
+        analysis_tests: List[type] = [TTest, UTest, ATE]
         executor_ids = data.get_ids(analysis_tests)
 
         analysis_data = {}

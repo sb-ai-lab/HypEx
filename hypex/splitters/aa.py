@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Optional
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import GroupingRole, StratificationRole, TreatmentRole
 from hypex.experiments.base import Executor, ComplexExecutor
-from hypex.transformers.transformers import Shuffle
+from hypex.transformers.shuffle import Shuffle
 from hypex.utils.enums import ExperimentDataEnum
 
 
@@ -37,10 +37,9 @@ class AASplitter(ComplexExecutor):
 
     def calc(self, data: ExperimentData) -> List[str]:
         experiment_data: ExperimentData = self.inner_executors["shuffle"].execute(data)
-        
+
         addition_indexes = list(experiment_data.index)
         edge = int(len(addition_indexes) * self.control_size)
-
 
         return ["A" if i < edge else "B" for i in addition_indexes]
 
