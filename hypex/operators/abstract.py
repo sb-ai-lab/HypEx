@@ -1,13 +1,12 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from typing import Optional, Any
 
-from hypex.dataset.dataset import ExperimentData, Dataset
-from hypex.dataset.roles import Arg1Role, Arg2Role, StatisticRole
+from hypex.dataset import ExperimentData, Dataset, Arg1Role, Arg2Role, StatisticRole
 from hypex.experiments.base import Executor
-from hypex.utils.enums import ExperimentDataEnum
+from hypex.utils import ExperimentDataEnum
 
 
-class BinaryOperator(Executor):
+class BinaryOperator(Executor, ABC):
 
     def __init__(self, full_name: Optional[str] = None, key: Any = ""):
         super().__init__(full_name, key)

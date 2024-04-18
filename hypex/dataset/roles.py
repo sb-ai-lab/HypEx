@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import Optional
 
-from hypex.utils.typings import (
+from hypex.utils import (
     ABCRoleTypes,
     StratificationRoleTypes,
     TargetRoleTypes,

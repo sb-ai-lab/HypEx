@@ -3,15 +3,17 @@ from typing import Optional
 
 from jsonschema import validate  # type: ignore
 
-from hypex.dataset.dataset import Dataset
-from hypex.dataset.roles import default_roles
+from hypex.dataset import Dataset, default_roles, InfoRole
 
 
 class Hypothesis:
     def __init__(self, config: str):
         with open(config, "rb") as file:
             opened_config = json.load(file)
-        with open("schemes/scheme.json", "rb") as file:
+        with open(
+            "C:\\Users\\User\\PycharmProjects\\HypEx\\hypex\\hypotheses\\schemes\\scheme.json",
+            "rb",
+        ) as file:
             self.scheme = json.load(file)
         self.config = opened_config
         self.dataset = self.config.get("dataset")
@@ -38,8 +40,6 @@ class Hypothesis:
 
     def _parse_config(self):
         self.dataset = self._parse_dataset()
-        self.experiment = self._parse_experiment()
-        self.report = self._parse_report()
 
     def _parse_dataset(self):
         data = (
@@ -48,18 +48,12 @@ class Hypothesis:
             else self.dataset["path"]
         )
         roles = {
-            default_roles.get(i.lower()): j
+            j: default_roles.get(i.lower(), InfoRole)
             for i, j in zip(
                 self.dataset["roles"]["role_names"], self.dataset["roles"]["columns"]
             )
         }
         return Dataset(data=data, roles=roles, backend=self.dataset["backend"])
-
-    def _parse_experiment(self):
-        print(self.experiment)
-
-    def _parse_report(self):
-        pass
 
     def to_json(self, file: Optional[str] = None):
         # return json.dumps(self.dataset.to_json(), self.experiment.to_json(), self.report.to_json())
@@ -73,8 +67,3 @@ class Hypothesis:
         return json.dumps(
             {"dataset": self.dataset.to_dict(), "experiment": {}, "report": {}}
         )
-
-
-if __name__ == "__main__":
-    hypo = Hypothesis("test_config.json")
-    print(hypo.dataset)

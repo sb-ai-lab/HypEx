@@ -1,8 +1,7 @@
-from hypex.analyzers.ab import ABAnalyzer
-from hypex.comparators.comparators import GroupDifference, GroupSizes, ATE
-from hypex.comparators.hypothesis_testing import TTest, UTest
-from hypex.dataset.roles import TargetRole, TreatmentRole
-from hypex.experiments.base import Experiment, OnRoleExperiment
+from hypex.analyzers import ABAnalyzer
+from hypex.comparators import GroupDifference, GroupSizes, ATE, TTest, UTest
+from hypex.dataset import TargetRole, TreatmentRole
+from hypex.experiments import Experiment, OnRoleExperiment
 
 AB_TEST = Experiment(
     executors=[

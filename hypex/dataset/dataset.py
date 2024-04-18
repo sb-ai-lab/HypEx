@@ -4,18 +4,19 @@ from typing import Union, List, Iterable, Any, Dict, Callable, Hashable, Optiona
 
 import pandas as pd  # type: ignore
 
-from hypex.dataset.backends.pandas_backend import PandasDataset
-from hypex.dataset.base import DatasetBase
+from hypex.dataset.abstract import DatasetBase
+from hypex.dataset.backends import PandasDataset
 from hypex.dataset.roles import StatisticRole, InfoRole, ABCRole, default_roles
-from hypex.utils.constants import ID_SPLIT_SYMBOL
-from hypex.utils.enums import ExperimentDataEnum, BackendsEnum
-from hypex.utils.errors import NotFoundInExperimentDataError
-from hypex.utils.errors import (
+from hypex.utils import (
+    ID_SPLIT_SYMBOL,
+    ExperimentDataEnum,
+    BackendsEnum,
     RoleColumnError,
     ConcatDataError,
     ConcatBackendError,
+    NotFoundInExperimentDataError,
+    FromDictType,
 )
-from hypex.utils.typings import FromDictType
 
 
 def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:

@@ -141,9 +141,39 @@
     "default": {},
     "title": "The experiment Schema",
     "properties": {
+      "AADictReporter": {
+        "required": [],
+        "properties": {}
+      },
       "AASplitter": {
-        "type": "object",
-        "default": {},
+        "required": [
+          "control_size",
+          "random_state",
+          "inner_executors"
+        ],
+        "properties": {
+          "control_size": {
+            "type": "",
+            "default": 0.5,
+            "title": "The control_size Schema"
+          },
+          "random_state": {
+            "type": "",
+            "default": "None",
+            "title": "The random_state Schema"
+          },
+          "inner_executors": {
+            "type": "",
+            "default": {},
+            "title": "The inner_executors Schema"
+          }
+        }
+      },
+      "AASplitterWithGrouping": {
+        "required": [],
+        "properties": {}
+      },
+      "AASplitterWithStratification": {
         "required": [
           "control_size",
           "random_state"
@@ -151,31 +181,49 @@
         "properties": {
           "control_size": {
             "type": "",
-            "default": {},
+            "default": 0.5,
             "title": "The control_size Schema"
           },
           "random_state": {
             "type": "",
-            "default": {},
+            "default": "None",
             "title": "The random_state Schema"
           }
         }
       },
-      "AASplitterWithGrouping": {
-        "type": "object",
-        "default": {},
+      "ABAnalyzer": {
         "required": [],
         "properties": {}
       },
-      "AASplitterWithStratification": {
-        "type": "object",
-        "default": {},
+      "ATE": {
         "required": [],
         "properties": {}
       },
-      "Analyzer": {
-        "type": "object",
-        "default": {},
+      "CycledExperiment": {
+        "required": [
+          "inner_executor",
+          "n_iterations",
+          "analyzer"
+        ],
+        "properties": {
+          "inner_executor": {
+            "type": "",
+            "default": {},
+            "title": "The inner_executor Schema"
+          },
+          "n_iterations": {
+            "type": "",
+            "default": {},
+            "title": "The n_iterations Schema"
+          },
+          "analyzer": {
+            "type": "",
+            "default": {},
+            "title": "The analyzer Schema"
+          }
+        }
+      },
+      "Experiment": {
         "required": [
           "executors"
         ],
@@ -187,216 +235,142 @@
           }
         }
       },
-      "BinaryOperator": {
-        "type": "object",
-        "default": {},
+      "GroupDifference": {
         "required": [],
         "properties": {}
       },
-      "Describer": {
-        "type": "object",
-        "default": {},
+      "GroupExperiment": {
         "required": [
-          "target_field"
+          "inner_executor"
         ],
         "properties": {
-          "target_field": {
+          "inner_executor": {
             "type": "",
             "default": {},
-            "title": "The target_field Schema"
+            "title": "The inner_executor Schema"
           }
         }
       },
-      "GroupComparator": {
-        "type": "object",
-        "default": {},
+      "GroupSizes": {
         "required": [],
         "properties": {}
       },
       "KSTest": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "Max": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "Mean": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "Median": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "MetricAbsoluteDelta": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "MetricDelta": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "MetricLogRatio": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "MetricPercentageDelta": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "MetricPercentageRatio": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "MetricRatio": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "MetricRelativeDelta": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "Min": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "Mode": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
-      "OneAASplit": {
-        "type": "object",
-        "default": {},
-        "required": [],
-        "properties": {}
+      "OnRoleExperiment": {
+        "required": [
+          "executors",
+          "role"
+        ],
+        "properties": {
+          "executors": {
+            "type": "",
+            "default": {},
+            "title": "The executors Schema"
+          },
+          "role": {
+            "type": "",
+            "default": {},
+            "title": "The role Schema"
+          }
+        }
       },
-      "Range": {
-        "type": "object",
-        "default": {},
+      "OneAASplitAnalyzer": {
         "required": [],
         "properties": {}
       },
       "Shuffle": {
-        "type": "object",
-        "default": {},
         "required": [
           "random_state"
         ],
         "properties": {
           "random_state": {
             "type": "",
-            "default": {},
+            "default": "None",
             "title": "The random_state Schema"
           }
         }
       },
       "Size": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
-      "StatDescriptive": {
-        "type": "object",
-        "default": {},
-        "required": [
-          "kwargs"
-        ],
-        "properties": {
-          "kwargs": {
-            "type": "",
-            "default": {},
-            "title": "The kwargs Schema"
-          }
-        }
-      },
-      "StatHypothesisTestingWithScipy": {
-        "type": "object",
-        "default": {},
-        "required": [
-          "reliability"
-        ],
-        "properties": {
-          "reliability": {
-            "type": "",
-            "default": {},
-            "title": "The reliability Schema"
-          }
-        }
-      },
       "StatMdeBySize": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "StatPowerByTTestInd": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "StatSampleSizeByMde": {
-        "type": "object",
-        "default": {},
         "required": [
-          "mde"
+          "mde",
+          "target_field",
+          "significance",
+          "power"
         ],
         "properties": {
           "mde": {
             "type": "",
             "default": {},
             "title": "The mde Schema"
-          }
-        }
-      },
-      "Std": {
-        "type": "object",
-        "default": {},
-        "required": [],
-        "properties": {}
-      },
-      "TTest": {
-        "type": "object",
-        "default": {},
-        "required": [],
-        "properties": {}
-      },
-      "TestPower": {
-        "type": "object",
-        "default": {},
-        "required": [
-          "significance",
-          "power"
-        ],
-        "properties": {
+          },
+          "target_field": {
+            "type": "",
+            "default": {},
+            "title": "The target_field Schema"
+          },
           "significance": {
             "type": "",
             "default": {},
@@ -409,15 +383,47 @@
           }
         }
       },
+      "Std": {
+        "required": [],
+        "properties": {}
+      },
+      "TTest": {
+        "required": [],
+        "properties": {}
+      },
+      "TestPower": {
+        "required": [
+          "target_field",
+          "significance",
+          "power"
+        ],
+        "properties": {
+          "target_field": {
+            "type": "",
+            "default": {},
+            "title": "The target_field Schema"
+          },
+          "significance": {
+            "type": "",
+            "default": {},
+            "title": "The significance Schema"
+          },
+          "power": {
+            "type": "",
+            "default": {},
+            "title": "The power Schema"
+          }
+        }
+      },
+      "UTest": {
+        "required": [],
+        "properties": {}
+      },
       "Unique": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       },
       "Variance": {
-        "type": "object",
-        "default": {},
         "required": [],
         "properties": {}
       }

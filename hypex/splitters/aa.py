@@ -1,10 +1,15 @@
 from typing import Dict, Any, List, Optional
 
-from hypex.dataset.dataset import ExperimentData, Dataset
-from hypex.dataset.roles import GroupingRole, StratificationRole, TreatmentRole
-from hypex.experiments.base import Executor, ComplexExecutor
-from hypex.transformers.shuffle import Shuffle
-from hypex.utils.enums import ExperimentDataEnum
+from hypex.dataset import (
+    ExperimentData,
+    Dataset,
+    GroupingRole,
+    StratificationRole,
+    TreatmentRole,
+)
+from hypex.executor import ComplexExecutor, Executor
+from hypex.transformers import Shuffle
+from hypex.utils import ExperimentDataEnum
 
 
 class AASplitter(ComplexExecutor):
