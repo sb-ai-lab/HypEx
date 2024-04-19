@@ -33,7 +33,7 @@
     "OnRoleExperiment": {
       "executors": {
         "GroupDifference": {
-          "grouping_role": "Target"
+          "grouping_role": "Treatment"
         }
       },
       "role": "Target"
