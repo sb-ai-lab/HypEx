@@ -25,7 +25,6 @@ from hypex.experiments import (
     GroupExperiment,
     CycledExperiment,
 )
-from hypex.hypotheses.hypothesis import Hypothesis
 from hypex.operators import (
     MetricRatio,
     MetricLogRatio,
@@ -97,19 +96,21 @@ all_classes = [
 
 
 class Factory:
-    def __init__(self, hypothesis: Hypothesis):
+    def __init__(self, hypothesis):
         self.hypothesis = hypothesis
 
     def make_experiment(self, experiment):
         executors = []
         for key, items in experiment.items():
             class_ = getattr(sys.modules[__name__], key)
-            if "executors" in items:
-                items["executors"] = self.make_experiment(experiment[key]["executors"])
-            if "inner_executors" in items:
-                items["inner_executors"] = self.make_experiment(
-                    experiment[key]["inner_executors"]
-                )
+            if "executors" in items or "inner_executors" in items:
+                item = "executors" if "executors" in items else "inner_executors"
+                items[f"{item}"] = self.make_experiment(experiment[key][f"{item}"])
+            if "role" in items or "grouping_role" in items:
+                item = "role" if "role" in items else "grouping_role"
+                items[f"{item}"] = getattr(
+                    sys.modules[__name__], items[item] + "Role"
+                )()
             items = {i: None if j == "None" else j for i, j in items.items()}
             executors.append(class_(**items))
         return executors

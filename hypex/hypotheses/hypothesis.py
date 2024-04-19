@@ -4,6 +4,7 @@ from typing import Optional
 from jsonschema import validate  # type: ignore
 
 from hypex.dataset import Dataset, default_roles, InfoRole
+from hypex.factory.base import Factory
 
 
 class Hypothesis:
@@ -64,3 +65,6 @@ class Hypothesis:
         return json.dumps(
             {"dataset": self.dataset.to_dict(), "experiment": {}, "report": {}}
         )
+
+    def execute(self):
+        return Factory(self).execute()
