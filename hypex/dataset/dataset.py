@@ -17,6 +17,17 @@ from hypex.utils.errors import (
 )
 from hypex.utils.typings import FromDictType
 
+import logging
+import funcy
+
+logging.basicConfig(
+    filename="dataset.log",
+    filemode="w",
+    format="%(name)s - %(levelname)s - %(message)s",
+    level=logging.DEBUG,
+)
+
+
 
 def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
     new_roles = {}
@@ -141,6 +152,7 @@ class Dataset(DatasetBase):
         ds.data = ds._backend.data
         return ds
 
+    @funcy.log_durations(logging.debug)
     def get_columns_by_roles(
         self, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role=False
     ) -> List[Union[str, int]]:

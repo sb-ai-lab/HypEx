@@ -6,12 +6,22 @@ from hypex.experiments.base import Executor
 from hypex.operators.binary import MetricDelta
 from hypex.stats.agg import Mean, Size
 
+import logging
+import funcy
+
+logger = logging.getLogger(__name__)
+f_handler = logging.FileHandler(f"{__name__}.log")
+f_handler.setFormatter(logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
+logger.addHandler(f_handler)
+logger.setLevel(logging.DEBUG)
+
 
 class GroupDifference(GroupComparator):
     default_inner_executors: Dict[str, Executor] = {
         "mean": Mean(),
     }
 
+    @funcy.log_durations(logger.debug, label="GroupDifference")
     def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
         target_field = control_data.get_columns_by_roles(
             TempTargetRole(), tmp_role=True
@@ -35,6 +45,7 @@ class GroupSizes(GroupComparator):
         "size": Size(),
     }
 
+    @funcy.log_durations(logger.debug, label="GroupComparator")
     def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
         size_a = self.inner_executors["size"].calc(control_data)
         size_b = self.inner_executors["size"].calc(test_data)

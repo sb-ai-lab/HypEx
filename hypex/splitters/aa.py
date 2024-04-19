@@ -7,20 +7,42 @@ from hypex.transformers.shuffle import Shuffle
 from hypex.utils.enums import ExperimentDataEnum
 
 
+import logging
+import funcy
+
+logger = logging.getLogger(__name__)
+f_handler = logging.FileHandler(f"{__name__}.log")
+f_handler.setFormatter(logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
+logger.addHandler(f_handler)
+logger.setLevel(logging.DEBUG)
+
+
 class AASplitter(ComplexExecutor):
     def __init__(
         self,
         control_size: float = 0.5,
         random_state: Optional[int] = None,
         full_name: Optional[str] = None,
+        constant_key: bool = False,
         key: Any = "",
         inner_executors: Optional[Dict[str, Executor]] = None,
     ):
         self.control_size = control_size
         self.random_state = random_state
         self.default_inner_executors = {"shuffle": Shuffle(self.random_state)}
-
+        self._key = key
+        self.constant_key = constant_key
         super().__init__(inner_executors, full_name, key)
+    
+    @property
+    def key(self) -> Any:
+        return self._key
+    
+    @key.setter
+    def key(self, value: Any):
+        if not self.constant_key:
+            self._key = value
+            self._generate_id()
 
     def generate_params_hash(self) -> str:
         return f"{self.random_state}"
@@ -35,6 +57,7 @@ class AASplitter(ComplexExecutor):
         )
         return data
 
+    @funcy.log_durations(logger.debug)
     def calc(self, data: ExperimentData) -> List[str]:
         experiment_data: ExperimentData = self.inner_executors["shuffle"].execute(data)
 

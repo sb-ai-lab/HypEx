@@ -8,6 +8,16 @@ from hypex.utils.enums import ExperimentDataEnum, SpaceEnum, BackendsEnum
 from hypex.utils.errors import NoColumnsError, ComparisonNotSuitableFieldError
 from hypex.utils.typings import FromDictType
 
+import logging
+import funcy
+
+logger = logging.getLogger(__name__)
+f_handler = logging.FileHandler(f"{__name__}.log")
+f_handler.setFormatter(logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
+logger.addHandler(f_handler)
+logger.setLevel(logging.DEBUG)
+
+import timeit
 
 class GroupComparator(ComplexExecutor):
     def __init__(
@@ -37,6 +47,7 @@ class GroupComparator(ComplexExecutor):
 
     def __group_field_searching(self, data: ExperimentData):
         group_field = []
+        timer = timeit.default_timer()
         if self.space in [SpaceEnum.auto, SpaceEnum.data]:
             group_field = data.get_columns_by_roles(self.grouping_role)
         if (
@@ -50,9 +61,12 @@ class GroupComparator(ComplexExecutor):
             self.__additional_mode = True
         if len(group_field) == 0:
             raise NoColumnsError(self.grouping_role)
+        logger.debug(f"Grouping search time: {(timeit.default_timer() - timer) * 1000} ms")
         return group_field
 
+    # @funcy.log_durations(logger.debug, repr_len=0)
     def __get_grouping_data(self, data: ExperimentData, group_field):
+
         if self.__additional_mode:
             t_groups = list(data.additional_fields.groupby(group_field))
             result = [(group, data.loc[subdata.index]) for (group, subdata) in t_groups]
@@ -68,6 +82,7 @@ class GroupComparator(ComplexExecutor):
     def calc(self, data: Dataset) -> Dict:
         target_field = None
         group_field = self.__group_field_searching(data)
+
         meta_name = group_field[0] if len(group_field) == 1 else group_field
         group_name = (
             str(data.id_name_mapping.get(meta_name, meta_name))
@@ -75,7 +90,7 @@ class GroupComparator(ComplexExecutor):
             else str(meta_name)
         )[0]
         target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)
-        self.key = f"{target_field}[{group_name}]" + self.key
+        self.key = f"{target_field}[{group_name}]{self.key}"
         grouping_data = self.__get_grouping_data(data, group_field)
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles

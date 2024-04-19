@@ -2,6 +2,7 @@ import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Iterable, Dict, Union, Any, List, Optional
+from tqdm.auto import tqdm
 
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import (
@@ -14,6 +15,17 @@ from hypex.dataset.roles import (
 )
 from hypex.utils.constants import ID_SPLIT_SYMBOL
 from hypex.utils.enums import ExperimentDataEnum
+
+import logging
+import funcy
+
+logger = logging.getLogger(__name__)
+f_handler = logging.FileHandler(f"{__name__}.log")
+f_handler.setFormatter(logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
+logger.addHandler(f_handler)
+logger.setLevel(logging.DEBUG)
+
+import timeit
 
 
 class Executor(ABC):
@@ -89,6 +101,7 @@ class Executor(ABC):
     def calc(self, data: Dataset):
         raise NotImplementedError
 
+    # @funcy.log_durations(logger.debug)
     def execute(self, data: ExperimentData) -> ExperimentData:
         value = self.calc(data)
         return self._set_value(data, value)
@@ -125,7 +138,7 @@ class ComplexExecutor(Executor, ABC):
 
 class Experiment(Executor):
     def _detect_transformer(self) -> bool:
-        return all(executor._is_transformer for executor in self.executors)
+        return any(executor._is_transformer for executor in self.executors)
 
     def get_executor_ids(
         self, searched_classes: Union[type, Iterable[type], None] = None
@@ -152,6 +165,7 @@ class Experiment(Executor):
         self,
         executors: List[Executor],
         transformer: Optional[bool] = None,
+        show_pbar: bool = False,
         full_name: Optional[str] = None,
         key: Any = "",
     ):
@@ -160,6 +174,7 @@ class Experiment(Executor):
             transformer if transformer is not None else self._detect_transformer()
         )
         full_name = str(full_name or f"Experiment({len(self.executors)})")
+        self.show_pbar = show_pbar
         super().__init__(full_name, key)
 
     # может быть удален?
@@ -173,10 +188,17 @@ class Experiment(Executor):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data = deepcopy(data) if self.transformer else data
-        for executor in self.executors:
+
+        for executor in tqdm(self.executors, disable=not self.show_pbar):
+            timer = timeit.default_timer()
+
             executor.key = self.key
             executor.random_state = self.random_state
             experiment_data = executor.execute(experiment_data)
+
+            logger.debug(
+                f"Executor {executor.full_name} took {(timeit.default_timer() - timer) * 1000} ms"
+            )
         return experiment_data
 
 
@@ -186,22 +208,27 @@ class CycledExperiment(Executor):
         inner_executor: Executor,
         n_iterations: int,
         analyzer: Executor,
+        show_pbar: bool = False,
         full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.inner_executor: Executor = inner_executor
         self.n_iterations: int = n_iterations
         self.analyzer: Executor = analyzer
+        self.show_pbar: bool = show_pbar
         super().__init__(full_name, key)
 
     def generate_params_hash(self) -> str:
         return f"{self.inner_executor.full_name} x {self.n_iterations}"
 
     def calc(self, data: Dataset):
-        return [self.inner_executor.calc(data) for _ in range(self.n_iterations)]
+        return [
+            self.inner_executor.calc(data)
+            for _ in tqdm(range(self.n_iterations), disable=not self.show_pbar)
+        ]
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        for i in range(self.n_iterations):
+        for i in tqdm(range(self.n_iterations), disable=not self.show_pbar):
             self.analyzer.key = f"{i}"
             self.inner_executor.key = f"{i}"
             self.inner_executor.random_state = i
@@ -220,10 +247,12 @@ class GroupExperiment(Executor):
     def __init__(
         self,
         inner_executor: Executor,
+        show_pbar: bool = False,
         full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.inner_executor: Executor = inner_executor
+        self.show_pbar: bool = show_pbar
         super().__init__(full_name, key)
 
     def _extract_result(self, data: ExperimentData) -> Dataset:
@@ -244,14 +273,18 @@ class GroupExperiment(Executor):
         group_field = data.get_columns_by_roles(TempGroupingRole(), tmp_role=True)
         return {
             group: self.inner_executor.calc(data)
-            for group, data in data.groupby(group_field)
+            for group, data in tqdm(
+                data.groupby(group_field), disable=not self.show_pbar
+            )
         }
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result_list = []
         group_field = data.get_columns_by_roles(TempGroupingRole(), tmp_role=True)
 
-        for group, group_data in data.groupby(group_field):
+        for group, group_data in tqdm(
+            data.groupby(group_field), disable=not self.show_pbar
+        ):
             temp_data = ExperimentData(group_data)
             temp_data = self.inner_executor.execute(temp_data)
             temp_data = temp_data.add_column(
@@ -267,20 +300,24 @@ class OnRoleExperiment(Experiment):
         self,
         executors: List[Executor],
         role: ABCRole,
+        show_pbar: bool = False,
         transformer: Optional[bool] = None,
         full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.role: ABCRole = role
-        super().__init__(executors, transformer, full_name, key)
+        super().__init__(executors, transformer, show_pbar, full_name, key)
 
     def calc(self, data: Dataset):
         return {
-            field: super().calc(data) for field in data.get_columns_by_roles(self.role)
+            field: super().calc(data) for field in tqdm(data.get_columns_by_roles(self.role), disable=not self.show_pbar)
         }
 
+    # @funcy.log_durations(logger.debug)
     def execute(self, data: ExperimentData) -> ExperimentData:
-        for field in data.get_columns_by_roles(self.role):
+        for field in tqdm(
+            data.get_columns_by_roles(self.role), disable=not self.show_pbar
+        ):
             data.tmp_roles = {field: TempTargetRole()}
             data = super().execute(data)
             data.tmp_roles = {}
