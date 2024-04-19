@@ -1,10 +1,99 @@
 import sys
 
+from hypex.analyzers import ABAnalyzer, OneAASplitAnalyzer
+from hypex.comparators import GroupDifference, GroupSizes, ATE, TTest, KSTest, UTest
 from hypex.dataset import (
     ExperimentData,
+    Arg1Role,
+    Arg2Role,
+    InfoRole,
+    TargetRole,
+    FeatureRole,
+    GroupingRole,
+    PreTargetRole,
+    StatisticRole,
+    StratificationRole,
+    TreatmentRole,
+    TmpTreatmentRole,
+    TempGroupingRole,
+    TempTargetRole,
 )
-from hypex.experiments import Experiment
+from hypex.describers import Unique
+from hypex.experiments import (
+    Experiment,
+    OnRoleExperiment,
+    GroupExperiment,
+    CycledExperiment,
+)
 from hypex.hypotheses.hypothesis import Hypothesis
+from hypex.operators import (
+    MetricRatio,
+    MetricLogRatio,
+    MetricPercentageRatio,
+    MetricDelta,
+    MetricRelativeDelta,
+    MetricAbsoluteDelta,
+    MetricPercentageDelta,
+)
+from hypex.reporters import AADictReporter
+from hypex.splitters import (
+    AASplitter,
+    AASplitterWithGrouping,
+    AASplitterWithStratification,
+)
+from hypex.stats import Min, Max, Mode, Mean, Median, Size, Std, Variance
+from hypex.transformers import Shuffle
+from hypex.utils import ExperimentDataEnum, SpaceEnum
+
+all_classes = [
+    ABAnalyzer,
+    OneAASplitAnalyzer,
+    GroupDifference,
+    GroupSizes,
+    ATE,
+    TTest,
+    KSTest,
+    UTest,
+    Arg1Role,
+    Arg2Role,
+    InfoRole,
+    TargetRole,
+    FeatureRole,
+    GroupingRole,
+    PreTargetRole,
+    StatisticRole,
+    StratificationRole,
+    TreatmentRole,
+    TmpTreatmentRole,
+    TempGroupingRole,
+    TempTargetRole,
+    Unique,
+    OnRoleExperiment,
+    GroupExperiment,
+    CycledExperiment,
+    MetricRatio,
+    MetricLogRatio,
+    MetricPercentageRatio,
+    MetricDelta,
+    MetricRelativeDelta,
+    MetricAbsoluteDelta,
+    MetricPercentageDelta,
+    AADictReporter,
+    AASplitter,
+    AASplitterWithGrouping,
+    AASplitterWithStratification,
+    Min,
+    Max,
+    Mode,
+    Mean,
+    Median,
+    Size,
+    Std,
+    Variance,
+    Shuffle,
+    ExperimentDataEnum,
+    SpaceEnum,
+]
 
 
 class Factory:
@@ -31,9 +120,3 @@ class Factory:
             executors=self.make_experiment(self.hypothesis.experiment)
         )
         return experiment_data, experiment
-
-
-factory = Factory(
-    Hypothesis("C:\\Users\\User\\PycharmProjects\\HypEx\\test_config.json")
-)
-print(factory.execute())

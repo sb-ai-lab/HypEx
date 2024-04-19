@@ -15,5 +15,5 @@ __all__ = [
     "MetricAbsoluteDelta",
     "MetricRelativeDelta",
     "MetricPercentageDelta",
-    "MetricPercentageDelta",
+    "MetricPercentageRatio",
 ]

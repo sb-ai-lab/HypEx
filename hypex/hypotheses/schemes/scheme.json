@@ -91,7 +91,9 @@
                 "type": "string",
                 "enum": [
                   "Info",
-                  "Target"
+                  "Target",
+                  "Feature",
+                  "Treatment"
                 ]
               }
             },
