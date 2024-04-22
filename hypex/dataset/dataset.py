@@ -147,9 +147,9 @@ class Dataset(DatasetBase):
         self.data[key] = value
 
     @staticmethod
-    def _create_empty(
-        roles: Dict[Any, ABCRole], backend=BackendsEnum.pandas, index=None
-    ):
+    def _create_empty(backend=BackendsEnum.pandas, roles=None, index=None):
+        if roles is None:
+            roles = {}
         index = [] if index is None else index
         columns = list(roles.keys())
         ds = Dataset(roles=roles, backend=backend)
@@ -328,17 +328,17 @@ class Dataset(DatasetBase):
 
 class ExperimentData(Dataset):
     def __init__(self, data: Dataset):
-        self.additional_fields = Dataset._create_empty(roles={}, index=data.index)
-        self.stats = Dataset._create_empty(roles={}, index=data.columns)
-        self.additional_fields = Dataset._create_empty(roles={}, index=data.index)
+        self.additional_fields = Dataset._create_empty(index=data.index)
+        self.stats = Dataset._create_empty(index=data.columns)
+        self.additional_fields = Dataset._create_empty(index=data.index)
         self.analysis_tables: Dict[str, Dataset] = {}
         self.id_name_mapping: Dict[str, str] = {}
 
         super().__init__(data=data.data, roles=data.roles)
 
     @staticmethod
-    def _create_empty(roles: Dict[Any, ABCRole], backend="pandas", index=None):
-        ds = Dataset._create_empty(roles, backend, index)
+    def _create_empty(roles=None, backend=BackendsEnum.pandas, index=None):
+        ds = Dataset._create_empty(backend, roles, index)
         return ExperimentData(ds)
 
     def check_hash(self, executor_id: int, space: ExperimentDataEnum) -> bool:
