@@ -1,5 +1,5 @@
 import json
-from typing import Optional
+from typing import Optional, Union, Dict, Any
 
 from jsonschema import validate  # type: ignore
 
@@ -8,9 +8,12 @@ from hypex.factory.base import Factory
 
 
 class Hypothesis:
-    def __init__(self, config: str):
-        with open(config, "rb") as file:
-            opened_config = json.load(file)
+    def __init__(self, config: Union[str, Dict[str, Any]]):
+        if isinstance(config, str):
+            with open(config, "rb") as file:
+                opened_config = json.load(file)
+        else:
+            opened_config = config
         with open("hypex\\hypotheses\\schemes\\scheme.json", "rb") as file:
             self.scheme = json.load(file)
         self.config = opened_config

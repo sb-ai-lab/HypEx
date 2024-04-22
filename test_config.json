@@ -4,23 +4,15 @@
     "roles": {
       "role_names": [
         "Info",
-        "Feature",
         "Treatment",
         "Target",
-        "Target",
-        "Feature",
-        "Feature",
-        "Feature"
+        "Target"
       ],
       "columns": [
         "user_id",
-        "signup_month",
         "treat",
         "pre_spends",
-        "post_spends",
-        "age",
-        "gender",
-        "industry"
+        "post_spends"
       ]
     },
     "backend": "pandas"
@@ -33,7 +25,8 @@
     "OnRoleExperiment": {
       "executors": {
         "GroupDifference": {
-          "grouping_role": "Treatment"
+          "grouping_role": "Treatment",
+          "space": "additional"
         }
       },
       "role": "Target"
