@@ -94,6 +94,12 @@ all_classes = [
     SpaceEnum,
 ]
 
+spaces = {
+    "additional": SpaceEnum.additional,
+    "auto": SpaceEnum.auto,
+    "data": SpaceEnum.data,
+}
+
 
 class Factory:
     def __init__(self, hypothesis):
@@ -111,6 +117,8 @@ class Factory:
                 items[f"{item}"] = getattr(
                     sys.modules[__name__], items[item] + "Role"
                 )()
+            if "space" in items:
+                items["space"] = spaces.get(items["space"])
             items = {i: None if j == "None" else j for i, j in items.items()}
             executors.append(class_(**items))
         return executors
