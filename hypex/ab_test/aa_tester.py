@@ -67,7 +67,7 @@ class AATest:
             Analyzes and plots numerical feature distributions in control and test data.
         cat_feature_uniform_analysis(control_data, test_data):
             Analyzes and plots categorical feature distributions in control and test data.
-        calc_mde_unbalanced_group(data, target_col, group_flag_col, power):
+        calc_mde_unbalanced_group(data, target_field, group_flag_col, power):
             Finds minimum detectable effect (MDE) and effect size for unbalanced groups.
         experiment_result_transform(experiment):
             Transforms the result of an experiment into a readable format.
@@ -788,58 +788,7 @@ class AATest:
             test_group = splited_data["test"][target_field]
             control_group = splited_data["control"][target_field]
         return {"test_group": test_group, "control_group": control_group}
-
-    def calc_mde(
-        self,
-        test_group: pd.Series = None,
-        control_group: pd.Series = None,
-        data: pd.DataFrame = None,
-        target_field: str = None,
-        reliability: float = 0.95,
-        power: float = 0.8,
-    ) -> float:
-        """Calculates the minimum detectable effect (MDE) for a given test and control groups.
-
-        Args:
-            test_group:
-                The test group as a pandas Series
-            control_group:
-                The control group as a pandas Series
-            data:
-                The input data as a pandas DataFrame used if test_group and control_group are None
-            target_field:
-                The target field used if given data is a DataFrame
-            reliability:
-                The reliability of the test
-            power:
-                The power of the test
-
-        Returns:
-            The minimum detectable effect
-        """
-
-        m = norm.ppf(1 - (1 - reliability) / 2) + norm.ppf(power)
-
-        groups = self.__get_test_and_control_series(
-            test_group=test_group,
-            control_group=control_group,
-            data=data,
-            target_field=target_field,
-        )
-        test_group = groups["test_group"]
-        control_group = groups["control_group"]
-
-        n_test, n_control = len(test_group), len(control_group)
-        proportion = n_test / (n_test + n_control)
-        p = np.sqrt(1 / (proportion * (1 - proportion)))
-
-        var_test, var_control = np.var(test_group, ddof=1), np.var(
-            control_group, ddof=1
-        )
-        s = np.sqrt(var_test / n_test + var_control / n_control)
-
-        return p * m * s
-
+    
     def __mde_unbalanced_non_binomial(
             self,
             control_group_size: int,
@@ -872,7 +821,7 @@ class AATest:
 
         return (
             float(Decimal(float(mde)).quantize(Decimal("1.00"))),
-            float(Decimal(float(effect_size)).quantize(Decimal("1.00")))
+            float(Decimal(float(effect_size)).q uantize(Decimal("1.00")))
         )
 
     def __mde_unbalanced_binomial(
@@ -911,10 +860,10 @@ class AATest:
             float(Decimal(float(cohen_d)).quantize(Decimal("1.00")))
         )
 
-    def calc_mde_unbalanced_group(
+    def _calc_mde_unbalanced_group(
             self,
             data: pd.DataFrame,
-            target_col: str,
+            target_field: str,
             group_flag_col: str,
             power: float = 0.8
     ) -> Tuple:
@@ -923,7 +872,7 @@ class AATest:
         Args:
             data:
                 Input data
-            target_col:
+            target_field:
                 Name of the target feature
             group_flag_col:
                 Name of the column with the group flag
@@ -934,12 +883,12 @@ class AATest:
         Returns:
             Tuple with MDE and effect size
         """
-        fact_conversion = float(Decimal(float(data[target_col].mean())).quantize(Decimal("1.00")))  # fact_conversion
+        fact_conversion = float(Decimal(float(data[target_field].mean())).quantize(Decimal("1.00")))  # fact_conversion
         control_group = data[(data[group_flag_col] == data[group_flag_col].unique()[0])]  # control_group
         control_group_size = len(control_group)  # control_group_size
         all_data_size = len(data[group_flag_col])  # all_data_size (???)
 
-        if data[target_col].nunique() == 2:
+        if data[target_field].nunique() == 2:
             res = self.__mde_unbalanced_binomial(
                 control_group_size=control_group_size,
                 all_data_size=all_data_size,
@@ -950,11 +899,72 @@ class AATest:
             res = self.__mde_unbalanced_non_binomial(
                 control_group_size=control_group_size,
                 all_data_size=all_data_size,
-                standard_deviation=data[target_col].std(),
+                standard_deviation=data[target_field].std(),
                 power=power
             )
 
         return res
+
+
+    def calc_mde(
+        self,
+        test_group: pd.Series = None,
+        control_group: pd.Series = None,
+        data: pd.DataFrame = None,
+        target_field: str = None,
+        reliability: float = 0.95,
+        power: float = 0.8,
+        unbalanced: bool = False,
+    ) -> float:
+        """Calculates the minimum detectable effect (MDE) for a given test and control groups.
+
+        Args:
+            test_group:
+                The test group as a pandas Series
+            control_group:
+                The control group as a pandas Series
+            data:
+                The input data as a pandas DataFrame used if test_group and control_group are None
+            target_field:
+                The target field used if given data is a DataFrame
+            reliability:
+                The reliability of the test
+            power:
+                The power of the test
+
+        Returns:
+            The minimum detectable effect
+        """
+
+        if unbalanced:
+            return self._calc_mde_unbalanced_group(
+                data=data,
+                target_field=target_field,
+                group_flag_col="group",
+                power=power
+            )
+
+        m = norm.ppf(1 - (1 - reliability) / 2) + norm.ppf(power)
+
+        groups = self.__get_test_and_control_series(
+            test_group=test_group,
+            control_group=control_group,
+            data=data,
+            target_field=target_field,
+        )
+        test_group = groups["test_group"]
+        control_group = groups["control_group"]
+
+        n_test, n_control = len(test_group), len(control_group)
+        proportion = n_test / (n_test + n_control)
+        p = np.sqrt(1 / (proportion * (1 - proportion)))
+
+        var_test, var_control = np.var(test_group, ddof=1), np.var(
+            control_group, ddof=1
+        )
+        s = np.sqrt(var_test / n_test + var_control / n_control)
+
+        return p * m * s
 
     def calc_sample_size(
         self,
