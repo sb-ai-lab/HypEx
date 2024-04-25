@@ -1,18 +1,18 @@
 from abc import ABC
-from typing import Optional
+from typing import Optional, Any
 
 from hypex.utils import (
-    ABCRoleTypes,
     StratificationRoleTypes,
     TargetRoleTypes,
     TreatmentRoleTypes,
+    CategoricalTypes,
 )
 
 
 class ABCRole(ABC):
     _role_name = "Abstract"
 
-    def __init__(self, data_type: Optional[ABCRoleTypes] = None):
+    def __init__(self, data_type: Optional[Any] = None):
         self.data_type = data_type
 
     @property
@@ -26,6 +26,9 @@ class ABCRole(ABC):
 class InfoRole(ABCRole):
     _role_name = "Info"
 
+    def __init__(self, data_type: Optional[TreatmentRoleTypes] = None):
+        super().__init__(data_type)
+
 
 class StratificationRole(ABCRole):
     _role_name = "Stratification"
@@ -36,6 +39,9 @@ class StratificationRole(ABCRole):
 
 class GroupingRole(ABCRole):
     _role_name = "Grouping"
+
+    def __init__(self, data_type: Optional[CategoricalTypes] = None):
+        super().__init__(data_type)
 
 
 class TreatmentRole(ABCRole):
@@ -67,11 +73,11 @@ class PreTargetRole(TargetRole):
     _role_name = "PreTarget"
 
 
-class TempTargetRole(ABCRole):
+class TempTargetRole(TargetRole):
     _role_name = "TempTarget"
 
 
-class TempGroupingRole(ABCRole):
+class TempGroupingRole(GroupingRole):
     _role_name = "TempGrouping"
 
 

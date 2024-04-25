@@ -79,12 +79,23 @@ class Dataset(DatasetBase):
             return PandasDataset(data)
         return PandasDataset(data)
 
-    def set_all_roles(self, roles):
+    def _set_all_roles(self, roles):
         keys = list(roles.keys())
         for column in self.columns:
             if column not in keys:
                 roles[column] = FeatureRole()
         return roles
+
+    def _set_empty_types(self):
+        types_map = {"int": int, "float": float, "object": str}
+        reversed_map = {int: "int", float: "float", str: "category"}
+        for column, role in self.roles.items():
+            if role.data_type is None:
+                d_type = self._backend._get_column_type(column)
+                role.data_type = [v for k, v in types_map.items() if k in d_type][0]
+            self._backend = self._backend._update_column_type(
+                column, reversed_map[role.data_type]
+            )
 
     def __init__(
         self,
@@ -113,8 +124,9 @@ class Dataset(DatasetBase):
         ):
             raise RoleColumnError(list(roles.keys()), self._backend.columns)
         if data is not None:
-            roles = self.set_all_roles(roles)
+            roles = self._set_all_roles(roles)
         self.roles: Dict[Union[str, int], ABCRole] = roles
+        self._set_empty_types()
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
 
@@ -131,7 +143,7 @@ class Dataset(DatasetBase):
         roles: Dict = {
             column: (
                 self.roles[column]
-                if column in self.columns and self.roles.get(column, 0)
+                if column in self.columns and self.roles.get(column, False)
                 else InfoRole()
             )
             for column in items
