@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any
 
-from hypex.dataset.dataset import ExperimentData, Dataset
+from hypex.dataset import ExperimentData, Dataset
 
 
 class Reporter(ABC):

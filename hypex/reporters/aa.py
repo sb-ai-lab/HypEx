@@ -3,7 +3,7 @@ from typing import Dict, Any
 from hypex.analyzers.aa import OneAASplitAnalyzer
 from hypex.comparators.comparators import GroupDifference, GroupSizes
 from hypex.dataset.dataset import ExperimentData
-from hypex.reporters.base import DictReporter
+from hypex.reporters.abstract import DictReporter
 from hypex.splitters.aa import AASplitter
 from hypex.utils.constants import ID_SPLIT_SYMBOL
 from hypex.utils.enums import ExperimentDataEnum

@@ -1,10 +1,9 @@
 from abc import ABC
 from typing import Optional, Any, Union
 
-from hypex.dataset.dataset import ExperimentData, Dataset
+from hypex.dataset import ExperimentData, Dataset
 from hypex.experiments.base import Executor
-from hypex.utils.enums import ExperimentDataEnum
-from hypex.utils.typings import FieldKey
+from hypex.utils import ExperimentDataEnum, FieldKey
 
 
 class Describer(Executor, ABC):

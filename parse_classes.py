@@ -2,8 +2,15 @@ import ast
 import json
 from pathlib import Path
 
-unnecessary_dirs = ("dataset", "factory", "errors", "experiment", "hypotheses", "utils")
-unnecessary_fields = ("loc", "iloc")
+unnecessary_dirs = (
+    "dataset",
+    "factory",
+    "errors",
+    "experiment",
+    "hypotheses",
+    "utils",
+    "executor",
+)
 
 
 def get_class_attributes(node):
@@ -21,23 +28,20 @@ def get_class_attributes(node):
                 "title": f"The {func.targets[0].id} Schema",
             }
         if isinstance(func, ast.FunctionDef) and func.name == "__init__":
-            for call in func.body:
-                if isinstance(call, ast.Assign):
-                    for target in call.targets:
-                        if (
-                            isinstance(target, ast.Attribute)
-                            and target.value.id == "self"
-                            and not (
-                                target.attr.startswith("_")
-                                or target.attr.startswith("default")
-                            )
-                        ):
-                            required.append(target.attr)
-                            objects[target.attr] = {
-                                "type": "",
-                                "default": {},
-                                "title": f"The {target.attr} Schema",
-                            }
+            for arg in func.args.args:
+
+                if isinstance(func.args.defaults[0], ast.AST) and arg.arg not in (
+                    "self",
+                    "key",
+                    "full_name",
+                    "transformer",
+                ):
+                    required.append(arg.arg)
+                    objects[arg.arg] = {
+                        "type": "",
+                        "default": {},
+                        "title": f"The {arg.arg} Schema",
+                    }
     return {"required": required, "properties": objects}
 
 
@@ -54,7 +58,14 @@ def parse_file(file_path):
 def parse_directory(directory):
     classes = {}
     for file in Path(directory).rglob("*.py"):
-        if len(file.parent.parts) > 1 and file.parent.parts[1] not in unnecessary_dirs:
+        if len(file.parent.parts) > 1 and (
+            (
+                file.parent.parts[1] not in unnecessary_dirs
+                and file.name != "abstract.py"
+            )
+            or file.parent.parts[1] == "experiments"
+            and file.name == "base.py"
+        ):
             classes.update(parse_file(file))
     return classes
 

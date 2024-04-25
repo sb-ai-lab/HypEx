@@ -1,8 +1,8 @@
-from hypex.analyzers.aa import OneAASplitAnalyzer
-from hypex.comparators.comparators import GroupDifference
-from hypex.comparators.hypothesis_testing import TTest, KSTest
-from hypex.dataset.roles import TargetRole, TreatmentRole
-from hypex.experiments.base import Experiment, OnRoleExperiment
+from hypex.analyzers import OneAASplitAnalyzer
+from hypex.comparators import GroupDifference
+from hypex.comparators import TTest, KSTest
+from hypex.dataset import TargetRole, TreatmentRole
+from hypex.experiments import Experiment, OnRoleExperiment
 
 HOMOGENEITY_TEST = Experiment(
     executors=[

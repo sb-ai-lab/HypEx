@@ -1,8 +1,8 @@
 import warnings
 from abc import ABC
 
-from hypex.dataset.dataset import Dataset
-from hypex.experiments.base import ComplexExecutor
+from hypex.dataset import Dataset
+from hypex.executor import ComplexExecutor
 
 
 class Analyzer(ComplexExecutor, ABC):

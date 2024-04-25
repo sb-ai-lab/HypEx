@@ -1,12 +1,13 @@
-from typing import Dict, Any
+from typing import Any
 
 import numpy as np
 from scipy.stats import norm
 from statsmodels.stats.power import TTestIndPower
 
-from hypex.dataset.dataset import ExperimentData
-from hypex.utils.typings import FieldKey
 from hypex.comparators.comparators import ComparatorInner
+from hypex.dataset import ExperimentData
+from hypex.utils import FieldKey
+
 
 # TODO: Rework ALL
 

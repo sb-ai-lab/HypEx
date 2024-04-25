@@ -2,8 +2,8 @@ from typing import Optional
 
 import numpy as np
 
-from hypex.dataset.dataset import Dataset
-from hypex.operators.base import BinaryOperator
+from hypex.dataset import Dataset
+from hypex.operators.abstract import BinaryOperator
 
 
 class MetricDelta(BinaryOperator):
