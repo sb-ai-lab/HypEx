@@ -1,9 +1,9 @@
 {
   "type": "object",
-  "default": {},
   "title": "Root Schema",
   "required": [
-    "dataset"
+    "dataset",
+    "experiment"
   ],
   "properties": {
     "dataset": {
@@ -75,376 +75,419 @@
           ],
           "default": "pandas"
         },
-        "roles": {
-          "type": "object",
-          "title": "The roles Schema",
-          "required": [
-            "role_names",
-            "columns"
-          ],
-          "properties": {
-            "role_names": {
-              "type": "array",
-              "minItems": 1,
-              "title": "The role_names Schema",
-              "items": {
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "role": {
                 "type": "string",
                 "enum": [
                   "Info",
                   "Target",
-                  "Feature",
-                  "Treatment"
+                  "Treatment",
+                  "Grouping",
+                  "Stratification",
+                  "PreTarget"
+                ]
+              },
+              "dataType": {
+                "type": "string",
+                "enum": [
+                  "int",
+                  "float",
+                  "category"
                 ]
               }
             },
-            "columns": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "default": [],
-              "title": "The columns Schema",
-              "items": {
-                "type": "string"
-              }
-            }
+            "required": [
+              "name",
+              "role"
+            ]
           }
-        },
-        "args": {
-          "type": "object",
-          "default": {},
-          "title": "The args Schema",
-          "properties": {},
-          "examples": [
-            {
-              "delimiter": ",",
-              "encoding": "utf-8"
-            }
-          ]
         }
       },
-      "examples": [
-        {
-          "data": "future",
-          "path": "path/to/file",
-          "backend": "pandas",
-          "roles": {
-            "columnname": "role"
-          },
-          "args": {
+      "args": {
+        "type": "object",
+        "default": {},
+        "title": "The args Schema",
+        "properties": {},
+        "examples": [
+          {
             "delimiter": ",",
             "encoding": "utf-8"
           }
-        }
-      ]
-    }
-  },
-  "experiment": {
-    "type": "object",
-    "default": {},
-    "title": "The experiment Schema",
-    "properties": {
-      "AADictReporter": {
-        "required": [],
-        "properties": {}
-      },
-      "AASplitter": {
-        "required": [
-          "control_size",
-          "random_state",
-          "inner_executors"
-        ],
-        "properties": {
-          "control_size": {
-            "type": "",
-            "default": 0.5,
-            "title": "The control_size Schema"
-          },
-          "random_state": {
-            "type": "",
-            "default": "None",
-            "title": "The random_state Schema"
-          },
-          "inner_executors": {
-            "type": "",
-            "default": {},
-            "title": "The inner_executors Schema"
-          }
-        }
-      },
-      "AASplitterWithGrouping": {
-        "required": [],
-        "properties": {}
-      },
-      "AASplitterWithStratification": {
-        "required": [
-          "control_size",
-          "random_state"
-        ],
-        "properties": {
-          "control_size": {
-            "type": "",
-            "default": 0.5,
-            "title": "The control_size Schema"
-          },
-          "random_state": {
-            "type": "",
-            "default": "None",
-            "title": "The random_state Schema"
-          }
-        }
-      },
-      "ABAnalyzer": {
-        "required": [],
-        "properties": {}
-      },
-      "ATE": {
-        "required": [],
-        "properties": {}
-      },
-      "CycledExperiment": {
-        "required": [
-          "inner_executor",
-          "n_iterations",
-          "analyzer"
-        ],
-        "properties": {
-          "inner_executor": {
-            "type": "",
-            "default": {},
-            "title": "The inner_executor Schema"
-          },
-          "n_iterations": {
-            "type": "",
-            "default": {},
-            "title": "The n_iterations Schema"
-          },
-          "analyzer": {
-            "type": "",
-            "default": {},
-            "title": "The analyzer Schema"
-          }
-        }
-      },
-      "Experiment": {
-        "required": [
-          "executors"
-        ],
-        "properties": {
-          "executors": {
-            "type": "",
-            "default": {},
-            "title": "The executors Schema"
-          }
-        }
-      },
-      "GroupDifference": {
-        "required": [],
-        "properties": {}
-      },
-      "GroupExperiment": {
-        "required": [
-          "inner_executor"
-        ],
-        "properties": {
-          "inner_executor": {
-            "type": "",
-            "default": {},
-            "title": "The inner_executor Schema"
-          }
-        }
-      },
-      "GroupSizes": {
-        "required": [],
-        "properties": {}
-      },
-      "KSTest": {
-        "required": [],
-        "properties": {}
-      },
-      "Max": {
-        "required": [],
-        "properties": {}
-      },
-      "Mean": {
-        "required": [],
-        "properties": {}
-      },
-      "Median": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricAbsoluteDelta": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricDelta": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricLogRatio": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricPercentageDelta": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricPercentageRatio": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricRatio": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricRelativeDelta": {
-        "required": [],
-        "properties": {}
-      },
-      "Min": {
-        "required": [],
-        "properties": {}
-      },
-      "Mode": {
-        "required": [],
-        "properties": {}
-      },
-      "OnRoleExperiment": {
-        "required": [
-          "executors",
-          "role"
-        ],
-        "properties": {
-          "executors": {
-            "type": "",
-            "default": {},
-            "title": "The executors Schema"
-          },
-          "role": {
-            "type": "",
-            "default": {},
-            "title": "The role Schema"
-          }
-        }
-      },
-      "OneAASplitAnalyzer": {
-        "required": [],
-        "properties": {}
-      },
-      "Shuffle": {
-        "required": [
-          "random_state"
-        ],
-        "properties": {
-          "random_state": {
-            "type": "",
-            "default": "None",
-            "title": "The random_state Schema"
-          }
-        }
-      },
-      "Size": {
-        "required": [],
-        "properties": {}
-      },
-      "StatMdeBySize": {
-        "required": [],
-        "properties": {}
-      },
-      "StatPowerByTTestInd": {
-        "required": [],
-        "properties": {}
-      },
-      "StatSampleSizeByMde": {
-        "required": [
-          "mde",
-          "target_field",
-          "significance",
-          "power"
-        ],
-        "properties": {
-          "mde": {
-            "type": "",
-            "default": {},
-            "title": "The mde Schema"
-          },
-          "target_field": {
-            "type": "",
-            "default": {},
-            "title": "The target_field Schema"
-          },
-          "significance": {
-            "type": "",
-            "default": {},
-            "title": "The significance Schema"
-          },
-          "power": {
-            "type": "",
-            "default": {},
-            "title": "The power Schema"
-          }
-        }
-      },
-      "Std": {
-        "required": [],
-        "properties": {}
-      },
-      "TTest": {
-        "required": [],
-        "properties": {}
-      },
-      "TestPower": {
-        "required": [
-          "target_field",
-          "significance",
-          "power"
-        ],
-        "properties": {
-          "target_field": {
-            "type": "",
-            "default": {},
-            "title": "The target_field Schema"
-          },
-          "significance": {
-            "type": "",
-            "default": {},
-            "title": "The significance Schema"
-          },
-          "power": {
-            "type": "",
-            "default": {},
-            "title": "The power Schema"
-          }
-        }
-      },
-      "UTest": {
-        "required": [],
-        "properties": {}
-      },
-      "Unique": {
-        "required": [],
-        "properties": {}
-      },
-      "Variance": {
-        "required": [],
-        "properties": {}
+        ]
       }
-    }
-  },
-  "examples": [
-    {
-      "dataset": {
-        "data": "future",
+    },
+    "examples": [
+      {
         "path": "path/to/file",
         "backend": "pandas",
-        "roles": {
-          "columnname": "role"
-        },
+        "columns": [
+          {
+            "name": "a",
+            "role": "Info"
+          }
+        ],
         "args": {
           "delimiter": ",",
           "encoding": "utf-8"
         }
       }
+    ],
+    "experiment": {
+      "type": "object",
+      "title": "The experiment Schema",
+      "properties": {
+        "AADictReporter": {
+          "required": [],
+          "properties": {
+          }
+        },
+        "AASplitter": {
+          "properties": {
+            "control_size": {
+              "type": "",
+              "default": 0.5,
+              "title": "The control_size Schema"
+            },
+            "random_state": {
+              "type": "",
+              "default": "None",
+              "title": "The random_state Schema"
+            }
+          }
+        },
+        "AASplitterWithGrouping": {
+          "properties": {
+            "control_size": {
+              "type": "",
+              "default": 0.5,
+              "title": "The control_size Schema"
+            },
+            "random_state": {
+              "type": "",
+              "default": "None",
+              "title": "The random_state Schema"
+            }
+          }
+        },
+        "AASplitterWithStratification": {
+          "properties": {
+            "control_size": {
+              "type": "",
+              "default": 0.5,
+              "title": "The control_size Schema"
+            },
+            "random_state": {
+              "type": "",
+              "default": "None",
+              "title": "The random_state Schema"
+            }
+          }
+        },
+        "ABAnalyzer": {
+          "properties": {}
+        },
+        "ATE": {
+          "properties": {
+            "grouping_role": {
+              "type": "string",
+              "default": "Treatment",
+              "enum": [
+                "Info",
+                "Target",
+                "Treatment",
+                "Grouping",
+                "Stratification",
+                "PreTarget"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "default": "auto",
+              "enum": [
+                "data",
+                "additional",
+                "auto"
+              ]
+            }
+          }
+        },
+        "CycledExperiment": {
+          "required": [
+            "inner_executor",
+            "n_iterations",
+            "analyzer"
+          ],
+          "properties": {
+            "inner_executor": {
+              "type": "string",
+              "title": "The inner_executor Schema"
+            },
+            "n_iterations": {
+              "type": "int",
+              "default": 20
+            },
+            "analyzer": {
+              "type": "string",
+              "title": "The analyzer Schema"
+            }
+          }
+        },
+        "GroupDifference": {
+          "properties": {
+            "grouping_role": {
+              "type": "string",
+              "default": "Treatment",
+              "enum": [
+                "Info",
+                "Target",
+                "Treatment",
+                "Grouping",
+                "Stratification",
+                "PreTarget"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "default": "auto",
+              "enum": [
+                "data",
+                "additional",
+                "auto"
+              ]
+            }
+          }
+        },
+        "GroupExperiment": {
+          "required": [
+            "inner_executor"
+          ],
+          "properties": {
+            "inner_executor": {
+              "type": "string",
+              "title": "The inner_executor Schema"
+            }
+          }
+        },
+        "GroupSizes": {
+          "required": [],
+          "properties": {
+            "grouping_role": {
+              "type": "string",
+              "default": "Treatment",
+              "enum": [
+                "Info",
+                "Target",
+                "Treatment",
+                "Grouping",
+                "Stratification",
+                "PreTarget"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "default": "auto",
+              "enum": [
+                "data",
+                "additional",
+                "auto"
+              ]
+            }
+          }
+        },
+        "KSTest": {
+          "required": [],
+          "properties": {
+            "grouping_role": {
+              "type": "string",
+              "default": "Treatment",
+              "enum": [
+                "Info",
+                "Target",
+                "Treatment",
+                "Grouping",
+                "Stratification",
+                "PreTarget"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "default": "auto",
+              "enum": [
+                "data",
+                "additional",
+                "auto"
+              ]
+            },
+            "reliability": {
+              "type": "float",
+              "default": 0.05
+            }
+          }
+        },
+        "Max": {
+          "properties": {}
+        },
+        "Mean": {
+          "properties": {}
+        },
+        "Median": {
+          "properties": {}
+        },
+        "MetricAbsoluteDelta": {
+          "properties": {}
+        },
+        "MetricDelta": {
+          "properties": {}
+        },
+        "MetricLogRatio": {
+          "properties": {}
+        },
+        "MetricPercentageDelta": {
+          "properties": {}
+        },
+        "MetricPercentageRatio": {
+          "properties": {}
+        },
+        "MetricRatio": {
+          "properties": {}
+        },
+        "MetricRelativeDelta": {
+          "properties": {}
+        },
+        "Min": {
+          "properties": {}
+        },
+        "Mode": {
+          "properties": {}
+        },
+        "OnRoleExperiment": {
+          "required": [
+            "executors",
+            "role"
+          ],
+          "properties": {
+            "executors": {
+              "type": "array",
+              "title": "The executors Schema",
+              "items": {
+                "type": "string"
+              }
+            },
+            "role": {
+              "enum": [
+                "Info",
+                "Target",
+                "Treatment",
+                "Grouping",
+                "Stratification",
+                "PreTarget"
+              ],
+              "default": "Target",
+              "title": "The role Schema"
+            }
+          }
+        },
+        "OneAASplitAnalyzer": {
+          "properties": {}
+        },
+        "Shuffle": {
+          "properties": {
+            "random_state": {
+              "type": "float",
+              "default": "None",
+              "title": "The random_state Schema"
+            }
+          }
+        },
+        "Size": {
+          "properties": {}
+        },
+        "Std": {
+          "properties": {}
+        },
+        "TTest": {
+          "required": [],
+          "properties": {
+            "grouping_role": {
+              "type": "string",
+              "default": "Treatment",
+              "enum": [
+                "Info",
+                "Target",
+                "Treatment",
+                "Grouping",
+                "Stratification",
+                "PreTarget"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "default": "auto",
+              "enum": [
+                "data",
+                "additional",
+                "auto"
+              ]
+            },
+            "reliability": {
+              "type": "float",
+              "default": 0.05
+            }
+          }
+        },
+        "UTest": {
+          "required": [],
+          "properties": {
+            "grouping_role": {
+              "type": "string",
+              "default": "Treatment",
+              "enum": [
+                "Info",
+                "Target",
+                "Treatment",
+                "Grouping",
+                "Stratification",
+                "PreTarget"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "default": "auto",
+              "enum": [
+                "data",
+                "additional",
+                "auto"
+              ]
+            },
+            "reliability": {
+              "type": "float",
+              "default": 0.05
+            }
+          }
+        },
+        "Unique": {
+          "required": [
+            "target_field"
+          ],
+          "properties": {
+            "target_field": {
+              "type": "str"
+            }
+          }
+        },
+        "Variance": {
+          "properties": {}
+        }
+      }
     }
-  ]
+  }
 }

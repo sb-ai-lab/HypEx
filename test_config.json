@@ -1,20 +1,24 @@
 {
   "dataset": {
     "path": "data.csv",
-    "roles": {
-      "role_names": [
-        "Info",
-        "Treatment",
-        "Target",
-        "Target"
-      ],
-      "columns": [
-        "user_id",
-        "treat",
-        "pre_spends",
-        "post_spends"
-      ]
-    },
+    "columns": [
+      {
+        "name": "user_id",
+        "role": "Info"
+      },
+      {
+        "name": "treat",
+        "role": "Treatment"
+      },
+      {
+        "name": "pre_spends",
+        "role": "Target"
+      },
+      {
+        "name": "post_spends",
+        "role": "Target"
+      }
+    ],
     "backend": "pandas"
   },
   "experiment": {
