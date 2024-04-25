@@ -10,11 +10,11 @@ from hypex.utils.errors import (
     ComparisonNotSuitableFieldError,
 )
 from hypex.utils.typings import (
-    ABCRoleTypes,
     FromDictType,
     TargetRoleTypes,
     TreatmentRoleTypes,
     StratificationRoleTypes,
+    CategoricalTypes,
     FieldKey,
 )
 
@@ -30,9 +30,9 @@ __all__ = [
     "ConcatBackendError",
     "NotFoundInExperimentDataError",
     "ComparisonNotSuitableFieldError",
-    "ABCRoleTypes",
     "FromDictType",
     "TargetRoleTypes",
+    "CategoricalTypes",
     "TreatmentRoleTypes",
     "StratificationRoleTypes",
     "FieldKey",
