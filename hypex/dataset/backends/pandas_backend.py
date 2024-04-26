@@ -9,6 +9,7 @@ from typing import (
     Sized,
     Callable,
     Optional,
+    Any,
 )
 
 import pandas as pd  # type: ignore
@@ -29,7 +30,7 @@ class PandasDataset(DatasetBackend):
         else:
             raise ValueError(f"Unsupported file extension {file_extension}")
 
-    def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series, None] = None):
+    def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series] = None):
         if isinstance(data, pd.DataFrame):
             self.data = data
         elif isinstance(data, pd.Series):
@@ -74,6 +75,13 @@ class PandasDataset(DatasetBackend):
             else self.data.columns.get_indexer(column_name)
         )[0]
 
+    def _get_column_type(self, column_name: str) -> str:
+        return str(self.data.dtypes[column_name])
+
+    def _update_column_type(self, column_name: str, type_name: str):
+        self.data[column_name] = self.data[column_name].astype(type_name)
+        return self
+
     def add_column(
         self,
         data: Union[Sequence],
@@ -87,7 +95,7 @@ class PandasDataset(DatasetBackend):
         else:
             self.data[name] = data
 
-    def append(self, other, index: bool = False):
+    def append(self, other, index: bool = False) -> pd.DataFrame:
         new_data = pd.concat([self.data, other.data])
         if index:
             new_data.reset_index()
@@ -107,20 +115,20 @@ class PandasDataset(DatasetBackend):
             self.data.index = index
         return self
 
-    def to_dict(self):
+    def to_dict(self) -> Dict[str, Any]:
         data = self.data.to_dict()
         for key, value in data.items():
             data[key] = list(data[key].values())
         index = list(self.index)
         return {"data": data, "index": index}
 
-    def apply(self, func: Callable, **kwargs):
+    def apply(self, func: Callable, **kwargs) -> pd.DataFrame:
         return self.data.apply(func, **kwargs)
 
-    def map(self, func: Callable, **kwargs):
+    def map(self, func: Callable, **kwargs) -> pd.DataFrame:
         return self.data.map(func, **kwargs)
 
-    def unique(self):
+    def unique(self) -> pd.DataFrame:
         return self.data.unique()
 
     def isin(self, values: Iterable) -> Iterable[bool]:
@@ -131,25 +139,27 @@ class PandasDataset(DatasetBackend):
         return list(groups)
 
     def loc(self, items: Iterable) -> Iterable:
-        return self.data.loc[items]
+        data = self.data.loc[items]
+        return pd.DataFrame(data) if not isinstance(data, pd.DataFrame) else data
 
     def iloc(self, items: Iterable) -> Iterable:
-        return self.data.iloc[items]
+        data = self.data.iloc[items]
+        return pd.DataFrame(data) if not isinstance(data, pd.DataFrame) else data
 
-    def mean(self):
+    def mean(self) -> pd.DataFrame:
         return self.data.agg(["mean"])
 
-    def max(self):
+    def max(self) -> pd.DataFrame:
         return self.data.agg(["max"])
 
-    def min(self):
+    def min(self) -> pd.DataFrame:
         return self.data.agg(["min"])
 
-    def count(self):
+    def count(self) -> pd.DataFrame:
         return self.data.agg(["count"])
 
-    def sum(self):
+    def sum(self) -> pd.DataFrame:
         return self.data.agg(["sum"])
 
-    def agg(self, func):
+    def agg(self, func) -> pd.DataFrame:
         return self.data.agg(func)

@@ -79,12 +79,24 @@ class Dataset(DatasetBase):
             return PandasDataset(data)
         return PandasDataset(data)
 
-    def set_all_roles(self, roles):
+    def _set_all_roles(self, roles):
         keys = list(roles.keys())
         for column in self.columns:
             if column not in keys:
                 roles[column] = FeatureRole()
         return roles
+
+    def _set_empty_types(self, roles):
+        types_map = {"int": int, "float": float, "object": str, "bool": bool}
+        reversed_map = {int: "int", float: "float", str: "category", bool: "bool"}
+        for column, role in roles.items():
+            if role.data_type is None:
+                d_type = self._backend._get_column_type(column)
+
+                role.data_type = [v for k, v in types_map.items() if k in d_type][0]
+            self._backend = self._backend._update_column_type(
+                column, reversed_map[role.data_type]
+            )
 
     def __init__(
         self,
@@ -113,7 +125,8 @@ class Dataset(DatasetBase):
         ):
             raise RoleColumnError(list(roles.keys()), self._backend.columns)
         if data is not None:
-            roles = self.set_all_roles(roles)
+            roles = self._set_all_roles(roles)
+            self._set_empty_types(roles)
         self.roles: Dict[Union[str, int], ABCRole] = roles
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
@@ -131,7 +144,7 @@ class Dataset(DatasetBase):
         roles: Dict = {
             column: (
                 self.roles[column]
-                if column in self.columns and self.roles.get(column, 0)
+                if column in self.columns and self.roles.get(column, False)
                 else InfoRole()
             )
             for column in items
@@ -147,9 +160,9 @@ class Dataset(DatasetBase):
         self.data[key] = value
 
     @staticmethod
-    def _create_empty(
-        roles: Dict[Any, ABCRole], backend=BackendsEnum.pandas, index=None
-    ):
+    def _create_empty(backend=BackendsEnum.pandas, roles=None, index=None):
+        if roles is None:
+            roles = {}
         index = [] if index is None else index
         columns = list(roles.keys())
         ds = Dataset(roles=roles, backend=backend)
@@ -192,7 +205,7 @@ class Dataset(DatasetBase):
         role: Optional[Dict[str, ABCRole]] = None,
         index: Optional[Iterable[Hashable]] = None,
     ):
-        if role is None:  # если данные - датасет
+        if role is None:
             if not isinstance(data, Dataset):
                 raise ValueError("Козьёль")
             self.roles.update(data.roles)
@@ -328,17 +341,17 @@ class Dataset(DatasetBase):
 
 class ExperimentData(Dataset):
     def __init__(self, data: Dataset):
-        self.additional_fields = Dataset._create_empty(roles={}, index=data.index)
-        self.stats = Dataset._create_empty(roles={}, index=data.columns)
-        self.additional_fields = Dataset._create_empty(roles={}, index=data.index)
+        self.additional_fields = Dataset._create_empty(index=data.index)
+        self.stats = Dataset._create_empty(index=data.columns)
+        self.additional_fields = Dataset._create_empty(index=data.index)
         self.analysis_tables: Dict[str, Dataset] = {}
         self.id_name_mapping: Dict[str, str] = {}
 
         super().__init__(data=data.data, roles=data.roles)
 
     @staticmethod
-    def _create_empty(roles: Dict[Any, ABCRole], backend="pandas", index=None):
-        ds = Dataset._create_empty(roles, backend, index)
+    def _create_empty(roles=None, backend=BackendsEnum.pandas, index=None):
+        ds = Dataset._create_empty(backend, roles, index)
         return ExperimentData(ds)
 
     def check_hash(self, executor_id: int, space: ExperimentDataEnum) -> bool:

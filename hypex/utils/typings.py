@@ -2,9 +2,9 @@ import datetime
 from typing import Any, Union, Dict, List
 
 StratificationRoleTypes = Union[float, str, datetime.datetime]
-TreatmentRoleTypes = Union[float, bool, str]
+TreatmentRoleTypes = Union[float, bool, str, int]
 TargetRoleTypes = Union[float, int, bool]
-ABCRoleTypes = Union[Any]
+CategoricalTypes = str
 
 FieldKey = Union[str, int]
 
