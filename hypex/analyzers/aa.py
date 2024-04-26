@@ -45,7 +45,7 @@ class OneAAStatAnalyzer(Analyzer):
                     analysis_data[f"{c.__name__} {f}"] =  mean_operator.calc(t_data[f])
             
         analysis_data["mean test score"] = (
-            s["TTest p-value"] + 2 * analysis_data["KSTest p-value"]
+            analysis_data["TTest p-value"] + 2 * analysis_data["KSTest p-value"]
         ) / 3
         analysis_data = Dataset.from_dict(
             [analysis_data],

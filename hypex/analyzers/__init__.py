@@ -1,4 +1,4 @@
-from hypex.analyzers.aa import OneAASplitAnalyzer
+from hypex.analyzers.aa import OneAAStatAnalyzer
 from hypex.analyzers.ab import ABAnalyzer
 
 
