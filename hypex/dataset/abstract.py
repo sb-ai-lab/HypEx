@@ -6,60 +6,61 @@ class DatasetBase(ABC):
 
     @abstractmethod
     def __len__(self):
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     def __repr__(self):
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     def __getitem__(self, idx):
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     def add_column(self, data, name):
-        raise NotImplementedError
+        pass
 
     def from_dict(self, data):
-        raise NotImplementedError
+        pass
 
     def _create_empty(self, index=None):
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     def apply(self, *args, **kwargs):
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     def map(self, *args, **kwargs):
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     def unique(self):
-        raise NotImplementedError
+        pass
 
     @property
     @abstractmethod
     def index(self):
-        raise NotImplementedError
+        pass
 
     @property
     @abstractmethod
     def columns(self):
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     def isin(self, values: Iterable) -> Iterable[bool]:
-        raise NotImplementedError
+        pass
 
     def groupby(self, by, **kwargs):
-        raise NotImplementedError
+        pass
 
     def loc(self, values: Iterable) -> Iterable:
-        raise NotImplementedError
+        pass
 
     def iloc(self, values: Iterable) -> Iterable:
-        raise NotImplementedError
+        pass
+
 
 class DatasetBackend(DatasetBase):
     @property
