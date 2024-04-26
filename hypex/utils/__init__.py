@@ -12,8 +12,7 @@ from hypex.utils.errors import (
 from hypex.utils.typings import (
     FromDictType,
     TargetRoleTypes,
-    TreatmentRoleTypes,
-    StratificationRoleTypes,
+    DefaultRoleTypes,
     CategoricalTypes,
     FieldKey,
 )
@@ -33,7 +32,6 @@ __all__ = [
     "FromDictType",
     "TargetRoleTypes",
     "CategoricalTypes",
-    "TreatmentRoleTypes",
-    "StratificationRoleTypes",
+    "DefaultRoleTypes",
     "FieldKey",
 ]
