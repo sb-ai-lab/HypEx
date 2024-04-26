@@ -30,7 +30,7 @@ class PandasDataset(DatasetBackend):
         else:
             raise ValueError(f"Unsupported file extension {file_extension}")
 
-    def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series, None] = None):
+    def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series] = None):
         if isinstance(data, pd.DataFrame):
             self.data = data
         elif isinstance(data, pd.Series):
@@ -76,7 +76,6 @@ class PandasDataset(DatasetBackend):
         )[0]
 
     def _get_column_type(self, column_name: str) -> str:
-        d_types = self.data.dtypes
         return str(self.data.dtypes[column_name])
 
     def _update_column_type(self, column_name: str, type_name: str):
@@ -140,10 +139,12 @@ class PandasDataset(DatasetBackend):
         return list(groups)
 
     def loc(self, items: Iterable) -> Iterable:
-        return self.data.loc[items]
+        data = self.data.loc[items]
+        return pd.DataFrame(data) if not isinstance(data, pd.DataFrame) else data
 
     def iloc(self, items: Iterable) -> Iterable:
-        return self.data.iloc[items]
+        data = self.data.iloc[items]
+        return pd.DataFrame(data) if not isinstance(data, pd.DataFrame) else data
 
     def mean(self) -> pd.DataFrame:
         return self.data.agg(["mean"])

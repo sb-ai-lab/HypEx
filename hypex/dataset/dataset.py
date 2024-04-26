@@ -205,7 +205,7 @@ class Dataset(DatasetBase):
         role: Optional[Dict[str, ABCRole]] = None,
         index: Optional[Iterable[Hashable]] = None,
     ):
-        if role is None:  # если данные - датасет
+        if role is None:
             if not isinstance(data, Dataset):
                 raise ValueError("Козьёль")
             self.roles.update(data.roles)
