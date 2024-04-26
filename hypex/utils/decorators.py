@@ -63,14 +63,14 @@ def inherit_docstring_from(source: Union[Callable[..., Any], property]) -> Docst
             TypeError: If 'obj' is neither a callable nor a property.
         """
         if isinstance(obj, property):
-            doc = source.__doc__
-            return cast(DecoratedType, property(obj.fget, obj.fset, obj.fdel, doc))
+            doc = getattr(source, '__doc__', 'No documentation provided.')
+            return property(obj.fget, obj.fset, obj.fdel, doc)
         elif callable(obj):
             @wraps(obj)
             def wrapper(*args, **kwargs) -> Any:
                 return obj(*args, **kwargs)
 
-            wrapper.__doc__ = source.__doc__
+            wrapper.__doc__ = getattr(source, '__doc__', 'No documentation provided.')
             return cast(DecoratedType, wrapper)
         else:
             raise TypeError("The decorator can only be applied to callables or properties.")
