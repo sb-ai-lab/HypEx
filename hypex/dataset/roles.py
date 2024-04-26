@@ -86,6 +86,9 @@ class Arg2Role(ABCRole):
 class StatisticRole(ABCRole):
     _role_name = "Statistic"
 
+class ResumeRole(ABCRole):
+    _role_name = "Resume"
+
 
 default_roles = {
     "info": InfoRole(),

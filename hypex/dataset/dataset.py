@@ -358,7 +358,7 @@ class ExperimentData(Dataset):
         self.id_name_mapping[executor_id] = name
         return self
 
-    def get_ids(
+    def get_ids_by_executors(
         self, classes: Union[type, List[type]]
     ) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
@@ -384,7 +384,10 @@ class ExperimentData(Dataset):
         }
 
     def _get_one_id(self, class_: type, space: ExperimentDataEnum) -> str:
-        result = self.get_ids(class_)
+        result = self.get_ids_by_executors(class_)
         if not len(result):
             raise NotFoundInExperimentDataError(class_)
         return result[class_][space.value][0]
+
+    def get_ids_by_field(self):
+        pass

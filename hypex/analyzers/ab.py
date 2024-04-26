@@ -25,7 +25,7 @@ class ABAnalyzer(Analyzer):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         analysis_tests: List[type] = [TTest, UTest, ATE]
-        executor_ids = data.get_ids(analysis_tests)
+        executor_ids = data.get_ids_by_executors(analysis_tests)
 
         analysis_data = {}
         mean_operator: Mean = self.inner_executors["mean"]

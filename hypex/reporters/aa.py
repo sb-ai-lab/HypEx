@@ -1,6 +1,6 @@
 from typing import Dict, Any
 
-from hypex.analyzers.aa import OneAASplitAnalyzer
+from hypex.analyzers.aa import OneAAStatAnalyzer
 from hypex.comparators.comparators import GroupDifference, GroupSizes
 from hypex.dataset.dataset import ExperimentData
 from hypex.reporters.base import DictReporter
@@ -18,7 +18,7 @@ class AADictReporter(DictReporter):
         return int(aa_id) if aa_id.isdigit() else None
 
     def extract_group_difference(self, data: ExperimentData) -> Dict[str, Any]:
-        group_difference_ids = data.get_ids(GroupDifference)[GroupDifference][
+        group_difference_ids = data.get_ids_by_executors(GroupDifference)[GroupDifference][
             ExperimentDataEnum.analysis_tables.value
         ]
         t_data = data.analysis_tables[group_difference_ids[0]]
@@ -34,7 +34,7 @@ class AADictReporter(DictReporter):
 
     def extract_analyzer_data(self, data: ExperimentData) -> Dict[str, Any]:
         analyzer_id = data._get_one_id(
-            OneAASplitAnalyzer, ExperimentDataEnum.analysis_tables
+            OneAAStatAnalyzer, ExperimentDataEnum.analysis_tables
         )
         return self.extract_from_one_row_dataset(data.analysis_tables[analyzer_id])
 

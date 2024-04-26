@@ -1,4 +1,4 @@
-from hypex.analyzers.aa import OneAASplitAnalyzer
+from hypex.analyzers.aa import OneAAStatAnalyzer
 from hypex.comparators.comparators import GroupDifference, GroupSizes
 from hypex.comparators.hypothesis_testing import TTest, KSTest
 from hypex.dataset.roles import TargetRole, TreatmentRole
@@ -20,6 +20,6 @@ AA_TEST = Experiment(
             ],
             role=TargetRole(),
         ),
-        OneAASplitAnalyzer(),
+        OneAAStatAnalyzer(),
     ]
 )
