@@ -1,15 +1,15 @@
 from typing import Dict, List
 
-from hypex.analyzers.base import Analyzer
-from hypex.comparators.comparators import ATE
-from hypex.comparators.hypothesis_testing import TTest, UTest
-from hypex.dataset.dataset import ExperimentData, Dataset
-from hypex.dataset.roles import StatisticRole
+from hypex.analyzers.abstract import Analyzer
+from hypex.comparators import ATE
+from hypex.comparators import TTest, UTest
+from hypex.dataset import ExperimentData, Dataset
+from hypex.dataset import StatisticRole
 from hypex.experiments.base import (
     Executor,
 )
-from hypex.stats.agg import Mean
-from hypex.utils.enums import ExperimentDataEnum, BackendsEnum
+from hypex.stats import Mean
+from hypex.utils import ExperimentDataEnum, BackendsEnum
 
 
 class ABAnalyzer(Analyzer):

@@ -1,7 +1,6 @@
 from typing import Any, Optional
 
-from hypex.dataset.dataset import Dataset
-from hypex.dataset.dataset import ExperimentData
+from hypex.dataset import Dataset, ExperimentData
 from hypex.experiments.base import Executor
 
 

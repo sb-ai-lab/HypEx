@@ -1,12 +1,11 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 
-from hypex.dataset.dataset import ExperimentData, Dataset
-from hypex.dataset.roles import TempTargetRole
+from hypex.dataset import ExperimentData, Dataset, TempTargetRole
 from hypex.experiments.base import Executor
-from hypex.utils.enums import ExperimentDataEnum
+from hypex.utils import ExperimentDataEnum
 
 
-class AggStat(Executor):
+class AggStat(Executor, ABC):
     def __init__(self, full_name=None, key=0, **kwargs):
         self.kwargs = kwargs
         super().__init__(full_name, key)

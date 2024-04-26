@@ -13,8 +13,8 @@ from typing import (
 
 import pandas as pd  # type: ignore
 
-from hypex.dataset.base import DatasetBackend
-from hypex.utils.typings import FromDictType
+from hypex.dataset.abstract import DatasetBackend
+from hypex.utils import FromDictType
 
 
 class PandasDataset(DatasetBackend):

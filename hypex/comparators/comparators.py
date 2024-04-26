@@ -1,10 +1,10 @@
 from typing import Dict, Any
 
-from hypex.comparators.base import GroupComparator
-from hypex.dataset.roles import TempTargetRole
+from hypex.comparators.abstract import GroupComparator
+from hypex.dataset import TempTargetRole
 from hypex.experiments.base import Executor
-from hypex.operators.binary import MetricDelta
-from hypex.stats.agg import Mean, Size
+from hypex.operators import MetricDelta
+from hypex.stats import Mean, Size
 
 
 class GroupDifference(GroupComparator):

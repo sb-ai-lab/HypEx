@@ -2,9 +2,8 @@ from typing import Union, Dict, List
 
 import numpy as np
 
-from hypex.dataset.dataset import Dataset, ExperimentData
-from hypex.dataset.roles import StatisticRole
-from hypex.describers.base import Describer
+from hypex.dataset import Dataset, ExperimentData, StatisticRole
+from hypex.describers.abstract import Describer
 
 
 class Unique(Describer):

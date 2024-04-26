@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import mode  # type: ignore
 
-from hypex.stats.base import AggStat
+from hypex.stats.abstract import AggStat
 
 
 class Mean(AggStat):

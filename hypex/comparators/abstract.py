@@ -1,12 +1,12 @@
 from abc import abstractmethod, ABC
 from typing import Optional, Dict, Any, List, Union
 
-from hypex.dataset.dataset import Dataset, ExperimentData
-from hypex.dataset.roles import ABCRole, GroupingRole, TempTargetRole, StatisticRole
-from hypex.experiments.base import ComplexExecutor, Executor
-from hypex.utils.enums import ExperimentDataEnum, SpaceEnum, BackendsEnum
-from hypex.utils.errors import NoColumnsError, ComparisonNotSuitableFieldError
-from hypex.utils.typings import FromDictType
+from hypex.dataset import ABCRole, GroupingRole, TempTargetRole, StatisticRole
+from hypex.dataset import Dataset, ExperimentData
+from hypex.executor import ComplexExecutor, Executor
+from hypex.utils import ExperimentDataEnum, SpaceEnum, BackendsEnum
+from hypex.utils import FromDictType
+from hypex.utils import NoColumnsError, ComparisonNotSuitableFieldError
 
 
 class GroupComparator(ComplexExecutor):

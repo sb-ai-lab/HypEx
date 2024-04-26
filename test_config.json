@@ -1,34 +1,35 @@
 {
   "dataset": {
-    "data": {
-      "data": {
-        "col1": [
-          1,
-          2,
-          3,
-          4
-        ],
-        "col2": [
-          5,
-          6,
-          7,
-          8
-        ]
-      }
-    },
+    "path": "data.csv",
     "roles": {
       "role_names": [
-        "Info"
+        "Info",
+        "Treatment",
+        "Target",
+        "Target"
       ],
       "columns": [
-        "col1"
+        "user_id",
+        "treat",
+        "pre_spends",
+        "post_spends"
       ]
     },
     "backend": "pandas"
   },
   "experiment": {
-    "Analyzer": {
-      "executors": "sdjsd"
+    "AASplitter": {
+      "control_size": 0.5,
+      "random_state": "None"
+    },
+    "OnRoleExperiment": {
+      "executors": {
+        "GroupDifference": {
+          "grouping_role": "Treatment",
+          "space": "additional"
+        }
+      },
+      "role": "Target"
     }
   },
   "report": {}
