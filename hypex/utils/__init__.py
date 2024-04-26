@@ -15,6 +15,7 @@ from hypex.utils.typings import (
     DefaultRoleTypes,
     CategoricalTypes,
     FieldKey,
+    RoleNameType
 )
 
 __all__ = [
@@ -34,4 +35,5 @@ __all__ = [
     "CategoricalTypes",
     "DefaultRoleTypes",
     "FieldKey",
+    "RoleNameType"
 ]
