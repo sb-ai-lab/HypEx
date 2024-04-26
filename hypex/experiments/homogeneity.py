@@ -6,9 +6,9 @@ from hypex.experiments import Experiment, OnRoleExperiment
 
 HOMOGENEITY_TEST = Experiment(
     executors=[
-        GroupSizes(),
         OnRoleExperiment(
             executors=[
+                GroupSizes(grouping_role=TreatmentRole()),
                 GroupDifference(grouping_role=TreatmentRole()),
                 TTest(grouping_role=TreatmentRole()),
                 KSTest(grouping_role=TreatmentRole()),

@@ -76,6 +76,7 @@ class PandasDataset(DatasetBackend):
         )[0]
 
     def _get_column_type(self, column_name: str) -> str:
+        d_types = self.data.dtypes
         return str(self.data.dtypes[column_name])
 
     def _update_column_type(self, column_name: str, type_name: str):

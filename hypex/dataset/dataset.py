@@ -86,12 +86,13 @@ class Dataset(DatasetBase):
                 roles[column] = FeatureRole()
         return roles
 
-    def _set_empty_types(self):
-        types_map = {"int": int, "float": float, "object": str}
-        reversed_map = {int: "int", float: "float", str: "category"}
-        for column, role in self.roles.items():
+    def _set_empty_types(self, roles):
+        types_map = {"int": int, "float": float, "object": str, "bool": bool}
+        reversed_map = {int: "int", float: "float", str: "category", bool: "bool"}
+        for column, role in roles.items():
             if role.data_type is None:
                 d_type = self._backend._get_column_type(column)
+
                 role.data_type = [v for k, v in types_map.items() if k in d_type][0]
             self._backend = self._backend._update_column_type(
                 column, reversed_map[role.data_type]
@@ -125,8 +126,8 @@ class Dataset(DatasetBase):
             raise RoleColumnError(list(roles.keys()), self._backend.columns)
         if data is not None:
             roles = self._set_all_roles(roles)
+            self._set_empty_types(roles)
         self.roles: Dict[Union[str, int], ABCRole] = roles
-        self._set_empty_types()
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
 

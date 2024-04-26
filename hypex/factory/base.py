@@ -111,7 +111,7 @@ class Factory:
             class_ = getattr(sys.modules[__name__], key)
             if "executors" in items or "inner_executors" in items:
                 item = "executors" if "executors" in items else "inner_executors"
-                items[f"{item}"] = self.make_experiment(experiment[key][f"{item}"])
+                items[f"{item}"] = self.make_experiment(experiment[key][f"{item}"][0])
             if "role" in items or "grouping_role" in items:
                 item = "role" if "role" in items else "grouping_role"
                 items[f"{item}"] = getattr(
