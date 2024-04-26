@@ -31,13 +31,13 @@ class Hypothesis:
             and not self.dataset["data"]["data"]
         ):
             raise ValueError("Data ot path to data must be added")
-        if len(self.dataset["roles"]["role_names"]) != len(
-            self.dataset["roles"]["columns"]
-        ):
-            raise ValueError(
-                f"Invalid number of columns and role_names. Columns and role_names must have equal length.\n "
-                f"role_names contains {len(self.dataset['roles']['role_names'])} values and columns contains {len(self.dataset['roles']['columns'])}"
-            )
+        # if len(self.dataset["roles"]["role_names"]) != len(
+        #     self.dataset["roles"]["columns"]
+        # ):
+        #     raise ValueError(
+        #         f"Invalid number of columns and role_names. Columns and role_names must have equal length.\n "
+        #         f"role_names contains {len(self.dataset['roles']['role_names'])} values and columns contains {len(self.dataset['roles']['columns'])}"
+        #     )
 
     def _parse_config(self):
         self.dataset = self._parse_dataset()
@@ -48,12 +48,11 @@ class Hypothesis:
             if "data" in self.dataset.keys()
             else self.dataset["path"]
         )
-        roles = {
-            j: default_roles.get(i.lower(), InfoRole)
-            for i, j in zip(
-                self.dataset["roles"]["role_names"], self.dataset["roles"]["columns"]
-            )
-        }
+        roles = {}
+        for column in self.dataset["columns"]:
+            role = default_roles.get(column["role"].lower(), InfoRole())
+            role.data_type = column["dataType"] if column.get("dataType") else None
+            roles.update({column["name"]: role})
         return Dataset(data=data, roles=roles, backend=self.dataset["backend"])
 
     def to_json(self, file: Optional[str] = None):
@@ -70,4 +69,5 @@ class Hypothesis:
         )
 
     def execute(self):
-        return Factory(self).execute()
+        experiment_data, self.experiment = Factory(self).execute()
+        return experiment_data, self.experiment

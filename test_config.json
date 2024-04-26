@@ -23,16 +23,17 @@
   },
   "experiment": {
     "AASplitter": {
-      "control_size": 0.5,
-      "random_state": "None"
+      "control_size": 0.5
     },
     "OnRoleExperiment": {
-      "executors": {
-        "GroupDifference": {
-          "grouping_role": "Treatment",
-          "space": "additional"
+      "executors": [
+        {
+          "GroupDifference": {
+            "grouping_role": "Treatment",
+            "space": "additional"
+          }
         }
-      },
+      ],
       "role": "Target"
     }
   },
