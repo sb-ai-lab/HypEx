@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Union, Dict, List
+from typing import Any, Union, Dict, List, TypeVar, Callable
 
 StratificationRoleTypes = Union[float, str, datetime.datetime]
 TreatmentRoleTypes = Union[float, bool, str, int]
@@ -9,3 +9,6 @@ CategoricalTypes = str
 FieldKey = Union[str, int]
 
 FromDictType = Union[Dict[str, List[Any]], List[Dict[Any, Any]]]
+
+DecoratedType = TypeVar('DecoratedType', bound=Union[Callable[..., Any], property])
+DocstringInheritDecorator = Callable[[DecoratedType], DecoratedType]
