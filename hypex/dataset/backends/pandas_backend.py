@@ -72,8 +72,6 @@ class PandasDataset(DatasetBackend):
             self.data = None
 
     def __getitem__(self, item: Union[slice, int, str, List[str]]) -> pd.DataFrame:
-        # TODO: Maybe it return not the pd.DataFrame, please check
-        # TODO: Also for item maybe should create special typing if it used not only here
         """Allows indexed access to the dataset using both positional and label indexing.
 
         This method supports slicing, integer-location based indexing (iloc) for positional access,
@@ -107,11 +105,11 @@ class PandasDataset(DatasetBackend):
 
     def _create_empty(self, index: Optional[Iterable] = None,
                       columns: Optional[Iterable[str]] = None) -> 'PandasDataset':
-        """
-        Resets the internal DataFrame to an empty DataFrame, optionally setting specific indices and columns.
+        """Resets the internal DataFrame to an empty DataFrame, optionally setting specific indices and columns.
 
         This method is useful for clearing existing data and reinitializing the dataset with a new structure,
-        defined by the index and columns parameters. It returns the dataset instance itself, allowing for method chaining.
+        defined by the index and columns parameters. It returns the dataset instance
+        itself, allowing for method chaining.
 
         Args:
             index (Optional[Iterable], optional): An iterable of index labels to include in the new DataFrame.
@@ -138,8 +136,7 @@ class PandasDataset(DatasetBackend):
         )[0]
 
     def _get_column_index(self, column_name: Union[str, Sequence[str]]) -> int:
-        """
-        Retrieves the positional index of a given column name or the first index of column names in the DataFrame.
+        """Retrieves the positional index of a given column name or the first index of column names in the DataFrame.
 
         This method supports both single string column names and sequences of column names, returning the index of the
         first column name in the sequence. It simplifies the process of column indexing in pandas, especially when
@@ -196,8 +193,7 @@ class PandasDataset(DatasetBackend):
         return self
 
     def add_column(self, data: Sequence, name: str, index: Optional[Sequence] = None) -> 'PandasDataset':
-        """
-        Adds a new column to the DataFrame with optional custom indexing.
+        """Adds a new column to the DataFrame with optional custom indexing.
 
         This method allows adding data as a new column to the DataFrame. If an index is provided, it ensures
         the data is aligned with the specified index. If no index is specified, the data is added directly.
@@ -221,8 +217,7 @@ class PandasDataset(DatasetBackend):
         return self
 
     def append(self, other: 'PandasDataset', index: bool = False) -> pd.DataFrame:
-        """
-        Appends another PandasDataset's DataFrame to this dataset's DataFrame and returns the combined DataFrame.
+        """Appends another PandasDataset's DataFrame to this dataset's DataFrame and returns the combined DataFrame.
 
         This method concatenates the current dataset's DataFrame with another, optionally resetting the index
         to ensure a continuous range from 0 to n-1 in the resulting DataFrame.
@@ -325,8 +320,7 @@ class PandasDataset(DatasetBackend):
         return self.data.isin(values)
 
     def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> List[Tuple[str, pd.DataFrame]]:
-        """
-        Groups the DataFrame by one or more columns and returns a list of tuples, each containing a group key and the corresponding subgroup.
+        """Groups the DataFrame by one or more columns and returns a list of tuples.
 
         This method leverages pandas' `groupby` functionality to organize data by the specified columns. It can be used
         with any additional keyword arguments accepted by pandas.DataFrame.groupby to customize the grouping behavior.
@@ -344,8 +338,7 @@ class PandasDataset(DatasetBackend):
         return list(groups)
 
     def loc(self, items: Union[str, Iterable[str]]) -> pd.DataFrame:
-        """
-        Selects columns from the DataFrame based on labels.
+        """Selects columns from the DataFrame based on labels.
 
         This method uses pandas' `loc` functionality to select columns.
         It ensures that the output is always a DataFrame,
@@ -362,8 +355,7 @@ class PandasDataset(DatasetBackend):
         return pd.DataFrame(data) if not isinstance(data, pd.DataFrame) else data
 
     def iloc(self, items: Union[int, slice, Iterable[int]]) -> pd.DataFrame:
-        """
-        Selects rows or columns from the DataFrame based on integer-location based indexing.
+        """Selects rows or columns from the DataFrame based on integer-location based indexing.
 
         This method uses pandas' `iloc` functionality to select data. It ensures that the output is always a DataFrame,
         even when selecting a single row or column, which in pandas would typically return a Series.
