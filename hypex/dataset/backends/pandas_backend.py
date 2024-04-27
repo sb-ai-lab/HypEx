@@ -19,9 +19,29 @@ from hypex.utils import FromDictType
 
 
 class PandasDataset(DatasetBackend):
+    """HypEx realization of pandas Dataset.
+    Provides a Pandas DataFrame-based backend for handling dataset operations, encapsulating
+    functionalities for data manipulation and analysis.
+
+    Methods include file reading, data appending, transformation, aggregation, and column management,
+    designed to abstract complex DataFrame operations into simpler high-level API calls.
+    """
 
     @staticmethod
     def _read_file(filename: Union[str, Path]) -> pd.DataFrame:
+        """Reads data from a file and returns a DataFrame.
+
+        Supports CSV and Excel formats. Raises an error for unsupported file types.
+
+        Args:
+            filename (Union[str, Path]): The path to the file to be read.
+
+        Returns:
+            pd.DataFrame: The data read from the file.
+
+        Raises:
+            ValueError: If the file extension is neither '.csv' nor '.xlsx'.
+        """
         file_extension = Path(filename).suffix
         if file_extension == ".csv":
             return pd.read_csv(filename)
@@ -31,18 +51,24 @@ class PandasDataset(DatasetBackend):
             raise ValueError(f"Unsupported file extension {file_extension}")
 
     def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series] = None):
+        """Initializes the PandasDataset with data provided in various forms.
+
+        Args:
+            data (Union[pd.DataFrame, Dict, str, pd.Series], optional): Initial data. Can be a DataFrame,
+                a dictionary with data and index keys, a path to a file, or a Pandas Series. Defaults to None.
+
+        If a string is provided, it is assumed to be a file path which will be read into the DataFrame.
+        """
         if isinstance(data, pd.DataFrame):
             self.data = data
         elif isinstance(data, pd.Series):
             self.data = pd.DataFrame(data)
         elif isinstance(data, Dict):
-            if "index" in data.keys():
-                self.data = pd.DataFrame(data=data["data"], index=data["index"])
-            else:
-                self.data = pd.DataFrame(data=data["data"])
+            self.data = pd.DataFrame(data=data.get("data"), index=data.get("index", None))
         elif isinstance(data, str):
             self.data = self._read_file(data)
         else:
+            ## TODO: Maybe here better create empty dataset?
             self.data = None
 
     def __getitem__(self, item):
@@ -59,15 +85,15 @@ class PandasDataset(DatasetBackend):
         return self.data.__repr__()
 
     def _create_empty(
-        self,
-        index: Optional[Iterable] = None,
-        columns: Optional[Iterable[str]] = None,
+            self,
+            index: Optional[Iterable] = None,
+            columns: Optional[Iterable[str]] = None,
     ):
         self.data = pd.DataFrame(index=index, columns=columns)
         return self
 
     def _get_column_index(
-        self, column_name: Union[Sequence[str], str]
+            self, column_name: Union[Sequence[str], str]
     ) -> Union[int, Sequence[int]]:
         return (
             self.data.columns.get_loc(column_name)
@@ -83,10 +109,10 @@ class PandasDataset(DatasetBackend):
         return self
 
     def add_column(
-        self,
-        data: Union[Sequence],
-        name: str,
-        index: Optional[Sequence] = None,
+            self,
+            data: Union[Sequence],
+            name: str,
+            index: Optional[Sequence] = None,
     ):
         if index:
             self.data[name] = [None] * len(data)
