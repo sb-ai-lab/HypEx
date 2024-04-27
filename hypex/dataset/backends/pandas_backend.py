@@ -92,7 +92,7 @@ class PandasDataset(DatasetBackend):
         if isinstance(item, (slice, int)):
             return self.data.iloc[item]
         if isinstance(item, (str, list)):
-            return self.data.loc[:, item]
+            return self.data[item]
         raise KeyError("No such column or row")
 
     @inherit_docstring_from(pd.DataFrame.__len__)
@@ -189,7 +189,7 @@ class PandasDataset(DatasetBackend):
         Returns:
             PandasDataset: Returns the dataset instance itself, allowing for method chaining.
         """
-        self.data[column_name] = self.data[column_name].astype(type_name)
+        self.data.loc[:, column_name] = self.data[column_name].astype(type_name)
         return self
 
     def add_column(self, data: Sequence, name: str, index: Optional[Sequence] = None) -> 'PandasDataset':
@@ -210,10 +210,9 @@ class PandasDataset(DatasetBackend):
         """
         if index is not None:
             temp_series = pd.Series(data, index=index)
-            self.data.loc[:, name] = temp_series.reindex(self.data.index)
+            self.data[name] = temp_series.reindex(self.data.index)
         else:
-            self.data.loc[:, name] = pd.Series(data, index=self.data.index)
-
+            self.data[name] = pd.Series(data, index=self.data.index)
         return self
 
     def append(self, other: 'PandasDataset', index: bool = False) -> pd.DataFrame:
@@ -350,7 +349,7 @@ class PandasDataset(DatasetBackend):
         Returns:
             pd.DataFrame: A DataFrame containing only the selected columns.
         """
-        data = self.data.loc[:, items]
+        data = self.data[items]
 
         return pd.DataFrame(data) if not isinstance(data, pd.DataFrame) else data
 
