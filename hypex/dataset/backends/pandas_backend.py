@@ -320,35 +320,84 @@ class PandasDataset(DatasetBackend):
     def map(self, func: Callable, **kwargs) -> pd.DataFrame:
         return self.data.map(func, **kwargs)
 
+    @inherit_docstring_from(pd.DataFrame.isin)
     def isin(self, values: Iterable) -> Iterable[bool]:
         return self.data.isin(values)
 
-    def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> List[Tuple]:
+    def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> List[Tuple[str, pd.DataFrame]]:
+        """
+        Groups the DataFrame by one or more columns and returns a list of tuples, each containing a group key and the corresponding subgroup.
+
+        This method leverages pandas' `groupby` functionality to organize data by the specified columns. It can be used
+        with any additional keyword arguments accepted by pandas.DataFrame.groupby to customize the grouping behavior.
+
+        Args:
+            by (Union[str, Iterable[str]]): The column name or a list of column names by which to group the DataFrame.
+            **kwargs: Additional keyword arguments to pass to pandas.DataFrame.groupby (e.g., as_index=False).
+
+        Returns:
+            List[Tuple[str, pd.DataFrame]]: A list of tuples, where each tuple contains:
+                - a group key (or tuple of keys if multiple columns are used),
+                - the corresponding subgroup as a DataFrame.
+        """
         groups = self.data.groupby(by, **kwargs)
         return list(groups)
 
-    def loc(self, items: Iterable) -> Iterable:
+    def loc(self, items: Union[str, Iterable[str]]) -> pd.DataFrame:
+        """
+        Selects columns from the DataFrame based on labels.
+
+        This method uses pandas' `loc` functionality to select columns.
+        It ensures that the output is always a DataFrame,
+        even when selecting a single column, which in pandas would typically return a Series.
+
+        Args:
+            items (Union[str, Iterable[str]]): A single label or a list of labels of the columns to select.
+
+        Returns:
+            pd.DataFrame: A DataFrame containing only the selected columns.
+        """
         data = self.data.loc[:, items]
+
         return pd.DataFrame(data) if not isinstance(data, pd.DataFrame) else data
 
-    def iloc(self, items: Iterable) -> Iterable:
+    def iloc(self, items: Union[int, slice, Iterable[int]]) -> pd.DataFrame:
+        """
+        Selects rows or columns from the DataFrame based on integer-location based indexing.
+
+        This method uses pandas' `iloc` functionality to select data. It ensures that the output is always a DataFrame,
+        even when selecting a single row or column, which in pandas would typically return a Series.
+
+        Args:
+            items (Union[int, slice, Iterable[int]]): An integer, a slice object, or a list of integers specifying
+                                                      the positions of the rows or columns to select.
+
+        Returns:
+            pd.DataFrame: A DataFrame containing only the selected rows or columns, even if a single row or column is selected.
+        """
         data = self.data.iloc[items]
         return pd.DataFrame(data) if not isinstance(data, pd.DataFrame) else data
 
+    @inherit_docstring_from(pd.DataFrame.mean)
     def mean(self) -> pd.DataFrame:
         return self.data.agg(["mean"])
 
+    @inherit_docstring_from(pd.DataFrame.max)
     def max(self) -> pd.DataFrame:
         return self.data.agg(["max"])
 
+    @inherit_docstring_from(pd.DataFrame.min)
     def min(self) -> pd.DataFrame:
         return self.data.agg(["min"])
 
+    @inherit_docstring_from(pd.DataFrame.count)
     def count(self) -> pd.DataFrame:
         return self.data.agg(["count"])
 
+    @inherit_docstring_from(pd.DataFrame.sum)
     def sum(self) -> pd.DataFrame:
         return self.data.agg(["sum"])
 
+    @inherit_docstring_from(pd.DataFrame.agg)
     def agg(self, func) -> pd.DataFrame:
         return self.data.agg(func)
