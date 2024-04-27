@@ -45,11 +45,6 @@ class DatasetBase(ABC):
         """Map a function over the dataset entries."""
         pass
 
-    @abstractmethod
-    def unique(self):
-        """Return a list of unique items in the dataset."""
-        pass
-
     @property
     @abstractmethod
     def index(self):
