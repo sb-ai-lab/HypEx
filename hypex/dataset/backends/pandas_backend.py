@@ -320,9 +320,6 @@ class PandasDataset(DatasetBackend):
     def map(self, func: Callable, **kwargs) -> pd.DataFrame:
         return self.data.map(func, **kwargs)
 
-    def unique(self) -> pd.DataFrame:
-        return self.data.unique()
-
     def isin(self, values: Iterable) -> Iterable[bool]:
         return self.data.isin(values)
 
