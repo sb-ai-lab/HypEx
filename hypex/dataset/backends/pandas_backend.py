@@ -349,7 +349,7 @@ class PandasDataset(DatasetBackend):
         Returns:
             pd.DataFrame: A DataFrame containing only the selected columns.
         """
-        data = self.data[items]
+        data = self.data.loc[items]
 
         return pd.DataFrame(data) if not isinstance(data, pd.DataFrame) else data
 
