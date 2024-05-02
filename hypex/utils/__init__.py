@@ -15,7 +15,10 @@ from hypex.utils.typings import (
     DefaultRoleTypes,
     StratificationRoleTypes,
     CategoricalTypes,
-    FieldKey,
+    FieldKeyTypes,
+    DecoratedType,
+    DocstringInheritDecorator,
+    RoleNameType,
 )
 
 __all__ = [
@@ -35,5 +38,8 @@ __all__ = [
     "CategoricalTypes",
     "DefaultRoleTypes",
     "StratificationRoleTypes",
-    "FieldKey",
+    "FieldKeyTypes",
+    "RoleNameType",
+    "DecoratedType",
+    "DocstringInheritDecorator",
 ]

@@ -14,7 +14,7 @@ from typing import (
 
 import pandas as pd  # type: ignore
 
-from hypex.dataset.abstract import DatasetBackend
+from hypex.dataset.backends.abstract import DatasetBackend
 from hypex.utils import FromDictType
 
 
@@ -128,8 +128,8 @@ class PandasDataset(DatasetBackend):
     def map(self, func: Callable, **kwargs) -> pd.DataFrame:
         return self.data.map(func, **kwargs)
 
-    def unique(self) -> pd.DataFrame:
-        return self.data.unique()
+    def unique(self):
+        return [(column, self.data[column].unique()) for column in self.data.columns]
 
     def isin(self, values: Iterable) -> Iterable[bool]:
         return self.data.isin(values)

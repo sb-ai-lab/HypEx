@@ -6,7 +6,7 @@
 #
 # from hypex.comparators.comparators import ComparatorInner
 # from hypex.dataset import ExperimentData
-# from hypex.utils import FieldKey
+# from hypex.utils import FieldKeyTypes
 #
 #
 # # TODO: Rework ALL
@@ -15,7 +15,7 @@
 # class TestPower(ComparatorInner):
 #     def __init__(
 #         self,
-#         target_field: FieldKey,
+#         target_field: FieldKeyTypes,
 #         significance: float = 0.95,
 #         power: float = 0.8,
 #         full_name: str = None,
@@ -45,7 +45,7 @@
 #     def __init__(
 #         self,
 #         mde: float,
-#         target_field: FieldKey,
+#         target_field: FieldKeyTypes,
 #         significance: float = 0.05,
 #         power: float = 0.8,
 #         full_name: str = None,
