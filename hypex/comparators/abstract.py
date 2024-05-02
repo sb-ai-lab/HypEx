@@ -8,6 +8,8 @@ from hypex.utils import ExperimentDataEnum, SpaceEnum, BackendsEnum
 from hypex.utils import FromDictType
 from hypex.utils import NoColumnsError, ComparisonNotSuitableFieldError
 
+from hypex.utils import NAME_BORDER_SYMBOL
+
 
 class GroupComparator(ComplexExecutor):
     def __init__(
@@ -66,16 +68,12 @@ class GroupComparator(ComplexExecutor):
         return result
 
     def calc(self, data: Dataset) -> Dict:
-        target_field = None
         group_field = self.__group_field_searching(data)
-        meta_name = group_field[0] if len(group_field) == 1 else group_field
-        group_name = (
-            str(data.id_name_mapping.get(meta_name, meta_name))
-            if (self.__additional_mode and isinstance(data, ExperimentData))
-            else str(meta_name)
-        )[0]
         target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)
-        self.key = f"{target_field}[{group_name}]" + self.key
+        if len(target_field) > 0:
+            self.key = f"{group_field} {NAME_BORDER_SYMBOL}{target_field[0]}{NAME_BORDER_SYMBOL}"
+        else:
+            self.key = group_field
         grouping_data = self.__get_grouping_data(data, group_field)
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
