@@ -14,12 +14,11 @@ from typing import (
 
 import pandas as pd  # type: ignore
 
-from hypex.dataset.backends.abstract import DatasetBackend
+from hypex.dataset.backends.abstract import DatasetBackendCalc
 from hypex.utils import FromDictType
 
 
-class PandasDataset(DatasetBackend):
-
+class PandasDataset(DatasetBackendCalc):
     @staticmethod
     def _read_file(filename: Union[str, Path]) -> pd.DataFrame:
         file_extension = Path(filename).suffix
