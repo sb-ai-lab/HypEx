@@ -65,16 +65,10 @@ class Dataset(DatasetBase):
 
     @staticmethod
     def _select_backend_from_data(data):
-        """
-        Выбирает бэкенд исходя из типа пришедших данных
-        """
         return PandasDataset(data)
 
     @staticmethod
     def _select_backend_from_str(data, backend):
-        """
-        Выбирает бэкенд исходя из строкового описания бэкенда
-        """
         if backend == BackendsEnum.pandas:
             return PandasDataset(data)
         return PandasDataset(data)
