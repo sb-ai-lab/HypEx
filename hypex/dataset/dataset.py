@@ -8,6 +8,7 @@ from hypex.dataset.roles import (
     StatisticRole,
     InfoRole,
     ABCRole,
+    FilterRole,
 )
 from hypex.utils import (
     ID_SPLIT_SYMBOL,
@@ -159,7 +160,10 @@ class Dataset(DatasetBase):
         return self._backend.unique()
 
     def isin(self, values: Iterable):
-        return Dataset(roles=self.roles, data=self._backend.isin(values))
+        return Dataset(
+            roles={column: FilterRole() for column in self.roles.keys()},
+            data=self._backend.isin(values),
+        )
 
     def groupby(
         self,
@@ -168,69 +172,73 @@ class Dataset(DatasetBase):
         fields_list: Optional[Union[str, List]] = None,
         **kwargs,
     ):
+
         datasets = [
             (i, Dataset(roles=self.roles, data=data))
             for i, data in self._backend.groupby(by=by, **kwargs)
         ]
+        if fields_list:
+            fields_list = (
+                fields_list if isinstance(fields_list, Iterable) else [fields_list]
+            )
+            datasets = [(i, data[fields_list]) for i, data in datasets]
         if func:
-            if fields_list:
-                fields_list = (
-                    fields_list if isinstance(fields_list, Iterable) else [fields_list]
-                )
-                datasets = [
-                    (
-                        i,
-                        Dataset(
-                            roles={
-                                k: v for k, v in self.roles.items() if k in fields_list
-                            },
-                            data=data[fields_list].agg(func).data,
-                        ),
-                    )
-                    for i, data in datasets
-                ]
-            else:
-                datasets = [
-                    (i, Dataset(roles=self.roles, data=data.agg(func).data))
-                    for i, data in datasets
-                ]
+            datasets = [(i, data.agg(func)) for i, data in datasets]
         for dataset in datasets:
             dataset[1].tmp_roles = self.tmp_roles
         return datasets
 
     def mean(self):
+        result = self._backend.mean()
+        if isinstance(result, float):
+            return result
         return Dataset(
-            data=self._backend.mean(),
+            data=result,
             roles={column: StatisticRole() for column in self.roles},
         )
 
     def max(self):
+        result = self._backend.max()
+        if isinstance(result, float):
+            return result
         return Dataset(
-            data=self._backend.max(),
+            data=result,
             roles={column: StatisticRole() for column in self.roles},
         )
 
     def min(self):
+        result = self._backend.min()
+        if isinstance(result, float):
+            return result
         return Dataset(
-            data=self._backend.min(),
+            data=result,
             roles={column: StatisticRole() for column in self.roles},
         )
 
     def count(self):
+        result = self._backend.count()
+        if isinstance(result, float):
+            return result
         return Dataset(
-            data=self._backend.count(),
+            data=result,
             roles={column: StatisticRole() for column in self.roles},
         )
 
     def sum(self):
+        result = self._backend.sum()
+        if isinstance(result, float):
+            return result
         return Dataset(
-            data=self._backend.sum(),
+            data=result,
             roles={column: StatisticRole() for column in self.roles},
         )
 
     def agg(self, func: Union[str, List]):
+        result = self._backend.agg(func)
+        if isinstance(result, float):
+            return result
         return Dataset(
-            data=self._backend.agg(func),
+            data=result,
             roles={column: StatisticRole() for column in self.roles},
         )
 

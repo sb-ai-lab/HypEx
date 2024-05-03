@@ -1,8 +1,7 @@
 from abc import ABC
-from typing import Optional, Any, Dict
+from typing import Optional, Dict
 
 from hypex.utils import (
-    StratificationRoleTypes,
     TargetRoleTypes,
     DefaultRoleTypes,
     CategoricalTypes,
@@ -161,6 +160,11 @@ class StatisticRole(ABCRole):
     _role_name: RoleNameType = "Statistic"
 
 
+class FilterRole(ABCRole):
+
+    _role_name: RoleNameType = "Filter"
+
+
 class TempTreatmentRole(TreatmentRole):
     """Role for temp treatment column.
     A temporary role used for transient treatment assignments in executables or during
@@ -230,4 +234,5 @@ default_roles: Dict[RoleNameType, ABCRole] = {
     "pretarget": PreTargetRole(),
     "stratification": StratificationRole(),
     "statistic": StatisticRole(),
+    "filter": FilterRole(),
 }

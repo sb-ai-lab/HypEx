@@ -88,11 +88,11 @@ class PandasDataset(DatasetBackendCalc):
         index: Optional[Sequence] = None,
     ):
         if index:
-            self.data[name] = [None] * len(data)
-            for i, value in zip(index, data):
-                self.data[name][i] = value
+            self.data = self.data.join(
+                pd.DataFrame(data, columns=[name], index=list(index))
+            )
         else:
-            self.data[name] = data
+            self.data.loc[:, name] = data
 
     def append(self, other, index: bool = False) -> pd.DataFrame:
         new_data = pd.concat([self.data, other.data])
@@ -145,21 +145,24 @@ class PandasDataset(DatasetBackendCalc):
         data = self.data.iloc[items]
         return pd.DataFrame(data) if not isinstance(data, pd.DataFrame) else data
 
-    def mean(self) -> pd.DataFrame:
-        return self.data.agg(["mean"])
+    def mean(self) -> Union[pd.DataFrame, float]:
+        return self.agg(["mean"])
 
-    def max(self) -> pd.DataFrame:
-        return self.data.agg(["max"])
+    def max(self) -> Union[pd.DataFrame, float]:
+        return self.agg(["max"])
 
-    def min(self) -> pd.DataFrame:
-        return self.data.agg(["min"])
+    def min(self) -> Union[pd.DataFrame, float]:
+        return self.agg(["min"])
 
-    def count(self) -> pd.DataFrame:
-        return self.data.agg(["count"])
+    def count(self) -> Union[pd.DataFrame, float]:
+        return self.agg(["count"])
 
-    def sum(self) -> pd.DataFrame:
-        return self.data.agg(["sum"])
+    def sum(self) -> Union[pd.DataFrame, float]:
+        return self.agg(["sum"])
 
-    def agg(self, func: Union[str, List]) -> pd.DataFrame:
+    def agg(self, func: Union[str, List]) -> Union[pd.DataFrame, float]:
         func = func if isinstance(func, List) else [func]
-        return self.data.agg(func)
+        result = self.data.agg(func)
+        if result.shape[0] == 1 and result.shape[1] == 1:
+            return float(result.loc[result.index[0], result.columns[0]])
+        return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
