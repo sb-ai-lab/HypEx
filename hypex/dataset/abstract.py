@@ -3,7 +3,7 @@ import warnings
 from abc import ABC
 from typing import Iterable, Dict, Union, List, Optional, Any
 
-import pandas as pd
+import pandas as pd  # type: ignore
 
 from hypex.dataset.backends import PandasDataset
 from hypex.dataset.roles import (

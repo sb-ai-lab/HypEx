@@ -160,5 +160,6 @@ class PandasDataset(DatasetBackendCalc):
     def sum(self) -> pd.DataFrame:
         return self.data.agg(["sum"])
 
-    def agg(self, func) -> pd.DataFrame:
+    def agg(self, func: Union[str, List]) -> pd.DataFrame:
+        func = func if isinstance(func, List) else [func]
         return self.data.agg(func)

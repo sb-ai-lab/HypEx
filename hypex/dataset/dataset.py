@@ -192,23 +192,40 @@ class Dataset(DatasetBase):
         return datasets
 
     def mean(self):
-        return Dataset(data=self._backend.mean(), roles=self.roles)
+        return Dataset(
+            data=self._backend.mean(),
+            roles={column: StatisticRole() for column in self.roles},
+        )
 
     def max(self):
-        return Dataset(data=self._backend.max(), roles=self.roles)
+        return Dataset(
+            data=self._backend.max(),
+            roles={column: StatisticRole() for column in self.roles},
+        )
 
     def min(self):
-        return Dataset(data=self._backend.min(), roles=self.roles)
+        return Dataset(
+            data=self._backend.min(),
+            roles={column: StatisticRole() for column in self.roles},
+        )
 
     def count(self):
-        return Dataset(data=self._backend.count(), roles=self.roles)
+        return Dataset(
+            data=self._backend.count(),
+            roles={column: StatisticRole() for column in self.roles},
+        )
 
     def sum(self):
-        return Dataset(data=self._backend.sum(), roles=self.roles)
+        return Dataset(
+            data=self._backend.sum(),
+            roles={column: StatisticRole() for column in self.roles},
+        )
 
     def agg(self, func: Union[str, List]):
-        func = func if isinstance(func, List) else [func]
-        return Dataset(data=self._backend.agg(func), roles=self.roles)
+        return Dataset(
+            data=self._backend.agg(func),
+            roles={column: StatisticRole() for column in self.roles},
+        )
 
 
 class ExperimentData(Dataset):
