@@ -1,3 +1,4 @@
+import warnings
 from typing import Union, List, Iterable, Any, Dict, Callable, Hashable, Optional
 
 import pandas as pd  # type: ignore
@@ -72,6 +73,12 @@ class Dataset(DatasetBase):
         result = Dataset(data=self._backend.__getitem__(item), roles=roles)
         result.tmp_roles = self.tmp_roles
         return result
+
+    def __setitem__(self, key: str, value: Any):
+        if key not in self.columns and isinstance(key, str):
+            self.add_column(value, {key: InfoRole()})
+            warnings.warn("Column must be added by add_column", category=SyntaxWarning)
+        self.data[key] = value
 
     @staticmethod
     def _create_empty(backend=BackendsEnum.pandas, roles=None, index=None):

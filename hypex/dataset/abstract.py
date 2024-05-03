@@ -104,12 +104,6 @@ class DatasetBase(ABC):
     def __len__(self):
         return self._backend.__len__()
 
-    def __setitem__(self, key: str, value: Any):
-        if key not in self.columns and isinstance(key, str):
-            self.add_column(value, {key: InfoRole()})
-            warnings.warn("Column must be added by add_column", category=SyntaxWarning)
-        self.data[key] = value
-
     def get_columns_by_roles(
         self, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role=False
     ) -> List[Union[str, int]]:
