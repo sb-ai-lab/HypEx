@@ -38,7 +38,7 @@ class NotFoundInExperimentDataError(Exception):
         super().__init__(f"{class_.__name__} id is not found in ExperimentData")
 
 
-class AbstractMethodError(Exception):
+class AbstractMethodError(NotImplementedError):
     def __init__(self):
         super().__init__(
             "This method is abstract and will be overridden in derived class."
