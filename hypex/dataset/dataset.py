@@ -92,7 +92,7 @@ class Dataset(DatasetBase):
         ds.data = ds._backend.data
         return ds
 
-    def _process_data(self, result):
+    def _convert_data_after_agg(self, result):
         if isinstance(result, float):
             return result
         return Dataset(
@@ -197,22 +197,22 @@ class Dataset(DatasetBase):
         return datasets
 
     def mean(self):
-        return self._process_data(self._backend.mean())
+        return self._convert_data_after_agg(self._backend.mean())
 
     def max(self):
-        return self._process_data(self._backend.max())
+        return self._convert_data_after_agg(self._backend.max())
 
     def min(self):
-        return self._process_data(self._backend.min())
+        return self._convert_data_after_agg(self._backend.min())
 
     def count(self):
-        return self._process_data(self._backend.count())
+        return self._convert_data_after_agg(self._backend.count())
 
     def sum(self):
-        return self._process_data(self._backend.sum())
+        return self._convert_data_after_agg(self._backend.sum())
 
     def agg(self, func: Union[str, List]):
-        return self._process_data(self._backend.agg(func))
+        return self._convert_data_after_agg(self._backend.agg(func))
 
 
 class ExperimentData(Dataset):
