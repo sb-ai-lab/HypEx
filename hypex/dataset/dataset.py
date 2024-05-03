@@ -92,6 +92,14 @@ class Dataset(DatasetBase):
         ds.data = ds._backend.data
         return ds
 
+    def _process_data(self, result):
+        if isinstance(result, float):
+            return result
+        return Dataset(
+            data=result,
+            roles={column: StatisticRole() for column in self.roles},
+        )
+
     def add_column(
         self,
         data,
@@ -189,58 +197,22 @@ class Dataset(DatasetBase):
         return datasets
 
     def mean(self):
-        result = self._backend.mean()
-        if isinstance(result, float):
-            return result
-        return Dataset(
-            data=result,
-            roles={column: StatisticRole() for column in self.roles},
-        )
+        return self._process_data(self._backend.mean())
 
     def max(self):
-        result = self._backend.max()
-        if isinstance(result, float):
-            return result
-        return Dataset(
-            data=result,
-            roles={column: StatisticRole() for column in self.roles},
-        )
+        return self._process_data(self._backend.max())
 
     def min(self):
-        result = self._backend.min()
-        if isinstance(result, float):
-            return result
-        return Dataset(
-            data=result,
-            roles={column: StatisticRole() for column in self.roles},
-        )
+        return self._process_data(self._backend.min())
 
     def count(self):
-        result = self._backend.count()
-        if isinstance(result, float):
-            return result
-        return Dataset(
-            data=result,
-            roles={column: StatisticRole() for column in self.roles},
-        )
+        return self._process_data(self._backend.count())
 
     def sum(self):
-        result = self._backend.sum()
-        if isinstance(result, float):
-            return result
-        return Dataset(
-            data=result,
-            roles={column: StatisticRole() for column in self.roles},
-        )
+        return self._process_data(self._backend.sum())
 
     def agg(self, func: Union[str, List]):
-        result = self._backend.agg(func)
-        if isinstance(result, float):
-            return result
-        return Dataset(
-            data=result,
-            roles={column: StatisticRole() for column in self.roles},
-        )
+        return self._process_data(self._backend.agg(func))
 
 
 class ExperimentData(Dataset):
