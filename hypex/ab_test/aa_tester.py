@@ -1,6 +1,8 @@
 """Module for AA tests"""
 
+import math
 import warnings
+from decimal import Decimal
 from itertools import combinations
 from pathlib import Path
 from typing import Iterable, Union, Optional, Dict, Any, Tuple, List
@@ -788,84 +790,90 @@ class AATest:
             test_group = splited_data["test"][target_field]
             control_group = splited_data["control"][target_field]
         return {"test_group": test_group, "control_group": control_group}
-    
+
     def __mde_unbalanced_non_binomial(
-            self,
-            control_group_size: int,
-            all_data_size: int,
-            standard_deviation: float = 2.0,
-            power: float = 0.8
+        self,
+        control_group_size: int,
+        all_data_size: int,
+        standard_deviation: float = 2.0,
+        power: float = 0.8,
     ) -> Tuple:
         """Calculates minimum detectable effect (MDE) and significance
-         of the effect size for unbalanced non-binomial groups.
+        of the effect size for unbalanced non-binomial groups.
 
-                        Args:
-                            control_group_size:
-                                Size of the control group
-                            all_data_size:
-                                Size of the all data sample
-                            standard_deviation:
-                                Standard_deviation
-                            power:
-                                Level of power
+                       Args:
+                           control_group_size:
+                               Size of the control group
+                           all_data_size:
+                               Size of the all data sample
+                           standard_deviation:
+                               Standard_deviation
+                           power:
+                               Level of power
 
 
-                        Returns:
-                            Tuple with MDE and significance of the effect size
-                        """
+                       Returns:
+                           Tuple with MDE and significance of the effect size
+        """
         proportion = round((all_data_size - control_group_size) / control_group_size, 2)
-        z_alpha = sps.norm.ppf(1 - self.alpha / 2)
-        z_power = sps.norm.ppf(power)
-        mde = (standard_deviation * (z_alpha - z_power)) * sqrt((1 + proportion) / (control_group_size * proportion))
+        z_alpha = norm.ppf(1 - self.alpha / 2)
+        z_power = norm.ppf(power)
+        mde = (standard_deviation * (z_alpha - z_power)) * math.sqrt(
+            (1 + proportion) / (control_group_size * proportion)
+        )
         effect_size = mde / standard_deviation  # effect_size
 
         return (
             float(Decimal(float(mde)).quantize(Decimal("1.00"))),
-            float(Decimal(float(effect_size)).q uantize(Decimal("1.00")))
+            float(Decimal(float(effect_size)).quantize(Decimal("1.00"))),
         )
 
     def __mde_unbalanced_binomial(
-            self,
-            control_group_size: int,
-            all_data_size: int,
-            fact_conversion: float,
-            power: float = 0.8
+        self,
+        control_group_size: int,
+        all_data_size: int,
+        fact_conversion: float,
+        power: float = 0.8,
     ) -> Tuple:
         """Calculates minimum detectable effect (MDE) and significance
-         of the effect size (Cohen's d) for unbalanced binomial groups.
+        of the effect size (Cohen's d) for unbalanced binomial groups.
 
-                Args:
-                    control_group_size:
-                        Size of the control group
-                    all_data_size:
-                        Size of the all data sample
-                    fact_conversion:
-                        Conversion in the control group
-                    power:
-                        Level of power
+               Args:
+                   control_group_size:
+                       Size of the control group
+                   all_data_size:
+                       Size of the all data sample
+                   fact_conversion:
+                       Conversion in the control group
+                   power:
+                       Level of power
 
 
-                Returns:
-                    Tuple with MDE and Cohen's d
-                """
+               Returns:
+                   Tuple with MDE and Cohen's d
+        """
         proportion = round((all_data_size - control_group_size) / control_group_size, 2)
-        z_alpha = sps.norm.ppf(1 - self.alpha / 2)
-        z_power = sps.norm.ppf(power)
-        cohen_d = (z_alpha - z_power) * sqrt((1 + proportion) / (control_group_size * proportion))  # effect_size
-        expect_conversion = sin(asin(sqrt(fact_conversion)) + cohen_d / 2) ** 2  # expect_conversion
+        z_alpha = norm.ppf(1 - self.alpha / 2)
+        z_power = norm.ppf(power)
+        cohen_d = (z_alpha - z_power) * math.sqrt(
+            (1 + proportion) / (control_group_size * proportion)
+        )  # effect_size
+        expect_conversion = (
+            math.sin(math.asin(math.sqrt(fact_conversion)) + cohen_d / 2) ** 2
+        )  # expect_conversion
         mde = abs(expect_conversion - fact_conversion)
 
         return (
             float(Decimal(float(mde)).quantize(Decimal("1.00"))),
-            float(Decimal(float(cohen_d)).quantize(Decimal("1.00")))
+            float(Decimal(float(cohen_d)).quantize(Decimal("1.00"))),
         )
 
-    def _calc_mde_unbalanced_group(
-            self,
-            data: pd.DataFrame,
-            target_field: str,
-            group_flag_col: str,
-            power: float = 0.8
+    def calc_mde(
+        self,
+        data: pd.DataFrame,
+        target_field: str,
+        group_field: str,
+        power: float = 0.8,
     ) -> Tuple:
         """Finds minimum detectable effect (MDE) and effect size for unbalanced groups.
 
@@ -874,7 +882,7 @@ class AATest:
                 Input data
             target_field:
                 Name of the target feature
-            group_flag_col:
+            group_field:
                 Name of the column with the group flag
             power:
                 Level of power
@@ -883,88 +891,31 @@ class AATest:
         Returns:
             Tuple with MDE and effect size
         """
-        fact_conversion = float(Decimal(float(data[target_field].mean())).quantize(Decimal("1.00")))  # fact_conversion
-        control_group = data[(data[group_flag_col] == data[group_flag_col].unique()[0])]  # control_group
+        fact_conversion = float(
+            Decimal(float(data[target_field].mean())).quantize(Decimal("1.00"))
+        )  # fact_conversion
+        control_group = data[
+            (data[group_field] == data[group_field].unique()[0])
+        ]  # control_group
         control_group_size = len(control_group)  # control_group_size
-        all_data_size = len(data[group_flag_col])  # all_data_size (???)
+        all_data_size = len(data[group_field])  # all_data_size (???)
 
         if data[target_field].nunique() == 2:
             res = self.__mde_unbalanced_binomial(
                 control_group_size=control_group_size,
                 all_data_size=all_data_size,
                 fact_conversion=fact_conversion,
-                power=power
+                power=power,
             )
         else:
             res = self.__mde_unbalanced_non_binomial(
                 control_group_size=control_group_size,
                 all_data_size=all_data_size,
                 standard_deviation=data[target_field].std(),
-                power=power
+                power=power,
             )
 
         return res
-
-
-    def calc_mde(
-        self,
-        test_group: pd.Series = None,
-        control_group: pd.Series = None,
-        data: pd.DataFrame = None,
-        target_field: str = None,
-        reliability: float = 0.95,
-        power: float = 0.8,
-        unbalanced: bool = False,
-    ) -> float:
-        """Calculates the minimum detectable effect (MDE) for a given test and control groups.
-
-        Args:
-            test_group:
-                The test group as a pandas Series
-            control_group:
-                The control group as a pandas Series
-            data:
-                The input data as a pandas DataFrame used if test_group and control_group are None
-            target_field:
-                The target field used if given data is a DataFrame
-            reliability:
-                The reliability of the test
-            power:
-                The power of the test
-
-        Returns:
-            The minimum detectable effect
-        """
-
-        if unbalanced:
-            return self._calc_mde_unbalanced_group(
-                data=data,
-                target_field=target_field,
-                group_flag_col="group",
-                power=power
-            )
-
-        m = norm.ppf(1 - (1 - reliability) / 2) + norm.ppf(power)
-
-        groups = self.__get_test_and_control_series(
-            test_group=test_group,
-            control_group=control_group,
-            data=data,
-            target_field=target_field,
-        )
-        test_group = groups["test_group"]
-        control_group = groups["control_group"]
-
-        n_test, n_control = len(test_group), len(control_group)
-        proportion = n_test / (n_test + n_control)
-        p = np.sqrt(1 / (proportion * (1 - proportion)))
-
-        var_test, var_control = np.var(test_group, ddof=1), np.var(
-            control_group, ddof=1
-        )
-        s = np.sqrt(var_test / n_test + var_control / n_control)
-
-        return p * m * s
 
     def calc_sample_size(
         self,
@@ -972,7 +923,8 @@ class AATest:
         control_group: pd.Series = None,
         data: pd.DataFrame = None,
         target_field: str = None,
-        mde=None,
+        group_field: str = "group",
+        mde: float = None,
         significance: float = 0.05,
         power: float = 0.8,
     ) -> float:
@@ -987,6 +939,8 @@ class AATest:
                 The input data as a pandas DataFrame used if test_group and control_group are None
             target_field:
                 The target field used if given data is a DataFrame
+            group_field:
+                The group field used if given data is a DataFrame
             mde:
                 Minimum detectable effect. If None, it will be calculated. If it is a tuple, it will be used as relative mde
             significance:
@@ -1018,11 +972,10 @@ class AATest:
             )
             control_group = groups["control_group"]
             test_group = groups["test_group"]
-
             mde = mde or self.calc_mde(
-                test_group=test_group,
-                control_group=control_group,
-                reliability=1 - significance,
+                data=data,
+                target_field=target_field,
+                group_field=group_field,
                 power=power,
             )
 
