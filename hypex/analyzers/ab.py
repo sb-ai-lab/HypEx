@@ -48,6 +48,7 @@ class ABAnalyzer(Analyzer):
                 indexes = t_data.index
                 values = t_data.data.values.tolist()
                 for idx, value in zip(indexes, values):
+                    # TODO: fix this
                     analysis_data[
                         f"{c.__name__} {idx.split(ID_SPLIT_SYMBOL)[-1].split('[[]')[0]}"
                     ] = value[0]

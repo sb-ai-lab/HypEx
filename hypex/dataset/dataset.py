@@ -15,6 +15,7 @@ from hypex.dataset.roles import (
 )
 from hypex.utils import (
     ID_SPLIT_SYMBOL,
+    NAME_BORDER_SYMBOL,
     ExperimentDataEnum,
     BackendsEnum,
     RoleColumnError,
@@ -374,11 +375,20 @@ class ExperimentData(Dataset):
         self.id_name_mapping[executor_id] = name
         return self
 
+    def __id_fields_filter(self, ids: Dict, fields=None):
+        if fields is None:
+            return ids
+        return {
+            k: v
+            for k, v in ids.items()
+            if any(f"{NAME_BORDER_SYMBOL}{f}{NAME_BORDER_SYMBOL}" in k for f in fields)
+        }
+
     def get_ids_by_executors(
-        self, classes: Union[type, List[type]]
+        self, classes: Union[type, List[type]], fields=None
     ) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
-        return {
+        result = {
             class_: {
                 ExperimentDataEnum.stats.value: [
                     str(_id)
@@ -398,6 +408,7 @@ class ExperimentData(Dataset):
             }
             for class_ in classes
         }
+        return self.__id_fields_filter(result, fields)
 
     def _get_one_id(self, class_: type, space: ExperimentDataEnum) -> str:
         result = self.get_ids_by_executors(class_)

@@ -27,7 +27,6 @@ class OneAAStatAnalyzer(Analyzer):
         analysis_tests: List[type] = [TTest, KSTest]
         return data.get_ids_by_executors(analysis_tests)
 
-
     def execute(self, data: ExperimentData) -> ExperimentData:
         executor_ids = self._get_test_ids(data)
         analysis_data = {}
@@ -43,7 +42,7 @@ class OneAAStatAnalyzer(Analyzer):
 
                 for f in ["p-value", "pass"]:
                     analysis_data[f"{c.__name__} {f}"] = mean_operator.calc(t_data[f])
-            
+
         analysis_data["mean test score"] = (
             analysis_data["TTest p-value"] + 2 * analysis_data["KSTest p-value"]
         ) / 3
@@ -54,6 +53,7 @@ class OneAAStatAnalyzer(Analyzer):
         )
 
         return self._set_value(data, analysis_data)
+
 
 class OneAAResumeAnalyzer(OneAAStatAnalyzer):
     def execute(self, data: ExperimentData) -> ExperimentData:
