@@ -1,41 +1,24 @@
-import json
 import warnings
 from typing import Union, List, Iterable, Any, Dict, Callable, Hashable, Optional
 
 import pandas as pd  # type: ignore
 
 from hypex.dataset.abstract import DatasetBase
-from hypex.dataset.backends import PandasDataset
 from hypex.dataset.roles import (
     StatisticRole,
     InfoRole,
     ABCRole,
-    default_roles,
-    FeatureRole,
+    FilterRole,
 )
 from hypex.utils import (
     ID_SPLIT_SYMBOL,
     ExperimentDataEnum,
     BackendsEnum,
-    RoleColumnError,
     ConcatDataError,
     ConcatBackendError,
     NotFoundInExperimentDataError,
     FromDictType,
 )
-
-
-def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
-    new_roles = {}
-    roles = roles or {}
-    for role in roles:
-        r = default_roles.get(role, role)
-        if isinstance(roles[role], list):
-            for i in roles[role]:
-                new_roles[i] = r
-        else:
-            new_roles[roles[role]] = r
-    return new_roles or roles
 
 
 class Dataset(DatasetBase):
@@ -63,41 +46,6 @@ class Dataset(DatasetBase):
                 roles={k: v for k, v in self.roles.items() if k in t_data.columns},
             )
 
-    @staticmethod
-    def _select_backend_from_data(data):
-        """
-        Выбирает бэкенд исходя из типа пришедших данных
-        """
-        return PandasDataset(data)
-
-    @staticmethod
-    def _select_backend_from_str(data, backend):
-        """
-        Выбирает бэкенд исходя из строкового описания бэкенда
-        """
-        if backend == BackendsEnum.pandas:
-            return PandasDataset(data)
-        return PandasDataset(data)
-
-    def _set_all_roles(self, roles):
-        keys = list(roles.keys())
-        for column in self.columns:
-            if column not in keys:
-                roles[column] = FeatureRole()
-        return roles
-
-    def _set_empty_types(self, roles):
-        types_map = {"int": int, "float": float, "object": str, "bool": bool}
-        reversed_map = {int: "int", float: "float", str: "category", bool: "bool"}
-        for column, role in roles.items():
-            if role.data_type is None:
-                d_type = self._backend._get_column_type(column)
-
-                role.data_type = [v for k, v in types_map.items() if k in d_type][0]
-            self._backend = self._backend._update_column_type(
-                column, reversed_map[role.data_type]
-            )
-
     def __init__(
         self,
         roles: Union[
@@ -107,35 +55,9 @@ class Dataset(DatasetBase):
         data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
     ):
-        self.tmp_roles: Union[
-            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
-        ] = {}
-        self._backend = (
-            self._select_backend_from_str(data, backend)
-            if backend
-            else self._select_backend_from_data(data)
-        )
-        roles = (
-            parse_roles(roles)
-            if any(isinstance(role, type) for role in roles.keys())
-            else roles
-        )
-        if data is not None and any(
-            i not in self._backend.columns for i in list(roles.keys())
-        ):
-            raise RoleColumnError(list(roles.keys()), self._backend.columns)
-        if data is not None:
-            roles = self._set_all_roles(roles)
-            self._set_empty_types(roles)
-        self.roles: Dict[Union[str, int], ABCRole] = roles
+        super().__init__(roles, data, backend)
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
-
-    def __repr__(self):
-        return self.data.__repr__()
-
-    def __len__(self):
-        return self._backend.__len__()
 
     def __getitem__(self, item: Union[Iterable, str, int]):
         items = (
@@ -170,34 +92,13 @@ class Dataset(DatasetBase):
         ds.data = ds._backend.data
         return ds
 
-    def get_columns_by_roles(
-        self, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role=False
-    ) -> List[Union[str, int]]:
-        roles = roles if isinstance(roles, Iterable) else [roles]
-        roles_for_search: Dict[Union[str, int], ABCRole] = (
-            self.tmp_roles if tmp_role else self.roles
+    def _convert_data_after_agg(self, result):
+        if isinstance(result, float):
+            return result
+        return Dataset(
+            data=result,
+            roles={column: StatisticRole() for column in self.roles},
         )
-        return [
-            column
-            for column, role in roles_for_search.items()
-            if any(isinstance(r, role.__class__) for r in roles)
-        ]
-
-    @property
-    def index(self):
-        return self._backend.index
-
-    @property
-    def data(self):
-        return self._backend.data
-
-    @data.setter
-    def data(self, value):
-        self._backend.data = value
-
-    @property
-    def columns(self):
-        return self._backend.columns
 
     def add_column(
         self,
@@ -243,22 +144,6 @@ class Dataset(DatasetBase):
         ds.data = ds._backend.data
         return ds
 
-    def to_dict(self):
-        return {
-            "backend": self._backend.name,
-            "roles": {
-                "role_names": list(map(lambda x: x, list(self.roles.keys()))),
-                "columns": list(self.roles.values()),
-            },
-            "data": self._backend.to_dict(),
-        }
-
-    def to_json(self, filename: Optional[str] = None):
-        if not filename:
-            return json.dumps(self.to_dict())
-        with open(filename, "w") as file:
-            json.dump(self.to_dict(), file)
-
     def apply(
         self,
         func: Callable,
@@ -274,13 +159,19 @@ class Dataset(DatasetBase):
         )
 
     def map(self, func, na_action=None, **kwargs):
-        return self._backend.map(func=func, na_action=na_action)
+        return Dataset(
+            roles=self.roles,
+            data=self._backend.map(func=func, na_action=na_action, **kwargs),
+        )
 
     def unique(self):
-        return Dataset(data=self._backend.unique())
+        return self._backend.unique()
 
     def isin(self, values: Iterable):
-        return Dataset(roles=self.roles, data=self._backend.isin(values))
+        return Dataset(
+            roles={column: FilterRole() for column in self.roles.keys()},
+            data=self._backend.isin(values),
+        )
 
     def groupby(
         self,
@@ -289,54 +180,39 @@ class Dataset(DatasetBase):
         fields_list: Optional[Union[str, List]] = None,
         **kwargs,
     ):
+
         datasets = [
             (i, Dataset(roles=self.roles, data=data))
             for i, data in self._backend.groupby(by=by, **kwargs)
         ]
+        if fields_list:
+            fields_list = (
+                fields_list if isinstance(fields_list, Iterable) else [fields_list]
+            )
+            datasets = [(i, data[fields_list]) for i, data in datasets]
         if func:
-            if fields_list:
-                fields_list = (
-                    fields_list if isinstance(fields_list, Iterable) else [fields_list]
-                )
-                datasets = [
-                    (
-                        i,
-                        Dataset(
-                            roles={
-                                k: v for k, v in self.roles.items() if k in fields_list
-                            },
-                            data=data[fields_list].agg(func).data,
-                        ),
-                    )
-                    for i, data in datasets
-                ]
-            else:
-                datasets = [
-                    (i, Dataset(roles=self.roles, data=data.agg(func).data))
-                    for i, data in datasets
-                ]
+            datasets = [(i, data.agg(func)) for i, data in datasets]
         for dataset in datasets:
             dataset[1].tmp_roles = self.tmp_roles
         return datasets
 
     def mean(self):
-        return Dataset(data=self._backend.mean(), roles=self.roles)
+        return self._convert_data_after_agg(self._backend.mean())
 
     def max(self):
-        return Dataset(data=self._backend.max(), roles=self.roles)
+        return self._convert_data_after_agg(self._backend.max())
 
     def min(self):
-        return Dataset(data=self._backend.min(), roles=self.roles)
+        return self._convert_data_after_agg(self._backend.min())
 
     def count(self):
-        return Dataset(data=self._backend.count(), roles=self.roles)
+        return self._convert_data_after_agg(self._backend.count())
 
     def sum(self):
-        return Dataset(data=self._backend.sum(), roles=self.roles)
+        return self._convert_data_after_agg(self._backend.sum())
 
     def agg(self, func: Union[str, List]):
-        func = func if isinstance(func, List) else [func]
-        return Dataset(data=self._backend.agg(func), roles=self.roles)
+        return self._convert_data_after_agg(self._backend.agg(func))
 
 
 class ExperimentData(Dataset):

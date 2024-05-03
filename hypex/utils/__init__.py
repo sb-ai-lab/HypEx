@@ -12,10 +12,13 @@ from hypex.utils.errors import (
 from hypex.utils.typings import (
     FromDictType,
     TargetRoleTypes,
-    TreatmentRoleTypes,
+    DefaultRoleTypes,
     StratificationRoleTypes,
     CategoricalTypes,
-    FieldKey,
+    FieldKeyTypes,
+    DecoratedType,
+    DocstringInheritDecorator,
+    RoleNameType,
 )
 
 __all__ = [
@@ -33,7 +36,10 @@ __all__ = [
     "FromDictType",
     "TargetRoleTypes",
     "CategoricalTypes",
-    "TreatmentRoleTypes",
+    "DefaultRoleTypes",
     "StratificationRoleTypes",
-    "FieldKey",
+    "FieldKeyTypes",
+    "RoleNameType",
+    "DecoratedType",
+    "DocstringInheritDecorator",
 ]

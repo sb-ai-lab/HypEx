@@ -14,7 +14,7 @@ from hypex.dataset import (
     StatisticRole,
     StratificationRole,
     TreatmentRole,
-    TmpTreatmentRole,
+    TempTreatmentRole,
     TempGroupingRole,
     TempTargetRole,
 )
@@ -63,7 +63,7 @@ all_classes = [
     StatisticRole,
     StratificationRole,
     TreatmentRole,
-    TmpTreatmentRole,
+    TempTreatmentRole,
     TempGroupingRole,
     TempTargetRole,
     Unique,

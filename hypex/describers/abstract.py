@@ -3,13 +3,16 @@ from typing import Optional, Any, Union
 
 from hypex.dataset import ExperimentData, Dataset
 from hypex.experiments.base import Executor
-from hypex.utils import ExperimentDataEnum, FieldKey
+from hypex.utils import ExperimentDataEnum, FieldKeyTypes
 
 
 class Describer(Executor, ABC):
 
     def __init__(
-        self, target_field: FieldKey, full_name: Optional[str] = None, key: Any = ""
+        self,
+        target_field: FieldKeyTypes,
+        full_name: Optional[str] = None,
+        key: Any = "",
     ):
         self.target_field = target_field
         super().__init__(full_name, key)

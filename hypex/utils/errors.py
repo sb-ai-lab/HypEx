@@ -22,15 +22,24 @@ class SpaceError(Exception):
     def __init__(self, space):
         super().__init__(f"{space} is not a valid space")
 
+
 class NoColumnsError(Exception):
     def __init__(self, role):
         super().__init__(f"No columns found by role {role}")
 
+
 class ComparisonNotSuitableFieldError(Exception):
-     def __init__(self, group_field):
+    def __init__(self, group_field):
         super().__init__(f"Group field {group_field} is not suitable for comparison")
 
 
 class NotFoundInExperimentDataError(Exception):
     def __init__(self, class_: type):
         super().__init__(f"{class_.__name__} id is not found in ExperimentData")
+
+
+class AbstractMethodError(NotImplementedError):
+    def __init__(self):
+        super().__init__(
+            "This method is abstract and will be overridden in derived class."
+        )
