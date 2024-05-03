@@ -10,6 +10,7 @@ from hypex.experiments.base import (
 )
 from hypex.stats import Mean
 from hypex.utils import ExperimentDataEnum, BackendsEnum
+from hypex.utils import ID_SPLIT_SYMBOL
 
 
 class ABAnalyzer(Analyzer):
@@ -48,7 +49,7 @@ class ABAnalyzer(Analyzer):
                 values = t_data.data.values.tolist()
                 for idx, value in zip(indexes, values):
                     analysis_data[
-                        f"{c.__name__} {idx.split('╰╰')[1].split('[[]')[0]}"
+                        f"{c.__name__} {idx.split(ID_SPLIT_SYMBOL)[-1].split('[[]')[0]}"
                     ] = value[0]
         analysis_data = Dataset.from_dict(
             [analysis_data],

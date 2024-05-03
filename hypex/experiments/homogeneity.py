@@ -1,4 +1,4 @@
-from hypex.analyzers import OneAASplitAnalyzer
+from hypex.analyzers import OneAAStatAnalyzer
 from hypex.comparators import GroupDifference
 from hypex.comparators import TTest, KSTest
 from hypex.dataset import TargetRole, TreatmentRole

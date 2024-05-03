@@ -42,7 +42,7 @@ class OneAAStatAnalyzer(Analyzer):
                 t_data.data.index = analysis_ids
 
                 for f in ["p-value", "pass"]:
-                    analysis_data[f"{c.__name__} {f}"] =  mean_operator.calc(t_data[f])
+                    analysis_data[f"{c.__name__} {f}"] = mean_operator.calc(t_data[f])
             
         analysis_data["mean test score"] = (
             analysis_data["TTest p-value"] + 2 * analysis_data["KSTest p-value"]
