@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import ttest_ind, ks_2samp, norm
+from scipy.stats import ttest_ind, ks_2samp, norm, chi2_contingency
 from sklearn.utils import shuffle
 from statsmodels.stats.power import TTestIndPower
 
@@ -1069,6 +1069,59 @@ class AATest:
             ratio=ratio,
             alpha=significance,
         )
+
+    def calc_chi2(self, df: pd.DataFrame, treated_column: str):
+        """Chi2 criterio calculation.
+
+        Args:
+            df:
+                Input data
+            treated_column:
+                Column name with group markers (treated/untreated)
+
+        Returns:
+            Dictionary with pvalues for all target fields.
+        """
+        df = df.sort_values(by=treated_column)
+        groups = df[treated_column].unique().tolist()
+        all_pvalues = {}
+        for target_field in self.target_fields:
+            group_a, group_b = (
+                df[df[treated_column] == groups[0]][target_field],
+                df[df[treated_column] == groups[1]][target_field],
+            )
+            proportions = group_a.shape[0] / (group_a.shape[0] + group_b.shape[0])
+            group_a = group_a.value_counts().rename(target_field).sort_index()
+            group_b = group_b.value_counts().rename(target_field).sort_index()
+            index = (
+                pd.Series(group_a.index.tolist() + group_b.index.tolist())
+                .unique()
+                .tolist()
+            )
+            group_a, group_b = [
+                group.reindex(index, fill_value=0) for group in [group_a, group_b]
+            ]
+            merged_data = pd.DataFrame(
+                {
+                    "index_x": group_a * (1 - proportions),
+                    "index_y": group_b * proportions,
+                }
+            ).fillna(0)
+            sub_group = merged_data.sum(axis=1).sort_values()
+            _filter = sub_group <= 15
+            if _filter.sum():
+                other = {
+                    "index_x": merged_data["index_x"][_filter].sum(),
+                    "index_y": merged_data["index_y"][_filter].sum(),
+                }
+                merged_data.drop(sub_group[_filter].index, inplace=True)
+                merged_data = pd.concat(
+                    [merged_data, pd.DataFrame([other], index=["Other"])]
+                )
+            all_pvalues[target_field] = chi2_contingency(
+                merged_data[["index_x", "index_y"]]
+            ).pvalue
+        return all_pvalues
 
     def experiment_result_transform(self, experiment: pd.Series):
         """
