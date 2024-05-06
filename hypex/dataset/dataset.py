@@ -21,6 +21,7 @@ from hypex.utils import (
 )
 
 
+# noinspection PyProtectedMember
 class Dataset(DatasetBase):
     class Locker:
         def __init__(self, backend, roles):
@@ -47,13 +48,13 @@ class Dataset(DatasetBase):
             )
 
     def __init__(
-        self,
-        roles: Union[
-            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
-            Dict[Union[str, int], ABCRole],
-        ],
-        data: Optional[Union[pd.DataFrame, str]] = None,
-        backend: Optional[BackendsEnum] = None,
+            self,
+            roles: Union[
+                Dict[ABCRole, Union[List[Union[str, int]], str, int]],
+                Dict[Union[str, int], ABCRole],
+            ],
+            data: Optional[Union[pd.DataFrame, str]] = None,
+            backend: Optional[BackendsEnum] = None,
     ):
         super().__init__(roles, data, backend)
         self.loc = self.Locker(self._backend, self.roles)
@@ -101,10 +102,10 @@ class Dataset(DatasetBase):
         )
 
     def add_column(
-        self,
-        data,
-        role: Optional[Dict[str, ABCRole]] = None,
-        index: Optional[Iterable[Hashable]] = None,
+            self,
+            data,
+            role: Optional[Dict[str, ABCRole]] = None,
+            index: Optional[Iterable[Hashable]] = None,
     ):
         if role is None:
             if not isinstance(data, Dataset):
@@ -122,22 +123,22 @@ class Dataset(DatasetBase):
     def append(self, other, index=None):
         if not isinstance(other, Dataset):
             raise ConcatDataError(type(other))
-        if type(other._backend) != type(self._backend):
-            raise ConcatBackendError(type(other._backend), type(self._backend))
-        self.roles.update(other.roles)
-        return Dataset(
-            roles=self.roles, data=self._backend.append(other._backend, index)
-        )
+        if type(other._backend) is type(self._backend):
+            self.roles.update(other.roles)
+            return Dataset(
+                roles=self.roles, data=self._backend.append(other._backend, index)
+            )
+        raise ConcatBackendError(type(other._backend), type(self._backend))
 
     @staticmethod
     def from_dict(
-        data: FromDictType,
-        roles: Union[
-            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
-            Dict[Union[str, int], ABCRole],
-        ],
-        backend: BackendsEnum = BackendsEnum.pandas,
-        index=None,
+            data: FromDictType,
+            roles: Union[
+                Dict[ABCRole, Union[List[Union[str, int]], str, int]],
+                Dict[Union[str, int], ABCRole],
+            ],
+            backend: BackendsEnum = BackendsEnum.pandas,
+            index=None,
     ):
         ds = Dataset(roles=roles, backend=backend)
         ds._backend = ds._backend.from_dict(data, index)
@@ -145,11 +146,11 @@ class Dataset(DatasetBase):
         return ds
 
     def apply(
-        self,
-        func: Callable,
-        role: Dict[Union[str, int], ABCRole],
-        axis=0,
-        **kwargs,
+            self,
+            func: Callable,
+            role: Dict[Union[str, int], ABCRole],
+            axis=0,
+            **kwargs,
     ):
         return Dataset(
             data=self._backend.apply(func=func, axis=axis, **kwargs).rename(
@@ -174,11 +175,11 @@ class Dataset(DatasetBase):
         )
 
     def groupby(
-        self,
-        by: Any,
-        func: Optional[Union[str, List]] = None,
-        fields_list: Optional[Union[str, List]] = None,
-        **kwargs,
+            self,
+            by: Any,
+            func: Optional[Union[str, List]] = None,
+            fields_list: Optional[Union[str, List]] = None,
+            **kwargs,
     ):
 
         datasets = [
@@ -241,13 +242,13 @@ class ExperimentData(Dataset):
             return any(self.check_hash(executor_id, s) for s in ExperimentDataEnum)
 
     def set_value(
-        self,
-        space: ExperimentDataEnum,
-        executor_id: str,
-        name: str,
-        value: Any,
-        key: Optional[str] = None,
-        role=None,
+            self,
+            space: ExperimentDataEnum,
+            executor_id: str,
+            name: str,
+            value: Any,
+            key: Optional[str] = None,
+            role=None,
     ):
         if space == ExperimentDataEnum.additional_fields:
             self.additional_fields.add_column(data=value, role={executor_id: role})
@@ -264,7 +265,7 @@ class ExperimentData(Dataset):
         return self
 
     def get_ids(
-        self, classes: Union[type, List[type]]
+            self, classes: Union[type, List[type]]
     ) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
         return {
