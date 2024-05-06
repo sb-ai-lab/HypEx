@@ -9,7 +9,7 @@ from hypex.dataset import (
     ABCRole,
     GroupingRole,
     TreatmentRole,
-    TmpTreatmentRole,
+    TempTreatmentRole,
 )
 from hypex.executor import Executor
 from hypex.utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
@@ -99,7 +99,7 @@ class CycledExperiment(Executor):
             self.inner_executor.random_state = i
             data = self.analyzer.execute(self.inner_executor.execute(data))
             column = data.additional_fields.get_columns_by_roles(TreatmentRole())[0]
-            data.additional_fields.roles[column] = TmpTreatmentRole()
+            data.additional_fields.roles[column] = TempTreatmentRole()
         return data
 
 
