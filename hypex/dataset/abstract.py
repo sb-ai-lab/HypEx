@@ -148,3 +148,7 @@ class DatasetBase(ABC):
             return json.dumps(self.to_dict())
         with open(filename, "w") as file:
             json.dump(self.to_dict(), file)
+
+    @property
+    def backend(self):
+        return self._backend
