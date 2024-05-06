@@ -42,7 +42,7 @@ class PandasDataset(DatasetBackendCalc):
         elif isinstance(data, str):
             self.data = self._read_file(data)
         else:
-            self.data = None
+            self.data = pd.DataFrame()
 
     def __getitem__(self, item):
         if isinstance(item, (slice, int)):
@@ -139,11 +139,11 @@ class PandasDataset(DatasetBackendCalc):
 
     def loc(self, items: Iterable) -> Iterable:
         data = self.data.loc[items]
-        return pd.DataFrame(data) if not isinstance(data, pd.DataFrame) else data
+        return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
     def iloc(self, items: Iterable) -> Iterable:
         data = self.data.iloc[items]
-        return pd.DataFrame(data) if not isinstance(data, pd.DataFrame) else data
+        return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
     def mean(self) -> Union[pd.DataFrame, float]:
         return self.agg(["mean"])

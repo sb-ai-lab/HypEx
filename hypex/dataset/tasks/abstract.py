@@ -21,5 +21,5 @@ class Task(ABC):
 
 
 class CompareTask(Task, ABC):
-    def calc(self, data: Dataset, other: Union[Dataset, List[Dataset], None] = None, **kwargs):
+    def calc(self, data: Dataset, other: Union[Dataset, None] = None, **kwargs):
         super().calc(data=data, other=other, **kwargs)
