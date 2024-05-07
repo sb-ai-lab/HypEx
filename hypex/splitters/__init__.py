@@ -1,4 +1,4 @@
-from hypex.splitters.aa import (
+from .aa import (
     AASplitter,
     AASplitterWithGrouping,
     AASplitterWithStratification,

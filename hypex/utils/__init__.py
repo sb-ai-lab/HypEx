@@ -1,6 +1,6 @@
-from hypex.utils.constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
-from hypex.utils.enums import SpaceEnum, BackendsEnum, ExperimentDataEnum
-from hypex.utils.errors import (
+from .constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
+from .enums import SpaceEnum, BackendsEnum, ExperimentDataEnum
+from .errors import (
     SpaceError,
     NoColumnsError,
     RoleColumnError,
@@ -9,7 +9,7 @@ from hypex.utils.errors import (
     NotFoundInExperimentDataError,
     ComparisonNotSuitableFieldError,
 )
-from hypex.utils.typings import (
+from .typings import (
     FromDictType,
     TargetRoleTypes,
     DefaultRoleTypes,

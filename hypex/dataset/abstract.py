@@ -1,13 +1,11 @@
-import json
-import warnings
+import json  # type: ignore
 from abc import ABC
-from typing import Iterable, Dict, Union, List, Optional, Any
+from typing import Iterable, Dict, Union, List, Optional
 
 import pandas as pd  # type: ignore
 
 from hypex.dataset.backends import PandasDataset
 from hypex.dataset.roles import (
-    InfoRole,
     ABCRole,
     default_roles,
     FeatureRole,
