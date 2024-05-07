@@ -1,4 +1,4 @@
-from hypex.utils.constants import ID_SPLIT_SYMBOL
+from hypex.utils.constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
 from hypex.utils.enums import SpaceEnum, BackendsEnum, ExperimentDataEnum
 from hypex.utils.errors import (
     SpaceError,
@@ -22,6 +22,7 @@ from hypex.utils.typings import (
 )
 
 __all__ = [
+    "NAME_BORDER_SYMBOL",
     "ID_SPLIT_SYMBOL",
     "SpaceEnum",
     "BackendsEnum",

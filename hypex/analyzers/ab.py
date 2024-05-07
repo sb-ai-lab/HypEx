@@ -10,6 +10,7 @@ from hypex.experiments.base import (
 )
 from hypex.stats import Mean
 from hypex.utils import ExperimentDataEnum, BackendsEnum
+from hypex.utils import ID_SPLIT_SYMBOL
 
 
 class ABAnalyzer(Analyzer):
@@ -25,7 +26,7 @@ class ABAnalyzer(Analyzer):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         analysis_tests: List[type] = [TTest, UTest, ATE]
-        executor_ids = data.get_ids(analysis_tests)
+        executor_ids = data.get_ids_by_executors(analysis_tests)
 
         analysis_data = {}
         mean_operator: Mean = self.inner_executors["mean"]
@@ -47,8 +48,9 @@ class ABAnalyzer(Analyzer):
                 indexes = t_data.index
                 values = t_data.data.values.tolist()
                 for idx, value in zip(indexes, values):
+                    # TODO: fix this
                     analysis_data[
-                        f"{c.__name__} {idx.split('╰╰')[1].split('[[]')[0]}"
+                        f"{c.__name__} {idx.split(ID_SPLIT_SYMBOL)[-1].split('[[]')[0]}"
                     ] = value[0]
         analysis_data = Dataset.from_dict(
             [analysis_data],
