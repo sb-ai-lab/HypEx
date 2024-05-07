@@ -8,6 +8,9 @@ from hypex.utils.errors import (
     ConcatBackendError,
     NotFoundInExperimentDataError,
     ComparisonNotSuitableFieldError,
+    MergeDataError,
+    MergeBackendError,
+    MergeOnError,
 )
 from hypex.utils.typings import (
     FromDictType,
@@ -42,4 +45,7 @@ __all__ = [
     "RoleNameType",
     "DecoratedType",
     "DocstringInheritDecorator",
-]
+    "MergeDataError",
+    "MergeBackendError",
+    "MergeOnError",
+    ]

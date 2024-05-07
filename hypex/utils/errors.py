@@ -43,3 +43,20 @@ class AbstractMethodError(NotImplementedError):
         super().__init__(
             "This method is abstract and will be overridden in derived class."
         )
+
+
+class MergeDataError(Exception):
+    def __init__(self, data_type):
+        super().__init__(f"Can only merge Dataset to Dataset. Got {data_type}")
+
+
+class MergeBackendError(Exception):
+    def __init__(self, other_backend, backend):
+        super().__init__(
+            f"Can only merge data with the same backends. Got {other_backend} expected {backend}")
+
+
+class MergeOnError(Exception):
+    def __init__(self, on):
+        super().__init__(
+            f"Can only merge on one of the columns data. Got {on}")

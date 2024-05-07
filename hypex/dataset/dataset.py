@@ -1,4 +1,5 @@
 import warnings
+from copy import copy
 from typing import Union, List, Iterable, Any, Dict, Callable, Hashable, Optional
 
 import pandas as pd  # type: ignore
@@ -18,10 +19,12 @@ from hypex.utils import (
     ConcatBackendError,
     NotFoundInExperimentDataError,
     FromDictType,
+    MergeDataError,
+    MergeBackendError,
+    MergeOnError, FieldKeyTypes,
 )
 
 
-# noinspection PyProtectedMember
 class Dataset(DatasetBase):
     class Locker:
         def __init__(self, backend, roles):
@@ -48,13 +51,13 @@ class Dataset(DatasetBase):
             )
 
     def __init__(
-            self,
-            roles: Union[
-                Dict[ABCRole, Union[List[Union[str, int]], str, int]],
-                Dict[Union[str, int], ABCRole],
-            ],
-            data: Optional[Union[pd.DataFrame, str]] = None,
-            backend: Optional[BackendsEnum] = None,
+        self,
+        roles: Union[
+            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
+            Dict[Union[str, int], ABCRole],
+        ],
+        data: Optional[Union[pd.DataFrame, str]] = None,
+        backend: Optional[BackendsEnum] = None,
     ):
         super().__init__(roles, data, backend)
         self.loc = self.Locker(self._backend, self.roles)
@@ -102,10 +105,10 @@ class Dataset(DatasetBase):
         )
 
     def add_column(
-            self,
-            data,
-            role: Optional[Dict[str, ABCRole]] = None,
-            index: Optional[Iterable[Hashable]] = None,
+        self,
+        data,
+        role: Optional[Dict[str, ABCRole]] = None,
+        index: Optional[Iterable[Hashable]] = None,
     ):
         if role is None:
             if not isinstance(data, Dataset):
@@ -123,34 +126,35 @@ class Dataset(DatasetBase):
     def append(self, other, index=None):
         if not isinstance(other, Dataset):
             raise ConcatDataError(type(other))
-        if type(other._backend) is type(self._backend):
-            self.roles.update(other.roles)
-            return Dataset(
-                roles=self.roles, data=self._backend.append(other._backend, index)
-            )
-        raise ConcatBackendError(type(other._backend), type(self._backend))
+        if type(other._backend) is not type(self._backend):
+            raise ConcatBackendError(type(other._backend), type(self._backend))
+        self.roles.update(other.roles)
+        return Dataset(
+            roles=self.roles, data=self._backend.append(other._backend, index)
+        )
 
     @staticmethod
     def from_dict(
-            data: FromDictType,
-            roles: Union[
-                Dict[ABCRole, Union[List[Union[str, int]], str, int]],
-                Dict[Union[str, int], ABCRole],
-            ],
-            backend: BackendsEnum = BackendsEnum.pandas,
-            index=None,
+        data: FromDictType,
+        roles: Union[
+            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
+            Dict[Union[str, int], ABCRole],
+        ],
+        backend: BackendsEnum = BackendsEnum.pandas,
+        index=None,
     ):
         ds = Dataset(roles=roles, backend=backend)
         ds._backend = ds._backend.from_dict(data, index)
         ds.data = ds._backend.data
         return ds
 
+    # What is going to happen when a matrix is returned?
     def apply(
-            self,
-            func: Callable,
-            role: Dict[Union[str, int], ABCRole],
-            axis=0,
-            **kwargs,
+        self,
+        func: Callable,
+        role: Dict[FieldKeyTypes, ABCRole],
+        axis: int=0,
+        **kwargs,
     ):
         return Dataset(
             data=self._backend.apply(func=func, axis=axis, **kwargs).rename(
@@ -168,6 +172,9 @@ class Dataset(DatasetBase):
     def unique(self):
         return self._backend.unique()
 
+    def nunique(self, dropna: bool = False):
+        return self._backend.nunique(dropna)
+
     def isin(self, values: Iterable):
         return Dataset(
             roles={column: FilterRole() for column in self.roles.keys()},
@@ -175,11 +182,11 @@ class Dataset(DatasetBase):
         )
 
     def groupby(
-            self,
-            by: Any,
-            func: Optional[Union[str, List]] = None,
-            fields_list: Optional[Union[str, List]] = None,
-            **kwargs,
+        self,
+        by: Any,
+        func: Optional[Union[str, List]] = None,
+        fields_list: Optional[Union[str, List]] = None,
+        **kwargs,
     ):
 
         datasets = [
@@ -215,6 +222,78 @@ class Dataset(DatasetBase):
     def agg(self, func: Union[str, List]):
         return self._convert_data_after_agg(self._backend.agg(func))
 
+    def std(self):
+        return self._convert_data_after_agg(self._backend.std())
+
+    def coefficient_of_variation(self):
+        return self._convert_data_after_agg(self._backend.coefficient_of_variation())
+
+    def value_counts(self, dropna: bool = False):
+        return self._convert_data_after_agg(self._backend.value_counts(dropna=dropna))
+
+    def dropna(self, subset: Union[str, Iterable[str]] = None):
+        return self._backend.dropna(subset=subset)
+
+    def isna(self):
+        return self._backend.isna()
+
+    def na_counts(self):
+        return self._convert_data_after_agg(self._backend.na_counts())
+
+    def quantile(self, q: float = 0.5):
+        return self._convert_data_after_agg(self._backend.quantile(q=q))
+
+    def select_dtypes(self, include: Any = None, exclude: Any = None):
+        t_data = self._backend.select_dtypes(include=include, exclude=exclude)
+        roles = {k: v for k, v in self.roles.items() if k in t_data.columns}
+        return Dataset(roles=roles, data=t_data)
+
+    def merge(
+        self,
+        right,
+        on=None,
+        left_on=None,
+        right_on=None,
+        left_index=False,
+        right_index=False,
+        suffixes=("_x", "_y"),
+    ):
+        # use backend check
+        for on_ in [on, left_on, right_on]:
+            if on_ and (on_ not in [*self.columns, *right.columns]):
+                raise MergeOnError(on_)
+        if not isinstance(right, Dataset):
+            raise MergeDataError(type(right))
+        #TODO type is type
+        if not isinstance(right._backend, type(self._backend)):
+            raise MergeBackendError(type(right._backend), type(self._backend))
+        t_data = self._backend.merge(
+            right=right._backend,
+            on=on,
+            left_on=left_on,
+            right_on=right_on,
+            left_index=left_index,
+            right_index=right_index,
+            suffixes=suffixes,
+        )
+        t_roles = copy(self.roles)
+        t_roles.update(right.roles)
+
+        for c in t_data.columns:
+            if f"{c}".endwith(suffixes[0]) and c[:-len(suffixes[0])] in self.columns:
+                t_roles[c] = self.roles[c[:-len(suffixes[0])]]
+            if f"{c}".endwith(suffixes[1]) and c[:-len(suffixes[1])] in right.columns:
+                t_roles[c] = right.roles[c[:-len(suffixes[1])]]
+
+        new_roles = {c: t_roles[c] for c in t_data.columns}
+        return Dataset(roles=new_roles, data=t_data)
+
+    def drop(self, labels: Any = None, axis: int = 1):
+        t_data = self._backend.drop(labels=labels, axis=axis)
+        if axis == 1:
+            self.roles = {c: self.roles[c] for c in t_data.columns}
+        return Dataset(roles=self.roles, data=t_data)
+
 
 class ExperimentData(Dataset):
     def __init__(self, data: Dataset):
@@ -242,13 +321,13 @@ class ExperimentData(Dataset):
             return any(self.check_hash(executor_id, s) for s in ExperimentDataEnum)
 
     def set_value(
-            self,
-            space: ExperimentDataEnum,
-            executor_id: str,
-            name: str,
-            value: Any,
-            key: Optional[str] = None,
-            role=None,
+        self,
+        space: ExperimentDataEnum,
+        executor_id: str,
+        name: str,
+        value: Any,
+        key: Optional[str] = None,
+        role=None,
     ):
         if space == ExperimentDataEnum.additional_fields:
             self.additional_fields.add_column(data=value, role={executor_id: role})
@@ -265,7 +344,7 @@ class ExperimentData(Dataset):
         return self
 
     def get_ids(
-            self, classes: Union[type, List[type]]
+        self, classes: Union[type, List[type]]
     ) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
         return {

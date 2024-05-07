@@ -125,9 +125,50 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
+    def nunique(self, dropna: bool = True) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
     def isin(self, values: Iterable) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
     def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def std(self) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def coefficient_of_variation(self) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def dropna(self, subset: Union[str, Iterable[str]] = None) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def isna(self) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def na_counts(self) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def quantile(self, q: float = 0.5) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def select_dtypes(self, include: Any = None, exclude: Any = None) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def merge(self, right, on=None, left_on=None, right_on=None, left_index=False, right_index=False, suffixes=('_x', '_y')) -> Any:
+        raise AbstractMethodError
+
+
+    @abstractmethod
+    def drop(self, labels: Any = None, axis: int = 1) -> Any:
         raise AbstractMethodError

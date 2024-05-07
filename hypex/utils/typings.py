@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Union, Dict, List, TypeVar, Callable
+from typing import Any, Union, Dict, List, TypeVar, Callable, Sequence
 
 StratificationRoleTypes = Union[float, str, datetime.datetime]
 DefaultRoleTypes = Union[float, bool, str, int]
@@ -7,6 +7,8 @@ TargetRoleTypes = Union[float, int, bool]
 CategoricalTypes = str
 
 FieldKeyTypes = Union[str, int]
+FieldsType = Union[FieldKeyTypes, Sequence[FieldKeyTypes]]
+# RoleDictType = Dict[FieldKeyTypes, ABCRole] cycled import
 
 FromDictType = Union[Dict[str, List[Any]], List[Dict[Any, Any]]]
 RoleNameType = str
