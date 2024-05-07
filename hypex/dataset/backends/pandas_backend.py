@@ -14,11 +14,11 @@ from typing import (
 
 import pandas as pd  # type: ignore
 
-from hypex.dataset.backends.abstract import DatasetBackendCalc
+from hypex.dataset.backends.abstract import DatasetBackendCalc, DatasetBackendNavigation
 from hypex.utils import FromDictType
 
 
-class PandasDataset(DatasetBackendCalc):
+class PandasNavigation(DatasetBackendNavigation):
     @staticmethod
     def _read_file(filename: Union[str, Path]) -> pd.DataFrame:
         file_extension = Path(filename).suffix
@@ -57,13 +57,13 @@ class PandasDataset(DatasetBackendCalc):
     def __repr__(self):
         return self.data.__repr__()
 
-    def _create_empty(
-        self,
-        index: Optional[Iterable] = None,
-        columns: Optional[Iterable[str]] = None,
-    ):
-        self.data = pd.DataFrame(index=index, columns=columns)
-        return self
+    @property
+    def index(self):
+        return self.data.index
+
+    @property
+    def columns(self):
+        return self.data.columns
 
     def _get_column_index(
         self, column_name: Union[Sequence[str], str]
@@ -94,19 +94,13 @@ class PandasDataset(DatasetBackendCalc):
         else:
             self.data.loc[:, name] = data
 
-    def append(self, other, index: bool = False) -> pd.DataFrame:
-        new_data = pd.concat([self.data, other.data])
-        if index:
-            new_data.reset_index()
-        return new_data
-
-    @property
-    def index(self):
-        return self.data.index
-
-    @property
-    def columns(self):
-        return self.data.columns
+    def _create_empty(
+        self,
+        index: Optional[Iterable] = None,
+        columns: Optional[Iterable[str]] = None,
+    ):
+        self.data = pd.DataFrame(index=index, columns=columns)
+        return self
 
     def from_dict(self, data: FromDictType, index: Union[Iterable, Sized, None] = None):
         self.data = pd.DataFrame().from_records(data)
@@ -120,6 +114,26 @@ class PandasDataset(DatasetBackendCalc):
             data[key] = list(data[key].values())
         index = list(self.index)
         return {"data": data, "index": index}
+
+    def append(self, other, index: bool = False) -> pd.DataFrame:
+        new_data = pd.concat([self.data, other.data])
+        if index:
+            new_data.reset_index()
+        return new_data
+
+    def loc(self, items: Iterable) -> Iterable:
+        data = self.data.loc[items]
+        return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+
+    def iloc(self, items: Iterable) -> Iterable:
+        data = self.data.iloc[items]
+        return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+
+
+class PandasDataset(PandasNavigation, DatasetBackendCalc):
+
+    def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series] = None):
+        super().__init__(data)
 
     def apply(self, func: Callable, **kwargs) -> pd.DataFrame:
         return self.data.apply(func, **kwargs)
@@ -136,14 +150,6 @@ class PandasDataset(DatasetBackendCalc):
     def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> List[Tuple]:
         groups = self.data.groupby(by, **kwargs)
         return list(groups)
-
-    def loc(self, items: Iterable) -> Iterable:
-        data = self.data.loc[items]
-        return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
-
-    def iloc(self, items: Iterable) -> Iterable:
-        data = self.data.iloc[items]
-        return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
     def mean(self) -> Union[pd.DataFrame, float]:
         return self.agg(["mean"])
