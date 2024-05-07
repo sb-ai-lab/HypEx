@@ -196,6 +196,18 @@ class Dataset(DatasetBase):
             dataset[1].tmp_roles = self.tmp_roles
         return datasets
 
+    def sort(
+        self,
+        by: Optional[Union[str, List]] = None,
+        ascending: Optional[bool] = True,
+        **kwargs,
+    ):
+        if by is None:
+            return Dataset(roles=self.roles, data=self.backend.sort_index())
+        return Dataset(
+            roles=self.roles, data=self.backend.sort_values(by=by, ascending=ascending)
+        )
+
     def mean(self):
         return self._convert_data_after_agg(self._backend.mean())
 
