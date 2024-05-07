@@ -10,7 +10,7 @@ from hypex.experiments.base import (
 )
 from hypex.stats import Mean
 from hypex.utils import ExperimentDataEnum, BackendsEnum
-from hypex.utils import ID_SPLIT_SYMBOL
+from hypex.utils import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
 
 
 class ABAnalyzer(Analyzer):
@@ -39,7 +39,7 @@ class ABAnalyzer(Analyzer):
                 t_data = t_data.append(data.analysis_tables[aid])
             t_data.data.index = analysis_ids
 
-            if c.__name__ in ["TTest", "MannWhitney"]:
+            if c.__name__ in ["TTest", "UTest"]:
                 for f in ["p-value", "pass"]:
                     analysis_data[f"{c.__name__} {f}"] = mean_operator.calc(
                         t_data[f]
@@ -50,7 +50,7 @@ class ABAnalyzer(Analyzer):
                 for idx, value in zip(indexes, values):
                     # TODO: fix this
                     analysis_data[
-                        f"{c.__name__} {idx.split(ID_SPLIT_SYMBOL)[-1].split('[[]')[0]}"
+                        f"{c.__name__} {idx.split(ID_SPLIT_SYMBOL)[-1].split(NAME_BORDER_SYMBOL)[1]}"
                     ] = value[0]
         analysis_data = Dataset.from_dict(
             [analysis_data],
