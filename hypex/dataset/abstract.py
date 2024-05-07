@@ -1,27 +1,16 @@
 import json
-import warnings
 from abc import ABC
-from typing import Iterable, Dict, Union, List, Optional, Any
+from typing import Iterable, Dict, Union, List, Optional
 
 import pandas as pd  # type: ignore
 
 from hypex.dataset.backends import PandasDataset
 from hypex.dataset.roles import (
-    InfoRole,
     ABCRole,
     default_roles,
     FeatureRole,
 )
 from hypex.utils import BackendsEnum, RoleColumnError
-
-
-# TODO 1: реализовать каскад абстракций (Хранение+Навигация -> Расчеты)
-# TODO 2: реализовать каскад абстракций для бэкенда
-# TODO 3: магические методы операторов
-# TODO 4: математичекие функции (abs, log, mean, median, mode, variance, std, min, max, _shuffle, unique, corr, transpose)
-# TODO 5: Enum для статистических тестов + реализация выбора функции из словаря
-# TODO 6: для фильтров (n_na, n_unique, value_counts, quantile, select_dtype, join, drop)
-# TODO 7: для предобработки (fillna, dropna, sort)
 
 
 def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
