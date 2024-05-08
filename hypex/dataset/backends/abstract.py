@@ -145,15 +145,19 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def dropna(self, subset: Union[str, Iterable[str]] = None) -> Any:
-        raise AbstractMethodError
-
-    @abstractmethod
-    def isna(self) -> Any:
+    def value_counts(self, normalize: bool = False, sort: bool = True, ascending: bool = False, dropna: bool = True) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
     def na_counts(self) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def dropna(self, how: ["any", "all"] = "any",  subset: Union[str, Iterable[str]] = None) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def isna(self) -> Any:
         raise AbstractMethodError
 
     @abstractmethod

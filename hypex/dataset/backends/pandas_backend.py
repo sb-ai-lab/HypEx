@@ -15,8 +15,7 @@ from typing import (
 import pandas as pd  # type: ignore
 
 from hypex.dataset.backends.abstract import DatasetBackendCalc
-from hypex.utils import FromDictType, FieldKeyTypes
-from hypex.utils.typings import FieldsType
+from hypex.utils import FromDictType, MergeOnError, FieldsType
 
 
 class PandasDataset(DatasetBackendCalc):
@@ -59,15 +58,15 @@ class PandasDataset(DatasetBackendCalc):
         return self.data.__repr__()
 
     def _create_empty(
-        self,
-        index: Optional[Iterable] = None,
-        columns: Optional[Iterable[str]] = None,
+            self,
+            index: Optional[Iterable] = None,
+            columns: Optional[Iterable[str]] = None,
     ):
         self.data = pd.DataFrame(index=index, columns=columns)
         return self
 
     def _get_column_index(
-        self, column_name: Union[Sequence[str], str]
+            self, column_name: Union[Sequence[str], str]
     ) -> Union[int, Sequence[int]]:
         return (
             self.data.columns.get_loc(column_name)
@@ -83,10 +82,10 @@ class PandasDataset(DatasetBackendCalc):
         return self
 
     def add_column(
-        self,
-        data: Union[Sequence],
-        name: str,
-        index: Optional[Sequence] = None,
+            self,
+            data: Union[Sequence],
+            name: str,
+            index: Optional[Sequence] = None,
     ):
         if index:
             self.data = self.data.join(
@@ -128,13 +127,11 @@ class PandasDataset(DatasetBackendCalc):
     def map(self, func: Callable, **kwargs) -> pd.DataFrame:
         return self.data.map(func, **kwargs)
 
-    # TODO: replace with a dict
     def unique(self):
-        return [(column, self.data[column].unique()) for column in self.data.columns]
+        return {column: self.data[column].unique() for column in self.data.columns}
 
-    # TODO: replace with a dict
     def nunique(self, dropna: bool = True):
-        return [(column, self.data[column].nunique()) for column in self.data.columns]
+        return {column: self.data[column].nunique() for column in self.data.columns}
 
     def isin(self, values: Iterable) -> Iterable[bool]:
         return self.data.isin(values)
@@ -177,60 +174,59 @@ class PandasDataset(DatasetBackendCalc):
         return self.agg(["std"])
 
     def coefficient_of_variation(self) -> Union[pd.DataFrame, float]:
-        # (t_data.data["pre_spends"].std() / t_data.data.mean()).to_frame().T
-        data = {
-            column: self.data[column].std() / self.data[column].mean()
-            for column in self.data.columns
-        }
-        result = pd.DataFrame(data=data, index=["cv"])
-        if result.shape[0] == 1 and result.shape[1] == 1:
-            return float(result.loc[result.index[0], result.columns[0]])
-        return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+        data = (self.data.std() / self.data.mean()).to_frame().T
+        data.index = ["cv"]
+        if data.shape[0] == 1 and data.shape[1] == 1:
+            return float(data.loc[data.index[0], data.columns[0]])
+        return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
-    # TODO: add all params excluding subset
-    def value_counts(self, dropna: bool = False) -> pd.DataFrame:
-        return self.data.value_counts(dropna=dropna).reset_index()
+    def value_counts(
+            self,
+            normalize: bool = False,
+            sort: bool = True,
+            ascending: bool = False,
+            dropna: bool = True,
+    ) -> pd.DataFrame:
+        return self.data.value_counts(
+            normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
+        ).reset_index()
 
-    # TODO: add mode (all, any)
-    def dropna(self, subset: Union[str, Iterable[str]] = None) -> pd.DataFrame:
-        return self.data.dropna(subset=subset)
+    def na_counts(self) -> Union[pd.DataFrame, int]:
+        data = self.data.isna().sum().to_frame().T
+        data.index = ["na_counts"]
+        if data.shape[0] == 1 and data.shape[1] == 1:
+            return int(data.loc[data.index[0], data.columns[0]])
+        return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+
+    def dropna(self, how: ["any", "all"] = "any", subset: Union[str, Iterable[str]] = None) -> pd.DataFrame:
+        return self.data.dropna(how=how, subset=subset)
 
     def isna(self) -> pd.DataFrame:
         return self.data.isna()
-
-    # TODO: rework
-    def na_counts(self) -> Union[pd.DataFrame, int]:
-        # t_data.data.isna().sum().to_frame().T
-        data = {
-            column: len(self.data[column]) - len(self.data[column].dropna())
-            for column in self.data.columns
-        }
-        result = pd.DataFrame(data=data, index=["na_counts"])
-        if result.shape[0] == 1 and result.shape[1] == 1:
-            return int(result.loc[result.index[0], result.columns[0]])
-        return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
     def quantile(self, q: float = 0.5) -> pd.DataFrame:
         return self.agg(func="quantile", q=q)
 
     def select_dtypes(
-        self, include: FieldsType = None, exclude: FieldsType = None
+            self, include: FieldsType = None, exclude: FieldsType = None
     ) -> pd.DataFrame:
         return self.data.select_dtypes(include=include, exclude=exclude)
 
-    # TODO: add types
     def merge(
-        self,
-        right: pd.DataFrame,
-        on=None,
-        left_on=None,
-        right_on=None,
-        left_index=False,
-        right_index=False,
-        suffixes=("_x", "_y"),
+            self,
+            right: pd.DataFrame,
+            on: FieldsType = None,
+            left_on: FieldsType = None,
+            right_on: FieldsType = None,
+            left_index: bool = False,
+            right_index: bool = False,
+            suffixes: tuple[str, str] = ("_x", "_y"),
     ) -> pd.DataFrame:
+        for on_ in [on, left_on, right_on]:
+            if on_ and (on_ not in [*self.columns, *right.columns]):
+                raise MergeOnError(on_)
         return self.data.merge(
-            right=right,
+            right=right.data,
             on=on,
             left_on=left_on,
             right_on=right_on,

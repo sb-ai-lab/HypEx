@@ -22,6 +22,7 @@ from hypex.utils.typings import (
     DecoratedType,
     DocstringInheritDecorator,
     RoleNameType,
+    FieldsType,
 )
 
 __all__ = [
@@ -48,4 +49,5 @@ __all__ = [
     "MergeDataError",
     "MergeBackendError",
     "MergeOnError",
+    "FieldsType",
     ]

@@ -21,7 +21,8 @@ from hypex.utils import (
     FromDictType,
     MergeDataError,
     MergeBackendError,
-    MergeOnError, FieldKeyTypes,
+    FieldKeyTypes,
+    FieldsType,
 )
 
 
@@ -101,7 +102,8 @@ class Dataset(DatasetBase):
             return result
         return Dataset(
             data=result,
-            roles={column: StatisticRole() for column in self.roles},
+            roles={column: StatisticRole() for column in self.roles}, # тут цикл именно по self.roles должен идти или
+            # по data.columns?
         )
 
     def add_column(
@@ -153,7 +155,7 @@ class Dataset(DatasetBase):
         self,
         func: Callable,
         role: Dict[FieldKeyTypes, ABCRole],
-        axis: int=0,
+        axis: int = 0,
         **kwargs,
     ):
         return Dataset(
@@ -228,17 +230,27 @@ class Dataset(DatasetBase):
     def coefficient_of_variation(self):
         return self._convert_data_after_agg(self._backend.coefficient_of_variation())
 
-    def value_counts(self, dropna: bool = False):
-        return self._convert_data_after_agg(self._backend.value_counts(dropna=dropna))
-
-    def dropna(self, subset: Union[str, Iterable[str]] = None):
-        return self._backend.dropna(subset=subset)
-
-    def isna(self):
-        return self._backend.isna()
+    def value_counts(
+        self,
+        normalize: bool = False,
+        sort: bool = True,
+        ascending: bool = False,
+        dropna: bool = True,
+    ):
+        return self._convert_data_after_agg(
+            self._backend.value_counts(
+                normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
+            )
+        )
 
     def na_counts(self):
         return self._convert_data_after_agg(self._backend.na_counts())
+
+    def dropna(self, how: ["any", "all"] = "any",  subset: Union[str, Iterable[str]] = None):
+        return Dataset(roles=self.roles, data=self._backend.dropna(how=how, subset=subset))
+
+    def isna(self):
+        return self._convert_data_after_agg(self._backend.isna())
 
     def quantile(self, q: float = 0.5):
         return self._convert_data_after_agg(self._backend.quantile(q=q))
@@ -251,21 +263,16 @@ class Dataset(DatasetBase):
     def merge(
         self,
         right,
-        on=None,
-        left_on=None,
-        right_on=None,
-        left_index=False,
-        right_index=False,
-        suffixes=("_x", "_y"),
+        on: FieldsType = None,
+        left_on: FieldsType = None,
+        right_on: FieldsType = None,
+        left_index: bool = False,
+        right_index: bool = False,
+        suffixes: tuple[str, str] = ("_x", "_y"),
     ):
-        # use backend check
-        for on_ in [on, left_on, right_on]:
-            if on_ and (on_ not in [*self.columns, *right.columns]):
-                raise MergeOnError(on_)
         if not isinstance(right, Dataset):
             raise MergeDataError(type(right))
-        #TODO type is type
-        if not isinstance(right._backend, type(self._backend)):
+        if type(right._backend) is not type(self._backend):
             raise MergeBackendError(type(right._backend), type(self._backend))
         t_data = self._backend.merge(
             right=right._backend,
@@ -280,10 +287,10 @@ class Dataset(DatasetBase):
         t_roles.update(right.roles)
 
         for c in t_data.columns:
-            if f"{c}".endwith(suffixes[0]) and c[:-len(suffixes[0])] in self.columns:
-                t_roles[c] = self.roles[c[:-len(suffixes[0])]]
-            if f"{c}".endwith(suffixes[1]) and c[:-len(suffixes[1])] in right.columns:
-                t_roles[c] = right.roles[c[:-len(suffixes[1])]]
+            if f"{c}".endswith(suffixes[0]) and c[: -len(suffixes[0])] in self.columns:
+                t_roles[c] = self.roles[c[: -len(suffixes[0])]]
+            if f"{c}".endswith(suffixes[1]) and c[: -len(suffixes[1])] in right.columns:
+                t_roles[c] = right.roles[c[: -len(suffixes[1])]]
 
         new_roles = {c: t_roles[c] for c in t_data.columns}
         return Dataset(roles=new_roles, data=t_data)
