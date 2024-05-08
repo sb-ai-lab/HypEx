@@ -7,7 +7,6 @@ from hypex.utils import ExperimentDataEnum
 
 
 class BinaryOperator(Executor, ABC):
-
     def __init__(self, full_name: Optional[str] = None, key: Any = ""):
         super().__init__(full_name, key)
 
@@ -25,7 +24,7 @@ class BinaryOperator(Executor, ABC):
 
     @abstractmethod
     def calc(self, data: Dataset, other: Optional[Dataset] = None):
-        raise NotImplementedError
+        raise AbstractMethodError
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         arg1 = data.get_columns_by_roles(Arg1Role(), tmp_role=True)[0]

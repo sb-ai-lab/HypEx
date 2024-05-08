@@ -4,6 +4,7 @@ from typing import Optional, Any, Union, Dict
 
 from hypex.dataset import ExperimentData, Dataset
 from hypex.utils import ID_SPLIT_SYMBOL
+from hypex.utils.errors import AbstractMethodError
 
 
 class Executor(ABC):
@@ -75,13 +76,14 @@ class Executor(ABC):
     ) -> ExperimentData:
         return data
 
+    @staticmethod
     @abstractmethod
-    def calc(self, data: Dataset):
-        raise NotImplementedError
+    def calc(data: Dataset, **kwargs):
+        raise AbstractMethodError
 
+    @abstractmethod
     def execute(self, data: ExperimentData) -> ExperimentData:
-        value = self.calc(data)
-        return self._set_value(data, value)
+        raise AbstractMethodError
 
 
 class ComplexExecutor(Executor, ABC):

@@ -4,9 +4,10 @@ from typing import Optional, Dict, Any, List, Union
 from hypex.dataset import ABCRole, GroupingRole, TempTargetRole, StatisticRole
 from hypex.dataset import Dataset, ExperimentData
 from hypex.executor import ComplexExecutor, Executor
-from hypex.utils import ExperimentDataEnum, SpaceEnum, BackendsEnum
+from hypex.utils import ExperimentDataEnum, SpaceEnum, BackendsEnum, FieldKeyTypes
 from hypex.utils import FromDictType
 from hypex.utils import NoColumnsError, ComparisonNotSuitableFieldError
+from hypex.utils.errors import AbstractMethodError
 
 
 class GroupComparator(ComplexExecutor):
@@ -28,12 +29,9 @@ class GroupComparator(ComplexExecutor):
     ) -> Dataset:
         return self._extract_dataset(compare_result, roles)
 
-    def _one_stat_calculation(self, data, stat: Executor):
-        pass
-
     @abstractmethod
     def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
-        raise NotImplementedError
+        raise AbstractMethodError
 
     def __group_field_searching(self, data: ExperimentData):
         group_field = []
@@ -65,8 +63,10 @@ class GroupComparator(ComplexExecutor):
         ]
         return result
 
-    def calc(self, data: Dataset) -> Dict:
-        target_field = None
+    @staticmethod
+    def calc(
+        data: Dataset, group_field: Optional[FieldKeyTypes] = None, **kwargs
+    ) -> Dict:
         group_field = self.__group_field_searching(data)
         meta_name = group_field[0] if len(group_field) == 1 else group_field
         group_name = (

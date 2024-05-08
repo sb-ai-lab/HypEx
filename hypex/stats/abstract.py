@@ -12,7 +12,7 @@ class AggStat(Executor, ABC):
 
     @abstractmethod
     def calc(self, data: Dataset):
-        raise NotImplementedError
+        raise AbstractMethodError
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         data.set_value(
