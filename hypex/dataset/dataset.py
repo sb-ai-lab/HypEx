@@ -1,4 +1,5 @@
 import warnings
+from copy import copy
 from typing import Union, List, Iterable, Any, Dict, Callable, Hashable, Optional
 
 import pandas as pd  # type: ignore
@@ -119,14 +120,23 @@ class Dataset(DatasetBase):
             self.roles.update(role)
             self._backend.add_column(data, list(role.keys())[0], index)
 
-    def append(self, other, index=None):
+    def _check_other_dataset(self, other):
         if not isinstance(other, Dataset):
             raise ConcatDataError(type(other))
         if type(other._backend) != type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
-        self.roles.update(other.roles)
+
+    def append(self, other, index=None):
+        if isinstance(other, Dataset):
+            other = [other]
+
+        new_roles = copy(self.roles)
+        for o in other:
+            self._check_other_dataset(o)
+            new_roles.update(o.roles)
+
         return Dataset(
-            roles=self.roles, data=self._backend.append(other._backend, index)
+            roles=new_roles, data=self._backend.append(other._backend, index)
         )
 
     @staticmethod
@@ -213,6 +223,9 @@ class Dataset(DatasetBase):
 
     def agg(self, func: Union[str, List]):
         return self._convert_data_after_agg(self._backend.agg(func))
+
+    def stat_test(self, enum: StatTestEnum):
+        pass
 
 
 class ExperimentData(Dataset):

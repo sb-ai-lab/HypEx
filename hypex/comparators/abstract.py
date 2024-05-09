@@ -3,26 +3,25 @@ from typing import Optional, Dict, Any, List, Union
 
 from hypex.dataset import ABCRole, GroupingRole, TempTargetRole, StatisticRole
 from hypex.dataset import Dataset, ExperimentData
-from hypex.executor import ComplexExecutor, Executor
+from hypex.executor import Executor
 from hypex.utils import ExperimentDataEnum, SpaceEnum, BackendsEnum, FieldKeyTypes
 from hypex.utils import FromDictType
 from hypex.utils import NoColumnsError, ComparisonNotSuitableFieldError
 from hypex.utils.errors import AbstractMethodError
 
 
-class GroupComparator(ComplexExecutor):
+class GroupComparator(Executor, ABC):
     def __init__(
         self,
         grouping_role: Optional[ABCRole] = None,
         space: SpaceEnum = SpaceEnum.auto,
-        inner_executors: Optional[Dict[str, Executor]] = None,
         full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.grouping_role = grouping_role or GroupingRole()
         self.space = space
         self.__additional_mode = space == SpaceEnum.additional
-        super().__init__(inner_executors=inner_executors, full_name=full_name, key=key)
+        super().__init__(full_name=full_name, key=key)
 
     def _local_extract_dataset(
         self, compare_result: Dict[Any, Any], roles: Dict[Any, ABCRole]

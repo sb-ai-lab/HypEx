@@ -85,31 +85,3 @@ class Executor(ABC):
     def execute(self, data: ExperimentData) -> ExperimentData:
         raise AbstractMethodError
 
-
-class ComplexExecutor(Executor, ABC):
-    default_inner_executors: Dict[str, Executor] = {}
-
-    def _get_inner_executors(
-        self, inner_executors: Optional[Dict[str, Executor]] = None
-    ) -> Dict[str, Executor]:
-        result = {}
-        inner_executors = inner_executors or {}
-        for key, executor in self.default_inner_executors.items():
-            if key not in inner_executors:
-                if len(inner_executors):
-                    warnings.warn(
-                        f"{key} executor not found in inner_executors. Will {key} will be used by default."
-                    )
-                result[key] = executor
-            else:
-                result[key] = inner_executors[key]
-        return result
-
-    def __init__(
-        self,
-        inner_executors: Optional[Dict[str, Executor]] = None,
-        full_name: Optional[str] = None,
-        key: Any = "",
-    ):
-        super().__init__(full_name=full_name, key=key)
-        self.inner_executors = self._get_inner_executors(inner_executors)

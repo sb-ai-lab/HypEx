@@ -1,6 +1,6 @@
 from typing import Callable
 
-from scipy.stats import ttest_ind, ks_2samp, chi2_contingency
+from scipy.stats import ttest_ind, ks_2samp, chi2_contingency, mannwhitneyu
 
 from typing import Union, List, Callable
 
@@ -70,6 +70,11 @@ class TTest(StatTest):
 class KSTest(StatTest):
     def __init__(self, alpha: float = 0.05):
         super().__init__(ks_2samp, alpha=alpha)
+
+
+class UTest(StatTest):
+    def __init__(self, alpha: float = 0.05):
+        super().__init__(mannwhitneyu, alpha=alpha)
 
 
 class Chi2Test(StatTest):
