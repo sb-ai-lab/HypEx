@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 from typing import Iterable, Any, Union, Callable, Sized, Optional, Dict, Sequence
 
-from hypex.utils import FromDictType
+from hypex.utils import FromDictType, FieldsType
 from hypex.utils.errors import AbstractMethodError
 
 
@@ -37,6 +37,118 @@ class DatasetBackendNavigation(ABC):
 
     @abstractmethod
     def __len__(self) -> int:
+        raise AbstractMethodError
+
+    # Comparison methods:
+    @abstractmethod
+    def __eq__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __ne__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __le__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __lt__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __ge__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __gt__(self, other) -> Any:
+        raise AbstractMethodError
+
+    # Unary methods:
+    @abstractmethod
+    def __pos__(self) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __neg__(self) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __abs__(self) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __invert__(self) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __round__(self, ndigits: int = 0) -> Any:
+        raise AbstractMethodError
+
+    # Binary methods:
+    @abstractmethod
+    def __add__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __sub__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __mul__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __floordiv__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __div__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __truediv__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __mod__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __pow__(self, other) -> Any:
+        raise AbstractMethodError
+
+    # Right arithmetic methods:
+    @abstractmethod
+    def __radd__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __rsub__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __rmul__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __rfloordiv__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __rdiv__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __rtruediv__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __rmod__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __rpow__(self, other) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
@@ -121,6 +233,10 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
+    def is_empty(self) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
     def unique(self) -> Any:
         raise AbstractMethodError
 
@@ -145,7 +261,13 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def value_counts(self, normalize: bool = False, sort: bool = True, ascending: bool = False, dropna: bool = True) -> Any:
+    def value_counts(
+        self,
+        normalize: bool = False,
+        sort: bool = True,
+        ascending: bool = False,
+        dropna: bool = True,
+    ) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
@@ -153,7 +275,9 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def dropna(self, how: ["any", "all"] = "any",  subset: Union[str, Iterable[str]] = None) -> Any:
+    def dropna(
+        self, how: str = "any", subset: Union[str, Iterable[str]] = []
+    ) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
@@ -169,10 +293,18 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def merge(self, right, on=None, left_on=None, right_on=None, left_index=False, right_index=False, suffixes=('_x', '_y')) -> Any:
+    def merge(
+        self,
+        right: Any,
+        on: FieldsType = "",
+        left_on: FieldsType = "",
+        right_on: FieldsType = "",
+        left_index: bool = False,
+        right_index: bool = False,
+        suffixes: tuple[str, str] = ("_x", "_y"),
+    ) -> Any:
         raise AbstractMethodError
 
-
     @abstractmethod
-    def drop(self, labels: Any = None, axis: int = 1) -> Any:
+    def drop(self, labels: FieldsType = "", axis: int = 1) -> Any:
         raise AbstractMethodError

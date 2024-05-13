@@ -8,8 +8,8 @@ from hypex.utils.errors import (
     ConcatBackendError,
     NotFoundInExperimentDataError,
     ComparisonNotSuitableFieldError,
-    MergeDataError,
-    MergeBackendError,
+    DataTypeError,
+    BackendTypeError,
     MergeOnError,
 )
 from hypex.utils.typings import (
@@ -23,6 +23,7 @@ from hypex.utils.typings import (
     DocstringInheritDecorator,
     RoleNameType,
     FieldsType,
+    ScalarType,
 )
 
 __all__ = [
@@ -46,8 +47,9 @@ __all__ = [
     "RoleNameType",
     "DecoratedType",
     "DocstringInheritDecorator",
-    "MergeDataError",
-    "MergeBackendError",
+    "DataTypeError",
+    "BackendTypeError",
     "MergeOnError",
     "FieldsType",
-    ]
+    "ScalarType",
+]

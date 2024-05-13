@@ -15,7 +15,14 @@ from typing import (
 import pandas as pd  # type: ignore
 
 from hypex.dataset.backends.abstract import DatasetBackendCalc
-from hypex.utils import FromDictType, MergeOnError, FieldsType
+from hypex.utils import FromDictType, MergeOnError, FieldsType, ScalarType
+
+binary_operations = {
+    "add": pd.DataFrame.add,
+    "sub": pd.DataFrame.sub,
+    "mul": pd.DataFrame.mul,
+    "div": pd.DataFrame.div,
+}
 
 
 class PandasDataset(DatasetBackendCalc):
@@ -54,19 +61,111 @@ class PandasDataset(DatasetBackendCalc):
     def __len__(self):
         return len(self.data)
 
+    def __binary_operator(self, other, func_name: str) -> Any:
+        func = getattr(self.data, func_name)
+        if isinstance(other, PandasDataset):
+            return func(other.data)
+        else:
+            return func(other)
+
+    # comparison operators:
+    def __eq__(self, other) -> Any:
+        return self.__binary_operator(other, "eq")
+
+    def __ne__(self, other) -> Any:
+        return self.__binary_operator(other, "ne")
+
+    def __le__(self, other) -> Any:
+        return self.__binary_operator(other, "le")
+
+    def __lt__(self, other) -> Any:
+        return self.__binary_operator(other, "lt")
+
+    def __ge__(self, other) -> Any:
+        return self.__binary_operator(other, "ge")
+
+    def __gt__(self, other) -> Any:
+        return self.__binary_operator(other, "gt")
+
+    # Unary operations:
+    def __pos__(self) -> Any:
+        return +self.data
+
+    def __neg__(self) -> Any:
+        return -self.data
+
+    def __abs__(self) -> Any:
+        return abs(self.data)
+
+    def __invert__(self) -> Any:
+        return ~self.data
+
+    def __round__(self, ndigits: int = 0) -> Any:
+        return round(self.data)
+
+    # Binary operations:
+    def __add__(self, other) -> Any:
+        return self.__binary_operator(other, "add")
+
+    def __sub__(self, other) -> Any:
+        return self.__binary_operator(other, "sub")
+
+    def __mul__(self, other) -> Any:
+        return self.__binary_operator(other, "mul")
+
+    def __floordiv__(self, other) -> Any:
+        return self.__binary_operator(other, "floordiv")
+
+    def __div__(self, other) -> Any:
+        return self.__binary_operator(other, "div")
+
+    def __truediv__(self, other) -> Any:
+        return self.__binary_operator(other, "truediv")
+
+    def __mod__(self, other) -> Any:
+        return self.__binary_operator(other, "mod")
+
+    def __pow__(self, other) -> Any:
+        return self.__binary_operator(other, "pow")
+
+    # Right arithmetic operators:
+    def __radd__(self, other) -> Any:
+        return self.__binary_operator(other, "radd")
+
+    def __rsub__(self, other) -> Any:
+        return self.__binary_operator(other, "rsub")
+
+    def __rmul__(self, other) -> Any:
+        return self.__binary_operator(other, "rmul")
+
+    def __rfloordiv__(self, other) -> Any:
+        return self.__binary_operator(other, "rfloordiv")
+
+    def __rdiv__(self, other) -> Any:
+        return self.__binary_operator(other, "rdiv")
+
+    def __rtruediv__(self, other) -> Any:
+        return self.__binary_operator(other, "rtruediv")
+
+    def __rmod__(self, other) -> Any:
+        return self.__binary_operator(other, "rmod")
+
+    def __rpow__(self, other) -> Any:
+        return self.__binary_operator(other, "rpow")
+
     def __repr__(self):
         return self.data.__repr__()
 
     def _create_empty(
-            self,
-            index: Optional[Iterable] = None,
-            columns: Optional[Iterable[str]] = None,
+        self,
+        index: Optional[Iterable] = None,
+        columns: Optional[Iterable[str]] = None,
     ):
         self.data = pd.DataFrame(index=index, columns=columns)
         return self
 
     def _get_column_index(
-            self, column_name: Union[Sequence[str], str]
+        self, column_name: Union[Sequence[str], str]
     ) -> Union[int, Sequence[int]]:
         return (
             self.data.columns.get_loc(column_name)
@@ -82,10 +181,10 @@ class PandasDataset(DatasetBackendCalc):
         return self
 
     def add_column(
-            self,
-            data: Union[Sequence],
-            name: str,
-            index: Optional[Sequence] = None,
+        self,
+        data: Union[Sequence],
+        name: str,
+        index: Optional[Sequence] = None,
     ):
         if index:
             self.data = self.data.join(
@@ -126,6 +225,9 @@ class PandasDataset(DatasetBackendCalc):
 
     def map(self, func: Callable, **kwargs) -> pd.DataFrame:
         return self.data.map(func, **kwargs)
+
+    def is_empty(self) -> bool:
+        return self.data.empty
 
     def unique(self):
         return {column: self.data[column].unique() for column in self.data.columns}
@@ -181,11 +283,11 @@ class PandasDataset(DatasetBackendCalc):
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
     def value_counts(
-            self,
-            normalize: bool = False,
-            sort: bool = True,
-            ascending: bool = False,
-            dropna: bool = True,
+        self,
+        normalize: bool = False,
+        sort: bool = True,
+        ascending: bool = False,
+        dropna: bool = True,
     ) -> pd.DataFrame:
         return self.data.value_counts(
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
@@ -198,7 +300,9 @@ class PandasDataset(DatasetBackendCalc):
             return int(data.loc[data.index[0], data.columns[0]])
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
-    def dropna(self, how: ["any", "all"] = "any", subset: Union[str, Iterable[str]] = None) -> pd.DataFrame:
+    def dropna(
+        self, how: str = "any", subset: Union[str, Iterable[str]] = []
+    ) -> pd.DataFrame:
         return self.data.dropna(how=how, subset=subset)
 
     def isna(self) -> pd.DataFrame:
@@ -208,19 +312,19 @@ class PandasDataset(DatasetBackendCalc):
         return self.agg(func="quantile", q=q)
 
     def select_dtypes(
-            self, include: FieldsType = None, exclude: FieldsType = None
+        self, include: FieldsType = "", exclude: FieldsType = ""
     ) -> pd.DataFrame:
         return self.data.select_dtypes(include=include, exclude=exclude)
 
     def merge(
-            self,
-            right: pd.DataFrame,
-            on: FieldsType = None,
-            left_on: FieldsType = None,
-            right_on: FieldsType = None,
-            left_index: bool = False,
-            right_index: bool = False,
-            suffixes: tuple[str, str] = ("_x", "_y"),
+        self,
+        right: pd.DataFrame,  # should be PandasDataset.
+        on: FieldsType = "",
+        left_on: FieldsType = "",
+        right_on: FieldsType = "",
+        left_index: bool = False,
+        right_index: bool = False,
+        suffixes: tuple[str, str] = ("_x", "_y"),
     ) -> pd.DataFrame:
         for on_ in [on, left_on, right_on]:
             if on_ and (on_ not in [*self.columns, *right.columns]):
@@ -235,5 +339,5 @@ class PandasDataset(DatasetBackendCalc):
             suffixes=suffixes,
         )
 
-    def drop(self, labels: FieldsType = None, axis: int = 1) -> pd.DataFrame:
+    def drop(self, labels: FieldsType = "", axis: int = 1) -> pd.DataFrame:
         return self.data.drop(labels=labels, axis=axis)

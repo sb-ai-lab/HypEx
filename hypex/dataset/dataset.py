@@ -1,6 +1,16 @@
 import warnings
 from copy import copy
-from typing import Union, List, Iterable, Any, Dict, Callable, Hashable, Optional
+from typing import (
+    Union,
+    List,
+    Iterable,
+    Any,
+    Dict,
+    Callable,
+    Hashable,
+    Optional,
+    Sequence,
+)
 
 import pandas as pd  # type: ignore
 
@@ -19,10 +29,11 @@ from hypex.utils import (
     ConcatBackendError,
     NotFoundInExperimentDataError,
     FromDictType,
-    MergeDataError,
-    MergeBackendError,
+    DataTypeError,
+    BackendTypeError,
     FieldKeyTypes,
     FieldsType,
+    ScalarType,
 )
 
 
@@ -86,6 +97,117 @@ class Dataset(DatasetBase):
             warnings.warn("Column must be added by add_column", category=SyntaxWarning)
         self.data[key] = value
 
+    def __comparison_operator(self, other, func_name: str) -> Any:
+        func = getattr(self._backend, func_name)
+        new_roles = self.roles.copy()
+        for role in new_roles.values():
+            role.data_type = None
+        if not isinstance(other, Union[Dataset, ScalarType, Sequence]):
+            raise DataTypeError(type(other))
+        if isinstance(other, Dataset):
+            if type(other._backend) is not type(self._backend):
+                raise BackendTypeError(type(other._backend), type(self._backend))
+            return Dataset(roles=new_roles, data=func(other._backend))
+        return Dataset(roles=new_roles, data=func(other))
+
+    def __binary_operator(self, other, func_name: str) -> Any:
+        func = getattr(self._backend, func_name)
+        if not isinstance(other, Union[Dataset, ScalarType, Sequence]):
+            raise DataTypeError(type(other))
+        if isinstance(other, Dataset):
+            if type(other._backend) is not type(self._backend):
+                raise BackendTypeError(type(other._backend), type(self._backend))
+            return Dataset(roles=self.roles, data=func(other._backend))
+        return Dataset(roles=self.roles, data=func(other))
+
+    # comparison operators:
+    def __eq__(self, other):
+        return self.__comparison_operator(other, "__eq__")
+
+    def __ne__(self, other):
+        return self.__comparison_operator(other, "__ne__")
+
+    def __le__(self, other):
+        return self.__comparison_operator(other, "__le__")
+
+    def __lt__(self, other):
+        return self.__comparison_operator(other, "__lt__")
+
+    def __ge__(self, other):
+        return self.__comparison_operator(other, "__ge__")
+
+    def __gt__(self, other):
+        return self.__comparison_operator(other, "__gt__")
+
+    # unary operators:
+    def __pos__(self):
+        return Dataset(roles=self.roles, data=(+self._backend))
+
+    def __neg__(self):
+        return Dataset(roles=self.roles, data=(-self._backend))
+
+    def __abs__(self):
+        return Dataset(roles=self.roles, data=abs(self._backend))
+
+    def __invert__(self):
+        return Dataset(roles=self.roles, data=(~self._backend))
+
+    def __round__(self, ndigits: int = 0):
+        return Dataset(roles=self.roles, data=round(self._backend, ndigits))
+
+    def __bool__(self):
+        return not self._backend.is_empty()
+
+    # Binary math operators:
+    def __add__(self, other):
+        return self.__binary_operator(other, "__add__")
+
+    def __sub__(self, other):
+        return self.__binary_operator(other, "__sub__")
+
+    def __mul__(self, other):
+        return self.__binary_operator(other, "__mul__")
+
+    def __floordiv__(self, other):
+        return self.__binary_operator(other, "__floordiv__")
+
+    def __div__(self, other):
+        return self.__binary_operator(other, "__div__")
+
+    def __truediv__(self, other):
+        return self.__binary_operator(other, "__truediv__")
+
+    def __mod__(self, other):
+        return self.__binary_operator(other, "__mod__")
+
+    def __pow__(self, other):
+        return self.__binary_operator(other, "__pow__")
+
+    # Right arithmetic operators:
+    def __radd__(self, other):
+        return self.__binary_operator(other, "__radd__")
+
+    def __rsub__(self, other):
+        return self.__binary_operator(other, "__rsub__")
+
+    def __rmul__(self, other):
+        return self.__binary_operator(other, "__rmul__")
+
+    def __rfloordiv__(self, other):
+        return self.__binary_operator(other, "__rfloordiv__")
+
+    def __rdiv__(self, other):
+        return self.__binary_operator(other, "__rdiv__")
+
+    def __rtruediv__(self, other):
+        return self.__binary_operator(other, "__rtruediv__")
+
+    def __rmod__(self, other):
+        return self.__binary_operator(other, "__rmod__")
+
+    def __rpow__(self, other) -> Any:
+        return self.__binary_operator(other, "__rpow__")
+
     @staticmethod
     def _create_empty(backend=BackendsEnum.pandas, roles=None, index=None):
         if roles is None:
@@ -102,7 +224,9 @@ class Dataset(DatasetBase):
             return result
         return Dataset(
             data=result,
-            roles={column: StatisticRole() for column in self.roles}, # тут цикл именно по self.roles должен идти или
+            roles={
+                column: StatisticRole() for column in self.roles
+            },  # тут цикл именно по self.roles должен идти или
             # по data.columns?
         )
 
@@ -171,6 +295,9 @@ class Dataset(DatasetBase):
             data=self._backend.map(func=func, na_action=na_action, **kwargs),
         )
 
+    def is_empty(self):
+        return self._backend.is_empty()
+
     def unique(self):
         return self._backend.unique()
 
@@ -237,17 +364,22 @@ class Dataset(DatasetBase):
         ascending: bool = False,
         dropna: bool = True,
     ):
-        return self._convert_data_after_agg(
-            self._backend.value_counts(
-                normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
-            )
+        t_data = self._backend.value_counts(
+            normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
         )
+        t_roles = self.roles
+        t_roles["count"] = StatisticRole()
+        return Dataset(roles=t_roles, data=t_data)
 
     def na_counts(self):
         return self._convert_data_after_agg(self._backend.na_counts())
 
-    def dropna(self, how: ["any", "all"] = "any",  subset: Union[str, Iterable[str]] = None):
-        return Dataset(roles=self.roles, data=self._backend.dropna(how=how, subset=subset))
+    def dropna(
+        self, how: str = "any", subset: Union[str, Iterable[str]] = []
+    ):
+        return Dataset(
+            roles=self.roles, data=self._backend.dropna(how=how, subset=subset)
+        )
 
     def isna(self):
         return self._convert_data_after_agg(self._backend.isna())
@@ -263,17 +395,17 @@ class Dataset(DatasetBase):
     def merge(
         self,
         right,
-        on: FieldsType = None,
-        left_on: FieldsType = None,
-        right_on: FieldsType = None,
+        on: FieldsType = "",
+        left_on: FieldsType = "",
+        right_on: FieldsType = "",
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
     ):
         if not isinstance(right, Dataset):
-            raise MergeDataError(type(right))
+            raise DataTypeError(type(right))
         if type(right._backend) is not type(self._backend):
-            raise MergeBackendError(type(right._backend), type(self._backend))
+            raise BackendTypeError(type(right._backend), type(self._backend))
         t_data = self._backend.merge(
             right=right._backend,
             on=on,

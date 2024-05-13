@@ -45,18 +45,20 @@ class AbstractMethodError(NotImplementedError):
         )
 
 
-class MergeDataError(Exception):
+class DataTypeError(Exception):
     def __init__(self, data_type):
-        super().__init__(f"Can only merge Dataset to Dataset. Got {data_type}")
+        super().__init__(
+            f"Can only perform the operation for Dataset and Dataset. Got {data_type}"
+        )
 
 
-class MergeBackendError(Exception):
+class BackendTypeError(Exception):
     def __init__(self, other_backend, backend):
         super().__init__(
-            f"Can only merge data with the same backends. Got {other_backend} expected {backend}")
+            f"Can only perform the operation with the same backends. Got {other_backend} expected {backend}"
+        )
 
 
 class MergeOnError(Exception):
     def __init__(self, on):
-        super().__init__(
-            f"Can only merge on one of the columns data. Got {on}")
+        super().__init__(f"Can only merge on one of the columns data. Got {on}")

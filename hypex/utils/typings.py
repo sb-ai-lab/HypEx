@@ -5,6 +5,7 @@ StratificationRoleTypes = Union[float, str, datetime.datetime]
 DefaultRoleTypes = Union[float, bool, str, int]
 TargetRoleTypes = Union[float, int, bool]
 CategoricalTypes = str
+ScalarType = Union[float, int, str, bool]
 
 FieldKeyTypes = Union[str, int]
 FieldsType = Union[FieldKeyTypes, Sequence[FieldKeyTypes]]
