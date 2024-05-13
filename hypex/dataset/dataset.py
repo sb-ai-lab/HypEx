@@ -17,7 +17,8 @@ from hypex.utils import (
     ConcatDataError,
     ConcatBackendError,
     NotFoundInExperimentDataError,
-    FromDictType,
+    FromDictTypes,
+    MultiFieldKeyTypes,
 )
 
 
@@ -131,7 +132,7 @@ class Dataset(DatasetBase):
 
     @staticmethod
     def from_dict(
-        data: FromDictType,
+        data: FromDictTypes,
         roles: Union[
             Dict[ABCRole, Union[List[Union[str, int]], str, int]],
             Dict[Union[str, int], ABCRole],
@@ -198,7 +199,7 @@ class Dataset(DatasetBase):
 
     def sort(
         self,
-        by: Optional[Union[str, List]] = None,
+        by: Optional[MultiFieldKeyTypes] = None,
         ascending: Optional[bool] = True,
         **kwargs,
     ):
