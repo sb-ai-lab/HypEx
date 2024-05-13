@@ -203,7 +203,7 @@ class Dataset(DatasetBase):
         **kwargs,
     ):
         if by is None:
-            return Dataset(roles=self.roles, data=self.backend.sort_index())
+            return Dataset(roles=self.roles, data=self.backend.sort_index(ascending=ascending))
         return Dataset(
             roles=self.roles, data=self.backend.sort_values(by=by, ascending=ascending)
         )

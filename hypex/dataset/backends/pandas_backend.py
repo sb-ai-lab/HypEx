@@ -167,7 +167,7 @@ class PandasDataset(DatasetBackendCalc):
             return float(result.loc[result.index[0], result.columns[0]])
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
-    def sort_index(self, **kwargs) -> pd.DataFrame:
+    def sort_index(self, ascending: bool = True, **kwargs) -> pd.DataFrame:
         return self.data.sort_index(**kwargs)
 
     def sort_values(
