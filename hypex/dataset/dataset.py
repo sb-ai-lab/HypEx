@@ -205,10 +205,12 @@ class Dataset(DatasetBase):
     ):
         if by is None:
             return Dataset(
-                roles=self.roles, data=self.backend.sort_index(ascending=ascending, **kwargs)
+                roles=self.roles,
+                data=self.backend.sort_index(ascending=ascending, **kwargs),
             )
         return Dataset(
-            roles=self.roles, data=self.backend.sort_values(by=by, ascending=ascending, **kwargs)
+            roles=self.roles,
+            data=self.backend.sort_values(by=by, ascending=ascending, **kwargs),
         )
 
     def mean(self):
