@@ -4,6 +4,7 @@ from hypex.dataset import Dataset, ExperimentData
 from hypex.experiments.base import Executor
 
 
+# TODO: merge with other branch
 class Shuffle(Executor):
     def __init__(
         self,

@@ -57,7 +57,7 @@ class PandasDataset(DatasetBackendCalc):
     def __repr__(self):
         return self.data.__repr__()
 
-    def _create_empty(
+    def create_empty(
         self,
         index: Optional[Iterable] = None,
         columns: Optional[Iterable[str]] = None,

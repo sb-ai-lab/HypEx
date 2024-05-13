@@ -44,7 +44,7 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def _create_empty(
+    def create_empty(
         self,
         index: Optional[Iterable] = None,
         columns: Optional[Iterable[str]] = None,

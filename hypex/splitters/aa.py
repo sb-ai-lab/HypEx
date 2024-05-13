@@ -7,12 +7,14 @@ from hypex.dataset import (
     StratificationRole,
     TreatmentRole,
 )
-from hypex.executor import ComplexExecutor, Executor
+from hypex.executor import Executor
+from hypex.executor.executor import Calculator
 from hypex.transformers import Shuffle
 from hypex.utils import ExperimentDataEnum
 
 
-class AASplitter(ComplexExecutor):
+# TODO: merge with other branch
+class AASplitter(Calculator):
     def __init__(
         self,
         control_size: float = 0.5,
@@ -54,7 +56,7 @@ class AASplitterWithGrouping(AASplitter):
         group_field = data.get_columns_by_roles(GroupingRole())
         groups = list(data.groupby(group_field))
         edge = len(groups) // 2
-        result: Dataset = Dataset._create_empty()
+        result: Dataset = Dataset.create_empty()
         for i, group in enumerate(groups):
             group_ds = Dataset.from_dict(
                 [{"group_for_split": group[0], "group": "A" if i < edge else "B"}]
@@ -80,7 +82,7 @@ class AASplitterWithStratification(AASplitter):
         stratification_columns = data.get_columns_by_roles(StratificationRole())
 
         groups = data.groupby(stratification_columns)
-        result = Dataset._create_empty()
+        result = Dataset.create_empty()
         for _, gd in groups:
             ged = ExperimentData(gd)
             ged = super().execute(ged)
