@@ -1,6 +1,6 @@
-from hypex.utils.constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
-from hypex.utils.enums import SpaceEnum, BackendsEnum, ExperimentDataEnum
-from hypex.utils.errors import (
+from .constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
+from .enums import SpaceEnum, BackendsEnum, ExperimentDataEnum
+from .errors import (
     SpaceError,
     NoColumnsError,
     RoleColumnError,
@@ -9,8 +9,9 @@ from hypex.utils.errors import (
     NotFoundInExperimentDataError,
     ComparisonNotSuitableFieldError,
 )
-from hypex.utils.typings import (
-    FromDictType,
+
+from .typings import (
+    FromDictTypes,
     TargetRoleTypes,
     DefaultRoleTypes,
     StratificationRoleTypes,
@@ -19,6 +20,7 @@ from hypex.utils.typings import (
     DecoratedType,
     DocstringInheritDecorator,
     RoleNameType,
+    MultiFieldKeyTypes,
 )
 
 __all__ = [
@@ -34,7 +36,7 @@ __all__ = [
     "ConcatBackendError",
     "NotFoundInExperimentDataError",
     "ComparisonNotSuitableFieldError",
-    "FromDictType",
+    "FromDictTypes",
     "TargetRoleTypes",
     "CategoricalTypes",
     "DefaultRoleTypes",
@@ -43,4 +45,5 @@ __all__ = [
     "RoleNameType",
     "DecoratedType",
     "DocstringInheritDecorator",
+    "MultiFieldKeyTypes",
 ]

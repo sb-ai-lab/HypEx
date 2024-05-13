@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC
-from typing import Iterable, Any, Union, Callable, Sized, Optional, Dict, Sequence
+from typing import Iterable, Any, Union, Callable, Sized, Optional, Dict, Sequence, List
 
 from hypex.utils import FromDictType
 from hypex.utils.errors import AbstractMethodError
@@ -130,4 +130,14 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
 
     @abstractmethod
     def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def sort_index(self, **kwargs) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def sort_values(
+        self, by: Union[str, List[str]], ascending: bool = True, **kwargs
+    ) -> Any:
         raise AbstractMethodError

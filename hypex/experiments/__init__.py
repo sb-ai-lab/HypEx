@@ -1,4 +1,4 @@
-from hypex.experiments.base import (
+from .base import (
     Experiment,
     GroupExperiment,
     CycledExperiment,
