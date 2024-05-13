@@ -3,10 +3,11 @@ from typing import Dict, Any
 from hypex.analyzers import OneAAStatAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes
 from hypex.dataset import ExperimentData
-from hypex.reporters.abstract import DictReporter
 from hypex.splitters import AASplitter
-from hypex.utils import ID_SPLIT_SYMBOL
 from hypex.utils import ExperimentDataEnum
+from hypex.utils import ID_SPLIT_SYMBOL
+from .abstract import DictReporter
+
 
 class AADictReporter(DictReporter):
     def get_random_state(self, data: ExperimentData):
@@ -17,9 +18,9 @@ class AADictReporter(DictReporter):
         return int(aa_id) if aa_id.isdigit() else None
 
     def extract_group_difference(self, data: ExperimentData) -> Dict[str, Any]:
-        group_difference_ids = data.get_ids_by_executors(GroupDifference)[GroupDifference][
-            ExperimentDataEnum.analysis_tables.value
-        ]
+        group_difference_ids = data.get_ids_by_executors(GroupDifference)[
+            GroupDifference
+        ][ExperimentDataEnum.analysis_tables.value]
         t_data = data.analysis_tables[group_difference_ids[0]]
         for aid in group_difference_ids[1:]:
             t_data = t_data.append(data.analysis_tables[aid])
