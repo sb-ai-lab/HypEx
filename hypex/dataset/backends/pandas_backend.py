@@ -172,3 +172,11 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         if result.shape[0] == 1 and result.shape[1] == 1:
             return float(result.loc[result.index[0], result.columns[0]])
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+
+    def sort_index(self, ascending: bool = True, **kwargs) -> pd.DataFrame:
+        return self.data.sort_index(**kwargs)
+
+    def sort_values(
+        self, by: Union[str, List[str]], ascending: bool = True, **kwargs
+    ) -> pd.DataFrame:
+        return self.data.sort_values(by=by, ascending=ascending, **kwargs)
