@@ -9,8 +9,9 @@ from .errors import (
     NotFoundInExperimentDataError,
     ComparisonNotSuitableFieldError,
 )
+
 from .typings import (
-    FromDictType,
+    FromDictTypes,
     TargetRoleTypes,
     DefaultRoleTypes,
     StratificationRoleTypes,
@@ -19,6 +20,7 @@ from .typings import (
     DecoratedType,
     DocstringInheritDecorator,
     RoleNameType,
+    MultiFieldKeyTypes,
 )
 
 __all__ = [
@@ -34,7 +36,7 @@ __all__ = [
     "ConcatBackendError",
     "NotFoundInExperimentDataError",
     "ComparisonNotSuitableFieldError",
-    "FromDictType",
+    "FromDictTypes",
     "TargetRoleTypes",
     "CategoricalTypes",
     "DefaultRoleTypes",
@@ -43,4 +45,5 @@ __all__ = [
     "RoleNameType",
     "DecoratedType",
     "DocstringInheritDecorator",
+    "MultiFieldKeyTypes",
 ]
