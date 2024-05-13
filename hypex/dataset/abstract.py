@@ -1,4 +1,4 @@
-import json
+import json  # type: ignore
 from abc import ABC
 from typing import Iterable, Dict, Union, List, Optional
 

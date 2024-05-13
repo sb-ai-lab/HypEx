@@ -1,4 +1,4 @@
-from hypex.operators.binary import (
+from .binary import (
     MetricDelta,
     MetricRatio,
     MetricLogRatio,

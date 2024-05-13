@@ -1,3 +1,3 @@
-from hypex.describers.describers import Unique
+from .describers import Unique
 
 __all__ = ["Unique"]

@@ -2,9 +2,9 @@
 This module defines data structures and roles used across the library for managing and manipulating experimental data.
 """
 
-from hypex.dataset.abstract import DatasetBase
-from hypex.dataset.dataset import Dataset, ExperimentData
-from hypex.dataset.roles import (
+from .abstract import DatasetBase
+from .dataset import Dataset, ExperimentData
+from .roles import (
     Arg1Role,
     Arg2Role,
     InfoRole,

@@ -1,3 +1,3 @@
-from hypex.reporters.aa import AADictReporter
+from .aa import AADictReporter
 
 __all__ = ["AADictReporter"]
