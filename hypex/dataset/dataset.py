@@ -200,15 +200,15 @@ class Dataset(DatasetBase):
     def sort(
         self,
         by: Optional[MultiFieldKeyTypes] = None,
-        ascending: Optional[bool] = True,
+        ascending: bool = True,
         **kwargs,
     ):
         if by is None:
             return Dataset(
-                roles=self.roles, data=self.backend.sort_index(ascending=ascending)
+                roles=self.roles, data=self.backend.sort_index(ascending=ascending, **kwargs)
             )
         return Dataset(
-            roles=self.roles, data=self.backend.sort_values(by=by, ascending=ascending)
+            roles=self.roles, data=self.backend.sort_values(by=by, ascending=ascending, **kwargs)
         )
 
     def mean(self):
