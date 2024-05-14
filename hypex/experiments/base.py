@@ -22,7 +22,6 @@ class Experiment(Executor):
     def get_executor_ids(
         self, searched_classes: Union[type, Iterable[type], None] = None
     ) -> Dict[type, List[str]]:
-        # странно
         if not searched_classes:
             return {}
 
@@ -54,15 +53,6 @@ class Experiment(Executor):
         full_name = str(full_name or f"Experiment({len(self.executors)})")
         super().__init__(full_name, key)
 
-    # может быть удален?
-    def _extract_result(
-        self, original_data: ExperimentData, experiment_data: ExperimentData
-    ):
-        return experiment_data
-
-    def calc(self, data: Dataset):
-        return {exexutor.id: exexutor.calc(data) for exexutor in self.executors}
-
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
@@ -88,9 +78,6 @@ class CycledExperiment(Executor):
 
     def generate_params_hash(self) -> str:
         return f"{self.inner_executor.full_name} x {self.n_iterations}"
-
-    def calc(self, data: Dataset):
-        return [self.inner_executor.calc(data) for _ in range(self.n_iterations)]
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         for i in range(self.n_iterations):
@@ -132,13 +119,6 @@ class GroupExperiment(Executor):
         )
         return data
 
-    def calc(self, data: Dataset):
-        group_field = data.get_columns_by_roles(TempGroupingRole(), tmp_role=True)
-        return {
-            group: self.inner_executor.calc(data)
-            for group, data in data.groupby(group_field)
-        }
-
     def execute(self, data: ExperimentData) -> ExperimentData:
         result_list = []
         group_field = data.get_columns_by_roles(TempGroupingRole(), tmp_role=True)
@@ -165,11 +145,6 @@ class OnRoleExperiment(Experiment):
     ):
         self.role: ABCRole = role
         super().__init__(executors, transformer, full_name, key)
-
-    def calc(self, data: Dataset):
-        return {
-            field: super().calc(data) for field in data.get_columns_by_roles(self.role)
-        }
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         for field in data.get_columns_by_roles(self.role):

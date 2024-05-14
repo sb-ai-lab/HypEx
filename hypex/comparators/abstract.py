@@ -1,16 +1,17 @@
 from abc import abstractmethod, ABC
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, List, Union, Sequence, Callable
 
 from hypex.dataset import ABCRole, GroupingRole, TempTargetRole, StatisticRole
 from hypex.dataset import Dataset, ExperimentData
 from hypex.executor import Executor
+from hypex.executor.executor import Calculator
 from hypex.utils import ExperimentDataEnum, SpaceEnum, BackendsEnum, FieldKeyTypes
 from hypex.utils import FromDictType
 from hypex.utils import NoColumnsError, ComparisonNotSuitableFieldError
 from hypex.utils.errors import AbstractMethodError
 
 
-class GroupComparator(Executor, ABC):
+class GroupComparator(Calculator):
     def __init__(
         self,
         grouping_role: Optional[ABCRole] = None,
@@ -63,19 +64,28 @@ class GroupComparator(Executor, ABC):
         return result
 
     @staticmethod
+    def __field_arg_universalization(
+        field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None]
+    ) -> List[FieldKeyTypes]:
+        if not field:
+            raise NoColumnsError(field)
+        elif isinstance(field, FieldKeyTypes):
+            return [field]
+        return list(field)
+
+    @staticmethod
     def calc(
-        data: Dataset, group_field: Optional[FieldKeyTypes] = None, **kwargs
+        data: Dataset,
+        group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
+        target_field: Optional[FieldKeyTypes] = None,
+        comparison_function: Optional[Callable] = None,
+        **kwargs,
     ) -> Dict:
-        group_field = self.__group_field_searching(data)
-        meta_name = group_field[0] if len(group_field) == 1 else group_field
-        group_name = (
-            str(data.id_name_mapping.get(meta_name, meta_name))
-            if (self.__additional_mode and isinstance(data, ExperimentData))
-            else str(meta_name)
-        )[0]
-        target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)
-        self.key = f"{target_field}[{group_name}]" + self.key
-        grouping_data = self.__get_grouping_data(data, group_field)
+        group_field = GroupComparator.__field_arg_universalization(group_field)
+        if comparison_function is None:
+            raise ValueError("Comparison function must be provided.")
+
+        grouping_data = data.groupby(group_field)
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
@@ -85,13 +95,13 @@ class GroupComparator(Executor, ABC):
         if target_field:
             for i in range(1, len(grouping_data)):
                 grouping_data[i][1].tmp_roles = data.tmp_roles
-                result[grouping_data[i][0]] = self._comparison_function(
+                result[grouping_data[i][0]] = comparison_function(
                     grouping_data[0][1][target_field],
                     grouping_data[i][1][target_field],
                 )
         else:
             for i in range(1, len(grouping_data)):
-                result[grouping_data[i][0]] = self._comparison_function(
+                result[grouping_data[i][0]] = comparison_function(
                     grouping_data[0][1], grouping_data[i][1]
                 )
         return result
@@ -111,6 +121,34 @@ class GroupComparator(Executor, ABC):
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        group_field = self.__group_field_searching(data)
+        meta_name = group_field[0] if len(group_field) == 1 else group_field
+        group_name = (
+            str(data.id_name_mapping.get(meta_name, meta_name))
+            if (self.__additional_mode and isinstance(data, ExperimentData))
+            else str(meta_name)
+        )[0]
+        target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)
+        grouping_data = self.__get_grouping_data(data, group_field)
+        if len(grouping_data) > 1:
+            grouping_data[0][1].tmp_roles = data.tmp_roles
+        else:
+            raise ComparisonNotSuitableFieldError(group_field)
+
+        compare_result = {}
+        if target_field:
+            for i in range(1, len(grouping_data)):
+                grouping_data[i][1].tmp_roles = data.tmp_roles
+                compare_result[grouping_data[i][0]] = self._comparison_function(
+                    grouping_data[0][1][target_field],
+                    grouping_data[i][1][target_field],
+                )
+        else:
+            for i in range(1, len(grouping_data)):
+                compare_result[grouping_data[i][0]] = self._comparison_function(
+                    grouping_data[0][1], grouping_data[i][1]
+                )
+
         compare_result = self.calc(data)
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key, _ in compare_result.items()}
@@ -146,10 +184,6 @@ class StatHypothesisTestingWithScipy(GroupComparator, ABC):
             for group, stats in compare_result.items()
         ]
         # mypy does not see an heir
-        # return super()._extract_dataset(
-        #     result_stats,
-        #     roles={StatisticRole(): ["group", "statistic", "p-value", "pass"]}
-        # )
 
         return super()._extract_dataset(
             result_stats,

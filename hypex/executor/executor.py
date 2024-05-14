@@ -76,12 +76,13 @@ class Executor(ABC):
     ) -> ExperimentData:
         return data
 
-    @staticmethod
-    @abstractmethod
-    def calc(data: Dataset, **kwargs):
-        raise AbstractMethodError
-
     @abstractmethod
     def execute(self, data: ExperimentData) -> ExperimentData:
         raise AbstractMethodError
 
+
+class Calculator(Executor, ABC):
+    @staticmethod
+    @abstractmethod
+    def calc(data: Dataset, **kwargs):
+        raise AbstractMethodError

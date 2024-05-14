@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any
 
 from hypex.dataset import ExperimentData, Dataset
+from hypex.utils.errors import AbstractMethodError
 
 
 class Reporter(ABC):
