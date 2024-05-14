@@ -26,4 +26,4 @@ class Shuffle(Calculator):
         return data
 
     def execute(self, data: ExperimentData):
-        return self.calc(data)
+        return self.calc(data.data)
