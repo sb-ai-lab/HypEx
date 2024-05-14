@@ -3,13 +3,6 @@ from typing import Union, List, Iterable, Any, Dict, Callable, Hashable, Optiona
 
 import pandas as pd  # type: ignore
 
-from hypex.dataset.abstract import DatasetBase
-from hypex.dataset.roles import (
-    StatisticRole,
-    InfoRole,
-    ABCRole,
-    FilterRole,
-)
 from hypex.utils import (
     ID_SPLIT_SYMBOL,
     NAME_BORDER_SYMBOL,
@@ -21,6 +14,14 @@ from hypex.utils import (
     FromDictTypes,
     MultiFieldKeyTypes,
     FieldKeyTypes,
+)
+from .abstract import DatasetBase
+from .roles import (
+    StatisticRole,
+    InfoRole,
+    ABCRole,
+    FilterRole,
+    FeatureRole,
 )
 
 
@@ -257,7 +258,7 @@ class Dataset(DatasetBase):
         result_data = self.backend.transpose(roles_names)
         if roles is None or isinstance(roles, List):
             names = result_data.columns if roles is None else roles
-            roles = {column: StatisticRole() for column in names}
+            roles = {column: FeatureRole() for column in names}
         return Dataset(roles=roles, data=result_data)
 
     def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
