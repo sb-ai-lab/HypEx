@@ -9,8 +9,6 @@ from hypex.executor import Executor
 from hypex.utils import ExperimentDataEnum
 
 
-class AASplitter(Executor):
-# TODO: merge with other branch
 class AASplitter(Calculator):
     def __init__(
         self,

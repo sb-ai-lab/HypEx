@@ -1,5 +1,5 @@
 import warnings
-from copy import deepcopy
+from copy import deepcopy, copy
 from typing import Union, List, Iterable, Any, Dict, Callable, Hashable, Optional
 
 import pandas as pd  # type: ignore
@@ -120,14 +120,13 @@ class Dataset(DatasetBase):
             self.roles.update(role)
             self._backend.add_column(data, list(role.keys())[0], index)
 
-    def append(self, other, index=None) -> "Dataset":
     def _check_other_dataset(self, other):
         if not isinstance(other, Dataset):
             raise ConcatDataError(type(other))
         if type(other._backend) != type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
 
-    def append(self, other, index=None):
+    def append(self, other, index=None) -> "Dataset":
         if isinstance(other, Dataset):
             other = [other]
 

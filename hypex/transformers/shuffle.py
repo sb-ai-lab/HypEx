@@ -1,11 +1,10 @@
 from typing import Any, Optional
 
 from hypex.dataset import Dataset, ExperimentData
-from hypex.experiments.base import Executor
+from hypex.experiments.base import Executor, Calculator
 
 
-# TODO: merge with other branch
-class Shuffle(Executor):
+class Shuffle(Calculator):
     def __init__(
         self,
         random_state: Optional[int] = None,
