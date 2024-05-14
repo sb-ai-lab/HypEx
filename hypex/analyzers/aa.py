@@ -1,13 +1,13 @@
 from typing import Dict, List, Any
 
-from hypex.analyzers.abstract import Analyzer
 from hypex.comparators import TTest, KSTest
 from hypex.dataset import ExperimentData, Dataset
 from hypex.dataset import StatisticRole
+from hypex.executor import Executor
 from hypex.utils import ExperimentDataEnum, BackendsEnum
 
 
-class OneAASplitAnalyzer(Analyzer):
+class OneAASplitAnalyzer(Executor):
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         return data.set_value(
             ExperimentDataEnum.analysis_tables,

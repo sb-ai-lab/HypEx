@@ -21,7 +21,8 @@ class Shuffle(Calculator):
     def __is_transformer(self):
         return True
 
-    def calc(self, data: Dataset) -> Dataset:
+    @staticmethod
+    def calc(data: Dataset) -> Dataset:
         data.data = data.data.sample(frac=1, random_state=self.random_state)
         return data
 

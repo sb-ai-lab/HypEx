@@ -12,7 +12,7 @@ from hypex.stats import Mean
 from hypex.utils import ExperimentDataEnum, BackendsEnum
 
 
-class ABAnalyzer(Analyzer):
+class ABAnalyzer(Executor):
     default_inner_executors: Dict[str, Executor] = {"mean": Mean()}
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:

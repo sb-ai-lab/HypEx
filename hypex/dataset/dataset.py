@@ -148,7 +148,7 @@ class Dataset(DatasetBase):
         ],
         backend: BackendsEnum = BackendsEnum.pandas,
         index=None,
-    ) -> Dataset:
+    ) -> "Dataset":
         ds = Dataset(roles=roles, backend=backend)
         ds._backend = ds._backend.from_dict(data, index)
         ds.data = ds._backend.data
@@ -160,7 +160,7 @@ class Dataset(DatasetBase):
         role: Dict[Union[str, int], ABCRole],
         axis=0,
         **kwargs,
-    ) -> Dataset:
+    ) -> "Dataset":
         return Dataset(
             data=self._backend.apply(func=func, axis=axis, **kwargs).rename(
                 list(role.keys())[0]
@@ -168,7 +168,7 @@ class Dataset(DatasetBase):
             roles=role,
         )
 
-    def map(self, func, na_action=None, **kwargs) -> Dataset:
+    def map(self, func, na_action=None, **kwargs) -> "Dataset":
         return Dataset(
             roles=self.roles,
             data=self._backend.map(func=func, na_action=na_action, **kwargs),
