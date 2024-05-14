@@ -5,10 +5,9 @@ from hypex.dataset import ABCRole, GroupingRole, TempTargetRole, StatisticRole
 from hypex.dataset import Dataset, ExperimentData
 from hypex.executor import ComplexExecutor, Executor
 from hypex.utils import ExperimentDataEnum, SpaceEnum, BackendsEnum
-from hypex.utils import FromDictType
-from hypex.utils import NoColumnsError, ComparisonNotSuitableFieldError
-
+from hypex.utils import FromDictTypes
 from hypex.utils import NAME_BORDER_SYMBOL
+from hypex.utils import NoColumnsError, ComparisonNotSuitableFieldError
 
 
 class GroupComparator(ComplexExecutor):
@@ -105,7 +104,7 @@ class GroupComparator(ComplexExecutor):
 
     @staticmethod
     def _extract_dataset(
-        compare_result: FromDictType, roles: Dict[Any, ABCRole]
+        compare_result: FromDictTypes, roles: Dict[Any, ABCRole]
     ) -> Dataset:
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 

@@ -15,7 +15,7 @@ from typing import (
 import pandas as pd  # type: ignore
 
 from hypex.dataset.backends.abstract import DatasetBackendCalc, DatasetBackendNavigation
-from hypex.utils import FromDictType
+from hypex.utils import FromDictTypes
 
 
 class PandasNavigation(DatasetBackendNavigation):
@@ -102,7 +102,9 @@ class PandasNavigation(DatasetBackendNavigation):
         self.data = pd.DataFrame(index=index, columns=columns)
         return self
 
-    def from_dict(self, data: FromDictType, index: Union[Iterable, Sized, None] = None):
+    def from_dict(
+        self, data: FromDictTypes, index: Union[Iterable, Sized, None] = None
+    ):
         self.data = pd.DataFrame().from_records(data)
         if index:
             self.data.index = index
@@ -180,3 +182,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         self, by: Union[str, List[str]], ascending: bool = True, **kwargs
     ) -> pd.DataFrame:
         return self.data.sort_values(by=by, ascending=ascending, **kwargs)
+
+    def fillna(self, values, method, **kwargs) -> pd.DataFrame:
+        return self.data.fillna(values, method=method, **kwargs)

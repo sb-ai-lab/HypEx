@@ -48,9 +48,9 @@ class ABAnalyzer(Analyzer):
                 indexes = t_data.index
                 values = t_data.data.values.tolist()
                 for idx, value in zip(indexes, values):
-                    # TODO: fix this
+                    name = idx.split(ID_SPLIT_SYMBOL)[-1]
                     analysis_data[
-                        f"{c.__name__} {idx.split(ID_SPLIT_SYMBOL)[-1].split(NAME_BORDER_SYMBOL)[1]}"
+                        f"{c.__name__} {name[name.find(NAME_BORDER_SYMBOL) + 1: name.rfind(NAME_BORDER_SYMBOL)]}"
                     ] = value[0]
         analysis_data = Dataset.from_dict(
             [analysis_data],

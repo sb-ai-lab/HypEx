@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 from typing import Iterable, Any, Union, Callable, Sized, Optional, Dict, Sequence, List
 
-from hypex.utils import FromDictType
+from hypex.utils import FromDictTypes
 from hypex.utils.errors import AbstractMethodError
 
 
@@ -23,7 +23,7 @@ class DatasetBackendNavigation(ABC):
 
     @abstractmethod
     def from_dict(
-        self, data: FromDictType, index: Optional[Union[Iterable, Sized]] = None
+        self, data: FromDictTypes, index: Optional[Union[Iterable, Sized]] = None
     ):
         raise AbstractMethodError
 
@@ -140,4 +140,8 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     def sort_values(
         self, by: Union[str, List[str]], ascending: bool = True, **kwargs
     ) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def fillna(self, values, method, **kwargs) -> Any:
         raise AbstractMethodError

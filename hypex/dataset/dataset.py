@@ -20,6 +20,7 @@ from hypex.utils import (
     NotFoundInExperimentDataError,
     FromDictTypes,
     MultiFieldKeyTypes,
+    FieldKeyTypes,
 )
 
 
@@ -212,6 +213,18 @@ class Dataset(DatasetBase):
         return Dataset(
             roles=self.roles,
             data=self.backend.sort_values(by=by, ascending=ascending, **kwargs),
+        )
+
+    def fillna(
+        self,
+        values: Union[int, Dict[FieldKeyTypes, FieldKeyTypes]],
+        method: Optional[str] = None,
+        **kwargs,
+    ):
+        if method and method not in ["backfill", "bfill", "ffill"]:
+            raise NameError("Unsupported fill method")
+        return Dataset(
+            roles=self.roles, data=self.backend.fillna(values, method, **kwargs)
         )
 
     def mean(self):
