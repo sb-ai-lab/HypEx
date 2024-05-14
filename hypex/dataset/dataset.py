@@ -97,47 +97,38 @@ class Dataset(DatasetBase):
             warnings.warn("Column must be added by add_column", category=SyntaxWarning)
         self.data[key] = value
 
-    def __comparison_operator(self, other, func_name: str) -> Any:
+    def __binary_magic_operator(self, other, func_name: str, types_reset: bool = False) -> Any:
+        if not isinstance(other, Union[Dataset, ScalarType, Sequence]):
+            raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
         new_roles = self.roles.copy()
-        for role in new_roles.values():
-            role.data_type = None
-        if not isinstance(other, Union[Dataset, ScalarType, Sequence]):
-            raise DataTypeError(type(other))
+        if types_reset:
+            for role in new_roles.values():
+                role.data_type = None
         if isinstance(other, Dataset):
             if type(other._backend) is not type(self._backend):
                 raise BackendTypeError(type(other._backend), type(self._backend))
-            return Dataset(roles=new_roles, data=func(other._backend))
-        return Dataset(roles=new_roles, data=func(other))
-
-    def __binary_operator(self, other, func_name: str) -> Any:
-        func = getattr(self._backend, func_name)
-        if not isinstance(other, Union[Dataset, ScalarType, Sequence]):
-            raise DataTypeError(type(other))
-        if isinstance(other, Dataset):
-            if type(other._backend) is not type(self._backend):
-                raise BackendTypeError(type(other._backend), type(self._backend))
-            return Dataset(roles=self.roles, data=func(other._backend))
+            other = other._backend
         return Dataset(roles=self.roles, data=func(other))
 
     # comparison operators:
     def __eq__(self, other):
-        return self.__comparison_operator(other, "__eq__")
+        return self.__binary_magic_operator(other=other, func_name="__eq__", types_reset=True)
 
     def __ne__(self, other):
-        return self.__comparison_operator(other, "__ne__")
+        return self.__binary_magic_operator(other=other, func_name="__ne__", types_reset=True)
 
     def __le__(self, other):
-        return self.__comparison_operator(other, "__le__")
+        return self.__binary_magic_operator(other=other, func_name="__le__", types_reset=True)
 
     def __lt__(self, other):
-        return self.__comparison_operator(other, "__lt__")
+        return self.__binary_magic_operator(other=other, func_name="__lt__", types_reset=True)
 
     def __ge__(self, other):
-        return self.__comparison_operator(other, "__ge__")
+        return self.__binary_magic_operator(other=other, func_name="__ge__", types_reset=True)
 
     def __gt__(self, other):
-        return self.__comparison_operator(other, "__gt__")
+        return self.__binary_magic_operator(other=other, func_name="__gt__", types_reset=True)
 
     # unary operators:
     def __pos__(self):
@@ -160,53 +151,59 @@ class Dataset(DatasetBase):
 
     # Binary math operators:
     def __add__(self, other):
-        return self.__binary_operator(other, "__add__")
+        return self.__binary_magic_operator(other=other, func_name="__add__")
 
     def __sub__(self, other):
-        return self.__binary_operator(other, "__sub__")
+        return self.__binary_magic_operator(other=other, func_name="__sub__")
 
     def __mul__(self, other):
-        return self.__binary_operator(other, "__mul__")
+        return self.__binary_magic_operator(other=other, func_name="__mul__")
 
     def __floordiv__(self, other):
-        return self.__binary_operator(other, "__floordiv__")
+        return self.__binary_magic_operator(other=other, func_name="__floordiv__")
 
     def __div__(self, other):
-        return self.__binary_operator(other, "__div__")
+        return self.__binary_magic_operator(other=other, func_name="__div__")
 
     def __truediv__(self, other):
-        return self.__binary_operator(other, "__truediv__")
+        return self.__binary_magic_operator(other=other, func_name="__truediv__")
 
     def __mod__(self, other):
-        return self.__binary_operator(other, "__mod__")
+        return self.__binary_magic_operator(other=other, func_name="__mod__")
 
     def __pow__(self, other):
-        return self.__binary_operator(other, "__pow__")
+        return self.__binary_magic_operator(other=other, func_name="__pow__")
+
+    def __and__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__and__")
+
+    def __or__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__or__")
 
     # Right arithmetic operators:
     def __radd__(self, other):
-        return self.__binary_operator(other, "__radd__")
+        return self.__binary_magic_operator(other=other, func_name="__radd__")
 
     def __rsub__(self, other):
-        return self.__binary_operator(other, "__rsub__")
+        return self.__binary_magic_operator(other=other, func_name="__rsub__")
 
     def __rmul__(self, other):
-        return self.__binary_operator(other, "__rmul__")
+        return self.__binary_magic_operator(other=other, func_name="__rmul__")
 
     def __rfloordiv__(self, other):
-        return self.__binary_operator(other, "__rfloordiv__")
+        return self.__binary_magic_operator(other=other, func_name="__rfloordiv__")
 
     def __rdiv__(self, other):
-        return self.__binary_operator(other, "__rdiv__")
+        return self.__binary_magic_operator(other=other, func_name="__rdiv__")
 
     def __rtruediv__(self, other):
-        return self.__binary_operator(other, "__rtruediv__")
+        return self.__binary_magic_operator(other=other, func_name="__rtruediv__")
 
     def __rmod__(self, other):
-        return self.__binary_operator(other, "__rmod__")
+        return self.__binary_magic_operator(other=other, func_name="__rmod__")
 
     def __rpow__(self, other) -> Any:
-        return self.__binary_operator(other, "__rpow__")
+        return self.__binary_magic_operator(other=other, func_name="__rpow__")
 
     @staticmethod
     def _create_empty(backend=BackendsEnum.pandas, roles=None, index=None):
@@ -226,8 +223,7 @@ class Dataset(DatasetBase):
             data=result,
             roles={
                 column: StatisticRole() for column in self.roles
-            },  # тут цикл именно по self.roles должен идти или
-            # по data.columns?
+            },
         )
 
     def add_column(
@@ -336,6 +332,12 @@ class Dataset(DatasetBase):
     def mean(self):
         return self._convert_data_after_agg(self._backend.mean())
 
+    def mode(self, numeric_only: bool = False, dropna: bool = True):
+        return self._convert_data_after_agg(self._backend.mode(numeric_only=numeric_only, dropna=dropna))
+
+    def var(self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False):
+        return self._convert_data_after_agg(self._backend.var(skipna=skipna, ddof=ddof, numeric_only=numeric_only))
+
     def max(self):
         return self._convert_data_after_agg(self._backend.max())
 
@@ -348,6 +350,9 @@ class Dataset(DatasetBase):
     def sum(self):
         return self._convert_data_after_agg(self._backend.sum())
 
+    def log(self):
+        return self._convert_data_after_agg(self._backend.log())
+
     def agg(self, func: Union[str, List]):
         return self._convert_data_after_agg(self._backend.agg(func))
 
@@ -356,6 +361,9 @@ class Dataset(DatasetBase):
 
     def coefficient_of_variation(self):
         return self._convert_data_after_agg(self._backend.coefficient_of_variation())
+
+    def corr(self, method='pearson', numeric_only=False):
+        return self._convert_data_after_agg(self._backend.corr(method=method, numeric_only=numeric_only))
 
     def value_counts(
         self,

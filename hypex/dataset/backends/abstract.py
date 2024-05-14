@@ -118,6 +118,14 @@ class DatasetBackendNavigation(ABC):
     def __pow__(self, other) -> Any:
         raise AbstractMethodError
 
+    @abstractmethod
+    def __and__(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def __or__(self, other) -> Any:
+        raise AbstractMethodError
+
     # Right arithmetic methods:
     @abstractmethod
     def __radd__(self, other) -> Any:
@@ -205,6 +213,14 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
+    def mode(self, numeric_only: bool = False, dropna: bool = True) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def var(self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
     def max(self) -> Any:
         raise AbstractMethodError
 
@@ -218,6 +234,10 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
 
     @abstractmethod
     def sum(self) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def log(self) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
@@ -258,6 +278,10 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
 
     @abstractmethod
     def coefficient_of_variation(self) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def corr(selfself, method='pearson', numeric_only=False) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
