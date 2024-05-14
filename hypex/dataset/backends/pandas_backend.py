@@ -95,7 +95,7 @@ class PandasDataset(DatasetBackendCalc):
             self.data.loc[:, name] = data
 
     def append(self, other, index: bool = False) -> pd.DataFrame:
-        new_data = pd.concat([self.data] + list(other))
+        new_data = pd.concat([self.data] + [d.data for d in other])
         if index:
             new_data.reset_index()
         return new_data
