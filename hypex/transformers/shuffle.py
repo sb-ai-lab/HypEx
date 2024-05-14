@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
 from hypex.dataset import Dataset, ExperimentData
-from hypex.experiments.base import Executor, Calculator
+from hypex.executor.executor import Calculator
 
 
 class Shuffle(Calculator):
@@ -22,9 +22,9 @@ class Shuffle(Calculator):
         return True
 
     @staticmethod
-    def calc(data: Dataset) -> Dataset:
-        data.data = data.data.sample(frac=1, random_state=self.random_state)
+    def calc(data: Dataset, random_state=None) -> Dataset:
+        data = data.shuffle(random_state)
         return data
 
     def execute(self, data: ExperimentData):
-        return self.calc(data.data)
+        return self.calc(data.ds)
