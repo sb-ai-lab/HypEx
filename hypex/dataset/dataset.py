@@ -245,6 +245,24 @@ class Dataset(DatasetBase):
     def agg(self, func: Union[str, List]):
         return self._convert_data_after_agg(self._backend.agg(func))
 
+    def dot(self, other: "Dataset") -> "Dataset":
+        result_data = self.backend.dot(other.backend)
+        return Dataset(roles=other.roles, data=result_data)
+
+    def transpose(
+        self,
+        roles: Optional[Union[Dict[Union[str, int], ABCRole], List]] = None,
+    ) -> "Dataset":
+        roles_names = roles.keys() or {} if isinstance(roles, Dict) else roles
+        result_data = self.backend.transpose(roles_names)
+        if roles is None or isinstance(roles, List):
+            names = result_data.columns if roles is None else roles
+            roles = {column: StatisticRole() for column in names}
+        return Dataset(roles=roles, data=result_data)
+
+    def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
+        return Dataset(self.roles, data=self.backend.shuffle(random_state))
+
 
 class ExperimentData(Dataset):
     def __init__(self, data: Dataset):
@@ -294,7 +312,8 @@ class ExperimentData(Dataset):
         self.id_name_mapping[executor_id] = name
         return self
 
-    def __id_fields_filter(self, ids: Dict, fields=None):
+    @staticmethod
+    def __id_fields_filter(ids: Dict, fields=None):
         if fields is None:
             return ids
         return {

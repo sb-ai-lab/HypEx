@@ -145,3 +145,14 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     @abstractmethod
     def fillna(self, values, method, **kwargs) -> Any:
         raise AbstractMethodError
+
+    @abstractmethod
+    def dot(self, other) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def transpose(self, names) -> Any:
+        raise AbstractMethodError
+
+    def shuffle(self, random_state) -> Any:
+        raise AbstractMethodError

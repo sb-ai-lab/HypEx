@@ -15,7 +15,7 @@ from typing import (
 import pandas as pd  # type: ignore
 
 from hypex.dataset.backends.abstract import DatasetBackendCalc, DatasetBackendNavigation
-from hypex.utils import FromDictTypes
+from hypex.utils import FromDictTypes, FieldKeyTypes
 
 
 class PandasNavigation(DatasetBackendNavigation):
@@ -185,3 +185,16 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def fillna(self, values, method, **kwargs) -> pd.DataFrame:
         return self.data.fillna(values, method=method, **kwargs)
+
+    def dot(self, other: "PandasDataset") -> pd.DataFrame:
+        result = self.data.dot(other.data)
+        return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+
+    def transpose(self, names: Optional[Sequence[FieldKeyTypes]]) -> pd.DataFrame:
+        result = self.data.transpose()
+        if names:
+            result.columns = names
+        return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+
+    def shuffle(self, random_state: Optional[int] = None) -> pd.DataFrame:
+        return self.data.sample(self.data.shape[0], random_state=random_state)
