@@ -18,13 +18,6 @@ import numpy as np
 from hypex.dataset.backends.abstract import DatasetBackendCalc
 from hypex.utils import FromDictType, MergeOnError, FieldsType, ScalarType
 
-binary_operations = {
-    "add": pd.DataFrame.add,
-    "sub": pd.DataFrame.sub,
-    "mul": pd.DataFrame.mul,
-    "div": pd.DataFrame.div,
-}
-
 
 class PandasDataset(DatasetBackendCalc):
     @staticmethod
@@ -62,31 +55,31 @@ class PandasDataset(DatasetBackendCalc):
     def __len__(self):
         return len(self.data)
 
-    def __binary_magic_operator(self, other, func_name: str) -> Any:
-        func = getattr(self.data, func_name)
+    @staticmethod
+    def __magic_determine_other(other) -> Any:
         if isinstance(other, PandasDataset):
-            return func(other.data)
+            return other.data
         else:
-            return func(other)
+            return other
 
     # comparison operators:
     def __eq__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "eq")
+        return self.data == PandasDataset.__magic_determine_other(other)
 
     def __ne__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "ne")
+        return self.data != PandasDataset.__magic_determine_other(other)
 
     def __le__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "le")
+        return self.data <= PandasDataset.__magic_determine_other(other)
 
     def __lt__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "lt")
+        return self.data < PandasDataset.__magic_determine_other(other)
 
     def __ge__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "ge")
+        return self.data >= PandasDataset.__magic_determine_other(other)
 
     def __gt__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "gt")
+        return self.data > PandasDataset.__magic_determine_other(other)
 
     # Unary operations:
     def __pos__(self) -> Any:
@@ -106,59 +99,59 @@ class PandasDataset(DatasetBackendCalc):
 
     # Binary operations:
     def __add__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "add")
+        return self.data + PandasDataset.__magic_determine_other(other)
 
     def __sub__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "sub")
+        return self.data - PandasDataset.__magic_determine_other(other)
 
     def __mul__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "mul")
+        return self.data * PandasDataset.__magic_determine_other(other)
 
     def __floordiv__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "floordiv")
+        return self.data // PandasDataset.__magic_determine_other(other)
 
     def __div__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "div")
+        return self.data / PandasDataset.__magic_determine_other(other)
 
     def __truediv__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "truediv")
+        return self.data / PandasDataset.__magic_determine_other(other)
 
     def __mod__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "mod")
+        return self.data % PandasDataset.__magic_determine_other(other)
 
     def __pow__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "pow")
+        return self.data ** PandasDataset.__magic_determine_other(other)
 
     def __and__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "__and__")
+        return self.data & PandasDataset.__magic_determine_other(other)
 
     def __or__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "__or__")
+        return self.data | PandasDataset.__magic_determine_other(other)
 
     # Right arithmetic operators:
     def __radd__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "radd")
+        return PandasDataset.__magic_determine_other(other) + self.data
 
     def __rsub__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "rsub")
+        return PandasDataset.__magic_determine_other(other) - self.data
 
     def __rmul__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "rmul")
+        return PandasDataset.__magic_determine_other(other) * self.data
 
     def __rfloordiv__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "rfloordiv")
+        return PandasDataset.__magic_determine_other(other) // self.data
 
     def __rdiv__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "rdiv")
+        return PandasDataset.__magic_determine_other(other) / self.data
 
     def __rtruediv__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "rtruediv")
+        return PandasDataset.__magic_determine_other(other) / self.data
 
     def __rmod__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "rmod")
+        return PandasDataset.__magic_determine_other(other) % self.data
 
     def __rpow__(self, other) -> Any:
-        return self.__binary_magic_operator(other, "rpow")
+        return PandasDataset.__magic_determine_other(other) ** self.data
 
     def __repr__(self):
         return self.data.__repr__()
@@ -267,10 +260,14 @@ class PandasDataset(DatasetBackendCalc):
     def mean(self) -> Union[pd.DataFrame, float]:
         return self.agg(["mean"])
 
-    def mode(self, numeric_only: bool = False, dropna: bool = True) -> Union[pd.DataFrame, float]:
+    def mode(
+        self, numeric_only: bool = False, dropna: bool = True
+    ) -> Union[pd.DataFrame, float]:
         return self.agg(["mode"])
 
-    def var(self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False) -> Union[pd.DataFrame, float]:
+    def var(
+        self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
+    ) -> Union[pd.DataFrame, float]:
         return self.agg(["var"])
 
     def max(self) -> Union[pd.DataFrame, float]:
@@ -285,7 +282,7 @@ class PandasDataset(DatasetBackendCalc):
     def sum(self) -> Union[pd.DataFrame, float]:
         return self.agg(["sum"])
 
-    def log(self) -> Union[pd.DataFrame, float]:
+    def log(self) -> pd.DataFrame:
         np_data = np.log(self.data.to_numpy())
         return pd.DataFrame(np_data, columns=self.data.columns)
 
@@ -299,8 +296,8 @@ class PandasDataset(DatasetBackendCalc):
             return float(data.loc[data.index[0], data.columns[0]])
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
-    def corr(self, method='pearson', numeric_only=False) -> Union[pd.DataFrame, float]:
-        return self.data.corr(method='pearson', numeric_only=False)
+    def corr(self, method="pearson", numeric_only=False) -> Union[pd.DataFrame, float]:
+        return self.data.corr(method="pearson", numeric_only=False)
 
     def value_counts(
         self,

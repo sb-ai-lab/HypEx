@@ -217,7 +217,9 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def var(self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False) -> Any:
+    def var(
+        self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
+    ) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
@@ -281,7 +283,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def corr(selfself, method='pearson', numeric_only=False) -> Any:
+    def corr(selfself, method="pearson", numeric_only=False) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
@@ -299,9 +301,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def dropna(
-        self, how: str = "any", subset: Union[str, Iterable[str]] = []
-    ) -> Any:
+    def dropna(self, how: str = "any", subset: Union[str, Iterable[str]] = []) -> Any:
         raise AbstractMethodError
 
     @abstractmethod

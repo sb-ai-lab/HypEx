@@ -97,38 +97,37 @@ class Dataset(DatasetBase):
             warnings.warn("Column must be added by add_column", category=SyntaxWarning)
         self.data[key] = value
 
-    def __binary_magic_operator(self, other, func_name: str, types_reset: bool = False) -> Any:
+    def __binary_magic_operator(self, other, func_name: str) -> Any:
         if not isinstance(other, Union[Dataset, ScalarType, Sequence]):
             raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
-        new_roles = self.roles.copy()
-        if types_reset:
-            for role in new_roles.values():
-                role.data_type = None
+        new_roles = self.roles
+        for role in new_roles.values():
+            role.data_type = None
         if isinstance(other, Dataset):
             if type(other._backend) is not type(self._backend):
                 raise BackendTypeError(type(other._backend), type(self._backend))
             other = other._backend
-        return Dataset(roles=self.roles, data=func(other))
+        return Dataset(roles=new_roles, data=func(other))
 
     # comparison operators:
     def __eq__(self, other):
-        return self.__binary_magic_operator(other=other, func_name="__eq__", types_reset=True)
+        return self.__binary_magic_operator(other=other, func_name="__eq__")
 
     def __ne__(self, other):
-        return self.__binary_magic_operator(other=other, func_name="__ne__", types_reset=True)
+        return self.__binary_magic_operator(other=other, func_name="__ne__")
 
     def __le__(self, other):
-        return self.__binary_magic_operator(other=other, func_name="__le__", types_reset=True)
+        return self.__binary_magic_operator(other=other, func_name="__le__")
 
     def __lt__(self, other):
-        return self.__binary_magic_operator(other=other, func_name="__lt__", types_reset=True)
+        return self.__binary_magic_operator(other=other, func_name="__lt__")
 
     def __ge__(self, other):
-        return self.__binary_magic_operator(other=other, func_name="__ge__", types_reset=True)
+        return self.__binary_magic_operator(other=other, func_name="__ge__")
 
     def __gt__(self, other):
-        return self.__binary_magic_operator(other=other, func_name="__gt__", types_reset=True)
+        return self.__binary_magic_operator(other=other, func_name="__gt__")
 
     # unary operators:
     def __pos__(self):
@@ -329,7 +328,7 @@ class Dataset(DatasetBase):
             dataset[1].tmp_roles = self.tmp_roles
         return datasets
 
-    def mean(self):
+    def mean(self):     # should we add arguments to all the methods?
         return self._convert_data_after_agg(self._backend.mean())
 
     def mode(self, numeric_only: bool = False, dropna: bool = True):
