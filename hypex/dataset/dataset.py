@@ -4,8 +4,6 @@ from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Unio
 
 import pandas as pd  # type: ignore
 
-from hypex.dataset.abstract import DatasetBase
-from hypex.dataset.roles import ABCRole, FilterRole, InfoRole, StatisticRole
 from hypex.utils import (
     ID_SPLIT_SYMBOL,
     BackendsEnum,
@@ -16,6 +14,14 @@ from hypex.utils import (
     FromDictTypes,
     MultiFieldKeyTypes,
     NotFoundInExperimentDataError,
+)
+from .abstract import DatasetBase
+from .roles import (
+    StatisticRole,
+    InfoRole,
+    ABCRole,
+    FilterRole,
+    FeatureRole,
 )
 
 
@@ -247,6 +253,24 @@ class Dataset(DatasetBase):
 
     def agg(self, func: Union[str, List]):
         return self._convert_data_after_agg(self._backend.agg(func))
+
+    def dot(self, other: "Dataset") -> "Dataset":
+        result_data = self.backend.dot(other.backend)
+        return Dataset(roles=other.roles, data=result_data)
+
+    def transpose(
+        self,
+        roles: Optional[Union[Dict[Union[str, int], ABCRole], List]] = None,
+    ) -> "Dataset":
+        roles_names = roles.keys() or {} if isinstance(roles, Dict) else roles
+        result_data = self.backend.transpose(roles_names)
+        if roles is None or isinstance(roles, List):
+            names = result_data.columns if roles is None else roles
+            roles = {column: FeatureRole() for column in names}
+        return Dataset(roles=roles, data=result_data)
+
+    def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
+        return Dataset(self.roles, data=self.backend.shuffle(random_state))
 
 
 class ExperimentData:
