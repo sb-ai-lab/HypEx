@@ -1,6 +1,17 @@
 import warnings
 from copy import copy, deepcopy
 from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Union
+from typing import (
+    Union,
+    List,
+    Iterable,
+    Any,
+    Dict,
+    Callable,
+    Hashable,
+    Optional,
+    Sequence,
+)
 
 import pandas as pd  # type: ignore
 
@@ -14,6 +25,12 @@ from hypex.utils import (
     FromDictTypes,
     MultiFieldKeyTypes,
     NotFoundInExperimentDataError,
+    FromDictType,
+    DataTypeError,
+    BackendTypeError,
+    FieldKeyTypes,
+    FieldsType,
+    ScalarType,
 )
 from .abstract import DatasetBase
 from .roles import (
@@ -85,6 +102,113 @@ class Dataset(DatasetBase):
             warnings.warn("Column must be added by add_column", category=SyntaxWarning)
         self.data[key] = value
 
+    def __binary_magic_operator(self, other, func_name: str) -> Any:
+        if not isinstance(other, Union[Dataset, ScalarType, Sequence]):
+            raise DataTypeError(type(other))
+        func = getattr(self._backend, func_name)
+        t_roles = self.roles
+        for role in t_roles.values():
+            role.data_type = None
+        if isinstance(other, Dataset):
+            if type(other._backend) is not type(self._backend):
+                raise BackendTypeError(type(other._backend), type(self._backend))
+            other = other._backend
+        return Dataset(roles=t_roles, data=func(other))
+
+    # comparison operators:
+    def __eq__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__eq__")
+
+    def __ne__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__ne__")
+
+    def __le__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__le__")
+
+    def __lt__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__lt__")
+
+    def __ge__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__ge__")
+
+    def __gt__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__gt__")
+
+    # unary operators:
+    def __pos__(self):
+        return Dataset(roles=self.roles, data=(+self._backend))
+
+    def __neg__(self):
+        return Dataset(roles=self.roles, data=(-self._backend))
+
+    def __abs__(self):
+        return Dataset(roles=self.roles, data=abs(self._backend))
+
+    def __invert__(self):
+        return Dataset(roles=self.roles, data=(~self._backend))
+
+    def __round__(self, ndigits: int = 0):
+        return Dataset(roles=self.roles, data=round(self._backend, ndigits))
+
+    def __bool__(self):
+        return not self._backend.is_empty()
+
+    # Binary math operators:
+    def __add__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__add__")
+
+    def __sub__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__sub__")
+
+    def __mul__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__mul__")
+
+    def __floordiv__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__floordiv__")
+
+    def __div__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__div__")
+
+    def __truediv__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__truediv__")
+
+    def __mod__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__mod__")
+
+    def __pow__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__pow__")
+
+    def __and__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__and__")
+
+    def __or__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__or__")
+
+    # Right arithmetic operators:
+    def __radd__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__radd__")
+
+    def __rsub__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__rsub__")
+
+    def __rmul__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__rmul__")
+
+    def __rfloordiv__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__rfloordiv__")
+
+    def __rdiv__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__rdiv__")
+
+    def __rtruediv__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__rtruediv__")
+
+    def __rmod__(self, other):
+        return self.__binary_magic_operator(other=other, func_name="__rmod__")
+
+    def __rpow__(self, other) -> Any:
+        return self.__binary_magic_operator(other=other, func_name="__rpow__")
+
     @staticmethod
     def create_empty(backend=BackendsEnum.pandas, roles=None, index=None) -> "Dataset":
         if roles is None:
@@ -101,7 +225,7 @@ class Dataset(DatasetBase):
             return result
         return Dataset(
             data=result,
-            roles={column: StatisticRole() for column in self.roles},
+            roles={column: StatisticRole() for column in self.roles}
         )
 
     def add_column(
@@ -126,7 +250,7 @@ class Dataset(DatasetBase):
     def _check_other_dataset(self, other):
         if not isinstance(other, Dataset):
             raise ConcatDataError(type(other))
-        if type(other._backend) != type(self._backend):
+        if type(other._backend) is not type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
 
     def append(self, other, index=None) -> "Dataset":
@@ -157,11 +281,12 @@ class Dataset(DatasetBase):
         ds.data = ds._backend.data
         return ds
 
+    # What is going to happen when a matrix is returned?
     def apply(
         self,
         func: Callable,
-        role: Dict[Union[str, int], ABCRole],
-        axis=0,
+        role: Dict[FieldKeyTypes, ABCRole],
+        axis: int = 0,
         **kwargs,
     ) -> "Dataset":
         return Dataset(
@@ -177,8 +302,14 @@ class Dataset(DatasetBase):
             data=self._backend.map(func=func, na_action=na_action, **kwargs),
         )
 
+    def is_empty(self):
+        return self._backend.is_empty()
+
     def unique(self):
         return self._backend.unique()
+
+    def nunique(self, dropna: bool = False):
+        return self._backend.nunique(dropna)
 
     def isin(self, values: Iterable) -> "Dataset":
         return Dataset(
@@ -207,6 +338,15 @@ class Dataset(DatasetBase):
         for dataset in datasets:
             dataset[1].tmp_roles = self.tmp_roles
         return datasets
+
+    def mean(self):     # should we add arguments to all the methods?
+        return self._convert_data_after_agg(self._backend.mean())
+
+    def mode(self, numeric_only: bool = False, dropna: bool = True):
+        return self._convert_data_after_agg(self._backend.mode(numeric_only=numeric_only, dropna=dropna))
+
+    def var(self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False):
+        return self._convert_data_after_agg(self._backend.var(skipna=skipna, ddof=ddof, numeric_only=numeric_only))
 
     def sort(
         self,
@@ -251,8 +391,97 @@ class Dataset(DatasetBase):
     def sum(self):
         return self._convert_data_after_agg(self._backend.sum())
 
+    def log(self):
+        return self._convert_data_after_agg(self._backend.log())
+
     def agg(self, func: Union[str, List]):
         return self._convert_data_after_agg(self._backend.agg(func))
+
+    def std(self):
+        return self._convert_data_after_agg(self._backend.std())
+
+    def coefficient_of_variation(self):
+        return self._convert_data_after_agg(self._backend.coefficient_of_variation())
+
+    def corr(self, method='pearson', numeric_only=False):
+        t_data = self._backend.corr(method=method, numeric_only=numeric_only)
+        t_roles = {column: self.roles[column] for column in t_data.columns}
+        return Dataset(roles=t_roles, data=t_data)
+
+    def value_counts(
+        self,
+        normalize: bool = False,
+        sort: bool = True,
+        ascending: bool = False,
+        dropna: bool = True,
+    ):
+        t_data = self._backend.value_counts(
+            normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
+        )
+        t_roles = self.roles
+        t_roles["count"] = StatisticRole()
+        return Dataset(roles=t_roles, data=t_data)
+
+    def na_counts(self):
+        return self._convert_data_after_agg(self._backend.na_counts())
+
+    def dropna(
+        self, how: str = "any", subset: Union[str, Iterable[str]] = None
+    ):
+        return Dataset(
+            roles=self.roles, data=self._backend.dropna(how=how, subset=subset)
+        )
+
+    def isna(self):
+        return self._convert_data_after_agg(self._backend.isna())
+
+    def quantile(self, q: float = 0.5):
+        return self._convert_data_after_agg(self._backend.quantile(q=q))
+
+    def select_dtypes(self, include: Any = None, exclude: Any = None):
+        t_data = self._backend.select_dtypes(include=include, exclude=exclude)
+        t_roles = {k: v for k, v in self.roles.items() if k in t_data.columns}
+        return Dataset(roles=t_roles, data=t_data)
+
+    def merge(
+        self,
+        right,
+        on: FieldsType = "",
+        left_on: FieldsType = "",
+        right_on: FieldsType = "",
+        left_index: bool = False,
+        right_index: bool = False,
+        suffixes: tuple[str, str] = ("_x", "_y"),
+    ):
+        if not isinstance(right, Dataset):
+            raise DataTypeError(type(right))
+        if type(right._backend) is not type(self._backend):
+            raise BackendTypeError(type(right._backend), type(self._backend))
+        t_data = self._backend.merge(
+            right=right._backend,
+            on=on,
+            left_on=left_on,
+            right_on=right_on,
+            left_index=left_index,
+            right_index=right_index,
+            suffixes=suffixes,
+        )
+        t_roles = copy(self.roles)
+        t_roles.update(right.roles)
+
+        for c in t_data.columns:
+            if f"{c}".endswith(suffixes[0]) and c[: -len(suffixes[0])] in self.columns:
+                t_roles[c] = self.roles[c[: -len(suffixes[0])]]
+            if f"{c}".endswith(suffixes[1]) and c[: -len(suffixes[1])] in right.columns:
+                t_roles[c] = right.roles[c[: -len(suffixes[1])]]
+
+        new_roles = {c: t_roles[c] for c in t_data.columns}
+        return Dataset(roles=new_roles, data=t_data)
+
+    def drop(self, labels: Any = None, axis: int = 1):
+        t_data = self._backend.drop(labels=labels, axis=axis)
+        t_roles = self.roles if axis == 0 else {c: self.roles[c] for c in t_data.columns}
+        return Dataset(roles=t_roles, data=t_data)
 
     def dot(self, other: "Dataset") -> "Dataset":
         result_data = self.backend.dot(other.backend)
