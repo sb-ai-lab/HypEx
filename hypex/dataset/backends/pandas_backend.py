@@ -318,7 +318,7 @@ class PandasDataset(DatasetBackendCalc):
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
     def dropna(
-        self, how: str = "any", subset: Union[str, Iterable[str]] = []
+        self, how: str = "any", subset: Union[str, Iterable[str]] = None
     ) -> pd.DataFrame:
         return self.data.dropna(how=how, subset=subset)
 

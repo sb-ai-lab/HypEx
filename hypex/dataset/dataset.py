@@ -101,14 +101,14 @@ class Dataset(DatasetBase):
         if not isinstance(other, Union[Dataset, ScalarType, Sequence]):
             raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
-        new_roles = self.roles
-        for role in new_roles.values():
+        t_roles = self.roles
+        for role in t_roles.values():
             role.data_type = None
         if isinstance(other, Dataset):
             if type(other._backend) is not type(self._backend):
                 raise BackendTypeError(type(other._backend), type(self._backend))
             other = other._backend
-        return Dataset(roles=new_roles, data=func(other))
+        return Dataset(roles=t_roles, data=func(other))
 
     # comparison operators:
     def __eq__(self, other):
@@ -382,7 +382,7 @@ class Dataset(DatasetBase):
         return self._convert_data_after_agg(self._backend.na_counts())
 
     def dropna(
-        self, how: str = "any", subset: Union[str, Iterable[str]] = []
+        self, how: str = "any", subset: Union[str, Iterable[str]] = None
     ):
         return Dataset(
             roles=self.roles, data=self._backend.dropna(how=how, subset=subset)
@@ -396,8 +396,8 @@ class Dataset(DatasetBase):
 
     def select_dtypes(self, include: Any = None, exclude: Any = None):
         t_data = self._backend.select_dtypes(include=include, exclude=exclude)
-        roles = {k: v for k, v in self.roles.items() if k in t_data.columns}
-        return Dataset(roles=roles, data=t_data)
+        t_roles = {k: v for k, v in self.roles.items() if k in t_data.columns}
+        return Dataset(roles=t_roles, data=t_data)
 
     def merge(
         self,
@@ -436,9 +436,8 @@ class Dataset(DatasetBase):
 
     def drop(self, labels: Any = None, axis: int = 1):
         t_data = self._backend.drop(labels=labels, axis=axis)
-        if axis == 1:
-            self.roles = {c: self.roles[c] for c in t_data.columns}
-        return Dataset(roles=self.roles, data=t_data)
+        t_roles = self.roles if axis == 0 else {c: self.roles[c] for c in t_data.columns}
+        return Dataset(roles=t_roles, data=t_data)
 
 
 class ExperimentData(Dataset):
