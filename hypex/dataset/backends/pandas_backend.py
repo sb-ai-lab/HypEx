@@ -297,7 +297,7 @@ class PandasDataset(DatasetBackendCalc):
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
     def corr(self, method="pearson", numeric_only=False) -> Union[pd.DataFrame, float]:
-        return self.data.corr(method="pearson", numeric_only=False)
+        return self.data.corr(method=method, numeric_only=numeric_only)
 
     def value_counts(
         self,
