@@ -1,10 +1,10 @@
 from typing import Any, Optional
 
 from hypex.dataset import Dataset, ExperimentData
-from hypex.experiments.base import Executor
+from hypex.executor.executor import Calculator
 
 
-class Shuffle(Executor):
+class Shuffle(Calculator):
     def __init__(
         self,
         random_state: Optional[int] = None,
@@ -21,9 +21,10 @@ class Shuffle(Executor):
     def __is_transformer(self):
         return True
 
-    def calc(self, data: Dataset) -> Dataset:
-        data.data = data.data.sample(frac=1, random_state=self.random_state)
+    @staticmethod
+    def calc(data: Dataset, random_state=None) -> Dataset:
+        data = data.shuffle(random_state)
         return data
 
     def execute(self, data: ExperimentData):
-        return self.calc(data)
+        return self.calc(data.ds)

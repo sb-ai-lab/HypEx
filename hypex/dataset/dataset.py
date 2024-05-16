@@ -1,26 +1,21 @@
 import warnings
-from typing import Union, List, Iterable, Any, Dict, Callable, Hashable, Optional
+from copy import copy, deepcopy
+from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Union
 
 import pandas as pd  # type: ignore
 
 from hypex.dataset.abstract import DatasetBase
-from hypex.dataset.roles import (
-    StatisticRole,
-    InfoRole,
-    ABCRole,
-    FilterRole,
-)
+from hypex.dataset.roles import ABCRole, FilterRole, InfoRole, StatisticRole
 from hypex.utils import (
     ID_SPLIT_SYMBOL,
-    NAME_BORDER_SYMBOL,
-    ExperimentDataEnum,
     BackendsEnum,
-    ConcatDataError,
     ConcatBackendError,
-    NotFoundInExperimentDataError,
+    ConcatDataError,
+    ExperimentDataEnum,
+    FieldKeyTypes,
     FromDictTypes,
     MultiFieldKeyTypes,
-    FieldKeyTypes,
+    NotFoundInExperimentDataError,
 )
 
 
@@ -30,7 +25,7 @@ class Dataset(DatasetBase):
             self.backend = backend
             self.roles = roles
 
-        def __getitem__(self, item):
+        def __getitem__(self, item) -> "Dataset":
             t_data = self.backend.loc(item)
             return Dataset(
                 data=t_data,
@@ -42,7 +37,7 @@ class Dataset(DatasetBase):
             self.backend = backend
             self.roles = roles
 
-        def __getitem__(self, item):
+        def __getitem__(self, item) -> "Dataset":
             t_data = self.backend.iloc(item)
             return Dataset(
                 data=t_data,
@@ -62,7 +57,7 @@ class Dataset(DatasetBase):
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
 
-    def __getitem__(self, item: Union[Iterable, str, int]):
+    def __getitem__(self, item: Union[Iterable, str, int]) -> "Dataset":
         items = (
             [item] if isinstance(item, str) or not isinstance(item, Iterable) else item
         )
@@ -85,17 +80,17 @@ class Dataset(DatasetBase):
         self.data[key] = value
 
     @staticmethod
-    def _create_empty(backend=BackendsEnum.pandas, roles=None, index=None):
+    def create_empty(backend=BackendsEnum.pandas, roles=None, index=None) -> "Dataset":
         if roles is None:
             roles = {}
         index = [] if index is None else index
         columns = list(roles.keys())
         ds = Dataset(roles=roles, backend=backend)
-        ds._backend = ds._backend._create_empty(index, columns)
+        ds._backend = ds._backend.create_empty(index, columns)
         ds.data = ds._backend.data
         return ds
 
-    def _convert_data_after_agg(self, result):
+    def _convert_data_after_agg(self, result) -> Union["Dataset", float]:
         if isinstance(result, float):
             return result
         return Dataset(
@@ -122,14 +117,23 @@ class Dataset(DatasetBase):
             self.roles.update(role)
             self._backend.add_column(data, list(role.keys())[0], index)
 
-    def append(self, other, index=None):
+    def _check_other_dataset(self, other):
         if not isinstance(other, Dataset):
             raise ConcatDataError(type(other))
         if type(other._backend) != type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
-        self.roles.update(other.roles)
+
+    def append(self, other, index=None) -> "Dataset":
+        if isinstance(other, Dataset):
+            other = [other]
+
+        new_roles = copy(self.roles)
+        for o in other:
+            self._check_other_dataset(o)
+            new_roles.update(o.roles)
+
         return Dataset(
-            roles=self.roles, data=self._backend.append(other._backend, index)
+            roles=new_roles, data=self._backend.append(other._backend, index)
         )
 
     @staticmethod
@@ -141,7 +145,7 @@ class Dataset(DatasetBase):
         ],
         backend: BackendsEnum = BackendsEnum.pandas,
         index=None,
-    ):
+    ) -> "Dataset":
         ds = Dataset(roles=roles, backend=backend)
         ds._backend = ds._backend.from_dict(data, index)
         ds.data = ds._backend.data
@@ -153,7 +157,7 @@ class Dataset(DatasetBase):
         role: Dict[Union[str, int], ABCRole],
         axis=0,
         **kwargs,
-    ):
+    ) -> "Dataset":
         return Dataset(
             data=self._backend.apply(func=func, axis=axis, **kwargs).rename(
                 list(role.keys())[0]
@@ -161,7 +165,7 @@ class Dataset(DatasetBase):
             roles=role,
         )
 
-    def map(self, func, na_action=None, **kwargs):
+    def map(self, func, na_action=None, **kwargs) -> "Dataset":
         return Dataset(
             roles=self.roles,
             data=self._backend.map(func=func, na_action=na_action, **kwargs),
@@ -170,7 +174,7 @@ class Dataset(DatasetBase):
     def unique(self):
         return self._backend.unique()
 
-    def isin(self, values: Iterable):
+    def isin(self, values: Iterable) -> "Dataset":
         return Dataset(
             roles={column: FilterRole() for column in self.roles.keys()},
             data=self._backend.isin(values),
@@ -183,7 +187,6 @@ class Dataset(DatasetBase):
         fields_list: Optional[Union[str, List]] = None,
         **kwargs,
     ):
-
         datasets = [
             (i, Dataset(roles=self.roles, data=data))
             for i, data in self._backend.groupby(by=by, **kwargs)
@@ -246,19 +249,24 @@ class Dataset(DatasetBase):
         return self._convert_data_after_agg(self._backend.agg(func))
 
 
-class ExperimentData(Dataset):
+class ExperimentData:
     def __init__(self, data: Dataset):
-        self.additional_fields = Dataset._create_empty(index=data.index)
-        self.stats = Dataset._create_empty(index=data.columns)
-        self.additional_fields = Dataset._create_empty(index=data.index)
+        self._data = data
+        self.additional_fields = Dataset.create_empty(index=data.index)
+        self.stats = Dataset.create_empty(index=data.columns)
+        self.additional_fields = Dataset.create_empty(index=data.index)
         self.analysis_tables: Dict[str, Dataset] = {}
         self.id_name_mapping: Dict[str, str] = {}
 
-        super().__init__(data=data.data, roles=data.roles)
+    @property
+    def ds(self):
+        return self._data
 
     @staticmethod
-    def _create_empty(roles=None, backend=BackendsEnum.pandas, index=None):
-        ds = Dataset._create_empty(backend, roles, index)
+    def create_empty(
+        roles=None, backend=BackendsEnum.pandas, index=None
+    ) -> "ExperimentData":
+        ds = Dataset.create_empty(backend, roles, index)
         return ExperimentData(ds)
 
     def check_hash(self, executor_id: int, space: ExperimentDataEnum) -> bool:
@@ -279,7 +287,7 @@ class ExperimentData(Dataset):
         value: Any,
         key: Optional[str] = None,
         role=None,
-    ):
+    ) -> "ExperimentData":
         if space == ExperimentDataEnum.additional_fields:
             self.additional_fields.add_column(data=value, role={executor_id: role})
         elif space == ExperimentDataEnum.analysis_tables:
@@ -294,20 +302,11 @@ class ExperimentData(Dataset):
         self.id_name_mapping[executor_id] = name
         return self
 
-    def __id_fields_filter(self, ids: Dict, fields=None):
-        if fields is None:
-            return ids
-        return {
-            k: v
-            for k, v in ids.items()
-            if any(f"{NAME_BORDER_SYMBOL}{f}{NAME_BORDER_SYMBOL}" in k for f in fields)
-        }
-
-    def get_ids_by_executors(
-        self, classes: Union[type, List[type]], fields=None
+    def get_ids(
+        self, classes: Union[type, List[type]]
     ) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
-        result = {
+        return {
             class_: {
                 ExperimentDataEnum.stats.value: [
                     str(_id)
@@ -327,13 +326,15 @@ class ExperimentData(Dataset):
             }
             for class_ in classes
         }
-        return self.__id_fields_filter(result, fields)
 
     def _get_one_id(self, class_: type, space: ExperimentDataEnum) -> str:
-        result = self.get_ids_by_executors(class_)
+        result = self.get_ids(class_)
         if not len(result):
             raise NotFoundInExperimentDataError(class_)
         return result[class_][space.value][0]
 
-    def get_ids_by_field(self):
-        pass
+    def copy(self, data: Optional[Dataset] = None) -> "ExperimentData":
+        result = deepcopy(self)
+        if data is not None:
+            result._data = data
+        return result

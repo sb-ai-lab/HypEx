@@ -1,9 +1,9 @@
-import warnings
 from abc import ABC, abstractmethod
-from typing import Optional, Any, Union, Dict
+from typing import Any, Optional, Union
 
-from hypex.dataset import ExperimentData, Dataset
+from hypex.dataset import Dataset, ExperimentData
 from hypex.utils import ID_SPLIT_SYMBOL
+from hypex.utils.errors import AbstractMethodError
 
 
 class Executor(ABC):
@@ -76,38 +76,12 @@ class Executor(ABC):
         return data
 
     @abstractmethod
-    def calc(self, data: Dataset):
-        raise NotImplementedError
-
     def execute(self, data: ExperimentData) -> ExperimentData:
-        value = self.calc(data)
-        return self._set_value(data, value)
+        raise AbstractMethodError
 
 
-class ComplexExecutor(Executor, ABC):
-    default_inner_executors: Dict[str, Executor] = {}
-
-    def _get_inner_executors(
-        self, inner_executors: Optional[Dict[str, Executor]] = None
-    ) -> Dict[str, Executor]:
-        result = {}
-        inner_executors = inner_executors or {}
-        for key, executor in self.default_inner_executors.items():
-            if key not in inner_executors:
-                if len(inner_executors):
-                    warnings.warn(
-                        f"{key} executor not found in inner_executors. Will {key} will be used by default."
-                    )
-                result[key] = executor
-            else:
-                result[key] = inner_executors[key]
-        return result
-
-    def __init__(
-        self,
-        inner_executors: Optional[Dict[str, Executor]] = None,
-        full_name: Optional[str] = None,
-        key: Any = "",
-    ):
-        super().__init__(full_name=full_name, key=key)
-        self.inner_executors = self._get_inner_executors(inner_executors)
+class Calculator(Executor, ABC):
+    @staticmethod
+    @abstractmethod
+    def calc(data: Dataset, **kwargs):
+        raise AbstractMethodError

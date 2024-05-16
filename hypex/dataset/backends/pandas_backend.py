@@ -1,15 +1,15 @@
 from pathlib import Path
 from typing import (
-    Sequence,
-    Union,
+    Any,
+    Callable,
+    Dict,
     Iterable,
     List,
-    Dict,
-    Tuple,
-    Sized,
-    Callable,
     Optional,
-    Any,
+    Sequence,
+    Sized,
+    Tuple,
+    Union,
 )
 
 import pandas as pd  # type: ignore
@@ -57,6 +57,14 @@ class PandasNavigation(DatasetBackendNavigation):
     def __repr__(self):
         return self.data.__repr__()
 
+    def create_empty(
+        self,
+        index: Optional[Iterable] = None,
+        columns: Optional[Iterable[str]] = None,
+    ):
+        self.data = pd.DataFrame(index=index, columns=columns)
+        return self
+
     @property
     def index(self):
         return self.data.index
@@ -94,13 +102,11 @@ class PandasNavigation(DatasetBackendNavigation):
         else:
             self.data.loc[:, name] = data
 
-    def _create_empty(
-        self,
-        index: Optional[Iterable] = None,
-        columns: Optional[Iterable[str]] = None,
-    ):
-        self.data = pd.DataFrame(index=index, columns=columns)
-        return self
+    def append(self, other, index: bool = False) -> pd.DataFrame:
+        new_data = pd.concat([self.data] + [d.data for d in other])
+        if index:
+            new_data.reset_index()
+        return new_data
 
     def from_dict(
         self, data: FromDictTypes, index: Union[Iterable, Sized, None] = None
@@ -117,12 +123,6 @@ class PandasNavigation(DatasetBackendNavigation):
         index = list(self.index)
         return {"data": data, "index": index}
 
-    def append(self, other, index: bool = False) -> pd.DataFrame:
-        new_data = pd.concat([self.data, other.data])
-        if index:
-            new_data.reset_index()
-        return new_data
-
     def loc(self, items: Iterable) -> Iterable:
         data = self.data.loc[items]
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
@@ -133,7 +133,6 @@ class PandasNavigation(DatasetBackendNavigation):
 
 
 class PandasDataset(PandasNavigation, DatasetBackendCalc):
-
     def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series] = None):
         super().__init__(data)
 

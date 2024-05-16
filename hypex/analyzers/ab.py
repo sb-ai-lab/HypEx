@@ -1,21 +1,17 @@
-from typing import Dict, List
+from typing import List
 
-from hypex.analyzers.abstract import Analyzer
-from hypex.comparators import ATE
-from hypex.comparators import TTest, UTest
-from hypex.dataset import ExperimentData, Dataset
-from hypex.dataset import StatisticRole
-from hypex.experiments.base import (
-    Executor,
+from hypex.comparators import ATE, TTest, UTest
+from hypex.dataset import Dataset, ExperimentData, StatisticRole
+from hypex.experiments.base import Executor
+from hypex.utils import (
+    ID_SPLIT_SYMBOL,
+    NAME_BORDER_SYMBOL,
+    BackendsEnum,
+    ExperimentDataEnum,
 )
-from hypex.stats import Mean
-from hypex.utils import ExperimentDataEnum, BackendsEnum
-from hypex.utils import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
 
 
-class ABAnalyzer(Analyzer):
-    default_inner_executors: Dict[str, Executor] = {"mean": Mean()}
-
+class ABAnalyzer(Executor):
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         return data.set_value(
             ExperimentDataEnum.analysis_tables,
@@ -29,7 +25,6 @@ class ABAnalyzer(Analyzer):
         executor_ids = data.get_ids_by_executors(analysis_tests)
 
         analysis_data = {}
-        mean_operator: Mean = self.inner_executors["mean"]
         for c, spaces in executor_ids.items():
             analysis_ids = spaces.get("analysis_tables", [])
             if len(analysis_ids) == 0:
@@ -41,9 +36,7 @@ class ABAnalyzer(Analyzer):
 
             if c.__name__ in ["TTest", "UTest"]:
                 for f in ["p-value", "pass"]:
-                    analysis_data[f"{c.__name__} {f}"] = mean_operator.calc(
-                        t_data[f]
-                    ).iloc[0]
+                    analysis_data[f"{c.__name__} {f}"] = t_data["f"].mean()
             else:
                 indexes = t_data.index
                 values = t_data.data.values.tolist()

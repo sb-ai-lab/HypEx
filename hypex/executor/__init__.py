@@ -1,3 +1,3 @@
-from .executor import Executor, ComplexExecutor
+from hypex.executor.executor import Executor
 
-__all__ = ["Executor", "ComplexExecutor"]
+__all__ = ["Executor"]

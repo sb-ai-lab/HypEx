@@ -1,12 +1,11 @@
-from abc import abstractmethod, ABC
-from typing import Iterable, Any, Union, Callable, Sized, Optional, Dict, Sequence, List
+from abc import ABC, abstractmethod
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Sized, Union
 
 from hypex.utils import FromDictTypes
 from hypex.utils.errors import AbstractMethodError
 
 
 class DatasetBackendNavigation(ABC):
-
     @property
     def name(self) -> str:
         return str(self.__class__.__name__).lower().replace("backend", "")
@@ -44,7 +43,7 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def _create_empty(
+    def create_empty(
         self,
         index: Optional[Iterable] = None,
         columns: Optional[Iterable[str]] = None,

@@ -1,40 +1,49 @@
-from abc import abstractmethod, ABC
-from typing import Optional, Dict, Any, List, Union
+from abc import ABC, abstractmethod
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
-from hypex.dataset import ABCRole, GroupingRole, TempTargetRole, StatisticRole
-from hypex.dataset import Dataset, ExperimentData
-from hypex.executor import ComplexExecutor, Executor
-from hypex.utils import ExperimentDataEnum, SpaceEnum, BackendsEnum
-from hypex.utils import FromDictTypes
-from hypex.utils import NAME_BORDER_SYMBOL
-from hypex.utils import NoColumnsError, ComparisonNotSuitableFieldError
+from hypex.dataset import (
+    ABCRole,
+    Dataset,
+    ExperimentData,
+    GroupingRole,
+    StatisticRole,
+    TempTargetRole,
+)
+from hypex.executor import Executor
+from hypex.executor.executor import Calculator
+from hypex.utils import (
+    BackendsEnum,
+    ComparisonNotSuitableFieldError,
+    ExperimentDataEnum,
+    FieldKeyTypes,
+    FromDictTypes,
+    NoColumnsError,
+    SpaceEnum,
+)
+from hypex.utils.errors import AbstractMethodError
 
 
-class GroupComparator(ComplexExecutor):
+class GroupComparator(Calculator):
     def __init__(
         self,
         grouping_role: Optional[ABCRole] = None,
         space: SpaceEnum = SpaceEnum.auto,
-        inner_executors: Optional[Dict[str, Executor]] = None,
         full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.grouping_role = grouping_role or GroupingRole()
         self.space = space
         self.__additional_mode = space == SpaceEnum.additional
-        super().__init__(inner_executors=inner_executors, full_name=full_name, key=key)
+        super().__init__(full_name=full_name, key=key)
 
     def _local_extract_dataset(
         self, compare_result: Dict[Any, Any], roles: Dict[Any, ABCRole]
     ) -> Dataset:
         return self._extract_dataset(compare_result, roles)
 
-    def _one_stat_calculation(self, data, stat: Executor):
-        pass
-
     @abstractmethod
     def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
-        raise NotImplementedError
+        raise AbstractMethodError
 
     def __group_field_searching(self, data: ExperimentData):
         group_field = []
@@ -66,14 +75,29 @@ class GroupComparator(ComplexExecutor):
         ]
         return result
 
-    def calc(self, data: Dataset) -> Dict:
-        group_field = self.__group_field_searching(data)
-        target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)
-        if len(target_field) > 0:
-            self.key = f"{group_field} {NAME_BORDER_SYMBOL}{target_field[0]}{NAME_BORDER_SYMBOL}"
-        else:
-            self.key = group_field
-        grouping_data = self.__get_grouping_data(data, group_field)
+    @staticmethod
+    def __field_arg_universalization(
+        field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None]
+    ) -> List[FieldKeyTypes]:
+        if not field:
+            raise NoColumnsError(field)
+        elif isinstance(field, FieldKeyTypes):
+            return [field]
+        return list(field)
+
+    @staticmethod
+    def calc(
+        data: Dataset,
+        group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
+        target_field: Optional[FieldKeyTypes] = None,
+        comparison_function: Optional[Callable] = None,
+        **kwargs,
+    ) -> Dict:
+        group_field = GroupComparator.__field_arg_universalization(group_field)
+        if comparison_function is None:
+            raise ValueError("Comparison function must be provided.")
+
+        grouping_data = data.groupby(group_field)
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
@@ -83,13 +107,13 @@ class GroupComparator(ComplexExecutor):
         if target_field:
             for i in range(1, len(grouping_data)):
                 grouping_data[i][1].tmp_roles = data.tmp_roles
-                result[grouping_data[i][0]] = self._comparison_function(
+                result[grouping_data[i][0]] = comparison_function(
                     grouping_data[0][1][target_field],
                     grouping_data[i][1][target_field],
                 )
         else:
             for i in range(1, len(grouping_data)):
-                result[grouping_data[i][0]] = self._comparison_function(
+                result[grouping_data[i][0]] = comparison_function(
                     grouping_data[0][1], grouping_data[i][1]
                 )
         return result
@@ -109,6 +133,34 @@ class GroupComparator(ComplexExecutor):
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        group_field = self.__group_field_searching(data)
+        meta_name = group_field[0] if len(group_field) == 1 else group_field
+        group_name = (
+            str(data.id_name_mapping.get(meta_name, meta_name))
+            if (self.__additional_mode and isinstance(data, ExperimentData))
+            else str(meta_name)
+        )[0]
+        target_field = data.get_columns_by_roles(TempTargetRole(), tmp_role=True)
+        grouping_data = self.__get_grouping_data(data, group_field)
+        if len(grouping_data) > 1:
+            grouping_data[0][1].tmp_roles = data.tmp_roles
+        else:
+            raise ComparisonNotSuitableFieldError(group_field)
+
+        compare_result = {}
+        if target_field:
+            for i in range(1, len(grouping_data)):
+                grouping_data[i][1].tmp_roles = data.tmp_roles
+                compare_result[grouping_data[i][0]] = self._comparison_function(
+                    grouping_data[0][1][target_field],
+                    grouping_data[i][1][target_field],
+                )
+        else:
+            for i in range(1, len(grouping_data)):
+                compare_result[grouping_data[i][0]] = self._comparison_function(
+                    grouping_data[0][1], grouping_data[i][1]
+                )
+
         compare_result = self.calc(data)
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key, _ in compare_result.items()}
@@ -144,10 +196,6 @@ class StatHypothesisTestingWithScipy(GroupComparator, ABC):
             for group, stats in compare_result.items()
         ]
         # mypy does not see an heir
-        # return super()._extract_dataset(
-        #     result_stats,
-        #     roles={StatisticRole(): ["group", "statistic", "p-value", "pass"]}
-        # )
 
         return super()._extract_dataset(
             result_stats,
