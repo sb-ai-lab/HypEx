@@ -365,7 +365,6 @@ class Dataset(DatasetBase):
         t_data = self._backend.corr(method=method, numeric_only=numeric_only)
         t_roles = {column: self.roles[column] for column in t_data.columns}
         return Dataset(roles=t_roles, data=t_data)
-            # self._convert_data_after_agg(self._backend.corr(method=method, numeric_only=numeric_only))
 
     def value_counts(
         self,
