@@ -1,12 +1,7 @@
-from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Sized, Union
-
-from hypex.utils import FromDictTypes
 from abc import abstractmethod, ABC
-from typing import Iterable, Any, Union, Callable, Sized, Optional, Dict, Sequence
+from typing import Iterable, Any, Union, Callable, Sized, Optional, Dict, Sequence, List
 
-from hypex.utils import FromDictType, FieldsType
-from hypex.utils.errors import AbstractMethodError
+from hypex.utils import AbstractMethodError, FromDictTypes, FieldKeyTypes
 
 
 class DatasetBackendNavigation(ABC):
@@ -283,7 +278,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
 
     @abstractmethod
     def sort_values(
-            self, by: Union[str, List[str]], ascending: bool = True, **kwargs
+        self, by: Union[str, List[str]], ascending: bool = True, **kwargs
     ) -> Any:
         raise AbstractMethodError
 
@@ -295,7 +290,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def corr(selfself, method="pearson", numeric_only=False) -> Any:
+    def corr(self, method="pearson", numeric_only=False) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
@@ -332,9 +327,9 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     def merge(
         self,
         right: Any,
-        on: FieldsType = "",
-        left_on: FieldsType = "",
-        right_on: FieldsType = "",
+        on: FieldKeyTypes = "",
+        left_on: FieldKeyTypes = "",
+        right_on: FieldKeyTypes = "",
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
@@ -342,7 +337,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def drop(self, labels: FieldsType = "", axis: int = 1) -> Any:
+    def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> Any:
         raise AbstractMethodError
 
     def fillna(self, values, method, **kwargs) -> Any:

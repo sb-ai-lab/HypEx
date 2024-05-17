@@ -121,13 +121,13 @@ class GroupExperiment(Executor):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result_list = []
-        group_field = data.get_columns_by_roles(TempGroupingRole(), tmp_role=True)
+        group_field = data.ds.get_columns_by_roles(TempGroupingRole(), tmp_role=True)
 
-        for group, group_data in data.groupby(group_field):
+        for group, group_data in data.ds.groupby(group_field):
             temp_data = ExperimentData(group_data)
             temp_data = self.inner_executor.execute(temp_data)
-            temp_data = temp_data.add_column(
-                [group] * len(temp_data),
+            temp_data = temp_data.ds.add_column(
+                [group] * len(temp_data.ds),
                 role={f"group({self.id_for_name})": GroupingRole()},
             )
             result_list.append(self._extract_result(temp_data))
@@ -147,8 +147,8 @@ class OnRoleExperiment(Experiment):
         super().__init__(executors, transformer, full_name, key)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        for field in data.get_columns_by_roles(self.role):
-            data.tmp_roles = {field: TempTargetRole()}
+        for field in data.ds.get_columns_by_roles(self.role):
+            data.ds.tmp_roles = {field: TempTargetRole()}
             data = super().execute(data)
-            data.tmp_roles = {}
+            data.ds.tmp_roles = {}
         return data

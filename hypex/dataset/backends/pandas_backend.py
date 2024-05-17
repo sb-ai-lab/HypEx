@@ -10,15 +10,14 @@ from typing import (
     Sized,
     Tuple,
     Union,
+    Literal,
 )
 
-import pandas as pd  # type: ignore
 import numpy as np
+import pandas as pd  # type: ignore
 
-from hypex.dataset.backends.abstract import DatasetBackendCalc, DatasetBackendNavigation
-from hypex.utils import FromDictTypes, FieldKeyTypes
-from hypex.dataset.backends.abstract import DatasetBackendCalc
-from hypex.utils import FromDictType, MergeOnError, FieldsType, ScalarType
+from hypex.utils import FromDictTypes, FieldKeyTypes, MergeOnError
+from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
 class PandasNavigation(DatasetBackendNavigation):
@@ -66,22 +65,22 @@ class PandasNavigation(DatasetBackendNavigation):
 
     # comparison operators:
     def __eq__(self, other) -> Any:
-        return self.data == PandasDataset.__magic_determine_other(other)
+        return self.data == self.__magic_determine_other(other)
 
     def __ne__(self, other) -> Any:
-        return self.data != PandasDataset.__magic_determine_other(other)
+        return self.data != self.__magic_determine_other(other)
 
     def __le__(self, other) -> Any:
-        return self.data <= PandasDataset.__magic_determine_other(other)
+        return self.data <= self.__magic_determine_other(other)
 
     def __lt__(self, other) -> Any:
-        return self.data < PandasDataset.__magic_determine_other(other)
+        return self.data < self.__magic_determine_other(other)
 
     def __ge__(self, other) -> Any:
-        return self.data >= PandasDataset.__magic_determine_other(other)
+        return self.data >= self.__magic_determine_other(other)
 
     def __gt__(self, other) -> Any:
-        return self.data > PandasDataset.__magic_determine_other(other)
+        return self.data > self.__magic_determine_other(other)
 
     # Unary operations:
     def __pos__(self) -> Any:
@@ -101,59 +100,59 @@ class PandasNavigation(DatasetBackendNavigation):
 
     # Binary operations:
     def __add__(self, other) -> Any:
-        return self.data + PandasDataset.__magic_determine_other(other)
+        return self.data + self.__magic_determine_other(other)
 
     def __sub__(self, other) -> Any:
-        return self.data - PandasDataset.__magic_determine_other(other)
+        return self.data - self.__magic_determine_other(other)
 
     def __mul__(self, other) -> Any:
-        return self.data * PandasDataset.__magic_determine_other(other)
+        return self.data * self.__magic_determine_other(other)
 
     def __floordiv__(self, other) -> Any:
-        return self.data // PandasDataset.__magic_determine_other(other)
+        return self.data // self.__magic_determine_other(other)
 
     def __div__(self, other) -> Any:
-        return self.data / PandasDataset.__magic_determine_other(other)
+        return self.data / self.__magic_determine_other(other)
 
     def __truediv__(self, other) -> Any:
-        return self.data / PandasDataset.__magic_determine_other(other)
+        return self.data / self.__magic_determine_other(other)
 
     def __mod__(self, other) -> Any:
-        return self.data % PandasDataset.__magic_determine_other(other)
+        return self.data % self.__magic_determine_other(other)
 
     def __pow__(self, other) -> Any:
-        return self.data ** PandasDataset.__magic_determine_other(other)
+        return self.data ** self.__magic_determine_other(other)
 
     def __and__(self, other) -> Any:
-        return self.data & PandasDataset.__magic_determine_other(other)
+        return self.data & self.__magic_determine_other(other)
 
     def __or__(self, other) -> Any:
-        return self.data | PandasDataset.__magic_determine_other(other)
+        return self.data | self.__magic_determine_other(other)
 
     # Right arithmetic operators:
     def __radd__(self, other) -> Any:
-        return PandasDataset.__magic_determine_other(other) + self.data
+        return self.__magic_determine_other(other) + self.data
 
     def __rsub__(self, other) -> Any:
-        return PandasDataset.__magic_determine_other(other) - self.data
+        return self.__magic_determine_other(other) - self.data
 
     def __rmul__(self, other) -> Any:
-        return PandasDataset.__magic_determine_other(other) * self.data
+        return self.__magic_determine_other(other) * self.data
 
     def __rfloordiv__(self, other) -> Any:
-        return PandasDataset.__magic_determine_other(other) // self.data
+        return self.__magic_determine_other(other) // self.data
 
     def __rdiv__(self, other) -> Any:
-        return PandasDataset.__magic_determine_other(other) / self.data
+        return self.__magic_determine_other(other) / self.data
 
     def __rtruediv__(self, other) -> Any:
-        return PandasDataset.__magic_determine_other(other) / self.data
+        return self.__magic_determine_other(other) / self.data
 
     def __rmod__(self, other) -> Any:
-        return PandasDataset.__magic_determine_other(other) % self.data
+        return self.__magic_determine_other(other) % self.data
 
     def __rpow__(self, other) -> Any:
-        return PandasDataset.__magic_determine_other(other) ** self.data
+        return self.__magic_determine_other(other) ** self.data
 
     def __repr__(self):
         return self.data.__repr__()
@@ -252,27 +251,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def nunique(self, dropna: bool = True):
         return {column: self.data[column].nunique() for column in self.data.columns}
 
-    def isin(self, values: Iterable) -> Iterable[bool]:
-        return self.data.isin(values)
-
     def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> List[Tuple]:
         groups = self.data.groupby(by, **kwargs)
         return list(groups)
-
-    def mean(self) -> Union[pd.DataFrame, float]:
-        return self.agg(["mean"])
-
-    def max(self) -> Union[pd.DataFrame, float]:
-        return self.agg(["max"])
-
-    def min(self) -> Union[pd.DataFrame, float]:
-        return self.agg(["min"])
-
-    def count(self) -> Union[pd.DataFrame, float]:
-        return self.agg(["count"])
-
-    def sum(self) -> Union[pd.DataFrame, float]:
-        return self.agg(["sum"])
 
     def agg(self, func: Union[str, List], **kwargs) -> Union[pd.DataFrame, float]:
         func = func if isinstance(func, List) else [func]
@@ -281,19 +262,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             return float(result.loc[result.index[0], result.columns[0]])
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
-    def mean(self) -> Union[pd.DataFrame, float]:
-        return self.agg(["mean"])
-
-    def mode(
-        self, numeric_only: bool = False, dropna: bool = True
-    ) -> Union[pd.DataFrame, float]:
-        return self.agg(["mode"])
-
-    def var(
-        self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
-    ) -> Union[pd.DataFrame, float]:
-        return self.agg(["var"])
-
     def max(self) -> Union[pd.DataFrame, float]:
         return self.agg(["max"])
 
@@ -305,6 +273,21 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def sum(self) -> Union[pd.DataFrame, float]:
         return self.agg(["sum"])
+
+    def mean(self) -> Union[pd.DataFrame, float]:
+        return self.agg(["mean"])
+
+    # TODO
+    def mode(
+        self, numeric_only: bool = False, dropna: bool = True
+    ) -> Union[pd.DataFrame, float]:
+        return self.agg(["mode"])
+
+    # TODO
+    def var(
+        self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
+    ) -> Union[pd.DataFrame, float]:
+        return self.agg(["var"])
 
     def log(self) -> pd.DataFrame:
         np_data = np.log(self.data.to_numpy())
@@ -321,10 +304,17 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
     def sort_index(self, ascending: bool = True, **kwargs) -> pd.DataFrame:
-        return self.data.sort_index(**kwargs)
+        return self.data.sort_index(ascending=ascending, **kwargs)
 
-    def corr(self, method="pearson", numeric_only=False) -> Union[pd.DataFrame, float]:
+    def corr(
+        self,
+        method: Literal["pearson", "kendall", "spearman"] = "pearson",
+        numeric_only: bool = False,
+    ) -> Union[pd.DataFrame, float]:
         return self.data.corr(method=method, numeric_only=numeric_only)
+
+    def isna(self) -> pd.DataFrame:
+        return self.data.isna()
 
     def sort_values(
         self, by: Union[str, List[str]], ascending: bool = True, **kwargs
@@ -357,7 +347,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
     def dropna(
-        self, how: str = "any", subset: Union[str, Iterable[str]] = None
+        self,
+        how: Literal["any", "all"] = "any",
+        subset: Union[str, Iterable[str]] = None,
     ) -> pd.DataFrame:
         return self.data.dropna(how=how, subset=subset)
 
@@ -374,16 +366,21 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return self.agg(func="quantile", q=q)
 
     def select_dtypes(
-        self, include: FieldsType = "", exclude: FieldsType = ""
+        self,
+        include: Optional[FieldKeyTypes] = None,
+        exclude: Optional[FieldKeyTypes] = None,
     ) -> pd.DataFrame:
         return self.data.select_dtypes(include=include, exclude=exclude)
+
+    def isin(self, values: Iterable) -> Iterable[bool]:
+        return self.data.isin(values)
 
     def merge(
         self,
         right: "PandasDataset",  # should be PandasDataset.
-        on: FieldsType = "",
-        left_on: FieldsType = "",
-        right_on: FieldsType = "",
+        on: FieldKeyTypes = "",
+        left_on: FieldKeyTypes = "",
+        right_on: FieldKeyTypes = "",
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
@@ -401,5 +398,5 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             suffixes=suffixes,
         )
 
-    def drop(self, labels: FieldsType = "", axis: int = 1) -> pd.DataFrame:
+    def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> pd.DataFrame:
         return self.data.drop(labels=labels, axis=axis)

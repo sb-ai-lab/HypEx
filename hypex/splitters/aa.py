@@ -1,6 +1,7 @@
 from typing import Any, List, Optional
 
 from hypex.dataset import Dataset, ExperimentData, TreatmentRole
+from hypex.executor import Calculator
 from hypex.utils import ExperimentDataEnum
 
 
@@ -45,7 +46,7 @@ class AASplitter(Calculator):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         return self._set_value(
-            data, self.calc(data, self.random_state, self.control_size)
+            data, self.calc(data.ds, self.random_state, self.control_size)
         )
 
 

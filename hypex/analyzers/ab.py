@@ -22,7 +22,7 @@ class ABAnalyzer(Executor):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         analysis_tests: List[type] = [TTest, UTest, ATE]
-        executor_ids = data.get_ids_by_executors(analysis_tests)
+        executor_ids = data.get_ids(analysis_tests)
 
         analysis_data = {}
         for c, spaces in executor_ids.items():
@@ -36,7 +36,7 @@ class ABAnalyzer(Executor):
 
             if c.__name__ in ["TTest", "UTest"]:
                 for f in ["p-value", "pass"]:
-                    analysis_data[f"{c.__name__} {f}"] = t_data["f"].mean()
+                    analysis_data[f"{c.__name__} {f}"] = t_data[f].mean()
             else:
                 indexes = t_data.index
                 values = t_data.data.values.tolist()

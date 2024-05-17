@@ -11,6 +11,7 @@ from .errors import (
     DataTypeError,
     BackendTypeError,
     MergeOnError,
+    AbstractMethodError,
 )
 
 from .typings import (
@@ -24,7 +25,6 @@ from .typings import (
     DecoratedType,
     DocstringInheritDecorator,
     RoleNameType,
-    FieldsType,
     ScalarType,
 )
 
@@ -41,6 +41,7 @@ __all__ = [
     "ConcatBackendError",
     "NotFoundInExperimentDataError",
     "ComparisonNotSuitableFieldError",
+    "AbstractMethodError",
     "FromDictTypes",
     "TargetRoleTypes",
     "CategoricalTypes",
@@ -54,6 +55,5 @@ __all__ = [
     "DataTypeError",
     "BackendTypeError",
     "MergeOnError",
-    "FieldsType",
     "ScalarType",
 ]

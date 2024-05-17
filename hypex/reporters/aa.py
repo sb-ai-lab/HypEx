@@ -18,9 +18,9 @@ class AADictReporter(DictReporter):
         return int(aa_id) if aa_id.isdigit() else None
 
     def extract_group_difference(self, data: ExperimentData) -> Dict[str, Any]:
-        group_difference_ids = data.get_ids_by_executors(GroupDifference)[
-            GroupDifference
-        ][ExperimentDataEnum.analysis_tables.value]
+        group_difference_ids = data.get_ids(GroupDifference)[GroupDifference][
+            ExperimentDataEnum.analysis_tables.value
+        ]
         t_data = data.analysis_tables[group_difference_ids[0]]
         for aid in group_difference_ids[1:]:
             t_data = t_data.append(data.analysis_tables[aid])

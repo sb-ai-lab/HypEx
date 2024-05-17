@@ -25,11 +25,8 @@ from hypex.utils import (
     FromDictTypes,
     MultiFieldKeyTypes,
     NotFoundInExperimentDataError,
-    FromDictType,
     DataTypeError,
     BackendTypeError,
-    FieldKeyTypes,
-    FieldsType,
     ScalarType,
 )
 from .abstract import DatasetBase
@@ -224,8 +221,7 @@ class Dataset(DatasetBase):
         if isinstance(result, float):
             return result
         return Dataset(
-            data=result,
-            roles={column: StatisticRole() for column in self.roles}
+            data=result, roles={column: StatisticRole() for column in self.roles}
         )
 
     def add_column(
@@ -262,9 +258,7 @@ class Dataset(DatasetBase):
             self._check_other_dataset(o)
             new_roles.update(o.roles)
 
-        return Dataset(
-            roles=new_roles, data=self._backend.append(other._backend, index)
-        )
+        return Dataset(roles=new_roles, data=self.backend.append(other, index))
 
     @staticmethod
     def from_dict(
@@ -339,14 +333,18 @@ class Dataset(DatasetBase):
             dataset[1].tmp_roles = self.tmp_roles
         return datasets
 
-    def mean(self):     # should we add arguments to all the methods?
+    def mean(self):  # should we add arguments to all the methods?
         return self._convert_data_after_agg(self._backend.mean())
 
     def mode(self, numeric_only: bool = False, dropna: bool = True):
-        return self._convert_data_after_agg(self._backend.mode(numeric_only=numeric_only, dropna=dropna))
+        return self._convert_data_after_agg(
+            self._backend.mode(numeric_only=numeric_only, dropna=dropna)
+        )
 
     def var(self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False):
-        return self._convert_data_after_agg(self._backend.var(skipna=skipna, ddof=ddof, numeric_only=numeric_only))
+        return self._convert_data_after_agg(
+            self._backend.var(skipna=skipna, ddof=ddof, numeric_only=numeric_only)
+        )
 
     def sort(
         self,
@@ -403,7 +401,7 @@ class Dataset(DatasetBase):
     def coefficient_of_variation(self):
         return self._convert_data_after_agg(self._backend.coefficient_of_variation())
 
-    def corr(self, method='pearson', numeric_only=False):
+    def corr(self, method="pearson", numeric_only=False):
         t_data = self._backend.corr(method=method, numeric_only=numeric_only)
         t_roles = {column: self.roles[column] for column in t_data.columns}
         return Dataset(roles=t_roles, data=t_data)
@@ -425,9 +423,7 @@ class Dataset(DatasetBase):
     def na_counts(self):
         return self._convert_data_after_agg(self._backend.na_counts())
 
-    def dropna(
-        self, how: str = "any", subset: Union[str, Iterable[str]] = None
-    ):
+    def dropna(self, how: str = "any", subset: Union[str, Iterable[str]] = None):
         return Dataset(
             roles=self.roles, data=self._backend.dropna(how=how, subset=subset)
         )
@@ -446,9 +442,9 @@ class Dataset(DatasetBase):
     def merge(
         self,
         right,
-        on: FieldsType = "",
-        left_on: FieldsType = "",
-        right_on: FieldsType = "",
+        on: FieldKeyTypes = "",
+        left_on: FieldKeyTypes = "",
+        right_on: FieldKeyTypes = "",
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
@@ -480,7 +476,9 @@ class Dataset(DatasetBase):
 
     def drop(self, labels: Any = None, axis: int = 1):
         t_data = self._backend.drop(labels=labels, axis=axis)
-        t_roles = self.roles if axis == 0 else {c: self.roles[c] for c in t_data.columns}
+        t_roles = (
+            self.roles if axis == 0 else {c: self.roles[c] for c in t_data.columns}
+        )
         return Dataset(roles=t_roles, data=t_data)
 
     def dot(self, other: "Dataset") -> "Dataset":

@@ -2,8 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional, Union
 
 from hypex.dataset import Dataset, ExperimentData
-from hypex.utils import ID_SPLIT_SYMBOL
-from hypex.utils.errors import AbstractMethodError
+from hypex.utils import ID_SPLIT_SYMBOL, AbstractMethodError
 
 
 class Executor(ABC):
