@@ -7,6 +7,4 @@ from .aa import AADictReporter
 class HomoReporter(AADictReporter):
 
     def report(self, data: ExperimentData) -> Dict[str, Any]:
-        result = {}
-        result.update(self.extract_data_from_analysis_tables(data))
-        return result
+        return self.extract_data_from_analysis_tables(data)
