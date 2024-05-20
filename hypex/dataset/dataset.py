@@ -211,7 +211,7 @@ class Dataset(DatasetBase):
 
     @property
     def data(self):
-        return self.data
+        return self._backend.data
 
     @data.setter
     def data(self, value):
