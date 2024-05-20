@@ -4,15 +4,15 @@ import pandas as pd
 from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind
 
 from hypex.dataset import Dataset, StatisticRole
-from hypex.dataset.tasks.abstract import CompareTask
+from hypex.extensions.abstract import CompareExtension
 from hypex.utils import BackendsEnum
 
 
-class StatTest(CompareTask):
-    def __init__(self, test_function: Callable = None, alpha: float = 0.05):
+class StatTest(CompareExtension):
+    def __init__(self, test_function: Callable = None, reliability: float = 0.05):
         super().__init__()
         self.test_function = test_function
-        self.alpha = alpha
+        self.reliability = reliability
 
     @staticmethod
     def check_other(other: Union[Dataset, None]) -> Dataset:
@@ -39,7 +39,7 @@ class StatTest(CompareTask):
                 {
                     "p-value": one_result.pvalue,
                     "statistic": one_result.statistic,
-                    "pass": one_result.pvalue < self.alpha,
+                    "pass": one_result.pvalue < self.reliability,
                 }
             ]
         )
@@ -56,25 +56,26 @@ class StatTest(CompareTask):
         one_result = self.test_function(
             data.backend.data.values.flatten(), other.backend.data.values.flatten()
         )
-        return self.convert_scipy_to_dataset(one_result)
+        one_result = self.convert_scipy_to_dataset(one_result)
+        return one_result
 
 
-class TTest(StatTest):
-    def __init__(self, alpha: float = 0.05):
-        super().__init__(ttest_ind, alpha=alpha)
+class TTestExtension(StatTest):
+    def __init__(self, reliability: float = 0.05):
+        super().__init__(ttest_ind, reliability=reliability)
 
 
-class KSTest(StatTest):
-    def __init__(self, alpha: float = 0.05):
-        super().__init__(ks_2samp, alpha=alpha)
+class KSTestExtension(StatTest):
+    def __init__(self, reliability: float = 0.05):
+        super().__init__(ks_2samp, reliability=reliability)
 
 
-class UTest(StatTest):
-    def __init__(self, alpha: float = 0.05):
-        super().__init__(mannwhitneyu, alpha=alpha)
+class UTestExtension(StatTest):
+    def __init__(self, reliability: float = 0.05):
+        super().__init__(mannwhitneyu, reliability=reliability)
 
 
-class Chi2Test(StatTest):
+class Chi2TestExtension(StatTest):
     @staticmethod
     def matrix_preparation(data: Dataset, other: Dataset):
         proportion = len(data) / (len(data) + len(other))

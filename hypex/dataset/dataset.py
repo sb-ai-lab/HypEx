@@ -37,7 +37,6 @@ from .roles import (
     FeatureRole,
 )
 
-
 class Dataset(DatasetBase):
     class Locker:
         def __init__(self, backend, roles):
@@ -208,6 +207,9 @@ class Dataset(DatasetBase):
     @property
     def index(self):
         return self.backend.index
+    @index.setter
+    def index(self, value):
+        self.backend.data.index = value
 
     @property
     def data(self):

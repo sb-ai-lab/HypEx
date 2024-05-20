@@ -1,5 +1,6 @@
 from hypex.analyzers import OneAAStatAnalyzer
-from hypex.comparators import GroupDifference, GroupSizes, TTest, KSTest
+from hypex.comparators import GroupDifference, GroupSizes
+from hypex.comparators.hypothesis_testing import TTest, KSTest
 from hypex.dataset import TargetRole, TreatmentRole
 from hypex.experiments import Experiment, OnRoleExperiment
 from hypex.splitters import AASplitter

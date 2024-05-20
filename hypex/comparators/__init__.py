@@ -1,11 +1,11 @@
-from .abstract import StatHypothesisTestingWithScipy
+from .abstract import StatHypothesisTesting
 from .comparators import GroupDifference, GroupSizes, ATE
 from .hypothesis_testing import TTest, KSTest, UTest
 
 __all__ = [
     "GroupDifference",
     "GroupSizes",
-    "StatHypothesisTestingWithScipy",
+    "StatHypothesisTesting",
     "ATE",
     "KSTest",
     "UTest",

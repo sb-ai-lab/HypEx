@@ -6,7 +6,7 @@ from hypex.dataset.backends import PandasDataset
 from hypex.utils.errors import AbstractMethodError
 
 
-class Task(ABC):
+class Extension(ABC):
     def __init__(self):
         self.BACKEND_MAPPING = {
             PandasDataset: self._calc_pandas,
@@ -20,6 +20,6 @@ class Task(ABC):
         return self.BACKEND_MAPPING[type(data.backend)](data=data, **kwargs)
 
 
-class CompareTask(Task, ABC):
+class CompareExtension(Extension, ABC):
     def calc(self, data: Dataset, other: Union[Dataset, None] = None, **kwargs):
-        super().calc(data=data, other=other, **kwargs)
+        return super().calc(data=data, other=other, **kwargs)

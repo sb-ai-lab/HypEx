@@ -41,7 +41,7 @@ class GroupComparator(Calculator):
         return self._extract_dataset(compare_result, roles)
 
     @abstractmethod
-    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
+    def _comparison_function(self, control_data, test_data) ->  Union[Dict[str, Any], Dataset]:
         raise AbstractMethodError
 
     def __group_field_searching(self, data: ExperimentData):
@@ -131,6 +131,13 @@ class GroupComparator(Calculator):
     def _extract_dataset(
         compare_result: FromDictTypes, roles: Dict[Any, ABCRole]
     ) -> Dataset:
+        if isinstance(list(compare_result.values())[0], Dataset):
+            cr_list_v = list(compare_result.values())
+            result = cr_list_v[0]
+            if len(result) > 1:
+                result = result.append(cr_list_v[1:])
+            result.index = list(compare_result.keys())
+            return result
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -156,13 +163,14 @@ class GroupComparator(Calculator):
                 compare_result[grouping_data[i][0]] = self._comparison_function(
                     grouping_data[0][1], grouping_data[i][1]
                 )
+
         result_dataset = self._local_extract_dataset(
-            compare_result, {key: StatisticRole() for key, _ in compare_result.items()}
+            compare_result, {key: StatisticRole() for key in compare_result}
         )
         return self._set_value(data, result_dataset)
 
 
-class StatHypothesisTestingWithScipy(GroupComparator, ABC):
+class StatHypothesisTesting(GroupComparator, ABC):
     def __init__(
         self,
         grouping_role: Union[ABCRole, None] = None,
@@ -173,26 +181,5 @@ class StatHypothesisTestingWithScipy(GroupComparator, ABC):
     ):
         super().__init__(grouping_role, space, full_name, key)
         self.reliability = reliability
-
-    # excessive override
-    def _local_extract_dataset(
-        self, compare_result: Dict[Any, Any], roles=None
-    ) -> Dataset:
-        # stats type
-        result_stats: List[Dict[str, Any]] = [
-            {
-                "group": group,
-                "statistic": stats.statistic,
-                "p-value": stats.pvalue,
-                "pass": stats.pvalue < self.reliability,
-            }
-            for group, stats in compare_result.items()
-        ]
-        # mypy does not see an heir
-
-        return super()._extract_dataset(
-            result_stats,
-            roles={
-                f: StatisticRole() for f in ["group", "statistic", "p-value", "pass"]
-            },
-        )
+        
+    

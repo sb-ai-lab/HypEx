@@ -2,25 +2,26 @@ from typing import Dict, Any
 
 from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu  # type: ignore
 
-from .abstract import StatHypothesisTestingWithScipy
+from .abstract import StatHypothesisTesting
+from ..dataset import Dataset
+from ..extensions.hypothesis_testing import TTestExtension, KSTestExtension, UTestExtension, Chi2TestExtension
 
 
-class TTest(StatHypothesisTestingWithScipy):
-    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
-        return ttest_ind(
-            control_data.data.values.flatten(), test_data.data.values.flatten()
-        )
+class TTest(StatHypothesisTesting):
+    def _comparison_function(self, control_data: Dataset, test_data: Dataset) -> Dataset:
+        return TTestExtension(self.reliability).calc(control_data, test_data)
 
 
-class KSTest(StatHypothesisTestingWithScipy):
-    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
-        return ks_2samp(
-            control_data.data.values.flatten(), test_data.data.values.flatten()
-        )
+class KSTest(StatHypothesisTesting):
+    def _comparison_function(self, control_data, test_data) -> Dataset:
+        return KSTestExtension(self.reliability).calc(control_data, test_data)
 
 
-class UTest(StatHypothesisTestingWithScipy):
-    def _comparison_function(self, control_data, test_data):
-        return mannwhitneyu(
-            control_data.data.values.flatten(), test_data.data.values.flatten()
-        )
+class UTest(StatHypothesisTesting):
+    def _comparison_function(self, control_data, test_data) -> Dataset:
+        return UTestExtension(self.reliability).calc(control_data, test_data)
+
+
+class Chi2Test(StatHypothesisTesting):
+    def _comparison_function(self, control_data, test_data) -> Dataset:
+        return Chi2TestExtension(reliability=self.reliability).calc(control_data, test_data)

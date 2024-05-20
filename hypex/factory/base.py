@@ -18,22 +18,13 @@ from hypex.dataset import (
     TempGroupingRole,
     TempTargetRole,
 )
-from hypex.describers import Unique
 from hypex.experiments import (
     Experiment,
     OnRoleExperiment,
     GroupExperiment,
     CycledExperiment,
 )
-from hypex.operators import (
-    MetricRatio,
-    MetricLogRatio,
-    MetricPercentageRatio,
-    MetricDelta,
-    MetricRelativeDelta,
-    MetricAbsoluteDelta,
-    MetricPercentageDelta,
-)
+
 from hypex.reporters import AADictReporter
 from hypex.splitters import (
     AASplitter,

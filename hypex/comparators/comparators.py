@@ -21,7 +21,6 @@ class GroupDifference(GroupComparator):
 
 
 class GroupSizes(GroupComparator):
-
     def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
         size_a = len(control_data)
         size_b = len(test_data)
