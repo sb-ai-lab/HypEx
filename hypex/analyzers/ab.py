@@ -1,7 +1,8 @@
 from typing import List, Optional, Any
 
-from hypex.comparators import ATE, TTest, UTest
+from hypex.comparators import TTest, UTest
 from hypex.dataset import Dataset, ExperimentData, StatisticRole
+from hypex.dataset.tasks.multitesting import ABMultiTest
 from hypex.experiments.base import Executor
 from hypex.utils import (
     ID_SPLIT_SYMBOL,
@@ -26,15 +27,15 @@ class ABAnalyzer(Executor):
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         return data.set_value(
             ExperimentDataEnum.analysis_tables,
-            self.id,
+            self.id + key if key else self.id,
             str(self.full_name),
             value,
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        analysis_tests: List[type] = [TTest, UTest, ATE]
+        analysis_tests: List[type] = [TTest, UTest]
         executor_ids = data.get_ids(analysis_tests)
-        multitest_pvalues = []
+        multitest_pvalues = Dataset.create_empty()
         analysis_data = {}
         for c, spaces in executor_ids.items():
             analysis_ids = spaces.get("analysis_tables", [])
@@ -43,7 +44,7 @@ class ABAnalyzer(Executor):
             t_data = data.analysis_tables[analysis_ids[0]]
             for aid in analysis_ids[1:]:
                 t_data = t_data.append(data.analysis_tables[aid])
-            t_data.data.index = analysis_ids
+            t_data.data.index = analysis_ids * len(t_data)
             if c.__name__ in ["TTest", "UTest"]:
                 for f in ["p-value", "pass"]:
                     value = t_data[f]
@@ -52,7 +53,7 @@ class ABAnalyzer(Executor):
                         and self.multitest_method
                         and f == "p-value"
                     ):
-                        multitest_pvalues.append(value.data)
+                        multitest_pvalues = multitest_pvalues.append(value)
                     analysis_data[f"{c.__name__} {f}"] = value.mean()
 
             else:
@@ -63,10 +64,20 @@ class ABAnalyzer(Executor):
                     analysis_data[
                         f"{c.__name__} {name[name.find(NAME_BORDER_SYMBOL) + 1: name.rfind(NAME_BORDER_SYMBOL)]}"
                     ] = value[0]
+
         analysis_dataset: Dataset = Dataset.from_dict(
             [analysis_data],
             {f: StatisticRole() for f in analysis_data},
             BackendsEnum.pandas,
         )
+        if self.multitest_method:
+            multitest_result = ABMultiTest(self.multitest_method).calc(
+                multitest_pvalues
+            )
+            data = self._set_value(
+                data,
+                multitest_result,
+                key="MultiTest",
+            )
 
         return self._set_value(data, analysis_dataset)

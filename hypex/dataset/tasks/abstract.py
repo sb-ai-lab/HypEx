@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Union, List
+from typing import Union
 
 from hypex.dataset import Dataset
 from hypex.dataset.backends import PandasDataset

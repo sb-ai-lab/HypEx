@@ -18,29 +18,12 @@ from hypex.dataset import (
     TempGroupingRole,
     TempTargetRole,
 )
-from hypex.describers import Unique
 from hypex.experiments import (
     Experiment,
     OnRoleExperiment,
     GroupExperiment,
     CycledExperiment,
 )
-from hypex.operators import (
-    MetricRatio,
-    MetricLogRatio,
-    MetricPercentageRatio,
-    MetricDelta,
-    MetricRelativeDelta,
-    MetricAbsoluteDelta,
-    MetricPercentageDelta,
-)
-from hypex.reporters import AADictReporter
-from hypex.splitters import (
-    AASplitter,
-    AASplitterWithGrouping,
-    AASplitterWithStratification,
-)
-from hypex.stats import Min, Max, Mode, Mean, Median, Size, Std, Variance
 from hypex.transformers import Shuffle
 from hypex.utils import ExperimentDataEnum, SpaceEnum
 
@@ -66,29 +49,9 @@ all_classes = [
     TempTreatmentRole,
     TempGroupingRole,
     TempTargetRole,
-    Unique,
     OnRoleExperiment,
     GroupExperiment,
     CycledExperiment,
-    MetricRatio,
-    MetricLogRatio,
-    MetricPercentageRatio,
-    MetricDelta,
-    MetricRelativeDelta,
-    MetricAbsoluteDelta,
-    MetricPercentageDelta,
-    AADictReporter,
-    AASplitter,
-    AASplitterWithGrouping,
-    AASplitterWithStratification,
-    Min,
-    Max,
-    Mode,
-    Mean,
-    Median,
-    Size,
-    Std,
-    Variance,
     Shuffle,
     ExperimentDataEnum,
     SpaceEnum,

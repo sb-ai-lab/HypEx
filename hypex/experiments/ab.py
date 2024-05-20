@@ -14,6 +14,6 @@ AB_TEST = Experiment(
             ],
             role=TargetRole(),
         ),
-        ABAnalyzer(),
+        ABAnalyzer(multitest_method="bonferroni"),
     ]
 )
