@@ -206,12 +206,20 @@ class Dataset(DatasetBase):
         return self.__binary_magic_operator(other=other, func_name="__rpow__")
 
     @property
+    def index(self):
+        return self.backend.index
+
+    @property
     def data(self):
         return self.data
 
+    @data.setter
+    def data(self, value):
+        self.backend.data = value
+
     @property
-    def index(self):
-        return self.backend.index
+    def columns(self):
+        return self.backend.columns
 
     @staticmethod
     def create_empty(backend=BackendsEnum.pandas, roles=None, index=None) -> "Dataset":
@@ -221,7 +229,7 @@ class Dataset(DatasetBase):
         columns = list(roles.keys())
         ds = Dataset(roles=roles, backend=backend)
         ds._backend = ds._backend.create_empty(index, columns)
-        ds.data = ds._backend.data
+        ds.data = ds.backend.data
         return ds
 
     def _convert_data_after_agg(self, result) -> Union["Dataset", float]:

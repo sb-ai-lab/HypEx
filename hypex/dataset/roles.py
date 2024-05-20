@@ -5,8 +5,8 @@ from hypex.utils import (
     TargetRoleTypes,
     DefaultRoleTypes,
     CategoricalTypes,
+    RoleNameType,
 )
-from hypex.utils.typings import RoleNameType
 
 
 class ABCRole(ABC):
@@ -158,6 +158,7 @@ class StatisticRole(ABCRole):
     """
 
     _role_name: RoleNameType = "Statistic"
+
 
 class ResumeRole(ABCRole):
     _role_name = "Resume"
