@@ -1,6 +1,5 @@
 import warnings
 from copy import copy, deepcopy
-from typing import Any, Callable, Dict, Hashable, Iterable, List, Optional, Union
 from typing import (
     Union,
     List,
@@ -205,6 +204,14 @@ class Dataset(DatasetBase):
 
     def __rpow__(self, other) -> Any:
         return self.__binary_magic_operator(other=other, func_name="__rpow__")
+
+    @property
+    def data(self):
+        return self.data
+
+    @property
+    def index(self):
+        return self.backend.index
 
     @staticmethod
     def create_empty(backend=BackendsEnum.pandas, roles=None, index=None) -> "Dataset":
