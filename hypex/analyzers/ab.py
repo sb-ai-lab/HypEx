@@ -1,7 +1,13 @@
-from typing import Optional, Any
+from typing import Optional, Any, Union, List
 
 from hypex.comparators import TTest, UTest
-from hypex.dataset import Dataset, ExperimentData, StatisticRole
+from hypex.dataset import (
+    Dataset,
+    ExperimentData,
+    StatisticRole,
+    TreatmentRole,
+    TargetRole,
+)
 from hypex.dataset.tasks.statsmodels import ABMultiTest
 from hypex.experiments.base import Executor
 from hypex.utils import (
@@ -18,10 +24,14 @@ class ABAnalyzer(Executor):
     def __init__(
         self,
         multitest_method: Optional[ABNTestMethodsEnum] = None,
+        equal_variance: bool = True,
+        quantiles: Optional[Union[float, List[float]]] = None,
         full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.multitest_method = multitest_method
+        self.equal_variance = equal_variance
+        self.quantiles = quantiles
         super().__init__(full_name, key)
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
@@ -32,9 +42,13 @@ class ABAnalyzer(Executor):
             value,
         )
 
-    def execute_multitest(self, data: ExperimentData, p_values: Dataset):
+    def execute_multitest(self, data: ExperimentData, p_values: Dataset, **kwargs):
+        group_field = data.ds.get_columns_by_roles(TreatmentRole())[0]
+        target_field = data.ds.get_columns_by_roles(TargetRole())[0]
         if self.multitest_method:
-            multitest_result = ABMultiTest(self.multitest_method).calc(p_values)
+            multitest_result = ABMultiTest(self.multitest_method).calc(
+                p_values, **kwargs
+            )
             return self._set_value(data, multitest_result, key="MultiTest")
         return data
 
@@ -69,6 +83,11 @@ class ABAnalyzer(Executor):
             {f: StatisticRole() for f in analysis_data},
             BackendsEnum.pandas,
         )
-        data = self.execute_multitest(data, multitest_pvalues)
+        data = self.execute_multitest(
+            data,
+            multitest_pvalues,
+            equal_variance=self.equal_variance,
+            quantiles=self.quantiles,
+        )
 
         return self._set_value(data, analysis_dataset)

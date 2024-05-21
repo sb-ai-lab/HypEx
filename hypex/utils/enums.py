@@ -32,3 +32,4 @@ class ABNTestMethodsEnum(enum.Enum):
     fdr_by = "fdr_by"
     fdr_tsbh = "fdr_tsbh"
     fdr_tsbky = "fdr_tsbky"
+    quantile = "quantile"
