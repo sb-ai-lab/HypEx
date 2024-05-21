@@ -1,11 +1,12 @@
 from statsmodels.stats.multitest import multipletests  # type: ignore
 
+from hypex.utils import ABNTestMethodsEnum
 from .abstract import Task
 from .. import Dataset, StatisticRole
 
 
 class ABMultiTest(Task):
-    def __init__(self, method, alpha: float = 0.05):
+    def __init__(self, method: ABNTestMethodsEnum, alpha: float = 0.05):
         self.method = method
         self.alpha = alpha
         super().__init__()
@@ -20,5 +21,7 @@ class ABMultiTest(Task):
     def _calc_pandas(self, data: Dataset, **kwargs):
         p_values = data.data.values.flatten()
         return self.multitest_result_to_dataset(
-            multipletests(p_values, method=self.method, alpha=self.alpha, **kwargs)
+            multipletests(
+                p_values, method=self.method.value, alpha=self.alpha, **kwargs
+            )
         )

@@ -9,7 +9,7 @@ from hypex.utils import (
     NAME_BORDER_SYMBOL,
     BackendsEnum,
     ExperimentDataEnum,
-    ABNTestMethodsTypes,
+    ABNTestMethodsEnum,
 )
 
 
@@ -17,7 +17,7 @@ class ABAnalyzer(Executor):
 
     def __init__(
         self,
-        multitest_method: Optional[ABNTestMethodsTypes] = None,
+        multitest_method: Optional[ABNTestMethodsEnum] = None,
         full_name: Optional[str] = None,
         key: Any = "",
     ):

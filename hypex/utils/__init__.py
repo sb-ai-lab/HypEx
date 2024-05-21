@@ -26,7 +26,6 @@ from .typings import (
     DocstringInheritDecorator,
     RoleNameType,
     ScalarType,
-    ABNTestMethodsTypes,
 )
 
 __all__ = [
@@ -57,5 +56,5 @@ __all__ = [
     "BackendTypeError",
     "MergeOnError",
     "ScalarType",
-    "ABNTestMethodsTypes",
+    "ABNTestMethodsEnum",
 ]
