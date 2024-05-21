@@ -345,7 +345,8 @@ class Dataset(DatasetBase):
         if func:
             datasets = [(i, data.agg(func)) for i, data in datasets]
         for dataset in datasets:
-            dataset[1].tmp_roles = self.tmp_roles
+            if isinstance(dataset, Dataset):
+                dataset[1].tmp_roles = self.tmp_roles
         return datasets
 
     def mean(self):  # should we add arguments to all the methods?
