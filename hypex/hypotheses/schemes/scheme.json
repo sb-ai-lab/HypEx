@@ -163,11 +163,6 @@
             "type": "",
             "default": "None",
             "title": "The random_state Schema"
-          },
-          "inner_executors": {
-            "type": "",
-            "default": {},
-            "title": "The inner_executors Schema"
           }
         }
       },
@@ -261,54 +256,6 @@
         "required": [],
         "properties": {}
       },
-      "Max": {
-        "required": [],
-        "properties": {}
-      },
-      "Mean": {
-        "required": [],
-        "properties": {}
-      },
-      "Median": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricAbsoluteDelta": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricDelta": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricLogRatio": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricPercentageDelta": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricPercentageRatio": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricRatio": {
-        "required": [],
-        "properties": {}
-      },
-      "MetricRelativeDelta": {
-        "required": [],
-        "properties": {}
-      },
-      "Min": {
-        "required": [],
-        "properties": {}
-      },
-      "Mode": {
-        "required": [],
-        "properties": {}
-      },
       "OnRoleExperiment": {
         "required": [
           "executors",
@@ -342,10 +289,6 @@
             "title": "The random_state Schema"
           }
         }
-      },
-      "Size": {
-        "required": [],
-        "properties": {}
       },
       "StatMdeBySize": {
         "required": [],
@@ -385,14 +328,6 @@
           }
         }
       },
-      "Std": {
-        "required": [],
-        "properties": {}
-      },
-      "TTest": {
-        "required": [],
-        "properties": {}
-      },
       "TestPower": {
         "required": [
           "target_field",
@@ -418,14 +353,6 @@
         }
       },
       "UTest": {
-        "required": [],
-        "properties": {}
-      },
-      "Unique": {
-        "required": [],
-        "properties": {}
-      },
-      "Variance": {
         "required": [],
         "properties": {}
       }

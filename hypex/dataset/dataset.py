@@ -520,7 +520,6 @@ class ExperimentData:
         self._data = data
         self.additional_fields = Dataset.create_empty(index=data.index)
         self.stats = Dataset.create_empty(index=data.columns)
-        self.additional_fields = Dataset.create_empty(index=data.index)
         self.analysis_tables: Dict[str, Dataset] = {}
         self.id_name_mapping: Dict[str, str] = {}
 

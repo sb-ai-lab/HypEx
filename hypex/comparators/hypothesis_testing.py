@@ -2,7 +2,7 @@ from typing import Dict, Any
 
 from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu  # type: ignore
 
-from .abstract import StatHypothesisTestingWithScipy
+from hypex.comparators import StatHypothesisTestingWithScipy
 
 
 class TTest(StatHypothesisTestingWithScipy):

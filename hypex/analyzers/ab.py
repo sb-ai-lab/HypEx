@@ -1,8 +1,8 @@
-from typing import List, Optional, Any
+from typing import Optional, Any
 
 from hypex.comparators import TTest, UTest
 from hypex.dataset import Dataset, ExperimentData, StatisticRole
-from hypex.dataset.tasks.multitesting import ABMultiTest
+from hypex.dataset.tasks.statsmodels import ABMultiTest
 from hypex.experiments.base import Executor
 from hypex.utils import (
     ID_SPLIT_SYMBOL,
@@ -32,9 +32,14 @@ class ABAnalyzer(Executor):
             value,
         )
 
+    def execute_multitest(self, data: ExperimentData, p_values: Dataset):
+        if self.multitest_method:
+            multitest_result = ABMultiTest(self.multitest_method).calc(p_values)
+            return self._set_value(data, multitest_result, key="MultiTest")
+        return data
+
     def execute(self, data: ExperimentData) -> ExperimentData:
-        analysis_tests: List[type] = [TTest, UTest]
-        executor_ids = data.get_ids(analysis_tests)
+        executor_ids = data.get_ids([TTest, UTest])
         multitest_pvalues = Dataset.create_empty()
         analysis_data = {}
         for c, spaces in executor_ids.items():
@@ -45,18 +50,12 @@ class ABAnalyzer(Executor):
             for aid in analysis_ids[1:]:
                 t_data = t_data.append(data.analysis_tables[aid])
             t_data.data.index = analysis_ids * len(t_data)
-            if c.__name__ in ["TTest", "UTest"]:
-                for f in ["p-value", "pass"]:
-                    value = t_data[f]
-                    if (
-                        c.__name__ == "TTest"
-                        and self.multitest_method
-                        and f == "p-value"
-                    ):
-                        multitest_pvalues = multitest_pvalues.append(value)
-                    analysis_data[f"{c.__name__} {f}"] = value.mean()
-
-            else:
+            for f in ["p-value", "pass"]:
+                value = t_data[f]
+                if c.__name__ == "TTest" and self.multitest_method and f == "p-value":
+                    multitest_pvalues = multitest_pvalues.append(value)
+                analysis_data[f"{c.__name__} {f}"] = value.mean()
+            if c.__name__ not in ["UTest", "TTest"]:
                 indexes = t_data.index
                 values = t_data.data.values.tolist()
                 for idx, value in zip(indexes, values):
@@ -70,14 +69,6 @@ class ABAnalyzer(Executor):
             {f: StatisticRole() for f in analysis_data},
             BackendsEnum.pandas,
         )
-        if self.multitest_method:
-            multitest_result = ABMultiTest(self.multitest_method).calc(
-                multitest_pvalues
-            )
-            data = self._set_value(
-                data,
-                multitest_result,
-                key="MultiTest",
-            )
+        data = self.execute_multitest(data, multitest_pvalues)
 
         return self._set_value(data, analysis_dataset)
