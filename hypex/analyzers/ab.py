@@ -8,7 +8,7 @@ from hypex.dataset import (
     TreatmentRole,
     TargetRole,
 )
-from hypex.dataset.tasks.statsmodels import ABMultiTest
+from hypex.dataset.tasks.statsmodels import ABMultiTest, ABMultitestQuantile
 from hypex.experiments.base import Executor
 from hypex.utils import (
     ID_SPLIT_SYMBOL,
@@ -24,14 +24,20 @@ class ABAnalyzer(Executor):
     def __init__(
         self,
         multitest_method: Optional[ABNTestMethodsEnum] = None,
+        alpha: float = 0.05,
         equal_variance: bool = True,
         quantiles: Optional[Union[float, List[float]]] = None,
+        iteration_size: int = 20000,
+        random_state: Optional[int] = None,
         full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.multitest_method = multitest_method
+        self.alpha = alpha
         self.equal_variance = equal_variance
         self.quantiles = quantiles
+        self.iteration_size = iteration_size
+        self.random_state = random_state
         super().__init__(full_name, key)
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
@@ -46,8 +52,20 @@ class ABAnalyzer(Executor):
         group_field = data.ds.get_columns_by_roles(TreatmentRole())[0]
         target_field = data.ds.get_columns_by_roles(TargetRole())[0]
         if self.multitest_method:
-            multitest_result = ABMultiTest(self.multitest_method).calc(
-                p_values, **kwargs
+            multitest_result = (
+                ABMultiTest(self.multitest_method).calc(p_values, **kwargs)
+                if self.multitest_method != ABNTestMethodsEnum.quantile
+                else ABMultitestQuantile(
+                    self.alpha,
+                    self.iteration_size,
+                    self.equal_variance,
+                    self.random_state,
+                ).calc(
+                    p_values,
+                    group_field=group_field,
+                    target_field=target_field,
+                    quantiles=self.quantiles,
+                )
             )
             return self._set_value(data, multitest_result, key="MultiTest")
         return data
@@ -66,7 +84,12 @@ class ABAnalyzer(Executor):
             t_data.data.index = analysis_ids * len(t_data)
             for f in ["p-value", "pass"]:
                 value = t_data[f]
-                if c.__name__ == "TTest" and self.multitest_method and f == "p-value":
+                if (
+                    c.__name__ == "TTest"
+                    and self.multitest_method
+                    and f == "p-value"
+                    and self.multitest_method != "quantile"
+                ):
                     multitest_pvalues = multitest_pvalues.append(value)
                 analysis_data[f"{c.__name__} {f}"] = value.mean()
             if c.__name__ not in ["UTest", "TTest"]:
@@ -84,10 +107,7 @@ class ABAnalyzer(Executor):
             BackendsEnum.pandas,
         )
         data = self.execute_multitest(
-            data,
-            multitest_pvalues,
-            equal_variance=self.equal_variance,
-            quantiles=self.quantiles,
+            data, multitest_pvalues if multitest_pvalues.is_empty() else data.ds
         )
 
         return self._set_value(data, analysis_dataset)
