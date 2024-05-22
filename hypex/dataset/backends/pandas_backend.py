@@ -186,7 +186,7 @@ class PandasNavigation(DatasetBackendNavigation):
         return str(self.data.dtypes[column_name])
 
     def _update_column_type(self, column_name: str, type_name: str):
-        self.data[column_name] = self.data[column_name].astype(type_name)
+        self.data.loc[:, column_name] = self.data[column_name].astype(type_name)
         return self
 
     def add_column(

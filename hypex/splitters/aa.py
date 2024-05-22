@@ -11,12 +11,24 @@ class AASplitter(Calculator):
         control_size: float = 0.5,
         random_state: Optional[int] = None,
         full_name: Optional[str] = None,
+        constant_key: bool = False,
         key: Any = "",
     ):
         self.control_size = control_size
         self.random_state = random_state
-
+        self._key = key
+        self.constant_key = constant_key
         super().__init__(full_name, key)
+
+    @property
+    def key(self) -> Any:
+        return self._key
+
+    @key.setter
+    def key(self, value: Any):
+        if not self.constant_key:
+            self._key = value
+            self._generate_id()
 
     def generate_params_hash(self) -> str:
         return f"{self.random_state}"

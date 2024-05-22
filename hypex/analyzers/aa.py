@@ -24,16 +24,11 @@ class OneAAStatAnalyzer(Executor):
             analysis_ids = spaces.get("analysis_tables", [])
             if len(analysis_ids) > 0:
                 if len(analysis_ids) > 1:
-                    t_data = data.analysis_tables[analysis_ids[0]].append(analysis_ids[1:])
+                    t_data = data.analysis_tables[analysis_ids[0]].append([data.analysis_tables[k] for k in analysis_ids[1:]])
                 else:
                     t_data = data.analysis_tables[analysis_ids[0]]
-                
-                print(t_data)
-                print(t_data.data.dtypes)
                 t_data.data.index = analysis_ids
-                print(t_data["p-value"])
                 for f in ["p-value", "pass"]:
-                    print(f)
                     analysis_data[f"{c.__name__} {f}"] = t_data[f].mean()
         analysis_data["mean test score"] = (
             analysis_data["TTest p-value"] + 2 * analysis_data["KSTest p-value"]

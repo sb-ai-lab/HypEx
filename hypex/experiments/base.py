@@ -14,6 +14,8 @@ from hypex.dataset import (
 from hypex.executor import Executor
 from hypex.utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
 
+from tqdm.auto import tqdm
+
 
 class Experiment(Executor):
     def _detect_transformer(self) -> bool:
@@ -80,7 +82,7 @@ class CycledExperiment(Executor):
         return f"{self.inner_executor.full_name} x {self.n_iterations}"
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        for i in range(self.n_iterations):
+        for i in tqdm(range(self.n_iterations)):
             self.analyzer.key = f"{i}"
             self.inner_executor.key = f"{i}"
             self.inner_executor.random_state = i
