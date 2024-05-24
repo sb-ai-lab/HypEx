@@ -136,7 +136,7 @@ class GroupComparator(Calculator):
         if isinstance(list(compare_result.values())[0], Dataset):
             cr_list_v = list(compare_result.values())
             result = cr_list_v[0]
-            if len(result) > 1:
+            if len(cr_list_v) > 1:
                 result = result.append(cr_list_v[1:])
             result.index = list(compare_result.keys())
             return result

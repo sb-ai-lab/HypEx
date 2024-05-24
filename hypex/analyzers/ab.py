@@ -8,7 +8,7 @@ from hypex.dataset import (
     TreatmentRole,
     TargetRole,
 )
-from hypex.dataset.tasks.statsmodels import ABMultiTest, ABMultitestQuantile
+from hypex.extensions.statsmodels import ABMultiTest, ABMultitestQuantile
 from hypex.experiments.base import Executor
 from hypex.utils import (
     ID_SPLIT_SYMBOL,

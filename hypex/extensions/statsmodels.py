@@ -4,12 +4,12 @@ import numpy as np
 from scipy.stats import norm
 from statsmodels.stats.multitest import multipletests  # type: ignore
 
+from hypex.dataset import Dataset, StatisticRole
 from hypex.utils import ABNTestMethodsEnum
-from .abstract import Task
-from .. import Dataset, StatisticRole
+from .abstract import Extension
 
 
-class ABMultiTest(Task):
+class ABMultiTest(Extension):
     def __init__(self, method: ABNTestMethodsEnum, alpha: float = 0.05):
         self.method = method
         self.alpha = alpha
@@ -31,7 +31,7 @@ class ABMultiTest(Task):
         )
 
 
-class ABMultitestQuantile(Task):
+class ABMultitestQuantile(Extension):
     def __init__(
         self,
         alpha: float = 0.05,
