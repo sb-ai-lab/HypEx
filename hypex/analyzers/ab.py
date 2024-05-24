@@ -70,6 +70,16 @@ class ABAnalyzer(Executor):
             return self._set_value(data, multitest_result, key="MultiTest")
         return data
 
+    def _add_pvalues(self, multitest_pvalues, value, field, class_name):
+        if (
+            class_name == "TTest"
+            and self.multitest_method
+            and field == "p-value"
+            and self.multitest_method != "quantile"
+        ):
+            multitest_pvalues = multitest_pvalues.append(value)
+        return multitest_pvalues
+
     def execute(self, data: ExperimentData) -> ExperimentData:
         executor_ids = data.get_ids([TTest, UTest])
         multitest_pvalues = Dataset.create_empty()
@@ -84,13 +94,9 @@ class ABAnalyzer(Executor):
             t_data.data.index = analysis_ids * len(t_data)
             for f in ["p-value", "pass"]:
                 value = t_data[f]
-                if (
-                    c.__name__ == "TTest"
-                    and self.multitest_method
-                    and f == "p-value"
-                    and self.multitest_method != "quantile"
-                ):
-                    multitest_pvalues = multitest_pvalues.append(value)
+                multitest_pvalues = self._add_pvalues(
+                    multitest_pvalues, value, f, c.__name__
+                )
                 analysis_data[f"{c.__name__} {f}"] = value.mean()
             if c.__name__ not in ["UTest", "TTest"]:
                 indexes = t_data.index
