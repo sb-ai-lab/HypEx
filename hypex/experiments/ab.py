@@ -2,6 +2,7 @@ from hypex.analyzers import ABAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes, TTest, UTest
 from hypex.dataset import TargetRole, TreatmentRole
 from hypex.experiments import Experiment, OnRoleExperiment
+from hypex.utils import ABNTestMethodsEnum
 
 AB_TEST = Experiment(
     executors=[
@@ -14,6 +15,6 @@ AB_TEST = Experiment(
             ],
             role=TargetRole(),
         ),
-        ABAnalyzer(),
+        ABAnalyzer(multitest_method=ABNTestMethodsEnum.quantile),
     ]
 )

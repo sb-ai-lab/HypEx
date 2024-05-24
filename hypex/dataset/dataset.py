@@ -349,7 +349,8 @@ class Dataset(DatasetBase):
         if func:
             datasets = [(i, data.agg(func)) for i, data in datasets]
         for dataset in datasets:
-            dataset[1].tmp_roles = self.tmp_roles
+            if isinstance(dataset, Dataset):
+                dataset[1].tmp_roles = self.tmp_roles
         return datasets
 
     def mean(self):  # should we add arguments to all the methods?
@@ -524,7 +525,6 @@ class ExperimentData:
         self._data = data
         self.additional_fields = Dataset.create_empty(index=data.index)
         self.stats = Dataset.create_empty(index=data.columns)
-        self.additional_fields = Dataset.create_empty(index=data.index)
         self.analysis_tables: Dict[str, Dataset] = {}
         self.id_name_mapping: Dict[str, str] = {}
 
