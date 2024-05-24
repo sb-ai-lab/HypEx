@@ -24,7 +24,9 @@ class OneAAStatAnalyzer(Executor):
             analysis_ids = spaces.get("analysis_tables", [])
             if len(analysis_ids) > 0:
                 if len(analysis_ids) > 1:
-                    t_data = data.analysis_tables[analysis_ids[0]].append([data.analysis_tables[k] for k in analysis_ids[1:]])
+                    t_data = data.analysis_tables[analysis_ids[0]].append(
+                        [data.analysis_tables[k] for k in analysis_ids[1:]]
+                    )
                 else:
                     t_data = data.analysis_tables[analysis_ids[0]]
                 t_data.data.index = analysis_ids
@@ -34,13 +36,13 @@ class OneAAStatAnalyzer(Executor):
             analysis_data["TTest p-value"] + 2 * analysis_data["KSTest p-value"]
         ) / 3
         # TODO check with types
-        analysis_data = Dataset.from_dict(
+        analysis_dataset = Dataset.from_dict(
             [analysis_data],
             {f: StatisticRole() for f in analysis_data},
             BackendsEnum.pandas,
         )
 
-        return self._set_value(data, analysis_data)
+        return self._set_value(data, analysis_dataset)
 
 
 class OneAAResumeAnalyzer(OneAAStatAnalyzer):

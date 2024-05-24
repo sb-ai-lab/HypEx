@@ -1,4 +1,4 @@
-from typing import Callable, Union
+from typing import Callable, Union, Optional
 
 import pandas as pd
 from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind
@@ -9,7 +9,9 @@ from hypex.utils import BackendsEnum
 
 
 class StatTest(CompareExtension):
-    def __init__(self, test_function: Callable = None, reliability: float = 0.05):
+    def __init__(
+        self, test_function: Optional[Callable] = None, reliability: float = 0.05
+    ):
         super().__init__()
         self.test_function = test_function
         self.reliability = reliability

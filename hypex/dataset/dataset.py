@@ -37,6 +37,7 @@ from .roles import (
     FeatureRole,
 )
 
+
 class Dataset(DatasetBase):
     class Locker:
         def __init__(self, backend, roles):
@@ -207,6 +208,7 @@ class Dataset(DatasetBase):
     @property
     def index(self):
         return self.backend.index
+
     @index.setter
     def index(self, value):
         self.backend.data.index = value
@@ -440,7 +442,7 @@ class Dataset(DatasetBase):
     def na_counts(self):
         return self._convert_data_after_agg(self._backend.na_counts())
 
-    def dropna(self, how: str = "any", subset: Union[str, Iterable[str]] = None):
+    def dropna(self, how: str = "any", subset: Union[str, Iterable[str], None] = None):
         return Dataset(
             roles=self.roles, data=self._backend.dropna(how=how, subset=subset)
         )

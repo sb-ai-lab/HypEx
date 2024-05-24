@@ -10,7 +10,8 @@ from .abstract import DictReporter
 
 
 class AADictReporter(DictReporter):
-    def get_random_state(self, data: ExperimentData):
+    @staticmethod
+    def get_random_state(data: ExperimentData):
         aa_splitter_id = data._get_one_id(
             AASplitter, ExperimentDataEnum.additional_fields
         )

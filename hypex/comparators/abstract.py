@@ -41,7 +41,9 @@ class GroupComparator(Calculator):
         return self._extract_dataset(compare_result, roles)
 
     @abstractmethod
-    def _comparison_function(self, control_data, test_data) ->  Union[Dict[str, Any], Dataset]:
+    def _comparison_function(
+        self, control_data, test_data
+    ) -> Union[Dict[str, Any], Dataset]:
         raise AbstractMethodError
 
     def __group_field_searching(self, data: ExperimentData):
@@ -142,7 +144,6 @@ class GroupComparator(Calculator):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field = self.__group_field_searching(data)
-        meta_name = group_field[0] if len(group_field) == 1 else group_field
         target_field = data.ds.get_columns_by_roles(TempTargetRole(), tmp_role=True)
         grouping_data = self.__get_grouping_data(data, group_field)
         if len(grouping_data) > 1:
@@ -181,5 +182,3 @@ class StatHypothesisTesting(GroupComparator, ABC):
     ):
         super().__init__(grouping_role, space, full_name, key)
         self.reliability = reliability
-        
-    

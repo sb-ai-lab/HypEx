@@ -55,10 +55,10 @@ class DatasetBase(ABC):
         reversed_map = {int: "int", float: "float", str: "category", bool: "bool"}
         for column, role in roles.items():
             if role.data_type is None:
-                d_type = self._backend._get_column_type(column)
+                d_type = self.backend._get_column_type(column)
 
                 role.data_type = [v for k, v in types_map.items() if k in d_type][0]
-            self._backend = self._backend._update_column_type(
+            self._backend = self.backend._update_column_type(
                 column, reversed_map[role.data_type]
             )
 

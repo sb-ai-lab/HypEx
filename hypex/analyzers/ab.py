@@ -45,10 +45,10 @@ class ABAnalyzer(Executor):
                     analysis_data[
                         f"{c.__name__} {name[name.find(NAME_BORDER_SYMBOL) + 1: name.rfind(NAME_BORDER_SYMBOL)]}"
                     ] = value[0]
-        analysis_data = Dataset.from_dict(
+        analysis_dataset = Dataset.from_dict(
             [analysis_data],
             {f: StatisticRole() for f in analysis_data},
             BackendsEnum.pandas,
         )
 
-        return self._set_value(data, analysis_data)
+        return self._set_value(data, analysis_dataset)
