@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union, Iterable
 
 from hypex.dataset import (
     ABCRole,
@@ -27,12 +27,18 @@ class GroupComparator(Calculator):
         self,
         grouping_role: Optional[ABCRole] = None,
         space: SpaceEnum = SpaceEnum.auto,
+        search_types: Union[object, List[object]] = None,
         full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.grouping_role = grouping_role or GroupingRole()
         self.space = space
         self.__additional_mode = space == SpaceEnum.additional
+        self._search_types = (
+            search_types
+            if isinstance(search_types, Iterable) or search_types is None
+            else [search_types]
+        )
         super().__init__(full_name=full_name, key=key)
 
     def _local_extract_dataset(
@@ -144,12 +150,16 @@ class GroupComparator(Calculator):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field = self.__group_field_searching(data)
-        target_field = data.ds.get_columns_by_roles(TempTargetRole(), tmp_role=True)
+        target_field = data.ds.get_columns_by_roles(
+            TempTargetRole(), tmp_role=True, search_types=self._search_types
+        )
         grouping_data = self.__get_grouping_data(data, group_field)
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.ds.tmp_roles
         else:
-            raise ComparisonNotSuitableFieldError(group_field)
+            return data
+        if not target_field:
+            return data
 
         compare_result = {}
         if target_field:
@@ -176,9 +186,10 @@ class StatHypothesisTesting(GroupComparator, ABC):
         self,
         grouping_role: Union[ABCRole, None] = None,
         space: SpaceEnum = SpaceEnum.auto,
+        search_types: Union[object, List[object]] = None,
         reliability: float = 0.05,
         full_name: Union[str, None] = None,
         key: Any = "",
     ):
-        super().__init__(grouping_role, space, full_name, key)
+        super().__init__(grouping_role, space, search_types, full_name, key)
         self.reliability = reliability

@@ -71,9 +71,6 @@ class DatasetBase(ABC):
         data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
     ):
-        self.tmp_roles: Union[
-            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
-        ] = {}
         self._backend = (
             self._select_backend_from_str(data, backend)
             if backend
@@ -92,6 +89,9 @@ class DatasetBase(ABC):
             roles = self._set_all_roles(roles)
             self._set_empty_types(roles)
         self.roles: Dict[Union[str, int], ABCRole] = roles
+        self._tmp_roles: Union[
+            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
+        ] = {}
 
     def __repr__(self):
         return self.data.__repr__()
@@ -100,16 +100,31 @@ class DatasetBase(ABC):
         return self._backend.__len__()
 
     def get_columns_by_roles(
-        self, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role=False
+        self,
+        roles: Union[ABCRole, Iterable[ABCRole]],
+        tmp_role=False,
+        search_types: Optional[List] = None,
     ) -> List[Union[str, int]]:
-        roles = roles if isinstance(roles, Iterable) else [roles]
-        roles_for_search: Dict[Union[str, int], ABCRole] = (
-            self.tmp_roles if tmp_role else self.roles
-        )
+        roles = [roles] if not isinstance(roles, Iterable) else roles
+        roles_for_search = self._tmp_roles if tmp_role else self.roles
         return [
             column
             for column, role in roles_for_search.items()
-            if any(isinstance(r, role.__class__) for r in roles)
+            if any(
+                isinstance(r, role.__class__)
+                and (not search_types or role.data_type in search_types)
+                for r in roles
+            )
+        ]
+
+    def get_columns_by_type(
+        self, search_types: Optional[List] = None, tmp_role=False
+    ) -> List[Union[str, int]]:
+        roles_for_search = self._tmp_roles if tmp_role else self.roles
+        return [
+            column
+            for column, role in roles_for_search.items()
+            if not search_types or role.data_type in search_types
         ]
 
     @property
@@ -127,6 +142,15 @@ class DatasetBase(ABC):
     @property
     def columns(self):
         return self._backend.columns
+
+    @property
+    def tmp_roles(self):
+        return self._tmp_roles
+
+    @tmp_roles.setter
+    def tmp_roles(self, value):
+        self._tmp_roles = value
+        self._set_empty_types(self._tmp_roles)
 
     def to_dict(self):
         return {
