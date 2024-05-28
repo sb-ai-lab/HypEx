@@ -99,7 +99,7 @@ class DatasetBase(ABC):
     def __len__(self):
         return self._backend.__len__()
 
-    def get_columns_by_roles(
+    def search_columns(
         self,
         roles: Union[ABCRole, Iterable[ABCRole]],
         tmp_role=False,
@@ -115,16 +115,6 @@ class DatasetBase(ABC):
                 and (not search_types or role.data_type in search_types)
                 for r in roles
             )
-        ]
-
-    def get_columns_by_type(
-        self, search_types: Optional[List] = None, tmp_role=False
-    ) -> List[Union[str, int]]:
-        roles_for_search = self._tmp_roles if tmp_role else self.roles
-        return [
-            column
-            for column, role in roles_for_search.items()
-            if not search_types or role.data_type in search_types
         ]
 
     @property

@@ -11,6 +11,7 @@ from ..extensions.hypothesis_testing import (
     Chi2TestExtension,
 )
 from ..utils import SpaceEnum
+from ..utils.typings import NumberTypes, CategoricalTypes
 
 
 class TTest(StatHypothesisTesting):
@@ -23,7 +24,7 @@ class TTest(StatHypothesisTesting):
         super().__init__(
             grouping_role=grouping_role,
             space=space,
-            search_types=[int, float],
+            search_types=NumberTypes,
             reliability=reliability,
         )
 
@@ -43,7 +44,7 @@ class KSTest(StatHypothesisTesting):
         super().__init__(
             grouping_role=grouping_role,
             space=space,
-            search_types=[int, float],
+            search_types=NumberTypes,
             reliability=reliability,
         )
 
@@ -61,7 +62,7 @@ class UTest(StatHypothesisTesting):
         super().__init__(
             grouping_role=grouping_role,
             space=space,
-            search_types=[int, float],
+            search_types=NumberTypes,
             reliability=reliability,
         )
 
@@ -79,7 +80,7 @@ class Chi2Test(StatHypothesisTesting):
         super().__init__(
             grouping_role=grouping_role,
             space=space,
-            search_types=str,
+            search_types=CategoricalTypes,
             reliability=reliability,
         )
 

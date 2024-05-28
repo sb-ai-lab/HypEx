@@ -27,7 +27,7 @@ class GroupComparator(Calculator):
         self,
         grouping_role: Optional[ABCRole] = None,
         space: SpaceEnum = SpaceEnum.auto,
-        search_types: Union[object, List[object]] = None,
+        search_types: Union[type, List[type], None] = None,
         full_name: Optional[str] = None,
         key: Any = "",
     ):
@@ -55,15 +55,13 @@ class GroupComparator(Calculator):
     def __group_field_searching(self, data: ExperimentData):
         group_field = []
         if self.space in [SpaceEnum.auto, SpaceEnum.data]:
-            group_field = data.ds.get_columns_by_roles(self.grouping_role)
+            group_field = data.ds.search_columns(self.grouping_role)
         if (
             self.space in [SpaceEnum.auto, SpaceEnum.additional]
             and group_field == []
             and isinstance(data, ExperimentData)
         ):
-            group_field = data.additional_fields.get_columns_by_roles(
-                self.grouping_role
-            )
+            group_field = data.additional_fields.search_columns(self.grouping_role)
             self.__additional_mode = True
         if len(group_field) == 0:
             raise NoColumnsError(self.grouping_role)
@@ -150,7 +148,7 @@ class GroupComparator(Calculator):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field = self.__group_field_searching(data)
-        target_field = data.ds.get_columns_by_roles(
+        target_field = data.ds.search_columns(
             TempTargetRole(), tmp_role=True, search_types=self._search_types
         )
         grouping_data = self.__get_grouping_data(data, group_field)
