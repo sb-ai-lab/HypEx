@@ -151,12 +151,14 @@ class GroupComparator(Calculator):
         target_field = data.ds.search_columns(
             TempTargetRole(), tmp_role=True, search_types=self._search_types
         )
+        if (
+            not target_field and data.ds.tmp_roles
+        ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
+            return data
         grouping_data = self.__get_grouping_data(data, group_field)
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.ds.tmp_roles
         else:
-            return data
-        if not target_field:
             return data
 
         compare_result = {}
