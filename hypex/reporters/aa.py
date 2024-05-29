@@ -1,12 +1,12 @@
 from typing import Dict, Any
 
-from hypex.analyzers.aa import OneAASplitAnalyzer
-from hypex.comparators.comparators import GroupDifference, GroupSizes
-from hypex.dataset.dataset import ExperimentData
-from hypex.reporters.abstract import DictReporter
-from hypex.splitters.aa import AASplitter
-from hypex.utils.constants import ID_SPLIT_SYMBOL
-from hypex.utils.enums import ExperimentDataEnum
+from hypex.analyzers import OneAAStatAnalyzer
+from hypex.comparators import GroupDifference, GroupSizes
+from hypex.dataset import ExperimentData
+from hypex.splitters import AASplitter
+from hypex.utils import ExperimentDataEnum
+from hypex.utils import ID_SPLIT_SYMBOL
+from .abstract import DictReporter
 
 
 class AADictReporter(DictReporter):
@@ -34,7 +34,7 @@ class AADictReporter(DictReporter):
 
     def extract_analyzer_data(self, data: ExperimentData) -> Dict[str, Any]:
         analyzer_id = data._get_one_id(
-            OneAASplitAnalyzer, ExperimentDataEnum.analysis_tables
+            OneAAStatAnalyzer, ExperimentDataEnum.analysis_tables
         )
         return self.extract_from_one_row_dataset(data.analysis_tables[analyzer_id])
 

@@ -1,3 +1,3 @@
-from hypex.hypotheses.hypothesis import Hypothesis
+from .hypothesis import Hypothesis
 
 __all__ = ["Hypothesis"]

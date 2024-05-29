@@ -2,12 +2,13 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any
 
 from hypex.dataset import ExperimentData, Dataset
+from hypex.utils.errors import AbstractMethodError
 
 
 class Reporter(ABC):
     @abstractmethod
     def report(self, data: ExperimentData):
-        raise NotImplementedError
+        raise AbstractMethodError
 
     @staticmethod
     def extract_from_one_row_dataset(data: Dataset) -> Dict[str, Any]:
@@ -34,4 +35,4 @@ class Reporter(ABC):
 class DictReporter(Reporter, ABC):
     @abstractmethod
     def report(self, data: ExperimentData) -> Dict:
-        raise NotImplementedError
+        raise AbstractMethodError

@@ -9,7 +9,7 @@ from hypex.dataset import (
     ABCRole,
     GroupingRole,
     TreatmentRole,
-    TmpTreatmentRole,
+    TempTreatmentRole,
 )
 from hypex.executor import Executor
 from hypex.utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
@@ -22,7 +22,6 @@ class Experiment(Executor):
     def get_executor_ids(
         self, searched_classes: Union[type, Iterable[type], None] = None
     ) -> Dict[type, List[str]]:
-        # странно
         if not searched_classes:
             return {}
 
@@ -54,15 +53,6 @@ class Experiment(Executor):
         full_name = str(full_name or f"Experiment({len(self.executors)})")
         super().__init__(full_name, key)
 
-    # может быть удален?
-    def _extract_result(
-        self, original_data: ExperimentData, experiment_data: ExperimentData
-    ):
-        return experiment_data
-
-    def calc(self, data: Dataset):
-        return {exexutor.id: exexutor.calc(data) for exexutor in self.executors}
-
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
@@ -89,9 +79,6 @@ class CycledExperiment(Executor):
     def generate_params_hash(self) -> str:
         return f"{self.inner_executor.full_name} x {self.n_iterations}"
 
-    def calc(self, data: Dataset):
-        return [self.inner_executor.calc(data) for _ in range(self.n_iterations)]
-
     def execute(self, data: ExperimentData) -> ExperimentData:
         for i in range(self.n_iterations):
             self.analyzer.key = f"{i}"
@@ -99,7 +86,7 @@ class CycledExperiment(Executor):
             self.inner_executor.random_state = i
             data = self.analyzer.execute(self.inner_executor.execute(data))
             column = data.additional_fields.get_columns_by_roles(TreatmentRole())[0]
-            data.additional_fields.roles[column] = TmpTreatmentRole()
+            data.additional_fields.roles[column] = TempTreatmentRole()
         return data
 
 
@@ -132,22 +119,15 @@ class GroupExperiment(Executor):
         )
         return data
 
-    def calc(self, data: Dataset):
-        group_field = data.get_columns_by_roles(TempGroupingRole(), tmp_role=True)
-        return {
-            group: self.inner_executor.calc(data)
-            for group, data in data.groupby(group_field)
-        }
-
     def execute(self, data: ExperimentData) -> ExperimentData:
         result_list = []
-        group_field = data.get_columns_by_roles(TempGroupingRole(), tmp_role=True)
+        group_field = data.ds.get_columns_by_roles(TempGroupingRole(), tmp_role=True)
 
-        for group, group_data in data.groupby(group_field):
+        for group, group_data in data.ds.groupby(group_field):
             temp_data = ExperimentData(group_data)
             temp_data = self.inner_executor.execute(temp_data)
-            temp_data = temp_data.add_column(
-                [group] * len(temp_data),
+            temp_data = temp_data.ds.add_column(
+                [group] * len(temp_data.ds),
                 role={f"group({self.id_for_name})": GroupingRole()},
             )
             result_list.append(self._extract_result(temp_data))
@@ -166,14 +146,9 @@ class OnRoleExperiment(Experiment):
         self.role: ABCRole = role
         super().__init__(executors, transformer, full_name, key)
 
-    def calc(self, data: Dataset):
-        return {
-            field: super().calc(data) for field in data.get_columns_by_roles(self.role)
-        }
-
     def execute(self, data: ExperimentData) -> ExperimentData:
-        for field in data.get_columns_by_roles(self.role):
-            data.tmp_roles = {field: TempTargetRole()}
+        for field in data.ds.get_columns_by_roles(self.role):
+            data.ds.tmp_roles = {field: TempTargetRole()}
             data = super().execute(data)
-            data.tmp_roles = {}
+            data.ds.tmp_roles = {}
         return data

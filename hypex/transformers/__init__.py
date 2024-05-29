@@ -1,3 +1,3 @@
-from hypex.transformers.shuffle import Shuffle
+from .shuffle import Shuffle
 
 __all__ = ["Shuffle"]

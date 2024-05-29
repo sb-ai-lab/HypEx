@@ -1,6 +1,6 @@
 import sys
 
-from hypex.analyzers import ABAnalyzer, OneAASplitAnalyzer
+from hypex.analyzers import ABAnalyzer, OneAAStatAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes, ATE, TTest, KSTest, UTest
 from hypex.dataset import (
     ExperimentData,
@@ -14,7 +14,7 @@ from hypex.dataset import (
     StatisticRole,
     StratificationRole,
     TreatmentRole,
-    TmpTreatmentRole,
+    TempTreatmentRole,
     TempGroupingRole,
     TempTargetRole,
 )
@@ -46,7 +46,7 @@ from hypex.utils import ExperimentDataEnum, SpaceEnum
 
 all_classes = [
     ABAnalyzer,
-    OneAASplitAnalyzer,
+    OneAAStatAnalyzer,
     GroupDifference,
     GroupSizes,
     ATE,
@@ -63,7 +63,7 @@ all_classes = [
     StatisticRole,
     StratificationRole,
     TreatmentRole,
-    TmpTreatmentRole,
+    TempTreatmentRole,
     TempGroupingRole,
     TempTargetRole,
     Unique,

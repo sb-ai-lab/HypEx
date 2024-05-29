@@ -1,5 +1,5 @@
-from hypex.analyzers.aa import OneAASplitAnalyzer
-from hypex.analyzers.ab import ABAnalyzer
+from .aa import OneAAStatAnalyzer
+from .ab import ABAnalyzer
 
 
-__all__ = ["OneAASplitAnalyzer", "ABAnalyzer"]
+__all__ = ["OneAAStatAnalyzer", "ABAnalyzer"]

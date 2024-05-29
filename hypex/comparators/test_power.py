@@ -6,16 +6,15 @@
 #
 # from hypex.comparators.comparators import ComparatorInner
 # from hypex.dataset import ExperimentData
-# from hypex.utils import FieldKey
+# from hypex.utils import FieldKeyTypes
 #
 #
-# # TODO: Rework ALL
 #
 #
 # class TestPower(ComparatorInner):
 #     def __init__(
 #         self,
-#         target_field: FieldKey,
+#         target_field: FieldKeyTypes,
 #         significance: float = 0.95,
 #         power: float = 0.8,
 #         full_name: str = None,
@@ -40,33 +39,6 @@
 #         return p * m * s
 #
 #
-# # TODO: replace target_field on subroles
-# class StatSampleSizeByMde(TestPower):
-#     def __init__(
-#         self,
-#         mde: float,
-#         target_field: FieldKey,
-#         significance: float = 0.05,
-#         power: float = 0.8,
-#         full_name: str = None,
-#         key: Any = "",
-#     ):
-#         super().__init__(target_field, significance, power, full_name, key)
-#         self.mde = mde
-#
-#     # TODO: rework by ExperimentData checking
-#     def _comparison_function(self, control_data, test_data) -> ExperimentData:
-#         control_std = control_data.std()
-#         test_std = test_data.std()
-#
-#         test_proportion = len(test_data) / (len(test_data) + len(control_data))
-#         control_proportion = 1 - test_proportion
-#
-#         d = ((norm.ppf(1 - self.significance / 2) + norm.ppf(power)) / self.mde) ** 2
-#         s = test_std**2 / test_proportion + control_std**2 / control_proportion
-#         return int(d * s)
-#
-#
 # class StatPowerByTTestInd(TestPower):
 #
 #     def _comparison_function(self, control_data, test_data) -> ExperimentData:
@@ -80,4 +52,62 @@
 #             nobs1=test_size,
 #             ratio=ratio,
 #             alpha=significance,
-#         )
+#
+from typing import Optional, Any, Dict, Union, Sequence
+
+import numpy as np
+
+from hypex.dataset import ABCRole, Dataset, ExperimentData, TargetRole
+from hypex.utils import SpaceEnum, FieldKeyTypes
+
+from scipy.stats import norm
+
+from hypex.comparators.abstract import GroupComparator
+
+
+class MDEBySize(GroupComparator):
+    def __init__(
+        self,
+        grouping_role: Optional[ABCRole] = None,
+        space: SpaceEnum = SpaceEnum.auto,
+        full_name: Optional[str] = None,
+        key: Any = "",
+        power: float = 0.8,
+        significance: float = 0.95,
+    ):
+        super().__init__(grouping_role, space, full_name, key)
+        self.power = power
+        self.significance = significance
+
+    @staticmethod
+    def _comparison_function(control_data, test_data, significance=0.95, power=0.8, **kwargs) -> Dict[str, Any]:
+        result = {}
+        m = norm.ppf(1 - significance / 2) - norm.ppf(power)
+        n_control, n_test = len(control_data), len(test_data)
+        proportion = n_test / (n_test + n_control)
+        p = np.sqrt(1 / (proportion * (1 - proportion)))
+        for target in control_data.columns:
+            var_control = control_data[target].var()
+            var_test = test_data[target].var()
+            s = np.sqrt(var_test / n_test + var_control / n_control)
+            result[target] = p * m * s
+
+        return result
+
+    @staticmethod
+    def calc(data: Dataset,
+        group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
+        target_field: Optional[FieldKeyTypes] = None,
+        significance=0.95,
+        power=0.8,
+        **kwargs
+        ):
+        return GroupComparator.calc(data=data, group_field=group_field, target_field=target_field, comparison_function=MDEBySize._comparison_function, power=power, significance=significance)
+
+    def _comparison(self, data, grouping_data, target_field, **kwargs):
+        return super()._comparison(data, grouping_data, target_field,  power=self.power, significance=self.significance)
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        subdata = data.ds.loc[:,data.ds.get_columns_by_roles([TargetRole(), self.grouping_role])]
+        ed = super().execute(ExperimentData(subdata))
+        return self._set_value(data, ed.analysis_tables[self._id])
