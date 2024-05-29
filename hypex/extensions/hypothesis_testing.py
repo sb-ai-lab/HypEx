@@ -81,10 +81,14 @@ class Chi2TestExtension(StatTest):
     @staticmethod
     def matrix_preparation(data: Dataset, other: Dataset):
         proportion = len(data) / (len(data) + len(other))
-        data_vc = data.value_counts() * (1 - proportion)
-        other_vc = other.value_counts() * proportion
-
-        return data_vc.merge(other_vc).fillna(0)
+        counted_data = data.value_counts()
+        data_vc = counted_data["count"] * (1 - proportion)
+        other_vc = other.value_counts()["count"] * proportion
+        data_vc.add_column(counted_data[counted_data.columns[0]])
+        other_vc.add_column(counted_data[counted_data.columns[0]])
+        return data_vc.merge(other_vc, on=counted_data.columns[0]).fillna(0)[
+            ["count_x", "count_y"]
+        ]
 
     def _calc_pandas(
         self, data: Dataset, other: Union[Dataset, None] = None, **kwargs

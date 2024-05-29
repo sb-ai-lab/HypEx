@@ -353,9 +353,6 @@ class Dataset(DatasetBase):
                 dataset[1].tmp_roles = self.tmp_roles
         return datasets
 
-    def mean(self):  # should we add arguments to all the methods?
-        return self._convert_data_after_agg(self._backend.mean())
-
     def mode(self, numeric_only: bool = False, dropna: bool = True):
         return self._convert_data_after_agg(
             self._backend.mode(numeric_only=numeric_only, dropna=dropna)
@@ -462,9 +459,9 @@ class Dataset(DatasetBase):
     def merge(
         self,
         right,
-        on: FieldKeyTypes = "",
-        left_on: FieldKeyTypes = "",
-        right_on: FieldKeyTypes = "",
+        on: Optional[FieldKeyTypes] = None,
+        left_on: Optional[FieldKeyTypes] = None,
+        right_on: Optional[FieldKeyTypes] = None,
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),

@@ -8,8 +8,8 @@ from hypex.dataset import (
     TreatmentRole,
     TargetRole,
 )
-from hypex.extensions.statsmodels import ABMultiTest, ABMultitestQuantile
 from hypex.experiments.base import Executor
+from hypex.extensions.statsmodels import ABMultiTest, ABMultitestQuantile
 from hypex.utils import (
     ID_SPLIT_SYMBOL,
     NAME_BORDER_SYMBOL,
@@ -49,8 +49,8 @@ class ABAnalyzer(Executor):
         )
 
     def execute_multitest(self, data: ExperimentData, p_values: Dataset, **kwargs):
-        group_field = data.ds.get_columns_by_roles(TreatmentRole())[0]
-        target_field = data.ds.get_columns_by_roles(TargetRole())[0]
+        group_field = data.ds.search_columns(TreatmentRole())[0]
+        target_field = data.ds.search_columns(TargetRole())[0]
         if self.multitest_method:
             multitest_result = (
                 ABMultiTest(self.multitest_method).calc(p_values, **kwargs)

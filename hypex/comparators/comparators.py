@@ -1,14 +1,23 @@
-from typing import Dict, Any
+from typing import Dict, Any, Union
 
 from hypex.comparators.abstract import GroupComparator
-from hypex.dataset import TempTargetRole
+from hypex.dataset import TempTargetRole, ABCRole
+from hypex.utils import SpaceEnum
+from hypex.utils.typings import NumberTypes
 
 
 class GroupDifference(GroupComparator):
+    def __init__(
+        self,
+        grouping_role: Union[ABCRole, None] = None,
+        space: SpaceEnum = SpaceEnum.auto,
+    ):
+        super().__init__(
+            grouping_role=grouping_role, space=space, search_types=NumberTypes
+        )
+
     def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
-        target_field = control_data.get_columns_by_roles(
-            TempTargetRole(), tmp_role=True
-        )[0]
+        target_field = control_data.search_columns(TempTargetRole(), tmp_role=True)[0]
         control_mean = control_data.mean()
         test_mean = test_data.mean()
 
@@ -21,6 +30,7 @@ class GroupDifference(GroupComparator):
 
 
 class GroupSizes(GroupComparator):
+
     def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
         size_a = len(control_data)
         size_b = len(test_data)
@@ -34,11 +44,17 @@ class GroupSizes(GroupComparator):
 
 
 class ATE(GroupComparator):
+    def __init__(
+        self,
+        grouping_role: Union[ABCRole, None] = None,
+        space: SpaceEnum = SpaceEnum.auto,
+    ):
+        super().__init__(
+            grouping_role=grouping_role, space=space, search_types=NumberTypes
+        )
 
     def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
-        target_field = control_data.get_columns_by_roles(
-            TempTargetRole(), tmp_role=True
-        )[0]
+        target_field = control_data.search_columns(TempTargetRole(), tmp_role=True)[0]
         size_a = len(control_data)
         size_b = len(test_data)
         control_mean = control_data.mean()
