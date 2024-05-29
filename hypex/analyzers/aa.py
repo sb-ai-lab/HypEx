@@ -43,3 +43,4 @@ class OneAAStatAnalyzer(Executor):
         )
 
         return self._set_value(data, analysis_dataset)
+
