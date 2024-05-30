@@ -518,6 +518,10 @@ class Dataset(DatasetBase):
 
     def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
         return Dataset(self.roles, data=self.backend.shuffle(random_state))
+    
+    def rename(self, names: Union[Dict[str]]): 
+        roles = {name if old_name1 == old_name else old_name: role for old_name1, name, old_name, role in zip(names.items(), self.roles.items())} 
+        return Dataset(roles, data=self.backend.rename(names))
 
 
 class ExperimentData:
