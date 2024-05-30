@@ -520,9 +520,8 @@ class Dataset(DatasetBase):
         return Dataset(self.roles, data=self.backend.shuffle(random_state))
 
     def rename(self, names: Dict[str, str]):
-        old_names = names.keys()
         roles = {
-            names[column] if column in old_names else column: role
+            names[column] if column in names else column: role
             for column, role in self.roles.items()
         }
         return Dataset(roles, data=self.backend.rename(names))
