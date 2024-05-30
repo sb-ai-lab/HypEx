@@ -353,19 +353,6 @@ class Dataset(DatasetBase):
                 dataset[1].tmp_roles = self.tmp_roles
         return datasets
 
-    def mean(self):  # should we add arguments to all the methods?
-        return self._convert_data_after_agg(self._backend.mean())
-
-    def mode(self, numeric_only: bool = False, dropna: bool = True):
-        return self._convert_data_after_agg(
-            self._backend.mode(numeric_only=numeric_only, dropna=dropna)
-        )
-
-    def var(self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False):
-        return self._convert_data_after_agg(
-            self._backend.var(skipna=skipna, ddof=ddof, numeric_only=numeric_only)
-        )
-
     def sort(
         self,
         by: Optional[MultiFieldKeyTypes] = None,
@@ -411,6 +398,16 @@ class Dataset(DatasetBase):
 
     def log(self):
         return self._convert_data_after_agg(self._backend.log())
+
+    def mode(self, numeric_only: bool = False, dropna: bool = True):
+        return self._convert_data_after_agg(
+            self._backend.mode(numeric_only=numeric_only, dropna=dropna)
+        )
+
+    def var(self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False):
+        return self._convert_data_after_agg(
+            self._backend.var(skipna=skipna, ddof=ddof, numeric_only=numeric_only)
+        )
 
     def agg(self, func: Union[str, List]):
         return self._convert_data_after_agg(self._backend.agg(func))
@@ -524,7 +521,8 @@ class ExperimentData:
     def __init__(self, data: Dataset):
         self._data = data
         self.additional_fields = Dataset.create_empty(index=data.index)
-        self.stats = Dataset.create_empty(index=data.columns)
+        self.variables: Dict[str, Dict[str, Union[int, float]]] = dict()
+        self.groups: Dict[FieldKeyTypes, Dataset] = dict()
         self.analysis_tables: Dict[str, Dataset] = {}
         self.id_name_mapping: Dict[str, str] = {}
 
@@ -542,8 +540,8 @@ class ExperimentData:
     def check_hash(self, executor_id: int, space: ExperimentDataEnum) -> bool:
         if space == ExperimentDataEnum.additional_fields:
             return executor_id in self.additional_fields.columns
-        elif space == ExperimentDataEnum.stats:
-            return executor_id in self.stats.columns
+        elif space == ExperimentDataEnum.variables:
+            return executor_id in self.variables.keys()
         elif space == ExperimentDataEnum.analysis_tables:
             return executor_id in self.analysis_tables
         else:
@@ -562,13 +560,8 @@ class ExperimentData:
             self.additional_fields.add_column(data=value, role={executor_id: role})
         elif space == ExperimentDataEnum.analysis_tables:
             self.analysis_tables[executor_id] = value
-        elif space == ExperimentDataEnum.stats:
-            if executor_id not in self.stats.columns:
-                self.stats.add_column(
-                    data=[None] * len(self.stats),
-                    role={executor_id: StatisticRole()},
-                )
-            self.stats[executor_id][key] = value
+        elif space == ExperimentDataEnum.variables:
+            self.variables[executor_id][key] = value
         self.id_name_mapping[executor_id] = name
         return self
 
@@ -578,9 +571,9 @@ class ExperimentData:
         classes = classes if isinstance(classes, Iterable) else [classes]
         return {
             class_: {
-                ExperimentDataEnum.stats.value: [
+                ExperimentDataEnum.variables.value: [
                     str(_id)
-                    for _id in self.stats.columns
+                    for _id in self.variables.keys()
                     if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
                 ],
                 ExperimentDataEnum.additional_fields.value: [
