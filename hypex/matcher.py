@@ -29,7 +29,7 @@ from .selectors.selector_primal_methods import (
 )
 from .utils.validators import emissions
 from .utils.validators import random_feature
-from .utils.validators import random_treatment
+from .utils.validators import permutation_test
 from .utils.validators import subset_refuter
 from .utils.validators import test_significance
 
@@ -190,7 +190,7 @@ class Matcher:
                 Write logs in debug mode
             pbar:
                 Display progress bar while get index
-            max_categories: 
+            max_categories:
                 The maximum number of categories. Default to 100.
             fill_gaps:
                 Determines whether to automatically fill NaN values in categorical columns used for grouping.
@@ -709,9 +709,9 @@ class Matcher:
 
     def validate_result(
             self,
-            refuter: str = "random_feature",
-            effect_type: str = "ate",
-            n_sim: int = 10,
+            refuter: str = "permutation_test",
+            effect_type: str = "att",
+            n_sim: int = 500,
             fraction: float = 0.8,
             low: float = 1.0,
             high: float = 99.0
@@ -720,7 +720,7 @@ class Matcher:
 
         Validates estimated effect:
                                     1) by replacing real treatment with random placebo treatment.
-                                     Estimated effect must be droped to zero, p-val > 0.05;
+                                     Estimated effect must be droped to zero, p-val < 0.05;
                                     2) by adding random feature (`random_feature`). Estimated effect shouldn't change
                                     significantly, p-val < 0.05;
                                     3) estimates effect on subset of data (default fraction is 0.8). Estimated effect
@@ -728,7 +728,7 @@ class Matcher:
 
         Args:
             refuter:
-                Refuter type (`random_treatment`, `random_feature`, `subset_refuter`, `emissions`)
+                Refuter type (`permutation_test`, `random_feature`, `subset_refuter`, `emissions`)
             effect_type:
                 Which effect to validate (`ate`, `att`, `atc`)
             n_sim:
@@ -752,9 +752,10 @@ class Matcher:
 
             These methods are not sufficiently accurate markers of a successful experiment.
         """
-        raise NotImplementedError(
-            "We have found that old validation is not mathematically correct. So now we are working on new method."
-        )
+        if refuter != "permutation_test":
+            raise NotImplementedError(
+                "We have found that old validation is not mathematically correct. So now we are working on new method. Please use permutation_test."
+            )
         if self.silent:
             logger.debug("Applying validation of result")
         else:
@@ -804,9 +805,9 @@ class Matcher:
         else:
 
             for i in tqdm(range(n_sim)):
-                if refuter in ["random_treatment", "random_feature"]:
-                    if refuter == "random_treatment":
-                        self.input_data, orig_treatment, self.validate = random_treatment(self.input_data,
+                if refuter in ["permutation_test", "random_feature"]:
+                    if refuter == "permutation_test":
+                        self.input_data, orig_treatment, self.validate = permutation_test(self.input_data,
                                                                                           self.treatment)
                     elif refuter == "random_feature":
                         self.input_data, self.validate = random_feature(self.input_data)
@@ -840,7 +841,7 @@ class Matcher:
                 else:
                     logger.error("Incorrect refuter name")
                     raise NameError(
-                        "Incorrect refuter name! Available refuters: `random_feature`, `random_treatment`, `subset_refuter`"
+                        "Incorrect refuter name! Available refuters: `random_feature`, `permutation_test`, `subset_refuter`"
                     )
 
                 if self.group_col is None:
@@ -861,7 +862,7 @@ class Matcher:
                     self.val_dict[outcome],
                 )
             )
-        if refuter == "random_treatment":
+        if refuter == "permutation_test":
             self.input_data[self.treatment] = orig_treatment
         elif refuter == "random_feature":
             self.input_data = self.input_data.drop(columns="random_feature")
