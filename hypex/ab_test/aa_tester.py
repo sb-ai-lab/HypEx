@@ -1165,7 +1165,7 @@ class AATest:
             "test": splitted_data[splitted_data[group_field] == "test"],
         }
 
-    def split_analysis(self, group_field, splited_data: pd.DataFrame, **kwargs):
+    def split_analysis(self, splited_data: pd.DataFrame, group_field, **kwargs):
         """Conducts a full splitting analysis.
 
         Args:
@@ -1315,7 +1315,7 @@ class AATest:
             ]
             final_split = best_split[best_rs]
             if show_plots:
-                self.split_analysis(final_split, group_field=group_field, **kwargs)
+                self.split_analysis(splited_data=final_split, group_field=group_field, **kwargs)
 
             transformed_results = self.experiment_result_transform(
                 best_results[best_results["random_state"] == best_rs].iloc[0]
