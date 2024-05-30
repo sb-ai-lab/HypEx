@@ -522,8 +522,8 @@ class Dataset(DatasetBase):
     def rename(self, names: Dict[str, str]):
         old_names = names.keys()
         roles = {
-            names[old_name] if column in old_names else column: self.roles[column]
-            for column, old_name in zip(self.roles.keys(), old_names)
+            names[column] if column in old_names else column: role
+            for column, role in self.roles.items()
         }
         return Dataset(roles, data=self.backend.rename(names))
 
