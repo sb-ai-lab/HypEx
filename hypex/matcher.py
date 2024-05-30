@@ -844,7 +844,7 @@ class Matcher:
                         "Incorrect refuter name! Available refuters: `random_feature`, `permutation_test`, `subset_refuter`"
                     )
 
-                if self.group_col is None:
+                if self.group_col == []:
                     sim = self.matcher.match()
                 else:
                     sim = self.matcher.group_match()
