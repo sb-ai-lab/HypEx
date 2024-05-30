@@ -352,7 +352,7 @@ class Dataset(DatasetBase):
             if isinstance(dataset, Dataset):
                 dataset[1].tmp_roles = self.tmp_roles
         return datasets
-
+      
     def sort(
         self,
         by: Optional[MultiFieldKeyTypes] = None,
@@ -459,9 +459,9 @@ class Dataset(DatasetBase):
     def merge(
         self,
         right,
-        on: FieldKeyTypes = "",
-        left_on: FieldKeyTypes = "",
-        right_on: FieldKeyTypes = "",
+        on: Optional[FieldKeyTypes] = None,
+        left_on: Optional[FieldKeyTypes] = None,
+        right_on: Optional[FieldKeyTypes] = None,
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
