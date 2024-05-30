@@ -18,9 +18,7 @@ except:
 
 from .algorithms.faiss_matcher import FaissMatcher
 from .algorithms.no_replacement_matching import MatcherNoReplacement
-from .selectors.base_filtration import const_filtration, nan_filtration
 from .selectors.feature_selector import FeatureSelector
-from .selectors.outliers_filter import OutliersFilter
 from .selectors.spearman_filter import SpearmanFilter
 from .selectors.outliers_filter import OutliersFilter
 from .selectors.base_filtration import const_filtration, nan_filtration
@@ -31,10 +29,9 @@ from hypex.selectors.selector_primal_methods import (
 )
 from .utils.validators import emissions
 from .utils.validators import random_feature
-from .utils.validators import random_treatment
+from .utils.validators import permutation_test
 from .utils.validators import subset_refuter
 from .utils.validators import test_significance
-
 
 REPORT_FEAT_SELECT_DIR = "report_feature_selector"
 REPORT_PROP_MATCHER_DIR = "report_matcher"
@@ -658,7 +655,7 @@ class Matcher:
 
     def validate_result(
             self,
-            refuter: str = "random_treatment",
+            refuter: str = "permutation_test",
             effect_type: str = "att",
             n_sim: int = 500,
             fraction: float = 0.8,
@@ -677,7 +674,7 @@ class Matcher:
 
         Args:
             refuter:
-                Refuter type (`random_treatment`, `random_feature`, `subset_refuter`, `emissions`)
+                Refuter type (`permutation_test`, `random_feature`, `subset_refuter`, `emissions`)
             effect_type:
                 Which effect to validate (`ate`, `att`, `atc`)
             n_sim:
@@ -750,9 +747,9 @@ class Matcher:
         else:
 
             for i in tqdm(range(n_sim)):
-                if refuter in ["random_treatment", "random_feature"]:
-                    if refuter == "random_treatment":
-                        self.input_data, orig_treatment, self.validate = random_treatment(self.input_data,
+                if refuter in ["permutation_test", "random_feature"]:
+                    if refuter == "permutation_test":
+                        self.input_data, orig_treatment, self.validate = permutation_test(self.input_data,
                                                                                           self.treatment)
                     elif refuter == "random_feature":
                         self.input_data, self.validate = random_feature(self.input_data)
@@ -786,7 +783,7 @@ class Matcher:
                 else:
                     logger.error("Incorrect refuter name")
                     raise NameError(
-                        "Incorrect refuter name! Available refuters: `random_feature`, `random_treatment`, `subset_refuter`"
+                        "Incorrect refuter name! Available refuters: `random_feature`, `permutation_test`, `subset_refuter`"
                     )
 
                 if self.group_col is None:
@@ -807,7 +804,7 @@ class Matcher:
                     self.val_dict[outcome],
                 )
             )
-        if refuter == "random_treatment":
+        if refuter == "permutation_test":
             self.input_data[self.treatment] = orig_treatment
         elif refuter == "random_feature":
             self.input_data = self.input_data.drop(columns="random_feature")
