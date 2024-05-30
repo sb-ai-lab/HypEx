@@ -3,6 +3,7 @@
 from typing import Dict
 import pandas as pd
 import numpy as np
+import warnings
 from scipy.stats import ttest_ind, mannwhitneyu
 
 
@@ -208,17 +209,25 @@ class ABTest:
             self.calc_difference_method in {"all", "diff_in_diff", "cuped"}
             and target_field_before is None
         ):
-            raise ValueError(
+            warnings.warn(
                 "For calculation metrics 'cuped' or 'diff_in_diff' field 'target_field_before' is required.\n"
                 "Metric 'ate'(=diff-in-means) can be used without 'target_field_before'"
             )
         if self.calc_difference_method in {"all", "ate"}:
             result["ate"] = (
-                splitted_data["test"][target_field].values
-                - splitted_data["control"][target_field].values
-            ).mean()
+                splitted_data["test"][target_field].mean()
+                - splitted_data["control"][target_field].mean()
+            )
 
-        if self.calc_difference_method in {"all", "cuped"}:
+        if self.calc_difference_method in {"all", "medain_diff"}:
+            result["medain_diff"] = (
+                splitted_data["test"][target_field].median()
+                - splitted_data["control"][target_field].median()
+            )
+
+        if (target_field_before is not None) and (
+            self.calc_difference_method in {"all", "cuped"}
+        ):
             result["cuped"] = self.cuped(
                 test_data=splitted_data["test"],
                 control_data=splitted_data["control"],
@@ -226,7 +235,9 @@ class ABTest:
                 target_field_before=target_field_before,
             )
 
-        if self.calc_difference_method in {"all", "diff_in_diff"}:
+        if (target_field_before is not None) and (
+            self.calc_difference_method in {"all", "diff_in_diff"}
+        ):
             result["diff_in_diff"] = self.diff_in_diff(
                 test_data=splitted_data["test"],
                 control_data=splitted_data["control"],

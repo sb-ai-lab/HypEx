@@ -779,6 +779,7 @@ class AATest:
         test_group: pd.Series = None,
         control_group: pd.Series = None,
         data: pd.DataFrame = None,
+        group_field: str = "group",
         target_field: str = None,
     ):
         if test_group is None and control_group is None:
@@ -786,7 +787,7 @@ class AATest:
                 raise ValueError(
                     "test_group and control_group cannot be None if data and target_field are None"
                 )
-            splited_data = self.split_splited_data(data)
+            splited_data = self.split_splited_data(data, group_field=group_field)
             test_group = splited_data["test"][target_field]
             control_group = splited_data["control"][target_field]
         return {"test_group": test_group, "control_group": control_group}
@@ -969,6 +970,7 @@ class AATest:
                 control_group=control_group,
                 data=data,
                 target_field=target_field,
+                group_field=group_field
             )
             control_group = groups["control_group"]
             test_group = groups["test_group"]
@@ -1147,7 +1149,7 @@ class AATest:
         }
 
     @staticmethod
-    def split_splited_data(splitted_data: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+    def split_splited_data(splitted_data: pd.DataFrame, group_field) -> Dict[str, pd.DataFrame]:
         """Splits a pandas DataFrame into two separate dataframes based on a specified group field.
 
         Args:
@@ -1159,11 +1161,11 @@ class AATest:
             group field is 'test', and 'control' contains rows where the group field is 'control'.
         """
         return {
-            "control": splitted_data[splitted_data["group"] == "control"],
-            "test": splitted_data[splitted_data["group"] == "test"],
+            "control": splitted_data[splitted_data[group_field] == "control"],
+            "test": splitted_data[splitted_data[group_field] == "test"],
         }
 
-    def split_analysis(self, splited_data: pd.DataFrame, **kwargs):
+    def split_analysis(self, group_field, splited_data: pd.DataFrame, **kwargs):
         """Conducts a full splitting analysis.
 
         Args:
@@ -1172,7 +1174,7 @@ class AATest:
             **kwargs:
                 Some extra keyword arguments for plots in visualization
         """
-        ssp = self.split_splited_data(splited_data)
+        ssp = self.split_splited_data(splited_data, group_field=group_field)
         for nf in self.target_fields:
             self.num_feature_uniform_analysis(
                 ssp["control"][nf], ssp["test"][nf], **kwargs
@@ -1225,6 +1227,7 @@ class AATest:
         show_plots: bool = True,
         test_size: float = 0.5,
         pbar: bool = True,
+        group_field: str = "group",
         **kwargs,
     ):
         """Main function for AATest estimation.
@@ -1312,7 +1315,7 @@ class AATest:
             ]
             final_split = best_split[best_rs]
             if show_plots:
-                self.split_analysis(final_split, **kwargs)
+                self.split_analysis(final_split, group_field=group_field, **kwargs)
 
             transformed_results = self.experiment_result_transform(
                 best_results[best_results["random_state"] == best_rs].iloc[0]
