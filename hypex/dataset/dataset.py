@@ -518,10 +518,15 @@ class Dataset(DatasetBase):
 
     def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
         return Dataset(self.roles, data=self.backend.shuffle(random_state))
-    
-    def rename(self, names: Dict[str, str]): 
-        roles = {names[old_name] if column == old_name else column: self.roles[column] 
-                 for column, old_name in zip(self.roles.keys(), names.keys())}
+
+    def rename(self, names: Dict[str, str]):
+        old_names = names.keys()
+        roles = {
+            names[old_name] if column in list(old_names) else column: self.roles[
+                column
+            ]
+            for column, old_name in zip(self.roles.keys(), old_names)
+        }
         return Dataset(roles, data=self.backend.rename(names))
 
 
