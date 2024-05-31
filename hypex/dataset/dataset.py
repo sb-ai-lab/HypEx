@@ -352,7 +352,7 @@ class Dataset(DatasetBase):
             if isinstance(dataset, Dataset):
                 dataset[1].tmp_roles = self.tmp_roles
         return datasets
-      
+
     def sort(
         self,
         by: Optional[MultiFieldKeyTypes] = None,
@@ -522,7 +522,7 @@ class ExperimentData:
         self._data = data
         self.additional_fields = Dataset.create_empty(index=data.index)
         self.variables: Dict[str, Dict[str, Union[int, float]]] = {}
-        self.groups: Dict[FieldKeyTypes, Dataset] = dict()
+        self.groups: Dict[FieldKeyTypes, Dataset] = {}
         self.analysis_tables: Dict[str, Dataset] = {}
         self.id_name_mapping: Dict[str, str] = {}
 
@@ -562,25 +562,29 @@ class ExperimentData:
             self.analysis_tables[executor_id] = value
         elif space == ExperimentDataEnum.variables:
             self.variables[executor_id][key] = value
-        elif space == ExperimentDataEnum.groups:  
+        elif space == ExperimentDataEnum.groups:
             self.groups[executor_id][key] = value
         self.id_name_mapping[executor_id] = name
         return self
 
     def get_ids(
-        self, classes: Union[type, Iterable[type]], searched_space: Optional[ExperimentDataEnum] = None
+        self,
+        classes: Union[type, Iterable[type]],
+        searched_space: Optional[ExperimentDataEnum] = None,
     ) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
-        if searched_space: 
-            spaces = {ExperimentDataEnum.additional_fields: self.additional_fields, 
-                      ExperimentDataEnum.analysis_tables: self.analysis_tables, 
-                      ExperimentDataEnum.groups: self.groups, 
-                      ExperimentDataEnum.variables: self.variables}
+        if searched_space:
+            spaces = {
+                ExperimentDataEnum.additional_fields: self.additional_fields,
+                ExperimentDataEnum.analysis_tables: self.analysis_tables,
+                ExperimentDataEnum.groups: self.groups,
+                ExperimentDataEnum.variables: self.variables,
+            }
             return {
                 class_: {
                     searched_space.value: [
-                        str(_id) 
-                        for _id in spaces[searched_space.value].keys()
+                        str(_id)
+                        for _id in spaces[searched_space]
                         if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
                     ]
                 }
@@ -588,6 +592,11 @@ class ExperimentData:
             }
         return {
             class_: {
+                ExperimentDataEnum.groups.value: [
+                    str(_id)
+                    for _id in self.groups.keys()
+                    if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
+                ],
                 ExperimentDataEnum.variables.value: [
                     str(_id)
                     for _id in self.variables.keys()
