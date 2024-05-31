@@ -3,9 +3,10 @@ import enum
 
 @enum.unique
 class ExperimentDataEnum(enum.Enum):
+    variables = "variables"
     additional_fields = "additional_fields"
     analysis_tables = "analysis_tables"
-    stats = "stats"
+    groups = "groups"
 
 
 @enum.unique
