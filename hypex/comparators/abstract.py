@@ -163,6 +163,11 @@ class GroupComparator(Calculator):
 
         compare_result = {}
         if target_field:
+            self.key = (
+                target_field[0]
+                if isinstance(target_field, list) and len(target_field) == 1
+                else target_field
+            )
             for i in range(1, len(grouping_data)):
                 grouping_data[i][1].tmp_roles = data.ds.tmp_roles
                 compare_result[grouping_data[i][0]] = self._comparison_function(
