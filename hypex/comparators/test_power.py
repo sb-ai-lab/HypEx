@@ -26,7 +26,7 @@
 #
 #
 # class StatMdeBySize(TestPower):
-#     def _comparison_function(self, control_data, test_data) -> ExperimentData:
+#     def _inner_function(self, control_data, test_data) -> ExperimentData:
 #         m = norm.ppf(1 - self.significance / 2) + norm.ppf(self.power)
 #
 #         n_test, n_control = len(test_data), len(control_data)
@@ -41,7 +41,7 @@
 #
 # class StatPowerByTTestInd(TestPower):
 #
-#     def _comparison_function(self, control_data, test_data) -> ExperimentData:
+#     def _inner_function(self, control_data, test_data) -> ExperimentData:
 #         control_size = len(control_data)
 #         test_size = len(test_data)
 #
@@ -80,7 +80,7 @@ class MDEBySize(GroupComparator):
         self.significance = significance
 
     @staticmethod
-    def _comparison_function(control_data, test_data, significance=0.95, power=0.8, **kwargs) -> Dict[str, Any]:
+    def _inner_function(control_data, test_data, significance=0.95, power=0.8, **kwargs) -> Dict[str, Any]:
         result = {}
         m = norm.ppf(1 - significance / 2) - norm.ppf(power)
         n_control, n_test = len(control_data), len(test_data)
@@ -102,10 +102,7 @@ class MDEBySize(GroupComparator):
         power=0.8,
         **kwargs
         ):
-        return GroupComparator.calc(data=data, group_field=group_field, target_field=target_field, comparison_function=MDEBySize._comparison_function, power=power, significance=significance)
-
-    def _comparison(self, data, grouping_data, target_field, **kwargs):
-        return super()._comparison(data, grouping_data, target_field,  power=self.power, significance=self.significance)
+        return GroupComparator.calc(data=data, group_field=group_field, target_field=target_field, comparison_function=MDEBySize._inner_function, power=power, significance=significance)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         subdata = data.ds.loc[:,data.ds.get_columns_by_roles([TargetRole(), self.grouping_role])]

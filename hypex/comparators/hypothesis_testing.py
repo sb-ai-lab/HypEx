@@ -6,21 +6,21 @@ from .abstract import StatHypothesisTestingWithScipy
 
 
 class TTest(StatHypothesisTestingWithScipy):
-    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
+    def _inner_function(self, control_data, test_data) -> Dict[str, Any]:
         return ttest_ind(
             control_data.data.values.flatten(), test_data.data.values.flatten()
         )
 
 
 class KSTest(StatHypothesisTestingWithScipy):
-    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
+    def _inner_function(self, control_data, test_data) -> Dict[str, Any]:
         return ks_2samp(
             control_data.data.values.flatten(), test_data.data.values.flatten()
         )
 
 
 class UTest(StatHypothesisTestingWithScipy):
-    def _comparison_function(self, control_data, test_data):
+    def _inner_function(self, control_data, test_data):
         return mannwhitneyu(
             control_data.data.values.flatten(), test_data.data.values.flatten()
         )

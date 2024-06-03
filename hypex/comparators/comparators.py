@@ -1,14 +1,12 @@
 from typing import Dict, Any
 
 from hypex.comparators.abstract import GroupComparator
-from hypex.dataset import TempTargetRole
+from hypex.dataset import TempTargetRole, Dataset
+from hypex.utils.adapter import Adapter
 
 
 class GroupDifference(GroupComparator):
-    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
-        target_field = control_data.get_columns_by_roles(
-            TempTargetRole(), tmp_role=True
-        )[0]
+    def _inner_function(self, control_data: Dataset, test_data: Dataset, target_field, **kwargs) -> Dict:
         control_mean = control_data.mean()
         test_mean = test_data.mean()
 
@@ -19,10 +17,12 @@ class GroupDifference(GroupComparator):
             f"{target_field} difference %": (test_mean / control_mean - 1) * 100,
         }
 
+    def _to_dataset(self, data: Dict) -> Dataset:
+        return Adapter.dict_to_dataset(data=data)
+
 
 class GroupSizes(GroupComparator):
-
-    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
+    def _inner_function(self, control_data: Dataset, test_data: Dataset, **kwargs) -> Dict:
         size_a = len(control_data)
         size_b = len(test_data)
 
@@ -33,13 +33,13 @@ class GroupSizes(GroupComparator):
             "test size %": (size_b / (size_a + size_b)) * 100,
         }
 
+    def _to_dataset(self, data: Dict) -> Dataset:
+        return Adapter.dict_to_dataset(data=data)
+
 
 class ATE(GroupComparator):
 
-    def _comparison_function(self, control_data, test_data) -> Dict[str, Any]:
-        target_field = control_data.get_columns_by_roles(
-            TempTargetRole(), tmp_role=True
-        )[0]
+    def _inner_function(self, control_data: Dataset, test_data: Dataset, target_field, **kwargs) -> float:
         size_a = len(control_data)
         size_b = len(test_data)
         control_mean = control_data.mean()
@@ -49,4 +49,7 @@ class ATE(GroupComparator):
             size_b / (size_a + size_b)
         ) * test_mean
 
-        return {f"{target_field} ATE": ate.iloc[0]}
+        return ate.iloc[0]
+
+    def _to_dataset(self, data: float) -> Dataset:
+        return Adapter.float_to_dataset(name="ATE", data=data)

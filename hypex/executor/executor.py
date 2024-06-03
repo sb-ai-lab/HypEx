@@ -83,3 +83,8 @@ class Calculator(Executor, ABC):
     @abstractmethod
     def calc(data: Dataset, **kwargs):
         raise AbstractMethodError
+
+    @staticmethod
+    @abstractmethod
+    def _inner_function(**kwargs):
+        raise AbstractMethodError

@@ -39,8 +39,9 @@ class GroupComparator(Calculator):
     ) -> Dataset:
         return self._extract_dataset(compare_result, roles)
 
+    @classmethod
     @abstractmethod
-    def _comparison_function(self, control_data, test_data, **kwargs) -> Dict[str, Any]:
+    def _inner_function(control_data: Dataset, test_data: Dataset, **kwargs) -> Any:
         raise AbstractMethodError
 
     def __group_field_searching(self, data: ExperimentData):
@@ -85,27 +86,16 @@ class GroupComparator(Calculator):
             return [field]
         return list(field)
 
-    def __check_input(self, test_data: ExperimentData, control_data: ExperimentData):
-        if not isinstance(test_data, ExperimentData):
-            raise TypeError(
-                f"Test data must be ExperimentData, not {type(test_data)}"
-            )
-        if not isinstance(control_data, ExperimentData):
-            raise TypeError(
-                f"Control data must be ExperimentData, not {type(control_data)}"
-            )
-
-    def __check_output(self, output: Dataset):
-        if not isinstance(output, Dataset):
-            raise TypeError(f"Output must be Dataset, not {type(output)}")
-        return output
+    @abstractmethod
+    def _to_dataset(self, **kwargs) -> Dataset:
+        raise AbstractMethodError
 
     @staticmethod
     def calc(
         data: Dataset,
         group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
         target_field: Optional[FieldKeyTypes] = None,
-        comparison_function: Optional[Callable] = None,
+        # comparison_function: Optional[Callable] = None,
         **kwargs,
     ) -> Dict:
         group_field = GroupComparator.__field_arg_universalization(group_field)
@@ -121,18 +111,27 @@ class GroupComparator(Calculator):
         result = {}
         if target_field:
             for i in range(1, len(grouping_data)):
-                result_key = grouping_data[i][0] if len(grouping_data[i][0]) > 1 else grouping_data[i][0][0]
+                result_key = (
+                    grouping_data[i][0]
+                    if len(grouping_data[i][0]) > 1
+                    else grouping_data[i][0][0]
+                )
                 grouping_data[i][1].tmp_roles = data.tmp_roles
-                result[result_key] = comparison_function(
+                result[result_key] = _inner_function(
                     grouping_data[0][1][target_field],
                     grouping_data[i][1][target_field],
                     **kwargs,
                 )
         else:
             for i in range(1, len(grouping_data)):
-                result_key = grouping_data[i][0] if len(grouping_data[i][0]) > 1 else grouping_data[i][0][0]
+                result_key = (
+                    grouping_data[i][0]
+                    if len(grouping_data[i][0]) > 1
+                    else grouping_data[i][0][0]
+                )
                 result[result_key] = comparison_function(
-                    grouping_data[0][1], grouping_data[i][1],
+                    grouping_data[0][1],
+                    grouping_data[i][1],
                     **kwargs,
                 )
         return result
@@ -151,34 +150,15 @@ class GroupComparator(Calculator):
     ) -> Dataset:
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
-    def _comparison(self, data, grouping_data, target_fields, **kwargs):
-        compare_result = {}
-        if target_fields:
-            for i in range(1, len(grouping_data)):
-                grouping_data[i][1].tmp_roles = data.ds.tmp_roles
-                compare_result[grouping_data[i][0]] = self._comparison_function(
-                    grouping_data[0][1][target_fields],
-                    grouping_data[i][1][target_fields],
-                    **kwargs
-                )
-        else:
-            for i in range(1, len(grouping_data)):
-                compare_result[grouping_data[i][0]] = self._comparison_function(
-                    grouping_data[0][1], grouping_data[i][1]
-                )
-        return compare_result
-
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field = self.__group_field_searching(data)
-        meta_name = group_field[0] if len(group_field) == 1 else group_field
         target_fields = data.ds.get_columns_by_roles(TempTargetRole(), tmp_role=True)
-        grouping_data = self.__get_grouping_data(data, group_field)
-        if len(grouping_data) > 1:
-            grouping_data[0][1].tmp_roles = data.ds.tmp_roles
-        else:
-            raise ComparisonNotSuitableFieldError(group_field)
-
-        compare_result = self._comparison(data, grouping_data, target_fields)
+        compare_result = self.calc(
+            data=data.ds,
+            group_field=group_field,
+            target_field=target_fields,
+            comparison_function=self._inner_function,
+        )
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key, _ in compare_result.items()}
         )
