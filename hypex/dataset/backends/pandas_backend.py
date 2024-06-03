@@ -399,4 +399,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         )
 
     def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> pd.DataFrame:
-        return self.data.drop(labels=labels, axis=axis)
+        return self.data.drop(labels=labels, axis=axis) 
+    
+    def rename(self, columns: Dict[str, str]): 
+        return self.data.rename(columns=columns)
+
+

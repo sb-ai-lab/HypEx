@@ -516,6 +516,13 @@ class Dataset(DatasetBase):
     def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
         return Dataset(self.roles, data=self.backend.shuffle(random_state))
 
+    def rename(self, names: Dict[FieldKeyTypes, FieldKeyTypes]):
+        roles = {
+            names[column] if column in names else column: role
+            for column, role in self.roles.items()
+        }
+        return Dataset(roles, data=self.backend.rename(names))
+
 
 class ExperimentData:
     def __init__(self, data: Dataset):
