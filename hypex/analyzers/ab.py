@@ -91,7 +91,7 @@ class ABAnalyzer(Executor):
             t_data = data.analysis_tables[analysis_ids[0]]
             for aid in analysis_ids[1:]:
                 t_data = t_data.append(data.analysis_tables[aid])
-            t_data.data.index = analysis_ids * len(t_data)
+            t_data.data.index = analysis_ids
             for f in ["p-value", "pass"]:
                 value = t_data[f]
                 multitest_pvalues = self._add_pvalues(
