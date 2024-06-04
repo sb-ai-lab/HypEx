@@ -1,17 +1,20 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Optional
 
 from hypex.comparators.abstract import GroupComparator
-from hypex.dataset import TempTargetRole, Dataset
+from hypex.dataset import Dataset
 from hypex.utils import FieldKeyTypes
 from hypex.utils.adapter import Adapter
-from hypex.dataset import TempTargetRole, ABCRole
-from hypex.utils import SpaceEnum
-from hypex.utils.typings import NumberTypes
 
 
 class GroupDifference(GroupComparator):
-    @staticmethod
-    def _inner_function(data: Dataset, test_data: Dataset, target_field: Optional[FieldKeyTypes] = None, **kwargs) -> Dict:
+    @classmethod
+    def _inner_function(
+        cls,
+        data: Dataset,
+        test_data: Dataset,
+        target_field: Optional[FieldKeyTypes] = None,
+        **kwargs,
+    ) -> Dict:
         control_mean = data.mean()
         test_mean = test_data.mean()
 
@@ -28,8 +31,8 @@ class GroupDifference(GroupComparator):
 
 
 class GroupSizes(GroupComparator):
-    @staticmethod
-    def _inner_function(data: Dataset, test_data: Dataset, **kwargs) -> Dict:
+    @classmethod
+    def _inner_function(cls, data: Dataset, test_data: Dataset, **kwargs) -> Dict:
         size_a = len(data)
         size_b = len(test_data)
 
@@ -47,8 +50,8 @@ class GroupSizes(GroupComparator):
 
 class ATE(GroupComparator):
 
-    @staticmethod
-    def _inner_function(data: Dataset, test_data: Dataset, **kwargs) -> float:
+    @classmethod
+    def _inner_function(cls, data: Dataset, test_data: Dataset, **kwargs) -> float:
         size_a = len(data)
         size_b = len(test_data)
         control_mean = data.mean()

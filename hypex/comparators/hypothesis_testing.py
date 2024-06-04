@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 
 from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu  # type: ignore
 
@@ -8,7 +8,6 @@ from ..extensions.hypothesis_testing import (
     TTestExtension,
     KSTestExtension,
     UTestExtension,
-    Chi2TestExtension,
 )
 from ..utils import SpaceEnum
 from ..utils.typings import NumberTypes, CategoricalTypes
@@ -28,10 +27,13 @@ class TTest(StatHypothesisTesting):
             reliability=reliability,
         )
 
+    @classmethod
     def _inner_function(
-        self, data: Dataset, test_data: Dataset = None
+        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dataset:
-        return TTestExtension(self.reliability).calc(data, test_data=test_data)
+        return TTestExtension(kwargs.get("reliability", 0.05)).calc(
+            data, test_data=test_data, **kwargs
+        )
 
 
 class KSTest(StatHypothesisTesting):
@@ -48,8 +50,13 @@ class KSTest(StatHypothesisTesting):
             reliability=reliability,
         )
 
-    def _inner_function(self, data: Dataset, test_data: Dataset = None) -> Dataset:
-        return KSTestExtension(self.reliability).calc(data, test_data=test_data)
+    @classmethod
+    def _inner_function(
+        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+    ) -> Dataset:
+        return KSTestExtension(kwargs.get("reliability", 0.05)).calc(
+            data, test_data=test_data, **kwargs
+        )
 
 
 class UTest(StatHypothesisTesting):
@@ -66,8 +73,13 @@ class UTest(StatHypothesisTesting):
             reliability=reliability,
         )
 
-    def _inner_function(self, data: Dataset, test_data: Dataset = None) -> Dataset:
-        return UTestExtension(self.reliability).calc(data, test_data=test_data)
+    @classmethod
+    def _inner_function(
+        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+    ) -> Dataset:
+        return UTestExtension(kwargs.get("reliability", 0.05)).calc(
+            data, test_data=test_data, **kwargs
+        )
 
 
 class Chi2Test(StatHypothesisTesting):
@@ -84,7 +96,10 @@ class Chi2Test(StatHypothesisTesting):
             reliability=reliability,
         )
 
-    def _inner_function(self, data: Dataset, test_data: Dataset = None) -> Dataset:
-        return Chi2TestExtension(reliability=self.reliability).calc(
-            data, test_data=test_data
+    @classmethod
+    def _inner_function(
+        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+    ) -> Dataset:
+        return UTestExtension(kwargs.get("reliability", 0.05)).calc(
+            data, test_data=test_data, **kwargs
         )

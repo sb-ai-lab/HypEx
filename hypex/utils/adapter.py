@@ -14,11 +14,15 @@ class Adapter:
         """
         Convert a float to a Dataset
         """
-        return Dataset(roles={name: InfoRole()}, data=pd.DataFrame(data=[data], columns=[name]))
+        return Dataset(
+            roles={name: InfoRole()}, data=pd.DataFrame(data=[data], columns=[name])
+        )
 
     @staticmethod
     def dict_to_dataset(data: Dict) -> Dataset:
         """
         Convert a dict to a Dataset
         """
-        return Dataset(roles={name: InfoRole() for name in data.keys()}, data=pd.DataFrame.from_dict(data=data))
+        return Dataset.from_dict(
+            [data], roles={name: InfoRole() for name in data.keys()}
+        )

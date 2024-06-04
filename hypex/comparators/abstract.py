@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union, Iterable
+from typing import Any, Dict, List, Optional, Sequence, Union, Iterable
 
 from hypex.dataset import (
     ABCRole,
@@ -41,7 +41,7 @@ class GroupComparator(Calculator):
         super().__init__(key=key)
 
     def _local_extract_dataset(
-            self, compare_result: Dict[Any, Any], roles: Dict[Any, ABCRole]
+        self, compare_result: Dict[Any, Any], roles: Dict[Any, ABCRole]
     ) -> Dataset:
         return self._extract_dataset(compare_result, roles)
 
@@ -55,9 +55,9 @@ class GroupComparator(Calculator):
         if self.space in [SpaceEnum.auto, SpaceEnum.data]:
             group_field = data.ds.search_columns(self.grouping_role)
         if (
-                self.space in [SpaceEnum.auto, SpaceEnum.additional]
-                and group_field == []
-                and isinstance(data, ExperimentData)
+            self.space in [SpaceEnum.auto, SpaceEnum.additional]
+            and group_field == []
+            and isinstance(data, ExperimentData)
         ):
             group_field = data.additional_fields.search_columns(self.grouping_role)
             self.__additional_mode = True
@@ -82,7 +82,7 @@ class GroupComparator(Calculator):
 
     @staticmethod
     def __field_arg_universalization(
-            field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None]
+        field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None]
     ) -> List[FieldKeyTypes]:
         if not field:
             raise NoColumnsError(field)
@@ -91,18 +91,17 @@ class GroupComparator(Calculator):
         return list(field)
 
     @staticmethod
-    @abstractmethod
     def _to_dataset(data: Any, **kwargs) -> Dataset:
-        raise AbstractMethodError
+        return data
 
     @classmethod
     def calc(
-            cls,
-            data: Dataset,
-            group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
-            target_field: Optional[FieldKeyTypes] = None,
-            grouping_data: Optional[Dict[FieldKeyTypes, Dataset]] = None,
-            **kwargs,
+        cls,
+        data: Dataset,
+        group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
+        target_field: Optional[FieldKeyTypes] = None,
+        grouping_data: Optional[Dict[FieldKeyTypes, Dataset]] = None,
+        **kwargs,
     ) -> Dict:
         group_field = GroupComparator.__field_arg_universalization(group_field)
 
@@ -122,11 +121,13 @@ class GroupComparator(Calculator):
                     else grouping_data[i][0][0]
                 )
                 grouping_data[i][1].tmp_roles = data.tmp_roles
-                result[result_key] = cls._to_dataset(cls._inner_function(
-                    grouping_data[0][1][target_field],
-                    grouping_data[i][1][target_field],
-                    **kwargs,
-                ))
+                result[result_key] = cls._to_dataset(
+                    cls._inner_function(
+                        data=grouping_data[0][1][target_field],
+                        test_data=grouping_data[i][1][target_field],
+                        **kwargs,
+                    )
+                )
         else:
             for i in range(1, len(grouping_data)):
                 result_key = (
@@ -134,24 +135,29 @@ class GroupComparator(Calculator):
                     if len(grouping_data[i][0]) > 1
                     else grouping_data[i][0][0]
                 )
-                result[result_key] = cls._to_dataset(cls._inner_function(
-                    grouping_data[0][1],
-                    grouping_data[i][1],
-                    **kwargs,
-                ))
+                result[result_key] = cls._to_dataset(
+                    cls._inner_function(
+                        grouping_data[0][1],
+                        grouping_data[i][1],
+                        **kwargs,
+                    )
+                )
         return result
 
     def _set_value(
-            self, data: ExperimentData, value: Optional[Dataset] = None, key: Any = None
+        self, data: ExperimentData, value: Optional[Dataset] = None, key: Any = None
     ) -> ExperimentData:
         data.set_value(
-            ExperimentDataEnum.analysis_tables, self.id, str(self.__class__.__name__), value
+            ExperimentDataEnum.analysis_tables,
+            self.id,
+            str(self.__class__.__name__),
+            value,
         )
         return data
 
     @staticmethod
     def _extract_dataset(
-            compare_result: FromDictTypes, roles: Dict[Any, ABCRole]
+        compare_result: FromDictTypes, roles: Dict[Any, ABCRole]
     ) -> Dataset:
         if isinstance(list(compare_result.values())[0], Dataset):
             cr_list_v = list(compare_result.values())
@@ -162,15 +168,18 @@ class GroupComparator(Calculator):
             return result
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
+    # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field = self.__group_field_searching(data)
-        target_fields = data.ds.get_columns_by_roles(TempTargetRole(), tmp_role=True, search_types=self._search_types)
+        target_fields = data.ds.search_columns(
+            TempTargetRole(), tmp_role=True, search_types=self._search_types
+        )
         if (
             not target_fields and data.ds.tmp_roles
         ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
             return data
-        if group_field in data.groups:  # TODO: to recheck if this is a correct check
-            grouping_data = list(data.groups[group_field].items())
+        if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
+            grouping_data = list(data.groups[group_field[0]].items())
         else:
             grouping_data = None
         compare_result = self.calc(
@@ -191,7 +200,7 @@ class StatHypothesisTesting(GroupComparator, ABC):
         self,
         grouping_role: Union[ABCRole, None] = None,
         space: SpaceEnum = SpaceEnum.auto,
-        search_types: Union[object, List[object]] = None,
+        search_types: Union[type, List[type], None] = None,
         reliability: float = 0.05,
         key: Any = "",
     ):

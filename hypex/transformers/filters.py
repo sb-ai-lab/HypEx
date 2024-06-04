@@ -1,9 +1,7 @@
-import warnings
 from typing import Any, Optional, Union, Iterable
 
 from hypex.dataset.dataset import Dataset
 from hypex.dataset.dataset import ExperimentData
-
 from hypex.dataset.roles import (
     ABCRole,
     InfoRole,
@@ -30,7 +28,7 @@ class CVFilter(Calculator):
             upper_bound:
                 The maximum acceptable coefficient of variation above which we consider the to be incorrect
         """
-        super().__init__(full_name=full_name, key=key)
+        super().__init__(key=key)
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
 
@@ -42,7 +40,9 @@ class CVFilter(Calculator):
     ) -> Dataset:
         target_roles = super()._list_unification(target_roles)
         if type_filter:
-            addressable_columns = data.search_columns(roles=target_roles, search_types=[float, int, bool])
+            addressable_columns = data.search_columns(
+                roles=target_roles, search_types=[float, int, bool]
+            )
         else:
             addressable_columns = data.search_columns(target_roles)
         for column in addressable_columns:
@@ -76,7 +76,7 @@ class ConstFilter(Calculator):
             threshold:
                 The maximum acceptable frequency above which we consider the column to be constant
         """
-        super().__init__(full_name=full_name, key=key)
+        super().__init__(key=key)
         self.threshold = threshold
 
     def calc(
@@ -111,7 +111,7 @@ class NanFilter(Calculator):
             threshold:
                 The maximum acceptable frequency of NaN values in a column
         """
-        super().__init__(full_name=full_name, key=key)
+        super().__init__(key=key)
         self.threshold = threshold
 
     def calc(
@@ -120,9 +120,7 @@ class NanFilter(Calculator):
         target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
     ) -> Dataset:
         target_roles = super()._list_unification(target_roles)
-        for column in data.search_columns(
-            target_roles
-        ):
+        for column in data.search_columns(target_roles):
             nan_share = data[column].isna().sum() / len(data)
             if nan_share > self.threshold:
                 data.roles[column] = InfoRole()
@@ -139,10 +137,9 @@ class CorrFilter(Calculator):
         threshold: float = 0.8,
         method: str = "pearson",
         numeric_only: bool = True,
-        full_name: Optional[str] = None,
         key: Any = "",
     ):
-        super().__init__(full_name=full_name, key=key)
+        super().__init__(key=key)
         self.threshold = threshold
         self.method = method
         self.numeric_only = numeric_only
@@ -166,7 +163,7 @@ class CorrFilter(Calculator):
         )
         pre_target_column = None
         if drop_policy == "corr":
-            pre_target_columns = data.get_columns_by_roles([PreTargetRole()])
+            pre_target_columns = data.search_columns([PreTargetRole()])
             if (PreTargetRole() not in corr_space_roles) | len(pre_target_columns) != 1:
                 raise ValueError(
                     "Correlation-based filtering cannot be applied if there are more than one PreTarget columns"
@@ -219,7 +216,7 @@ class OutliersFilter(Calculator):
             percentile:
                 The value of the percentile to filter outliers
         """
-        super().__init__(full_name=full_name, key=key)
+        super().__init__(key=key)
         self.lower_percentile = lower_percentile
         self.upper_percentile = upper_percentile
 
@@ -228,10 +225,16 @@ class OutliersFilter(Calculator):
         data: Dataset,
         target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
     ) -> Dataset:
-        addressable_roles = data.search_columns(roles=super()._list_unification(target_roles), search_types=[float, int, bool])
+        addressable_roles = data.search_columns(
+            roles=super()._list_unification(target_roles),
+            search_types=[float, int, bool],
+        )
         mask = data[addressable_roles].apply(
-            func=lambda x: (x < x.quantile(self.lower_percentile)) | (x > x.quantile(self.upper_percentile)),
-            role={column: InfoRole() for column in addressable_roles}, axis=0)
+            func=lambda x: (x < x.quantile(self.lower_percentile))
+            | (x > x.quantile(self.upper_percentile)),
+            role={column: InfoRole() for column in addressable_roles},
+            axis=0,
+        )
         mask = mask.apply(func=lambda x: x.any(), role={"filter": InfoRole()}, axis=1)
         drop_indexes = mask[~mask].index.get_values(columns="filter")
         data = data.drop(drop_indexes, axis=0)

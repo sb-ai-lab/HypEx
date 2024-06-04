@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from hypex.dataset import Dataset, ExperimentData
 from hypex.utils import ID_SPLIT_SYMBOL, AbstractMethodError
@@ -71,7 +71,6 @@ class Executor(ABC):
 
 class Calculator(Executor, ABC):
     @classmethod
-    @abstractmethod
     def calc(cls, data: Dataset, **kwargs):
         return cls._inner_function(data, **kwargs)
 
