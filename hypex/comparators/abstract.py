@@ -41,7 +41,7 @@ class GroupComparator(Calculator):
 
     @classmethod
     @abstractmethod
-    def _inner_function(control_data: Dataset, test_data: Dataset, **kwargs) -> Any:
+    def _inner_function(cls, control_data: Dataset, test_data: Dataset, **kwargs) -> Any:
         raise AbstractMethodError
 
     def __group_field_searching(self, data: ExperimentData):
@@ -86,16 +86,18 @@ class GroupComparator(Calculator):
             return [field]
         return list(field)
 
+    @classmethod
     @abstractmethod
-    def _to_dataset(self, **kwargs) -> Dataset:
+    def _to_dataset(cls, self, **kwargs) -> Dataset:
         raise AbstractMethodError
 
-    @staticmethod
+    @classmethod
     def calc(
+        cls,
         data: Dataset,
         group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
         target_field: Optional[FieldKeyTypes] = None,
-        # comparison_function: Optional[Callable] = None,
+        comparison_function: Optional[Callable] = None,
         **kwargs,
     ) -> Dict:
         group_field = GroupComparator.__field_arg_universalization(group_field)
@@ -117,11 +119,11 @@ class GroupComparator(Calculator):
                     else grouping_data[i][0][0]
                 )
                 grouping_data[i][1].tmp_roles = data.tmp_roles
-                result[result_key] = _inner_function(
+                result[result_key] = cls._to_dataset(cls._inner_function(
                     grouping_data[0][1][target_field],
                     grouping_data[i][1][target_field],
                     **kwargs,
-                )
+                ))
         else:
             for i in range(1, len(grouping_data)):
                 result_key = (
@@ -129,11 +131,11 @@ class GroupComparator(Calculator):
                     if len(grouping_data[i][0]) > 1
                     else grouping_data[i][0][0]
                 )
-                result[result_key] = comparison_function(
+                result[result_key] = cls._to_dataset(cls._inner_function(
                     grouping_data[0][1],
                     grouping_data[i][1],
                     **kwargs,
-                )
+                ))
         return result
 
     def _set_value(

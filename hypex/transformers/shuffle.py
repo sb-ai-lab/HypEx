@@ -4,7 +4,7 @@ from hypex.dataset import Dataset, ExperimentData
 from hypex.executor.executor import Calculator
 
 
-class Shuffle(Calculator):
+class Shuffle(Transformer):
     def __init__(
         self,
         random_state: Optional[int] = None,

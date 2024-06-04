@@ -6,7 +6,8 @@ from hypex.utils.adapter import Adapter
 
 
 class GroupDifference(GroupComparator):
-    def _inner_function(self, control_data: Dataset, test_data: Dataset, target_field, **kwargs) -> Dict:
+    @classmethod
+    def _inner_function(cls, control_data: Dataset, test_data: Dataset, target_field, **kwargs) -> Dict:
         control_mean = control_data.mean()
         test_mean = test_data.mean()
 
@@ -17,12 +18,14 @@ class GroupDifference(GroupComparator):
             f"{target_field} difference %": (test_mean / control_mean - 1) * 100,
         }
 
-    def _to_dataset(self, data: Dict) -> Dataset:
+    @classmethod
+    def _to_dataset(cls, data: Dict) -> Dataset:
         return Adapter.dict_to_dataset(data=data)
 
 
 class GroupSizes(GroupComparator):
-    def _inner_function(self, control_data: Dataset, test_data: Dataset, **kwargs) -> Dict:
+    @classmethod
+    def _inner_function(cls, control_data: Dataset, test_data: Dataset, **kwargs) -> Dict:
         size_a = len(control_data)
         size_b = len(test_data)
 
@@ -33,13 +36,15 @@ class GroupSizes(GroupComparator):
             "test size %": (size_b / (size_a + size_b)) * 100,
         }
 
-    def _to_dataset(self, data: Dict) -> Dataset:
+    @classmethod
+    def _to_dataset(cls, data: Dict) -> Dataset:
         return Adapter.dict_to_dataset(data=data)
 
 
 class ATE(GroupComparator):
 
-    def _inner_function(self, control_data: Dataset, test_data: Dataset, target_field, **kwargs) -> float:
+    @classmethod
+    def _inner_function(cls, control_data: Dataset, test_data: Dataset, target_field, **kwargs) -> float:
         size_a = len(control_data)
         size_b = len(test_data)
         control_mean = control_data.mean()
@@ -51,5 +56,6 @@ class ATE(GroupComparator):
 
         return ate.iloc[0]
 
-    def _to_dataset(self, data: float) -> Dataset:
+    @classmethod
+    def _to_dataset(cls, data: float) -> Dataset:
         return Adapter.float_to_dataset(name="ATE", data=data)

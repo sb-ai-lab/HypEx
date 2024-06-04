@@ -79,12 +79,12 @@ class Executor(ABC):
 
 
 class Calculator(Executor, ABC):
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def calc(data: Dataset, **kwargs):
-        raise AbstractMethodError
+    def calc(cls, data: Dataset, **kwargs):
+        return cls._inner_function(**kwargs)
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def _inner_function(**kwargs):
+    def _inner_function(cls, **kwargs) -> Any:
         raise AbstractMethodError

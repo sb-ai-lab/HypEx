@@ -7,6 +7,8 @@ from hypex.dataset import Dataset, InfoRole
 
 class Adapter:
 
+    # def to_dataset(name: str, data: Union[float, int]) -> Dataset:
+
     @staticmethod
     def float_to_dataset(name: str, data: Union[float, int]) -> Dataset:
         """
