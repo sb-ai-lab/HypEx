@@ -187,6 +187,7 @@ class PandasNavigation(DatasetBackendNavigation):
     def _get_column_type(self, column_name: str) -> str:
         return str(self.data.dtypes[column_name])
 
+    # try try-except if necessary
     def _update_column_type(self, column_name: str, type_name: str):
         if self.data[column_name].isna().sum() == 0:
             self.data.loc[:, column_name] = self.data[column_name].astype(type_name)
