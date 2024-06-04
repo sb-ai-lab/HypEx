@@ -104,7 +104,7 @@ class Dataset(DatasetBase):
         if not isinstance(other, Union[Dataset, ScalarType, Sequence]):
             raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
-        t_roles = self.roles
+        t_roles = deepcopy(self.roles)
         for role in t_roles.values():
             role.data_type = None
         if isinstance(other, Dataset):
