@@ -1,14 +1,15 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from hypex.comparators.abstract import GroupComparator
 from hypex.dataset import TempTargetRole, Dataset
+from hypex.utils import FieldKeyTypes
 from hypex.utils.adapter import Adapter
 
 
 class GroupDifference(GroupComparator):
-    @classmethod
-    def _inner_function(cls, control_data: Dataset, test_data: Dataset, target_field, **kwargs) -> Dict:
-        control_mean = control_data.mean()
+    @staticmethod
+    def _inner_function(data: Dataset, test_data: Dataset, target_field: Optional[FieldKeyTypes], **kwargs) -> Dict:
+        control_mean = data.mean()
         test_mean = test_data.mean()
 
         return {
@@ -18,15 +19,15 @@ class GroupDifference(GroupComparator):
             f"{target_field} difference %": (test_mean / control_mean - 1) * 100,
         }
 
-    @classmethod
-    def _to_dataset(cls, data: Dict) -> Dataset:
+    @staticmethod
+    def _to_dataset(data: Dict, **kwargs) -> Dataset:
         return Adapter.dict_to_dataset(data=data)
 
 
 class GroupSizes(GroupComparator):
-    @classmethod
-    def _inner_function(cls, control_data: Dataset, test_data: Dataset, **kwargs) -> Dict:
-        size_a = len(control_data)
+    @staticmethod
+    def _inner_function(data: Dataset, test_data: Dataset, **kwargs) -> Dict:
+        size_a = len(data)
         size_b = len(test_data)
 
         return {
@@ -36,18 +37,18 @@ class GroupSizes(GroupComparator):
             "test size %": (size_b / (size_a + size_b)) * 100,
         }
 
-    @classmethod
-    def _to_dataset(cls, data: Dict) -> Dataset:
+    @staticmethod
+    def _to_dataset(data: Dict, **kwargs) -> Dataset:
         return Adapter.dict_to_dataset(data=data)
 
 
 class ATE(GroupComparator):
 
-    @classmethod
-    def _inner_function(cls, control_data: Dataset, test_data: Dataset, target_field, **kwargs) -> float:
-        size_a = len(control_data)
+    @staticmethod
+    def _inner_function(data: Dataset, test_data: Dataset, **kwargs) -> float:
+        size_a = len(data)
         size_b = len(test_data)
-        control_mean = control_data.mean()
+        control_mean = data.mean()
         test_mean = test_data.mean()
 
         ate = (size_a / (size_a + size_b)) * control_mean + (
@@ -56,6 +57,6 @@ class ATE(GroupComparator):
 
         return ate.iloc[0]
 
-    @classmethod
-    def _to_dataset(cls, data: float) -> Dataset:
+    @staticmethod
+    def _to_dataset(data: float, **kwargs) -> Dataset:
         return Adapter.float_to_dataset(name="ATE", data=data)
