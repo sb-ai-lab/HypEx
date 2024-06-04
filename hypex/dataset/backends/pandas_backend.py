@@ -52,8 +52,7 @@ class PandasNavigation(DatasetBackendNavigation):
         if isinstance(item, (str, list)):
             return self.data[item]
         if isinstance(item, pd.DataFrame) and item.shape[1] == 1:
-            series = item[item.columns[0]]
-            return self.data[series]
+            return self.data[item[item.columns[0]]]
         raise KeyError("No such column or row")
 
     def __len__(self):
