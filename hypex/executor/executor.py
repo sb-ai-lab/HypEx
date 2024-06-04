@@ -8,7 +8,6 @@ from hypex.utils import ID_SPLIT_SYMBOL, AbstractMethodError
 class Executor(ABC):
     def __init__(
         self,
-        full_name: Optional[str] = None,
         key: Any = "",
         random_state: Optional[int] = None,
     ):
@@ -34,14 +33,6 @@ class Executor(ABC):
     @property
     def id(self) -> str:
         return self._id
-
-    @property
-    def full_name(self) -> Union[str, None]:
-        return self._full_name
-
-    @full_name.setter
-    def full_name(self, value: Optional[str]):
-        self._full_name: str = str(value or self.__class__.__name__)
 
     @property
     def key(self) -> Any:

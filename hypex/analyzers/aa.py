@@ -11,7 +11,7 @@ class OneAAStatAnalyzer(Executor):
         return data.set_value(
             ExperimentDataEnum.analysis_tables,
             self.id,
-            str(self.full_name),
+            str(self.__class__.__name__),
             value,
         )
 

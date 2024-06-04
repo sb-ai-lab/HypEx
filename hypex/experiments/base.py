@@ -45,15 +45,13 @@ class Experiment(Executor):
         self,
         executors: List[Executor],
         transformer: Optional[bool] = None,
-        full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.executors: List[Executor] = executors
         self.transformer: bool = (
             transformer if transformer is not None else self._detect_transformer()
         )
-        full_name = str(full_name or f"Experiment({len(self.executors)})")
-        super().__init__(full_name, key)
+        super().__init__( key)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data = deepcopy(data) if self.transformer else data
@@ -70,16 +68,15 @@ class CycledExperiment(Executor):
         inner_executor: Executor,
         n_iterations: int,
         analyzer: Executor,
-        full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.inner_executor: Executor = inner_executor
         self.n_iterations: int = n_iterations
         self.analyzer: Executor = analyzer
-        super().__init__(full_name, key)
+        super().__init__( key)
 
     def generate_params_hash(self) -> str:
-        return f"{self.inner_executor.full_name} x {self.n_iterations}"
+        return f"{self.inner_executor.__class__.__name__} x {self.n_iterations}"
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         for i in tqdm(range(self.n_iterations)):
@@ -101,11 +98,10 @@ class GroupExperiment(Executor):
     def __init__(
         self,
         inner_executor: Executor,
-        full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.inner_executor: Executor = inner_executor
-        super().__init__(full_name, key)
+        super().__init__( key)
 
     def _extract_result(self, data: ExperimentData) -> Dataset:
         return data.analysis_tables[self.inner_executor._id]
@@ -117,7 +113,7 @@ class GroupExperiment(Executor):
         for i in range(1, len(result_list)):
             result = result.append(result_list[i])
         data.set_value(
-            ExperimentDataEnum.analysis_tables, self._id, str(self.full_name), result
+            ExperimentDataEnum.analysis_tables, self._id, str(self.__class__.__name__), result
         )
         return data
 
@@ -142,11 +138,10 @@ class OnRoleExperiment(Experiment):
         executors: List[Executor],
         role: ABCRole,
         transformer: Optional[bool] = None,
-        full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.role: ABCRole = role
-        super().__init__(executors, transformer, full_name, key)
+        super().__init__(executors, transformer,  key)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         for field in data.ds.search_columns(self.role):

@@ -523,8 +523,7 @@ class Dataset(DatasetBase):
 
     def rename(self, names: Dict[FieldKeyTypes, FieldKeyTypes]):
         roles = {
-            names[column] if column in names else column: role
-            for column, role in self.roles.items()
+            names.get(column, column): role for column, role in self.roles.items()
         }
         return Dataset(roles, data=self.backend.rename(names))
 
@@ -534,7 +533,7 @@ class ExperimentData:
         self._data = data
         self.additional_fields = Dataset.create_empty(index=data.index)
         self.variables: Dict[str, Dict[str, Union[int, float]]] = {}
-        self.groups: Dict[FieldKeyTypes, Dataset] = {}
+        self.groups: Dict[str, Dict[Hashable, Dataset]] = {}
         self.analysis_tables: Dict[str, Dataset] = {}
         self.id_name_mapping: Dict[str, str] = {}
 

@@ -8,10 +8,9 @@ class Shuffle(Calculator):
     def __init__(
         self,
         random_state: Optional[int] = None,
-        full_name: Optional[str] = None,
         key: Any = "",
     ):
-        super().__init__(full_name, key)
+        super().__init__( key)
         self.random_state = random_state
 
     def generate_params_hash(self):

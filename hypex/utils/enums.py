@@ -35,9 +35,3 @@ class ABNTestMethodsEnum(enum.Enum):
     fdr_tsbky = "fdr_tsbky"
     quantile = "quantile"
 
-
-@enum.unique
-class AASplitSaveModeEnum(enum.Enum):
-    save_group = "save_group"
-    save_split = "save_split"
-    save_split_and_group = "save_split_and_group"
