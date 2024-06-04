@@ -51,7 +51,7 @@ class AASplitter(Calculator):
         return data
 
     @staticmethod
-    def calc(
+    def _inner_function(
         data: Dataset,
         random_state: Optional[int] = None,
         control_size: float = 0.5,
@@ -65,7 +65,10 @@ class AASplitter(Calculator):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         return self._set_value(
-            data, self.calc(data.ds, self.random_state, self.control_size)
+            data,
+            self.calc(
+                data.ds, random_state=self.random_state, control_size=self.control_size
+            ),
         )
 
 
