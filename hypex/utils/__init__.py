@@ -1,5 +1,5 @@
 from .constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
-from .enums import SpaceEnum, BackendsEnum, ExperimentDataEnum
+from .enums import SpaceEnum, BackendsEnum, ExperimentDataEnum, ABNTestMethodsEnum
 from .errors import (
     SpaceError,
     NoColumnsError,
@@ -56,4 +56,5 @@ __all__ = [
     "BackendTypeError",
     "MergeOnError",
     "ScalarType",
+    "ABNTestMethodsEnum",
 ]

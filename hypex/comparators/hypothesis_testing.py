@@ -1,26 +1,90 @@
-from typing import Dict, Any
+from typing import Union
 
 from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu  # type: ignore
 
-from .abstract import StatHypothesisTestingWithScipy
+from .abstract import StatHypothesisTesting
+from ..dataset import Dataset, ABCRole
+from ..extensions.hypothesis_testing import (
+    TTestExtension,
+    KSTestExtension,
+    UTestExtension,
+    Chi2TestExtension,
+)
+from ..utils import SpaceEnum
+from ..utils.typings import NumberTypes, CategoricalTypes
 
 
-class TTest(StatHypothesisTestingWithScipy):
-    def _inner_function(self, control_data, test_data) -> Dict[str, Any]:
-        return ttest_ind(
-            control_data.data.values.flatten(), test_data.data.values.flatten()
+class TTest(StatHypothesisTesting):
+    def __init__(
+        self,
+        grouping_role: Union[ABCRole, None] = None,
+        space: SpaceEnum = SpaceEnum.auto,
+        reliability: float = 0.05,
+    ):
+        super().__init__(
+            grouping_role=grouping_role,
+            space=space,
+            search_types=NumberTypes,
+            reliability=reliability,
         )
 
+    def _inner_function(
+        self, data: Dataset, test_data: Dataset = None
+    ) -> Dataset:
+        return TTestExtension(self.reliability).calc(data, test_data=test_data)
 
-class KSTest(StatHypothesisTestingWithScipy):
-    def _inner_function(self, control_data, test_data) -> Dict[str, Any]:
-        return ks_2samp(
-            control_data.data.values.flatten(), test_data.data.values.flatten()
+
+class KSTest(StatHypothesisTesting):
+    def __init__(
+        self,
+        grouping_role: Union[ABCRole, None] = None,
+        space: SpaceEnum = SpaceEnum.auto,
+        reliability: float = 0.05,
+    ):
+        super().__init__(
+            grouping_role=grouping_role,
+            space=space,
+            search_types=NumberTypes,
+            reliability=reliability,
         )
 
+    def _inner_function(self, data: Dataset, test_data: Dataset = None) -> Dataset:
+        return KSTestExtension(self.reliability).calc(data, test_data=test_data)
 
-class UTest(StatHypothesisTestingWithScipy):
-    def _inner_function(self, control_data, test_data):
-        return mannwhitneyu(
-            control_data.data.values.flatten(), test_data.data.values.flatten()
+
+class UTest(StatHypothesisTesting):
+    def __init__(
+        self,
+        grouping_role: Union[ABCRole, None] = None,
+        space: SpaceEnum = SpaceEnum.auto,
+        reliability: float = 0.05,
+    ):
+        super().__init__(
+            grouping_role=grouping_role,
+            space=space,
+            search_types=NumberTypes,
+            reliability=reliability,
+        )
+
+    def _inner_function(self, data: Dataset, test_data: Dataset = None) -> Dataset:
+        return UTestExtension(self.reliability).calc(data, test_data=test_data)
+
+
+class Chi2Test(StatHypothesisTesting):
+    def __init__(
+        self,
+        grouping_role: Union[ABCRole, None] = None,
+        space: SpaceEnum = SpaceEnum.auto,
+        reliability: float = 0.05,
+    ):
+        super().__init__(
+            grouping_role=grouping_role,
+            space=space,
+            search_types=CategoricalTypes,
+            reliability=reliability,
+        )
+
+    def _inner_function(self, data: Dataset, test_data: Dataset = None) -> Dataset:
+        return Chi2TestExtension(reliability=self.reliability).calc(
+            data, test_data=test_data
         )

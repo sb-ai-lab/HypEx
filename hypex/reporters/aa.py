@@ -10,7 +10,8 @@ from .abstract import DictReporter
 
 
 class AADictReporter(DictReporter):
-    def get_random_state(self, data: ExperimentData):
+    @staticmethod
+    def get_random_state(data: ExperimentData):
         aa_splitter_id = data._get_one_id(
             AASplitter, ExperimentDataEnum.additional_fields
         )
@@ -36,7 +37,9 @@ class AADictReporter(DictReporter):
         analyzer_id = data._get_one_id(
             OneAAStatAnalyzer, ExperimentDataEnum.analysis_tables
         )
-        return self.extract_from_one_row_dataset(data.analysis_tables[analyzer_id])
+        result = self.extract_from_one_row_dataset(data.analysis_tables[analyzer_id])
+        result = {c: ("NOT OK" if v else "OK") if c.endswith("pass") else v for c, v in result.items()}
+        return result
 
     def extract_data_from_analysis_tables(self, data: ExperimentData) -> Dict[str, Any]:
         result = {}

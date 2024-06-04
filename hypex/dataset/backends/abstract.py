@@ -308,7 +308,9 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def dropna(self, how: str = "any", subset: Union[str, Iterable[str]] = []) -> Any:
+    def dropna(
+        self, how: str = "any", subset: Union[str, Iterable[str], None] = None
+    ) -> Any:
         raise AbstractMethodError
 
     @abstractmethod

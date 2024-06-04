@@ -14,3 +14,5 @@ FromDictTypes = Union[Dict[str, List[Any]], List[Dict[Any, Any]]]
 RoleNameType = str
 DecoratedType = TypeVar("DecoratedType", bound=Union[Callable[..., Any], property])
 DocstringInheritDecorator = Callable[[DecoratedType], DecoratedType]
+
+NumberTypes = [int, float]

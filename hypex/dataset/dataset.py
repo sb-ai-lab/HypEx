@@ -209,6 +209,10 @@ class Dataset(DatasetBase):
     def index(self):
         return self.backend.index
 
+    @index.setter
+    def index(self, value):
+        self.backend.data.index = value
+
     @property
     def data(self):
         return self._backend.data
@@ -345,21 +349,9 @@ class Dataset(DatasetBase):
         if func:
             datasets = [(i, data.agg(func)) for i, data in datasets]
         for dataset in datasets:
-            dataset[1].tmp_roles = self.tmp_roles
+            if isinstance(dataset, Dataset):
+                dataset[1].tmp_roles = self.tmp_roles
         return datasets
-
-    def mean(self):  # should we add arguments to all the methods?
-        return self._convert_data_after_agg(self._backend.mean())
-
-    def mode(self, numeric_only: bool = False, dropna: bool = True):
-        return self._convert_data_after_agg(
-            self._backend.mode(numeric_only=numeric_only, dropna=dropna)
-        )
-
-    def var(self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False):
-        return self._convert_data_after_agg(
-            self._backend.var(skipna=skipna, ddof=ddof, numeric_only=numeric_only)
-        )
 
     def sort(
         self,
@@ -407,6 +399,16 @@ class Dataset(DatasetBase):
     def log(self):
         return self._convert_data_after_agg(self._backend.log())
 
+    def mode(self, numeric_only: bool = False, dropna: bool = True):
+        return self._convert_data_after_agg(
+            self._backend.mode(numeric_only=numeric_only, dropna=dropna)
+        )
+
+    def var(self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False):
+        return self._convert_data_after_agg(
+            self._backend.var(skipna=skipna, ddof=ddof, numeric_only=numeric_only)
+        )
+
     def agg(self, func: Union[str, List]):
         return self._convert_data_after_agg(self._backend.agg(func))
 
@@ -448,6 +450,11 @@ class Dataset(DatasetBase):
 
     def quantile(self, q: float = 0.5):
         return self._convert_data_after_agg(self._backend.quantile(q=q))
+
+    def select_dtypes(self, include: Any = None, exclude: Any = None):
+        t_data = self._backend.select_dtypes(include=include, exclude=exclude)
+        t_roles = {k: v for k, v in self.roles.items() if k in t_data.columns}
+        return Dataset(roles=t_roles, data=t_data)
 
     def select_dtypes(self, include: Any = None, exclude: Any = None):
         t_data = self._backend.select_dtypes(include=include, exclude=exclude)
@@ -514,13 +521,20 @@ class Dataset(DatasetBase):
     def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
         return Dataset(self.roles, data=self.backend.shuffle(random_state))
 
+    def rename(self, names: Dict[FieldKeyTypes, FieldKeyTypes]):
+        roles = {
+            names[column] if column in names else column: role
+            for column, role in self.roles.items()
+        }
+        return Dataset(roles, data=self.backend.rename(names))
+
 
 class ExperimentData:
     def __init__(self, data: Dataset):
         self._data = data
         self.additional_fields = Dataset.create_empty(index=data.index)
-        self.stats = Dataset.create_empty(index=data.columns)
-        self.additional_fields = Dataset.create_empty(index=data.index)
+        self.variables: Dict[str, Dict[str, Union[int, float]]] = {}
+        self.groups: Dict[FieldKeyTypes, Dataset] = {}
         self.analysis_tables: Dict[str, Dataset] = {}
         self.id_name_mapping: Dict[str, str] = {}
 
@@ -538,8 +552,8 @@ class ExperimentData:
     def check_hash(self, executor_id: int, space: ExperimentDataEnum) -> bool:
         if space == ExperimentDataEnum.additional_fields:
             return executor_id in self.additional_fields.columns
-        elif space == ExperimentDataEnum.stats:
-            return executor_id in self.stats.columns
+        elif space == ExperimentDataEnum.variables:
+            return executor_id in self.variables.keys()
         elif space == ExperimentDataEnum.analysis_tables:
             return executor_id in self.analysis_tables
         else:
@@ -558,25 +572,46 @@ class ExperimentData:
             self.additional_fields.add_column(data=value, role={executor_id: role})
         elif space == ExperimentDataEnum.analysis_tables:
             self.analysis_tables[executor_id] = value
-        elif space == ExperimentDataEnum.stats:
-            if executor_id not in self.stats.columns:
-                self.stats.add_column(
-                    data=[None] * len(self.stats),
-                    role={executor_id: StatisticRole()},
-                )
-            self.stats[executor_id][key] = value
+        elif space == ExperimentDataEnum.variables:
+            self.variables[executor_id][key] = value
+        elif space == ExperimentDataEnum.groups:
+            self.groups[executor_id][key] = value
         self.id_name_mapping[executor_id] = name
         return self
 
     def get_ids(
-        self, classes: Union[type, List[type]]
+        self,
+        classes: Union[type, Iterable[type]],
+        searched_space: Optional[ExperimentDataEnum] = None,
     ) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
+        if searched_space:
+            spaces = {
+                ExperimentDataEnum.additional_fields: self.additional_fields,
+                ExperimentDataEnum.analysis_tables: self.analysis_tables,
+                ExperimentDataEnum.groups: self.groups,
+                ExperimentDataEnum.variables: self.variables,
+            }
+            return {
+                class_: {
+                    searched_space.value: [
+                        str(_id)
+                        for _id in spaces[searched_space]
+                        if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
+                    ]
+                }
+                for class_ in classes
+            }
         return {
             class_: {
-                ExperimentDataEnum.stats.value: [
+                ExperimentDataEnum.groups.value: [
                     str(_id)
-                    for _id in self.stats.columns
+                    for _id in self.groups.keys()
+                    if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
+                ],
+                ExperimentDataEnum.variables.value: [
+                    str(_id)
+                    for _id in self.variables.keys()
                     if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
                 ],
                 ExperimentDataEnum.additional_fields.value: [

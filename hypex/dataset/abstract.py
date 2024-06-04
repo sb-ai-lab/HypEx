@@ -55,10 +55,10 @@ class DatasetBase(ABC):
         reversed_map = {int: "int", float: "float", str: "category", bool: "bool"}
         for column, role in roles.items():
             if role.data_type is None:
-                d_type = self._backend._get_column_type(column)
+                d_type = self.backend._get_column_type(column)
 
                 role.data_type = [v for k, v in types_map.items() if k in d_type][0]
-            self._backend = self._backend._update_column_type(
+            self._backend = self.backend._update_column_type(
                 column, reversed_map[role.data_type]
             )
 
@@ -71,9 +71,6 @@ class DatasetBase(ABC):
         data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
     ):
-        self.tmp_roles: Union[
-            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
-        ] = {}
         self._backend = (
             self._select_backend_from_str(data, backend)
             if backend
@@ -92,6 +89,9 @@ class DatasetBase(ABC):
             roles = self._set_all_roles(roles)
             self._set_empty_types(roles)
         self.roles: Dict[Union[str, int], ABCRole] = roles
+        self._tmp_roles: Union[
+            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
+        ] = {}
 
     def __repr__(self):
         return self.data.__repr__()
@@ -99,17 +99,22 @@ class DatasetBase(ABC):
     def __len__(self):
         return self._backend.__len__()
 
-    def get_columns_by_roles(
-        self, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role=False
+    def search_columns(
+        self,
+        roles: Union[ABCRole, Iterable[ABCRole]],
+        tmp_role=False,
+        search_types: Optional[List] = None,
     ) -> List[Union[str, int]]:
-        roles = roles if isinstance(roles, Iterable) else [roles]
-        roles_for_search: Dict[Union[str, int], ABCRole] = (
-            self.tmp_roles if tmp_role else self.roles
-        )
+        roles = [roles] if not isinstance(roles, Iterable) else roles
+        roles_for_search = self._tmp_roles if tmp_role else self.roles
         return [
             column
             for column, role in roles_for_search.items()
-            if any(isinstance(r, role.__class__) for r in roles)
+            if any(
+                isinstance(r, role.__class__)
+                and (not search_types or role.data_type in search_types)
+                for r in roles
+            )
         ]
 
     @property
@@ -127,6 +132,15 @@ class DatasetBase(ABC):
     @property
     def columns(self):
         return self._backend.columns
+
+    @property
+    def tmp_roles(self):
+        return self._tmp_roles
+
+    @tmp_roles.setter
+    def tmp_roles(self, value):
+        self._tmp_roles = value
+        self._set_empty_types(self._tmp_roles)
 
     def to_dict(self):
         return {

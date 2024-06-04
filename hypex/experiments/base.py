@@ -1,6 +1,8 @@
 from copy import deepcopy
 from typing import Iterable, Dict, Union, Any, List, Optional
 
+from tqdm.auto import tqdm
+
 from hypex.dataset import (
     ExperimentData,
     Dataset,
@@ -80,12 +82,12 @@ class CycledExperiment(Executor):
         return f"{self.inner_executor.full_name} x {self.n_iterations}"
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        for i in range(self.n_iterations):
+        for i in tqdm(range(self.n_iterations)):
             self.analyzer.key = f"{i}"
             self.inner_executor.key = f"{i}"
             self.inner_executor.random_state = i
             data = self.analyzer.execute(self.inner_executor.execute(data))
-            column = data.additional_fields.get_columns_by_roles(TreatmentRole())[0]
+            column = data.additional_fields.search_columns(TreatmentRole())[0]
             data.additional_fields.roles[column] = TempTreatmentRole()
         return data
 
@@ -121,7 +123,7 @@ class GroupExperiment(Executor):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result_list = []
-        group_field = data.ds.get_columns_by_roles(TempGroupingRole(), tmp_role=True)
+        group_field = data.ds.search_columns(TempGroupingRole(), tmp_role=True)
 
         for group, group_data in data.ds.groupby(group_field):
             temp_data = ExperimentData(group_data)
@@ -147,7 +149,7 @@ class OnRoleExperiment(Experiment):
         super().__init__(executors, transformer, full_name, key)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        for field in data.ds.get_columns_by_roles(self.role):
+        for field in data.ds.search_columns(self.role):
             data.ds.tmp_roles = {field: TempTargetRole()}
             data = super().execute(data)
             data.ds.tmp_roles = {}

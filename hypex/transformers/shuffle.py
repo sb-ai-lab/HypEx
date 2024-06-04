@@ -22,9 +22,9 @@ class Shuffle(Calculator):
         return True
 
     @staticmethod
-    def calc(cls, data: Dataset, random_state: Optional[int] = None) -> Dataset:
-        data = data.shuffle(random_state)
+    def calc(data: Dataset, **kwargs) -> Dataset:
+        data = data.shuffle(kwargs.get("random_state", None))
         return data
 
-    def execute(self, data: ExperimentData) -> ExperimentData:
+    def execute(self, data: ExperimentData):
         return self.calc(data.ds)

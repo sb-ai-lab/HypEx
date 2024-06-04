@@ -186,7 +186,7 @@ class PandasNavigation(DatasetBackendNavigation):
         return str(self.data.dtypes[column_name])
 
     def _update_column_type(self, column_name: str, type_name: str):
-        self.data[column_name] = self.data[column_name].astype(type_name)
+        self.data.loc[:, column_name] = self.data[column_name].astype(type_name)
         return self
 
     def add_column(
@@ -399,4 +399,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         )
 
     def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> pd.DataFrame:
-        return self.data.drop(labels=labels, axis=axis)
+        return self.data.drop(labels=labels, axis=axis) 
+    
+    def rename(self, columns: Dict[str, str]): 
+        return self.data.rename(columns=columns)
+
+
