@@ -77,6 +77,8 @@ class Dataset(DatasetBase):
         self.iloc = self.ILocker(self._backend, self.roles)
 
     def __getitem__(self, item: Union[Iterable, str, int]) -> "Dataset":
+        if isinstance(item, Dataset):
+            item = item.data
         items = (
             [item] if isinstance(item, str) or not isinstance(item, Iterable) else item
         )

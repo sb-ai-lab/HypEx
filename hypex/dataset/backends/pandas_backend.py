@@ -51,6 +51,9 @@ class PandasNavigation(DatasetBackendNavigation):
             return self.data.iloc[item]
         if isinstance(item, (str, list)):
             return self.data[item]
+        if isinstance(item, pd.DataFrame) and item.shape[1] == 1:
+            series = item[item.columns[0]]
+            return self.data[series]
         raise KeyError("No such column or row")
 
     def __len__(self):
@@ -399,9 +402,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         )
 
     def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> pd.DataFrame:
-        return self.data.drop(labels=labels, axis=axis) 
-    
-    def rename(self, columns: Dict[str, str]): 
+        return self.data.drop(labels=labels, axis=axis)
+
+    def rename(self, columns: Dict[str, str]):
         return self.data.rename(columns=columns)
-
-
