@@ -21,7 +21,7 @@
 #         full_name: str = None,
 #         key: Any = "",
 #     ):
-#         super().__init__(target_field, self.comparison_function, full_name, key)
+#         super().__init__(target_field, self.comparison_function,  key)
 #         self.significance = significance
 #         self.power = power
 #
@@ -51,7 +51,7 @@
 #         full_name: str = None,
 #         key: Any = "",
 #     ):
-#         super().__init__(target_field, significance, power, full_name, key)
+#         super().__init__(target_field, significance, power,  key)
 #         self.mde = mde
 #
 #     # TODO: rework by ExperimentData checking

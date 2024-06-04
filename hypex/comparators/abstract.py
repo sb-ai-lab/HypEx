@@ -28,7 +28,6 @@ class GroupComparator(Calculator):
         grouping_role: Optional[ABCRole] = None,
         space: SpaceEnum = SpaceEnum.auto,
         search_types: Union[type, List[type], None] = None,
-        full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.grouping_role = grouping_role or GroupingRole()
@@ -39,7 +38,7 @@ class GroupComparator(Calculator):
             if isinstance(search_types, Iterable) or search_types is None
             else [search_types]
         )
-        super().__init__(full_name=full_name, key=key)
+        super().__init__(key=key)
 
     def _local_extract_dataset(
         self, compare_result: Dict[Any, Any], roles: Dict[Any, ABCRole]
@@ -129,7 +128,7 @@ class GroupComparator(Calculator):
         self, data: ExperimentData, value: Optional[Dataset] = None, key: Any = None
     ) -> ExperimentData:
         data.set_value(
-            ExperimentDataEnum.analysis_tables, self.id, str(self.full_name), value
+            ExperimentDataEnum.analysis_tables, self.id, str(self.__class__.__name__), value
         )
         return data
 
@@ -193,8 +192,7 @@ class StatHypothesisTesting(GroupComparator, ABC):
         space: SpaceEnum = SpaceEnum.auto,
         search_types: Union[object, List[object]] = None,
         reliability: float = 0.05,
-        full_name: Union[str, None] = None,
         key: Any = "",
     ):
-        super().__init__(grouping_role, space, search_types, full_name, key)
+        super().__init__(grouping_role, space, search_types, key)
         self.reliability = reliability

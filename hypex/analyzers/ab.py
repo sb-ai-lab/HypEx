@@ -20,7 +20,6 @@ from hypex.utils import (
 
 
 class ABAnalyzer(Executor):
-
     def __init__(
         self,
         multitest_method: Optional[ABNTestMethodsEnum] = None,
@@ -29,7 +28,6 @@ class ABAnalyzer(Executor):
         quantiles: Optional[Union[float, List[float]]] = None,
         iteration_size: int = 20000,
         random_state: Optional[int] = None,
-        full_name: Optional[str] = None,
         key: Any = "",
     ):
         self.multitest_method = multitest_method
@@ -38,13 +36,13 @@ class ABAnalyzer(Executor):
         self.quantiles = quantiles
         self.iteration_size = iteration_size
         self.random_state = random_state
-        super().__init__(full_name, key)
+        super().__init__( key)
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         return data.set_value(
             ExperimentDataEnum.analysis_tables,
             self.id + key if key else self.id,
-            str(self.full_name),
+            str(self.__class__.__name__),
             value,
         )
 

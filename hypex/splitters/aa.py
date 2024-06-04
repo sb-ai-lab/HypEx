@@ -10,16 +10,16 @@ class AASplitter(Calculator):
         self,
         control_size: float = 0.5,
         random_state: Optional[int] = None,
-        full_name: Optional[str] = None,
         constant_key: bool = False,
-        # save_split_mode:
+        save_groups: bool = True,
         key: Any = "",
     ):
         self.control_size = control_size
         self.random_state = random_state
         self._key = key
         self.constant_key = constant_key
-        super().__init__(full_name, key)
+        self.save_groups = save_groups
+        super().__init__(key)
 
     @property
     def key(self) -> Any:
@@ -38,10 +38,16 @@ class AASplitter(Calculator):
         data = data.set_value(
             ExperimentDataEnum.additional_fields,
             self._id,
-            str(self.full_name),
+            str(self.__class__.__name__),
             value,
             role=TreatmentRole(),
         )
+
+        if self.save_groups:
+            data.groups[self.id] = {
+                group: data.ds.loc[group_data.index]
+                for group, group_data in data.additional_fields.groupby(self.id)
+            }
         return data
 
     @staticmethod
@@ -55,7 +61,7 @@ class AASplitter(Calculator):
         addition_indexes = list(experiment_data.index)
         edge = int(len(addition_indexes) * control_size)
 
-        return ["A" if i < edge else "B" for i in addition_indexes]
+        return ["control" if i < edge else "test" for i in addition_indexes]
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         return self._set_value(
@@ -86,10 +92,9 @@ class AASplitter(Calculator):
 #         self,
 #         control_size: float = 0.5,
 #         random_state: Optional[int] = None,
-#         full_name: Optional[str] = None,
-#         key: Any = "",
+# #         key: Any = "",
 #     ):
-#         super().__init__(control_size, random_state, full_name, key)
+#         super().__init__(control_size, random_state,  key)
 #
 #     def calc(self, data: Dataset):
 #         stratification_columns = data.get_columns_by_roles(StratificationRole())

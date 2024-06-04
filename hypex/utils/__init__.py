@@ -1,5 +1,10 @@
 from .constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
-from .enums import SpaceEnum, BackendsEnum, ExperimentDataEnum, ABNTestMethodsEnum
+from .enums import (
+    SpaceEnum,
+    BackendsEnum,
+    ExperimentDataEnum,
+    ABNTestMethodsEnum,
+)
 from .errors import (
     SpaceError,
     NoColumnsError,
