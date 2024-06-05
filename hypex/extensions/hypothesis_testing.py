@@ -35,21 +35,13 @@ class StatTest(CompareExtension):
 
         return other
 
+    @staticmethod
     def result_to_dataset(self, result: Any) -> Dataset:
-        df_result = pd.DataFrame(
-            [
-                {
+        return super.result_to_dataset({
                     "p-value": result.pvalue,
                     "statistic": result.statistic,
                     "pass": result.pvalue < self.reliability,
-                }
-            ]
-        )
-        return Dataset(
-            data=df_result,
-            backend=BackendsEnum.pandas,
-            roles={str(f): StatisticRole() for f in df_result.columns},
-        )
+                }, StatisticRole())
 
     def _calc_pandas(
         self, data: Dataset, other: Union[Dataset, None] = None, **kwargs

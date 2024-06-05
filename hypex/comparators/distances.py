@@ -11,9 +11,9 @@ class MahalanobisDistance(GroupComparator):
         cov = (data.cov() + other.cov()) / 2 if other else data.cov()
         cholesky = CholeskyExtension().calc(cov)
         mahalanobis_transform = InverseExtension().calc(cholesky)
-        yc = data.dot(mahalanobis_transform.transpose())
+        y_control = data.dot(mahalanobis_transform.transpose())
         if other: 
-            yt = other.dot(mahalanobis_transform.transpose())
-            return {self.id: {"control": yc, "test": yt}} 
-        return {self.id: {"control": yc}} 
+            y_test = other.dot(mahalanobis_transform.transpose())
+            return {self.id: {"control": y_control, "test": y_test}} 
+        return {self.id: {"control": y_control}} 
         
