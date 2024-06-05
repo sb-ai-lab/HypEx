@@ -9,10 +9,7 @@ from hypex.utils import BackendsEnum, ExperimentDataEnum
 class OneAAStatAnalyzer(Executor):
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         return data.set_value(
-            ExperimentDataEnum.analysis_tables,
-            self.id,
-            str(self.__class__.__name__),
-            value,
+            ExperimentDataEnum.analysis_tables, self.id, self.__class__.__name__, value
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -43,4 +40,3 @@ class OneAAStatAnalyzer(Executor):
         )
 
         return self._set_value(data, analysis_dataset)
-

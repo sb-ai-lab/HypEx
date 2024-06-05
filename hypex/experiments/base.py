@@ -51,7 +51,7 @@ class Experiment(Executor):
         self.transformer: bool = (
             transformer if transformer is not None else self._detect_transformer()
         )
-        super().__init__( key)
+        super().__init__(key)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data = deepcopy(data) if self.transformer else data
@@ -73,19 +73,27 @@ class CycledExperiment(Executor):
         self.inner_executor: Executor = inner_executor
         self.n_iterations: int = n_iterations
         self.analyzer: Executor = analyzer
-        super().__init__( key)
+        super().__init__(key)
+
+    def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
+        return data.set_value(
+            ExperimentDataEnum.analysis_tables, self.id, self.__class__.__name__, value
+        )
 
     def generate_params_hash(self) -> str:
         return f"{self.inner_executor.__class__.__name__} x {self.n_iterations}"
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        result: List[Dataset] = []
         for i in tqdm(range(self.n_iterations)):
+            t_data = ExperimentData(data.ds)
             self.analyzer.key = f"{i}"
-            self.inner_executor.key = f"{i}"
-            self.inner_executor.random_state = i
-            data = self.analyzer.execute(self.inner_executor.execute(data))
-            column = data.additional_fields.search_columns(TreatmentRole())[0]
-            data.additional_fields.roles[column] = TempTreatmentRole()
+            t_data = self.inner_executor.execute(t_data)
+        #     result.append(
+        #         self.analyzer.execute(t_data).analysis_tables[self.analyzer.id]
+        #     )
+        # result = result[0].append(result[1:], range(self.n_iterations))
+        # return self._set_value(data, result)
         return data
 
 
@@ -101,7 +109,7 @@ class GroupExperiment(Executor):
         key: Any = "",
     ):
         self.inner_executor: Executor = inner_executor
-        super().__init__( key)
+        super().__init__(key)
 
     def _extract_result(self, data: ExperimentData) -> Dataset:
         return data.analysis_tables[self.inner_executor._id]
@@ -113,7 +121,10 @@ class GroupExperiment(Executor):
         for i in range(1, len(result_list)):
             result = result.append(result_list[i])
         data.set_value(
-            ExperimentDataEnum.analysis_tables, self._id, str(self.__class__.__name__), result
+            ExperimentDataEnum.analysis_tables,
+            self._id,
+            str(self.__class__.__name__),
+            result,
         )
         return data
 
@@ -141,7 +152,7 @@ class OnRoleExperiment(Experiment):
         key: Any = "",
     ):
         self.role: ABCRole = role
-        super().__init__(executors, transformer,  key)
+        super().__init__(executors, transformer, key)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         for field in data.ds.search_columns(self.role):
