@@ -13,7 +13,7 @@ class Transformer(Calculator):
 
     @staticmethod
     @abstractmethod
-    def _inner_function(data: Dataset, **kwargs) -> Any:
+    def _inner_function(data: Dataset, **kwargs) -> Dataset:
         raise AbstractMethodError
 
     @classmethod
