@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Union
+from typing import Union, Any
 
 from hypex.dataset import Dataset
 from hypex.dataset.backends import PandasDataset
@@ -18,6 +18,10 @@ class Extension(ABC):
 
     def calc(self, data: Dataset, **kwargs):
         return self.BACKEND_MAPPING[type(data.backend)](data=data, **kwargs)
+    
+    @staticmethod
+    def result_to_dataset(result: Any) -> Dataset:
+        return Dataset({}, data=result)
 
 
 class CompareExtension(Extension, ABC):
