@@ -51,6 +51,8 @@ class PandasNavigation(DatasetBackendNavigation):
             return self.data.iloc[item]
         if isinstance(item, (str, list)):
             return self.data[item]
+        if isinstance(item, pd.DataFrame):
+            return self.data[item]
         raise KeyError("No such column or row")
 
     def __len__(self):
@@ -185,8 +187,10 @@ class PandasNavigation(DatasetBackendNavigation):
     def _get_column_type(self, column_name: str) -> str:
         return str(self.data.dtypes[column_name])
 
+    # try try-except if necessary
     def _update_column_type(self, column_name: str, type_name: str):
-        self.data.loc[:, column_name] = self.data[column_name].astype(type_name)
+        if self.data[column_name].isna().sum() == 0:
+            self.data.loc[:, column_name] = self.data[column_name].astype(type_name)
         return self
 
     def add_column(
@@ -399,9 +403,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         )
 
     def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> pd.DataFrame:
-        return self.data.drop(labels=labels, axis=axis) 
-    
-    def rename(self, columns: Dict[str, str]): 
+        return self.data.drop(labels=labels, axis=axis)
+
+    def rename(self, columns: Dict[str, str]):
         return self.data.rename(columns=columns)
-
-

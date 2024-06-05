@@ -77,6 +77,8 @@ class Dataset(DatasetBase):
         self.iloc = self.ILocker(self._backend, self.roles)
 
     def __getitem__(self, item: Union[Iterable, str, int]) -> "Dataset":
+        if isinstance(item, Dataset):
+            item = item.data
         items = (
             [item] if isinstance(item, str) or not isinstance(item, Iterable) else item
         )
@@ -102,7 +104,7 @@ class Dataset(DatasetBase):
         if not isinstance(other, Union[Dataset, ScalarType, Sequence]):
             raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
-        t_roles = self.roles
+        t_roles = deepcopy(self.roles)
         for role in t_roles.values():
             role.data_type = None
         if isinstance(other, Dataset):
