@@ -178,7 +178,7 @@ class GroupComparator(Calculator):
             not target_fields and data.ds.tmp_roles
         ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
             return data
-        if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
+        if group_field[0] in data.groups:
             grouping_data = list(data.groups[group_field[0]].items())
         else:
             grouping_data = None

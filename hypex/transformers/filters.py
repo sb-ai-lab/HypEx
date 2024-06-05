@@ -9,15 +9,14 @@ from hypex.dataset.roles import (
     PreTargetRole,
     TargetRole,
 )
-from hypex.executor import Calculator
+from hypex.transformers.abstract import Transformer
 
 
-class CVFilter(Calculator):
+class CVFilter(Transformer):
     def __init__(
         self,
         lower_bound: Optional[float] = None,
         upper_bound: Optional[float] = None,
-        full_name: Optional[str] = None,
         key: Any = "",
     ):
         """Initialize coefficient of variation filter of the columns in which it does not fit into the defined borders.
@@ -32,11 +31,14 @@ class CVFilter(Calculator):
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
 
-    def calc(
-        self,
+    @staticmethod
+    def _inner_function(
         data: Dataset,
         target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
+        lower_bound: Optional[float] = None,
+        upper_bound: Optional[float] = None,
         type_filter: bool = True,
+        **kwargs
     ) -> Dataset:
         target_roles = super()._list_unification(target_roles)
         if type_filter:
@@ -48,24 +50,46 @@ class CVFilter(Calculator):
         for column in addressable_columns:
             cv = data[column].coefficient_of_variation()
             drop = False
-            if self.upper_bound and cv > self.upper_bound:
+            if upper_bound and cv > upper_bound:
                 drop = True
-            if self.lower_bound and cv < self.lower_bound:
+            if lower_bound and cv < lower_bound:
                 drop = True
             if drop:
                 data.roles[column] = InfoRole()
         return data
 
+    @classmethod
+    def calc(
+        cls,
+        data: Dataset,
+        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
+        lower_bound: Optional[float] = None,
+        upper_bound: Optional[float] = None,
+        type_filter: bool = True,
+        **kwargs
+    ) -> Dataset:
+        return cls._inner_function(
+            data=data,
+            target_roles=target_roles,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+            type_filter=type_filter,
+            **kwargs
+        )
+
     def execute(self, data: ExperimentData) -> ExperimentData:
-        data = data.copy(data=self.calc(data.ds))
-        return data
+        result = data.copy(
+            data=self.calc(
+                data=data.ds, lower_bound=self.lower_bound, upper_bound=self.upper_bound
+            )
+        )
+        return result
 
 
-class ConstFilter(Calculator):
+class ConstFilter(Transformer):
     def __init__(
         self,
         threshold: float = 0.95,
-        full_name: Optional[str] = None,
         key: Any = "",
     ):
         """Initialize constants filter of the values which occur more often than defined by threshold.
@@ -79,6 +103,16 @@ class ConstFilter(Calculator):
         super().__init__(key=key)
         self.threshold = threshold
 
+    @staticmethod
+    def _inner_function(
+            data: Dataset,
+            target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
+            lower_bound: Optional[float] = None,
+            upper_bound: Optional[float] = None,
+            type_filter: bool = True,
+            **kwargs
+    ) -> Dataset:
+    @classmethod
     def calc(
         self,
         data: Dataset,
@@ -96,11 +130,10 @@ class ConstFilter(Calculator):
         return data
 
 
-class NanFilter(Calculator):
+class NanFilter(Transformer):
     def __init__(
         self,
         threshold: float = 0.8,
-        full_name: Optional[str] = None,
         key: Any = "",
     ):
         """Initialize filter of the columns in which NaN occurs more often than defined by threshold.
@@ -114,6 +147,7 @@ class NanFilter(Calculator):
         super().__init__(key=key)
         self.threshold = threshold
 
+    @classmethod
     def calc(
         self,
         data: Dataset,
@@ -131,7 +165,7 @@ class NanFilter(Calculator):
         return data
 
 
-class CorrFilter(Calculator):
+class CorrFilter(Transformer):
     def __init__(
         self,
         threshold: float = 0.8,
@@ -144,6 +178,7 @@ class CorrFilter(Calculator):
         self.method = method
         self.numeric_only = numeric_only
 
+    @classmethod
     def calc(
         self,
         data: Dataset,
@@ -200,12 +235,11 @@ class CorrFilter(Calculator):
         return data
 
 
-class OutliersFilter(Calculator):
+class OutliersFilter(Transformer):
     def __init__(
         self,
         lower_percentile: float = 0,
         upper_percentile: float = 1,
-        full_name: Optional[str] = None,
         key: Any = "",
     ):
         """Initialize outliers filter of the values laying beyond the given percentile and NaNs.
@@ -220,6 +254,7 @@ class OutliersFilter(Calculator):
         self.lower_percentile = lower_percentile
         self.upper_percentile = upper_percentile
 
+    @classmethod
     def calc(
         self,
         data: Dataset,

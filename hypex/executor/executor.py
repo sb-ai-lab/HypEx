@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-from hypex.dataset import Dataset, ExperimentData
+from hypex.dataset import Dataset, ExperimentData, ABCRole
 from hypex.utils import ID_SPLIT_SYMBOL, AbstractMethodError
 
 

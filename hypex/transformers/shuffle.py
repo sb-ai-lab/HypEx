@@ -16,10 +16,6 @@ class Shuffle(Calculator):
     def generate_params_hash(self):
         return f"{self.random_state}"
 
-    @property
-    def __is_transformer(self):
-        return True
-
     @staticmethod
     def calc(data: Dataset, **kwargs) -> Dataset:
         data = data.shuffle(kwargs.get("random_state", None))
