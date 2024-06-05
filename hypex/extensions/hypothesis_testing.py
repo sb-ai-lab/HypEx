@@ -37,7 +37,7 @@ class StatTest(CompareExtension):
 
     @staticmethod
     def result_to_dataset(self, result: Any) -> Dataset:
-        return super.result_to_dataset({
+        return super().result_to_dataset({
                     "p-value": result.pvalue,
                     "statistic": result.statistic,
                     "pass": result.pvalue < self.reliability,

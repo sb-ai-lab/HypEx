@@ -15,17 +15,13 @@ class ABMultiTest(Extension):
         self.alpha = alpha
         super().__init__()
 
-    @staticmethod
-    def result_to_dataset(result: Any):
-        return super.result_to_datase(result, StatisticRole())
-
     def _calc_pandas(self, data: Dataset, **kwargs):
         p_values = data.data.values.flatten()
         result = multipletests(
             p_values, method=self.method.value, alpha=self.alpha, **kwargs
         )
         return self.result_to_dataset(
-            {"rejected": result[0], "new p-values": result[1]}
+            {"rejected": result[0], "new p-values": result[1]}, StatisticRole()
         )
 
 
@@ -42,10 +38,6 @@ class ABMultitestQuantile(Extension):
         self.equal_variance = equal_variance
         self.random_state = random_state
         super().__init__()
-
-    @staticmethod
-    def result_to_dataset(result: Any):
-        return super.result_to_dataset(result, StatisticRole())
 
     def _calc_pandas(self, data: Dataset, **kwargs):
         group_field = kwargs.get("group_field")
@@ -83,7 +75,7 @@ class ABMultitestQuantile(Extension):
                 return self.result_to_dataset(
                     {"accepted hypothesis": [j + 1]}
                 )
-        return self.result_to_dataset({"accepted hypothesis": [0]})
+        return self.result_to_dataset({"accepted hypothesis": [0]}, StatisticRole())
 
     def quantile_of_marginal_distribution(
         self,
