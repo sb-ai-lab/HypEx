@@ -32,7 +32,7 @@ class TTest(StatHypothesisTesting):
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dataset:
         return TTestExtension(kwargs.get("reliability", 0.05)).calc(
-            data, test_data=test_data, **kwargs
+            data, other=test_data, **kwargs
         )
 
 
@@ -55,7 +55,7 @@ class KSTest(StatHypothesisTesting):
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dataset:
         return KSTestExtension(kwargs.get("reliability", 0.05)).calc(
-            data, test_data=test_data, **kwargs
+            data, other=test_data, **kwargs
         )
 
 
@@ -78,7 +78,7 @@ class UTest(StatHypothesisTesting):
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dataset:
         return UTestExtension(kwargs.get("reliability", 0.05)).calc(
-            data, test_data=test_data, **kwargs
+            data, other=test_data, **kwargs
         )
 
 
@@ -101,5 +101,5 @@ class Chi2Test(StatHypothesisTesting):
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dataset:
         return UTestExtension(kwargs.get("reliability", 0.05)).calc(
-            data, test_data=test_data, **kwargs
+            data, other=test_data, **kwargs
         )
