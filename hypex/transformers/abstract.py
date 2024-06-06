@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Any
 
-from hypex.dataset import Dataset, ExperimentData
+from hypex.dataset import Dataset, ExperimentData, ABCRole
 from hypex.executor import Calculator
 from hypex.utils import AbstractMethodError
 
@@ -22,9 +22,9 @@ class Transformer(Calculator):
         return cls._inner_function(data, **kwargs)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        data = data.copy(data=self.calc(data.ds))
+        data = data.copy(data=self.calc(data=data.ds))
         return data
 
     @staticmethod
-    def _list_unification(roles):
+    def _list_unification(roles: Any):
         return [roles] if isinstance(roles, ABCRole) else roles

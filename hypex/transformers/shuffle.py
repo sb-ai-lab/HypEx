@@ -10,16 +10,21 @@ class Shuffle(Calculator):
         random_state: Optional[int] = None,
         key: Any = "",
     ):
-        super().__init__( key)
+        super().__init__(key)
         self.random_state = random_state
+
+    @staticmethod
+    def _inner_function(data: Dataset, random_state: Optional[int] = None) -> Any:
+        result = data.shuffle(random_state=random_state)
+        return result
 
     def generate_params_hash(self):
         return f"{self.random_state}"
 
-    @staticmethod
-    def calc(data: Dataset, **kwargs) -> Dataset:
-        data = data.shuffle(kwargs.get("random_state", None))
-        return data
+    @classmethod
+    def calc(cls, data: Dataset, random_state: Optional[int] = None) -> Dataset:
+        return cls._inner_function(data=data, random_state=random_state)
 
-    def execute(self, data: ExperimentData):
-        return self.calc(data.ds)
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        result = data.copy(data=self.calc(data=data.ds, random_state=self.random_state))
+        return result

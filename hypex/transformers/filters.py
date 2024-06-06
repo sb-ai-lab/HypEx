@@ -102,9 +102,9 @@ class ConstFilter(Transformer):
 
     @staticmethod
     def _inner_function(
-            data: Dataset,
-            target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
-            threshold: float = 0.95,
+        data: Dataset,
+        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
+        threshold: float = 0.95,
     ) -> Dataset:
         target_roles = super()._list_unification(target_roles)
         for column in data.search_columns(target_roles):
@@ -124,11 +124,11 @@ class ConstFilter(Transformer):
             data=data,
             target_roles=target_roles,
             threshold=threshold,
-    )
+        )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        data = data.copy(data=self.calc(data=data.ds, threshold=self.threshold))
-        return data
+        result = data.copy(data=self.calc(data=data.ds, threshold=self.threshold))
+        return result
 
 
 class NanFilter(Transformer):
@@ -150,9 +150,9 @@ class NanFilter(Transformer):
 
     @staticmethod
     def _inner_function(
-            data: Dataset,
-            target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
-            threshold: float = 0.8,
+        data: Dataset,
+        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
+        threshold: float = 0.8,
     ) -> Dataset:
         target_roles = super()._list_unification(target_roles)
         for column in data.search_columns(target_roles):
@@ -168,11 +168,13 @@ class NanFilter(Transformer):
         target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
         threshold: float = 0.8,
     ) -> Dataset:
-        return cls._inner_function(data=data, target_roles=target_roles, threshold=threshold)
+        return cls._inner_function(
+            data=data, target_roles=target_roles, threshold=threshold
+        )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        data = data.copy(data=self.calc(data=data.ds, threshold=self.threshold))
-        return data
+        result = data.copy(data=self.calc(data=data.ds, threshold=self.threshold))
+        return result
 
 
 class CorrFilter(Transformer):
@@ -221,13 +223,13 @@ class CorrFilter(Transformer):
         for target in target_roles_cols:
             for column in corr_matrix.columns:
                 if (target != column) and (
-                        abs(corr_matrix.get_values(target, column)) > threshold
+                    abs(corr_matrix.get_values(target, column)) > threshold
                 ):
                     drop = target
                     if data.roles[column] in target_roles_cols:
                         if drop_policy == "corr":
                             if abs(
-                                    corr_matrix.get_values(target, pre_target_column)
+                                corr_matrix.get_values(target, pre_target_column)
                             ) > abs(corr_matrix.get_values(column, pre_target_column)):
                                 drop = target
                             else:
@@ -236,7 +238,7 @@ class CorrFilter(Transformer):
                             drop = (
                                 target
                                 if data[target].coefficient_of_variation()
-                                   < data[column].coefficient_of_variation()
+                                < data[column].coefficient_of_variation()
                                 else column
                             )
                     data.roles[drop] = InfoRole()
@@ -264,8 +266,15 @@ class CorrFilter(Transformer):
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        data = data.copy(data=self.calc(data=data.ds, threshold=self.threshold, method=self.method, numeric_only=self.numeric_only))
-        return data
+        result = data.copy(
+            data=self.calc(
+                data=data.ds,
+                threshold=self.threshold,
+                method=self.method,
+                numeric_only=self.numeric_only,
+            )
+        )
+        return result
 
 
 class OutliersFilter(Transformer):
@@ -289,10 +298,10 @@ class OutliersFilter(Transformer):
 
     @staticmethod
     def _inner_function(
-            data: Dataset,
-            target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
-            lower_percentile: float = 0,
-            upper_percentile: float = 1,
+        data: Dataset,
+        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
+        lower_percentile: float = 0,
+        upper_percentile: float = 1,
     ) -> Dataset:
         addressable_roles = data.search_columns(
             roles=super()._list_unification(target_roles),
@@ -300,7 +309,7 @@ class OutliersFilter(Transformer):
         )
         mask = data[addressable_roles].apply(
             func=lambda x: (x < x.quantile(lower_percentile))
-                           | (x > x.quantile(upper_percentile)),
+            | (x > x.quantile(upper_percentile)),
             role={column: InfoRole() for column in addressable_roles},
             axis=0,
         )
@@ -325,7 +334,11 @@ class OutliersFilter(Transformer):
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        t_ds = self.calc(data=data.ds, lower_percentile=self.lower_percentile, upper_percentile=self.upper_percentile)
-        data = data.copy(data=t_ds)
-        data.additional_fields = data.additional_fields.filter(t_ds.index, axis=0)
-        return data
+        t_ds = self.calc(
+            data=data.ds,
+            lower_percentile=self.lower_percentile,
+            upper_percentile=self.upper_percentile,
+        )
+        result = data.copy(data=t_ds)
+        result.additional_fields = result.additional_fields.filter(t_ds.index, axis=0)
+        return result
