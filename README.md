@@ -39,6 +39,9 @@ Diff-in-Diff) and CUPED methods, to rigorously test hypotheses and validate expe
 Some functions in HypEx can facilitate solving specific auxiliary tasks but cannot automate decisions on experiment
 design. Below, we will discuss features that are implemented in HypEx but do not automate the design of experiments.
 
+**Note:** For Matching, it's recommended not to use more than 7 features as it might result in the curse of
+dimensionality, making the results unrepresentative.
+
 ### Feature Selection
 
 **Feature selection** models the significance of features for the accuracy of target approximation. However, it does not
@@ -161,12 +164,12 @@ discover why HypEx is the best solution for causal inference
 Visit [this](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-part-2) notebook ain Kaggle and
 estimate results by yourself.
 
-| Group size             | 32 768   | 65 536     | 131 072   | 262 144   | 524 288    | 1 048 576   | 2 097 152    | 4 194 304     |
-|------------------------|---------|-----------|----------|----------|-----------|-----------|------------|-------------|
-| Causal Inference       | 46s | 169s | None     | None     | None      | None      | None       | None        |
-| DoWhy                  | 9s | 19s  | 40s | 77s | 159s | 312s | 615s  | 1 235s  |
-| HypEx with grouping    | 2s | 6s   | 16s | 42s | 167s | 509s | 1 932s | 7 248s  |
-| HypEx without grouping | 2s  | 7s   | 21s | 101s | 273s | 982s | 3 750s | 14 720s |
+| Group size             | 32 768 | 65 536 | 131 072 | 262 144 | 524 288 | 1 048 576 | 2 097 152 | 4 194 304 |
+|------------------------|--------|--------|---------|---------|---------|-----------|-----------|-----------|
+| Causal Inference       | 46s    | 169s   | None    | None    | None    | None      | None      | None      |
+| DoWhy                  | 9s     | 19s    | 40s     | 77s     | 159s    | 312s      | 615s      | 1 235s    |
+| HypEx with grouping    | 2s     | 6s     | 16s     | 42s     | 167s    | 509s      | 1 932s    | 7 248s    |
+| HypEx without grouping | 2s     | 7s     | 21s     | 101s    | 273s    | 982s      | 3 750s    | 14 720s   |
 
 ## Join Our Community
 
@@ -179,4 +182,4 @@ HypEx stands as an indispensable resource for data analysts and researchers delv
 testing. With its automated capabilities, sophisticated matching techniques, and thorough validation procedures, HypEx
 is poised to unravel causal relationships in complex datasets with unprecedented speed and precision.
 
-##                                                                              
+##                                                                               
