@@ -16,6 +16,8 @@ from .roles import (
     TempTreatmentRole,
     TempGroupingRole,
     TempTargetRole,
+    FilterRole,
+    MatchingRole,
     ABCRole,
     default_roles,
 )
@@ -31,6 +33,8 @@ __all__ = [
     "StratificationRole",
     "StatisticRole",
     "TreatmentRole",
+    "FilterRole",
+    "MatchingRole",
     "TempTreatmentRole",
     "TempGroupingRole",
     "TempTargetRole",

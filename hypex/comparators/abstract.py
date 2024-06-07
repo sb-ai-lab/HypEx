@@ -8,6 +8,7 @@ from hypex.dataset import (
     GroupingRole,
     StatisticRole,
     TempTargetRole,
+    MatchingRole,
 )
 from hypex.executor import Calculator
 from hypex.utils import (
@@ -18,8 +19,8 @@ from hypex.utils import (
     FromDictTypes,
     NoColumnsError,
     SpaceEnum,
+    AbstractMethodError,
 )
-from hypex.utils.errors import AbstractMethodError
 
 
 class GroupComparator(Calculator):
@@ -47,7 +48,9 @@ class GroupComparator(Calculator):
 
     @staticmethod
     @abstractmethod
-    def _inner_function(data: Dataset, test_data: Dataset, **kwargs) -> Any:
+    def _inner_function(
+        data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+    ) -> Any:
         raise AbstractMethodError
 
     def __group_field_searching(self, data: ExperimentData):
@@ -65,20 +68,19 @@ class GroupComparator(Calculator):
             raise NoColumnsError(self.grouping_role)
         return group_field
 
-    def __get_grouping_data(self, data: ExperimentData, group_field):
-        if self.__additional_mode:
-            t_groups = list(data.additional_fields.groupby(group_field))
-            result = [
-                (group, data.ds.loc[subdata.index]) for (group, subdata) in t_groups
-            ]
-        else:
-            result = list(data.ds.groupby(group_field))
-
-        result = [
-            (group[0] if len(group) == 1 else group, subdata)
-            for (group, subdata) in result
-        ]
-        return result
+    def __get_grouping_data(self, data: ExperimentData):
+        group_field = self.__group_field_searching(data)
+        target_fields = data.ds.search_columns(
+            TempTargetRole(), tmp_role=True, search_types=self._search_types
+        )
+        if (
+            not target_fields and data.ds.tmp_roles
+        ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
+            return data
+        grouping_data = None
+        if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
+            grouping_data = list(data.groups[group_field[0]].items())
+        return group_field, target_fields, grouping_data
 
     @staticmethod
     def __field_arg_universalization(
@@ -169,19 +171,9 @@ class GroupComparator(Calculator):
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
     # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
+
     def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field = self.__group_field_searching(data)
-        target_fields = data.ds.search_columns(
-            TempTargetRole(), tmp_role=True, search_types=self._search_types
-        )
-        if (
-            not target_fields and data.ds.tmp_roles
-        ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
-            return data
-        if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
-            grouping_data = list(data.groups[group_field[0]].items())
-        else:
-            grouping_data = None
+        group_field, target_fields, grouping_data = self.__get_grouping_data(data)
         compare_result = self.calc(
             data=data.ds,
             group_field=group_field,
@@ -206,3 +198,54 @@ class StatHypothesisTesting(GroupComparator, ABC):
     ):
         super().__init__(grouping_role, space, search_types, key)
         self.reliability = reliability
+
+
+class MatchingComparator(GroupComparator):
+    def __init__(
+        self,
+        grouping_role: Union[ABCRole, None] = None,
+        space: SpaceEnum = SpaceEnum.auto,
+        search_types: Union[type, List[type], None] = None,
+        index_role: Union[ABCRole, None] = None,
+        key: Any = "",
+    ):
+        super().__init__(grouping_role, space, search_types, key)
+        self.index_role = index_role or MatchingRole()
+
+    def _set_value(
+        self,
+        data: ExperimentData,
+        value: Optional[Union[float, int, bool, str]] = None,
+        key: Any = None,
+    ) -> ExperimentData:
+        data.set_value(
+            ExperimentDataEnum.value,
+            self.id,
+            str(self.__class__.__name__),
+            value,
+        )
+        return data
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        group_field, target_fields, grouping_data = self.__get_grouping_data(data)
+        if grouping_data:
+            index_column = data.additional_fields.search_columns(self.index_role)
+            grouping_data = [
+                (
+                    group,
+                    (
+                        group_data.iloc[index_column]
+                        if group in index_column
+                        else group_data
+                    ),
+                )
+                for group, group_data in grouping_data
+            ]
+        compare_result = self.calc(
+            data=data.ds,
+            group_field=group_field,
+            target_field=target_fields,
+            grouping_data=grouping_data,
+            comparison_function=self._inner_function,
+        )
+        return self._set_value(data, result_dataset)

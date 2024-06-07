@@ -168,6 +168,10 @@ class FilterRole(ABCRole):
     _role_name: RoleNameType = "Filter"
 
 
+class MatchingRole(ABCRole):
+    _role_name: RoleNameType = "Matching"
+
+
 class TempTreatmentRole(TreatmentRole):
     """Role for temp treatment column.
     A temporary role used for transient treatment assignments in executables or during
