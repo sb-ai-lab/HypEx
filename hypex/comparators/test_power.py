@@ -80,7 +80,9 @@ class MDEBySize(GroupComparator):
         self.significance = significance
 
     @staticmethod
-    def _inner_function(control_data, test_data, significance=0.95, power=0.8, **kwargs) -> Dict[str, Any]:
+    def _inner_function(
+        control_data, test_data, significance=0.95, power=0.8, **kwargs
+    ) -> Dict[str, Any]:
         result = {}
         m = norm.ppf(1 - significance / 2) - norm.ppf(power)
         n_control, n_test = len(control_data), len(test_data)
@@ -95,16 +97,26 @@ class MDEBySize(GroupComparator):
         return result
 
     @staticmethod
-    def calc(data: Dataset,
-        group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
-        target_field: Optional[FieldKeyTypes] = None,
-        significance=0.95,
-        power=0.8,
+    def calc(
+        cls: Dataset,
+        data: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None],
+        group_field: Optional[FieldKeyTypes] = None,
+        target_fields=None,
+        grouping_data=None,
         **kwargs
-        ):
-        return GroupComparator.calc(data=data, group_field=group_field, target_field=target_field, comparison_function=MDEBySize._inner_function, power=power, significance=significance)
+    ):
+        return GroupComparator.calc(
+            data=data,
+            group_field=group_field,
+            target_fields=target_field,
+            comparison_function=MDEBySize._inner_function,
+            power=power,
+            significance=target_fields,
+        )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        subdata = data.ds.loc[:,data.ds.get_columns_by_roles([TargetRole(), self.grouping_role])]
+        subdata = data.ds.loc[
+            :, data.ds.get_columns_by_roles([TargetRole(), self.grouping_role])
+        ]
         ed = super().execute(ExperimentData(subdata))
         return self._set_value(data, ed.analysis_tables[self._id])

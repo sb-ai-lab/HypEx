@@ -11,12 +11,14 @@ class GroupDifference(GroupComparator):
     def _inner_function(
         cls,
         data: Dataset,
-        test_data: Dataset,
-        target_field: Optional[FieldKeyTypes] = None,
+        test_data: Optional[Dataset] = None,
+        target_fields: Optional[FieldKeyTypes] = None,
         **kwargs,
     ) -> Dict:
+        super()._inner_function(data, test_data)
         control_mean = data.mean()
         test_mean = test_data.mean()
+        target_field = target_fields[0]
 
         return {
             f"{target_field} control mean": control_mean,
@@ -32,9 +34,11 @@ class GroupDifference(GroupComparator):
 
 class GroupSizes(GroupComparator):
     @classmethod
-    def _inner_function(cls, data: Dataset, test_data: Dataset, **kwargs) -> Dict:
+    def _inner_function(
+        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+    ) -> Dict:
         size_a = len(data)
-        size_b = len(test_data)
+        size_b = len(test_data) if test_data else 0
 
         return {
             "control size": size_a,
@@ -49,9 +53,10 @@ class GroupSizes(GroupComparator):
 
 
 class ATE(GroupComparator):
-
     @classmethod
-    def _inner_function(cls, data: Dataset, test_data: Dataset, **kwargs) -> float:
+    def _inner_function(
+        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+    ) -> float:
         size_a = len(data)
         size_b = len(test_data)
         control_mean = data.mean()
