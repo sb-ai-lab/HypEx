@@ -76,7 +76,7 @@ class Dataset(DatasetBase):
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
 
-    def __getitem__(self, item: Union[Iterable, str, int, "Dataset"]) -> "Dataset":
+    def __getitem__(self, item: Union[Iterable, str, int]) -> "Dataset":
         if isinstance(item, Dataset):
             item = item.data
         items = (
@@ -104,7 +104,7 @@ class Dataset(DatasetBase):
         if not isinstance(other, Union[Dataset, ScalarType, Sequence]):
             raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
-        t_roles = self.roles
+        t_roles = deepcopy(self.roles)
         for role in t_roles.values():
             role.data_type = None
         if isinstance(other, Dataset):
@@ -309,14 +309,6 @@ class Dataset(DatasetBase):
                 data=data,
                 roles=role,
             )
-
-        # data = self._backend.apply(func=func, axis=axis, **kwargs)
-        # if len(data.columns) == 1:
-        #     data.columns.values[0] = list(role.keys())[0]
-        # return Dataset(
-        #     data=data,
-        #     roles=role,
-        # )
 
     def map(self, func, na_action=None, **kwargs) -> "Dataset":
         return Dataset(
@@ -643,7 +635,7 @@ class ExperimentData:
             for class_ in classes
         }
 
-    def _get_one_id(self, class_: type, space: ExperimentDataEnum) -> str:
+    def get_one_id(self, class_: type, space: ExperimentDataEnum) -> str:
         result = self.get_ids(class_)
         if not len(result):
             raise NotFoundInExperimentDataError(class_)

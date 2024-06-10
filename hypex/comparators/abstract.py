@@ -46,8 +46,16 @@ class GroupComparator(Calculator):
         return self._extract_dataset(compare_result, roles)
 
     @staticmethod
+    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
+        if test_data is None:
+            raise ValueError("test_data is needed for comparison")
+        return test_data
+
+    @classmethod
     @abstractmethod
-    def _inner_function(data: Dataset, test_data: Dataset, **kwargs) -> Any:
+    def _inner_function(
+        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+    ) -> Any:
         raise AbstractMethodError
 
     def __group_field_searching(self, data: ExperimentData):
@@ -99,7 +107,7 @@ class GroupComparator(Calculator):
         cls,
         data: Dataset,
         group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
-        target_field: Optional[FieldKeyTypes] = None,
+        target_fields: Optional[FieldKeyTypes] = None,
         grouping_data: Optional[Dict[FieldKeyTypes, Dataset]] = None,
         **kwargs,
     ) -> Dict:
@@ -113,7 +121,7 @@ class GroupComparator(Calculator):
             raise ComparisonNotSuitableFieldError(group_field)
 
         result = {}
-        if target_field:
+        if target_fields:
             for i in range(1, len(grouping_data)):
                 result_key = (
                     grouping_data[i][0]
@@ -123,8 +131,8 @@ class GroupComparator(Calculator):
                 grouping_data[i][1].tmp_roles = data.tmp_roles
                 result[result_key] = cls._to_dataset(
                     cls._inner_function(
-                        data=grouping_data[0][1][target_field],
-                        test_data=grouping_data[i][1][target_field],
+                        data=grouping_data[0][1][target_fields],
+                        test_data=grouping_data[i][1][target_fields],
                         **kwargs,
                     )
                 )
@@ -159,8 +167,9 @@ class GroupComparator(Calculator):
     def _extract_dataset(
         compare_result: FromDictTypes, roles: Dict[Any, ABCRole]
     ) -> Dataset:
+        # TODO: криво. Надо переделать
         if isinstance(list(compare_result.values())[0], Dataset):
-            cr_list_v = list(compare_result.values())
+            cr_list_v: List[Dataset] = list(compare_result.values())
             result = cr_list_v[0]
             if len(cr_list_v) > 1:
                 result = result.append(cr_list_v[1:])
@@ -174,6 +183,9 @@ class GroupComparator(Calculator):
         target_fields = data.ds.search_columns(
             TempTargetRole(), tmp_role=True, search_types=self._search_types
         )
+        self.key = str(
+            target_fields[0] if len(target_fields) == 1 else (target_fields or "")
+        )
         if (
             not target_fields and data.ds.tmp_roles
         ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
@@ -185,9 +197,8 @@ class GroupComparator(Calculator):
         compare_result = self.calc(
             data=data.ds,
             group_field=group_field,
-            target_field=target_fields,
+            target_fields=target_fields,
             grouping_data=grouping_data,
-            comparison_function=self._inner_function,
         )
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key in compare_result}

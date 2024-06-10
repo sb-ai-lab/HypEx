@@ -8,7 +8,7 @@ from .aa import AADictReporter
 
 class ABDictReporter(AADictReporter):
     def extract_analyzer_data(self, data: ExperimentData) -> Dict[str, Any]:
-        analyzer_id = data._get_one_id(ABAnalyzer, ExperimentDataEnum.analysis_tables)
+        analyzer_id = data.get_one_id(ABAnalyzer, ExperimentDataEnum.analysis_tables)
         return self.extract_from_one_row_dataset(data.analysis_tables[analyzer_id])
 
     def extract_data_from_analysis_tables(self, data: ExperimentData) -> Dict[str, Any]:
