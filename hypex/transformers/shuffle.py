@@ -21,10 +21,6 @@ class Shuffle(Calculator):
     def generate_params_hash(self):
         return f"{self.random_state}"
 
-    # @classmethod
-    # def calc(cls, data: Dataset, random_state: Optional[int] = None) -> Dataset:
-    #     return cls._inner_function(data=data, random_state=random_state)
-
     def execute(self, data: ExperimentData) -> ExperimentData:
         result = data.copy(data=self.calc(data=data.ds, random_state=self.random_state))
         return result

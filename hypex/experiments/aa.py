@@ -9,11 +9,11 @@ from hypex.transformers.filters import CVFilter, ConstFilter, NanFilter, CorrFil
 
 AA_TEST = Experiment(
     executors=[
-        CVFilter(lower_bound=0.5),
-        # ConstFilter(),
-        # NanFilter(threshold=0.04),
+        # CVFilter(),
+        # ConstFilter(threshold=0.4),
+        # NanFilter(threshold=0.4),
         # CorrFilter(),
-        # OutliersFilter(lower_percentile=0.05, upper_percentile=0.95),
+        OutliersFilter(lower_percentile=0.05, upper_percentile=0.95),
         AASplitter(),
         GroupSizes(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
         OnRoleExperiment(

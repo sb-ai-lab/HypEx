@@ -10,6 +10,7 @@ from hypex.dataset.roles import (
     TargetRole,
 )
 from hypex.transformers.abstract import Transformer
+from hypex.utils import FieldKeyTypes
 
 
 class CVFilter(Transformer):
@@ -30,23 +31,17 @@ class CVFilter(Transformer):
         super().__init__(key=key)
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
+        self.type_filter: bool = True
 
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
+        target_cols: Optional[FieldKeyTypes] = None,
         lower_bound: Optional[float] = None,
         upper_bound: Optional[float] = None,
-        type_filter: bool = True,
     ) -> Dataset:
-        target_roles = super(CVFilter, CVFilter)._list_unification(target_roles)
-        if type_filter:
-            addressable_columns = data.search_columns(
-                roles=target_roles, search_types=[float, int, bool]
-            )
-        else:
-            addressable_columns = data.search_columns(target_roles)
-        for column in addressable_columns:
+        target_cols = super(CVFilter, CVFilter)._list_unification(target_cols)
+        for column in target_cols:
             cv = data[column].coefficient_of_variation()
             drop = False
             if upper_bound and cv > upper_bound:
@@ -58,9 +53,13 @@ class CVFilter(Transformer):
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        if self.type_filter:
+            target_cols = data.ds.search_columns(roles=FeatureRole(), search_types=[float, int, bool])
+        else:
+            target_cols = data.ds.search_columns(roles=FeatureRole())
         result = data.copy(
             data=self.calc(
-                data=data.ds, lower_bound=self.lower_bound, upper_bound=self.upper_bound
+                data=data.ds, target_cols=target_cols, lower_bound=self.lower_bound, upper_bound=self.upper_bound
             )
         )
         return result
@@ -86,18 +85,19 @@ class ConstFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
+        target_cols: Optional[FieldKeyTypes] = None,
         threshold: float = 0.95,
     ) -> Dataset:
-        target_roles = super(CVFilter, CVFilter)._list_unification(target_roles)
-        for column in data.search_columns(target_roles):
+        target_cols = super(ConstFilter, ConstFilter)._list_unification(target_cols)
+        for column in target_cols:
             value_counts = data[column].value_counts(normalize=True, sort=True)
             if value_counts.get_values(0, "proportion") > threshold:
                 data.roles[column] = InfoRole()
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        result = data.copy(data=self.calc(data=data.ds, threshold=self.threshold))
+        target_cols = data.ds.search_columns(roles=FeatureRole())
+        result = data.copy(data=self.calc(data=data.ds, target_cols=target_cols, threshold=self.threshold))
         return result
 
 
@@ -121,18 +121,19 @@ class NanFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
+        target_cols: Optional[FieldKeyTypes] = None,
         threshold: float = 0.8,
     ) -> Dataset:
-        target_roles = super(CVFilter, CVFilter)._list_unification(target_roles)
-        for column in data.search_columns(target_roles):
+        target_cols = super(CVFilter, CVFilter)._list_unification(target_cols)
+        for column in target_cols:
             nan_share = data[column].isna().sum() / len(data)
             if nan_share > threshold:
                 data.roles[column] = InfoRole()
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        result = data.copy(data=self.calc(data=data.ds, threshold=self.threshold))
+        target_cols = data.ds.search_columns(roles=FeatureRole())
+        result = data.copy(data=self.calc(data=data.ds, target_cols=target_cols, threshold=self.threshold))
         return result
 
 
@@ -152,40 +153,35 @@ class CorrFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
+        target_cols: Optional[FieldKeyTypes] = None,
         threshold: float = 0.8,
         method: str = "pearson",
         numeric_only: bool = True,
-        corr_space_roles: Optional[Union[ABCRole, Iterable[ABCRole]]] = None,
+        corr_space_cols: Optional[FieldKeyTypes] = None,
         drop_policy: str = "cv",
     ) -> Dataset:
-        if corr_space_roles is None:
-            corr_space_roles = [
-                FeatureRole(),
-                TargetRole(),
-            ]
-        target_roles = super(CVFilter, CVFilter)._list_unification(target_roles)
-        corr_space_roles = super(CVFilter, CVFilter)._list_unification(corr_space_roles)
-        corr_matrix = data[data.search_columns(corr_space_roles)].corr(
+        target_cols = super(CVFilter, CVFilter)._list_unification(target_cols)
+        corr_space_cols = super(CVFilter, CVFilter)._list_unification(corr_space_cols)
+        corr_matrix = data[corr_space_cols].corr(
             method=method, numeric_only=numeric_only
         )
         pre_target_column = None
         if drop_policy == "corr":
             pre_target_columns = data.search_columns([PreTargetRole()])
-            if (PreTargetRole() not in corr_space_roles) | len(pre_target_columns) != 1:
+            if (pre_target_columns[0] not in corr_space_cols) | len(pre_target_columns) != 1:
                 raise ValueError(
                     "Correlation-based filtering cannot be applied if there are more than one PreTarget columns"
                 )
             else:
                 pre_target_column = pre_target_columns[0]
-        target_roles_cols = corr_matrix.search_columns(target_roles)
-        for target in target_roles_cols:
+        corr_target_cols = [column for column in target_cols if column in corr_matrix.columns]
+        for target in corr_target_cols:
             for column in corr_matrix.columns:
                 if (target != column) and (
-                    abs(corr_matrix.get_values(target, column)) > threshold
+                    abs(corr_matrix.get_values(row=target, column=column)) > threshold
                 ):
                     drop = target
-                    if data.roles[column] in target_roles_cols:
+                    if data.roles[column] in corr_target_cols:
                         if drop_policy == "corr":
                             if abs(
                                 corr_matrix.get_values(target, pre_target_column)
@@ -204,12 +200,16 @@ class CorrFilter(Transformer):
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        target_cols = data.ds.search_columns(roles=FeatureRole())
+        corr_space_cols = data.ds.search_columns(roles=[FeatureRole(), TargetRole()])
         result = data.copy(
             data=self.calc(
                 data=data.ds,
+                target_cols=target_cols,
                 threshold=self.threshold,
                 method=self.method,
                 numeric_only=self.numeric_only,
+                corr_space_cols=corr_space_cols,
             )
         )
         return result
@@ -237,18 +237,14 @@ class OutliersFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
+        target_cols: Optional[FieldKeyTypes] = None,
         lower_percentile: float = 0,
         upper_percentile: float = 1,
     ) -> Dataset:
-        addressable_columns = data.search_columns(
-            roles=super(CVFilter, CVFilter)._list_unification(target_roles),
-            search_types=[float, int, bool],
-        )
-        mask = data[addressable_columns].apply(
+        mask = data[target_cols].apply(
             func=lambda x: (x < x.quantile(lower_percentile))
             | (x > x.quantile(upper_percentile)),
-            role={column: InfoRole() for column in addressable_columns},
+            role={column: InfoRole() for column in target_cols},
             axis=0,
         )
         mask = mask.apply(func=lambda x: x.any(), role={"filter": InfoRole()}, axis=1)
@@ -257,8 +253,13 @@ class OutliersFilter(Transformer):
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        target_cols = data.ds.search_columns(
+            roles=FeatureRole(),
+            search_types=[float, int, bool],
+        )
         t_ds = self.calc(
             data=data.ds,
+            target_cols=target_cols,
             lower_percentile=self.lower_percentile,
             upper_percentile=self.upper_percentile,
         )
