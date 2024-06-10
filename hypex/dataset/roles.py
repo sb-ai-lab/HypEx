@@ -208,6 +208,12 @@ class TempGroupingRole(GroupingRole):
     _role_name: RoleNameType = "TempGrouping"
 
 
+class ReportRole(ABCRole):
+    """ """
+
+    _role_name: RoleNameType = "Report"
+
+
 default_roles: Dict[RoleNameType, ABCRole] = {
     "info": InfoRole(),
     "feature": FeatureRole(),

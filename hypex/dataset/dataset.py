@@ -629,7 +629,7 @@ class ExperimentData:
             for class_ in classes
         }
 
-    def _get_one_id(self, class_: type, space: ExperimentDataEnum) -> str:
+    def get_one_id(self, class_: type, space: ExperimentDataEnum) -> str:
         result = self.get_ids(class_)
         if not len(result):
             raise NotFoundInExperimentDataError(class_)

@@ -12,7 +12,7 @@ from .abstract import DictReporter
 class AADictReporter(DictReporter):
     @staticmethod
     def get_random_state(data: ExperimentData):
-        aa_splitter_id = data._get_one_id(
+        aa_splitter_id = data.get_one_id(
             AASplitter, ExperimentDataEnum.additional_fields
         )
         aa_id = aa_splitter_id.split(ID_SPLIT_SYMBOL)[1]
@@ -22,23 +22,22 @@ class AADictReporter(DictReporter):
         group_difference_ids = data.get_ids(GroupDifference)[GroupDifference][
             ExperimentDataEnum.analysis_tables.value
         ]
-        t_data = data.analysis_tables[group_difference_ids[0]]
-        for aid in group_difference_ids[1:]:
-            t_data = t_data.append(data.analysis_tables[aid])
-        return self._extract_from_comparators(t_data)
+        return self._extract_from_comparators(data, group_difference_ids)
 
     def extract_group_sizes(self, data: ExperimentData) -> Dict[str, Any]:
-        group_sizes_id = data._get_one_id(
-            GroupSizes, ExperimentDataEnum.analysis_tables
-        )
-        return self._extract_from_comparators(data.analysis_tables[group_sizes_id])
+        group_sizes_id = data.get_one_id(GroupSizes, ExperimentDataEnum.analysis_tables)
+        return self._extract_from_comparators(data, [group_sizes_id])
 
     def extract_analyzer_data(self, data: ExperimentData) -> Dict[str, Any]:
-        analyzer_id = data._get_one_id(
+        analyzer_id = data.get_one_id(
             OneAAStatAnalyzer, ExperimentDataEnum.analysis_tables
         )
         result = self.extract_from_one_row_dataset(data.analysis_tables[analyzer_id])
-        result = {c: ("NOT OK" if v else "OK") if c.endswith("pass") else v for c, v in result.items()}
+        if self.front:
+            result = {
+                c: ("NOT OK" if v else "OK") if c.endswith("pass") else v
+                for c, v in result.items()
+            }
         return result
 
     def extract_data_from_analysis_tables(self, data: ExperimentData) -> Dict[str, Any]:

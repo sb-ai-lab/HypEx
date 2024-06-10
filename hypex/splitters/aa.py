@@ -10,7 +10,7 @@ class AASplitter(Calculator):
         self,
         control_size: float = 0.5,
         random_state: Optional[int] = None,
-        constant_key: bool = False,
+        constant_key: bool = True,
         save_groups: bool = True,
         key: Any = "",
     ):
