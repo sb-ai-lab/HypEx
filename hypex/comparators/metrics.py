@@ -1,10 +1,10 @@
 from typing import Optional
 
-from .abstract import GroupComparator
+from .abstract import MatchingComparator
 from ..dataset import Dataset
 
 
-class ATC(GroupComparator):
+class ATC(MatchingComparator):
 
     # TODO переопределить функцию подготовки данных
     @classmethod
@@ -12,17 +12,22 @@ class ATC(GroupComparator):
         return {"ATC": (data - other).mean()}
 
 
-class ATT(GroupComparator):
+class ATT(MatchingComparator):
     @classmethod
     def _inner_function(cls, data: Dataset, other: Optional[Dataset] = None, **kwargs):
         return {"ATT": (other - data).mean()}
 
 
-class ATE(GroupComparator):
+class ATE(MatchingComparator):
     @classmethod
     def _inner_function(
-        cls, data: Dataset, other: Optional[Dataset] = None, **kwargs
+        cls,
+        data: Dataset,
+        other: Optional[Dataset] = None,
+        att: Optional[float] = None,
+        atc: Optional[float] = None,
+        **kwargs
     ) -> float:
-        atc = ATC.calc(data, other)
-        att = ATT.calc(data, other)
+        att = att if att is not None else ATT().calc(data, other).get("ATT")
+        atc = atc if atc is not None else ATC().calc(data, other).get("ATC")
         return (att * len(data) + atc * len(other)) / (len(data) + len(other))

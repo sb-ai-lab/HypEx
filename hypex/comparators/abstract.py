@@ -241,11 +241,17 @@ class MatchingComparator(GroupComparator):
                 )
                 for group, group_data in grouping_data
             ]
+        att = data.variables.get("ATT", None)
+        atc = data.variables.get("ATT", None)
         compare_result = self.calc(
             data=data.ds,
             group_field=group_field,
             target_field=target_fields,
             grouping_data=grouping_data,
             comparison_function=self._inner_function,
+            att=att,
+            atc=atc,
         )
-        return self._set_value(data, result_dataset)
+        return self._set_value(
+            data, list(compare_result.values())[0], key=list(compare_result.keys())[0]
+        )
