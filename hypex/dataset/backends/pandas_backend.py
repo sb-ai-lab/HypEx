@@ -49,7 +49,7 @@ class PandasNavigation(DatasetBackendNavigation):
     def __getitem__(self, item):
         if isinstance(item, (slice, int)):
             return self.data.iloc[item]
-        if isinstance(item, (str, list)):
+        if isinstance(item, (str, list, pd.DataFrame)):
             return self.data[item]
         raise KeyError("No such column or row")
 
@@ -186,7 +186,8 @@ class PandasNavigation(DatasetBackendNavigation):
         return str(self.data.dtypes[column_name])
 
     def _update_column_type(self, column_name: str, type_name: str):
-        self.data.loc[:, column_name] = self.data[column_name].astype(type_name)
+        if self.data[column_name].isna().sum() == 0:
+            self.data.loc[:, column_name] = self.data[column_name].astype(type_name)
         return self
 
     def add_column(
@@ -236,8 +237,23 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series] = None):
         super().__init__(data)
 
+    def get_values(self, row: FieldKeyTypes = None, column: FieldKeyTypes = None) -> Any:
+        if (column is not None) and (row is not None):
+            return self.data.loc[row, column]
+        elif column is not None:
+            result = self.data.loc[:, column]
+        elif row is not None:
+            result = self.data.loc[row, :]
+        else:
+            result = self.data
+        return result.values.tolist()
+
     def apply(self, func: Callable, **kwargs) -> pd.DataFrame:
-        return self.data.apply(func, **kwargs)
+        single_column_name = kwargs.pop("column_name")
+        result = self.data.apply(func, **kwargs)
+        if not isinstance(result, pd.DataFrame):
+            result = result.to_frame(name=single_column_name)
+        return result
 
     def map(self, func: Callable, **kwargs) -> pd.DataFrame:
         return self.data.map(func, **kwargs)
@@ -399,7 +415,10 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         )
 
     def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> pd.DataFrame:
-        return self.data.drop(labels=labels, axis=axis) 
+        return self.data.drop(labels=labels, axis=axis)
+
+    def filter(self, items: Optional[List] = None, like: Optional[str] = None, regex: Optional[str] = None, axis: Optional[int] = None) -> pd.DataFrame:
+        return self.data.filter(items=items, like=like, regex=regex, axis=axis)
     
     def rename(self, columns: Dict[str, str]): 
         return self.data.rename(columns=columns)

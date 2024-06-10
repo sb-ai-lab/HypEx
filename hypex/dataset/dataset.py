@@ -76,7 +76,9 @@ class Dataset(DatasetBase):
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
 
-    def __getitem__(self, item: Union[Iterable, str, int]) -> "Dataset":
+    def __getitem__(self, item: Union[Iterable, str, int, "Dataset"]) -> "Dataset":
+        if isinstance(item, Dataset):
+            item = item.data
         items = (
             [item] if isinstance(item, str) or not isinstance(item, Iterable) else item
         )
@@ -302,12 +304,19 @@ class Dataset(DatasetBase):
         axis: int = 0,
         **kwargs,
     ) -> "Dataset":
-        return Dataset(
-            data=self._backend.apply(func=func, axis=axis, **kwargs).rename(
-                list(role.keys())[0]
-            ),
-            roles=role,
-        )
+            data = self._backend.apply(func=func, axis=axis, column_name=list(role.keys())[0], **kwargs)
+            return Dataset(
+                data=data,
+                roles=role,
+            )
+
+        # data = self._backend.apply(func=func, axis=axis, **kwargs)
+        # if len(data.columns) == 1:
+        #     data.columns.values[0] = list(role.keys())[0]
+        # return Dataset(
+        #     data=data,
+        #     roles=role,
+        # )
 
     def map(self, func, na_action=None, **kwargs) -> "Dataset":
         return Dataset(
@@ -434,7 +443,10 @@ class Dataset(DatasetBase):
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
         )
         t_roles = self.roles
-        t_roles["count"] = StatisticRole()
+        if normalize:
+            t_roles["proportion"] = StatisticRole()
+        else:
+            t_roles["count"] = StatisticRole()
         return Dataset(roles=t_roles, data=t_data)
 
     def na_counts(self):
@@ -502,6 +514,10 @@ class Dataset(DatasetBase):
             self.roles if axis == 0 else {c: self.roles[c] for c in t_data.columns}
         )
         return Dataset(roles=t_roles, data=t_data)
+
+    def filter(self, items: Optional[List] = None, like: Optional[str] = None, regex: Optional[str] = None, axis: Optional[int] = None):
+        t_data = self._backend.filter(items=items, like=like, regex=regex, axis=axis)
+        return Dataset(roles=self.roles, data=t_data)
 
     def dot(self, other: "Dataset") -> "Dataset":
         result_data = self.backend.dot(other.backend)

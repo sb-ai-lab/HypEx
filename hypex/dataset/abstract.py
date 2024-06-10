@@ -1,6 +1,6 @@
 import json  # type: ignore
 from abc import ABC
-from typing import Iterable, Dict, Union, List, Optional
+from typing import Iterable, Dict, Union, List, Optional, Any
 
 import pandas as pd  # type: ignore
 
@@ -10,7 +10,7 @@ from hypex.dataset.roles import (
     default_roles,
     FeatureRole,
 )
-from hypex.utils import BackendsEnum, RoleColumnError
+from hypex.utils import BackendsEnum, RoleColumnError, FieldKeyTypes
 
 
 def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
@@ -161,3 +161,6 @@ class DatasetBase(ABC):
     @property
     def backend(self):
         return self._backend
+
+    def get_values(self, row: FieldKeyTypes = None, column: FieldKeyTypes = None) -> Any:
+        return self._backend.get_values(row=row, column=column)

@@ -17,7 +17,6 @@ class Transformer(Calculator):
         raise AbstractMethodError
 
     @classmethod
-    @abstractmethod
     def calc(cls, data: Dataset, **kwargs):
         return cls._inner_function(data, **kwargs)
 

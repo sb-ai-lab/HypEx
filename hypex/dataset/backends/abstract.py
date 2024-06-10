@@ -245,6 +245,9 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
+    def get_values(self, row: FieldKeyTypes = None, column: FieldKeyTypes = None) -> Any:
+        raise AbstractMethodError
+    @abstractmethod
     def apply(self, func: Callable, **kwargs) -> Any:
         raise AbstractMethodError
 
@@ -341,6 +344,9 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     @abstractmethod
     def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> Any:
         raise AbstractMethodError
+
+    def filter(self, items: Optional[List] = None, like: Optional[str] = None, regex: Optional[str] = None, axis: Optional[int] = None) -> Any:
+        return AbstractMethodError
 
     def fillna(self, values, method, **kwargs) -> Any:
         raise AbstractMethodError

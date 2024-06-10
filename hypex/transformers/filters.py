@@ -39,7 +39,7 @@ class CVFilter(Transformer):
         upper_bound: Optional[float] = None,
         type_filter: bool = True,
     ) -> Dataset:
-        target_roles = super()._list_unification(target_roles)
+        target_roles = super(CVFilter, CVFilter)._list_unification(target_roles)
         if type_filter:
             addressable_columns = data.search_columns(
                 roles=target_roles, search_types=[float, int, bool]
@@ -56,23 +56,6 @@ class CVFilter(Transformer):
             if drop:
                 data.roles[column] = InfoRole()
         return data
-
-    @classmethod
-    def calc(
-        cls,
-        data: Dataset,
-        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
-        lower_bound: Optional[float] = None,
-        upper_bound: Optional[float] = None,
-        type_filter: bool = True,
-    ) -> Dataset:
-        return cls._inner_function(
-            data=data,
-            target_roles=target_roles,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
-            type_filter=type_filter,
-        )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result = data.copy(
@@ -106,25 +89,12 @@ class ConstFilter(Transformer):
         target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
         threshold: float = 0.95,
     ) -> Dataset:
-        target_roles = super()._list_unification(target_roles)
+        target_roles = super(CVFilter, CVFilter)._list_unification(target_roles)
         for column in data.search_columns(target_roles):
             value_counts = data[column].value_counts(normalize=True, sort=True)
             if value_counts.get_values(0, "proportion") > threshold:
                 data.roles[column] = InfoRole()
         return data
-
-    @classmethod
-    def calc(
-        cls,
-        data: Dataset,
-        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
-        threshold: float = 0.95,
-    ) -> Dataset:
-        return cls._inner_function(
-            data=data,
-            target_roles=target_roles,
-            threshold=threshold,
-        )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result = data.copy(data=self.calc(data=data.ds, threshold=self.threshold))
@@ -154,23 +124,12 @@ class NanFilter(Transformer):
         target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
         threshold: float = 0.8,
     ) -> Dataset:
-        target_roles = super()._list_unification(target_roles)
+        target_roles = super(CVFilter, CVFilter)._list_unification(target_roles)
         for column in data.search_columns(target_roles):
             nan_share = data[column].isna().sum() / len(data)
             if nan_share > threshold:
                 data.roles[column] = InfoRole()
         return data
-
-    @classmethod
-    def calc(
-        cls,
-        data: Dataset,
-        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
-        threshold: float = 0.8,
-    ) -> Dataset:
-        return cls._inner_function(
-            data=data, target_roles=target_roles, threshold=threshold
-        )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result = data.copy(data=self.calc(data=data.ds, threshold=self.threshold))
@@ -197,7 +156,7 @@ class CorrFilter(Transformer):
         threshold: float = 0.8,
         method: str = "pearson",
         numeric_only: bool = True,
-        corr_space_roles=None,
+        corr_space_roles: Optional[Union[ABCRole, Iterable[ABCRole]]] = None,
         drop_policy: str = "cv",
     ) -> Dataset:
         if corr_space_roles is None:
@@ -205,8 +164,8 @@ class CorrFilter(Transformer):
                 FeatureRole(),
                 TargetRole(),
             ]
-        target_roles = super()._list_unification(target_roles)
-        corr_space_roles = super()._list_unification(corr_space_roles)
+        target_roles = super(CVFilter, CVFilter)._list_unification(target_roles)
+        corr_space_roles = super(CVFilter, CVFilter)._list_unification(corr_space_roles)
         corr_matrix = data[data.search_columns(corr_space_roles)].corr(
             method=method, numeric_only=numeric_only
         )
@@ -243,27 +202,6 @@ class CorrFilter(Transformer):
                             )
                     data.roles[drop] = InfoRole()
         return data
-
-    @classmethod
-    def calc(
-        cls,
-        data: Dataset,
-        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
-        threshold: float = 0.8,
-        method: str = "pearson",
-        numeric_only: bool = True,
-        corr_space_roles=None,
-        drop_policy: str = "cv",
-    ) -> Dataset:
-        return cls._inner_function(
-            data=data,
-            target_roles=target_roles,
-            threshold=threshold,
-            method=method,
-            numeric_only=numeric_only,
-            corr_space_roles=corr_space_roles,
-            drop_policy=drop_policy,
-        )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result = data.copy(
@@ -303,35 +241,20 @@ class OutliersFilter(Transformer):
         lower_percentile: float = 0,
         upper_percentile: float = 1,
     ) -> Dataset:
-        addressable_roles = data.search_columns(
-            roles=super()._list_unification(target_roles),
+        addressable_columns = data.search_columns(
+            roles=super(CVFilter, CVFilter)._list_unification(target_roles),
             search_types=[float, int, bool],
         )
-        mask = data[addressable_roles].apply(
+        mask = data[addressable_columns].apply(
             func=lambda x: (x < x.quantile(lower_percentile))
             | (x > x.quantile(upper_percentile)),
-            role={column: InfoRole() for column in addressable_roles},
+            role={column: InfoRole() for column in addressable_columns},
             axis=0,
         )
         mask = mask.apply(func=lambda x: x.any(), role={"filter": InfoRole()}, axis=1)
-        drop_indexes = mask[~mask].index.get_values(columns="filter")
+        drop_indexes = mask[mask["filter"]].dropna().index
         data = data.drop(drop_indexes, axis=0)
         return data
-
-    @classmethod
-    def calc(
-        cls,
-        data: Dataset,
-        target_roles: Union[ABCRole, Iterable[ABCRole]] = FeatureRole(),
-        lower_percentile: float = 0,
-        upper_percentile: float = 1,
-    ) -> Dataset:
-        return cls._inner_function(
-            data=data,
-            target_roles=target_roles,
-            lower_percentile=lower_percentile,
-            upper_percentile=upper_percentile,
-        )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         t_ds = self.calc(
