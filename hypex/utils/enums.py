@@ -7,6 +7,7 @@ class ExperimentDataEnum(enum.Enum):
     additional_fields = "additional_fields"
     analysis_tables = "analysis_tables"
     groups = "groups"
+    value = "value"
 
 
 @enum.unique
@@ -34,4 +35,3 @@ class ABNTestMethodsEnum(enum.Enum):
     fdr_tsbh = "fdr_tsbh"
     fdr_tsbky = "fdr_tsbky"
     quantile = "quantile"
-
