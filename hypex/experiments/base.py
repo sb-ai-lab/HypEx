@@ -10,8 +10,6 @@ from hypex.dataset import (
     TempTargetRole,
     ABCRole,
     GroupingRole,
-    TreatmentRole,
-    TempTreatmentRole,
 )
 from hypex.executor import Executor
 from hypex.utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
@@ -62,17 +60,18 @@ class Experiment(Executor):
         return experiment_data
 
 
+# TODO: Reporter cycle import
 class CycledExperiment(Executor):
     def __init__(
         self,
         inner_executor: Executor,
         n_iterations: int,
-        analyzer: Executor,
+        reporter,
         key: Any = "",
     ):
         self.inner_executor: Executor = inner_executor
         self.n_iterations: int = n_iterations
-        self.analyzer: Executor = analyzer
+        self.reporter = reporter
         super().__init__(key)
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
@@ -87,14 +86,11 @@ class CycledExperiment(Executor):
         result: List[Dataset] = []
         for i in tqdm(range(self.n_iterations)):
             t_data = ExperimentData(data.ds)
-            self.analyzer.key = f"{i}"
+            self.reporter.key = f"{i}"
             t_data = self.inner_executor.execute(t_data)
-        #     result.append(
-        #         self.analyzer.execute(t_data).analysis_tables[self.analyzer.id]
-        #     )
-        # result = result[0].append(result[1:], range(self.n_iterations))
-        # return self._set_value(data, result)
-        return data
+            result.append(self.reporter.report(t_data))
+        result = result[0].append(result[1:], range(self.n_iterations))
+        return self._set_value(data, result)
 
 
 class GroupExperiment(Executor):

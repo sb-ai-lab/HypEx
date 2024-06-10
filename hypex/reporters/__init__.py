@@ -1,5 +1,11 @@
 from .aa import AADictReporter
 from .ab import ABDictReporter
-from .abstract import Reporter, DictReporter
+from .abstract import Reporter, DictReporter, DatasetReporter
 
-__all__ = ["AADictReporter", "ABDictReporter", "Reporter", "DictReporter"]
+__all__ = [
+    "AADictReporter",
+    "ABDictReporter",
+    "Reporter",
+    "DictReporter",
+    "DatasetReporter",
+]

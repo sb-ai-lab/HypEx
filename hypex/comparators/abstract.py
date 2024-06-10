@@ -46,11 +46,17 @@ class GroupComparator(Calculator):
         return self._extract_dataset(compare_result, roles)
 
     @staticmethod
-    def _inner_function(
-        data: Dataset, test_data: Optional[Dataset] = None, **kwargs
-    ) -> Any:
+    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
         if test_data is None:
             raise ValueError("test_data is needed for comparison")
+        return test_data
+
+    @classmethod
+    @abstractmethod
+    def _inner_function(
+        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+    ) -> Any:
+        raise AbstractMethodError
 
     def __group_field_searching(self, data: ExperimentData):
         group_field = []
@@ -127,7 +133,6 @@ class GroupComparator(Calculator):
                     cls._inner_function(
                         data=grouping_data[0][1][target_fields],
                         test_data=grouping_data[i][1][target_fields],
-                        target_fields=target_fields,
                         **kwargs,
                     )
                 )
