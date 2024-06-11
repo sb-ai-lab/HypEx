@@ -66,26 +66,6 @@ class GroupExperiment(ExperimentWithReporter):
         return self._set_result(data, result)
 
 
-# params = {
-#     AASplitter: {"random_state": range(5)},
-#     GroupComparator: {
-#         "grouping_role": [TreatmentRole(), TargetRole()],
-#         "space": [SpaceEnum.additional],
-#     },
-# }
-#
-# flat_params = []
-# param_combinations = []
-# classes = list(params)
-# for c, ps in params.items():
-#     param_combinations.append(
-#         list(product(*[product([p], vs) for p, vs in ps.items()]))
-#     )
-# for pc in product(*param_combinations):
-#     flat_params.append({classes[i]: {p: v for p, v in pc[i]} for i in range(len(pc))})
-# flat_params
-
-
 class ParamsExperiment(ExperimentWithReporter):
     def __init__(
         self,
@@ -97,7 +77,7 @@ class ParamsExperiment(ExperimentWithReporter):
     ):
         super().__init__(executors, reporter, transformer, key)
         self._params = parameters
-        self._flat_params = []
+        self._flat_params: List[Dict[type, Dict[str, Any]]] = []
 
     def generate_params_hash(self) -> str:
         return f"ParamsExperiment: {self.reporter.__class__.__name__}"
@@ -107,29 +87,25 @@ class ParamsExperiment(ExperimentWithReporter):
         return self._params
 
     def _update_flat_params(self):
-        new_flat_params = []
-        param_combinations = []
         classes = list(self._params)
-        for class_params in self._params.values():
-            param_combinations.append(
-                list(
-                    product(
-                        *[
-                            product([parameter], values)
-                            for parameter, values in class_params.items()
-                        ]
-                    )
+        param_combinations = [
+            list(
+                product(
+                    *[
+                        product([parameter], values)
+                        for parameter, values in class_params.items()
+                    ]
                 )
             )
-        for param_combination in product(*param_combinations):
-            new_flat_params.append(
-                {
-                    classes[i]: {
-                        parameter: value for parameter, value in param_combination[i]
-                    }
-                    for i in range(len(param_combination))
-                }
-            )
+            for class_params in self._params.values()
+        ]
+        new_flat_params = [
+            {
+                classes[i]: dict(param_combination[i])
+                for i in range(len(param_combination))
+            }
+            for param_combination in product(*param_combinations)
+        ]
         self._flat_params = new_flat_params
 
     @property
@@ -142,4 +118,16 @@ class ParamsExperiment(ExperimentWithReporter):
         self._update_flat_params()
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        pass
+        results = []
+        self._update_flat_params()
+        for flat_param in self._flat_params:
+            t_data = ExperimentData(data.ds)
+            for executor in self.executors:
+                for class_, params in flat_param.items():
+                    if isinstance(executor, class_):
+                        executor.set_params(params)
+                t_data = executor.execute(t_data)
+            report = self.reporter.report(t_data)
+            results.append(report)
+        return self._set_result(data, results)
+
