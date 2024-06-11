@@ -245,7 +245,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def get_values(self, row: FieldKeyTypes = None, column: FieldKeyTypes = None) -> Any:
+    def get_values(self, row: Optional[FieldKeyTypes] = None, column: Optional[FieldKeyTypes] = None) -> Any:
         raise AbstractMethodError
     @abstractmethod
     def apply(self, func: Callable, **kwargs) -> Any:

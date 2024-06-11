@@ -23,7 +23,3 @@ class Transformer(Calculator):
     def execute(self, data: ExperimentData) -> ExperimentData:
         data = data.copy(data=self.calc(data=data.ds))
         return data
-
-    @staticmethod
-    def _list_unification(roles: Any):
-        return [roles] if isinstance(roles, ABCRole) else roles

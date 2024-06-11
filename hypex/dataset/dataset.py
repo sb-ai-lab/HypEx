@@ -304,9 +304,8 @@ class Dataset(DatasetBase):
         axis: int = 0,
         **kwargs,
     ) -> "Dataset":
-            data = self._backend.apply(func=func, axis=axis, column_name=list(role.keys())[0], **kwargs)
             return Dataset(
-                data=data,
+                data=self._backend.apply(func=func, axis=axis, column_name=list(role.keys())[0], **kwargs),
                 roles=role,
             )
 
@@ -435,10 +434,7 @@ class Dataset(DatasetBase):
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
         )
         t_roles = self.roles
-        if normalize:
-            t_roles["proportion"] = StatisticRole()
-        else:
-            t_roles["count"] = StatisticRole()
+        t_roles["proportion" if normalize else "count"] = StatisticRole()
         return Dataset(roles=t_roles, data=t_data)
 
     def na_counts(self):
@@ -512,8 +508,7 @@ class Dataset(DatasetBase):
         return Dataset(roles=self.roles, data=t_data)
 
     def dot(self, other: "Dataset") -> "Dataset":
-        result_data = self.backend.dot(other.backend)
-        return Dataset(roles=other.roles, data=result_data)
+        return Dataset(roles=other.roles, data=self.backend.dot(other.backend))
 
     def transpose(
         self,

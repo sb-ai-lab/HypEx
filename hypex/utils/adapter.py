@@ -1,4 +1,4 @@
-from typing import Union, Dict
+from typing import Union, Dict, Any, List
 
 import pandas as pd
 
@@ -6,6 +6,13 @@ from hypex.dataset import Dataset, InfoRole
 
 
 class Adapter:
+
+    @staticmethod
+    def to_list(data: Any) -> List:
+        if not isinstance(data, list):
+            return [data]
+        else:
+            return data
 
     # def to_dataset(name: str, data: Union[float, int]) -> Dataset:
 

@@ -11,6 +11,7 @@ from hypex.dataset.roles import (
 )
 from hypex.transformers.abstract import Transformer
 from hypex.utils import FieldKeyTypes
+from hypex.utils.adapter import Adapter
 
 
 class CVFilter(Transformer):
@@ -40,13 +41,11 @@ class CVFilter(Transformer):
         lower_bound: Optional[float] = None,
         upper_bound: Optional[float] = None,
     ) -> Dataset:
-        target_cols = super(CVFilter, CVFilter)._list_unification(target_cols)
+        target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
             cv = data[column].coefficient_of_variation()
             drop = False
-            if upper_bound and cv > upper_bound:
-                drop = True
-            if lower_bound and cv < lower_bound:
+            if (upper_bound and cv > upper_bound) or (lower_bound and cv < lower_bound):
                 drop = True
             if drop:
                 data.roles[column] = InfoRole()
@@ -88,7 +87,7 @@ class ConstFilter(Transformer):
         target_cols: Optional[FieldKeyTypes] = None,
         threshold: float = 0.95,
     ) -> Dataset:
-        target_cols = super(ConstFilter, ConstFilter)._list_unification(target_cols)
+        target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
             value_counts = data[column].value_counts(normalize=True, sort=True)
             if value_counts.get_values(0, "proportion") > threshold:
@@ -124,7 +123,7 @@ class NanFilter(Transformer):
         target_cols: Optional[FieldKeyTypes] = None,
         threshold: float = 0.8,
     ) -> Dataset:
-        target_cols = super(CVFilter, CVFilter)._list_unification(target_cols)
+        target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
             nan_share = data[column].isna().sum() / len(data)
             if nan_share > threshold:
@@ -160,8 +159,8 @@ class CorrFilter(Transformer):
         corr_space_cols: Optional[FieldKeyTypes] = None,
         drop_policy: str = "cv",
     ) -> Dataset:
-        target_cols = super(CVFilter, CVFilter)._list_unification(target_cols)
-        corr_space_cols = super(CVFilter, CVFilter)._list_unification(corr_space_cols)
+        target_cols = Adapter.to_list(target_cols)
+        corr_space_cols = Adapter.to_list(corr_space_cols)
         corr_matrix = data[corr_space_cols].corr(
             method=method, numeric_only=numeric_only
         )

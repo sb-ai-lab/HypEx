@@ -14,9 +14,8 @@ class Shuffle(Calculator):
         self.random_state = random_state
 
     @staticmethod
-    def _inner_function(data: Dataset, random_state: Optional[int] = None) -> Any:
-        result = data.shuffle(random_state=random_state)
-        return result
+    def _inner_function(data: Dataset, random_state: Optional[int] = None) -> Dataset:
+        return data.shuffle(random_state=random_state)
 
     def generate_params_hash(self):
         return f"{self.random_state}"
