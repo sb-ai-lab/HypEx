@@ -137,7 +137,7 @@ class FeatureRole(ABCRole):
     _role_name: RoleNameType = "Feature"
 
 
-class PreTargetRole(TargetRole):
+class PreTargetRole(ABCRole):
     """Roles for column that shows Pre target.
     Represents the value of the target variable at a previous time point. This is often required
     for algorithms that need to consider historical outcomes to make predictions or assessments.
@@ -146,6 +146,9 @@ class PreTargetRole(TargetRole):
     """
 
     _role_name: RoleNameType = "PreTarget"
+
+    def __init__(self, data_type: Optional[TargetRoleTypes] = None):
+        super().__init__(data_type)
 
 
 class StatisticRole(ABCRole):

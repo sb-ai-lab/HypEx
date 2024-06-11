@@ -524,9 +524,7 @@ class Dataset(DatasetBase):
         return Dataset(self.roles, data=self.backend.shuffle(random_state))
 
     def rename(self, names: Dict[FieldKeyTypes, FieldKeyTypes]):
-        roles = {
-            names.get(column, column): role for column, role in self.roles.items()
-        }
+        roles = {names.get(column, column): role for column, role in self.roles.items()}
         return Dataset(roles, data=self.backend.rename(names))
 
 
@@ -574,7 +572,7 @@ class ExperimentData:
         elif space == ExperimentDataEnum.analysis_tables:
             self.analysis_tables[executor_id] = value
         elif space == ExperimentDataEnum.variables:
-            self.variables[executor_id][key] = value
+            self.variables[executor_id] = {key: value}
         elif space == ExperimentDataEnum.groups:
             self.groups[executor_id][key] = value
         self.id_name_mapping[executor_id] = name
