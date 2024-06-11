@@ -226,6 +226,12 @@ class MatchingComparator(GroupComparator):
         )
         return data
 
+    @staticmethod
+    def _inner_function(
+        data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+    ) -> Any:
+        raise AbstractMethodError
+
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields, grouping_data = self.__get_grouping_data(data)
         if grouping_data:
