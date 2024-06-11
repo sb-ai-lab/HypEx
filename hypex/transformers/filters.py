@@ -124,7 +124,7 @@ class NanFilter(Transformer):
         target_cols: Optional[FieldKeyTypes] = None,
         threshold: float = 0.8,
     ) -> Dataset:
-        target_cols = super(CVFilter, CVFilter)._list_unification(target_cols)
+        target_cols = super(NanFilter, NanFilter)._list_unification(target_cols)
         for column in target_cols:
             nan_share = data[column].isna().sum() / len(data)
             if nan_share > threshold:
@@ -160,8 +160,8 @@ class CorrFilter(Transformer):
         corr_space_cols: Optional[FieldKeyTypes] = None,
         drop_policy: str = "cv",
     ) -> Dataset:
-        target_cols = super(CVFilter, CVFilter)._list_unification(target_cols)
-        corr_space_cols = super(CVFilter, CVFilter)._list_unification(corr_space_cols)
+        target_cols = super(CorrFilter, CorrFilter)._list_unification(target_cols)
+        corr_space_cols = super(CorrFilter, CorrFilter)._list_unification(corr_space_cols)
         corr_matrix = data[corr_space_cols].corr(
             method=method, numeric_only=numeric_only
         )
@@ -265,4 +265,50 @@ class OutliersFilter(Transformer):
         )
         result = data.copy(data=t_ds)
         result.additional_fields = result.additional_fields.filter(t_ds.index, axis=0)
+        return result
+
+class CategoryFilter(Transformer):
+    def __init__(
+        self,
+        threshold: Optional[int] = 15,
+        new_group_name: Optional[str] = None,
+        key: Any = "",
+    ):
+        """Initialize coefficient of variation filter of the columns in which it does not fit into the defined borders.
+
+        Args:
+            lower_bound:
+                The minimum acceptable coefficient of variation below which we consider the column to be constant
+            upper_bound:
+                The maximum acceptable coefficient of variation above which we consider the to be incorrect
+        """
+        super().__init__(key=key)
+        self.threshold = threshold
+        self.new_group_name = new_group_name
+
+    @staticmethod
+    def _inner_function(
+        data: Dataset,
+        target_cols: Optional[FieldKeyTypes] = None,
+        threshold: Optional[int] = 50,
+        new_group_name: Optional[str] = None,
+    ) -> Dataset:
+        target_cols = super(CategoryFilter, CategoryFilter)._list_unification(target_cols)
+        for column in ["spend_for_candies"]:
+            categories_counts = data[column].value_counts()
+            values_to_replace = categories_counts[categories_counts["count"] < threshold][column].get_values(column=column)
+            print(values_to_replace)
+            print(data[column])
+            print(data[column].replace(to_replace=values_to_replace, value=new_group_name))
+            data[column] = data[column].replace(to_replace=values_to_replace, value=new_group_name)
+
+        return data
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        target_cols = data.ds.search_columns(roles=FeatureRole())
+        result = data.copy(
+            data=self.calc(
+                data=data.ds, target_cols=target_cols, threshold=self.threshold, new_group_name=self.new_group_name
+            )
+        )
         return result

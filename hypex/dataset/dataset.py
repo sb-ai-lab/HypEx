@@ -535,6 +535,9 @@ class Dataset(DatasetBase):
         }
         return Dataset(roles, data=self.backend.rename(names))
 
+    def replace(self, to_replace: Any = None, value: Any = None, inplace: bool = False, regex: bool = False) -> "Dataset":
+        return Dataset(self.roles, data=self._backend.replace(to_replace=to_replace, value=value, inplace=inplace, regex=regex))
+
 
 class ExperimentData:
     def __init__(self, data: Dataset):

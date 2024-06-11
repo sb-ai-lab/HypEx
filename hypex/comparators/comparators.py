@@ -68,4 +68,4 @@ class ATE(GroupComparator):
 
     @staticmethod
     def _to_dataset(data: float, **kwargs) -> Dataset:
-        return Adapter.float_to_dataset(name="ATE", data=data)
+        return Adapter.value_to_dataset(data=data, col_name="ATE")

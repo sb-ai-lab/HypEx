@@ -359,5 +359,14 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     def transpose(self, names) -> Any:
         raise AbstractMethodError
 
+    @abstractmethod
     def shuffle(self, random_state) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def rename(self, columns: Dict[str, str]) -> Any:
+        return AbstractMethodError
+
+    @abstractmethod
+    def replace(self, to_replace: Any = None, value: Any = None, inplace: bool = False, regex: bool = False) -> Any:
         raise AbstractMethodError
