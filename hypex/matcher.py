@@ -610,7 +610,15 @@ class Matcher:
                     self.input_data.loc[np.concatenate(filtred_matches.values)],
                 ]
             )
-        return matched_data
+
+            filtred_matches = filtred_matches.apply(lambda x: int(x[0]))
+            filtred_matches_df = filtred_matches.to_frame().reset_index()
+            df_matched = matched_data.merge(filtred_matches_df, left_on='user_id', right_on='index', how="left"). \
+                merge(filtred_matches_df, left_on='user_id', right_on='matches', how='left').fillna(0)
+            df_matched['user_id_matched'] = df_matched['matches_x'] + df_matched['index_y']
+            df_matched = df_matched.drop(columns=['index_x', 'matches_x', 'index_y', 'matches_y'])
+            df_matched['user_id_matched'] = df_matched['user_id_matched'].astype(int)
+        return df_matched
 
     def feature_select(self) -> pd.DataFrame:
         """Calculates the importance of each feature.
