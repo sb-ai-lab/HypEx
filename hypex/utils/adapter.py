@@ -11,8 +11,16 @@ class Adapter:
     @staticmethod
     def to_dataset(data: Any, col_name: Union[str, List]) -> Dataset:
         """
-        Convert a number to a Dataset
+        Convert various data types to a Dataset object.
+        Args:
+        data (Any): The input data to convert.
+        col_name (Union[str, List]): The column name or list of column names.
+        Returns:
+        Dataset: A Dataset object generated from the input data.
+        Raises:
+        ValueError: If the data type is not supported.
         """
+        # Convert data based on its type
         if isinstance(data, dict):
             return Adapter.dict_to_dataset(data)
         elif isinstance(data, list):
@@ -30,7 +38,8 @@ class Adapter:
         Convert a float to a Dataset
         """
         return Dataset(
-            roles={col_name: InfoRole()}, data=pd.DataFrame(data=[data], columns=[col_name])
+            roles={col_name: InfoRole()},
+            data=pd.DataFrame(data=[data], columns=[col_name]),
         )
 
     @staticmethod
@@ -48,5 +57,6 @@ class Adapter:
         Convert a list to a Dataset
         """
         return Dataset(
-            roles={name: InfoRole() for name in col_name}, data=pd.DataFrame(data=data, columns=[col_name])
+            roles={name: InfoRole() for name in col_name},
+            data=pd.DataFrame(data=data, columns=[col_name]),
         )

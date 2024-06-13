@@ -1,9 +1,8 @@
-from typing import Any, Optional, Union, Iterable
+from typing import Any, Optional
 
 from hypex.dataset.dataset import Dataset
 from hypex.dataset.dataset import ExperimentData
 from hypex.dataset.roles import (
-    ABCRole,
     InfoRole,
     FeatureRole,
     PreTargetRole,
@@ -54,12 +53,17 @@ class CVFilter(Transformer):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         if self.type_filter:
-            target_cols = data.ds.search_columns(roles=FeatureRole(), search_types=[float, int, bool])
+            target_cols = data.ds.search_columns(
+                roles=FeatureRole(), search_types=[float, int, bool]
+            )
         else:
             target_cols = data.ds.search_columns(roles=FeatureRole())
         result = data.copy(
             data=self.calc(
-                data=data.ds, target_cols=target_cols, lower_bound=self.lower_bound, upper_bound=self.upper_bound
+                data=data.ds,
+                target_cols=target_cols,
+                lower_bound=self.lower_bound,
+                upper_bound=self.upper_bound,
             )
         )
         return result
@@ -97,7 +101,11 @@ class ConstFilter(Transformer):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         target_cols = data.ds.search_columns(roles=FeatureRole())
-        result = data.copy(data=self.calc(data=data.ds, target_cols=target_cols, threshold=self.threshold))
+        result = data.copy(
+            data=self.calc(
+                data=data.ds, target_cols=target_cols, threshold=self.threshold
+            )
+        )
         return result
 
 
@@ -133,7 +141,11 @@ class NanFilter(Transformer):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         target_cols = data.ds.search_columns(roles=FeatureRole())
-        result = data.copy(data=self.calc(data=data.ds, target_cols=target_cols, threshold=self.threshold))
+        result = data.copy(
+            data=self.calc(
+                data=data.ds, target_cols=target_cols, threshold=self.threshold
+            )
+        )
         return result
 
 
@@ -161,20 +173,26 @@ class CorrFilter(Transformer):
         drop_policy: str = "cv",
     ) -> Dataset:
         target_cols = super(CorrFilter, CorrFilter)._list_unification(target_cols)
-        corr_space_cols = super(CorrFilter, CorrFilter)._list_unification(corr_space_cols)
+        corr_space_cols = super(CorrFilter, CorrFilter)._list_unification(
+            corr_space_cols
+        )
         corr_matrix = data[corr_space_cols].corr(
             method=method, numeric_only=numeric_only
         )
         pre_target_column = None
         if drop_policy == "corr":
             pre_target_columns = data.search_columns([PreTargetRole()])
-            if (pre_target_columns[0] not in corr_space_cols) | len(pre_target_columns) != 1:
+            if (pre_target_columns[0] not in corr_space_cols) | len(
+                pre_target_columns
+            ) != 1:
                 raise ValueError(
                     "Correlation-based filtering cannot be applied if there are more than one PreTarget columns"
                 )
             else:
                 pre_target_column = pre_target_columns[0]
-        corr_target_cols = [column for column in target_cols if column in corr_matrix.columns]
+        corr_target_cols = [
+            column for column in target_cols if column in corr_matrix.columns
+        ]
         for target in corr_target_cols:
             for column in corr_matrix.columns:
                 if (target != column) and (
@@ -265,50 +283,4 @@ class OutliersFilter(Transformer):
         )
         result = data.copy(data=t_ds)
         result.additional_fields = result.additional_fields.filter(t_ds.index, axis=0)
-        return result
-
-class CategoryFilter(Transformer):
-    def __init__(
-        self,
-        threshold: Optional[int] = 15,
-        new_group_name: Optional[str] = None,
-        key: Any = "",
-    ):
-        """Initialize coefficient of variation filter of the columns in which it does not fit into the defined borders.
-
-        Args:
-            lower_bound:
-                The minimum acceptable coefficient of variation below which we consider the column to be constant
-            upper_bound:
-                The maximum acceptable coefficient of variation above which we consider the to be incorrect
-        """
-        super().__init__(key=key)
-        self.threshold = threshold
-        self.new_group_name = new_group_name
-
-    @staticmethod
-    def _inner_function(
-        data: Dataset,
-        target_cols: Optional[FieldKeyTypes] = None,
-        threshold: Optional[int] = 50,
-        new_group_name: Optional[str] = None,
-    ) -> Dataset:
-        target_cols = super(CategoryFilter, CategoryFilter)._list_unification(target_cols)
-        for column in ["spend_for_candies"]:
-            categories_counts = data[column].value_counts()
-            values_to_replace = categories_counts[categories_counts["count"] < threshold][column].get_values(column=column)
-            print(values_to_replace)
-            print(data[column])
-            print(data[column].replace(to_replace=values_to_replace, value=new_group_name))
-            data[column] = data[column].replace(to_replace=values_to_replace, value=new_group_name)
-
-        return data
-
-    def execute(self, data: ExperimentData) -> ExperimentData:
-        target_cols = data.ds.search_columns(roles=FeatureRole())
-        result = data.copy(
-            data=self.calc(
-                data=data.ds, target_cols=target_cols, threshold=self.threshold, new_group_name=self.new_group_name
-            )
-        )
         return result
