@@ -10,7 +10,7 @@ from hypex.dataset import (
     TempTargetRole,
     MatchingRole,
 )
-from hypex.executor import Calculator
+from hypex.executor import GroupCalculator
 from hypex.utils import (
     BackendsEnum,
     ComparisonNotSuitableFieldError,
@@ -23,56 +23,12 @@ from hypex.utils import (
 )
 
 
-class GroupComparator(Calculator):
-    def __init__(
-        self,
-        grouping_role: Optional[ABCRole] = None,
-        space: SpaceEnum = SpaceEnum.auto,
-        search_types: Union[type, List[type], None] = None,
-        key: Any = "",
-    ):
-        self.grouping_role = grouping_role or GroupingRole()
-        self.space = space
-        self.__additional_mode = space == SpaceEnum.additional
-        self._search_types = (
-            search_types
-            if isinstance(search_types, Iterable) or search_types is None
-            else [search_types]
-        )
-        super().__init__(key=key)
+class GroupComparator(GroupCalculator):
 
     def _local_extract_dataset(
         self, compare_result: Dict[Any, Any], roles: Dict[Any, ABCRole]
     ) -> Dataset:
         return self._extract_dataset(compare_result, roles)
-
-    @staticmethod
-    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
-        if test_data is None:
-            raise ValueError("test_data is needed for comparison")
-        return test_data
-
-    @classmethod
-    @abstractmethod
-    def _inner_function(
-        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
-    ) -> Any:
-        raise AbstractMethodError
-
-    def __group_field_searching(self, data: ExperimentData):
-        group_field = []
-        if self.space in [SpaceEnum.auto, SpaceEnum.data]:
-            group_field = data.ds.search_columns(self.grouping_role)
-        if (
-            self.space in [SpaceEnum.auto, SpaceEnum.additional]
-            and group_field == []
-            and isinstance(data, ExperimentData)
-        ):
-            group_field = data.additional_fields.search_columns(self.grouping_role)
-            self.__additional_mode = True
-        if len(group_field) == 0:
-            raise NoColumnsError(self.grouping_role)
-        return group_field
 
     def __get_grouping_data(self, data: ExperimentData):
         group_field = self.__group_field_searching(data)
@@ -87,16 +43,6 @@ class GroupComparator(Calculator):
         if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
             grouping_data = list(data.groups[group_field[0]].items())
         return group_field, target_fields, grouping_data
-
-    @staticmethod
-    def __field_arg_universalization(
-        field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None]
-    ) -> List[FieldKeyTypes]:
-        if not field:
-            raise NoColumnsError(field)
-        elif isinstance(field, FieldKeyTypes):
-            return [field]
-        return list(field)
 
     @staticmethod
     def _to_dataset(data: Any, **kwargs) -> Dataset:
@@ -121,13 +67,14 @@ class GroupComparator(Calculator):
             raise ComparisonNotSuitableFieldError(group_field)
 
         result = {}
-        if target_fields:
-            for i in range(1, len(grouping_data)):
-                result_key = (
-                    grouping_data[i][0]
-                    if len(grouping_data[i][0]) > 1
-                    else grouping_data[i][0][0]
-                )
+        
+        for i in range(1, len(grouping_data)):
+            result_key = (
+                grouping_data[i][0]
+                if len(grouping_data[i][0]) > 1
+                else grouping_data[i][0][0]
+            )
+            if target_fields:
                 grouping_data[i][1].tmp_roles = data.tmp_roles
                 result[result_key] = cls._to_dataset(
                     cls._inner_function(
@@ -136,13 +83,7 @@ class GroupComparator(Calculator):
                         **kwargs,
                     )
                 )
-        else:
-            for i in range(1, len(grouping_data)):
-                result_key = (
-                    grouping_data[i][0]
-                    if len(grouping_data[i][0]) > 1
-                    else grouping_data[i][0][0]
-                )
+            else: 
                 result[result_key] = cls._to_dataset(
                     cls._inner_function(
                         grouping_data[0][1],
@@ -150,6 +91,7 @@ class GroupComparator(Calculator):
                         **kwargs,
                     )
                 )
+                
         return result
 
     def _set_value(
