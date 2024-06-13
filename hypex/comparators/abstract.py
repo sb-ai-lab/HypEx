@@ -121,13 +121,13 @@ class GroupComparator(Calculator):
             raise ComparisonNotSuitableFieldError(group_field)
 
         result = {}
-        if target_fields:
-            for i in range(1, len(grouping_data)):
-                result_key = (
-                    grouping_data[i][0]
-                    if len(grouping_data[i][0]) > 1
-                    else grouping_data[i][0][0]
-                )
+        for i in range(1, len(grouping_data)):
+            result_key = (
+                grouping_data[i][0]
+                if len(grouping_data[i][0]) > 1
+                else grouping_data[i][0][0]
+            )
+            if target_fields:
                 grouping_data[i][1].tmp_roles = data.tmp_roles
                 result[result_key] = cls._to_dataset(
                     cls._inner_function(
@@ -136,13 +136,7 @@ class GroupComparator(Calculator):
                         **kwargs,
                     )
                 )
-        else:
-            for i in range(1, len(grouping_data)):
-                result_key = (
-                    grouping_data[i][0]
-                    if len(grouping_data[i][0]) > 1
-                    else grouping_data[i][0][0]
-                )
+            else:
                 result[result_key] = cls._to_dataset(
                     cls._inner_function(
                         grouping_data[0][1],
