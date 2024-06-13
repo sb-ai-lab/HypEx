@@ -572,7 +572,7 @@ class ExperimentData:
         elif space == ExperimentDataEnum.analysis_tables:
             self.analysis_tables[executor_id] = value
         elif space == ExperimentDataEnum.variables:
-            self.variables[executor_id] = {key: value}
+            self.variables[executor_id] = value
         elif space == ExperimentDataEnum.groups:
             self.groups[executor_id][key] = value
         self.id_name_mapping[executor_id] = name
