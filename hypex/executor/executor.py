@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional, Dict
 
 from hypex.dataset import Dataset, ExperimentData
-from hypex.utils import ID_SPLIT_SYMBOL, AbstractMethodError
+from hypex.utils import ID_SPLIT_SYMBOL, AbstractMethodError, SetParamsDictTypes
 
 
 class Executor(ABC):
@@ -16,7 +16,7 @@ class Executor(ABC):
         self.key: Any = key
         self._generate_id()
 
-    def set_params(self, params: Dict[str, Any]) -> None:
+    def check_and_setattr(self, params: Dict[str, Any]):
         for key, value in params.items():
             if key in self.__dir__():
                 setattr(self, key, value)
@@ -33,6 +33,19 @@ class Executor(ABC):
                 str(self._key).replace(ID_SPLIT_SYMBOL, "|"),
             ]
         )
+
+    def set_params(self, params: SetParamsDictTypes) -> None:
+        if isinstance(list(params)[0], str):
+            self.check_and_setattr(params)
+        elif isinstance(list(params)[0], type):
+            for executor_class, class_params in params.items():
+                if isinstance(self, executor_class):
+                    self.check_and_setattr(class_params)
+        else:
+            raise ValueError(
+                "params must be a dict of str to dict or a dict of class to dict"
+            )
+        self._generate_id()
 
     @property
     def id(self) -> str:

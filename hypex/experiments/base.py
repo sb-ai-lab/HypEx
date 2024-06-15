@@ -46,6 +46,19 @@ class Experiment(Executor):
         )
         super().__init__(key)
 
+    def set_params(
+        self, params: Union[Dict[str, Any], Dict[type, Dict[str, Any]]]
+    ) -> None:
+        if isinstance(list(params)[0], str):
+            super().set_params(params)
+        elif isinstance(list(params)[0], type):
+            for executor in self.executors:
+                executor.set_params(params)
+        else:
+            raise ValueError(
+                "params must be a dict of str to dict or a dict of class to dict"
+            )
+
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         return data.set_value(
             ExperimentDataEnum.analysis_tables, self.id, self.__class__.__name__, value

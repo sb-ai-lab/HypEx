@@ -27,18 +27,16 @@ class GroupComparator(Calculator):
         self,
         grouping_role: Optional[ABCRole] = None,
         space: SpaceEnum = SpaceEnum.auto,
-        search_types: Union[type, List[type], None] = None,
         key: Any = "",
     ):
         self.grouping_role = grouping_role or GroupingRole()
         self.space = space
         self.__additional_mode = space == SpaceEnum.additional
-        self._search_types = (
-            search_types
-            if isinstance(search_types, Iterable) or search_types is None
-            else [search_types]
-        )
         super().__init__(key=key)
+
+    @property
+    def search_types(self) -> Optional[List[type]]:
+        return None
 
     def _local_extract_dataset(
         self, compare_result: Dict[Any, Any], roles: Dict[Any, ABCRole]
@@ -90,11 +88,11 @@ class GroupComparator(Calculator):
 
     @staticmethod
     def __field_arg_universalization(
-        field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None]
+        field: Union[List[FieldKeyTypes], FieldKeyTypes, None]
     ) -> List[FieldKeyTypes]:
         if not field:
             raise NoColumnsError(field)
-        elif isinstance(field, FieldKeyTypes):
+        elif not isinstance(field, list):
             return [field]
         return list(field)
 
@@ -167,7 +165,6 @@ class GroupComparator(Calculator):
     def _extract_dataset(
         compare_result: FromDictTypes, roles: Dict[Any, ABCRole]
     ) -> Dataset:
-        # TODO: криво. Надо переделать
         if isinstance(list(compare_result.values())[0], Dataset):
             cr_list_v: List[Dataset] = list(compare_result.values())
             result = cr_list_v[0]
@@ -181,7 +178,7 @@ class GroupComparator(Calculator):
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field = self.__group_field_searching(data)
         target_fields = data.ds.search_columns(
-            TempTargetRole(), tmp_role=True, search_types=self._search_types
+            TempTargetRole(), tmp_role=True, search_types=self.search_types
         )
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
@@ -211,9 +208,8 @@ class StatHypothesisTesting(GroupComparator, ABC):
         self,
         grouping_role: Union[ABCRole, None] = None,
         space: SpaceEnum = SpaceEnum.auto,
-        search_types: Union[type, List[type], None] = None,
         reliability: float = 0.05,
         key: Any = "",
     ):
-        super().__init__(grouping_role, space, search_types, key)
+        super().__init__(grouping_role, space, key)
         self.reliability = reliability

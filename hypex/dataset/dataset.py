@@ -389,6 +389,9 @@ class Dataset(DatasetBase):
     def max(self):
         return self._convert_data_after_agg(self._backend.max())
 
+    def idxmax(self):
+        return self._convert_data_after_agg(self._backend.idxmax())
+
     def min(self):
         return self._convert_data_after_agg(self._backend.min())
 
@@ -458,20 +461,16 @@ class Dataset(DatasetBase):
         t_roles = {k: v for k, v in self.roles.items() if k in t_data.columns}
         return Dataset(roles=t_roles, data=t_data)
 
-    def select_dtypes(self, include: Any = None, exclude: Any = None):
-        t_data = self._backend.select_dtypes(include=include, exclude=exclude)
-        t_roles = {k: v for k, v in self.roles.items() if k in t_data.columns}
-        return Dataset(roles=t_roles, data=t_data)
-
     def merge(
         self,
         right,
-        on: FieldKeyTypes = "",
-        left_on: FieldKeyTypes = "",
-        right_on: FieldKeyTypes = "",
+        on: Optional[FieldKeyTypes] = None,
+        left_on: Optional[FieldKeyTypes] = None,
+        right_on: Optional[FieldKeyTypes] = None,
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
+        how: str = "inner",
     ):
         if not isinstance(right, Dataset):
             raise DataTypeError(type(right))
@@ -485,6 +484,7 @@ class Dataset(DatasetBase):
             left_index=left_index,
             right_index=right_index,
             suffixes=suffixes,
+            how=how,
         )
         t_roles = copy(self.roles)
         t_roles.update(right.roles)
@@ -524,9 +524,7 @@ class Dataset(DatasetBase):
         return Dataset(self.roles, data=self.backend.shuffle(random_state))
 
     def rename(self, names: Dict[FieldKeyTypes, FieldKeyTypes]):
-        roles = {
-            names.get(column, column): role for column, role in self.roles.items()
-        }
+        roles = {names.get(column, column): role for column, role in self.roles.items()}
         return Dataset(roles, data=self.backend.rename(names))
 
 

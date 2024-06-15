@@ -27,7 +27,7 @@ class ExperimentWithReporter(Experiment):
         return self.reporter.report(t_data)
 
     def _set_result(self, data: ExperimentData, result: List[Dataset]):
-        result = result[0].append(result[1:], range(self.n_iterations))
+        result = result[0].append(result[1:], range(len(result[1:])))
         return self._set_value(data, result)
 
 
@@ -71,20 +71,16 @@ class ParamsExperiment(ExperimentWithReporter):
         self,
         executors: list[Executor],
         reporter: DatasetReporter,
-        parameters: Dict[type, Dict[str, Sequence[Any]]],
+        params: Dict[type, Dict[str, Sequence[Any]]],
         transformer: Optional[bool] = None,
         key: str = "",
     ):
         super().__init__(executors, reporter, transformer, key)
-        self._params = parameters
+        self._params = params
         self._flat_params: List[Dict[type, Dict[str, Any]]] = []
 
     def generate_params_hash(self) -> str:
         return f"ParamsExperiment: {self.reporter.__class__.__name__}"
-
-    @property
-    def parameters(self) -> Dict[type, Dict[str, Sequence[Any]]]:
-        return self._params
 
     def _update_flat_params(self):
         classes = list(self._params)
@@ -112,8 +108,12 @@ class ParamsExperiment(ExperimentWithReporter):
     def flat_params(self) -> List[Dict[type, Dict[str, Any]]]:
         return self._flat_params
 
-    @parameters.setter
-    def parameters(self, params: Dict[type, Dict[str, Sequence[Any]]]):
+    @property
+    def params(self) -> Dict[type, Dict[str, Sequence[Any]]]:
+        return self._params
+
+    @params.setter
+    def params(self, params: Dict[type, Dict[str, Sequence[Any]]]):
         self._params = params
         self._update_flat_params()
 
@@ -123,11 +123,8 @@ class ParamsExperiment(ExperimentWithReporter):
         for flat_param in self._flat_params:
             t_data = ExperimentData(data.ds)
             for executor in self.executors:
-                for class_, params in flat_param.items():
-                    if isinstance(executor, class_):
-                        executor.set_params(params)
+                executor.set_params(flat_param)
                 t_data = executor.execute(t_data)
             report = self.reporter.report(t_data)
             results.append(report)
         return self._set_result(data, results)
-

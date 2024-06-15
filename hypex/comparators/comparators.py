@@ -1,12 +1,25 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Union, List
 
 from hypex.comparators.abstract import GroupComparator
-from hypex.dataset import Dataset
-from hypex.utils import FieldKeyTypes
+from hypex.dataset import Dataset, ABCRole
+from hypex.utils import SpaceEnum
 from hypex.utils.adapter import Adapter
+from hypex.utils.constants import NUMBER_TYPES_LIST
 
 
 class GroupDifference(GroupComparator):
+    def __init__(
+        self,
+        grouping_role: ABCRole = None,
+        space: SpaceEnum = SpaceEnum.auto,
+        key: str = "",
+    ):
+        super().__init__(grouping_role=grouping_role, space=space, key=key)
+
+    @property
+    def search_types(self) -> Optional[List[type]]:
+        return NUMBER_TYPES_LIST
+
     @staticmethod
     def _to_dataset(data: Dict, **kwargs) -> Dataset:
         return Adapter.dict_to_dataset(data=data)
@@ -23,10 +36,10 @@ class GroupDifference(GroupComparator):
         test_mean = test_data.mean()
 
         return {
-            f"control mean": control_mean,
-            f"test mean": test_mean,
-            f"difference": test_mean - control_mean,
-            f"difference %": (test_mean / control_mean - 1) * 100,
+            "control mean": control_mean,
+            "test mean": test_mean,
+            "difference": test_mean - control_mean,
+            "difference %": (test_mean / control_mean - 1) * 100,
         }
 
 
@@ -51,6 +64,19 @@ class GroupSizes(GroupComparator):
 
 
 class ATE(GroupComparator):
+    def __init__(
+        self, grouping_role: ABCRole, space: SpaceEnum = SpaceEnum.auto, key: str = ""
+    ):
+        super().__init__(
+            grouping_role=grouping_role,
+            space=space,
+            key=key,
+        )
+
+    @property
+    def search_types(self) -> Optional[List[type]]:
+        return NUMBER_TYPES_LIST
+
     @classmethod
     def _inner_function(
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs

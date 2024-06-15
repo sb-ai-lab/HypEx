@@ -31,6 +31,7 @@ from .typings import (
     DocstringInheritDecorator,
     RoleNameType,
     ScalarType,
+    SetParamsDictTypes,
 )
 
 __all__ = [
@@ -62,4 +63,5 @@ __all__ = [
     "MergeOnError",
     "ScalarType",
     "ABNTestMethodsEnum",
+    "SetParamsDictTypes",
 ]

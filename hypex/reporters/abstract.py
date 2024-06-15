@@ -28,7 +28,9 @@ class DictReporter(Reporter, ABC):
         analysis_dict = data.analysis_tables[comparator_id].to_dict()["data"]
         for i, index_value in enumerate(analysis_dict["index"]):
             for k, v in analysis_dict["data"].items():
-                key = sep.join([field, k, index_value] if field else [k, index_value])
+                key = sep.join(
+                    [field, k, str(index_value)] if field else [k, str(index_value)]
+                )
                 result[key] = v[i]
         return result
 

@@ -225,6 +225,10 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
+    def idxmax(self) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
     def min(self) -> Any:
         raise AbstractMethodError
 

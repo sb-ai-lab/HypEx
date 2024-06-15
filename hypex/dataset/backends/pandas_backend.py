@@ -237,6 +237,12 @@ class PandasNavigation(DatasetBackendNavigation):
 
 
 class PandasDataset(PandasNavigation, DatasetBackendCalc):
+    @staticmethod
+    def _convert_agg_result(result):
+        if result.shape[0] == 1 and result.shape[1] == 1:
+            return float(result.loc[result.index[0], result.columns[0]])
+        return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+
     def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series] = None):
         super().__init__(data)
 
@@ -262,12 +268,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def agg(self, func: Union[str, List], **kwargs) -> Union[pd.DataFrame, float]:
         func = func if isinstance(func, List) else [func]
         result = self.data.agg(func, **kwargs)
-        if result.shape[0] == 1 and result.shape[1] == 1:
-            return float(result.loc[result.index[0], result.columns[0]])
-        return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+        return self._convert_agg_result(result)
 
     def max(self) -> Union[pd.DataFrame, float]:
         return self.agg(["max"])
+
+    def idxmax(self) -> pd.DataFrame:
+        return self._convert_agg_result(self.data.idxmax())
 
     def min(self) -> Union[pd.DataFrame, float]:
         return self.agg(["min"])
@@ -281,13 +288,11 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def mean(self) -> Union[pd.DataFrame, float]:
         return self.agg(["mean"])
 
-    # TODO
     def mode(
         self, numeric_only: bool = False, dropna: bool = True
     ) -> Union[pd.DataFrame, float]:
         return self.agg(["mode"])
 
-    # TODO
     def var(
         self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
     ) -> Union[pd.DataFrame, float]:
@@ -388,6 +393,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
+        how="inner",
     ) -> pd.DataFrame:
         for on_ in [on, left_on, right_on]:
             if on_ and (on_ not in [*self.columns, *right.columns]):
@@ -400,6 +406,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             left_index=left_index,
             right_index=right_index,
             suffixes=suffixes,
+            how=how,
         )
 
     def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> pd.DataFrame:
