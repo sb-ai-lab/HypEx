@@ -27,7 +27,7 @@ class ExperimentWithReporter(Experiment):
         return self.reporter.report(t_data)
 
     def _set_result(self, data: ExperimentData, result: List[Dataset]):
-        result = result[0].append(result[1:], range(len(result[1:])))
+        result = result[0].append(result[1:], True)
         return self._set_value(data, result)
 
 
