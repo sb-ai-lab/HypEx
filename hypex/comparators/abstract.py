@@ -18,6 +18,7 @@ from hypex.utils import (
     SpaceEnum,
     AbstractMethodError,
 )
+from hypex.utils.adapter import Adapter
 
 
 class GroupComparator(GroupCalculator):
@@ -38,12 +39,6 @@ class GroupComparator(GroupCalculator):
     ) -> Dataset:
         return self._extract_dataset(compare_result, roles)
 
-    @staticmethod
-    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
-        if test_data is None:
-            raise ValueError("test_data is needed for comparison")
-        return test_data
-
     @classmethod
     @abstractmethod
     def _inner_function(
@@ -57,10 +52,6 @@ class GroupComparator(GroupCalculator):
             TempTargetRole(), tmp_role=True, search_types=self._search_types
         )
         return group_field, target_fields
-
-    @staticmethod
-    def _to_dataset(data: Any, **kwargs) -> Dataset:
-        return data
 
     @classmethod
     def _execute_inner_function(
@@ -79,7 +70,7 @@ class GroupComparator(GroupCalculator):
             )
             if target_fields:
                 grouping_data[i][1].tmp_roles = old_data.tmp_roles
-                result[result_key] = cls._to_dataset(
+                result[result_key] = Adapter.to_dataset(
                     cls._inner_function(
                         data=grouping_data[0][1][target_fields],
                         test_data=grouping_data[i][1][target_fields],
@@ -87,7 +78,7 @@ class GroupComparator(GroupCalculator):
                     )
                 )
             else:
-                result[result_key] = cls._to_dataset(
+                result[result_key] = Adapter.to_dataset(
                     cls._inner_function(
                         grouping_data[0][1],
                         grouping_data[i][1],
@@ -181,6 +172,12 @@ class MatchingComparator(GroupComparator):
         data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Any:
         raise AbstractMethodError
+
+    @staticmethod
+    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
+        if test_data is None:
+            raise ValueError("test_data is needed for evaluation")
+        return test_data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields, grouping_data = self._get_grouping_data(data)

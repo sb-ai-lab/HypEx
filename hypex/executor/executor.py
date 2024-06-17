@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC
-from typing import Any, Dict, List, Optional, Sequence, Union, Iterable
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 from hypex.dataset import (
     ABCRole,
@@ -15,6 +15,7 @@ from hypex.utils import (
     AbstractMethodError,
     ID_SPLIT_SYMBOL,
 )
+from hypex.utils.adapter import Adapter
 
 
 class Executor(ABC):
@@ -106,7 +107,7 @@ class GroupCalculator(Calculator):
         self.__additional_mode = space == SpaceEnum.additional
         self._search_types = (
             search_types
-            if isinstance(search_types, Iterable) or search_types is None
+            if isinstance(search_types, type) or search_types is None
             else [search_types]
         )
         self.target_roles = target_roles or []
@@ -139,6 +140,12 @@ class GroupCalculator(Calculator):
             data, self.target_roles, search_types=self._search_types
         )
         return group_field, target_fields
+
+    @staticmethod
+    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
+        if test_data is None:
+            raise ValueError("test_data is needed for comparison")
+        return test_data
 
     def _get_grouping_data(self, data: ExperimentData):
         group_field, target_fields = self._get_fields(data)
@@ -182,7 +189,7 @@ class GroupCalculator(Calculator):
         target_fields: Optional[List[FieldKeyTypes]] = None,
         **kwargs,
     ) -> Dict:
-        group_field = cls._field_arg_universalization(group_field)
+        group_field = Adapter.to_list(group_field)
 
         if grouping_data is None:
             grouping_data = data.groupby(group_field)

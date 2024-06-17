@@ -5,20 +5,33 @@ from ..dataset import Dataset
 
 
 class ATC(MatchingComparator):
-
-    # TODO переопределить функцию подготовки данных
     @classmethod
     def _inner_function(cls, data: Dataset, other: Optional[Dataset] = None, **kwargs):
+        other = cls._check_test_data(test_data=other)
         return {"ATC": (data - other).mean()}
 
 
 class ATT(MatchingComparator):
+
     @classmethod
     def _inner_function(cls, data: Dataset, other: Optional[Dataset] = None, **kwargs):
+        other = cls._check_test_data(test_data=other)
         return {"ATT": (other - data).mean()}
 
 
 class ATE(MatchingComparator):
+    @staticmethod
+    def _check_test_data(
+        test_data: Optional[Dataset] = None,
+        att: Optional[float] = None,
+        atc: Optional[float] = None,
+    ) -> Dataset:
+        if test_data is None:
+            raise ValueError("test_data is needed for evaluation")
+        if att is None or atc is None:
+            raise ValueError("ATC and ATT must be provided.")
+        return test_data
+
     @classmethod
     def _inner_function(
         cls,
@@ -28,6 +41,5 @@ class ATE(MatchingComparator):
         atc: Optional[float] = None,
         **kwargs
     ) -> float:
-        att = att if att is not None else ATT().calc(data, other).get("ATT")
-        atc = atc if atc is not None else ATC().calc(data, other).get("ATC")
+        other = cls._check_test_data(test_data=other, att=att, atc=atc)
         return (att * len(data) + atc * len(other)) / (len(data) + len(other))
