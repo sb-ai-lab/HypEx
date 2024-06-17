@@ -517,7 +517,7 @@ class Dataset(DatasetBase):
         like: Optional[str] = None,
         regex: Optional[str] = None,
         axis: Optional[int] = None,
-    ):
+    ) -> "Dataset":
         t_data = self._backend.filter(items=items, like=like, regex=regex, axis=axis)
         return Dataset(roles=self.roles, data=t_data)
 
@@ -547,7 +547,6 @@ class Dataset(DatasetBase):
         self,
         to_replace: Any = None,
         value: Any = None,
-        inplace: bool = False,
         regex: bool = False,
     ) -> "Dataset":
         return Dataset(

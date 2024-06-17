@@ -3,18 +3,18 @@ from typing import Union, Dict, Any, List
 import pandas as pd
 
 from hypex.dataset import Dataset, InfoRole
-from hypex.utils import ScalarType
+from hypex.utils import ScalarType, FieldKeyTypes
 
 
 class Adapter:
 
     @staticmethod
-    def to_dataset(data: Any, col_name: Union[str, List]) -> Dataset:
+    def to_dataset(data: Any, column_name: Union[FieldKeyTypes, List[FieldKeyTypes]]) -> Dataset:
         """
         Convert various data types to a Dataset object.
         Args:
         data (Any): The input data to convert.
-        col_name (Union[str, List]): The column name or list of column names.
+        column_name (Union[str, List]): The column name or list of column names.
         Returns:
         Dataset: A Dataset object generated from the input data.
         Raises:
@@ -23,23 +23,23 @@ class Adapter:
         # Convert data based on its type
         if isinstance(data, dict):
             return Adapter.dict_to_dataset(data)
-        elif isinstance(data, list):
-            if not isinstance(col_name, list):
-                col_name = [col_name]
-            return Adapter.list_to_dataset(data, col_name)
+        elif isinstance(data, List):
+            if not isinstance(column_name, List):
+                column_name = [column_name]
+            return Adapter.list_to_dataset(data, column_name)
         elif isinstance(data, ScalarType):
-            return Adapter.value_to_dataset(data, col_name)
+            return Adapter.value_to_dataset(data, column_name)
         else:
             raise ValueError(f"Unsupported data type {type(data)}")
 
     @staticmethod
-    def value_to_dataset(data: ScalarType, col_name: str) -> Dataset:
+    def value_to_dataset(data: ScalarType, column_name: str) -> Dataset:
         """
         Convert a float to a Dataset
         """
         return Dataset(
-            roles={col_name: InfoRole()},
-            data=pd.DataFrame(data=[data], columns=[col_name]),
+            roles={column_name: InfoRole()},
+            data=pd.DataFrame(data=[data], columns=[column_name]),
         )
 
     @staticmethod
@@ -52,11 +52,11 @@ class Adapter:
         )
 
     @staticmethod
-    def list_to_dataset(data: List, col_name: List) -> Dataset:
+    def list_to_dataset(data: List, column_name: List) -> Dataset:
         """
         Convert a list to a Dataset
         """
         return Dataset(
-            roles={name: InfoRole() for name in col_name},
-            data=pd.DataFrame(data=data, columns=[col_name]),
+            roles={name: InfoRole() for name in column_name},
+            data=pd.DataFrame(data=data, columns=[column_name]),
         )

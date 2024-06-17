@@ -162,5 +162,9 @@ class DatasetBase(ABC):
     def backend(self):
         return self._backend
 
-    def get_values(self, row: FieldKeyTypes = None, column: FieldKeyTypes = None) -> Any:
+    def get_values(
+        self,
+        row: Optional[FieldKeyTypes] = None,
+        column: Optional[FieldKeyTypes] = None,
+    ) -> Any:
         return self._backend.get_values(row=row, column=column)
