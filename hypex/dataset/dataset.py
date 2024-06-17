@@ -64,13 +64,13 @@ class Dataset(DatasetBase):
             )
 
     def __init__(
-        self,
-        roles: Union[
-            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
-            Dict[Union[str, int], ABCRole],
-        ],
-        data: Optional[Union[pd.DataFrame, str]] = None,
-        backend: Optional[BackendsEnum] = None,
+            self,
+            roles: Union[
+                Dict[ABCRole, Union[List[Union[str, int]], str, int]],
+                Dict[Union[str, int], ABCRole],
+            ],
+            data: Optional[Union[pd.DataFrame, str]] = None,
+            backend: Optional[BackendsEnum] = None,
     ):
         super().__init__(roles, data, backend)
         self.loc = self.Locker(self._backend, self.roles)
@@ -246,10 +246,10 @@ class Dataset(DatasetBase):
         )
 
     def add_column(
-        self,
-        data,
-        role: Optional[Dict[str, ABCRole]] = None,
-        index: Optional[Iterable[Hashable]] = None,
+            self,
+            data,
+            role: Optional[Dict[str, ABCRole]] = None,
+            index: Optional[Iterable[Hashable]] = None,
     ):
         if role is None:
             if not isinstance(data, Dataset):
@@ -270,7 +270,7 @@ class Dataset(DatasetBase):
         if type(other._backend) is not type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
 
-    def append(self, other, index=None) -> "Dataset":
+    def append(self, other, index: bool = False) -> "Dataset":
         if isinstance(other, Dataset):
             other = [other]
 
@@ -283,13 +283,13 @@ class Dataset(DatasetBase):
 
     @staticmethod
     def from_dict(
-        data: FromDictTypes,
-        roles: Union[
-            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
-            Dict[Union[str, int], ABCRole],
-        ],
-        backend: BackendsEnum = BackendsEnum.pandas,
-        index=None,
+            data: FromDictTypes,
+            roles: Union[
+                Dict[ABCRole, Union[List[Union[str, int]], str, int]],
+                Dict[Union[str, int], ABCRole],
+            ],
+            backend: BackendsEnum = BackendsEnum.pandas,
+            index=None,
     ) -> "Dataset":
         ds = Dataset(roles=roles, backend=backend)
         ds._backend = ds._backend.from_dict(data, index)
@@ -298,11 +298,11 @@ class Dataset(DatasetBase):
 
     # What is going to happen when a matrix is returned?
     def apply(
-        self,
-        func: Callable,
-        role: Dict[FieldKeyTypes, ABCRole],
-        axis: int = 0,
-        **kwargs,
+            self,
+            func: Callable,
+            role: Dict[FieldKeyTypes, ABCRole],
+            axis: int = 0,
+            **kwargs,
     ) -> "Dataset":
         return Dataset(
             data=self._backend.apply(func=func, axis=axis, **kwargs).rename(
@@ -333,11 +333,11 @@ class Dataset(DatasetBase):
         )
 
     def groupby(
-        self,
-        by: Any,
-        func: Optional[Union[str, List]] = None,
-        fields_list: Optional[Union[str, List]] = None,
-        **kwargs,
+            self,
+            by: Any,
+            func: Optional[Union[str, List]] = None,
+            fields_list: Optional[Union[str, List]] = None,
+            **kwargs,
     ):
         datasets = [
             (i, Dataset(roles=self.roles, data=data))
@@ -356,10 +356,10 @@ class Dataset(DatasetBase):
         return datasets
 
     def sort(
-        self,
-        by: Optional[MultiFieldKeyTypes] = None,
-        ascending: bool = True,
-        **kwargs,
+            self,
+            by: Optional[MultiFieldKeyTypes] = None,
+            ascending: bool = True,
+            **kwargs,
     ):
         if by is None:
             return Dataset(
@@ -372,10 +372,10 @@ class Dataset(DatasetBase):
         )
 
     def fillna(
-        self,
-        values: Union[int, Dict[FieldKeyTypes, FieldKeyTypes]],
-        method: Optional[str] = None,
-        **kwargs,
+            self,
+            values: Union[int, Dict[FieldKeyTypes, FieldKeyTypes]],
+            method: Optional[str] = None,
+            **kwargs,
     ):
         if method and method not in ["backfill", "bfill", "ffill"]:
             raise NameError("Unsupported fill method")
@@ -429,11 +429,11 @@ class Dataset(DatasetBase):
         return Dataset(roles=t_roles, data=t_data)
 
     def value_counts(
-        self,
-        normalize: bool = False,
-        sort: bool = True,
-        ascending: bool = False,
-        dropna: bool = True,
+            self,
+            normalize: bool = False,
+            sort: bool = True,
+            ascending: bool = False,
+            dropna: bool = True,
     ):
         t_data = self._backend.value_counts(
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
@@ -462,15 +462,15 @@ class Dataset(DatasetBase):
         return Dataset(roles=t_roles, data=t_data)
 
     def merge(
-        self,
-        right,
-        on: Optional[FieldKeyTypes] = None,
-        left_on: Optional[FieldKeyTypes] = None,
-        right_on: Optional[FieldKeyTypes] = None,
-        left_index: bool = False,
-        right_index: bool = False,
-        suffixes: tuple[str, str] = ("_x", "_y"),
-        how: str = "inner",
+            self,
+            right,
+            on: Optional[FieldKeyTypes] = None,
+            left_on: Optional[FieldKeyTypes] = None,
+            right_on: Optional[FieldKeyTypes] = None,
+            left_index: bool = False,
+            right_index: bool = False,
+            suffixes: tuple[str, str] = ("_x", "_y"),
+            how: str = "inner",
     ):
         if not isinstance(right, Dataset):
             raise DataTypeError(type(right))
@@ -510,8 +510,8 @@ class Dataset(DatasetBase):
         return Dataset(roles=other.roles, data=result_data)
 
     def transpose(
-        self,
-        roles: Optional[Union[Dict[Union[str, int], ABCRole], List]] = None,
+            self,
+            roles: Optional[Union[Dict[Union[str, int], ABCRole], List]] = None,
     ) -> "Dataset":
         roles_names = roles.keys() or {} if isinstance(roles, Dict) else roles
         result_data = self.backend.transpose(roles_names)
@@ -543,7 +543,7 @@ class ExperimentData:
 
     @staticmethod
     def create_empty(
-        roles=None, backend=BackendsEnum.pandas, index=None
+            roles=None, backend=BackendsEnum.pandas, index=None
     ) -> "ExperimentData":
         ds = Dataset.create_empty(backend, roles, index)
         return ExperimentData(ds)
@@ -559,13 +559,13 @@ class ExperimentData:
             return any(self.check_hash(executor_id, s) for s in ExperimentDataEnum)
 
     def set_value(
-        self,
-        space: ExperimentDataEnum,
-        executor_id: str,
-        name: str,
-        value: Any,
-        key: Optional[str] = None,
-        role=None,
+            self,
+            space: ExperimentDataEnum,
+            executor_id: str,
+            name: str,
+            value: Any,
+            key: Optional[str] = None,
+            role=None,
     ) -> "ExperimentData":
         if space == ExperimentDataEnum.additional_fields:
             self.additional_fields.add_column(data=value, role={executor_id: role})
@@ -579,9 +579,9 @@ class ExperimentData:
         return self
 
     def get_ids(
-        self,
-        classes: Union[type, Iterable[type]],
-        searched_space: Optional[ExperimentDataEnum] = None,
+            self,
+            classes: Union[type, Iterable[type]],
+            searched_space: Optional[ExperimentDataEnum] = None,
     ) -> Dict[type, Dict[str, List[str]]]:
         classes = classes if isinstance(classes, Iterable) else [classes]
         if searched_space:

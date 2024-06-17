@@ -209,7 +209,7 @@ class PandasNavigation(DatasetBackendNavigation):
     def append(self, other, index: bool = False) -> pd.DataFrame:
         new_data = pd.concat([self.data] + [d.data for d in other])
         if index:
-            new_data.reset_index()
+            new_data = new_data.reset_index(drop=True)
         return new_data
 
     def from_dict(
@@ -239,6 +239,8 @@ class PandasNavigation(DatasetBackendNavigation):
 class PandasDataset(PandasNavigation, DatasetBackendCalc):
     @staticmethod
     def _convert_agg_result(result):
+        if isinstance(result, pd.Series):
+            result = result.to_frame()
         if result.shape[0] == 1 and result.shape[1] == 1:
             return float(result.loc[result.index[0], result.columns[0]])
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
