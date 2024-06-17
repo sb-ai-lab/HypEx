@@ -30,12 +30,12 @@ class OneAAStatAnalyzer(Executor):
                 for f in ["p-value", "pass"]:
                     analysis_data[f"mean {c.__name__} {f}"] = t_data[f].mean()
         analysis_data["mean test score"] = (
-                analysis_data["mean TTest p-value"]
-                + 2 * analysis_data["mean KSTest p-value"]
+            analysis_data["mean TTest p-value"]
+            + 2 * analysis_data["mean KSTest p-value"]
         )
         if "mean Chi2Test p-value" in analysis_data:
             analysis_data["mean test score"] += (
-                    2 * analysis_data["mean Chi2Test p-value"]
+                2 * analysis_data["mean Chi2Test p-value"]
             )
             analysis_data["mean test score"] /= 5
         else:

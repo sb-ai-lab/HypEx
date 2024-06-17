@@ -227,6 +227,9 @@ class PandasNavigation(DatasetBackendNavigation):
         index = list(self.index)
         return {"data": data, "index": index}
 
+    def to_records(self) -> List[Dict]:
+        return self.data.to_dict(orient="records")
+
     def loc(self, items: Iterable) -> Iterable:
         data = self.data.loc[items]
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)

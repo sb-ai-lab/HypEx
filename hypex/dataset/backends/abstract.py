@@ -29,6 +29,9 @@ class DatasetBackendNavigation(ABC):
     def to_dict(self) -> Dict[str, Any]:
         raise AbstractMethodError
 
+    def to_records(self) -> List[Dict]:
+        raise AbstractMethodError
+
     @abstractmethod
     def __getitem__(self, item) -> Any:
         raise AbstractMethodError
