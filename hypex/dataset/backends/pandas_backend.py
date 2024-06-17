@@ -353,7 +353,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def dropna(
         self,
         how: Literal["any", "all"] = "any",
-        subset: Union[str, Iterable[str]] = None,
+        subset: Union[str, Iterable[str], None] = None,
     ) -> pd.DataFrame:
         return self.data.dropna(how=how, subset=subset)
 

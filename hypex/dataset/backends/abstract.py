@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC
-from typing import Iterable, Any, Union, Callable, Sized, Optional, Dict, Sequence, List
+from typing import Iterable, Any, Union, Callable, Sized, Optional, Dict, Sequence, List, Literal
 
 from hypex.utils import AbstractMethodError, FromDictTypes, FieldKeyTypes
 
@@ -309,7 +309,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
 
     @abstractmethod
     def dropna(
-        self, how: str = "any", subset: Union[str, Iterable[str], None] = None
+        self, how: Literal["any", "all"] = "any", subset: Union[str, Iterable[str], None] = None
     ) -> Any:
         raise AbstractMethodError
 

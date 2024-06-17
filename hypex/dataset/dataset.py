@@ -442,7 +442,7 @@ class Dataset(DatasetBase):
     def na_counts(self):
         return self._convert_data_after_agg(self._backend.na_counts())
 
-    def dropna(self, how: str = "any", subset: Union[str, Iterable[str]] = None):
+    def dropna(self, how: str = "any", subset: Union[str, Iterable[str], None] = None):
         return Dataset(
             roles=self.roles, data=self._backend.dropna(how=how, subset=subset)
         )
@@ -452,11 +452,6 @@ class Dataset(DatasetBase):
 
     def quantile(self, q: float = 0.5):
         return self._convert_data_after_agg(self._backend.quantile(q=q))
-
-    def select_dtypes(self, include: Any = None, exclude: Any = None):
-        t_data = self._backend.select_dtypes(include=include, exclude=exclude)
-        t_roles = {k: v for k, v in self.roles.items() if k in t_data.columns}
-        return Dataset(roles=t_roles, data=t_data)
 
     def select_dtypes(self, include: Any = None, exclude: Any = None):
         t_data = self._backend.select_dtypes(include=include, exclude=exclude)
