@@ -4,15 +4,17 @@ from typing import Any, Union, Dict, List, TypeVar, Callable, Sequence
 StratificationRoleTypes = Union[float, str, datetime.datetime]
 DefaultRoleTypes = Union[float, bool, str, int]
 TargetRoleTypes = Union[float, int, bool]
-CategoricalTypes = str
+CategoricalTypes = Union[str]
 ScalarType = Union[float, int, str, bool]
 
 FieldKeyTypes = Union[str, int]
 MultiFieldKeyTypes = Union[FieldKeyTypes, Sequence[FieldKeyTypes]]
 
-FromDictTypes = Union[Dict[str, List[Any]], List[Dict[Any, Any]]]
+FromDictTypes = Union[
+    Dict[str, List[Any]], List[Dict[Any, Any]], Dict[str, Dict[Any, List]]
+]
 RoleNameType = str
 DecoratedType = TypeVar("DecoratedType", bound=Union[Callable[..., Any], property])
 DocstringInheritDecorator = Callable[[DecoratedType], DecoratedType]
 
-NumberTypes = [int, float]
+SetParamsDictTypes = Union[Dict[str, Any], Dict[type, Dict[str, Any]]]

@@ -1,4 +1,4 @@
-from typing import Union, Optional
+from typing import Union, Optional, List
 
 from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu  # type: ignore
 
@@ -8,9 +8,10 @@ from ..extensions.hypothesis_testing import (
     TTestExtension,
     KSTestExtension,
     UTestExtension,
+    Chi2TestExtension,
 )
 from ..utils import SpaceEnum
-from ..utils.typings import NumberTypes, CategoricalTypes
+from ..utils.constants import NUMBER_TYPES_LIST
 
 
 class TTest(StatHypothesisTesting):
@@ -23,9 +24,12 @@ class TTest(StatHypothesisTesting):
         super().__init__(
             grouping_role=grouping_role,
             space=space,
-            search_types=NumberTypes,
             reliability=reliability,
         )
+
+    @property
+    def search_types(self) -> Optional[List[type]]:
+        return NUMBER_TYPES_LIST
 
     @classmethod
     def _inner_function(
@@ -46,9 +50,12 @@ class KSTest(StatHypothesisTesting):
         super().__init__(
             grouping_role=grouping_role,
             space=space,
-            search_types=NumberTypes,
             reliability=reliability,
         )
+
+    @property
+    def search_types(self) -> Optional[List[type]]:
+        return NUMBER_TYPES_LIST
 
     @classmethod
     def _inner_function(
@@ -69,9 +76,12 @@ class UTest(StatHypothesisTesting):
         super().__init__(
             grouping_role=grouping_role,
             space=space,
-            search_types=NumberTypes,
             reliability=reliability,
         )
+
+    @property
+    def search_types(self) -> Optional[List[type]]:
+        return NUMBER_TYPES_LIST
 
     @classmethod
     def _inner_function(
@@ -92,14 +102,17 @@ class Chi2Test(StatHypothesisTesting):
         super().__init__(
             grouping_role=grouping_role,
             space=space,
-            search_types=CategoricalTypes,
             reliability=reliability,
         )
+
+    @property
+    def search_types(self) -> Optional[List[type]]:
+        return [str]
 
     @classmethod
     def _inner_function(
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dataset:
-        return UTestExtension(kwargs.get("reliability", 0.05)).calc(
+        return Chi2TestExtension(reliability=kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )

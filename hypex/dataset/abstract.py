@@ -152,6 +152,9 @@ class DatasetBase(ABC):
             "data": self._backend.to_dict(),
         }
 
+    def to_records(self):
+        return self._backend.to_records()
+
     def to_json(self, filename: Optional[str] = None):
         if not filename:
             return json.dumps(self.to_dict())

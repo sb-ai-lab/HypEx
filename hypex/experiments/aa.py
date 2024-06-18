@@ -1,14 +1,19 @@
+from typing import Optional, Dict
+
 from hypex.analyzers import OneAAStatAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes
-from hypex.comparators.hypothesis_testing import TTest, KSTest
+from hypex.comparators.abstract import GroupComparator
+from hypex.comparators.hypothesis_testing import TTest, KSTest, Chi2Test
 from hypex.dataset import TargetRole, TreatmentRole
 from hypex.experiments import Experiment, OnRoleExperiment
+from hypex.experiments.base_complex import ParamsExperiment
+from hypex.reporters import DatasetReporter, AADictReporter
 from hypex.splitters import AASplitter
 from hypex.utils import SpaceEnum
 from hypex.transformers.filters import CVFilter, ConstFilter, NanFilter, CorrFilter, OutliersFilter
 from hypex.transformers.category_agg import CategoryAggregator
 
-AA_TEST = Experiment(
+ONE_AA_TEST = Experiment(
     executors=[
         # CVFilter(),
         # ConstFilter(threshold=0.4),
@@ -25,6 +30,7 @@ AA_TEST = Experiment(
                 ),
                 TTest(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
                 KSTest(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
+                Chi2Test(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
             ],
             role=TargetRole(),
         ),

@@ -21,6 +21,9 @@ class AASplitter(Calculator):
         self.save_groups = save_groups
         super().__init__(key)
 
+    def _generate_params_hash(self) -> str:
+        self._params_hash = f"{self.random_state}"
+
     @property
     def key(self) -> Any:
         return self._key
@@ -30,9 +33,6 @@ class AASplitter(Calculator):
         if not self.constant_key:
             self._key = value
             self._generate_id()
-
-    def generate_params_hash(self) -> str:
-        return f"{self.random_state}"
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         data = data.set_value(

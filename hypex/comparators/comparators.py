@@ -1,12 +1,16 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 from hypex.comparators.abstract import GroupComparator
-from hypex.dataset import Dataset, InfoRole
-from hypex.utils import FieldKeyTypes
-from hypex.utils.adapter import Adapter
+from hypex.dataset import Dataset
+from hypex.utils.constants import NUMBER_TYPES_LIST
 
 
 class GroupDifference(GroupComparator):
+
+    @property
+    def search_types(self) -> Optional[List[type]]:
+        return NUMBER_TYPES_LIST
+
     @classmethod
     def _inner_function(
         cls,
@@ -14,15 +18,14 @@ class GroupDifference(GroupComparator):
         test_data: Optional[Dataset] = None,
         **kwargs,
     ) -> Dict:
-        # test_data = cls._to_dataset(test_data=test_data)
         control_mean = data.mean()
         test_mean = test_data.mean()
 
         return {
-            f"control mean": control_mean,
-            f"test mean": test_mean,
-            f"difference": test_mean - control_mean,
-            f"difference %": (test_mean / control_mean - 1) * 100,
+            "control mean": control_mean,
+            "test mean": test_mean,
+            "difference": test_mean - control_mean,
+            "difference %": (test_mean / control_mean - 1) * 100,
         }
 
 
@@ -32,7 +35,7 @@ class GroupSizes(GroupComparator):
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dict:
         size_a = len(data)
-        size_b = len(test_data) if test_data else 0
+        size_b = len(test_data) if isinstance(test_data, Dataset) else 0
 
         return {
             "control size": size_a,
@@ -43,6 +46,11 @@ class GroupSizes(GroupComparator):
 
 
 class ATE(GroupComparator):
+
+    @property
+    def search_types(self) -> Optional[List[type]]:
+        return NUMBER_TYPES_LIST
+
     @classmethod
     def _inner_function(
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs

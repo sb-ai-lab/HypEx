@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-from hypex.comparators import KSTest, TTest
+from hypex.comparators import KSTest, TTest, Chi2Test
 from hypex.dataset import Dataset, ExperimentData, StatisticRole
 from hypex.executor import Executor
 from hypex.utils import BackendsEnum, ExperimentDataEnum
@@ -13,7 +13,7 @@ class OneAAStatAnalyzer(Executor):
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        analysis_tests: List[type] = [TTest, KSTest]
+        analysis_tests: List[type] = [TTest, KSTest, Chi2Test]
         executor_ids = data.get_ids(analysis_tests)
 
         analysis_data: Dict[str, float] = {}
@@ -26,12 +26,20 @@ class OneAAStatAnalyzer(Executor):
                     )
                 else:
                     t_data = data.analysis_tables[analysis_ids[0]]
-                t_data.data.index = analysis_ids
+                # t_data.data.index = analysis_ids
                 for f in ["p-value", "pass"]:
-                    analysis_data[f"{c.__name__} {f}"] = t_data[f].mean()
+                    analysis_data[f"mean {c.__name__} {f}"] = t_data[f].mean()
         analysis_data["mean test score"] = (
-            analysis_data["TTest p-value"] + 2 * analysis_data["KSTest p-value"]
-        ) / 3
+            analysis_data["mean TTest p-value"]
+            + 2 * analysis_data["mean KSTest p-value"]
+        )
+        if "mean Chi2Test p-value" in analysis_data:
+            analysis_data["mean test score"] += (
+                2 * analysis_data["mean Chi2Test p-value"]
+            )
+            analysis_data["mean test score"] /= 5
+        else:
+            analysis_data["mean test score"] /= 3
 
         analysis_dataset = Dataset.from_dict(
             [analysis_data],
