@@ -52,23 +52,21 @@ class AADictReporter(DictReporter):
     def _convert_struct_dict_to_dataset(data: Dict) -> Dataset:
         result = []
         for feature, groups in data.items():
-            result.extend(
-                {
+            for group, tests in groups.items():
+                t_values = {
                     "feature": feature,
-                    "group": group,
-                    "pass": values["pass"],
-                    "p-value": values["p-value"],
+                    "group": group
                 }
-                for group, values in groups.items()
-            )
+                for test, values in tests.items():
+                    t_values[f"{test} pass"] = values["pass"]
+                    t_values[f"{test} p-value"] = values["p-value"]
+                result.append(t_values)
         result = [AADictReporter.rename_passed(d) for d in result]
         return Dataset.from_dict(
             result,
             roles={
                 "feature": InfoRole(),
-                "group": TreatmentRole(),
-                "pass": TargetRole(),
-                "p-value": StatisticRole(),
+                "group": TreatmentRole()
             },
         )
 

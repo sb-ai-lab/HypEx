@@ -10,7 +10,9 @@ ScalarType = Union[float, int, str, bool]
 FieldKeyTypes = Union[str, int]
 MultiFieldKeyTypes = Union[FieldKeyTypes, Sequence[FieldKeyTypes]]
 
-FromDictTypes = Union[Dict[str, List[Any]], List[Dict[Any, Any]]]
+FromDictTypes = Union[
+    Dict[str, List[Any]], List[Dict[Any, Any]], Dict[str, Dict[Any, List]]
+]
 RoleNameType = str
 DecoratedType = TypeVar("DecoratedType", bound=Union[Callable[..., Any], property])
 DocstringInheritDecorator = Callable[[DecoratedType], DecoratedType]

@@ -49,7 +49,7 @@ class GroupSizes(GroupComparator):
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dict:
         size_a = len(data)
-        size_b = len(test_data) if test_data else 0
+        size_b = len(test_data) if isinstance(test_data, Dataset) else 0
 
         return {
             "control size": size_a,

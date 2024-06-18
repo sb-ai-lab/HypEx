@@ -232,10 +232,14 @@ class PandasNavigation(DatasetBackendNavigation):
 
     def loc(self, items: Iterable) -> Iterable:
         data = self.data.loc[items]
+        if not isinstance(data, Iterable) or isinstance(data, str):
+            data = [data]
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
     def iloc(self, items: Iterable) -> Iterable:
         data = self.data.iloc[items]
+        if not isinstance(data, Iterable) or isinstance(data, str):
+            data = [data]
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
 
