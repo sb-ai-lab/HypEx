@@ -62,6 +62,7 @@ class Executor(ABC):
     def _set_value(
         self, data: ExperimentData, value: Any, key: Any = None
     ) -> ExperimentData:
+        # defined in order to avoid  unnecessary redefinition in classes like transformer
         return data
 
     @abstractmethod

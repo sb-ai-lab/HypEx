@@ -444,7 +444,7 @@ class Dataset(DatasetBase):
     def na_counts(self):
         return self._convert_data_after_agg(self._backend.na_counts())
 
-    def dropna(self, how: str = "any", subset: Union[str, Iterable[str]] = None):
+    def dropna(self, how: str = "any", subset: Union[str, Iterable[str], None] = None):
         return Dataset(
             roles=self.roles, data=self._backend.dropna(how=how, subset=subset)
         )
@@ -460,17 +460,12 @@ class Dataset(DatasetBase):
         t_roles = {k: v for k, v in self.roles.items() if k in t_data.columns}
         return Dataset(roles=t_roles, data=t_data)
 
-    def select_dtypes(self, include: Any = None, exclude: Any = None):
-        t_data = self._backend.select_dtypes(include=include, exclude=exclude)
-        t_roles = {k: v for k, v in self.roles.items() if k in t_data.columns}
-        return Dataset(roles=t_roles, data=t_data)
-
     def merge(
         self,
         right,
-        on: FieldKeyTypes = "",
-        left_on: FieldKeyTypes = "",
-        right_on: FieldKeyTypes = "",
+        on: Optional[FieldKeyTypes] = None,
+        left_on: Optional[FieldKeyTypes] = None,
+        right_on: Optional[FieldKeyTypes] = None,
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
@@ -535,9 +530,7 @@ class Dataset(DatasetBase):
         return Dataset(self.roles, data=self.backend.shuffle(random_state))
 
     def rename(self, names: Dict[FieldKeyTypes, FieldKeyTypes]):
-        roles = {
-            names.get(column, column): role for column, role in self.roles.items()
-        }
+        roles = {names[column]: role for column, role in self.roles.items()}
         return Dataset(roles, data=self.backend.rename(names))
 
     def replace(
@@ -587,21 +580,31 @@ class ExperimentData:
     def set_value(
         self,
         space: ExperimentDataEnum,
-        executor_id: str,
+        executor_id: Union[str, Dict[str, str]],
         name: str,
         value: Any,
         key: Optional[str] = None,
         role=None,
     ) -> "ExperimentData":
         if space == ExperimentDataEnum.additional_fields:
-            self.additional_fields.add_column(data=value, role={executor_id: role})
+            if not isinstance(value, Dataset) or len(value.columns) == 1:
+                self.additional_fields.add_column(data=value, role={executor_id: role})
+            else:
+                value = value.rename(names=executor_id)
+                self.additional_fields = self.additional_fields.merge(
+                    right=value, left_index=True, right_index=True
+                )
         elif space == ExperimentDataEnum.analysis_tables:
             self.analysis_tables[executor_id] = value
         elif space == ExperimentDataEnum.variables:
             self.variables[executor_id][key] = value
         elif space == ExperimentDataEnum.groups:
             self.groups[executor_id][key] = value
-        self.id_name_mapping[executor_id] = name
+        if len(executor_id) == 1:
+            self.id_name_mapping[executor_id] = name
+        else:
+            for id_ in executor_id:
+                self.id_name_mapping[id_] = name
         return self
 
     def get_ids(

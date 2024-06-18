@@ -2,19 +2,21 @@ from typing import Union, Dict, Any, List
 
 import pandas as pd
 
-from hypex.dataset import Dataset, InfoRole
+from hypex.dataset import Dataset, InfoRole, ABCRole
 from hypex.utils import ScalarType, FieldKeyTypes
 
 
 class Adapter:
 
     @staticmethod
-    def to_dataset(data: Any, column_name: Union[FieldKeyTypes, List[FieldKeyTypes]]) -> Dataset:
+    def to_dataset(
+        data: Any, roles: Union[ABCRole, Dict[FieldKeyTypes, ABCRole]]
+    ) -> Dataset:
         """
         Convert various data types to a Dataset object.
         Args:
         data (Any): The input data to convert.
-        column_name (Union[str, List]): The column name or list of column names.
+        col_name (Union[str, List]): The column name or list of column names.
         Returns:
         Dataset: A Dataset object generated from the input data.
         Raises:
@@ -22,41 +24,62 @@ class Adapter:
         """
         # Convert data based on its type
         if isinstance(data, dict):
-            return Adapter.dict_to_dataset(data)
-        elif isinstance(data, List):
-            if not isinstance(column_name, List):
-                column_name = [column_name]
-            return Adapter.list_to_dataset(data, column_name)
+            return Adapter.dict_to_dataset(data, roles)
+        elif isinstance(data, pd.DataFrame):
+            return Adapter.frame_to_dataset(data, roles)
+        elif isinstance(data, list):
+            return Adapter.list_to_dataset(data, roles)
         elif isinstance(data, ScalarType):
-            return Adapter.value_to_dataset(data, column_name)
+            return Adapter.value_to_dataset(data, roles)
         else:
             raise ValueError(f"Unsupported data type {type(data)}")
 
     @staticmethod
-    def value_to_dataset(data: ScalarType, column_name: str) -> Dataset:
+    def value_to_dataset(
+        data: ScalarType, roles: Dict[FieldKeyTypes, ABCRole]
+    ) -> Dataset:
         """
         Convert a float to a Dataset
         """
         return Dataset(
-            roles={column_name: InfoRole()},
-            data=pd.DataFrame(data=[data], columns=[column_name]),
+            roles=roles,
+            data=pd.DataFrame(data=data, columns=[list(roles.keys())[0]]),
         )
 
     @staticmethod
-    def dict_to_dataset(data: Dict) -> Dataset:
+    def dict_to_dataset(
+        data: Dict, roles: Union[ABCRole, Dict[FieldKeyTypes, ABCRole]]
+    ) -> Dataset:
         """
         Convert a dict to a Dataset
         """
-        return Dataset.from_dict(
-            data=[data], roles={name: InfoRole() for name in data.keys()}
-        )
+        roles_names = list(data.keys())
+        data = [{key: value} for key, value in data.items()]
+        if isinstance(roles, Dict):
+            return Dataset.from_dict(data=data, roles=roles)
+        elif isinstance(roles, ABCRole):
+            return Dataset.from_dict(
+                data=data, roles={name: roles for name in roles_names}
+            )
 
     @staticmethod
-    def list_to_dataset(data: List, column_name: List) -> Dataset:
+    def list_to_dataset(data: List, roles: Dict[FieldKeyTypes, ABCRole]) -> Dataset:
         """
         Convert a list to a Dataset
         """
         return Dataset(
-            roles={name: InfoRole() for name in column_name},
-            data=pd.DataFrame(data=data, columns=[column_name]),
+            roles=roles,
+            data=pd.DataFrame(data=data, columns=[list(roles.keys())[0]]),
+        )
+
+    @staticmethod
+    def frame_to_dataset(
+        data: pd.DataFrame, roles: Dict[FieldKeyTypes, ABCRole]
+    ) -> Dataset:
+        """
+        Convert a list to a Dataset
+        """
+        return Dataset(
+            roles=roles,
+            data=data,
         )

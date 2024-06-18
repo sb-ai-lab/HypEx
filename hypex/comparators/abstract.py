@@ -8,6 +8,7 @@ from hypex.dataset import (
     GroupingRole,
     StatisticRole,
     TempTargetRole,
+    InfoRole,
 )
 from hypex.executor import Calculator
 from hypex.utils import (
@@ -19,6 +20,7 @@ from hypex.utils import (
     NoColumnsError,
     SpaceEnum,
 )
+from hypex.utils.adapter import Adapter
 from hypex.utils.errors import AbstractMethodError
 
 
@@ -143,12 +145,13 @@ class GroupComparator(Calculator):
                     if len(grouping_data[i][0]) > 1
                     else grouping_data[i][0][0]
                 )
-                result[result_key] = cls._to_dataset(
+                result[result_key] = Adapter.to_dataset(
                     cls._inner_function(
                         grouping_data[0][1],
                         grouping_data[i][1],
                         **kwargs,
-                    )
+                    ),
+                    InfoRole(),
                 )
         return result
 
@@ -173,7 +176,7 @@ class GroupComparator(Calculator):
             result = cr_list_v[0]
             if len(cr_list_v) > 1:
                 result = result.append(cr_list_v[1:])
-            result.index = list(compare_result.keys())
+            # result.index = list(compare_result.keys())
             return result
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
