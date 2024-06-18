@@ -1,4 +1,4 @@
-from typing import Callable, Union, Optional
+from typing import Callable, Union, Optional, Any
 
 import pandas as pd
 from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind
@@ -35,21 +35,13 @@ class StatTest(CompareExtension):
 
         return other
 
-    def convert_scipy_to_dataset(self, one_result):
-        df_result = pd.DataFrame(
-            [
-                {
-                    "p-value": one_result.pvalue,
-                    "statistic": one_result.statistic,
-                    "pass": one_result.pvalue < self.reliability,
-                }
-            ]
-        )
-        return Dataset(
-            data=df_result,
-            backend=BackendsEnum.pandas,
-            roles={str(f): StatisticRole() for f in df_result.columns},
-        )
+    @staticmethod
+    def result_to_dataset(self, result: Any) -> Dataset:
+        return super().result_to_dataset({
+                    "p-value": result.pvalue,
+                    "statistic": result.statistic,
+                    "pass": result.pvalue < self.reliability,
+                }, StatisticRole())
 
     def _calc_pandas(
         self, data: Dataset, other: Union[Dataset, None] = None, **kwargs
@@ -58,7 +50,7 @@ class StatTest(CompareExtension):
         one_result = self.test_function(
             data.backend.data.values.flatten(), other.backend.data.values.flatten()
         )
-        one_result = self.convert_scipy_to_dataset(one_result)
+        one_result = self.resut_to_dataset(one_result)
         return one_result
 
 
@@ -96,4 +88,4 @@ class Chi2TestExtension(StatTest):
         other = self.check_data(data, other)
         matrix = self.matrix_preparation(data, other)
         one_result = chi2_contingency(matrix.backend.data)
-        return self.convert_scipy_to_dataset(one_result)
+        return self.resut_to_dataset(one_result)
