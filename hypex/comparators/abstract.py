@@ -176,7 +176,6 @@ class GroupComparator(Calculator):
             result = cr_list_v[0]
             if len(cr_list_v) > 1:
                 result = result.append(cr_list_v[1:])
-            # result.index = list(compare_result.keys())
             return result
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
