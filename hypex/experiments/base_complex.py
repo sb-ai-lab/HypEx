@@ -4,6 +4,7 @@ from typing import Optional, List, Dict, Sequence, Any
 from tqdm.auto import tqdm
 
 from hypex.dataset import ExperimentData, Dataset, TempGroupingRole
+from hypex.dataset import ExperimentData, Dataset, ABCRole
 from hypex.executor import Executor
 from hypex.experiments import Experiment
 from hypex.reporters import Reporter, DatasetReporter
