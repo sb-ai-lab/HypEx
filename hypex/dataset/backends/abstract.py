@@ -245,8 +245,13 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def get_values(self, row: Optional[FieldKeyTypes] = None, column: Optional[FieldKeyTypes] = None) -> Any:
+    def get_values(
+        self,
+        row: Optional[FieldKeyTypes] = None,
+        column: Optional[FieldKeyTypes] = None,
+    ) -> Any:
         raise AbstractMethodError
+
     @abstractmethod
     def apply(self, func: Callable, **kwargs) -> Any:
         raise AbstractMethodError
@@ -325,16 +330,18 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def select_dtypes(self, include: Any = None, exclude: Any = None) -> Any:
+    def select_dtypes(
+        self, include: Optional[Any] = None, exclude: Optional[Any] = None
+    ) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
     def merge(
         self,
         right: Any,
-        on: FieldKeyTypes = "",
-        left_on: FieldKeyTypes = "",
-        right_on: FieldKeyTypes = "",
+        on: Optional[FieldKeyTypes] = None,
+        left_on: Optional[FieldKeyTypes] = None,
+        right_on: Optional[FieldKeyTypes] = None,
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
@@ -342,10 +349,20 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> Any:
+    def drop(
+        self,
+        labels: Optional[Union[FieldKeyTypes], Sequence[FieldKeyTypes]] = None,
+        axis: int = 1,
+    ) -> Any:
         raise AbstractMethodError
 
-    def filter(self, items: Optional[List] = None, like: Optional[str] = None, regex: Optional[str] = None, axis: Optional[int] = None) -> Any:
+    def filter(
+        self,
+        items: Optional[List] = None,
+        like: Optional[str] = None,
+        regex: Optional[str] = None,
+        axis: int = 0,
+    ) -> Any:
         return AbstractMethodError
 
     def fillna(self, values, method, **kwargs) -> Any:
@@ -359,5 +376,16 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     def transpose(self, names) -> Any:
         raise AbstractMethodError
 
+    @abstractmethod
     def shuffle(self, random_state) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def rename(self, columns: Dict[str, str]) -> Any:
+        return AbstractMethodError
+
+    @abstractmethod
+    def replace(
+        self, to_replace: Any = None, value: Any = None, regex: bool = False
+    ) -> Any:
         raise AbstractMethodError

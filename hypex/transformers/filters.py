@@ -1,9 +1,8 @@
-from typing import Any, Optional, Union, Iterable
+from typing import Any, Optional
 
 from hypex.dataset.dataset import Dataset
 from hypex.dataset.dataset import ExperimentData
 from hypex.dataset.roles import (
-    ABCRole,
     InfoRole,
     FeatureRole,
     PreTargetRole,
@@ -53,12 +52,17 @@ class CVFilter(Transformer):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         if self.type_filter:
-            target_cols = data.ds.search_columns(roles=FeatureRole(), search_types=[float, int, bool])
+            target_cols = data.ds.search_columns(
+                roles=FeatureRole(), search_types=[float, int, bool]
+            )
         else:
             target_cols = data.ds.search_columns(roles=FeatureRole())
         result = data.copy(
             data=self.calc(
-                data=data.ds, target_cols=target_cols, lower_bound=self.lower_bound, upper_bound=self.upper_bound
+                data=data.ds,
+                target_cols=target_cols,
+                lower_bound=self.lower_bound,
+                upper_bound=self.upper_bound,
             )
         )
         return result
@@ -96,7 +100,11 @@ class ConstFilter(Transformer):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         target_cols = data.ds.search_columns(roles=FeatureRole())
-        result = data.copy(data=self.calc(data=data.ds, target_cols=target_cols, threshold=self.threshold))
+        result = data.copy(
+            data=self.calc(
+                data=data.ds, target_cols=target_cols, threshold=self.threshold
+            )
+        )
         return result
 
 
@@ -132,7 +140,11 @@ class NanFilter(Transformer):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         target_cols = data.ds.search_columns(roles=FeatureRole())
-        result = data.copy(data=self.calc(data=data.ds, target_cols=target_cols, threshold=self.threshold))
+        result = data.copy(
+            data=self.calc(
+                data=data.ds, target_cols=target_cols, threshold=self.threshold
+            )
+        )
         return result
 
 
@@ -167,13 +179,17 @@ class CorrFilter(Transformer):
         pre_target_column = None
         if drop_policy == "corr":
             pre_target_columns = data.search_columns([PreTargetRole()])
-            if (pre_target_columns[0] not in corr_space_cols) | len(pre_target_columns) != 1:
+            if (pre_target_columns[0] not in corr_space_cols) | len(
+                pre_target_columns
+            ) != 1:
                 raise ValueError(
                     "Correlation-based filtering cannot be applied if there are more than one PreTarget columns"
                 )
             else:
                 pre_target_column = pre_target_columns[0]
-        corr_target_cols = [column for column in target_cols if column in corr_matrix.columns]
+        corr_target_cols = [
+            column for column in target_cols if column in corr_matrix.columns
+        ]
         for target in corr_target_cols:
             for column in corr_matrix.columns:
                 if (target != column) and (

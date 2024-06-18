@@ -95,6 +95,8 @@ class Dataset(DatasetBase):
         return result
 
     def __setitem__(self, key: str, value: Any):
+        if isinstance(value, Dataset):
+            value = value.data
         if key not in self.columns and isinstance(key, str):
             self.add_column(value, {key: InfoRole()})
             warnings.warn("Column must be added by add_column", category=SyntaxWarning)
@@ -304,10 +306,12 @@ class Dataset(DatasetBase):
         axis: int = 0,
         **kwargs,
     ) -> "Dataset":
-            return Dataset(
-                data=self._backend.apply(func=func, axis=axis, column_name=list(role.keys())[0], **kwargs),
-                roles=role,
-            )
+        return Dataset(
+            data=self._backend.apply(
+                func=func, axis=axis, column_name=list(role.keys())[0], **kwargs
+            ),
+            roles=role,
+        )
 
     def map(self, func, na_action=None, **kwargs) -> "Dataset":
         return Dataset(
@@ -503,7 +507,13 @@ class Dataset(DatasetBase):
         )
         return Dataset(roles=t_roles, data=t_data)
 
-    def filter(self, items: Optional[List] = None, like: Optional[str] = None, regex: Optional[str] = None, axis: Optional[int] = None):
+    def filter(
+        self,
+        items: Optional[List] = None,
+        like: Optional[str] = None,
+        regex: Optional[str] = None,
+        axis: Optional[int] = None,
+    ) -> "Dataset":
         t_data = self._backend.filter(items=items, like=like, regex=regex, axis=axis)
         return Dataset(roles=self.roles, data=t_data)
 
@@ -529,6 +539,19 @@ class Dataset(DatasetBase):
             names.get(column, column): role for column, role in self.roles.items()
         }
         return Dataset(roles, data=self.backend.rename(names))
+
+    def replace(
+        self,
+        to_replace: Any = None,
+        value: Any = None,
+        regex: bool = False,
+    ) -> "Dataset":
+        return Dataset(
+            self.roles,
+            data=self._backend.replace(
+                to_replace=to_replace, value=value, inplace=inplace, regex=regex
+            ),
+        )
 
 
 class ExperimentData:

@@ -49,8 +49,13 @@ class PandasNavigation(DatasetBackendNavigation):
     def __getitem__(self, item):
         if isinstance(item, (slice, int)):
             return self.data.iloc[item]
-        if isinstance(item, (str, list, pd.DataFrame)):
+        if isinstance(item, (str, list)):
             return self.data[item]
+        if isinstance(item, pd.DataFrame):
+            if len(item.columns) == 1:
+                return self.data[item.iloc[:, 0]]
+            else:
+                return self.data[item]
         raise KeyError("No such column or row")
 
     def __len__(self):
@@ -238,7 +243,11 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series] = None):
         super().__init__(data)
 
-    def get_values(self, row: FieldKeyTypes = None, column: FieldKeyTypes = None) -> Any:
+    def get_values(
+        self,
+        row: Optional[FieldKeyTypes] = None,
+        column: Optional[FieldKeyTypes] = None,
+    ) -> Any:
         if (column is not None) and (row is not None):
             return self.data.loc[row, column]
         elif column is not None:
@@ -418,10 +427,23 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> pd.DataFrame:
         return self.data.drop(labels=labels, axis=axis)
 
-    def filter(self, items: Optional[List] = None, like: Optional[str] = None, regex: Optional[str] = None, axis: Optional[int] = None) -> pd.DataFrame:
+    def filter(
+        self,
+        items: Optional[List] = None,
+        like: Optional[str] = None,
+        regex: Optional[str] = None,
+        axis: int = 0,
+    ) -> pd.DataFrame:
         return self.data.filter(items=items, like=like, regex=regex, axis=axis)
-    
-    def rename(self, columns: Dict[str, str]): 
+
+    def rename(self, columns: Dict[str, str]) -> pd.DataFrame:
         return self.data.rename(columns=columns)
 
-
+    def replace(
+        self, to_replace: Any = None, value: Any = None, regex: bool = False
+    ) -> pd.DataFrame:
+        if isinstance(to_replace, pd.DataFrame) and len(to_replace.columns) == 1:
+            to_replace = to_replace.iloc[:, 0]
+        elif isinstance(to_replace, pd.Series):
+            to_replace = to_replace.to_list()
+        return self.data.replace(to_replace=to_replace, value=value, regex=regex)
