@@ -14,6 +14,9 @@ from hypex.utils import (
 
 
 class GroupOperator(GroupCalculator):
+    @property 
+    def search_types(self): 
+        return None
 
     @classmethod
     @abstractmethod
@@ -21,6 +24,13 @@ class GroupOperator(GroupCalculator):
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Any:
         raise AbstractMethodError
+    
+    def _get_fields(self, data: ExperimentData): 
+        group_field = self._field_searching(data, self.grouping_role)
+        target_fields = self._field_searching(
+            data, self.target_roles, search_types=self.search_types
+        )
+        return group_field, target_fields
 
     @classmethod
     def _execute_inner_function(

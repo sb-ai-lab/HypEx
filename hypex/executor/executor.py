@@ -218,13 +218,17 @@ class GroupCalculator(Calculator):
         return cls._execute_inner_function(
             grouping_data, target_fields=target_fields, old_data=data, **kwargs
         )
-
-    # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
-    def execute(self, data: ExperimentData) -> ExperimentData:
+    
+    def _get_fields(self, data: ExperimentData): 
         group_field = self._field_searching(data, self.grouping_role)
         target_fields = self._field_searching(
             data, TempTargetRole(), tmp_role=True, search_types=self.search_types
         )
+        return group_field, target_fields
+
+    # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        group_field, target_fields = self._get_fields(data=data)
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
