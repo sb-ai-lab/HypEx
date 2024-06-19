@@ -1,4 +1,4 @@
-from hypex.analyzers import ABAnalyzer
+from hypex.analyzers.ab import ABAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes, TTest, UTest, Chi2Test
 from hypex.dataset import TargetRole, TreatmentRole
 from hypex.experiments import Experiment, OnRoleExperiment
