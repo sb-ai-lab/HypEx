@@ -566,58 +566,50 @@ class Matcher:
         """
         a = self.input_data[self.treatment]
         X = self.input_data.drop(columns=self.treatment)
+
         if self.info_col is not None:
             X = X.drop(columns=self.info_col)
 
         index_matched = MatcherNoReplacement(
             X, a, self.weights, approximate_match
         ).match()
-        filtred_matches = (
+
+        filtered_matches = (
             index_matched.loc[1]
             .iloc[self.input_data[a == 1].index]
-            .matches[
-                index_matched.loc[1]
+            .matches[index_matched.loc[1]
             .iloc[self.input_data[a == 1].index]
-            .matches.apply(lambda x: x != [])
+            .matches.apply(lambda x: x != [])]
+        )
+
+        matched_data = pd.concat(
+            [
+                self.input_data.loc[filtered_matches.index.to_list()],
+                self.input_data.loc[np.concatenate(filtered_matches.values)],
             ]
         )
 
-        if self.weights is not None:
-            weighted_features = [f for f in self.weights.keys()]
-            index_dict = dict()
-            for w in weighted_features:
-                source = self.input_data.loc[np.concatenate(filtred_matches.values)][
-                    w
-                ].values
-                target = self.input_data.loc[filtred_matches.index.to_list()][w].values
-                index = abs(source - target) <= abs(source) * threshold
-                index_dict.update({w: index})
-            index_filtered = sum(index_dict.values()) == len(self.weights)
-            matched_data = pd.concat(
-                [
-                    self.input_data.loc[filtred_matches.index.to_list()].iloc[
-                        index_filtered
-                    ],
-                    self.input_data.loc[np.concatenate(filtred_matches.values)].iloc[
-                        index_filtered
-                    ],
-                ]
-            )
-        else:
-            matched_data = pd.concat(
-                [
-                    self.input_data.loc[filtred_matches.index.to_list()],
-                    self.input_data.loc[np.concatenate(filtred_matches.values)],
-                ]
-            )
+        filtered_matches = filtered_matches.apply(lambda x: int(x[0]))
+        filtered_matches_df = filtered_matches.to_frame().reset_index()
+        df_matched = matched_data.merge(
+            filtered_matches_df, left_on='user_id', right_on='index', how="left"
+        ).merge(
+            filtered_matches_df, left_on='user_id', right_on='matches', how='left'
+        ).fillna(0)
 
-            filtred_matches = filtred_matches.apply(lambda x: int(x[0]))
-            filtred_matches_df = filtred_matches.to_frame().reset_index()
-            df_matched = matched_data.merge(filtred_matches_df, left_on='user_id', right_on='index', how="left"). \
-                merge(filtred_matches_df, left_on='user_id', right_on='matches', how='left').fillna(0)
-            df_matched['user_id_matched'] = df_matched['matches_x'] + df_matched['index_y']
-            df_matched = df_matched.drop(columns=['index_x', 'matches_x', 'index_y', 'matches_y'])
-            df_matched['user_id_matched'] = df_matched['user_id_matched'].astype(int)
+        df_matched['user_id_matched'] = df_matched['matches_x'] + df_matched['index_y']
+        df_matched = df_matched.drop(columns=['index_x', 'matches_x', 'index_y', 'matches_y'])
+        df_matched['user_id_matched'] = df_matched['user_id_matched'].astype(int)
+
+        input_data_matched = self.input_data.add_suffix('_matched')
+        input_data_matched = input_data_matched.rename(columns={'user_id_matched': 'user_id_matched_matched'})
+
+        df_matched = df_matched.merge(
+            input_data_matched, left_on='user_id_matched', right_on='user_id_matched_matched', how='left'
+        )
+
+        df_matched = df_matched.drop(columns=['user_id_matched_matched'])
+
         return df_matched
 
     def feature_select(self) -> pd.DataFrame:
