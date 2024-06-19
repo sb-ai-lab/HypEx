@@ -22,8 +22,8 @@ from hypex.utils.adapter import Adapter
 
 class Executor(ABC):
     def __init__(
-        self,
-        key: Any = "",
+            self,
+            key: Any = "",
     ):
         self._id: str = ""
         self._params_hash = ""
@@ -62,6 +62,19 @@ class Executor(ABC):
             )
         self._generate_id()
 
+    def init_from_hash(self, hash: str) -> None:
+        self._params_hash = hash
+        self._generate_id()
+
+    @classmethod
+    def build_from_id(cls, executor_id: str):
+        splitted_id = executor_id.split(ID_SPLIT_SYMBOL)
+        if splitted_id[0] != cls.__name__:
+            raise ValueError(f"{executor_id} is not a valid {cls.__name__} id")
+        result = cls()
+        result.init_from_hash(splitted_id[1])
+        return result
+
     @property
     def id(self) -> str:
         return self._id
@@ -88,7 +101,7 @@ class Executor(ABC):
         return False
 
     def _set_value(
-        self, data: ExperimentData, value: Any, key: Any = None
+            self, data: ExperimentData, value: Any, key: Any = None
     ) -> ExperimentData:
         # defined in order to avoid  unnecessary redefinition in classes like transformer
         return data
@@ -111,11 +124,11 @@ class Calculator(Executor, ABC):
 
 class GroupCalculator(Calculator):
     def __init__(
-        self,
-        grouping_role: Optional[ABCRole] = None,
-        target_roles: Optional[List[ABCRole]] = None,
-        space: SpaceEnum = SpaceEnum.auto,
-        key: Any = "",
+            self,
+            grouping_role: Optional[ABCRole] = None,
+            target_roles: Optional[List[ABCRole]] = None,
+            space: SpaceEnum = SpaceEnum.auto,
+            key: Any = "",
     ):
         self.grouping_role = grouping_role or GroupingRole()
         self.space = space
@@ -128,7 +141,7 @@ class GroupCalculator(Calculator):
         raise AbstractMethodError
 
     def _field_searching(
-        self, data: ExperimentData, field, tmp_role: bool = False, search_types=None
+            self, data: ExperimentData, field, tmp_role: bool = False, search_types=None
     ):
         searched_field = []
         if self.space in [SpaceEnum.auto, SpaceEnum.data]:
@@ -136,9 +149,9 @@ class GroupCalculator(Calculator):
                 field, tmp_role=tmp_role, search_types=search_types
             )
         if (
-            self.space in [SpaceEnum.auto, SpaceEnum.additional]
-            and searched_field == []
-            and isinstance(data, ExperimentData)
+                self.space in [SpaceEnum.auto, SpaceEnum.additional]
+                and searched_field == []
+                and isinstance(data, ExperimentData)
         ):
             searched_field = data.additional_fields.search_columns(
                 field, tmp_role=tmp_role, search_types=search_types
@@ -178,7 +191,7 @@ class GroupCalculator(Calculator):
 
     @staticmethod
     def _field_arg_universalization(
-        field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None]
+            field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None]
     ) -> List[FieldKeyTypes]:
         if not field:
             raise NoColumnsError(field)
@@ -189,7 +202,7 @@ class GroupCalculator(Calculator):
     @classmethod
     @abstractmethod
     def _inner_function(
-        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+            cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Any:
         raise AbstractMethodError
 
@@ -200,12 +213,12 @@ class GroupCalculator(Calculator):
 
     @classmethod
     def calc(
-        cls,
-        data: Dataset,
-        group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
-        grouping_data: Optional[Dict[FieldKeyTypes, Dataset]] = None,
-        target_fields: Optional[List[FieldKeyTypes]] = None,
-        **kwargs,
+            cls,
+            data: Dataset,
+            group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
+            grouping_data: Optional[Dict[FieldKeyTypes, Dataset]] = None,
+            target_fields: Optional[List[FieldKeyTypes]] = None,
+            **kwargs,
     ) -> Dict:
         group_field = Adapter.to_list(group_field)
 
@@ -218,8 +231,8 @@ class GroupCalculator(Calculator):
         return cls._execute_inner_function(
             grouping_data, target_fields=target_fields, old_data=data, **kwargs
         )
-    
-    def _get_fields(self, data: ExperimentData): 
+
+    def _get_fields(self, data: ExperimentData):
         group_field = self._field_searching(data, self.grouping_role)
         target_fields = self._field_searching(
             data, TempTargetRole(), tmp_role=True, search_types=self.search_types
@@ -233,7 +246,7 @@ class GroupCalculator(Calculator):
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
         if (
-            not target_fields and data.ds.tmp_roles
+                not target_fields and data.ds.tmp_roles
         ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
             return data
         if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check

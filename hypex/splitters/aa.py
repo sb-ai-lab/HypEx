@@ -7,12 +7,12 @@ from hypex.utils import ExperimentDataEnum
 
 class AASplitter(Calculator):
     def __init__(
-        self,
-        control_size: float = 0.5,
-        random_state: Optional[int] = None,
-        constant_key: bool = True,
-        save_groups: bool = True,
-        key: Any = "",
+            self,
+            control_size: float = 0.5,
+            random_state: Optional[int] = None,
+            constant_key: bool = True,
+            save_groups: bool = True,
+            key: Any = "",
     ):
         self.control_size = control_size
         self.random_state = random_state
@@ -21,8 +21,22 @@ class AASplitter(Calculator):
         self.save_groups = save_groups
         super().__init__(key)
 
-    def _generate_params_hash(self) -> str:
-        self._params_hash = f"{self.random_state}"
+    def _generate_params_hash(self):
+        hash_parts: List[str] = []
+        if self.control_size != 0.5:
+            hash_parts.append(f"cs {self.control_size}")
+        if self.random_state is not None:
+            hash_parts.append(f"rs {self.random_state}")
+        self._params_hash = "|".join(hash_parts)
+
+    def init_from_hash(self, params_hash: str):
+        hash_parts: List[str] = params_hash.split("|")
+        for hash_part in hash_parts:
+            if hash_part.startswith("cs"):
+                self.control_size = float(hash_part[hash_part.rfind(" ") + 1:])
+            elif hash_part.startswith("rs"):
+                self.random_state = int(hash_part[hash_part.rfind(" ") + 1:])
+        self._generate_id()
 
     @property
     def key(self) -> Any:
@@ -52,10 +66,10 @@ class AASplitter(Calculator):
 
     @staticmethod
     def _inner_function(
-        data: Dataset,
-        random_state: Optional[int] = None,
-        control_size: float = 0.5,
-        **kwargs,
+            data: Dataset,
+            random_state: Optional[int] = None,
+            control_size: float = 0.5,
+            **kwargs,
     ) -> List[str]:
         experiment_data = data.shuffle(random_state)
         addition_indexes = list(experiment_data.index)
@@ -70,7 +84,6 @@ class AASplitter(Calculator):
                 data.ds, random_state=self.random_state, control_size=self.control_size
             ),
         )
-
 
 # class AASplitterWithGrouping(AASplitter):
 #     @staticmethod
