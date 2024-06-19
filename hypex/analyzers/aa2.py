@@ -5,7 +5,7 @@ from hypex.executor import Executor
 from hypex.experiments.aa2 import AATest
 from hypex.splitters import AASplitter
 from hypex.utils import ExperimentDataEnum, ID_SPLIT_SYMBOL
-from hypex.reporters.aa import AADictReporter
+from hypex.reporters.aa import OneAADictReporter
 
 
 class AAScoreAnalyzer(Executor):
@@ -18,14 +18,14 @@ class AAScoreAnalyzer(Executor):
         self.__feature_weights = {}
 
     def _set_value(
-            self, data: ExperimentData, value: Any, key: Any = None
+        self, data: ExperimentData, value: Any, key: Any = None
     ) -> ExperimentData:
         return data.set_value(
             ExperimentDataEnum.analysis_tables, self.id, self.key, value
         )
 
     def _analyze_aa_score(
-            self, data: ExperimentData, score_table: Dataset
+        self, data: ExperimentData, score_table: Dataset
     ) -> ExperimentData:
         search_flag = f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}"
         self.__feature_weights = {
@@ -43,32 +43,34 @@ class AAScoreAnalyzer(Executor):
         return self._set_value(data, result)
 
     def build_splitter_from_id(self, splitter_id: str):
-        return self.AA_SPLITER_CLASS_MAPPING.get(splitter_id[:splitter_id.find(ID_SPLIT_SYMBOL)]).build_from_id(
-            splitter_id)
+        return self.AA_SPLITER_CLASS_MAPPING.get(
+            splitter_id[: splitter_id.find(ID_SPLIT_SYMBOL)]
+        ).build_from_id(splitter_id)
 
-    def _geet_best_split(self, data: ExperimentData, score_table: Dataset) -> Dict[str, Any]:
+    def _geet_best_split(
+        self, data: ExperimentData, score_table: Dataset
+    ) -> Dict[str, Any]:
         aa_split_scores = score_table.apply(
             lambda x: (
-                    sum([x[k] * v for k, v in self.__feature_weights.items()])
-                    / len(self.__feature_weights)
-                    * 2
-                    / 3
-                    + x["mean test score"] / 3
+                sum([x[k] * v for k, v in self.__feature_weights.items()])
+                / len(self.__feature_weights)
+                * 2
+                / 3
+                + x["mean test score"] / 3
             ),
             axis=1,
             role={"aa split score": StatisticRole()},
         )
         best_index = aa_split_scores.idxmax()
         score_dict = score_table.loc[best_index, :].transpose().to_records()[0]
-        best_score_stat = AADictReporter.convert_flat_dataset(score_dict)
+        best_score_stat = OneAADictReporter.convert_flat_dataset(score_dict)
         self.key = "best split statistics"
         result = self._set_value(data, best_score_stat)
-        return {
-            "index": best_index,
-            "data": result
-        }
+        return {"index": best_index, "data": result}
 
-    def _set_best_split(self, data: ExperimentData, score_table: Dataset, best_index: int) -> ExperimentData:
+    def _set_best_split(
+        self, data: ExperimentData, score_table: Dataset, best_index: int
+    ) -> ExperimentData:
         self.key = "best splitter"
         # TODO: replace get_values
         best_splitter_id = score_table.loc[best_index, "splitter_id"].to_dict()["data"][
@@ -79,14 +81,18 @@ class AAScoreAnalyzer(Executor):
         )
         best_splitter = self.build_splitter_from_id(best_splitter_id)
         best_splitter.save_groups = False
+        best_splitter.constant_key = False
+        best_splitter.key = "best"
         result = best_splitter.execute(result)
         return result
 
     def _analyze_best_split(
-            self, data: ExperimentData, score_table: Dataset
+        self, data: ExperimentData, score_table: Dataset
     ) -> ExperimentData:
         best_split = self._geet_best_split(data, score_table)
-        return self._set_best_split(best_split["data"], score_table, best_split["index"])
+        return self._set_best_split(
+            best_split["data"], score_table, best_split["index"]
+        )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         score_table_id = data.get_one_id(AATest, ExperimentDataEnum.analysis_tables)

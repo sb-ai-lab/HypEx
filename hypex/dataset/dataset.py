@@ -247,6 +247,7 @@ class Dataset(DatasetBase):
             data=result, roles={column: StatisticRole() for column in self.roles}
         )
 
+    # TODO: fix inplace
     def add_column(
         self,
         data,
@@ -283,6 +284,7 @@ class Dataset(DatasetBase):
 
         return Dataset(roles=new_roles, data=self.backend.append(other, index))
 
+    # TODO: set backend by backend object
     @staticmethod
     def from_dict(
         data: FromDictTypes,

@@ -8,12 +8,12 @@ from hypex.dataset import (
     TargetRole,
     StatisticRole,
 )
-from .aa import AADictReporter
+from .aa import OneAADictReporter
 from .abstract import DatasetReporter
 from ..utils import ID_SPLIT_SYMBOL
 
 
-class HomoDictReporter(AADictReporter):
+class HomoDictReporter(OneAADictReporter):
     def report(self, data: ExperimentData) -> Dict[str, Any]:
         return self.extract_data_from_analysis_tables(data)
 

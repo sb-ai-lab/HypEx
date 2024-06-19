@@ -24,7 +24,7 @@ from hypex.experiments import (
     GroupExperiment,
     CycledExperiment,
 )
-from hypex.reporters import AADictReporter
+from hypex.reporters import OneAADictReporter
 from hypex.transformers import Shuffle
 from hypex.utils import ExperimentDataEnum, SpaceEnum
 
@@ -53,7 +53,7 @@ all_classes = [
     OnRoleExperiment,
     GroupExperiment,
     CycledExperiment,
-    AADictReporter,
+    OneAADictReporter,
     Shuffle,
     ExperimentDataEnum,
     SpaceEnum,

@@ -35,3 +35,9 @@ class ABNTestMethodsEnum(enum.Enum):
     fdr_tsbh = "fdr_tsbh"
     fdr_tsbky = "fdr_tsbky"
     quantile = "quantile"
+
+
+@enum.unique
+class AAReporterModsEnum(enum.Enum):
+    passed = "passed"
+    best_split = "best_split"

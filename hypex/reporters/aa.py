@@ -11,11 +11,11 @@ from hypex.dataset import (
     StatisticRole,
 )
 from hypex.splitters import AASplitter
-from hypex.utils import ExperimentDataEnum, ID_SPLIT_SYMBOL
+from hypex.utils import ExperimentDataEnum, ID_SPLIT_SYMBOL, AAReporterModsEnum
 from .abstract import DictReporter
 
 
-class AADictReporter(DictReporter):
+class OneAADictReporter(DictReporter):
     @staticmethod
     def rename_passed(data: Dict[str, bool]):
         return {
@@ -61,7 +61,7 @@ class AADictReporter(DictReporter):
                     t_values[f"{test} pass"] = values["pass"]
                     t_values[f"{test} p-value"] = values["p-value"]
                 result.append(t_values)
-        result = [AADictReporter.rename_passed(d) for d in result]
+        result = [OneAADictReporter.rename_passed(d) for d in result]
         return Dataset.from_dict(
             result,
             roles={
@@ -72,8 +72,8 @@ class AADictReporter(DictReporter):
 
     @staticmethod
     def convert_flat_dataset(data: Dict) -> Dataset:
-        struct_dict = AADictReporter._get_struct_dict(data)
-        return AADictReporter._convert_struct_dict_to_dataset(struct_dict)
+        struct_dict = OneAADictReporter._get_struct_dict(data)
+        return OneAADictReporter._convert_struct_dict_to_dataset(struct_dict)
 
     @staticmethod
     def get_splitter_id(data: ExperimentData):
