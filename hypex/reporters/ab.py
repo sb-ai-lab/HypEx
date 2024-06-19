@@ -1,6 +1,6 @@
 from typing import Dict, Any
 
-from hypex.analyzers import ABAnalyzer
+from hypex.analyzers.ab import ABAnalyzer
 from hypex.dataset import ExperimentData
 from hypex.utils import ExperimentDataEnum
 from .aa import AADictReporter
