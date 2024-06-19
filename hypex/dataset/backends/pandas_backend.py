@@ -424,7 +424,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
-        how="inner",
+        how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> pd.DataFrame:
         for on_ in [on, left_on, right_on]:
             if on_ and (on_ not in [*self.columns, *right.columns]):

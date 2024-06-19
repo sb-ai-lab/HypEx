@@ -7,6 +7,7 @@ from hypex.dataset.roles import (
 )
 from hypex.transformers.abstract import Transformer
 from hypex.utils import FieldKeyTypes
+from hypex.utils.adapter import Adapter
 
 
 class CategoryAggregator(Transformer):
@@ -27,9 +28,7 @@ class CategoryAggregator(Transformer):
         threshold: Optional[int] = 15,
         new_group_name: Optional[str] = None,
     ) -> Dataset:
-        target_cols = super(CategoryAggregator, CategoryAggregator)._list_unification(
-            target_cols
-        )
+        target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
             categories_counts = data[column].value_counts()
             values_to_replace = categories_counts[

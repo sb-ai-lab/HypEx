@@ -2,7 +2,7 @@ from typing import Union, Dict, Any, List
 
 import pandas as pd
 
-from hypex.dataset import Dataset, InfoRole, ABCRole
+from hypex.dataset import Dataset, ABCRole
 from hypex.utils import ScalarType, FieldKeyTypes
 
 
@@ -31,6 +31,8 @@ class Adapter:
             return Adapter.list_to_dataset(data, roles)
         elif isinstance(data, ScalarType):
             return Adapter.value_to_dataset(data, roles)
+        elif isinstance(data, Dataset):
+            return data
         else:
             raise ValueError(f"Unsupported data type {type(data)}")
 
@@ -54,12 +56,11 @@ class Adapter:
         Convert a dict to a Dataset
         """
         roles_names = list(data.keys())
-        data = [{key: value} for key, value in data.items()]
         if isinstance(roles, Dict):
-            return Dataset.from_dict(data=data, roles=roles)
+            return Dataset.from_dict(data=[data], roles=roles)
         elif isinstance(roles, ABCRole):
             return Dataset.from_dict(
-                data=data, roles={name: roles for name in roles_names}
+                data=[data], roles={name: roles for name in roles_names}
             )
 
     @staticmethod
@@ -83,3 +84,10 @@ class Adapter:
             roles=roles,
             data=data,
         )
+
+    @staticmethod
+    def to_list(data: Any) -> List:
+        if not isinstance(data, list):
+            return [data]
+        else:
+            return data

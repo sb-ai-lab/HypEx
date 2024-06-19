@@ -17,9 +17,7 @@ from hypex.utils import (
     FieldKeyTypes,
     FromDictTypes,
     SpaceEnum,
-    AbstractMethodError,
 )
-from hypex.utils.adapter import Adapter
 from hypex.utils.adapter import Adapter
 from hypex.utils.errors import AbstractMethodError
 
@@ -32,9 +30,7 @@ class GroupComparator(GroupCalculator):
         key: Any = "",
     ):
         self.__additional_mode = space == SpaceEnum.additional
-        super().__init__(
-            grouping_role=grouping_role, search_types=search_types, space=space, key=key
-        )
+        super().__init__(grouping_role=grouping_role, space=space, key=key)
 
     @property
     def search_types(self) -> Optional[List[type]]:
@@ -54,8 +50,8 @@ class GroupComparator(GroupCalculator):
 
     def _get_fields(self, data: ExperimentData):
         group_field = self._field_searching(data, self.grouping_role)
-        target_fields = data.ds.search_columns(
-            TempTargetRole(), tmp_role=True, search_types=self._search_types
+        target_fields = self._field_searching(
+            data, TempTargetRole(), tmp_role=True, search_types=self.search_types
         )
         return group_field, target_fields
 
@@ -82,7 +78,8 @@ class GroupComparator(GroupCalculator):
                         data=grouping_data[0][1][target_fields],
                         test_data=grouping_data[i][1][target_fields],
                         **kwargs,
-                    ), InfoRole()
+                    ),
+                    InfoRole(),
                 )
             else:
                 result[result_key] = Adapter.to_dataset(
@@ -120,9 +117,22 @@ class GroupComparator(GroupCalculator):
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
     # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
-
     def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field, target_fields, grouping_data = self._get_grouping_data(data)
+        group_field = self._field_searching(data, self.grouping_role)
+        target_fields = data.ds.search_columns(
+            TempTargetRole(), tmp_role=True, search_types=self.search_types
+        )
+        self.key = str(
+            target_fields[0] if len(target_fields) == 1 else (target_fields or "")
+        )
+        if (
+            not target_fields and data.ds.tmp_roles
+        ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
+            return data
+        if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
+            grouping_data = list(data.groups[group_field[0]].items())
+        else:
+            grouping_data = None
         compare_result = self.calc(
             data=data.ds,
             group_field=group_field,
