@@ -10,6 +10,7 @@ from typing import (
     Hashable,
     Optional,
     Sequence,
+    Tuple,
 )
 
 import pandas as pd  # type: ignore
@@ -473,7 +474,7 @@ class Dataset(DatasetBase):
         right_on: Optional[FieldKeyTypes] = None,
         left_index: bool = False,
         right_index: bool = False,
-        suffixes: tuple[str, str] = ("_x", "_y"),
+        suffixes: Tuple[str, str] = ("_x", "_y"),
         how: str = "inner",
     ):
         if not isinstance(right, Dataset):

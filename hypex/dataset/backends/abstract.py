@@ -10,6 +10,7 @@ from typing import (
     Sequence,
     List,
     Literal,
+    Tuple,
 )
 
 from hypex.utils import AbstractMethodError, FromDictTypes, FieldKeyTypes
@@ -364,7 +365,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         right_on: Optional[FieldKeyTypes] = None,
         left_index: bool = False,
         right_index: bool = False,
-        suffixes: tuple[str, str] = ("_x", "_y"),
+        suffixes: Tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> Any:
         raise AbstractMethodError
