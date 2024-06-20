@@ -1,4 +1,4 @@
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Union, Sequence
 
 from hypex.dataset import Dataset, ExperimentData, FeatureRole
 from hypex.executor import Calculator
@@ -10,10 +10,15 @@ from hypex.utils import (
     ExperimentDataEnum,
 )
 
+
 class Encoder(Calculator):
 
-    def __init__(self, target_roles: Optional[FieldKeyTypes] = None, key: Any = ""):
-        self.target_roles = target_roles
+    def __init__(
+        self,
+        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
+        key: Any = "",
+    ):
+        self.target_roles = target_roles or FeatureRole()
         self._key = key
         super().__init__(key)
 
@@ -45,7 +50,7 @@ class Encoder(Calculator):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         target_cols = data.ds.search_columns(
-            roles=self.target_roles or [FeatureRole()], search_types=[CategoricalTypes]
+            roles=self.target_roles, search_types=[CategoricalTypes]
         )
         return self._set_value(
             data=data,
