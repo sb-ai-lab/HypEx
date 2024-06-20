@@ -10,7 +10,9 @@ from hypex.utils import SpaceEnum
 
 
 class AATest(ParamsExperiment):
-    def __init__(self, random_states=range(2000), additional_params: Optional[Dict] = None):
+    def __init__(
+        self, random_states=range(2000), additional_params: Optional[Dict] = None
+    ):
         additional_params = additional_params or {}
         params = {
             AASplitter: {"random_state": random_states},

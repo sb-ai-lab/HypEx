@@ -9,7 +9,8 @@ from typing import (
     Callable,
     Hashable,
     Optional,
-    Sequence, Literal,
+    Sequence,
+    Literal,
 )
 
 import pandas as pd  # type: ignore
@@ -447,7 +448,11 @@ class Dataset(DatasetBase):
     def na_counts(self):
         return self._convert_data_after_agg(self._backend.na_counts())
 
-    def dropna(self, how: Literal["any", "all"] = "any", subset: Union[str, Iterable[str], None] = None):
+    def dropna(
+        self,
+        how: Literal["any", "all"] = "any",
+        subset: Union[str, Iterable[str], None] = None,
+    ):
         return Dataset(
             roles=self.roles, data=self._backend.dropna(how=how, subset=subset)
         )
@@ -474,7 +479,7 @@ class Dataset(DatasetBase):
         suffixes: tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "outer", "inner", "cross"] = "inner",
     ):
-        if not any ([on, left_on, right_on, left_index, right_index]):
+        if not any([on, left_on, right_on, left_index, right_index]):
             left_index = True
             right_index = True
         if not isinstance(right, Dataset):

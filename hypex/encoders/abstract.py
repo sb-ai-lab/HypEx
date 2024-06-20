@@ -41,10 +41,10 @@ class Encoder(Calculator):
         self, data: ExperimentData, value: Dataset, key=None
     ) -> ExperimentData:
         return data.set_value(
-            ExperimentDataEnum.additional_fields,
-            self._ids_to_names(value.columns),
-            str(self.__class__.__name__),
-            value,
+            space=ExperimentDataEnum.additional_fields,
+            executor_id=self._ids_to_names(value.columns),
+            name=str(self.__class__.__name__),
+            value=value,
             role=value.roles,
         )
 
