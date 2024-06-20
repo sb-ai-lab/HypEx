@@ -1,17 +1,15 @@
-from typing import Dict, Any
-from itertools import product
+from typing import Dict
 
 from hypex.analyzers.aa2 import AAScoreAnalyzer
 from hypex.dataset import ExperimentData, Dataset, InfoRole, StatisticRole
 from hypex.reporters import Reporter
-from hypex.utils import AAReporterModsEnum, ID_SPLIT_SYMBOL, ExperimentDataEnum
+from hypex.utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
 
 
-class AAReporter(Reporter):
-    def __init__(self, mode: AAReporterModsEnum = AAReporterModsEnum.passed):
-        self.mode = mode
+class AAPassedReporter(Reporter):
 
-    def _reformat_aa_score_table(self, table: Dataset) -> Dataset:
+    @staticmethod
+    def _reformat_aa_score_table(table: Dataset) -> Dataset:
         result = {}
         for ind in table.index:
             splitted_index = ind.split(ID_SPLIT_SYMBOL)
@@ -23,7 +21,8 @@ class AAReporter(Reporter):
                 result[row_index][splitted_index[1]] = value
         return Dataset.from_dict(result, roles={}).transpose() * 1
 
-    def _reformat_best_split_table(self, table: Dataset) -> Dataset:
+    @staticmethod
+    def _reformat_best_split_table(table: Dataset) -> Dataset:
         passed = table.loc[:, [c for c in table.columns if c.endswith("pass")]]
         new_index = table.apply(
             lambda x: f"{x['feature']}{ID_SPLIT_SYMBOL}{x['group']}",
@@ -37,7 +36,7 @@ class AAReporter(Reporter):
         passed = passed.replace("OK", 1).replace("NOT OK", 0)
         return passed
 
-    def _pass_mode(self, analyzer_tables: Dict[str, Dataset]):
+    def _detect_pass(self, analyzer_tables: Dict[str, Dataset]):
         score_table = self._reformat_aa_score_table(analyzer_tables["aa score"])
         best_split_table = self._reformat_best_split_table(
             analyzer_tables["best split statistics"]
@@ -55,33 +54,30 @@ class AAReporter(Reporter):
             right_index=True,
         )
         result = result.merge(resume_table, left_index=True, right_index=True)
-
+        result.roles = {c: r.__class__(str) for c, r in result.roles.items()}
         result = result.replace(0, "NOT OK").replace(1, "OK")
-        splitted_index = [i.split(ID_SPLIT_SYMBOL) for i in result.index]
+        splitted_index = [str(i).split(ID_SPLIT_SYMBOL) for i in result.index]
         result.add_column([i[0] for i in splitted_index], role={"feature": InfoRole()})
         result.add_column([i[1] for i in splitted_index], role={"group": InfoRole()})
         result.index = range(len(splitted_index))
         return result
 
     def report(self, data: ExperimentData) -> Dataset:
-        if self.mode == AAReporterModsEnum.passed:
-            analyser_ids = data.get_ids(
-                AAScoreAnalyzer, ExperimentDataEnum.analysis_tables
-            )
-            analyser_tables = {
-                id_[id_.rfind(ID_SPLIT_SYMBOL) + 1 :]: data.analysis_tables[id_]
-                for id_ in analyser_ids[AAScoreAnalyzer][
-                    ExperimentDataEnum.analysis_tables.value
-                ]
-            }
-            return self._pass_mode(analyser_tables)
-        elif self.mode == AAReporterModsEnum.best_split:
-            best_split_id = []
-            for c in data.additional_fields.columns:
-                if c.endswith("best"):
-                    best_split_id = c
-                    break
+        analyser_ids = data.get_ids(AAScoreAnalyzer, ExperimentDataEnum.analysis_tables)
+        analyser_tables = {
+            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1 :]: data.analysis_tables[id_]
+            for id_ in analyser_ids[AAScoreAnalyzer][
+                ExperimentDataEnum.analysis_tables.value
+            ]
+        }
+        return self._detect_pass(analyser_tables)
 
-            markers = data.additional_fields.loc[:, best_split_id]
-            markers = markers.rename({markers.columns[0]: "split"})
-            return data.ds.merge(markers, left_index=True, right_index=True)
+
+class AABestSplitReporter(Reporter):
+    def report(self, data: ExperimentData):
+        best_split_id = next(
+            (c for c in data.additional_fields.columns if c.endswith("best")), []
+        )
+        markers = data.additional_fields.loc[:, best_split_id]
+        markers = markers.rename({markers.columns[0]: "split"})
+        return data.ds.merge(markers, left_index=True, right_index=True)

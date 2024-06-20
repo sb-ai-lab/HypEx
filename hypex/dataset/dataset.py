@@ -247,7 +247,6 @@ class Dataset(DatasetBase):
             data=result, roles={column: StatisticRole() for column in self.roles}
         )
 
-    # TODO: fix inplace
     def add_column(
         self,
         data,
@@ -266,6 +265,7 @@ class Dataset(DatasetBase):
         else:
             self.roles.update(role)
             self._backend.add_column(data, list(role.keys())[0], index)
+        return self
 
     def _check_other_dataset(self, other):
         if not isinstance(other, Dataset):
@@ -594,10 +594,11 @@ class ExperimentData:
         role=None,
     ) -> "ExperimentData":
         if space == ExperimentDataEnum.additional_fields:
-            if not isinstance(value, Dataset) or len(value.columns) == 1:
+            if not isinstance(value, Dataset):
                 self.additional_fields.add_column(data=value, role={executor_id: role})
             else:
-                value = value.rename(names=executor_id)
+                rename_dict = {value.columns[0]: executor_id} if isinstance(executor_id, str) else executor_id
+                value = value.rename(names=rename_dict)
                 self.additional_fields = self.additional_fields.merge(
                     right=value, left_index=True, right_index=True
                 )
@@ -668,7 +669,7 @@ class ExperimentData:
 
     def get_one_id(self, class_: type, space: ExperimentDataEnum) -> str:
         result = self.get_ids(class_)
-        if not len(result):
+        if not len(result[class_][space.value]):
             raise NotFoundInExperimentDataError(class_)
         return result[class_][space.value][0]
 

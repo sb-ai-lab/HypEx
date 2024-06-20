@@ -3,13 +3,15 @@ from typing import Any, Dict
 from hypex.dataset import ExperimentData, Dataset, StatisticRole
 from hypex.executor import Executor
 from hypex.experiments.aa2 import AATest
-from hypex.splitters import AASplitter
+from hypex.splitters import AASplitter, AASplitterWithStratification
 from hypex.utils import ExperimentDataEnum, ID_SPLIT_SYMBOL
 from hypex.reporters.aa import OneAADictReporter
 
 
 class AAScoreAnalyzer(Executor):
-    AA_SPLITER_CLASS_MAPPING = {c.__name__: c for c in [AASplitter]}
+    AA_SPLITER_CLASS_MAPPING = {
+        c.__name__: c for c in [AASplitter, AASplitterWithStratification]
+    }
 
     # TODO: rename alpha
     def __init__(self, alpha: float = 0.05, key: str = ""):
@@ -37,7 +39,7 @@ class AAScoreAnalyzer(Executor):
             c.replace(f"{ID_SPLIT_SYMBOL}p-value", ""): v
             for c, v in self.__feature_weights.items()
         }
-        aa_passed = {c: v >= (1 - self.alpha * 0.2) for c, v in aa_scores.items()}
+        aa_passed = {c: v >= (1 - self.alpha * 1.2) for c, v in aa_scores.items()}
         result = Dataset.from_dict({"score": aa_scores, "pass": aa_passed}, roles={})
         self.key = "aa score"
         return self._set_value(data, result)
@@ -52,10 +54,18 @@ class AAScoreAnalyzer(Executor):
     ) -> Dict[str, Any]:
         aa_split_scores = score_table.apply(
             lambda x: (
-                sum([x[k] * v for k, v in self.__feature_weights.items()])
-                / len(self.__feature_weights)
-                * 2
-                / 3
+                (
+                    (
+                        (
+                            sum(
+                                x[k] * v for k, v in self.__feature_weights.items()
+                            )
+                            / len(self.__feature_weights)
+                        )
+                        * 2
+                    )
+                    / 3
+                )
                 + x["mean test score"] / 3
             ),
             axis=1,

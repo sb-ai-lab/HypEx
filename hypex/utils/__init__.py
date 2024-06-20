@@ -4,7 +4,6 @@ from .enums import (
     BackendsEnum,
     ExperimentDataEnum,
     ABNTestMethodsEnum,
-    AAReporterModsEnum
 )
 from .errors import (
     SpaceError,
@@ -65,5 +64,4 @@ __all__ = [
     "ScalarType",
     "ABNTestMethodsEnum",
     "SetParamsDictTypes",
-    "AAReporterModsEnum"
 ]

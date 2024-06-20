@@ -10,8 +10,12 @@ from hypex.dataset import (
     TargetRole,
     StatisticRole,
 )
-from hypex.splitters import AASplitter
-from hypex.utils import ExperimentDataEnum, ID_SPLIT_SYMBOL, AAReporterModsEnum
+from hypex.splitters import AASplitter, AASplitterWithStratification
+from hypex.utils import (
+    ExperimentDataEnum,
+    ID_SPLIT_SYMBOL,
+    NotFoundInExperimentDataError,
+)
 from .abstract import DictReporter
 
 
@@ -53,10 +57,7 @@ class OneAADictReporter(DictReporter):
         result = []
         for feature, groups in data.items():
             for group, tests in groups.items():
-                t_values = {
-                    "feature": feature,
-                    "group": group
-                }
+                t_values = {"feature": feature, "group": group}
                 for test, values in tests.items():
                     t_values[f"{test} pass"] = values["pass"]
                     t_values[f"{test} p-value"] = values["p-value"]
@@ -64,10 +65,7 @@ class OneAADictReporter(DictReporter):
         result = [OneAADictReporter.rename_passed(d) for d in result]
         return Dataset.from_dict(
             result,
-            roles={
-                "feature": InfoRole(),
-                "group": TreatmentRole()
-            },
+            roles={"feature": InfoRole(), "group": TreatmentRole()},
         )
 
     @staticmethod
@@ -77,7 +75,11 @@ class OneAADictReporter(DictReporter):
 
     @staticmethod
     def get_splitter_id(data: ExperimentData):
-        return data.get_one_id(AASplitter, ExperimentDataEnum.additional_fields)
+        for c in [AASplitter, AASplitterWithStratification]:
+            try:
+                return data.get_one_id(c, ExperimentDataEnum.additional_fields)
+            except NotFoundInExperimentDataError:
+                pass  # The splitting was done by another class
 
     def extract_group_difference(self, data: ExperimentData) -> Dict[str, Any]:
         group_difference_ids = data.get_ids(GroupDifference)[GroupDifference][

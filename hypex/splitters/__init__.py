@@ -1,3 +1,3 @@
-from .aa import AASplitter
+from .aa import AASplitter, AASplitterWithStratification
 
-__all__ = ["AASplitter"]
+__all__ = ["AASplitter", "AASplitterWithStratification"]
