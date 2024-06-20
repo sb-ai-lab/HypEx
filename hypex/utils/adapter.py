@@ -29,7 +29,7 @@ class Adapter:
             return Adapter.frame_to_dataset(data, roles)
         elif isinstance(data, list):
             return Adapter.list_to_dataset(data, roles)
-        elif isinstance(data, ScalarType):
+        elif any(isinstance(data, t) for t in [str, int, float, bool]):
             return Adapter.value_to_dataset(data, roles)
         elif isinstance(data, Dataset):
             return data

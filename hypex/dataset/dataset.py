@@ -104,7 +104,7 @@ class Dataset(DatasetBase):
         self.data[key] = value
 
     def __binary_magic_operator(self, other, func_name: str) -> Any:
-        if not isinstance(other, Union[Dataset, ScalarType, Sequence]):
+        if not any(isinstance(other, t) for t in [Dataset, str, int, float, bool, Sequence]):
             raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
         t_roles = deepcopy(self.roles)
