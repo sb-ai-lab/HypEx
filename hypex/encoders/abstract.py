@@ -22,7 +22,7 @@ class Encoder(Calculator):
         return True
 
     def _get_ids(self, col_name):
-        self.key = NAME_BORDER_SYMBOL + col_name + NAME_BORDER_SYMBOL
+        self.key = f"{NAME_BORDER_SYMBOL} + {col_name} + {NAME_BORDER_SYMBOL}"
         return self.id
 
     def _ids_to_names(self, col_names: List[str]):
