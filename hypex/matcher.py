@@ -592,23 +592,22 @@ class Matcher:
         filtered_matches = filtered_matches.apply(lambda x: int(x[0]))
         filtered_matches_df = filtered_matches.to_frame().reset_index()
         df_matched = matched_data.merge(
-            filtered_matches_df, left_on='user_id', right_on='index', how="left"
+            filtered_matches_df, left_index=True, right_index=True, how="left"
         ).merge(
-            filtered_matches_df, left_on='user_id', right_on='matches', how='left'
+            filtered_matches_df, left_index=True, right_on='matches', how='left'
         ).fillna(0)
 
-        df_matched['user_id_matched'] = df_matched['matches_x'] + df_matched['index_y']
+        df_matched['index_matched'] = df_matched['matches_x'] + df_matched['index_y']
         df_matched = df_matched.drop(columns=['index_x', 'matches_x', 'index_y', 'matches_y'])
-        df_matched['user_id_matched'] = df_matched['user_id_matched'].astype(int)
+        df_matched['index_matched'] = df_matched['index_matched'].astype(int)
 
         input_data_matched = self.input_data.add_suffix('_matched')
-        input_data_matched = input_data_matched.rename(columns={'user_id_matched': 'user_id_matched_matched'})
 
         df_matched = df_matched.merge(
-            input_data_matched, left_on='user_id_matched', right_on='user_id_matched_matched', how='left'
+            input_data_matched, left_on='index_matched', right_index=True, how='left'
         )
 
-        df_matched = df_matched.drop(columns=['user_id_matched_matched'])
+        df_matched = df_matched.drop(columns=['index_matched'])
 
         return df_matched
 
