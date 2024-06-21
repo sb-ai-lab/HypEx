@@ -607,7 +607,7 @@ class Matcher:
             input_data_matched, left_on='index_matched', right_index=True, how='left'
         )
 
-        df_matched = df_matched.drop(columns=['index_matched'])
+        df_matched = df_matched.set_index("matches").reset_index().drop(columns=['index_matched', 'matches'])
 
         return df_matched
 
