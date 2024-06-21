@@ -12,9 +12,9 @@ from hypex.encoders.encoders import DummyEncoder
 PREPROCESSING_DATA = Experiment(
     executors=[
         CategoryAggregator(),
+        CorrFilter(),
         CVFilter(),
         NanFilter(),
-        CorrFilter(),
         ConstFilter(),
         OutliersFilter(lower_percentile=0.05, upper_percentile=0.95),
         DummyEncoder(),
