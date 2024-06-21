@@ -193,7 +193,7 @@ class PandasNavigation(DatasetBackendNavigation):
     # try try-except if necessary
     def _update_column_type(self, column_name: str, type_name: str):
         if self.data[column_name].isna().sum() == 0:
-            self.data.loc[:, column_name] = self.data[column_name].astype(type_name)
+            self.data = self.data.astype({column_name: type_name})
         return self
 
     def add_column(
@@ -398,6 +398,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         if names:
             result.columns = names
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+
+    def cov(self):
+        return self.data.cov(ddof=0)
 
     def shuffle(self, random_state: Optional[int] = None) -> pd.DataFrame:
         return self.data.sample(self.data.shape[0], random_state=random_state)

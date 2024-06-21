@@ -27,7 +27,6 @@ from hypex.utils import (
     NotFoundInExperimentDataError,
     DataTypeError,
     BackendTypeError,
-    ScalarType,
 )
 from .abstract import DatasetBase
 from .roles import (
@@ -104,7 +103,9 @@ class Dataset(DatasetBase):
         self.data[key] = value
 
     def __binary_magic_operator(self, other, func_name: str) -> Any:
-        if not any(isinstance(other, t) for t in [Dataset, str, int, float, bool, Sequence]):
+        if not any(
+            isinstance(other, t) for t in [Dataset, str, int, float, bool, Sequence]
+        ):
             raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
         t_roles = deepcopy(self.roles)
@@ -533,6 +534,12 @@ class Dataset(DatasetBase):
             names = result_data.columns if roles is None else roles
             roles = {column: FeatureRole() for column in names}
         return Dataset(roles=roles, data=result_data)
+
+    def cov(self):
+        t_data = self.backend.cov()
+        return Dataset(
+            {column: FeatureRole() for column in t_data.columns}, data=t_data
+        )
 
     def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
         return Dataset(self.roles, data=self.backend.shuffle(random_state))
