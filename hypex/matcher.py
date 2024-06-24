@@ -3,6 +3,7 @@
 import logging
 import pickle
 import warnings
+import copy
 from typing import Union, Iterable, List
 
 import numpy as np
@@ -574,30 +575,34 @@ class Matcher:
             X, a, self.weights, approximate_match
         ).match()
 
-        filtered_matches = (
+        filtered_matches_tr = (
             index_matched.loc[1]
             .iloc[self.input_data[a == 1].index]
             .matches[index_matched.loc[1]
             .iloc[self.input_data[a == 1].index]
             .matches.apply(lambda x: x != [])]
         )
-
-        matched_data = pd.concat(
-            [
-                self.input_data.loc[filtered_matches.index.to_list()],
-                self.input_data.loc[np.concatenate(filtered_matches.values)],
-            ]
+        filtered_matches_ntr = (
+            index_matched.loc[0]
+            .iloc[self.input_data[a == 0].index]
+            .matches[index_matched.loc[1]
+            .iloc[self.input_data[a == 0].index]
+            .matches.apply(lambda x: x != [])]
         )
+
+        filtered_matches = pd.concat([filtered_matches_tr, filtered_matches_ntr]).sort_index()
+
+        matched_data = self.input_data.loc[filtered_matches.index.to_list()]
 
         filtered_matches = filtered_matches.apply(lambda x: int(x[0]))
         filtered_matches_df = filtered_matches.to_frame().reset_index()
         df_matched = matched_data.merge(
-            filtered_matches_df, left_index=True, right_index=True, how="left"
+            filtered_matches_df, left_index=True, right_on='index', how="left"
         ).merge(
             filtered_matches_df, left_index=True, right_on='matches', how='left'
         ).fillna(0)
 
-        df_matched['index_matched'] = df_matched['matches_x'] + df_matched['index_y']
+        df_matched['index_matched'] = df_matched['matches_x']
         df_matched = df_matched.drop(columns=['index_x', 'matches_x', 'index_y', 'matches_y'])
         df_matched['index_matched'] = df_matched['index_matched'].astype(int)
 
