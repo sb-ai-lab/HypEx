@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, Union, Sequence
 
 from hypex.dataset.dataset import Dataset
 from hypex.dataset.dataset import ExperimentData
@@ -16,6 +16,7 @@ from hypex.utils.adapter import Adapter
 class CVFilter(Transformer):
     def __init__(
         self,
+        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
         lower_bound: Optional[float] = None,
         upper_bound: Optional[float] = None,
         key: Any = "",
@@ -29,6 +30,7 @@ class CVFilter(Transformer):
                 The maximum acceptable coefficient of variation above which we consider the to be incorrect
         """
         super().__init__(key=key)
+        self.target_roles = target_roles or FeatureRole()
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
         self.type_filter: bool = True
@@ -53,7 +55,7 @@ class CVFilter(Transformer):
     def execute(self, data: ExperimentData) -> ExperimentData:
         if self.type_filter:
             target_cols = data.ds.search_columns(
-                roles=FeatureRole(), search_types=[float, int, bool]
+                roles=self.target_roles, search_types=[float, int, bool]
             )
         else:
             target_cols = data.ds.search_columns(roles=FeatureRole())
@@ -71,6 +73,7 @@ class CVFilter(Transformer):
 class ConstFilter(Transformer):
     def __init__(
         self,
+        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
         threshold: float = 0.95,
         key: Any = "",
     ):
@@ -83,6 +86,7 @@ class ConstFilter(Transformer):
                 The maximum acceptable frequency above which we consider the column to be constant
         """
         super().__init__(key=key)
+        self.target_roles = target_roles or FeatureRole()
         self.threshold = threshold
 
     @staticmethod
@@ -99,7 +103,7 @@ class ConstFilter(Transformer):
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        target_cols = data.ds.search_columns(roles=FeatureRole())
+        target_cols = data.ds.search_columns(roles=self.target_roles)
         result = data.copy(
             data=self.calc(
                 data=data.ds, target_cols=target_cols, threshold=self.threshold
@@ -111,6 +115,7 @@ class ConstFilter(Transformer):
 class NanFilter(Transformer):
     def __init__(
         self,
+        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
         threshold: float = 0.8,
         key: Any = "",
     ):
@@ -123,6 +128,7 @@ class NanFilter(Transformer):
                 The maximum acceptable frequency of NaN values in a column
         """
         super().__init__(key=key)
+        self.target_roles = target_roles or FeatureRole()
         self.threshold = threshold
 
     @staticmethod
@@ -139,7 +145,7 @@ class NanFilter(Transformer):
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        target_cols = data.ds.search_columns(roles=FeatureRole())
+        target_cols = data.ds.search_columns(roles=self.target_roles)
         result = data.copy(
             data=self.calc(
                 data=data.ds, target_cols=target_cols, threshold=self.threshold
@@ -151,12 +157,16 @@ class NanFilter(Transformer):
 class CorrFilter(Transformer):
     def __init__(
         self,
+        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
+        corr_space_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
         threshold: float = 0.8,
         method: str = "pearson",
         numeric_only: bool = True,
         key: Any = "",
     ):
         super().__init__(key=key)
+        self.target_roles = target_roles or FeatureRole()
+        self.corr_space_roles = corr_space_roles or [FeatureRole(), TargetRole()]
         self.threshold = threshold
         self.method = method
         self.numeric_only = numeric_only
@@ -165,10 +175,10 @@ class CorrFilter(Transformer):
     def _inner_function(
         data: Dataset,
         target_cols: Optional[FieldKeyTypes] = None,
+        corr_space_cols: Optional[FieldKeyTypes] = None,
         threshold: float = 0.8,
         method: str = "pearson",
         numeric_only: bool = True,
-        corr_space_cols: Optional[FieldKeyTypes] = None,
         drop_policy: str = "cv",
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
@@ -215,16 +225,16 @@ class CorrFilter(Transformer):
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        target_cols = data.ds.search_columns(roles=FeatureRole())
-        corr_space_cols = data.ds.search_columns(roles=[FeatureRole(), TargetRole()])
+        target_cols = data.ds.search_columns(roles=self.target_roles)
+        corr_space_cols = data.ds.search_columns(roles=self.corr_space_roles)
         result = data.copy(
             data=self.calc(
                 data=data.ds,
                 target_cols=target_cols,
+                corr_space_cols=corr_space_cols,
                 threshold=self.threshold,
                 method=self.method,
                 numeric_only=self.numeric_only,
-                corr_space_cols=corr_space_cols,
             )
         )
         return result
@@ -233,6 +243,7 @@ class CorrFilter(Transformer):
 class OutliersFilter(Transformer):
     def __init__(
         self,
+        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
         lower_percentile: float = 0,
         upper_percentile: float = 1,
         key: Any = "",
@@ -246,6 +257,7 @@ class OutliersFilter(Transformer):
                 The value of the percentile to filter outliers
         """
         super().__init__(key=key)
+        self.target_roles = target_roles or FeatureRole()
         self.lower_percentile = lower_percentile
         self.upper_percentile = upper_percentile
 
@@ -269,7 +281,7 @@ class OutliersFilter(Transformer):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         target_cols = data.ds.search_columns(
-            roles=FeatureRole(),
+            roles=self.target_roles,
             search_types=[float, int, bool],
         )
         t_ds = self.calc(

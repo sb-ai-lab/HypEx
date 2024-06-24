@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, Union, Sequence
 
 from hypex.dataset.dataset import Dataset
 from hypex.dataset.dataset import ExperimentData
@@ -6,18 +6,20 @@ from hypex.dataset.roles import (
     FeatureRole,
 )
 from hypex.transformers.abstract import Transformer
-from hypex.utils import FieldKeyTypes
+from hypex.utils import FieldKeyTypes, CategoricalTypes
 from hypex.utils.adapter import Adapter
 
 
 class CategoryAggregator(Transformer):
     def __init__(
         self,
+        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
         threshold: Optional[int] = 15,
         new_group_name: Optional[str] = None,
         key: Any = "",
     ):
         super().__init__(key=key)
+        self.target_roles = target_roles or FeatureRole()
         self.threshold = threshold
         self.new_group_name = new_group_name
 
@@ -41,7 +43,7 @@ class CategoryAggregator(Transformer):
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        target_cols = data.ds.search_columns(roles=FeatureRole())
+        target_cols = data.ds.search_columns(roles=self.target_roles, search_types=[CategoricalTypes])
         result = data.copy(
             data=self.calc(
                 data=data.ds,
