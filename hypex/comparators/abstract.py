@@ -92,6 +92,12 @@ class GroupComparator(GroupCalculator):
                 )
         return result
 
+    @staticmethod
+    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
+        if test_data is None:
+            raise ValueError("test_data is needed for evaluation")
+        return test_data
+
     def _set_value(
         self, data: ExperimentData, value: Optional[Dataset] = None, key: Any = None
     ) -> ExperimentData:
@@ -103,6 +109,7 @@ class GroupComparator(GroupCalculator):
         )
         return data
 
+    # TODO compare_result.values(), но тайпинг для нее FromDictTypes
     @staticmethod
     def _extract_dataset(
         compare_result: FromDictTypes, roles: Dict[Any, ABCRole]

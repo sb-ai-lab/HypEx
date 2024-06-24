@@ -6,17 +6,21 @@ from ..dataset import Dataset
 
 class ATC(MatchingComparator):
     @classmethod
-    def _inner_function(cls, data: Dataset, other: Optional[Dataset] = None, **kwargs):
-        other = cls._check_test_data(test_data=other)
-        return {"ATC": (data - other).mean()}
+    def _inner_function(
+        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+    ):
+        test_data = cls._check_test_data(test_data=test_data)
+        return {"ATC": (data - test_data).mean()}
 
 
 class ATT(MatchingComparator):
 
     @classmethod
-    def _inner_function(cls, data: Dataset, other: Optional[Dataset] = None, **kwargs):
-        other = cls._check_test_data(test_data=other)
-        return {"ATT": (other - data).mean()}
+    def _inner_function(
+        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+    ):
+        test_data = cls._check_test_data(test_data=test_data)
+        return {"ATT": (test_data - data).mean()}
 
 
 class ATE(MatchingComparator):
@@ -36,10 +40,10 @@ class ATE(MatchingComparator):
     def _inner_function(
         cls,
         data: Dataset,
-        other: Optional[Dataset] = None,
+        test_data: Optional[Dataset] = None,
         att: Optional[float] = None,
         atc: Optional[float] = None,
         **kwargs
     ) -> float:
-        other = cls._check_test_data(test_data=other, att=att, atc=atc)
-        return (att * len(data) + atc * len(other)) / (len(data) + len(other))
+        test_data = cls._check_test_data(test_data=test_data, att=att, atc=atc)
+        return (att * len(data) + atc * len(test_data)) / (len(data) + len(test_data))

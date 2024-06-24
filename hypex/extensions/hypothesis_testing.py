@@ -92,7 +92,7 @@ class Chi2TestExtension(StatTest):
         ]
 
     def _calc_pandas(
-        self, data: Dataset, other: Union[Dataset, None] = None, **kwargs
+        self, data: Dataset, other: Optional[Dataset] = None, **kwargs
     ) -> Union[float, Dataset]:
         other = self.check_data(data, other)
         matrix = self.matrix_preparation(data, other)

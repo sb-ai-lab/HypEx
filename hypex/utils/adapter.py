@@ -1,6 +1,6 @@
 from typing import Union, Dict, Any, List
 
-import pandas as pd
+import pandas as pd  # type: ignore
 
 from hypex.dataset import Dataset, ABCRole
 from hypex.utils import ScalarType, FieldKeyTypes

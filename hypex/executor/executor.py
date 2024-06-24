@@ -146,15 +146,6 @@ class GroupCalculator(Calculator):
             self.__additional_mode = True
         return searched_field
 
-    def _get_fields(self, data: ExperimentData):
-        group_field = self._field_searching(data, self.grouping_role)
-        if len(group_field) == 0:
-            raise NoColumnsError(group_field)
-        target_fields = self._field_searching(
-            data, self.target_roles, search_types=self.search_types
-        )
-        return group_field, target_fields
-
     @staticmethod
     def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
         if test_data is None:
@@ -182,7 +173,7 @@ class GroupCalculator(Calculator):
     ) -> List[FieldKeyTypes]:
         if not field:
             raise NoColumnsError(field)
-        elif isinstance(field, FieldKeyTypes):
+        elif isinstance(field, int) or isinstance(field, str):
             return [field]
         return list(field)
 
@@ -218,8 +209,8 @@ class GroupCalculator(Calculator):
         return cls._execute_inner_function(
             grouping_data, target_fields=target_fields, old_data=data, **kwargs
         )
-    
-    def _get_fields(self, data: ExperimentData): 
+
+    def _get_fields(self, data: ExperimentData):
         group_field = self._field_searching(data, self.grouping_role)
         target_fields = self._field_searching(
             data, TempTargetRole(), tmp_role=True, search_types=self.search_types
@@ -247,3 +238,15 @@ class GroupCalculator(Calculator):
             grouping_data=grouping_data,
         )
         return self._set_value(data, compare_result)
+
+
+class MLExecutor(Executor):
+
+    def fit(self, X: Dataset, Y: Dataset) -> "MLExecutor":
+        pass
+
+    def predict(self, data: Dataset) -> Dataset:
+        pass
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        pass
