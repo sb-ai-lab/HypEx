@@ -56,13 +56,11 @@
 from typing import Optional, Any, Dict, Union, Sequence
 
 import numpy as np
-
-from hypex.dataset import ABCRole, Dataset, ExperimentData, TargetRole
-from hypex.utils import SpaceEnum, FieldKeyTypes
-
 from scipy.stats import norm
 
 from hypex.comparators.abstract import GroupComparator
+from hypex.dataset import ABCRole, Dataset, ExperimentData, TargetRole
+from hypex.utils import SpaceEnum, FieldKeyTypes
 
 
 class MDEBySize(GroupComparator):
@@ -101,14 +99,14 @@ class MDEBySize(GroupComparator):
         cls: Dataset,
         data: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None],
         group_field: Optional[FieldKeyTypes] = None,
-        target_fields=None,
         grouping_data=None,
+        target_field=None,
         **kwargs
     ):
         return GroupComparator.calc(
             data=data,
             group_field=group_field,
-            target_fields=target_field,
+            target_field=target_field,
             comparison_function=MDEBySize._inner_function,
             power=power,
             significance=target_fields,

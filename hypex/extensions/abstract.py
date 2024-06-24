@@ -38,13 +38,13 @@ class MLExtension(Extension):
     def _calc_pandas(
         self,
         data: Dataset,
-        other: Optional[Dataset] = None,
-        test: Optional[Dataset] = None,
+        target_data: Optional[Dataset] = None,
+        test_data: Optional[Dataset] = None,
         mode: Optional[Literal["auto", "fit", "predict"]] = None,
         **kwargs
     ):
-        model = self.fit(data, other, **kwargs)
-        return model.predict(test)
+        model = self.fit(data, target_data, **kwargs)
+        return model.predict(test_data)
 
     @abstractmethod
     def fit(self, X, y=None, **kwargs):
@@ -57,8 +57,10 @@ class MLExtension(Extension):
     def calc(
         self,
         data: Dataset,
-        other: Union[Dataset, None] = None,
-        test: Optional[Dataset] = None,
+        target_data: Union[Dataset, None] = None,
+        test_data: Optional[Dataset] = None,
         **kwargs
     ):
-        return super().calc(data=data, other=other, test=test, **kwargs)
+        return super().calc(
+            data=data, target_data=target_data, test_data=test_data, **kwargs
+        )

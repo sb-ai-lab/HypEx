@@ -143,8 +143,8 @@ class GroupComparator(GroupCalculator):
         compare_result = self.calc(
             data=data.ds,
             group_field=group_field,
-            target_fields=target_fields,
             grouping_data=grouping_data,
+            target_field=target_fields,
         )
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key in compare_result}
@@ -222,8 +222,8 @@ class MatchingComparator(GroupComparator):
         compare_result = self.calc(
             data=data.ds,
             group_field=group_field,
-            target_field=target_fields,
             grouping_data=grouping_data,
+            target_field=target_fields,
             comparison_function=self._inner_function,
             att=att,
             atc=atc,

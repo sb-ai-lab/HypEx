@@ -23,11 +23,11 @@ class Adapter:
         ValueError: If the data type is not supported.
         """
         # Convert data based on its type
-        if isinstance(data, dict):
+        if isinstance(data, Dict):
             return Adapter.dict_to_dataset(data, roles)
         elif isinstance(data, pd.DataFrame):
             return Adapter.frame_to_dataset(data, roles)
-        elif isinstance(data, list):
+        elif isinstance(data, List):
             return Adapter.list_to_dataset(data, roles)
         elif any(isinstance(data, t) for t in [str, int, float, bool]):
             return Adapter.value_to_dataset(data, roles)
@@ -70,7 +70,7 @@ class Adapter:
         """
         return Dataset(
             roles=roles,
-            data=pd.DataFrame(data=data, columns=[list(roles.keys())[0]]),
+            data=pd.DataFrame(data=data, columns=list(roles.keys())),
         )
 
     @staticmethod

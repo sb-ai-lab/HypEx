@@ -14,8 +14,8 @@ from hypex.utils import (
 
 
 class GroupOperator(GroupCalculator):
-    @property 
-    def search_types(self): 
+    @property
+    def search_types(self):
         return None
 
     @classmethod
@@ -24,28 +24,29 @@ class GroupOperator(GroupCalculator):
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Any:
         raise AbstractMethodError
-    
-    def _get_fields(self, data: ExperimentData): 
+
+    def _get_fields(self, data: ExperimentData):
         group_field = self._field_searching(data, self.grouping_role)
         target_fields = self._field_searching(
             data, self.target_roles, search_types=self.search_types
         )
         return group_field, target_fields
 
+    # TODO дописать ошибку
     @classmethod
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_fields: Optional[List[FieldKeyTypes]] = None,
+        target_field: Optional[List[FieldKeyTypes]] = None,
         **kwargs,
     ) -> Dict:
-        if len(target_fields) != 2:
-            raise ValueError
+        if target_field is None or len(target_field) != 2:
+            raise ValueError("Нужно дописать ошибку")
         result = {}
         for group, group_data in grouping_data:
             result[group[0]] = cls._inner_function(
-                data=group_data[target_fields[0]],
-                test_data=group_data[target_fields[1]],
+                data=group_data[target_field[0]],
+                test_data=group_data[target_field[1]],
                 **kwargs,
             )
         return result

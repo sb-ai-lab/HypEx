@@ -255,6 +255,8 @@ class Dataset(DatasetBase):
         role: Optional[Dict[str, ABCRole]] = None,
         index: Optional[Iterable[Hashable]] = None,
     ):
+        if isinstance(data, Dataset):
+            data = data.data
         if role is None:
             if not isinstance(data, Dataset):
                 raise ValueError("Козьёль")
@@ -618,7 +620,7 @@ class ExperimentData:
             self.groups[executor_id][key] = value
         if len(executor_id) == 1:
             self.id_name_mapping[executor_id] = name
-        else:
+        else:  # TODO если str, то записывается побуквенно
             for id_ in executor_id:
                 self.id_name_mapping[id_] = name
         return self
