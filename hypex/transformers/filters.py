@@ -35,6 +35,10 @@ class CVFilter(Transformer):
         self.upper_bound = upper_bound
         self.type_filter: bool = True
 
+    @property
+    def search_types(self):
+        return [float, int, bool]
+
     @staticmethod
     def _inner_function(
         data: Dataset,
@@ -55,7 +59,7 @@ class CVFilter(Transformer):
     def execute(self, data: ExperimentData) -> ExperimentData:
         if self.type_filter:
             target_cols = data.ds.search_columns(
-                roles=self.target_roles, search_types=[float, int, bool]
+                roles=self.target_roles, search_types=self.search_types
             )
         else:
             target_cols = data.ds.search_columns(roles=FeatureRole())
@@ -261,6 +265,10 @@ class OutliersFilter(Transformer):
         self.lower_percentile = lower_percentile
         self.upper_percentile = upper_percentile
 
+    @property
+    def search_types(self):
+        return [float, int, bool]
+
     @staticmethod
     def _inner_function(
         data: Dataset,
@@ -282,7 +290,7 @@ class OutliersFilter(Transformer):
     def execute(self, data: ExperimentData) -> ExperimentData:
         target_cols = data.ds.search_columns(
             roles=self.target_roles,
-            search_types=[float, int, bool],
+            search_types=self.search_types,
         )
         t_ds = self.calc(
             data=data.ds,

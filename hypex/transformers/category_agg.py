@@ -23,6 +23,10 @@ class CategoryAggregator(Transformer):
         self.threshold = threshold
         self.new_group_name = new_group_name
 
+    @property
+    def search_types(self):
+        return [CategoricalTypes]
+
     @staticmethod
     def _inner_function(
         data: Dataset,
@@ -43,7 +47,7 @@ class CategoryAggregator(Transformer):
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        target_cols = data.ds.search_columns(roles=self.target_roles, search_types=[CategoricalTypes])
+        target_cols = data.ds.search_columns(roles=self.target_roles, search_types=self.search_types)
         result = data.copy(
             data=self.calc(
                 data=data.ds,

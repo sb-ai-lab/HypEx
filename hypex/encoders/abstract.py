@@ -26,6 +26,10 @@ class Encoder(Calculator):
     def __is_encoder(self):
         return True
 
+    @property
+    def search_types(self):
+        return [CategoricalTypes]
+
     def _get_ids(self, col_name):
         self.key = f"{NAME_BORDER_SYMBOL}{col_name}{NAME_BORDER_SYMBOL}"
         return self.id
@@ -50,7 +54,7 @@ class Encoder(Calculator):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         target_cols = data.ds.search_columns(
-            roles=self.target_roles, search_types=[CategoricalTypes]
+            roles=self.target_roles, search_types=self.search_types
         )
         return self._set_value(
             data=data,
