@@ -41,7 +41,7 @@ class FaissNearestNeighbors(MLExecutor):
         return data + cls._inner_function(
             data=grouping_data[1][1],
             test_data=grouping_data[0][1],
-            n_neighbors=n_neighbors,
+            n_neighbors=n_neighbors or 1,
             **kwargs,
         )
 
