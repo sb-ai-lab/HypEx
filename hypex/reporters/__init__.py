@@ -10,5 +10,5 @@ __all__ = [
     "DictReporter",
     "DatasetReporter",
     "HomoDictReporter",
-    "HomoDatasetReporter"
+    "HomoDatasetReporter",
 ]
