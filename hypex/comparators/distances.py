@@ -1,11 +1,64 @@
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
-from hypex.comparators.abstract import GroupComparator
-from hypex.dataset import Dataset
+from hypex.dataset import Dataset, ExperimentData, FeatureRole
+from hypex.executor import GroupCalculator
 from hypex.extensions.linalg import CholeskyExtension, InverseExtension
+from hypex.utils import FieldKeyTypes, ExperimentDataEnum
 
 
-class MahalanobisDistance(GroupComparator):
+class MahalanobisDistance(GroupCalculator):
+
+    @classmethod
+    def _execute_inner_function(
+        cls,
+        grouping_data,
+        target_field: Optional[List[FieldKeyTypes]] = None,
+        **kwargs,
+    ) -> Dict:
+        result = {}
+        for i in range(1, len(grouping_data)):
+            if target_field:
+                result.update(
+                    cls._inner_function(
+                        data=grouping_data[0][1][target_field],
+                        test_data=grouping_data[i][1][target_field],
+                        **kwargs,
+                    )
+                )
+            else:
+                result.update(
+                    cls._inner_function(
+                        data=grouping_data[0][1],
+                        test_data=grouping_data[i][1],
+                        **kwargs,
+                    )
+                )
+        return result
+
+    def _set_value(
+        self, data: ExperimentData, value: Optional[Dataset] = None, key: Any = None
+    ) -> ExperimentData:
+        if isinstance(value, Dict):
+            for key, value_ in value.items():
+                data = data.set_value(
+                    ExperimentDataEnum.groups,
+                    self.id,
+                    str(self.__class__.__name__),
+                    value_,
+                    key=key,
+                )
+        return data
+
+    def _get_fields(self, data: ExperimentData):
+        group_field = self._field_searching(data, self.grouping_role)
+        target_fields = self._field_searching(
+            data, FeatureRole(), search_types=self.search_types
+        )
+        return group_field, target_fields
+
+    @property
+    def search_types(self) -> Optional[List[type]]:
+        return [int, float]
 
     @classmethod
     def _inner_function(

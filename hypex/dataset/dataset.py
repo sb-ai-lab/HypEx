@@ -617,7 +617,10 @@ class ExperimentData:
             else:
                 self.variables[executor_id][key] = value
         elif space == ExperimentDataEnum.groups:
-            self.groups[executor_id][key] = value
+            if executor_id not in self.groups:
+                self.groups[executor_id] = {key: value}
+            else:
+                self.groups[executor_id][key] = value
         if len(executor_id) == 1:
             self.id_name_mapping[executor_id] = name
         else:  # TODO если str, то записывается побуквенно

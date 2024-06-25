@@ -59,7 +59,7 @@ class GroupComparator(GroupCalculator):
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_fields: Optional[List[FieldKeyTypes]] = None,
+        target_field: Optional[List[FieldKeyTypes]] = None,
         old_data: Optional[Dataset] = None,
         **kwargs,
     ) -> Dict:
@@ -71,12 +71,12 @@ class GroupComparator(GroupCalculator):
                 else grouping_data[i][0][0]
             )
             # TODO roles
-            if target_fields:
+            if target_field:
                 grouping_data[i][1].tmp_roles = old_data.tmp_roles
                 result[result_key] = Adapter.to_dataset(
                     cls._inner_function(
-                        data=grouping_data[0][1][target_fields],
-                        test_data=grouping_data[i][1][target_fields],
+                        data=grouping_data[0][1][target_field],
+                        test_data=grouping_data[i][1][target_field],
                         **kwargs,
                     ),
                     InfoRole(),
@@ -125,10 +125,7 @@ class GroupComparator(GroupCalculator):
 
     # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
     def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field = self._field_searching(data, self.grouping_role)
-        target_fields = data.ds.search_columns(
-            TempTargetRole(), tmp_role=True, search_types=self.search_types
-        )
+        group_field, target_fields = self._get_fields(data)
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
