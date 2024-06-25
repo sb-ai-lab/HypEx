@@ -13,7 +13,7 @@ from hypex.reporters import Reporter, DatasetReporter
 class ExperimentWithReporter(Experiment):
     def __init__(
         self,
-        executors: list[Executor],
+        executors: List[Executor],
         reporter: Reporter,
         transformer: Optional[bool] = None,
         key: str = "",
@@ -35,7 +35,7 @@ class ExperimentWithReporter(Experiment):
 class CycledExperiment(ExperimentWithReporter):
     def __init__(
         self,
-        executors: list[Executor],
+        executors: List[Executor],
         reporter: DatasetReporter,
         n_iterations: int,
         transformer: Optional[bool] = None,
@@ -70,7 +70,7 @@ class GroupExperiment(ExperimentWithReporter):
 class ParamsExperiment(ExperimentWithReporter):
     def __init__(
         self,
-        executors: list[Executor],
+        executors: List[Executor],
         reporter: DatasetReporter,
         params: Dict[type, Dict[str, Sequence[Any]]],
         transformer: Optional[bool] = None,

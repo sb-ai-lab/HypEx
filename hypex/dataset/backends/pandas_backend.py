@@ -423,7 +423,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         right_on: FieldKeyTypes = "",
         left_index: bool = False,
         right_index: bool = False,
-        suffixes: tuple[str, str] = ("_x", "_y"),
+        suffixes: Tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> pd.DataFrame:
         for on_ in [on, left_on, right_on]:

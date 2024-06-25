@@ -3,11 +3,11 @@ from typing import Dict, Any
 from hypex.analyzers.ab import ABAnalyzer
 from hypex.dataset import ExperimentData
 from hypex.utils import ExperimentDataEnum
-from .aa import AADictReporter
+from .aa import OneAADictReporter
 from ..comparators import TTest, UTest, Chi2Test
 
 
-class ABDictReporter(AADictReporter):
+class ABDictReporter(OneAADictReporter):
     def extract_analyzer_data(self, data: ExperimentData) -> Dict[str, Any]:
         analyzer_id = data.get_one_id(ABAnalyzer, ExperimentDataEnum.analysis_tables)
         return self.extract_from_one_row_dataset(data.analysis_tables[analyzer_id])

@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Iterable, Dict, Union, Any, List, Optional
+from typing import Iterable, Dict, Union, Any, List, Optional, Sequence
 
 from hypex.dataset import (
     ExperimentData,
@@ -76,11 +76,11 @@ class OnRoleExperiment(Experiment):
     def __init__(
         self,
         executors: List[Executor],
-        role: ABCRole,
+        role: Union[ABCRole, Sequence[ABCRole]],
         transformer: Optional[bool] = None,
         key: Any = "",
     ):
-        self.role: ABCRole = role
+        self.role: List[ABCRole] = [role] if isinstance(role, ABCRole) else list(role)
         super().__init__(executors, transformer, key)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
