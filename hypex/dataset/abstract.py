@@ -104,7 +104,7 @@ class DatasetBase(ABC):
         roles: Union[ABCRole, Iterable[ABCRole]],
         tmp_role=False,
         search_types: Optional[List] = None,
-    ) -> List[Union[str, int]]:
+    ) -> List[str]:
         roles = [roles] if not isinstance(roles, Iterable) else roles
         roles_for_search = self._tmp_roles if tmp_role else self.roles
         return [
