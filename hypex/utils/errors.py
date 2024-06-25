@@ -62,3 +62,7 @@ class BackendTypeError(Exception):
 class MergeOnError(Exception):
     def __init__(self, on):
         super().__init__(f"Can only merge on one of the columns data. Got {on}")
+
+class DatasetSizeError(Exception):
+    def __init__(self, size):
+        super().__init__(f"The Dataset is of wrong size. Got {size}")

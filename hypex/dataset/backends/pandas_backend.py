@@ -16,7 +16,7 @@ from typing import (
 import numpy as np
 import pandas as pd  # type: ignore
 
-from hypex.utils import FromDictTypes, FieldKeyTypes, MergeOnError
+from hypex.utils import FromDictTypes, FieldKeyTypes, MergeOnError, ScalarType
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -463,3 +463,26 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         elif isinstance(to_replace, pd.Series):
             to_replace = to_replace.to_list()
         return self.data.replace(to_replace=to_replace, value=value, regex=regex)
+
+    def cut(
+        self,
+        bins: Union[int, Sequence[ScalarType]],
+        right: bool = True,
+        labels: Union[Sequence[ScalarType], bool, None] = None,
+        retbins: bool = False,
+        precision: int = 3,
+        include_lowest: bool = False,
+        duplicates: Literal["raise", "drop"] = "raise",
+        ordered: bool = True,
+    ) -> pd.DataFrame:
+        return pd.cut(
+                x=self.data.iloc[:, 0],
+                bins=bins,
+                right=right,
+                labels=labels,
+                retbins=retbins,
+                precision=precision,
+                include_lowest=include_lowest,
+                duplicates=duplicates,
+                ordered=ordered,
+        )

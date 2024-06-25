@@ -11,6 +11,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Literal,
 )
 
 import pandas as pd  # type: ignore
@@ -28,6 +29,7 @@ from hypex.utils import (
     DataTypeError,
     BackendTypeError,
     ScalarType,
+    DatasetSizeError,
 )
 from .abstract import DatasetBase
 from .roles import (
@@ -104,7 +106,9 @@ class Dataset(DatasetBase):
         self.data[key] = value
 
     def __binary_magic_operator(self, other, func_name: str) -> Any:
-        if not any(isinstance(other, t) for t in [Dataset, str, int, float, bool, Sequence]):
+        if not any(
+            isinstance(other, t) for t in [Dataset, str, int, float, bool, Sequence]
+        ):
             raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
         t_roles = deepcopy(self.roles)
@@ -550,6 +554,33 @@ class Dataset(DatasetBase):
         return Dataset(
             self.roles,
             data=self._backend.replace(to_replace=to_replace, value=value, regex=regex),
+        )
+
+    def cut(
+        self,
+        bins: Union[int, Sequence[ScalarType]],
+        right: bool = True,
+        labels: Union[Sequence[ScalarType], bool, None] = None,
+        retbins: bool = False,
+        precision: int = 3,
+        include_lowest: bool = False,
+        duplicates: Literal["raise", "drop"] = "raise",
+        ordered: bool = True,
+    ) -> "Dataset":
+        if len(self.columns) > 1:
+            raise DatasetSizeError(len(self.columns))
+        return Dataset(
+            self.roles,
+            data=self._backend.cut(
+                bins=bins,
+                right=right,
+                labels=labels,
+                retbins=retbins,
+                precision=precision,
+                include_lowest=include_lowest,
+                duplicates=duplicates,
+                ordered=ordered,
+            ),
         )
 
 

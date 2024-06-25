@@ -17,6 +17,7 @@ from .errors import (
     BackendTypeError,
     MergeOnError,
     AbstractMethodError,
+    DatasetSizeError,
 )
 
 from .typings import (
@@ -64,4 +65,5 @@ __all__ = [
     "ScalarType",
     "ABNTestMethodsEnum",
     "SetParamsDictTypes",
+    "DatasetSizeError",
 ]
