@@ -11,6 +11,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Literal,
 )
 
 import pandas as pd  # type: ignore
@@ -450,8 +451,11 @@ class Dataset(DatasetBase):
     def na_counts(self):
         return self._convert_data_after_agg(self._backend.na_counts())
 
-    # TODO Literal
-    def dropna(self, how: str = "any", subset: Union[str, Iterable[str], None] = None):
+    def dropna(
+        self,
+        how: Literal["any", "all"] = "any",
+        subset: Union[str, Iterable[str], None] = None,
+    ):
         return Dataset(
             roles=self.roles, data=self._backend.dropna(how=how, subset=subset)
         )
@@ -467,7 +471,6 @@ class Dataset(DatasetBase):
         t_roles = {k: v for k, v in self.roles.items() if k in t_data.columns}
         return Dataset(roles=t_roles, data=t_data)
 
-    # TODO Literal
     def merge(
         self,
         right,
@@ -476,9 +479,12 @@ class Dataset(DatasetBase):
         right_on: Optional[FieldKeyTypes] = None,
         left_index: bool = False,
         right_index: bool = False,
-        suffixes: Tuple[str, str] = ("_x", "_y"),
-        how: str = "inner",
+        suffixes: tuple[str, str] = ("_x", "_y"),
+        how: Literal["left", "right", "outer", "inner", "cross"] = "inner",
     ):
+        if not any([on, left_on, right_on, left_index, right_index]):
+            left_index = True
+            right_index = True
         if not isinstance(right, Dataset):
             raise DataTypeError(type(right))
         if type(right._backend) is not type(self._backend):
