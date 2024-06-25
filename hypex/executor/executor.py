@@ -312,7 +312,14 @@ class MLExecutor(GroupCalculator, ABC):
     ) -> ExperimentData:
         return data.set_value(
             ExperimentDataEnum.additional_fields,
-            self.id,
+            (
+                self.id
+                if len(value.columns) == 1
+                else {
+                    f"matched_indexes_{i}": f"{self.id}{i}"
+                    for i in range(len(value.columns))
+                }
+            ),
             str(self.__class__.__name__),
             value=value,
             key=key,
@@ -337,11 +344,12 @@ class MLExecutor(GroupCalculator, ABC):
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
             raise ComparisonNotSuitableFieldError(group_field)
+        result = cls._execute_inner_function(
+            grouping_data, target_field=target_field, **kwargs
+        )
         return Adapter.to_dataset(
-            cls._execute_inner_function(
-                grouping_data, target_field=target_field, **kwargs
-            ),
-            {"matched_indexes": MatchingRole()},
+            result,
+            {f"matched_indexes_{i}": MatchingRole() for i in range(len(result[0]))},
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:

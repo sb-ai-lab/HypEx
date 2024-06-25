@@ -1,9 +1,10 @@
 from typing import Optional, Any, List
 
+from hypex.comparators.distances import MahalanobisDistance
 from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData
 from hypex.executor import MLExecutor
 from hypex.extensions.ml import FaissExtension
-from hypex.utils import SpaceEnum
+from hypex.utils import SpaceEnum, ExperimentDataEnum
 
 
 class FaissNearestNeighbors(MLExecutor):
@@ -50,9 +51,10 @@ class FaissNearestNeighbors(MLExecutor):
         data: Dataset,
         test_data: Optional[Dataset] = None,
         target_data: Optional[Dataset] = None,
+        n_neighbors: Optional[int] = None,
         **kwargs,
     ) -> Any:
-        return FaissExtension().calc(
+        return FaissExtension(n_neighbors=n_neighbors or 1).calc(
             data=data, test_data=test_data, target_data=target_data
         )
 
@@ -68,6 +70,11 @@ class FaissNearestNeighbors(MLExecutor):
             grouping_data = list(data.groups[group_field[0]].items())
         else:
             grouping_data = None
+        distances_keys = data.get_ids(MahalanobisDistance, ExperimentDataEnum.groups)
+        if len(distances_keys[MahalanobisDistance]) > 0:
+            grouping_data = list(
+                data.groups[distances_keys[MahalanobisDistance]["groups"][0]].items()
+            )
         compare_result = self.calc(
             data=data.ds,
             group_field=group_field,
@@ -76,5 +83,4 @@ class FaissNearestNeighbors(MLExecutor):
             n_neighbors=self.n_neighbors,
             two_sides=self.two_sides,
         )
-        compare_result = compare_result.rename({"matched_indexes": self.id})
         return self._set_value(data, compare_result)
