@@ -1,9 +1,17 @@
+from typing import Optional, Dict, Any, List
+
 from hypex.analyzers import OneAAStatAnalyzer
+from hypex.analyzers.aa2 import AAScoreAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes
+from hypex.comparators.abstract import GroupComparator
 from hypex.comparators.hypothesis_testing import TTest, KSTest, Chi2Test
-from hypex.dataset import TargetRole, TreatmentRole, StratificationRole
+from hypex.dataset import TargetRole, TreatmentRole
 from hypex.experiments import Experiment, OnRoleExperiment
+from hypex.experiments.base_complex import ParamsExperiment
+from hypex.reporters import DatasetReporter, OneAADictReporter
 from hypex.splitters import AASplitter, AASplitterWithStratification
+from hypex.ui.aa import AAOutput
+from hypex.ui.base import ExperimentShell
 from hypex.utils import SpaceEnum
 
 ONE_AA_TEST = Experiment(
@@ -43,3 +51,53 @@ ONE_AA_TEST_WITH_STRATIFICATION = Experiment(
         OneAAStatAnalyzer(),
     ]
 )
+
+
+class AATest(ExperimentShell):
+    @staticmethod
+    def _prepare_experiment(stratification: bool = False) -> List[Experiment]:
+        inner_test = (
+            ONE_AA_TEST if not stratification else ONE_AA_TEST_WITH_STRATIFICATION
+        )
+        return [inner_test, AAScoreAnalyzer()]
+
+    @staticmethod
+    def _prepare_params(
+        n_iterations: int,
+        control_size: float,
+        random_states: Optional[List[int]] = None,
+        additional_params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[type, Dict[str, Any]]:
+        random_states = random_states or range(n_iterations)
+        additional_params = additional_params or {}
+        params = {
+            AASplitter: {"random_state": random_states, "control_size": [control_size]},
+            GroupComparator: {
+                "grouping_role": [TreatmentRole()],
+                "space": [SpaceEnum.additional],
+            },
+        }
+
+        params.update(additional_params)
+        return params
+
+    def __init__(
+        self,
+        n_iterations: int = 2000,
+        control_size: float = 0.5,
+        stratification: bool = False,
+        additional_params: Optional[Dict[str, Any]] = None,
+        random_states: Optional[List[int]] = None,
+    ):
+
+        super().__init__(
+            experiment=ParamsExperiment(
+                executors=self._prepare_experiment(stratification),
+                params=self._prepare_params(
+                    n_iterations, control_size, random_states, additional_params
+                ),
+                reporter=DatasetReporter(OneAADictReporter(front=False)),
+                key="AATest",
+            ),
+            output=AAOutput(),
+        )
