@@ -418,9 +418,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def merge(
         self,
         right: "PandasDataset",  # should be PandasDataset.
-        on: FieldKeyTypes = "",
-        left_on: FieldKeyTypes = "",
-        right_on: FieldKeyTypes = "",
+        on: Optional[FieldKeyTypes] = None,
+        left_on: Optional[FieldKeyTypes] = None,
+        right_on: Optional[FieldKeyTypes] = None,
         left_index: bool = False,
         right_index: bool = False,
         suffixes: Tuple[str, str] = ("_x", "_y"),
@@ -440,7 +440,11 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             how=how,
         )
 
-    def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> pd.DataFrame:
+    def drop(
+        self,
+        labels: Union[FieldKeyTypes, Sequence[FieldKeyTypes], None] = None,
+        axis: int = 1,
+    ) -> pd.DataFrame:
         return self.data.drop(labels=labels, axis=axis)
 
     def filter(

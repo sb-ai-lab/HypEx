@@ -68,8 +68,8 @@ class Dataset(DatasetBase):
     def __init__(
         self,
         roles: Union[
-            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
-            Dict[Union[str, int], ABCRole],
+            Dict[ABCRole, Union[List[str], str]],
+            Dict[str, ABCRole],
         ],
         data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
@@ -78,10 +78,10 @@ class Dataset(DatasetBase):
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
 
-    def __getitem__(self, item: Union[Iterable, str, int]) -> "Dataset":
+    def __getitem__(self, item: Union[Iterable[str], str]) -> "Dataset":
         if isinstance(item, Dataset):
             item = item.data
-        items = (
+        items: Iterable[str] = (
             [item] if isinstance(item, str) or not isinstance(item, Iterable) else item
         )
         roles: Dict = {
@@ -105,7 +105,9 @@ class Dataset(DatasetBase):
         self.data[key] = value
 
     def __binary_magic_operator(self, other, func_name: str) -> Any:
-        if not any(isinstance(other, t) for t in [Dataset, str, int, float, bool, Sequence]):
+        if not any(
+            isinstance(other, t) for t in [Dataset, str, int, float, bool, Sequence]
+        ):
             raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
         t_roles = deepcopy(self.roles)
@@ -291,8 +293,8 @@ class Dataset(DatasetBase):
     def from_dict(
         data: FromDictTypes,
         roles: Union[
-            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
-            Dict[Union[str, int], ABCRole],
+            Dict[ABCRole, Union[List[str], str]],
+            Dict[str, ABCRole],
         ],
         backend: BackendsEnum = BackendsEnum.pandas,
         index=None,
@@ -306,7 +308,7 @@ class Dataset(DatasetBase):
     def apply(
         self,
         func: Callable,
-        role: Dict[FieldKeyTypes, ABCRole],
+        role: Dict[str, ABCRole],
         axis: int = 0,
         **kwargs,
     ) -> "Dataset":
@@ -511,7 +513,11 @@ class Dataset(DatasetBase):
         new_roles = {c: t_roles[c] for c in t_data.columns}
         return Dataset(roles=new_roles, data=t_data)
 
-    def drop(self, labels: Any = None, axis: int = 1):
+    def drop(
+        self,
+        labels: Union[FieldKeyTypes, Sequence[FieldKeyTypes], None] = None,
+        axis: int = 1,
+    ):
         t_data = self._backend.drop(labels=labels, axis=axis)
         t_roles = (
             self.roles if axis == 0 else {c: self.roles[c] for c in t_data.columns}
@@ -533,9 +539,9 @@ class Dataset(DatasetBase):
 
     def transpose(
         self,
-        roles: Optional[Union[Dict[Union[str, int], ABCRole], List]] = None,
+        roles: Optional[Union[Dict[str, ABCRole], List]] = None,
     ) -> "Dataset":
-        roles_names = roles.keys() or {} if isinstance(roles, Dict) else roles
+        roles_names = list(roles.keys()) or None if isinstance(roles, Dict) else roles
         result_data = self.backend.transpose(roles_names)
         if roles is None or isinstance(roles, List):
             names = result_data.columns if roles is None else roles
@@ -545,7 +551,7 @@ class Dataset(DatasetBase):
     def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
         return Dataset(self.roles, data=self.backend.shuffle(random_state))
 
-    def rename(self, names: Dict[FieldKeyTypes, FieldKeyTypes]):
+    def rename(self, names: Dict[str, str]):
         roles = {names.get(column, column): role for column, role in self.roles.items()}
         return Dataset(roles, data=self.backend.rename(names))
 
@@ -598,17 +604,23 @@ class ExperimentData:
         name: str,
         value: Any,
         key: Optional[str] = None,
-        role=None,
+        role: Optional[ABCRole] = None,
     ) -> "ExperimentData":
         if space == ExperimentDataEnum.additional_fields:
-            if not isinstance(value, Dataset):
-                self.additional_fields.add_column(data=value, role={executor_id: role})
-            else:
-                rename_dict = {value.columns[0]: executor_id} if isinstance(executor_id, str) else executor_id
+            if isinstance(value, Dataset):
+                rename_dict = (
+                    {value.columns[0]: executor_id}
+                    if isinstance(executor_id, str)
+                    else executor_id
+                )
                 value = value.rename(names=rename_dict)
                 self.additional_fields = self.additional_fields.merge(
                     right=value, left_index=True, right_index=True
                 )
+            elif (role is not None) and isinstance(executor_id, str):
+                self.additional_fields.add_column(data=value, role={executor_id: role})
+            else:
+                raise ValueError("Executor id must be a single string and role must be provided")
         elif space == ExperimentDataEnum.analysis_tables:
             self.analysis_tables[executor_id] = value
         elif space == ExperimentDataEnum.variables:

@@ -13,7 +13,7 @@ from hypex.dataset.roles import (
 from hypex.utils import BackendsEnum, RoleColumnError, FieldKeyTypes
 
 
-def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
+def parse_roles(roles: Dict) -> Dict[str, ABCRole]:
     new_roles = {}
     roles = roles or {}
     for role in roles:
@@ -65,8 +65,8 @@ class DatasetBase(ABC):
     def __init__(
         self,
         roles: Union[
-            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
-            Dict[Union[str, int], ABCRole],
+            Dict[ABCRole, Union[List[str], str]],
+            Dict[str, ABCRole],
         ],
         data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
@@ -88,10 +88,8 @@ class DatasetBase(ABC):
         if data is not None:
             roles = self._set_all_roles(roles)
             self._set_empty_types(roles)
-        self.roles: Dict[Union[str, int], ABCRole] = roles
-        self._tmp_roles: Union[
-            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
-        ] = {}
+        self.roles: Dict[str, ABCRole] = roles
+        self._tmp_roles: Dict[str, ABCRole] = {}
 
     def __repr__(self):
         return self.data.__repr__()
