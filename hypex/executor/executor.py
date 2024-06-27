@@ -9,6 +9,7 @@ from hypex.dataset import (
     TempTargetRole,
     FeatureRole,
     MatchingRole,
+    TargetRole,
 )
 from hypex.utils import (
     ComparisonNotSuitableFieldError,
@@ -198,7 +199,7 @@ class GroupCalculator(Calculator):
         data: Dataset,
         group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
         grouping_data: Optional[List[Tuple[FieldKeyTypes, Dataset]]] = None,
-        target_field: Union[FieldKeyTypes, List[FieldKeyTypes], None] = None,
+        target_fields: Union[FieldKeyTypes, List[FieldKeyTypes], None] = None,
         **kwargs,
     ) -> Dict:
         group_field = Adapter.to_list(group_field)
@@ -210,7 +211,7 @@ class GroupCalculator(Calculator):
         else:
             raise ComparisonNotSuitableFieldError(group_field)
         return cls._execute_inner_function(
-            grouping_data, target_field=target_field, old_data=data, **kwargs
+            grouping_data, target_fields=target_fields, old_data=data, **kwargs
         )
 
     def _get_fields(self, data: ExperimentData):
@@ -238,7 +239,7 @@ class GroupCalculator(Calculator):
             data=data.ds,
             group_field=group_field,
             grouping_data=grouping_data,
-            target_field=target_fields,
+            target_fields=target_fields,
         )
         return self._set_value(data, compare_result)
 
@@ -251,8 +252,10 @@ class MLExecutor(GroupCalculator, ABC):
         space: SpaceEnum = SpaceEnum.auto,
         key: Any = "",
     ):
-        self.target_role = target_role
-        super().__init__(grouping_role=grouping_role, space=space, key=key)
+        self.target_role = target_role or TargetRole()
+        super().__init__(
+            grouping_role=grouping_role or GroupingRole(), space=space, key=key
+        )
 
     def _get_fields(self, data: ExperimentData):
         group_field = self._field_searching(data, self.grouping_role)
@@ -262,11 +265,11 @@ class MLExecutor(GroupCalculator, ABC):
         return group_field, target_field
 
     @abstractmethod
-    def fit(self, X: Dataset, Y: Dataset) -> "MLExecutor":
+    def fit(self, X: Dataset, Y: Optional[Dataset] = None) -> "MLExecutor":
         raise NotImplementedError
 
     @abstractmethod
-    def predict(self, data: Dataset) -> Dataset:
+    def predict(self, X: Dataset) -> Dataset:
         raise NotImplementedError
 
     def score(self, X: Dataset, Y: Dataset) -> float:
@@ -372,7 +375,7 @@ class MLExecutor(GroupCalculator, ABC):
             data=data.ds,
             group_field=group_field,
             grouping_data=grouping_data,
-            target_field=target_fields,
+            target_fields=target_fields,
             features_fields=features_fields,
         )
         return self._set_value(data, compare_result)

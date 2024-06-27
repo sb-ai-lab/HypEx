@@ -43,11 +43,12 @@ class MLExtension(Extension):
         mode: Optional[Literal["auto", "fit", "predict"]] = None,
         **kwargs
     ):
-        model = self.fit(data, target_data, **kwargs)
-        return model.predict(test_data)
+        if mode in ["auto", "fit"]:
+            return self.fit(data, target_data, **kwargs)
+        return self.predict(test_data)
 
     @abstractmethod
-    def fit(self, X, y=None, **kwargs):
+    def fit(self, X, Y=None, **kwargs):
         raise NotImplementedError
 
     @abstractmethod

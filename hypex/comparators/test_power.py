@@ -100,13 +100,13 @@ class MDEBySize(GroupComparator):
         data: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None],
         group_field: Optional[FieldKeyTypes] = None,
         grouping_data=None,
-        target_field=None,
+        target_fields=None,
         **kwargs
     ):
         return GroupComparator.calc(
             data=data,
             group_field=group_field,
-            target_field=target_field,
+            target_fields=target_fields,
             comparison_function=MDEBySize._inner_function,
             power=power,
             significance=target_fields,

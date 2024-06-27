@@ -114,7 +114,12 @@ class Dataset(DatasetBase):
         if isinstance(other, Dataset):
             if type(other._backend) is not type(self._backend):
                 raise BackendTypeError(type(other._backend), type(self._backend))
-            other = other._backend
+            other = other.rename(
+                {
+                    other.columns[i]: self.data.columns[i]
+                    for i in range(len(other.columns))
+                }
+            ).backend
         return Dataset(roles=t_roles, data=func(other))
 
     # comparison operators:
@@ -269,6 +274,7 @@ class Dataset(DatasetBase):
         else:
             self.roles.update(role)
             self._backend.add_column(data, list(role.keys())[0], index)
+        return self
 
     def _check_other_dataset(self, other):
         if not isinstance(other, Dataset):
@@ -613,7 +619,10 @@ class ExperimentData:
             self.analysis_tables[executor_id] = value
         elif space == ExperimentDataEnum.variables:
             if executor_id not in self.variables:
-                self.variables[executor_id] = {key: value}
+                if isinstance(value, Dict):
+                    self.variables[executor_id] = value
+                else:
+                    self.variables[executor_id] = {key: value}
             else:
                 self.variables[executor_id][key] = value
         elif space == ExperimentDataEnum.groups:
