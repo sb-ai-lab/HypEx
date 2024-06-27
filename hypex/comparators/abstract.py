@@ -7,7 +7,6 @@ from hypex.dataset import (
     ExperimentData,
     StatisticRole,
     TempTargetRole,
-    MatchingRole,
     InfoRole,
 )
 from hypex.executor import GroupCalculator
@@ -59,7 +58,7 @@ class GroupComparator(GroupCalculator):
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_field: Optional[List[FieldKeyTypes]] = None,
+        target_fields: Optional[List[FieldKeyTypes]] = None,
         old_data: Optional[Dataset] = None,
         **kwargs,
     ) -> Dict:
@@ -71,12 +70,12 @@ class GroupComparator(GroupCalculator):
                 else grouping_data[i][0][0]
             )
             # TODO roles
-            if target_field:
+            if target_fields:
                 grouping_data[i][1].tmp_roles = old_data.tmp_roles
                 result[result_key] = Adapter.to_dataset(
                     cls._inner_function(
-                        data=grouping_data[0][1][target_field],
-                        test_data=grouping_data[i][1][target_field],
+                        data=grouping_data[0][1][target_fields],
+                        test_data=grouping_data[i][1][target_fields],
                         **kwargs,
                     ),
                     InfoRole(),
@@ -141,7 +140,7 @@ class GroupComparator(GroupCalculator):
             data=data.ds,
             group_field=group_field,
             grouping_data=grouping_data,
-            target_field=target_fields,
+            target_fields=target_fields,
         )
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key in compare_result}
@@ -159,72 +158,3 @@ class StatHypothesisTesting(GroupComparator, ABC):
     ):
         super().__init__(grouping_role, space, key)
         self.reliability = reliability
-
-
-class MatchingComparator(GroupComparator):
-    def __init__(
-        self,
-        grouping_role: Union[ABCRole, None] = None,
-        space: SpaceEnum = SpaceEnum.auto,
-        search_types: Union[type, List[type], None] = None,
-        index_role: Union[ABCRole, None] = None,
-        key: Any = "",
-    ):
-        super().__init__(grouping_role, space, search_types, key)
-        self.index_role = index_role or MatchingRole()
-
-    def _set_value(
-        self,
-        data: ExperimentData,
-        value: Optional[Union[float, int, bool, str]] = None,
-        key: Any = None,
-    ) -> ExperimentData:
-        data.set_value(
-            ExperimentDataEnum.value,
-            self.id,
-            str(self.__class__.__name__),
-            value,
-        )
-        return data
-
-    @staticmethod
-    def _inner_function(
-        data: Dataset, test_data: Optional[Dataset] = None, **kwargs
-    ) -> Any:
-        raise AbstractMethodError
-
-    @staticmethod
-    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
-        if test_data is None:
-            raise ValueError("test_data is needed for evaluation")
-        return test_data
-
-    def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field, target_fields, grouping_data = self._get_grouping_data(data)
-        if grouping_data:
-            index_column = data.additional_fields.search_columns(self.index_role)
-            grouping_data = [
-                (
-                    group,
-                    (
-                        group_data.iloc[index_column]
-                        if group in index_column
-                        else group_data
-                    ),
-                )
-                for group, group_data in grouping_data
-            ]
-        att = data.variables.get("ATT", None)
-        atc = data.variables.get("ATT", None)
-        compare_result = self.calc(
-            data=data.ds,
-            group_field=group_field,
-            grouping_data=grouping_data,
-            target_field=target_fields,
-            comparison_function=self._inner_function,
-            att=att,
-            atc=atc,
-        )
-        return self._set_value(
-            data, list(compare_result.values())[0], key=list(compare_result.keys())[0]
-        )

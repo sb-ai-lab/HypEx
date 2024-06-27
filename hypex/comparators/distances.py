@@ -12,41 +12,39 @@ class MahalanobisDistance(GroupCalculator):
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_field: Optional[List[FieldKeyTypes]] = None,
+        target_fields: Optional[List[FieldKeyTypes]] = None,
         **kwargs,
     ) -> Dict:
         result = {}
         for i in range(1, len(grouping_data)):
-            if target_field:
-                result.update(
-                    cls._inner_function(
-                        data=grouping_data[0][1][target_field],
-                        test_data=grouping_data[i][1][target_field],
-                        **kwargs,
-                    )
+            result.update(
+                cls._inner_function(
+                    data=(
+                        grouping_data[0][1][target_fields]
+                        if target_fields
+                        else grouping_data[0][1]
+                    ),
+                    test_data=(
+                        grouping_data[i][1][target_fields]
+                        if target_fields
+                        else grouping_data[i][1]
+                    ),
+                    **kwargs,
                 )
-            else:
-                result.update(
-                    cls._inner_function(
-                        data=grouping_data[0][1],
-                        test_data=grouping_data[i][1],
-                        **kwargs,
-                    )
-                )
+            )
         return result
 
     def _set_value(
-        self, data: ExperimentData, value: Optional[Dataset] = None, key: Any = None
+        self, data: ExperimentData, value: Optional[Dict] = None, key: Any = None
     ) -> ExperimentData:
-        if isinstance(value, Dict):
-            for key, value_ in value.items():
-                data = data.set_value(
-                    ExperimentDataEnum.groups,
-                    self.id,
-                    str(self.__class__.__name__),
-                    value_,
-                    key=key,
-                )
+        for key, value_ in value.items():
+            data = data.set_value(
+                ExperimentDataEnum.groups,
+                self.id,
+                str(self.__class__.__name__),
+                value_,
+                key=key,
+            )
         return data
 
     def _get_fields(self, data: ExperimentData):
