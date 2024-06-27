@@ -3,6 +3,7 @@
 import logging
 import pickle
 import warnings
+import copy
 from typing import Union, Iterable, List
 
 import numpy as np
@@ -566,51 +567,54 @@ class Matcher:
         """
         a = self.input_data[self.treatment]
         X = self.input_data.drop(columns=self.treatment)
+
         if self.info_col is not None:
             X = X.drop(columns=self.info_col)
 
         index_matched = MatcherNoReplacement(
             X, a, self.weights, approximate_match
         ).match()
-        filtred_matches = (
+
+        filtered_matches_tr = (
             index_matched.loc[1]
             .iloc[self.input_data[a == 1].index]
-            .matches[
-                index_matched.loc[1]
+            .matches[index_matched.loc[1]
             .iloc[self.input_data[a == 1].index]
-            .matches.apply(lambda x: x != [])
-            ]
+            .matches.apply(lambda x: x != [])]
+        )
+        filtered_matches_ntr = (
+            index_matched.loc[0]
+            .iloc[self.input_data[a == 0].index]
+            .matches[index_matched.loc[1]
+            .iloc[self.input_data[a == 0].index]
+            .matches.apply(lambda x: x != [])]
         )
 
-        if self.weights is not None:
-            weighted_features = [f for f in self.weights.keys()]
-            index_dict = dict()
-            for w in weighted_features:
-                source = self.input_data.loc[np.concatenate(filtred_matches.values)][
-                    w
-                ].values
-                target = self.input_data.loc[filtred_matches.index.to_list()][w].values
-                index = abs(source - target) <= abs(source) * threshold
-                index_dict.update({w: index})
-            index_filtered = sum(index_dict.values()) == len(self.weights)
-            matched_data = pd.concat(
-                [
-                    self.input_data.loc[filtred_matches.index.to_list()].iloc[
-                        index_filtered
-                    ],
-                    self.input_data.loc[np.concatenate(filtred_matches.values)].iloc[
-                        index_filtered
-                    ],
-                ]
-            )
-        else:
-            matched_data = pd.concat(
-                [
-                    self.input_data.loc[filtred_matches.index.to_list()],
-                    self.input_data.loc[np.concatenate(filtred_matches.values)],
-                ]
-            )
-        return matched_data
+        filtered_matches = pd.concat([filtered_matches_tr, filtered_matches_ntr]).sort_index()
+
+        matched_data = self.input_data.loc[filtered_matches.index.to_list()]
+
+        filtered_matches = filtered_matches.apply(lambda x: int(x[0]))
+        filtered_matches_df = filtered_matches.to_frame().reset_index()
+        df_matched = matched_data.merge(
+            filtered_matches_df, left_index=True, right_on='index', how="left"
+        ).merge(
+            filtered_matches_df, left_index=True, right_on='matches', how='left'
+        ).fillna(0)
+
+        df_matched['index_matched'] = df_matched['matches_x']
+        df_matched = df_matched.drop(columns=['index_x', 'matches_x', 'index_y', 'matches_y'])
+        df_matched['index_matched'] = df_matched['index_matched'].astype(int)
+
+        input_data_matched = self.input_data.add_suffix('_matched')
+
+        df_matched = df_matched.merge(
+            input_data_matched, left_on='index_matched', right_index=True, how='left'
+        )
+
+        df_matched = df_matched.set_index("matches").reset_index().drop(columns=['index_matched', 'matches'])
+
+        return df_matched
 
     def feature_select(self) -> pd.DataFrame:
         """Calculates the importance of each feature.
@@ -844,7 +848,7 @@ class Matcher:
                         "Incorrect refuter name! Available refuters: `random_feature`, `permutation_test`, `subset_refuter`"
                     )
 
-                if self.group_col is None:
+                if self.group_col == []:
                     sim = self.matcher.match()
                 else:
                     sim = self.matcher.group_match()
