@@ -202,6 +202,12 @@ class PandasNavigation(DatasetBackendNavigation):
         name: str,
         index: Optional[Sequence] = None,
     ):
+        if isinstance(data, pd.DataFrame):
+            data = data.values
+        if len(self.data) != len(data):
+            if len(data[0]) == 1:
+                data = data.squeeze()
+            data = pd.Series(data)
         if index:
             self.data = self.data.join(
                 pd.DataFrame(data, columns=[name], index=list(index))

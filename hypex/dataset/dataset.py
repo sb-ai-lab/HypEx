@@ -260,20 +260,20 @@ class Dataset(DatasetBase):
         role: Optional[Dict[str, ABCRole]] = None,
         index: Optional[Iterable[Hashable]] = None,
     ):
-        if isinstance(data, Dataset):
-            data = data.data
         if role is None:
             if not isinstance(data, Dataset):
                 raise ValueError("Козьёль")
             self.roles.update(data.roles)
             self._backend.add_column(
-                data._backend.data[list(data._backend.data.columns)[0]],
-                list(data.roles.keys())[0],
+                data.data,
+                data.columns,
                 index,
             )
         else:
+            if isinstance(data, Dataset):
+                data = data.data
             self.roles.update(role)
-            self._backend.add_column(data, list(role.keys())[0], index)
+            self._backend.add_column(data, list(role.keys()), index)
         return self
 
     def _check_other_dataset(self, other):
@@ -609,7 +609,9 @@ class ExperimentData:
     ) -> "ExperimentData":
         if space == ExperimentDataEnum.additional_fields:
             if not isinstance(value, Dataset) or len(value.columns) == 1:
-                self.additional_fields.add_column(data=value, role={executor_id: role})
+                self.additional_fields = self.additional_fields.add_column(
+                    data=value, role={executor_id: role}
+                )
             else:
                 value = value.rename(names=executor_id)
                 self.additional_fields = self.additional_fields.merge(

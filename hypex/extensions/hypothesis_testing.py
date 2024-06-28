@@ -85,11 +85,11 @@ class Chi2TestExtension(StatTest):
         counted_data = data.value_counts()
         data_vc = counted_data["count"] * (1 - proportion)
         other_vc = other.value_counts()["count"] * proportion
-        data_vc.add_column(counted_data[counted_data.columns[0]])
-        other_vc.add_column(counted_data[counted_data.columns[0]])
-        return data_vc.merge(other_vc, on=counted_data.columns[0]).fillna(0)[
+        data_vc = data_vc.add_column(counted_data[counted_data.columns[0]])
+        other_vc = other_vc.add_column(counted_data[counted_data.columns[0]])
+        return data_vc.merge(other_vc, on=counted_data.columns[0])[
             ["count_x", "count_y"]
-        ]
+        ].fillna(0)
 
     def _calc_pandas(
         self, data: Dataset, other: Optional[Dataset] = None, **kwargs

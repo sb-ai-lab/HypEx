@@ -2,6 +2,7 @@ from typing import Optional, Literal
 
 import faiss  # type: ignore
 import numpy as np
+import pandas as pd  # type: ignore
 
 from hypex.dataset import Dataset, MatchingRole
 from hypex.extensions.abstract import MLExtension
@@ -29,10 +30,13 @@ class FaissExtension(MLExtension):
             dist, indexes = self.index.search(X, k=self.n_neighbors)
             if self.n_neighbors == 1:
                 equal_dist = list(map(lambda x: np.where(x == x[0])[0], dist))
-                indexes = [i[j] for i, j in zip(indexes, equal_dist)]
+                indexes = [
+                    int(i[j][0]) if abs(i[j][0]) <= len(data) + len(test_data) else -1
+                    for i, j in zip(indexes, equal_dist)
+                ]
             else:
                 indexes = self._prepare_indexes(indexes, dist, self.n_neighbors)
-            return indexes
+            return pd.Series(indexes)
         return self
 
     def fit(self, X: Dataset, y: Optional[Dataset] = None, **kwargs):

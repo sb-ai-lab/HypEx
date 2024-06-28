@@ -316,12 +316,9 @@ class MLExecutor(GroupCalculator, ABC):
         return data.set_value(
             ExperimentDataEnum.additional_fields,
             (
-                self.id
+                f"{self.id}{value.columns[0]}"
                 if len(value.columns) == 1
-                else {
-                    f"matched_indexes_{i}": f"{self.id}{i}"
-                    for i in range(len(value.columns))
-                }
+                else {i: f"{self.id}{i}" for i in value.columns}
             ),
             str(self.__class__.__name__),
             value=value,
@@ -352,7 +349,7 @@ class MLExecutor(GroupCalculator, ABC):
         )
         return Adapter.to_dataset(
             result,
-            {f"matched_indexes_{i}": MatchingRole() for i in range(len(result[0]))},
+            {i: MatchingRole() for i in list(result.keys())},
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:

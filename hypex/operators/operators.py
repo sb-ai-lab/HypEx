@@ -1,4 +1,4 @@
-from copy import copy
+from copy import deepcopy
 from typing import Optional, Any, List, Literal, Union, Dict
 
 from hypex.dataset import Dataset, ABCRole, ExperimentData, MatchingRole
@@ -41,15 +41,21 @@ class MatchingMetrics(GroupOperator):
         if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
             grouping_data = list(data.groups[group_field[0]].items())
         else:
-            grouping_data = None
-        t_data = copy(data.ds)
+            grouping_data = data.ds.groupby(group_field)
+        t_data = deepcopy(data.ds)
         if len(target_fields) < 2:
-            target_field = data.additional_fields.search_columns(MatchingRole())
-            target_fields += target_field
-            t_data = t_data.add_column(
-                data.additional_fields[target_field[0]],
-                role={target_field[0]: MatchingRole()},
-            )
+            index_fields = data.additional_fields.search_columns(MatchingRole())
+            if not index_fields:
+                raise Exception()
+            for i in range(len(index_fields)):
+                index_field = data.additional_fields[index_fields[i]].fillna(-1)
+                # TODO фильтр -1, дроп, iloc, таргет столбец, присоединить
+
+            # target_fields += indexes
+            # t_data = t_data.add_column(
+            #     data.additional_fields[target_field[0]],
+            #     role={target_field[0]: MatchingRole()},
+            # )
         compare_result = self.calc(
             data=t_data,
             group_field=group_field,

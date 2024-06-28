@@ -1,4 +1,4 @@
-from typing import Optional, Any, List
+from typing import Optional, Any, Dict
 
 from hypex.comparators.distances import MahalanobisDistance
 from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData
@@ -29,7 +29,7 @@ class FaissNearestNeighbors(MLExecutor):
         n_neighbors: Optional[int] = None,
         two_sides: Optional[bool] = None,
         **kwargs,
-    ) -> List:
+    ) -> Dict:
         data = cls._inner_function(
             data=grouping_data[0][1],
             test_data=grouping_data[1][1],
@@ -37,25 +37,27 @@ class FaissNearestNeighbors(MLExecutor):
             **kwargs,
         )
         if two_sides is None or two_sides == False:
-            return data
-        return data + cls._inner_function(
-            data=grouping_data[1][1],
-            test_data=grouping_data[0][1],
-            n_neighbors=n_neighbors or 1,
-            **kwargs,
-        )
+            return {"control": data}
+        return {
+            "control": data,
+            "test": cls._inner_function(
+                data=grouping_data[1][1],
+                test_data=grouping_data[0][1],
+                n_neighbors=n_neighbors or 1,
+                **kwargs,
+            ),
+        }
 
     @classmethod
     def _inner_function(
         cls,
         data: Dataset,
         test_data: Optional[Dataset] = None,
-        target_data: Optional[Dataset] = None,
         n_neighbors: Optional[int] = None,
         **kwargs,
     ) -> Any:
         return FaissExtension(n_neighbors=n_neighbors or 1).calc(
-            data=data, test_data=test_data, target_data=target_data
+            data=data, test_data=test_data
         )
 
     def fit(self, X: Dataset, Y: Optional[Dataset] = None) -> "MLExecutor":
