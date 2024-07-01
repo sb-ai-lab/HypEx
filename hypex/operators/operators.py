@@ -1,4 +1,3 @@
-from copy import deepcopy
 from typing import Optional, Any, List, Literal, Union, Dict
 
 from hypex.dataset import Dataset, ABCRole, ExperimentData, MatchingRole
@@ -42,22 +41,31 @@ class MatchingMetrics(GroupOperator):
             grouping_data = list(data.groups[group_field[0]].items())
         else:
             grouping_data = data.ds.groupby(group_field)
-        t_data = deepcopy(data.ds)
         if len(target_fields) < 2:
-            index_fields = data.additional_fields.search_columns(MatchingRole())
-            if not index_fields:
-                raise Exception()
-            for i in range(len(index_fields)):
-                index_field = data.additional_fields[index_fields[i]].fillna(-1)
-                # TODO фильтр -1, дроп, iloc, таргет столбец, присоединить
-
-            # target_fields += indexes
-            # t_data = t_data.add_column(
-            #     data.additional_fields[target_field[0]],
-            #     role={target_field[0]: MatchingRole()},
-            # )
+            t_grouping_data = []
+            target_fields += [target_fields[0] + "_matched"]
+            index_fields_names = data.additional_fields.search_columns(MatchingRole())
+            if not index_fields_names:
+                raise Exception("Сюда тоже нужна ошибка")
+            for i in range(len(index_fields_names)):
+                index_field = data.additional_fields[index_fields_names[i]].fillna(-1)
+                filtered_field = index_field.drop(
+                    index_field[index_field[index_fields_names[i]] == -1], axis=0
+                )
+                new_target = data.ds.iloc[
+                    list(map(lambda x: x[0], filtered_field.get_values()))
+                ][target_fields[0]]
+                new_target.index = filtered_field.index
+                new_target = new_target.reindex(
+                    grouping_data[i][1].index,
+                    fill_value=0,
+                ).rename({target_fields[0]: target_fields[0] + "_matched"})
+                t_grouping_data += [
+                    (grouping_data[i][0], grouping_data[i][1].add_column(new_target))
+                ]
+            grouping_data = t_grouping_data
         compare_result = self.calc(
-            data=t_data,
+            data=data.ds,
             group_field=group_field,
             grouping_data=grouping_data,
             target_fields=target_fields,

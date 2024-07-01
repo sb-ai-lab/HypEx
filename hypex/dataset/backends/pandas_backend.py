@@ -199,9 +199,11 @@ class PandasNavigation(DatasetBackendNavigation):
     def add_column(
         self,
         data: Union[Sequence],
-        name: str,
+        name: Union[str, List[str]],
         index: Optional[Sequence] = None,
     ):
+        if isinstance(name, List) and len(name) == 1:
+            name = name[0]
         if isinstance(data, pd.DataFrame):
             data = data.values
         if len(self.data) != len(data):
@@ -472,3 +474,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         elif isinstance(to_replace, pd.Series):
             to_replace = to_replace.to_list()
         return self.data.replace(to_replace=to_replace, value=value, regex=regex)
+
+    def reindex(
+        self, labels: FieldKeyTypes = "", fill_value: Optional[FieldKeyTypes] = None
+    ) -> pd.DataFrame:
+        return self.data.reindex(labels, fill_value=fill_value)

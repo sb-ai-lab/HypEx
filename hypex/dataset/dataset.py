@@ -401,6 +401,11 @@ class Dataset(DatasetBase):
     def max(self):
         return self._convert_data_after_agg(self._backend.max())
 
+    def reindex(self, labels, fill_value: Optional[Any] = None) -> "Dataset":
+        return Dataset(
+            self.roles, data=self.backend.reindex(labels, fill_value=fill_value)
+        )
+
     def idxmax(self):
         return self._convert_data_after_agg(self._backend.idxmax())
 
@@ -513,6 +518,8 @@ class Dataset(DatasetBase):
         return Dataset(roles=new_roles, data=t_data)
 
     def drop(self, labels: Any = None, axis: int = 1):
+        if isinstance(labels, Dataset):
+            labels = labels.data.index.tolist()
         t_data = self._backend.drop(labels=labels, axis=axis)
         t_roles = (
             self.roles if axis == 0 else {c: self.roles[c] for c in t_data.columns}
