@@ -3,6 +3,8 @@ from typing import Dict, Union, Any, Optional
 from hypex.dataset import ExperimentData, Dataset
 from hypex.experiments import Experiment
 from hypex.reporters import Reporter
+from hypex.utils import ID_SPLIT_SYMBOL
+from hypex.utils.enums import RenameEnum
 
 
 class Output:
@@ -20,6 +22,19 @@ class Output:
         self.resume = self.resume_reporter.report(experiment_data)
         for attribute, reporter in self.additional_reporters.items():
             setattr(self, attribute, reporter.report(experiment_data))
+
+    @staticmethod
+    def replace_splitters(
+        data: Dataset, mode: RenameEnum = RenameEnum.columns
+    ) -> Dataset:
+        result = data
+        if mode in (RenameEnum.all, RenameEnum.columns):
+            result = result.rename(
+                {c: c.replace(ID_SPLIT_SYMBOL, " ") for c in result.columns}
+            )
+        if mode in (RenameEnum.all, RenameEnum.index):
+            result.index = [i.replace(ID_SPLIT_SYMBOL, " ") for i in result.index]
+        return result
 
     def extract(self, experiment_data: ExperimentData):
         self._extract_by_reporters(experiment_data)

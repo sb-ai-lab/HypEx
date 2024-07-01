@@ -1,11 +1,12 @@
 from typing import Optional, Dict, Any, List, Iterable, Sequence
 
 from hypex.analyzers import OneAAStatAnalyzer
-from hypex.analyzers.aa2 import AAScoreAnalyzer
+from hypex.analyzers.aa import AAScoreAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes
 from hypex.comparators.abstract import GroupComparator
 from hypex.comparators.hypothesis_testing import TTest, KSTest, Chi2Test
 from hypex.dataset import TargetRole, TreatmentRole
+from hypex.executor import Executor
 from hypex.experiments import Experiment, OnRoleExperiment
 from hypex.experiments.base_complex import ParamsExperiment
 from hypex.reporters import DatasetReporter, OneAADictReporter
@@ -54,12 +55,6 @@ ONE_AA_TEST_WITH_STRATIFICATION = Experiment(
 
 
 class AATest(ExperimentShell):
-    @staticmethod
-    def _prepare_experiment(stratification: bool = False) -> Sequence[Experiment]:
-        inner_test = (
-            ONE_AA_TEST if not stratification else ONE_AA_TEST_WITH_STRATIFICATION
-        )
-        return [inner_test, AAScoreAnalyzer()]
 
     @staticmethod
     def _prepare_params(
@@ -91,12 +86,25 @@ class AATest(ExperimentShell):
     ):
 
         super().__init__(
-            experiment=ParamsExperiment(
-                executors=self._prepare_experiment(stratification),
-                params=self._prepare_params(
-                    n_iterations, control_size, random_states, additional_params
-                ),
-                reporter=DatasetReporter(OneAADictReporter(front=False)),
+            experiment=Experiment(
+                [
+                    ParamsExperiment(
+                        executors=(
+                            [
+                                (
+                                    ONE_AA_TEST_WITH_STRATIFICATION
+                                    if stratification
+                                    else ONE_AA_TEST
+                                )
+                            ]
+                        ),
+                        params=self._prepare_params(
+                            n_iterations, control_size, random_states, additional_params
+                        ),
+                        reporter=DatasetReporter(OneAADictReporter(front=False)),
+                    ),
+                    AAScoreAnalyzer(),
+                ],
                 key="AATest",
             ),
             output=AAOutput(),

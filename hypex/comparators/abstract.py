@@ -9,6 +9,7 @@ from hypex.dataset import (
     TempTargetRole,
     MatchingRole,
     InfoRole,
+    DatasetAdapter
 )
 from hypex.executor import GroupCalculator
 from hypex.utils import (
@@ -18,7 +19,6 @@ from hypex.utils import (
     FromDictTypes,
     SpaceEnum,
 )
-from hypex.utils.adapter import Adapter
 from hypex.utils.errors import AbstractMethodError
 
 
@@ -73,7 +73,7 @@ class GroupComparator(GroupCalculator):
             # TODO roles
             if target_fields:
                 grouping_data[i][1].tmp_roles = old_data.tmp_roles
-                result[result_key] = Adapter.to_dataset(
+                result[result_key] = DatasetAdapter.to_dataset(
                     cls._inner_function(
                         data=grouping_data[0][1][target_fields],
                         test_data=grouping_data[i][1][target_fields],
@@ -82,7 +82,7 @@ class GroupComparator(GroupCalculator):
                     InfoRole(),
                 )
             else:
-                result[result_key] = Adapter.to_dataset(
+                result[result_key] = DatasetAdapter.to_dataset(
                     cls._inner_function(
                         grouping_data[0][1],
                         grouping_data[i][1],

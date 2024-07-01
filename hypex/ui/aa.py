@@ -1,8 +1,11 @@
+import itertools
+
 from .base import Output
-from ..analyzers.aa2 import AAScoreAnalyzer
+from ..analyzers.aa import AAScoreAnalyzer
 from ..dataset import Dataset, ExperimentData
-from ..reporters.aa2 import AAPassedReporter, AABestSplitReporter
-from ..utils import ExperimentDataEnum
+from ..reporters.aa import AAPassedReporter, AABestSplitReporter
+from ..utils import ExperimentDataEnum, ID_SPLIT_SYMBOL
+from ..utils.enums import RenameEnum
 
 
 class AAOutput(Output):
@@ -18,7 +21,12 @@ class AAOutput(Output):
         )
 
     def _extract_experiments(self, experiment_data: ExperimentData):
-        pass
+        id_ = experiment_data.get_one_id(
+            "ParamsExperiment", ExperimentDataEnum.analysis_tables, "AATest"
+        )
+        self.experiments = self.replace_splitters(
+            experiment_data.analysis_tables[id_], RenameEnum.columns
+        )
 
     def _extract_aa_score(self, experiment_data: ExperimentData):
         def get_analyzer_id(key: str):
@@ -30,9 +38,11 @@ class AAOutput(Output):
 
         aa_score_analyser_ids = experiment_data.get_ids(
             AAScoreAnalyzer, ExperimentDataEnum.analysis_tables
-        )[AAScoreAnalyzer][ExperimentDataEnum.analysis_tables.value]
+        )[AAScoreAnalyzer.__name__][ExperimentDataEnum.analysis_tables.value]
 
-        self.aa_score = experiment_data.analysis_tables[get_analyzer_id("aa_score")]
+        self.aa_score = experiment_data.analysis_tables[get_analyzer_id("aa score")]
+        self.aa_score = self.replace_splitters(self.aa_score, RenameEnum.index)
+
         self.best_split_statistic = experiment_data.analysis_tables[
             get_analyzer_id("best split statistics")
         ]

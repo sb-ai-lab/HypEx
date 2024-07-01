@@ -9,9 +9,9 @@ from typing import (
     Callable,
     Hashable,
     Optional,
-    Sequence,
     Tuple,
     Literal,
+    Sequence
 )
 
 import pandas as pd  # type: ignore
@@ -38,6 +38,7 @@ from .roles import (
     FilterRole,
     FeatureRole,
 )
+from ..utils.adapter import Adapter
 
 
 class Dataset(DatasetBase):
@@ -105,7 +106,9 @@ class Dataset(DatasetBase):
         self.data[key] = value
 
     def __binary_magic_operator(self, other, func_name: str) -> Any:
-        if not any(isinstance(other, t) for t in [Dataset, str, int, float, bool, Sequence]):
+        if not any(
+            isinstance(other, t) for t in [Dataset, str, int, float, bool, Sequence]
+        ):
             raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
         t_roles = deepcopy(self.roles)
@@ -479,7 +482,7 @@ class Dataset(DatasetBase):
         right_on: Optional[FieldKeyTypes] = None,
         left_index: bool = False,
         right_index: bool = False,
-        suffixes: tuple[str, str] = ("_x", "_y"),
+        suffixes: Tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "outer", "inner", "cross"] = "inner",
     ):
         if not any([on, left_on, right_on, left_index, right_index]):
@@ -604,7 +607,11 @@ class ExperimentData:
             if not isinstance(value, Dataset):
                 self.additional_fields.add_column(data=value, role={executor_id: role})
             else:
-                rename_dict = {value.columns[0]: executor_id} if isinstance(executor_id, str) else executor_id
+                rename_dict = (
+                    {value.columns[0]: executor_id}
+                    if isinstance(executor_id, str)
+                    else executor_id
+                )
                 value = value.rename(names=rename_dict)
                 self.additional_fields = self.additional_fields.merge(
                     right=value, left_index=True, right_index=True
@@ -627,56 +634,50 @@ class ExperimentData:
 
     def get_ids(
         self,
-        classes: Union[type, Iterable[type]],
-        searched_space: Optional[ExperimentDataEnum] = None,
-    ) -> Dict[type, Dict[str, List[str]]]:
-        classes = classes if isinstance(classes, Iterable) else [classes]
-        if searched_space:
-            spaces = {
-                ExperimentDataEnum.additional_fields: self.additional_fields,
-                ExperimentDataEnum.analysis_tables: self.analysis_tables,
-                ExperimentDataEnum.groups: self.groups,
-                ExperimentDataEnum.variables: self.variables,
-            }
-            return {
-                class_: {
-                    searched_space.value: [
-                        str(_id)
-                        for _id in spaces[searched_space]
-                        if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
-                    ]
-                }
-                for class_ in classes
-            }
+        classes: Union[type, Iterable[type], str, Iterable[str]],
+        searched_space: Union[
+            ExperimentDataEnum, Iterable[ExperimentDataEnum], None
+        ] = None,
+        key: Optional[str] = None,
+    ) -> Dict[str, Dict[str, List[str]]]:
+
+        def check_id(id_: str, class_: str) -> bool:
+            result = id_[: id_.find(ID_SPLIT_SYMBOL)] == class_
+
+            if result and key is not None:
+                result = id_[id_.rfind(ID_SPLIT_SYMBOL) + 1 :] == key
+            return result
+
+        spaces = {
+            ExperimentDataEnum.additional_fields: self.additional_fields.columns,
+            ExperimentDataEnum.analysis_tables: self.analysis_tables.keys(),
+            ExperimentDataEnum.groups: self.groups.keys(),
+            ExperimentDataEnum.variables: self.variables.keys(),
+        }
+        classes = [
+            c.__name__ if isinstance(c, type) else c for c in Adapter.to_list(classes)
+        ]
+        searched_space = Adapter.to_list(searched_space) if searched_space else list(spaces.keys())
+
         return {
             class_: {
-                ExperimentDataEnum.groups.value: [
-                    str(_id)
-                    for _id in self.groups.keys()
-                    if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
-                ],
-                ExperimentDataEnum.variables.value: [
-                    str(_id)
-                    for _id in self.variables.keys()
-                    if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
-                ],
-                ExperimentDataEnum.additional_fields.value: [
-                    str(_id)
-                    for _id in self.additional_fields.columns
-                    if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
-                ],
-                ExperimentDataEnum.analysis_tables.value: [
-                    str(_id)
-                    for _id in self.analysis_tables
-                    if _id.split(ID_SPLIT_SYMBOL)[0] == class_.__name__
-                ],
+                space.value: [
+                    str(id_) for id_ in spaces[space] if check_id(id_, class_)
+                ]
+                for space in searched_space
             }
             for class_ in classes
         }
 
-    def get_one_id(self, class_: type, space: ExperimentDataEnum) -> str:
-        result = self.get_ids(class_)
-        if not len(result[class_][space.value]):
+    def get_one_id(
+        self,
+        class_: Union[type, str],
+        space: ExperimentDataEnum,
+        key: Optional[str] = None,
+    ) -> str:
+        class_ = class_ if isinstance(class_, str) else class_.__name__
+        result = self.get_ids(class_, space, key)
+        if (class_ not in result) or (not len(result[class_][space.value])):
             raise NotFoundInExperimentDataError(class_)
         return result[class_][space.value][0]
 
@@ -685,3 +686,82 @@ class ExperimentData:
         if data is not None:
             result._data = data
         return result
+
+
+class DatasetAdapter(Adapter):
+    @staticmethod
+    def to_dataset(
+        data: Any, roles: Union[ABCRole, Dict[FieldKeyTypes, ABCRole]]
+    ) -> Dataset:
+        """
+        Convert various data types to a Dataset object.
+        Args:
+        data (Any): The input data to convert.
+        col_name (Union[str, List]): The column name or list of column names.
+        Returns:
+        Dataset: A Dataset object generated from the input data.
+        Raises:
+        ValueError: If the data type is not supported.
+        """
+        # Convert data based on its type
+        if isinstance(data, dict):
+            return DatasetAdapter.dict_to_dataset(data, roles)
+        elif isinstance(data, pd.DataFrame):
+            return DatasetAdapter.frame_to_dataset(data, roles)
+        elif isinstance(data, list):
+            return DatasetAdapter.list_to_dataset(data, roles)
+        elif any(isinstance(data, t) for t in [str, int, float, bool]):
+            return DatasetAdapter.value_to_dataset(data, roles)
+        elif isinstance(data, Dataset):
+            return data
+        else:
+            raise ValueError(f"Unsupported data type {type(data)}")
+
+    @staticmethod
+    def value_to_dataset(
+        data: ScalarType, roles: Dict[FieldKeyTypes, ABCRole]
+    ) -> Dataset:
+        """
+        Convert a float to a Dataset
+        """
+        return Dataset(
+            roles=roles,
+            data=pd.DataFrame(data=data, columns=[list(roles.keys())[0]]),
+        )
+
+    @staticmethod
+    def dict_to_dataset(
+        data: Dict, roles: Union[ABCRole, Dict[FieldKeyTypes, ABCRole]]
+    ) -> Dataset:
+        """
+        Convert a dict to a Dataset
+        """
+        roles_names = list(data.keys())
+        if isinstance(roles, Dict):
+            return Dataset.from_dict(data=[data], roles=roles)
+        elif isinstance(roles, ABCRole):
+            return Dataset.from_dict(
+                data=[data], roles={name: roles for name in roles_names}
+            )
+
+    @staticmethod
+    def list_to_dataset(data: List, roles: Dict[FieldKeyTypes, ABCRole]) -> Dataset:
+        """
+        Convert a list to a Dataset
+        """
+        return Dataset(
+            roles=roles,
+            data=pd.DataFrame(data=data, columns=[list(roles.keys())[0]]),
+        )
+
+    @staticmethod
+    def frame_to_dataset(
+        data: pd.DataFrame, roles: Dict[FieldKeyTypes, ABCRole]
+    ) -> Dataset:
+        """
+        Convert a list to a Dataset
+        """
+        return Dataset(
+            roles=roles,
+            data=data,
+        )
