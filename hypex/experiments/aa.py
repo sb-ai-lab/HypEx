@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Iterable, Sequence
 
 from hypex.analyzers import OneAAStatAnalyzer
 from hypex.analyzers.aa2 import AAScoreAnalyzer
@@ -55,7 +55,7 @@ ONE_AA_TEST_WITH_STRATIFICATION = Experiment(
 
 class AATest(ExperimentShell):
     @staticmethod
-    def _prepare_experiment(stratification: bool = False) -> List[Experiment]:
+    def _prepare_experiment(stratification: bool = False) -> Sequence[Experiment]:
         inner_test = (
             ONE_AA_TEST if not stratification else ONE_AA_TEST_WITH_STRATIFICATION
         )
@@ -65,7 +65,7 @@ class AATest(ExperimentShell):
     def _prepare_params(
         n_iterations: int,
         control_size: float,
-        random_states: Optional[List[int]] = None,
+        random_states: Optional[Iterable[int]] = None,
         additional_params: Optional[Dict[str, Any]] = None,
     ) -> Dict[type, Dict[str, Any]]:
         random_states = random_states or range(n_iterations)
@@ -87,7 +87,7 @@ class AATest(ExperimentShell):
         control_size: float = 0.5,
         stratification: bool = False,
         additional_params: Optional[Dict[str, Any]] = None,
-        random_states: Optional[List[int]] = None,
+        random_states: Optional[Iterable[int]] = None,
     ):
 
         super().__init__(

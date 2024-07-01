@@ -36,11 +36,11 @@ class Experiment(Executor):
 
     def __init__(
         self,
-        executors: List[Executor],
+        executors: Sequence[Executor],
         transformer: Optional[bool] = None,
         key: Any = "",
     ):
-        self.executors: List[Executor] = executors
+        self.executors: Sequence[Executor] = executors
         self.transformer: bool = (
             transformer if transformer is not None else self._detect_transformer()
         )
