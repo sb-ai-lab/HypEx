@@ -1,7 +1,7 @@
 from typing import Optional, Any, Dict
 
 from hypex.comparators.distances import MahalanobisDistance
-from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData
+from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData, TargetRole
 from hypex.executor import MLExecutor
 from hypex.extensions.ml import FaissExtension
 from hypex.utils import SpaceEnum, ExperimentDataEnum
@@ -37,10 +37,10 @@ class FaissNearestNeighbors(MLExecutor):
             **kwargs,
         )
         if two_sides is None or two_sides == False:
-            return {"control": data}
+            return {"test": data}
         return {
-            "control": data,
-            "test": cls._inner_function(
+            "test": data,
+            "control": cls._inner_function(
                 data=grouping_data[1][1],
                 test_data=grouping_data[0][1],
                 n_neighbors=n_neighbors or 1,
@@ -85,4 +85,28 @@ class FaissNearestNeighbors(MLExecutor):
             n_neighbors=self.n_neighbors,
             two_sides=self.two_sides,
         )
-        return self._set_value(data, compare_result)
+        matched_target = Dataset.create_empty()
+
+        target_field = data.ds.search_columns(TargetRole())[0]
+        index_field = compare_result.fillna(-1)
+        for i in range(len(compare_result.columns)):
+            t_index_field = index_field[index_field.columns[i]]
+            filtered_field = t_index_field.drop(
+                t_index_field[t_index_field[t_index_field.columns[0]] == -1], axis=0
+            )
+            new_target = data.ds.iloc[
+                list(map(lambda x: x[0], filtered_field.get_values()))
+            ][target_field]
+            new_target.index = filtered_field.index
+            group = (
+                grouping_data[0][1]
+                if grouping_data[0][0] == compare_result.columns[i]
+                else grouping_data[1][1]
+            )
+            new_target = new_target.reindex(group.index, fill_value=0).rename(
+                {target_field: target_field + "_matched"}
+            )
+            matched_target = matched_target.append(new_target).sort()
+        if len(matched_target) != len(data.ds):
+            matched_target = matched_target.reindex(data.ds.index, fill_value=0)
+        return self._set_value(data, matched_target)

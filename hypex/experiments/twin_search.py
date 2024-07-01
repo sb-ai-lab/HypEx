@@ -8,9 +8,6 @@ TWIN_SEARCH = Experiment(
     executors=[
         MahalanobisDistance(grouping_role=TreatmentRole()),
         FaissNearestNeighbors(grouping_role=TreatmentRole(), two_sides=True),
-        MatchingMetrics(
-            grouping_role=TreatmentRole(),
-            target_roles=[TargetRole()],
-        ),
+        MatchingMetrics(grouping_role=TreatmentRole(), target_roles=[TargetRole()]),
     ]
 )
