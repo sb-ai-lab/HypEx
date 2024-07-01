@@ -1,6 +1,6 @@
 from typing import Union, Dict, Any, List
 
-import pandas as pd
+from pandas import DataFrame
 
 from hypex.dataset import Dataset, ABCRole
 from hypex.utils import ScalarType, FieldKeyTypes
@@ -25,7 +25,7 @@ class Adapter:
         # Convert data based on its type
         if isinstance(data, dict):
             return Adapter.dict_to_dataset(data, roles)
-        elif isinstance(data, pd.DataFrame):
+        elif isinstance(data, DataFrame):
             return Adapter.frame_to_dataset(data, roles)
         elif isinstance(data, list):
             return Adapter.list_to_dataset(data, roles)
@@ -45,7 +45,7 @@ class Adapter:
         """
         return Dataset(
             roles=roles,
-            data=pd.DataFrame(data=data, columns=[list(roles.keys())[0]]),
+            data=DataFrame(data=data, columns=[list(roles.keys())[0]]),
         )
 
     @staticmethod
@@ -70,12 +70,12 @@ class Adapter:
         """
         return Dataset(
             roles=roles,
-            data=pd.DataFrame(data=data, columns=[list(roles.keys())[0]]),
+            data=DataFrame(data=data, columns=[list(roles.keys())[0]]),
         )
 
     @staticmethod
     def frame_to_dataset(
-        data: pd.DataFrame, roles: Dict[FieldKeyTypes, ABCRole]
+        data: DataFrame, roles: Dict[FieldKeyTypes, ABCRole]
     ) -> Dataset:
         """
         Convert a list to a Dataset

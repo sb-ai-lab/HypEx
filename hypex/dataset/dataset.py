@@ -262,13 +262,15 @@ class Dataset(DatasetBase):
                 raise ValueError("Козьёль")
             self.roles.update(data.roles)
             self._backend.add_column(
-                data._backend.data[list(data._backend.data.columns)[0]],
-                list(data.roles.keys())[0],
+                data.data,
+                data.columns,
                 index,
             )
         else:
+            if isinstance(data, Dataset):
+                data = data.data
             self.roles.update(role)
-            self._backend.add_column(data, list(role.keys())[0], index)
+            self._backend.add_column(data, list(role.keys()), index)
         return self
 
     def _check_other_dataset(self, other):
@@ -608,12 +610,12 @@ class ExperimentData:
     ) -> "ExperimentData":
         if space == ExperimentDataEnum.additional_fields:
             if isinstance(value, Dataset):
-                rename_dict = (
+                rename_to = (
                     {value.columns[0]: executor_id}
                     if isinstance(executor_id, str)
                     else executor_id
                 )
-                value = value.rename(names=rename_dict)
+                value = value.rename(names=rename_to)
                 self.additional_fields = self.additional_fields.merge(
                     right=value, left_index=True, right_index=True
                 )
@@ -621,16 +623,16 @@ class ExperimentData:
                 self.additional_fields.add_column(data=value, role={executor_id: role})
             else:
                 raise ValueError("Executor id must be a single string and role must be provided")
-        elif space == ExperimentDataEnum.analysis_tables:
-            self.analysis_tables[executor_id] = value
-        elif space == ExperimentDataEnum.variables:
-            if executor_id not in self.variables:
-                self.variables[executor_id] = {key: value}
-            else:
-                self.variables[executor_id][key] = value
-        elif space == ExperimentDataEnum.groups:
-            self.groups[executor_id][key] = value
-        if len(executor_id) == 1:
+        if isinstance(executor_id, str):
+            if space == ExperimentDataEnum.analysis_tables:
+                self.analysis_tables[executor_id] = value
+            elif (space == ExperimentDataEnum.variables) and any([isinstance(value, t) for t in [int, float]]):
+                if executor_id not in self.variables:
+                    self.variables[executor_id] = {key: value}
+                else:
+                    self.variables[executor_id][key] = value
+            elif space == ExperimentDataEnum.groups:
+                self.groups[executor_id][key] = value
             self.id_name_mapping[executor_id] = name
         else:
             for id_ in executor_id:
