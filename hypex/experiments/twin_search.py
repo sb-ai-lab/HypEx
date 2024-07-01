@@ -11,7 +11,6 @@ TWIN_SEARCH = Experiment(
         MatchingMetrics(
             grouping_role=TreatmentRole(),
             target_roles=[TargetRole()],
-            metric="ate",
         ),
     ]
 )

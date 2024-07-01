@@ -63,6 +63,8 @@ class MatchingMetrics(GroupOperator):
                 t_grouping_data += [
                     (grouping_data[i][0], grouping_data[i][1].add_column(new_target))
                 ]
+            if len(t_grouping_data) < 2:
+                t_grouping_data.append(grouping_data[1])
             grouping_data = t_grouping_data
         compare_result = self.calc(
             data=data.ds,
@@ -84,10 +86,15 @@ class MatchingMetrics(GroupOperator):
         if target_fields is None or len(target_fields) != 2:
             raise ValueError("Нужно дописать ошибку")
         if metric == "auto":
-            if grouping_data[0][target_fields[1]].isna().sum() > 0:
-                metric = "atc" if grouping_data[0][0] < grouping_data[1][0] else "att"
-            else:
+            if (
+                target_fields[1] in grouping_data[0][1].columns
+                and target_fields[1] in grouping_data[1][1].columns
+            ):
                 metric = "ate"
+            else:
+                metric = (
+                    "att" if target_fields[1] in grouping_data[0][1].columns else "atc"
+                )
         if metric in ["atc", "att"]:
             return {
                 metric.upper(): (
