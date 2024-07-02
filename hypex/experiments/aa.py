@@ -1,12 +1,10 @@
-from typing import Optional, Dict, Any, List, Iterable, Sequence
+from typing import Optional, Dict, Any, Iterable
 
-from hypex.analyzers import OneAAStatAnalyzer
-from hypex.analyzers.aa import AAScoreAnalyzer
+from hypex.analyzers.aa import OneAAStatAnalyzer, AAScoreAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes
 from hypex.comparators.abstract import GroupComparator
 from hypex.comparators.hypothesis_testing import TTest, KSTest, Chi2Test
 from hypex.dataset import TargetRole, TreatmentRole
-from hypex.executor import Executor
 from hypex.experiments import Experiment, OnRoleExperiment
 from hypex.experiments.base_complex import ParamsExperiment
 from hypex.reporters import DatasetReporter, OneAADictReporter
