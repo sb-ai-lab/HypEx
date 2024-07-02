@@ -11,6 +11,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Literal,
 )
 
 import pandas as pd  # type: ignore
@@ -267,6 +268,7 @@ class Dataset(DatasetBase):
         else:
             self.roles.update(role)
             self._backend.add_column(data, list(role.keys())[0], index)
+        return self
 
     def _check_other_dataset(self, other):
         if not isinstance(other, Dataset):
@@ -285,6 +287,7 @@ class Dataset(DatasetBase):
 
         return Dataset(roles=new_roles, data=self.backend.append(other, index))
 
+    # TODO: set backend by backend object
     @staticmethod
     def from_dict(
         data: FromDictTypes,
@@ -449,8 +452,11 @@ class Dataset(DatasetBase):
     def na_counts(self):
         return self._convert_data_after_agg(self._backend.na_counts())
 
-    # TODO Literal
-    def dropna(self, how: str = "any", subset: Union[str, Iterable[str], None] = None):
+    def dropna(
+        self,
+        how: Literal["any", "all"] = "any",
+        subset: Union[str, Iterable[str], None] = None,
+    ):
         return Dataset(
             roles=self.roles, data=self._backend.dropna(how=how, subset=subset)
         )
@@ -466,7 +472,6 @@ class Dataset(DatasetBase):
         t_roles = {k: v for k, v in self.roles.items() if k in t_data.columns}
         return Dataset(roles=t_roles, data=t_data)
 
-    # TODO Literal
     def merge(
         self,
         right,
@@ -475,9 +480,12 @@ class Dataset(DatasetBase):
         right_on: Optional[FieldKeyTypes] = None,
         left_index: bool = False,
         right_index: bool = False,
-        suffixes: Tuple[str, str] = ("_x", "_y"),
-        how: str = "inner",
+        suffixes: tuple[str, str] = ("_x", "_y"),
+        how: Literal["left", "right", "outer", "inner", "cross"] = "inner",
     ):
+        if not any([on, left_on, right_on, left_index, right_index]):
+            left_index = True
+            right_index = True
         if not isinstance(right, Dataset):
             raise DataTypeError(type(right))
         if type(right._backend) is not type(self._backend):
@@ -600,10 +608,11 @@ class ExperimentData:
         role=None,
     ) -> "ExperimentData":
         if space == ExperimentDataEnum.additional_fields:
-            if not isinstance(value, Dataset) or len(value.columns) == 1:
+            if not isinstance(value, Dataset):
                 self.additional_fields.add_column(data=value, role={executor_id: role})
             else:
-                value = value.rename(names=executor_id)
+                rename_dict = {value.columns[0]: executor_id} if isinstance(executor_id, str) else executor_id
+                value = value.rename(names=rename_dict)
                 self.additional_fields = self.additional_fields.merge(
                     right=value, left_index=True, right_index=True
                 )
@@ -674,7 +683,7 @@ class ExperimentData:
 
     def get_one_id(self, class_: type, space: ExperimentDataEnum) -> str:
         result = self.get_ids(class_)
-        if not len(result):
+        if not len(result[class_][space.value]):
             raise NotFoundInExperimentDataError(class_)
         return result[class_][space.value][0]
 

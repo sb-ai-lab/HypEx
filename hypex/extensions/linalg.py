@@ -15,4 +15,6 @@ class CholeskyExtension(Extension):
 
 class InverseExtension(Extension):
     def _calc_pandas(self, data: Dataset, **kwargs):
-        return self.result_to_dataset(np.linalg.inv(data.data.to_numpy()), FeatureRole())
+        return self.result_to_dataset(
+            np.linalg.inv(data.data.to_numpy()), FeatureRole()
+        )
