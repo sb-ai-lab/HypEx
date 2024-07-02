@@ -20,7 +20,7 @@ class OneAAStatAnalyzer(Executor):
         executor_ids = data.get_ids(analysis_tests, ExperimentDataEnum.analysis_tables)
 
         analysis_data: Dict[str, float] = {}
-        for c, spaces in executor_ids.items():
+        for class_, spaces in executor_ids.items():
             analysis_ids = spaces.get("analysis_tables", [])
             if len(analysis_ids) > 0:
                 if len(analysis_ids) > 1:
@@ -30,8 +30,8 @@ class OneAAStatAnalyzer(Executor):
                 else:
                     t_data = data.analysis_tables[analysis_ids[0]]
                 # t_data.data.index = analysis_ids
-                for f in ["p-value", "pass"]:
-                    analysis_data[f"mean {c} {f}"] = t_data[f].mean()
+                for field in ["p-value", "pass"]:
+                    analysis_data[f"mean {class_} {field}"] = t_data[field].mean()
         analysis_data["mean test score"] = (
             analysis_data["mean TTest p-value"]
             + 2 * analysis_data["mean KSTest p-value"]
@@ -46,7 +46,7 @@ class OneAAStatAnalyzer(Executor):
 
         analysis_dataset = Dataset.from_dict(
             [analysis_data],
-            {f: StatisticRole() for f in analysis_data},
+            {field: StatisticRole() for field in analysis_data},
             BackendsEnum.pandas,
         )
 
@@ -55,7 +55,7 @@ class OneAAStatAnalyzer(Executor):
 
 class AAScoreAnalyzer(Executor):
     AA_SPLITER_CLASS_MAPPING = {
-        c.__name__: c for c in [AASplitter, AASplitterWithStratification]
+        class_.__name__: class_ for class_ in [AASplitter, AASplitterWithStratification]
     }
 
     # TODO: rename alpha
@@ -76,15 +76,18 @@ class AAScoreAnalyzer(Executor):
     ) -> ExperimentData:
         search_flag = f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}"
         self.__feature_weights = {
-            c: 1 - abs(self.alpha - score_table.loc[:, c].mean())
-            for c in score_table.columns
-            if search_flag in c
+            column: 1 - abs(self.alpha - score_table.loc[:, column].mean())
+            for column in score_table.columns
+            if search_flag in column
         }
         aa_scores = {
-            c.replace(f"{ID_SPLIT_SYMBOL}p-value", ""): v
-            for c, v in self.__feature_weights.items()
+            class_.replace(f"{ID_SPLIT_SYMBOL}p-value", ""): value
+            for class_, value in self.__feature_weights.items()
         }
-        aa_passed = {c: v >= (1 - self.alpha * 1.2) for c, v in aa_scores.items()}
+        aa_passed = {
+            class_: value >= (1 - self.alpha * 1.2)
+            for class_, value in aa_scores.items()
+        }
         result = Dataset.from_dict({"score": aa_scores, "pass": aa_passed}, roles={})
         self.key = "aa score"
         return self._set_value(data, result)
@@ -97,7 +100,7 @@ class AAScoreAnalyzer(Executor):
             raise ValueError(f"{splitter_id} is not a valid splitter id")
         return splitter_class.build_from_id(splitter_id)
 
-    def _geet_best_split(
+    def _get_best_split(
         self, data: ExperimentData, score_table: Dataset
     ) -> Dict[str, Any]:
         aa_split_scores = score_table.apply(
@@ -105,7 +108,10 @@ class AAScoreAnalyzer(Executor):
                 (
                     (
                         (
-                            sum(x[k] * v for k, v in self.__feature_weights.items())
+                            sum(
+                                x[key] * value
+                                for key, value in self.__feature_weights.items()
+                            )
                             / len(self.__feature_weights)
                         )
                         * 2
@@ -129,9 +135,7 @@ class AAScoreAnalyzer(Executor):
     ) -> ExperimentData:
         self.key = "best splitter"
         # TODO: replace get_values
-        best_splitter_id = score_table.loc[best_index, "splitter_id"].to_dict()["data"][
-            "data"
-        ][0][0]
+        best_splitter_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
         result = data.set_value(
             ExperimentDataEnum.variables, self.id, self.key, best_splitter_id, self.key
         )
@@ -145,7 +149,7 @@ class AAScoreAnalyzer(Executor):
     def _analyze_best_split(
         self, data: ExperimentData, score_table: Dataset
     ) -> ExperimentData:
-        best_split = self._geet_best_split(data, score_table)
+        best_split = self._get_best_split(data, score_table)
         return self._set_best_split(
             best_split["data"], score_table, best_split["index"]
         )
