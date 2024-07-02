@@ -71,9 +71,9 @@ class FaissNearestNeighbors(MLExecutor):
         if group_field[0] in data.groups:
             grouping_data = list(data.groups[group_field[0]].items())
         else:
-            grouping_data = None
+            grouping_data = data.ds.groupby(group_field, fields_list=features_fields)
         distances_keys = data.get_ids(MahalanobisDistance, ExperimentDataEnum.groups)
-        if len(distances_keys[MahalanobisDistance]) > 0:
+        if len(distances_keys[MahalanobisDistance]["groups"]) > 0:
             grouping_data = list(
                 data.groups[distances_keys[MahalanobisDistance]["groups"][0]].items()
             )
@@ -100,13 +100,13 @@ class FaissNearestNeighbors(MLExecutor):
             new_target.index = filtered_field.index
             group = (
                 grouping_data[0][1]
-                if grouping_data[0][0] == compare_result.columns[i]
+                if compare_result.columns[i] == "test"
                 else grouping_data[1][1]
             )
             new_target = new_target.reindex(group.index, fill_value=0).rename(
                 {target_field: target_field + "_matched"}
             )
             matched_target = matched_target.append(new_target).sort()
-        if len(matched_target) != len(data.ds):
+        if len(matched_target) < len(data.ds):
             matched_target = matched_target.reindex(data.ds.index, fill_value=0)
         return self._set_value(data, matched_target)
