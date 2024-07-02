@@ -82,8 +82,7 @@ class AASplitter(Calculator):
         edge = int(len(addition_indexes) * control_size)
         control_indexes = addition_indexes[:edge]
 
-        r =  ["control" if i in control_indexes else "test" for i in range(len(addition_indexes))]
-        return r
+        return ["control" if i in control_indexes else "test" for i in data.index]
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         return self._set_value(
