@@ -78,10 +78,12 @@ class AASplitter(Calculator):
         **kwargs,
     ) -> List[str]:
         experiment_data = data.shuffle(random_state)
-        addition_indexes = range(len(experiment_data))
+        addition_indexes = list(experiment_data.index)
         edge = int(len(addition_indexes) * control_size)
+        control_indexes = addition_indexes[:edge]
 
-        return ["control" if i < edge else "test" for i in addition_indexes]
+        r =  ["control" if i in control_indexes else "test" for i in range(len(addition_indexes))]
+        return r
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         return self._set_value(

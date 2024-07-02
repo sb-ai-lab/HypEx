@@ -134,7 +134,6 @@ class AAScoreAnalyzer(Executor):
         self, data: ExperimentData, score_table: Dataset, best_index: int
     ) -> ExperimentData:
         self.key = "best splitter"
-        # TODO: replace get_values
         best_splitter_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
         result = data.set_value(
             ExperimentDataEnum.variables, self.id, self.key, best_splitter_id, self.key

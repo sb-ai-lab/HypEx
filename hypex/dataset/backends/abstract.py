@@ -191,11 +191,11 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def _get_column_type(self, column_name: str) -> str:
+    def get_column_type(self, column_name: str) -> str:
         raise AbstractMethodError
 
     @abstractmethod
-    def _update_column_type(self, column_name: str, type_name: str):
+    def update_column_type(self, column_name: str, type_name: str):
         raise AbstractMethodError
 
     @abstractmethod
