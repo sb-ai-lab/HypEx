@@ -2,7 +2,7 @@ from typing import Optional, List, Dict, Any
 
 from hypex.dataset import Dataset, ExperimentData, FeatureRole
 from hypex.executor import GroupCalculator
-from hypex.extensions.linalg import CholeskyExtension, InverseExtension
+from hypex.extensions.scipy_linalg import CholeskyExtension, InverseExtension
 from hypex.utils import FieldKeyTypes, ExperimentDataEnum
 
 

@@ -1,12 +1,12 @@
 from .encoders import DummyEncoderExtension
-from .hypothesis_testing import (
+from .faiss import FaissExtension
+from .scipy_linalg import CholeskyExtension, InverseExtension
+from .scipy_stats import (
     TTestExtension,
     KSTestExtension,
     UTestExtension,
     Chi2TestExtension,
 )
-from .linalg import CholeskyExtension, InverseExtension
-from .ml import FaissExtension
 from .statsmodels import ABMultiTest, ABMultitestQuantile
 
 __all__ = [

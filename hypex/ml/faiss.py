@@ -3,7 +3,7 @@ from typing import Optional, Any, Dict
 from hypex.comparators.distances import MahalanobisDistance
 from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData, TargetRole
 from hypex.executor import MLExecutor
-from hypex.extensions.ml import FaissExtension
+from hypex.extensions.faiss import FaissExtension
 from hypex.utils import SpaceEnum, ExperimentDataEnum
 
 
