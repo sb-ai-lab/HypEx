@@ -21,4 +21,4 @@ class DummyEncoderExtension(Extension):
         roles = {col: data.roles[col[: col.rfind("_")]] for col in dummies_df.columns}
         for role in roles.values():
             role.data_type = bool
-        return Adapter.to_dataset(dummies_df, roles=roles)
+        return DatasetAdapter.to_dataset(dummies_df, roles=roles)

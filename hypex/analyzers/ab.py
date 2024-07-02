@@ -93,16 +93,16 @@ class ABAnalyzer(Executor):
             for f in ["p-value", "pass"]:
                 value = t_data[f]
                 multitest_pvalues = self._add_pvalues(
-                    multitest_pvalues, value, f, c.__name__
+                    multitest_pvalues, value, f, c
                 )
-                analysis_data[f"{c.__name__} {f}"] = value.mean()
-            if c.__name__ not in ["UTest", "TTest"]:
+                analysis_data[f"{c} {f}"] = value.mean()
+            if c not in ["UTest", "TTest"]:
                 indexes = t_data.index
                 values = t_data.data.values.tolist()
                 for idx, value in zip(indexes, values):
                     name = idx.split(ID_SPLIT_SYMBOL)[-1]
                     analysis_data[
-                        f"{c.__name__} {name[name.find(NAME_BORDER_SYMBOL) + 1: name.rfind(NAME_BORDER_SYMBOL)]}"
+                        f"{c} {name[name.find(NAME_BORDER_SYMBOL) + 1: name.rfind(NAME_BORDER_SYMBOL)]}"
                     ] = value[0]
 
         analysis_dataset = Dataset.from_dict(
