@@ -4,7 +4,7 @@ from hypex.comparators import KSTest, TTest, Chi2Test
 from hypex.dataset import Dataset, ExperimentData, StatisticRole
 from hypex.executor import Executor
 from hypex.experiments.base_complex import ParamsExperiment
-from hypex.reporters import OneAADictReporter
+from hypex.reporters.aa import OneAADictReporter
 from hypex.splitters import AASplitter, AASplitterWithStratification
 from hypex.utils import BackendsEnum, ExperimentDataEnum, ID_SPLIT_SYMBOL
 
