@@ -4,7 +4,7 @@ from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu  # type: ignore
 
 from .abstract import StatHypothesisTesting
 from ..dataset import Dataset, ABCRole
-from ..extensions.hypothesis_testing import (
+from ..extensions.scipy_stats import (
     TTestExtension,
     KSTestExtension,
     UTestExtension,

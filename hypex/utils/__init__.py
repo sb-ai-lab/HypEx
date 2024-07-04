@@ -1,4 +1,4 @@
-from .constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
+from .constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL, NUMBER_TYPES_LIST
 from .enums import (
     SpaceEnum,
     BackendsEnum,
@@ -37,6 +37,7 @@ from .typings import (
 __all__ = [
     "NAME_BORDER_SYMBOL",
     "ID_SPLIT_SYMBOL",
+    "NUMBER_TYPES_LIST",
     "SpaceEnum",
     "BackendsEnum",
     "ExperimentDataEnum",

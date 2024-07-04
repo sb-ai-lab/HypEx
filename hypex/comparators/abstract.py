@@ -7,7 +7,6 @@ from hypex.dataset import (
     ExperimentData,
     StatisticRole,
     TempTargetRole,
-    MatchingRole,
     InfoRole,
 )
 from hypex.executor import GroupCalculator
@@ -92,6 +91,12 @@ class GroupComparator(GroupCalculator):
                 )
         return result
 
+    @staticmethod
+    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
+        if test_data is None:
+            raise ValueError("test_data is needed for evaluation")
+        return test_data
+
     def _set_value(
         self, data: ExperimentData, value: Optional[Dataset] = None, key: Any = None
     ) -> ExperimentData:
@@ -103,6 +108,7 @@ class GroupComparator(GroupCalculator):
         )
         return data
 
+    # TODO compare_result.values(), но тайпинг для нее FromDictTypes
     @staticmethod
     def _extract_dataset(
         compare_result: FromDictTypes, roles: Dict[Any, ABCRole]
@@ -117,10 +123,7 @@ class GroupComparator(GroupCalculator):
 
     # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
     def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field = self._field_searching(data, self.grouping_role)
-        target_fields = data.ds.search_columns(
-            TempTargetRole(), tmp_role=True, search_types=self.search_types
-        )
+        group_field, target_fields = self._get_fields(data)
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
@@ -135,8 +138,8 @@ class GroupComparator(GroupCalculator):
         compare_result = self.calc(
             data=data.ds,
             group_field=group_field,
-            target_fields=target_fields,
             grouping_data=grouping_data,
+            target_fields=target_fields,
         )
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key in compare_result}
@@ -154,72 +157,3 @@ class StatHypothesisTesting(GroupComparator, ABC):
     ):
         super().__init__(grouping_role, space, key)
         self.reliability = reliability
-
-
-class MatchingComparator(GroupComparator):
-    def __init__(
-        self,
-        grouping_role: Union[ABCRole, None] = None,
-        space: SpaceEnum = SpaceEnum.auto,
-        search_types: Union[type, List[type], None] = None,
-        index_role: Union[ABCRole, None] = None,
-        key: Any = "",
-    ):
-        super().__init__(grouping_role, space, search_types, key)
-        self.index_role = index_role or MatchingRole()
-
-    def _set_value(
-        self,
-        data: ExperimentData,
-        value: Optional[Union[float, int, bool, str]] = None,
-        key: Any = None,
-    ) -> ExperimentData:
-        data.set_value(
-            ExperimentDataEnum.value,
-            self.id,
-            str(self.__class__.__name__),
-            value,
-        )
-        return data
-
-    @staticmethod
-    def _inner_function(
-        data: Dataset, test_data: Optional[Dataset] = None, **kwargs
-    ) -> Any:
-        raise AbstractMethodError
-
-    @staticmethod
-    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
-        if test_data is None:
-            raise ValueError("test_data is needed for evaluation")
-        return test_data
-
-    def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field, target_fields, grouping_data = self._get_grouping_data(data)
-        if grouping_data:
-            index_column = data.additional_fields.search_columns(self.index_role)
-            grouping_data = [
-                (
-                    group,
-                    (
-                        group_data.iloc[index_column]
-                        if group in index_column
-                        else group_data
-                    ),
-                )
-                for group, group_data in grouping_data
-            ]
-        att = data.variables.get("ATT", None)
-        atc = data.variables.get("ATT", None)
-        compare_result = self.calc(
-            data=data.ds,
-            group_field=group_field,
-            target_field=target_fields,
-            grouping_data=grouping_data,
-            comparison_function=self._inner_function,
-            att=att,
-            atc=atc,
-        )
-        return self._set_value(
-            data, list(compare_result.values())[0], key=list(compare_result.keys())[0]
-        )

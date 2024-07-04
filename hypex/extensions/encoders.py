@@ -1,5 +1,6 @@
 from typing import Optional
-import pandas as pd
+
+import pandas as pd  # type: ignore
 
 from hypex.dataset import Dataset
 from hypex.extensions.abstract import Extension

@@ -1,7 +1,7 @@
 from typing import Optional, Union, List
 
 import numpy as np
-from scipy.stats import norm
+from scipy.stats import norm  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
 
 from hypex.dataset import Dataset, StatisticRole
@@ -100,6 +100,8 @@ class ABMultitestQuantile(Extension):
                         if self.equal_variance:
                             t_value = (sample[j] - sample[i]) / np.sqrt(2)
                         else:
+                            if variances is None:
+                                raise ValueError("variances is needed for execution")
                             t_value = sample[j] / np.sqrt(
                                 1 + variances[i] / variances[j]
                             ) - sample[i] / np.sqrt(1 + variances[j] / variances[i])
@@ -123,15 +125,15 @@ class ABMultitestQuantile(Extension):
         initial_estimate: int = 0,
         iteration_size: int = 3000,
     ):
-        if type(quantile_1) is float:
+        if isinstance(quantile_1, float):
             quantile_1 = np.full(num_samples, quantile_1).tolist()
-        if type(quantile_2) is float:
+        if isinstance(quantile_1, float):
             quantile_2 = np.full(num_samples, quantile_2).tolist()
 
         quantile_1 = quantile_1 or self.quantile_of_marginal_distribution(
             num_samples=num_samples,
             quantile_level=1 - self.alpha / num_samples,
-            variances=variances,
+            variances=variances if isinstance(variances, List) else [variances],
         )
         quantile_2 = quantile_2 or self.quantile_of_marginal_distribution(
             num_samples=num_samples, quantile_level=power

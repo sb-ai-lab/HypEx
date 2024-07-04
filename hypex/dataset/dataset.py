@@ -115,7 +115,12 @@ class Dataset(DatasetBase):
         if isinstance(other, Dataset):
             if type(other._backend) is not type(self._backend):
                 raise BackendTypeError(type(other._backend), type(self._backend))
-            other = other._backend
+            other = other.rename(
+                {
+                    other.columns[i]: self.data.columns[i]
+                    for i in range(len(other.columns))
+                }
+            ).backend
         return Dataset(roles=t_roles, data=func(other))
 
     # comparison operators:
@@ -261,13 +266,15 @@ class Dataset(DatasetBase):
                 raise ValueError("Козьёль")
             self.roles.update(data.roles)
             self._backend.add_column(
-                data._backend.data[list(data._backend.data.columns)[0]],
-                list(data.roles.keys())[0],
+                data.data,
+                data.columns,
                 index,
             )
         else:
+            if isinstance(data, Dataset):
+                data = data.data
             self.roles.update(role)
-            self._backend.add_column(data, list(role.keys())[0], index)
+            self._backend.add_column(data, list(role.keys()), index)
         return self
 
     def _check_other_dataset(self, other):
@@ -396,6 +403,11 @@ class Dataset(DatasetBase):
     def max(self):
         return self._convert_data_after_agg(self._backend.max())
 
+    def reindex(self, labels, fill_value: Optional[Any] = None) -> "Dataset":
+        return Dataset(
+            self.roles, data=self.backend.reindex(labels, fill_value=fill_value)
+        )
+
     def idxmax(self):
         return self._convert_data_after_agg(self._backend.idxmax())
 
@@ -513,6 +525,8 @@ class Dataset(DatasetBase):
         return Dataset(roles=new_roles, data=t_data)
 
     def drop(self, labels: Any = None, axis: int = 1):
+        if isinstance(labels, Dataset):
+            labels = list(labels.index)
         t_data = self._backend.drop(labels=labels, axis=axis)
         t_roles = (
             self.roles if axis == 0 else {c: self.roles[c] for c in t_data.columns}
@@ -608,8 +622,10 @@ class ExperimentData:
         role=None,
     ) -> "ExperimentData":
         if space == ExperimentDataEnum.additional_fields:
-            if not isinstance(value, Dataset):
-                self.additional_fields.add_column(data=value, role={executor_id: role})
+            if not isinstance(value, Dataset) or len(value.columns) == 1:
+                self.additional_fields = self.additional_fields.add_column(
+                    data=value, role={executor_id: role}
+                )
             else:
                 rename_dict = {value.columns[0]: executor_id} if isinstance(executor_id, str) else executor_id
                 value = value.rename(names=rename_dict)
@@ -620,14 +636,20 @@ class ExperimentData:
             self.analysis_tables[executor_id] = value
         elif space == ExperimentDataEnum.variables:
             if executor_id not in self.variables:
-                self.variables[executor_id] = {key: value}
+                if isinstance(value, Dict):
+                    self.variables[executor_id] = value
+                else:
+                    self.variables[executor_id] = {key: value}
             else:
                 self.variables[executor_id][key] = value
         elif space == ExperimentDataEnum.groups:
-            self.groups[executor_id][key] = value
+            if executor_id not in self.groups:
+                self.groups[executor_id] = {key: value}
+            else:
+                self.groups[executor_id][key] = value
         if len(executor_id) == 1:
             self.id_name_mapping[executor_id] = name
-        else:
+        else:  # TODO если str, то записывается побуквенно
             for id_ in executor_id:
                 self.id_name_mapping[id_] = name
         return self

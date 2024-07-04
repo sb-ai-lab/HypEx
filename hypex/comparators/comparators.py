@@ -18,6 +18,7 @@ class GroupDifference(GroupComparator):
         test_data: Optional[Dataset] = None,
         **kwargs,
     ) -> Dict:
+        test_data = cls._check_test_data(test_data)
         control_mean = data.mean()
         test_mean = test_data.mean()
 
