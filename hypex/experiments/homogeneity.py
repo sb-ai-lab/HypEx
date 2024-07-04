@@ -1,4 +1,4 @@
-from hypex.analyzers import OneAAStatAnalyzer
+from hypex.analyzers.aa import OneAAStatAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes
 from hypex.comparators import TTest, KSTest, Chi2Test
 from hypex.dataset import TargetRole, TreatmentRole

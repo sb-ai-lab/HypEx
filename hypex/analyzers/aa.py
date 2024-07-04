@@ -17,7 +17,9 @@ class OneAAStatAnalyzer(Executor):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         analysis_tests: List[type] = [TTest, KSTest, Chi2Test]
-        executor_ids = data.get_ids(analysis_tests, ExperimentDataEnum.analysis_tables)
+        executor_ids = data.get_ids(
+            analysis_tests, searched_space=ExperimentDataEnum.analysis_tables
+        )
 
         analysis_data: Dict[str, float] = {}
         for class_, spaces in executor_ids.items():

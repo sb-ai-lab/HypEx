@@ -11,7 +11,7 @@ from typing import (
     Optional,
     Tuple,
     Literal,
-    Sequence
+    Sequence,
 )
 
 import pandas as pd  # type: ignore
@@ -27,6 +27,7 @@ from hypex.utils import (
     NotFoundInExperimentDataError,
     DataTypeError,
     BackendTypeError,
+    ScalarType,
 )
 from .abstract import DatasetBase
 from .roles import (
@@ -683,7 +684,9 @@ class ExperimentData:
         classes = [
             c.__name__ if isinstance(c, type) else c for c in Adapter.to_list(classes)
         ]
-        searched_space = Adapter.to_list(searched_space) if searched_space else list(spaces.keys())
+        searched_space = (
+            Adapter.to_list(searched_space) if searched_space else list(spaces.keys())
+        )
 
         return {
             class_: {
@@ -716,9 +719,7 @@ class ExperimentData:
 
 class DatasetAdapter(Adapter):
     @staticmethod
-    def to_dataset(
-        data: Any, roles: Union[ABCRole, Dict[FieldKeyTypes, ABCRole]]
-    ) -> Dataset:
+    def to_dataset(data: Any, roles: Union[ABCRole, Dict[str, ABCRole]]) -> Dataset:
         """
         Convert various data types to a Dataset object.
         Args:
@@ -744,9 +745,7 @@ class DatasetAdapter(Adapter):
             raise ValueError(f"Unsupported data type {type(data)}")
 
     @staticmethod
-    def value_to_dataset(
-        data: ScalarType, roles: Dict[FieldKeyTypes, ABCRole]
-    ) -> Dataset:
+    def value_to_dataset(data: ScalarType, roles: Dict[str, ABCRole]) -> Dataset:
         """
         Convert a float to a Dataset
         """
@@ -757,7 +756,7 @@ class DatasetAdapter(Adapter):
 
     @staticmethod
     def dict_to_dataset(
-        data: Dict, roles: Union[ABCRole, Dict[FieldKeyTypes, ABCRole]]
+        data: Dict, roles: Union[ABCRole, Dict[str, ABCRole]]
     ) -> Dataset:
         """
         Convert a dict to a Dataset
@@ -771,7 +770,7 @@ class DatasetAdapter(Adapter):
             )
 
     @staticmethod
-    def list_to_dataset(data: List, roles: Dict[FieldKeyTypes, ABCRole]) -> Dataset:
+    def list_to_dataset(data: List, roles: Dict[str, ABCRole]) -> Dataset:
         """
         Convert a list to a Dataset
         """
@@ -781,9 +780,7 @@ class DatasetAdapter(Adapter):
         )
 
     @staticmethod
-    def frame_to_dataset(
-        data: pd.DataFrame, roles: Dict[FieldKeyTypes, ABCRole]
-    ) -> Dataset:
+    def frame_to_dataset(data: pd.DataFrame, roles: Dict[str, ABCRole]) -> Dataset:
         """
         Convert a list to a Dataset
         """

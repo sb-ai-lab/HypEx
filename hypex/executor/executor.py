@@ -10,6 +10,7 @@ from hypex.dataset import (
     FeatureRole,
     MatchingRole,
     TargetRole,
+    DatasetAdapter,
 )
 from hypex.utils import (
     ComparisonNotSuitableFieldError,
@@ -144,15 +145,21 @@ class GroupCalculator(Calculator):
         raise AbstractMethodError
 
     def _field_searching(
-        self, data: ExperimentData, field, tmp_role: bool = False, search_types=None
+        self,
+        data: ExperimentData,
+        field,
+        tmp_role: bool = False,
+        search_types=None,
+        space: Optional[SpaceEnum] = None,
     ):
+        space = space or self.space
         searched_field = []
-        if self.space in [SpaceEnum.auto, SpaceEnum.data]:
+        if space in [SpaceEnum.auto, SpaceEnum.data]:
             searched_field = data.ds.search_columns(
                 field, tmp_role=tmp_role, search_types=search_types
             )
         if (
-            self.space in [SpaceEnum.auto, SpaceEnum.additional]
+            space in [SpaceEnum.auto, SpaceEnum.additional]
             and searched_field == []
             and isinstance(data, ExperimentData)
         ):
@@ -359,7 +366,7 @@ class MLExecutor(GroupCalculator, ABC):
         result = cls._execute_inner_function(
             grouping_data, target_field=target_field, **kwargs
         )
-        return Adapter.to_dataset(
+        return DatasetAdapter.to_dataset(
             result,
             {i: MatchingRole() for i in list(result.keys())},
         )

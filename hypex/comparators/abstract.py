@@ -8,7 +8,7 @@ from hypex.dataset import (
     StatisticRole,
     TempTargetRole,
     InfoRole,
-    DatasetAdapter
+    DatasetAdapter,
 )
 from hypex.executor import GroupCalculator
 from hypex.utils import (
@@ -49,7 +49,11 @@ class GroupComparator(GroupCalculator):
     def _get_fields(self, data: ExperimentData):
         group_field = self._field_searching(data, self.grouping_role)
         target_fields = self._field_searching(
-            data, TempTargetRole(), tmp_role=True, search_types=self.search_types
+            data,
+            TempTargetRole(),
+            tmp_role=True,
+            search_types=self.search_types,
+            space=SpaceEnum.data,
         )
         return group_field, target_fields
 
