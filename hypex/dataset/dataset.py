@@ -10,7 +10,6 @@ from typing import (
     Hashable,
     Optional,
     Sequence,
-    Tuple,
     Literal,
 )
 
@@ -22,7 +21,6 @@ from hypex.utils import (
     ConcatBackendError,
     ConcatDataError,
     ExperimentDataEnum,
-    FieldKeyTypes,
     FromDictTypes,
     MultiFieldKeyTypes,
     NotFoundInExperimentDataError,
@@ -314,7 +312,7 @@ class Dataset(DatasetBase):
     def apply(
         self,
         func: Callable,
-        role: Dict[FieldKeyTypes, ABCRole],
+        role: Dict[str, ABCRole],
         axis: int = 0,
         **kwargs,
     ) -> "Dataset":
@@ -387,7 +385,7 @@ class Dataset(DatasetBase):
 
     def fillna(
         self,
-        values: Union[int, Dict[FieldKeyTypes, FieldKeyTypes]],
+        values: Union[int, Dict[str, str]],
         method: Optional[str] = None,
         **kwargs,
     ):
@@ -487,9 +485,9 @@ class Dataset(DatasetBase):
     def merge(
         self,
         right,
-        on: Optional[FieldKeyTypes] = None,
-        left_on: Optional[FieldKeyTypes] = None,
-        right_on: Optional[FieldKeyTypes] = None,
+        on: Optional[str] = None,
+        left_on: Optional[str] = None,
+        right_on: Optional[str] = None,
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
@@ -566,7 +564,7 @@ class Dataset(DatasetBase):
     def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
         return Dataset(self.roles, data=self.backend.shuffle(random_state))
 
-    def rename(self, names: Dict[FieldKeyTypes, FieldKeyTypes]):
+    def rename(self, names: Dict[str, str]):
         roles = {names.get(column, column): role for column, role in self.roles.items()}
         return Dataset(roles, data=self.backend.rename(names))
 
@@ -627,7 +625,11 @@ class ExperimentData:
                     data=value, role={executor_id: role}
                 )
             else:
-                rename_dict = {value.columns[0]: executor_id} if isinstance(executor_id, str) else executor_id
+                rename_dict = (
+                    {value.columns[0]: executor_id}
+                    if isinstance(executor_id, str)
+                    else executor_id
+                )
                 value = value.rename(names=rename_dict)
                 self.additional_fields = self.additional_fields.merge(
                     right=value, left_index=True, right_index=True

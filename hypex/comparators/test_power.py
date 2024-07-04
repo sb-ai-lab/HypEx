@@ -6,7 +6,7 @@
 #
 # from hypex.comparators.comparators import ComparatorInner
 # from hypex.dataset import ExperimentData
-# from hypex.utils import FieldKeyTypes
+# from hypex.utils import
 #
 #
 #
@@ -14,7 +14,7 @@
 # class TestPower(ComparatorInner):
 #     def __init__(
 #         self,
-#         target_field: FieldKeyTypes,
+#         target_field: ,
 #         significance: float = 0.95,
 #         power: float = 0.8,
 #         full_name: str = None,
@@ -60,7 +60,7 @@ from scipy.stats import norm
 
 from hypex.comparators.abstract import GroupComparator
 from hypex.dataset import ABCRole, Dataset, ExperimentData, TargetRole
-from hypex.utils import SpaceEnum, FieldKeyTypes
+from hypex.utils import SpaceEnum
 
 
 class MDEBySize(GroupComparator):
@@ -97,8 +97,8 @@ class MDEBySize(GroupComparator):
     @staticmethod
     def calc(
         cls: Dataset,
-        data: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None],
-        group_field: Optional[FieldKeyTypes] = None,
+        data: Union[Sequence[str], str, None],
+        group_field: Optional[str] = None,
         grouping_data=None,
         target_fields=None,
         **kwargs

@@ -3,7 +3,7 @@ from typing import Optional, List, Dict, Any
 from hypex.dataset import Dataset, ExperimentData, FeatureRole
 from hypex.executor import GroupCalculator
 from hypex.extensions.scipy_linalg import CholeskyExtension, InverseExtension
-from hypex.utils import FieldKeyTypes, ExperimentDataEnum
+from hypex.utils import ExperimentDataEnum
 
 
 class MahalanobisDistance(GroupCalculator):
@@ -12,7 +12,7 @@ class MahalanobisDistance(GroupCalculator):
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_fields: Optional[List[FieldKeyTypes]] = None,
+        target_fields: Optional[List[str]] = None,
         **kwargs,
     ) -> Dict:
         result = {}

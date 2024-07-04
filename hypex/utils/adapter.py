@@ -3,15 +3,13 @@ from typing import Union, Dict, Any, List
 import pandas as pd  # type: ignore
 
 from hypex.dataset import Dataset, ABCRole
-from hypex.utils import ScalarType, FieldKeyTypes
+from hypex.utils import ScalarType
 
 
 class Adapter:
 
     @staticmethod
-    def to_dataset(
-        data: Any, roles: Union[ABCRole, Dict[FieldKeyTypes, ABCRole]]
-    ) -> Dataset:
+    def to_dataset(data: Any, roles: Union[ABCRole, Dict[str, ABCRole]]) -> Dataset:
         """
         Convert various data types to a Dataset object.
         Args:
@@ -37,9 +35,7 @@ class Adapter:
             raise ValueError(f"Unsupported data type {type(data)}")
 
     @staticmethod
-    def value_to_dataset(
-        data: ScalarType, roles: Dict[FieldKeyTypes, ABCRole]
-    ) -> Dataset:
+    def value_to_dataset(data: ScalarType, roles: Dict[str, ABCRole]) -> Dataset:
         """
         Convert a float to a Dataset
         """
@@ -50,7 +46,7 @@ class Adapter:
 
     @staticmethod
     def dict_to_dataset(
-        data: Dict, roles: Union[ABCRole, Dict[FieldKeyTypes, ABCRole]]
+        data: Dict, roles: Union[ABCRole, Dict[str, ABCRole]]
     ) -> Dataset:
         """
         Convert a dict to a Dataset
@@ -68,7 +64,7 @@ class Adapter:
             )
 
     @staticmethod
-    def list_to_dataset(data: List, roles: Dict[FieldKeyTypes, ABCRole]) -> Dataset:
+    def list_to_dataset(data: List, roles: Dict[str, ABCRole]) -> Dataset:
         """
         Convert a list to a Dataset
         """
@@ -78,9 +74,7 @@ class Adapter:
         )
 
     @staticmethod
-    def frame_to_dataset(
-        data: pd.DataFrame, roles: Dict[FieldKeyTypes, ABCRole]
-    ) -> Dataset:
+    def frame_to_dataset(data: pd.DataFrame, roles: Dict[str, ABCRole]) -> Dataset:
         """
         Convert a list to a Dataset
         """

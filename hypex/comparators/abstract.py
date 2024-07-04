@@ -13,7 +13,6 @@ from hypex.executor import GroupCalculator
 from hypex.utils import (
     BackendsEnum,
     ExperimentDataEnum,
-    FieldKeyTypes,
     FromDictTypes,
     SpaceEnum,
 )
@@ -58,7 +57,7 @@ class GroupComparator(GroupCalculator):
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_fields: Optional[List[FieldKeyTypes]] = None,
+        target_fields: Optional[List[str]] = None,
         old_data: Optional[Dataset] = None,
         **kwargs,
     ) -> Dict:

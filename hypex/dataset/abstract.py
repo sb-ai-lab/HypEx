@@ -10,7 +10,7 @@ from hypex.dataset.roles import (
     default_roles,
     FeatureRole,
 )
-from hypex.utils import BackendsEnum, RoleColumnError, FieldKeyTypes
+from hypex.utils import BackendsEnum, RoleColumnError
 
 
 def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
@@ -167,7 +167,7 @@ class DatasetBase(ABC):
 
     def get_values(
         self,
-        row: Optional[FieldKeyTypes] = None,
-        column: Optional[FieldKeyTypes] = None,
+        row: Optional[str] = None,
+        column: Optional[str] = None,
     ) -> Any:
         return self._backend.get_values(row=row, column=column)

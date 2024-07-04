@@ -8,7 +8,6 @@ from hypex.dataset import (
 from hypex.executor import GroupCalculator
 from hypex.utils import (
     ExperimentDataEnum,
-    FieldKeyTypes,
     AbstractMethodError,
 )
 
@@ -37,7 +36,7 @@ class GroupOperator(GroupCalculator):
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_fields: Optional[List[FieldKeyTypes]] = None,
+        target_fields: Optional[List[str]] = None,
         **kwargs,
     ) -> Dict:
         if target_fields is None or len(target_fields) != 2:

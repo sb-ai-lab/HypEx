@@ -9,14 +9,13 @@ from hypex.dataset.roles import (
     TargetRole,
 )
 from hypex.transformers.abstract import Transformer
-from hypex.utils import FieldKeyTypes
 from hypex.utils.adapter import Adapter
 
 
 class CVFilter(Transformer):
     def __init__(
         self,
-        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
+        target_roles: Optional[Union[str, Sequence[str]]] = None,
         lower_bound: Optional[float] = None,
         upper_bound: Optional[float] = None,
         key: Any = "",
@@ -42,7 +41,7 @@ class CVFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: Optional[FieldKeyTypes] = None,
+        target_cols: Optional[str] = None,
         lower_bound: Optional[float] = None,
         upper_bound: Optional[float] = None,
     ) -> Dataset:
@@ -77,7 +76,7 @@ class CVFilter(Transformer):
 class ConstFilter(Transformer):
     def __init__(
         self,
-        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
+        target_roles: Optional[Union[str, Sequence[str]]] = None,
         threshold: float = 0.95,
         key: Any = "",
     ):
@@ -96,7 +95,7 @@ class ConstFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: Optional[FieldKeyTypes] = None,
+        target_cols: Optional[str] = None,
         threshold: float = 0.95,
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
@@ -119,7 +118,7 @@ class ConstFilter(Transformer):
 class NanFilter(Transformer):
     def __init__(
         self,
-        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
+        target_roles: Optional[Union[str, Sequence[str]]] = None,
         threshold: float = 0.8,
         key: Any = "",
     ):
@@ -138,7 +137,7 @@ class NanFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: Optional[FieldKeyTypes] = None,
+        target_cols: Optional[str] = None,
         threshold: float = 0.8,
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
@@ -161,8 +160,8 @@ class NanFilter(Transformer):
 class CorrFilter(Transformer):
     def __init__(
         self,
-        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
-        corr_space_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
+        target_roles: Optional[Union[str, Sequence[str]]] = None,
+        corr_space_roles: Optional[Union[str, Sequence[str]]] = None,
         threshold: float = 0.8,
         method: str = "pearson",
         numeric_only: bool = True,
@@ -178,8 +177,8 @@ class CorrFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: Optional[FieldKeyTypes] = None,
-        corr_space_cols: Optional[FieldKeyTypes] = None,
+        target_cols: Optional[str] = None,
+        corr_space_cols: Optional[str] = None,
         threshold: float = 0.8,
         method: str = "pearson",
         numeric_only: bool = True,
@@ -247,7 +246,7 @@ class CorrFilter(Transformer):
 class OutliersFilter(Transformer):
     def __init__(
         self,
-        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
+        target_roles: Optional[Union[str, Sequence[str]]] = None,
         lower_percentile: float = 0,
         upper_percentile: float = 1,
         key: Any = "",
@@ -272,7 +271,7 @@ class OutliersFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: Optional[FieldKeyTypes] = None,
+        target_cols: Optional[str] = None,
         lower_percentile: float = 0,
         upper_percentile: float = 1,
     ) -> Dataset:

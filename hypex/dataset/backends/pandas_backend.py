@@ -16,7 +16,7 @@ from typing import (
 import numpy as np
 import pandas as pd  # type: ignore
 
-from hypex.utils import FromDictTypes, FieldKeyTypes, MergeOnError
+from hypex.utils import FromDictTypes, MergeOnError
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -268,8 +268,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def get_values(
         self,
-        row: Optional[FieldKeyTypes] = None,
-        column: Optional[FieldKeyTypes] = None,
+        row: Optional[str] = None,
+        column: Optional[str] = None,
     ) -> Any:
         if (column is not None) and (row is not None):
             return self.data.loc[row, column]
@@ -401,7 +401,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     ) -> pd.DataFrame:
         return self.data.dropna(how=how, subset=subset)
 
-    def transpose(self, names: Optional[Sequence[FieldKeyTypes]]) -> pd.DataFrame:
+    def transpose(self, names: Optional[Sequence[str]]) -> pd.DataFrame:
         result = self.data.transpose()
         if names:
             result.columns = names
@@ -418,8 +418,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def select_dtypes(
         self,
-        include: Optional[FieldKeyTypes] = None,
-        exclude: Optional[FieldKeyTypes] = None,
+        include: Optional[str] = None,
+        exclude: Optional[str] = None,
     ) -> pd.DataFrame:
         return self.data.select_dtypes(include=include, exclude=exclude)
 
@@ -429,9 +429,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def merge(
         self,
         right: "PandasDataset",  # should be PandasDataset.
-        on: FieldKeyTypes = "",
-        left_on: FieldKeyTypes = "",
-        right_on: FieldKeyTypes = "",
+        on: str = "",
+        left_on: str = "",
+        right_on: str = "",
         left_index: bool = False,
         right_index: bool = False,
         suffixes: Tuple[str, str] = ("_x", "_y"),
@@ -451,7 +451,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             how=how,
         )
 
-    def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> pd.DataFrame:
+    def drop(self, labels: str = "", axis: int = 1) -> pd.DataFrame:
         return self.data.drop(labels=labels, axis=axis)
 
     def filter(
@@ -476,6 +476,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return self.data.replace(to_replace=to_replace, value=value, regex=regex)
 
     def reindex(
-        self, labels: FieldKeyTypes = "", fill_value: Optional[FieldKeyTypes] = None
+        self, labels: str = "", fill_value: Optional[str] = None
     ) -> pd.DataFrame:
         return self.data.reindex(labels, fill_value=fill_value)

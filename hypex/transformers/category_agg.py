@@ -6,14 +6,14 @@ from hypex.dataset.roles import (
     FeatureRole,
 )
 from hypex.transformers.abstract import Transformer
-from hypex.utils import FieldKeyTypes, CategoricalTypes
+from hypex.utils import CategoricalTypes
 from hypex.utils.adapter import Adapter
 
 
 class CategoryAggregator(Transformer):
     def __init__(
         self,
-        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
+        target_roles: Optional[Union[str, Sequence[str]]] = None,
         threshold: Optional[int] = 15,
         new_group_name: Optional[str] = None,
         key: Any = "",
@@ -30,7 +30,7 @@ class CategoryAggregator(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: Optional[FieldKeyTypes] = None,
+        target_cols: Optional[str] = None,
         threshold: Optional[int] = 15,
         new_group_name: Optional[str] = None,
     ) -> Dataset:
@@ -47,7 +47,9 @@ class CategoryAggregator(Transformer):
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        target_cols = data.ds.search_columns(roles=self.target_roles, search_types=self.search_types)
+        target_cols = data.ds.search_columns(
+            roles=self.target_roles, search_types=self.search_types
+        )
         result = data.copy(
             data=self.calc(
                 data=data.ds,

@@ -3,7 +3,7 @@ from typing import Optional, Any, List, Literal, Union, Dict
 
 from hypex.dataset import Dataset, ABCRole, ExperimentData, MatchingRole, TargetRole
 from hypex.operators.abstract import GroupOperator
-from hypex.utils import SpaceEnum, FieldKeyTypes
+from hypex.utils import SpaceEnum
 
 
 class SMD(GroupOperator):
@@ -58,10 +58,7 @@ class MatchingMetrics(GroupOperator):
 
     @classmethod
     def _execute_inner_function(
-        cls,
-        grouping_data,
-        target_fields: Optional[List[FieldKeyTypes]] = None,
-        **kwargs
+        cls, grouping_data, target_fields: Optional[List[str]] = None, **kwargs
     ) -> Dict:
         metric = kwargs.get("metric", "auto")
         if target_fields is None or len(target_fields) != 2:

@@ -4,7 +4,7 @@ from hypex.dataset import Dataset, ExperimentData, FeatureRole
 from hypex.executor import Calculator
 from hypex.utils import (
     AbstractMethodError,
-    FieldKeyTypes,
+,
     CategoricalTypes,
     NAME_BORDER_SYMBOL,
     ExperimentDataEnum,
@@ -15,7 +15,7 @@ class Encoder(Calculator):
 
     def __init__(
         self,
-        target_roles: Optional[Union[FieldKeyTypes, Sequence[FieldKeyTypes]]] = None,
+        target_roles: Optional[Union[str, Sequence[str]]] = None,
         key: Any = "",
     ):
         self.target_roles = target_roles or FeatureRole()

@@ -13,7 +13,7 @@ from typing import (
     Tuple,
 )
 
-from hypex.utils import AbstractMethodError, FromDictTypes, FieldKeyTypes
+from hypex.utils import AbstractMethodError, FromDictTypes
 
 
 class DatasetBackendNavigation(ABC):
@@ -266,8 +266,8 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     @abstractmethod
     def get_values(
         self,
-        row: Optional[FieldKeyTypes] = None,
-        column: Optional[FieldKeyTypes] = None,
+        row: Optional[str] = None,
+        column: Optional[str] = None,
     ) -> Any:
         raise AbstractMethodError
 
@@ -360,9 +360,9 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     def merge(
         self,
         right: Any,
-        on: Optional[FieldKeyTypes] = None,
-        left_on: Optional[FieldKeyTypes] = None,
-        right_on: Optional[FieldKeyTypes] = None,
+        on: Optional[str] = None,
+        left_on: Optional[str] = None,
+        right_on: Optional[str] = None,
         left_index: bool = False,
         right_index: bool = False,
         suffixes: Tuple[str, str] = ("_x", "_y"),
@@ -373,7 +373,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     @abstractmethod
     def drop(
         self,
-        labels: Union[FieldKeyTypes, Sequence[FieldKeyTypes], None] = None,
+        labels: Union[str, Sequence[str], None] = None,
         axis: int = 1,
     ) -> Any:
         raise AbstractMethodError

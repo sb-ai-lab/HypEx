@@ -13,7 +13,6 @@ from hypex.dataset import (
 )
 from hypex.utils import (
     ComparisonNotSuitableFieldError,
-    FieldKeyTypes,
     NoColumnsError,
     SpaceEnum,
     AbstractMethodError,
@@ -186,8 +185,8 @@ class GroupCalculator(Calculator):
 
     @staticmethod
     def _field_arg_universalization(
-        field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None]
-    ) -> List[FieldKeyTypes]:
+        field: Union[Sequence[str], str, None]
+    ) -> List[str]:
         if not field:
             raise NoColumnsError(field)
         elif isinstance(field, str):
@@ -210,9 +209,9 @@ class GroupCalculator(Calculator):
     def calc(
         cls,
         data: Dataset,
-        group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
-        grouping_data: Optional[List[Tuple[FieldKeyTypes, Dataset]]] = None,
-        target_fields: Union[FieldKeyTypes, List[FieldKeyTypes], None] = None,
+        group_field: Union[Sequence[str], str, None] = None,
+        grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
+        target_fields: Union[str, List[str], None] = None,
         **kwargs,
     ) -> Dict:
         group_field = Adapter.to_list(group_field)
@@ -252,7 +251,7 @@ class GroupCalculator(Calculator):
             data=data.ds,
             group_field=group_field,
             target_fields=target_fields,
-            grouping_data=grouping_data
+            grouping_data=grouping_data,
         )
         return self._set_value(data, compare_result)
 
@@ -307,7 +306,7 @@ class MLExecutor(GroupCalculator, ABC):
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_field: Optional[FieldKeyTypes] = None,
+        target_field: Optional[str] = None,
         **kwargs,
     ) -> Any:
         if target_field:
@@ -343,10 +342,10 @@ class MLExecutor(GroupCalculator, ABC):
     def calc(
         cls,
         data: Dataset,
-        group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
-        grouping_data: Optional[List[Tuple[FieldKeyTypes, Dataset]]] = None,
-        target_field: Union[FieldKeyTypes, List[FieldKeyTypes], None] = None,
-        features_fields: Union[FieldKeyTypes, List[FieldKeyTypes], None] = None,
+        group_field: Union[Sequence[str], str, None] = None,
+        grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
+        target_field: Union[str, List[str], None] = None,
+        features_fields: Union[str, List[str], None] = None,
         **kwargs,
     ) -> Dataset:
         group_field = Adapter.to_list(group_field)
