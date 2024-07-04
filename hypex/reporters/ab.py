@@ -37,3 +37,12 @@ class ABDictReporter(OneAADictReporter):
         result = {}
         result.update(self.extract_data_from_analysis_tables(data))
         return result
+
+
+class ABDatasetReporter(ABDictReporter):
+    def report(self, data: ExperimentData):
+        front_buffer = self.front
+        self.front = False
+        dict_report = super().report(data)
+        self.front = front_buffer
+        return self.convert_flat_dataset(dict_report)

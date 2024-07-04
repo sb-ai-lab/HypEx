@@ -4,11 +4,9 @@ import numpy as np
 from scipy.stats import norm  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
 
-from hypex.dataset import Dataset, StatisticRole
+from hypex.dataset import Dataset, StatisticRole, DatasetAdapter
 from hypex.utils import ABNTestMethodsEnum
 from .abstract import Extension
-from ..utils.adapter import Adapter
-
 
 class ABMultiTest(Extension):
     def __init__(self, method: ABNTestMethodsEnum, alpha: float = 0.05):
@@ -21,7 +19,7 @@ class ABMultiTest(Extension):
         result = multipletests(
             p_values, method=self.method.value, alpha=self.alpha, **kwargs
         )
-        return Adapter.to_dataset(
+        return DatasetAdapter.to_dataset(
             {"rejected": result[0], "new p-values": result[1]}, StatisticRole()
         )
 
@@ -73,10 +71,10 @@ class ABMultitestQuantile(Extension):
                     )
                     min_t_value = min(min_t_value, t_value)
             if min_t_value > quantiles[j]:
-                return Adapter.to_dataset(
+                return DatasetAdapter.to_dataset(
                     {"accepted hypothesis": [j + 1]}, StatisticRole()
                 )
-        return Adapter.to_dataset({"accepted hypothesis": [0]}, StatisticRole())
+        return DatasetAdapter.to_dataset({"accepted hypothesis": [0]}, StatisticRole())
 
     def quantile_of_marginal_distribution(
         self,

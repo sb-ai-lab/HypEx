@@ -34,8 +34,8 @@ class ComparisonNotSuitableFieldError(Exception):
 
 
 class NotFoundInExperimentDataError(Exception):
-    def __init__(self, class_: type):
-        super().__init__(f"{class_.__name__} id is not found in ExperimentData")
+    def __init__(self, class_: str):
+        super().__init__(f"{class_} id is not found in ExperimentData")
 
 
 class AbstractMethodError(NotImplementedError):

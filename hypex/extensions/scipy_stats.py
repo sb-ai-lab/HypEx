@@ -2,9 +2,8 @@ from typing import Callable, Union, Optional
 
 from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind  # type: ignore
 
-from hypex.dataset import Dataset, StatisticRole
+from hypex.dataset import Dataset, StatisticRole, DatasetAdapter
 from hypex.extensions.abstract import CompareExtension
-from hypex.utils.adapter import Adapter
 
 
 class StatTest(CompareExtension):
@@ -43,7 +42,7 @@ class StatTest(CompareExtension):
         one_result = self.test_function(
             data.backend.data.values.flatten(), other.backend.data.values.flatten()
         )
-        one_result = Adapter.to_dataset(
+        one_result = DatasetAdapter.to_dataset(
             {
                 "p-value": one_result.pvalue,
                 "statistic": one_result.statistic,
@@ -88,7 +87,7 @@ class Chi2TestExtension(StatTest):
         other = self.check_data(data, other)
         matrix = self.matrix_preparation(data, other)
         one_result = chi2_contingency(matrix.backend.data)
-        return Adapter.to_dataset(
+        return DatasetAdapter.to_dataset(
             {
                 "p-value": one_result.pvalue,
                 "statistic": one_result.statistic,

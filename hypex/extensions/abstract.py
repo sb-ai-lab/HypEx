@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Union, Any, Dict, Optional, Literal
 
-from hypex.dataset import ABCRole
-from hypex.dataset import Dataset
+from hypex.dataset import Dataset, ABCRole
 from hypex.dataset.backends import PandasDataset
-from hypex.utils.adapter import Adapter
+from hypex.dataset.dataset import DatasetAdapter
 from hypex.utils.errors import AbstractMethodError
 
 
@@ -25,7 +24,7 @@ class Extension(ABC):
     def result_to_dataset(
         result: Any, roles: Union[ABCRole, Dict[str, ABCRole]]
     ) -> Dataset:
-        return Adapter.to_dataset(result, roles=roles)
+        return DatasetAdapter.to_dataset(result, roles=roles)
 
 
 class CompareExtension(Extension, ABC):
