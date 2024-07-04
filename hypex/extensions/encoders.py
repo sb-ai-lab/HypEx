@@ -2,9 +2,8 @@ from typing import Optional
 
 import pandas as pd  # type: ignore
 
-from hypex.dataset import Dataset
+from hypex.dataset import Dataset, DatasetAdapter
 from hypex.extensions.abstract import Extension
-from hypex.utils.adapter import Adapter
 
 
 class DummyEncoderExtension(Extension):

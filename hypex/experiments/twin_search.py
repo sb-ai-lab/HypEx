@@ -3,9 +3,11 @@ from hypex.dataset import TreatmentRole, TargetRole
 from hypex.experiments import Experiment
 from hypex.ml.faiss import FaissNearestNeighbors
 from hypex.operators.operators import MatchingMetrics
+from .preprocessing import PREPROCESSING_DATA
 
-TWIN_SEARCH = Experiment(
+MATCHING = Experiment(
     executors=[
+        PREPROCESSING_DATA,
         MahalanobisDistance(grouping_role=TreatmentRole()),
         FaissNearestNeighbors(grouping_role=TreatmentRole(), two_sides=True),
         MatchingMetrics(grouping_role=TreatmentRole(), target_roles=[TargetRole()]),
