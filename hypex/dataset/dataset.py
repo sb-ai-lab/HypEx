@@ -519,7 +519,7 @@ class Dataset(DatasetBase):
 
     def drop(self, labels: Any = None, axis: int = 1):
         if isinstance(labels, Dataset):
-            labels = labels.data.index.tolist()
+            labels = list(labels.index)
         t_data = self._backend.drop(labels=labels, axis=axis)
         t_roles = (
             self.roles if axis == 0 else {c: self.roles[c] for c in t_data.columns}

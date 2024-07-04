@@ -33,13 +33,9 @@ class MatchingMetrics(GroupOperator):
         group_field, target_fields = self._get_fields(data=data)
         t_data = deepcopy(data.ds)
         if len(target_fields) != 2:
-            target_fields += data.additional_fields.search_columns(self.target_roles)
-            t_data = t_data.add_column(
-                data.additional_fields[target_fields[1]],
-                role={target_fields[1]: TargetRole()},
+            target_fields += data.additional_fields.search_columns(
+                [self.target_roles, MatchingRole()]
             )
-        if len(target_fields) != 2:
-            target_fields += data.additional_fields.search_columns(MatchingRole())
             t_data = t_data.add_column(
                 data.additional_fields[target_fields[1]],
                 role={target_fields[1]: TargetRole()},
@@ -69,7 +65,11 @@ class MatchingMetrics(GroupOperator):
     ) -> Dict:
         metric = kwargs.get("metric", "auto")
         if target_fields is None or len(target_fields) != 2:
-            raise ValueError("Нужно дописать ошибку")
+            raise ValueError(
+                "This operator works with 2 targets, but got {}".format(
+                    len(target_fields) if target_fields else None
+                )
+            )
         if metric == "auto":
             if len(
                 grouping_data[0][1][grouping_data[0][1][target_fields[1]] == 0]

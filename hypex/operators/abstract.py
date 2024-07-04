@@ -41,7 +41,11 @@ class GroupOperator(GroupCalculator):
         **kwargs,
     ) -> Dict:
         if target_fields is None or len(target_fields) != 2:
-            raise ValueError("Нужно дописать ошибку")
+            raise ValueError(
+                "This operator works with 2 targets, but got {}".format(
+                    len(target_fields) if target_fields else None
+                )
+            )
         result = {}
         for group, group_data in grouping_data:
             result[group[0]] = cls._inner_function(

@@ -1,6 +1,6 @@
-from typing import Callable, Union, Optional, Any
+from typing import Callable, Union, Optional
 
-from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind
+from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind  # type: ignore
 
 from hypex.dataset import Dataset, StatisticRole
 from hypex.extensions.abstract import CompareExtension
@@ -34,21 +34,12 @@ class StatTest(CompareExtension):
 
         return other
 
-    @staticmethod
-    def result_to_dataset(self, result: Any) -> Dataset:
-        return super().result_to_dataset(
-            {
-                "p-value": result.pvalue,
-                "statistic": result.statistic,
-                "pass": result.pvalue < self.reliability,
-            },
-            StatisticRole(),
-        )
-
     def _calc_pandas(
         self, data: Dataset, other: Union[Dataset, None] = None, **kwargs
     ) -> Union[float, Dataset]:
         other = self.check_data(data, other)
+        if self.test_function is None:
+            raise ValueError("test_function is needed for execution")
         one_result = self.test_function(
             data.backend.data.values.flatten(), other.backend.data.values.flatten()
         )

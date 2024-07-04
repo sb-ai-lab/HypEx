@@ -177,7 +177,7 @@ class GroupCalculator(Calculator):
     ) -> List[FieldKeyTypes]:
         if not field:
             raise NoColumnsError(field)
-        elif isinstance(field, int) or isinstance(field, str):
+        elif isinstance(field, str):
             return [field]
         return list(field)
 
