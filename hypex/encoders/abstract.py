@@ -4,7 +4,6 @@ from hypex.dataset import Dataset, ExperimentData, FeatureRole
 from hypex.executor import Calculator
 from hypex.utils import (
     AbstractMethodError,
-,
     CategoricalTypes,
     NAME_BORDER_SYMBOL,
     ExperimentDataEnum,

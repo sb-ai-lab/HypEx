@@ -3,7 +3,6 @@ from typing import Optional
 from hypex.dataset import Dataset
 from hypex.encoders.abstract import Encoder
 from hypex.extensions.encoders import DummyEncoderExtension
-from hypex.utils import
 
 
 class DummyEncoder(Encoder):

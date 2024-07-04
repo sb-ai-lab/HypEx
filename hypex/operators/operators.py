@@ -34,7 +34,7 @@ class MatchingMetrics(GroupOperator):
         t_data = deepcopy(data.ds)
         if len(target_fields) != 2:
             target_fields += data.additional_fields.search_columns(
-                [self.target_roles, MatchingRole()]
+                self.target_roles + [MatchingRole()]
             )
             t_data = t_data.add_column(
                 data.additional_fields[target_fields[1]],
