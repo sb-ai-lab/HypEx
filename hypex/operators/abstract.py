@@ -25,10 +25,8 @@ class GroupOperator(GroupCalculator):
         raise AbstractMethodError
 
     def _get_fields(self, data: ExperimentData):
-        group_field = self._field_searching(data, self.grouping_role)
-        target_fields = self._field_searching(
-            data, self.target_roles, search_types=self.search_types
-        )
+        group_field = self._fields_searching(data, self.grouping_role)
+        target_fields = self._fields_searching(data, self.target_roles, search_types=self.search_types)
         return group_field, target_fields
 
     # TODO дописать ошибку

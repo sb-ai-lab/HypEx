@@ -312,8 +312,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def max(self) -> Union[pd.DataFrame, float]:
         return self.agg(["max"])
 
-    def idxmax(self) -> pd.DataFrame:
-        return self._convert_agg_result(self.data.idxmax())
+    def idxmax(self) -> Union[pd.DataFrame, float]:
+        return self.agg(["idxmax"])
 
     def min(self) -> Union[pd.DataFrame, float]:
         return self.agg(["min"])

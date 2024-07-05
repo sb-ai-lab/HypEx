@@ -338,7 +338,7 @@ class Dataset(DatasetBase):
     def unique(self):
         return self._backend.unique()
 
-    def nunique(self, dropna: bool = False):
+    def nunique(self, dropna: bool = False) -> Dict[str, int]:
         return self._backend.nunique(dropna)
 
     def isin(self, values: Iterable) -> "Dataset":
