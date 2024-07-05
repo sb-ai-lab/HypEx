@@ -1,4 +1,5 @@
 from abc import abstractmethod, ABC
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, Sequence, Union, Tuple
 
 from hypex.dataset import (
@@ -254,8 +255,14 @@ class GroupCalculator(Calculator):
             grouping_data = list(data.groups[group_field[0]].items())
         else:
             grouping_data = None
+        t_data = deepcopy(data.ds)
+        if target_fields[1] not in t_data.columns:
+            t_data = t_data.add_column(
+                data.additional_fields[target_fields[1]],
+                role={target_fields[1]: TargetRole()},
+            )
         compare_result = self.calc(
-            data=data.ds,
+            data=t_data,
             group_field=group_field,
             target_fields=target_fields,
             grouping_data=grouping_data,

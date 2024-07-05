@@ -731,11 +731,11 @@ class DatasetAdapter(Adapter):
         ValueError: If the data type is not supported.
         """
         # Convert data based on its type
-        if isinstance(data, dict):
+        if isinstance(data, Dict):
             return DatasetAdapter.dict_to_dataset(data, roles)
         elif isinstance(data, pd.DataFrame):
             return DatasetAdapter.frame_to_dataset(data, roles)
-        elif isinstance(data, list):
+        elif isinstance(data, List):
             return DatasetAdapter.list_to_dataset(data, roles)
         elif any(isinstance(data, t) for t in [str, int, float, bool]):
             return DatasetAdapter.value_to_dataset(data, roles)
@@ -762,11 +762,15 @@ class DatasetAdapter(Adapter):
         Convert a dict to a Dataset
         """
         roles_names = list(data.keys())
+        if any(
+            isinstance(i, Union[int, str, float, bool]) for i in list(data.values())
+        ):
+            data = [data]
         if isinstance(roles, Dict):
-            return Dataset.from_dict(data=[data], roles=roles)
+            return Dataset.from_dict(data=data, roles=roles)
         elif isinstance(roles, ABCRole):
             return Dataset.from_dict(
-                data=[data], roles={name: roles for name in roles_names}
+                data=data, roles={name: roles for name in roles_names}
             )
 
     @staticmethod

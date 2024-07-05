@@ -36,6 +36,7 @@ class MatchingMetrics(GroupOperator):
             target_fields += data.additional_fields.search_columns(
                 self.target_roles + [MatchingRole()]
             )
+        if target_fields[1] not in t_data.columns:
             t_data = t_data.add_column(
                 data.additional_fields[target_fields[1]],
                 role={target_fields[1]: TargetRole()},

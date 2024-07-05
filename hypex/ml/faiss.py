@@ -61,7 +61,7 @@ class FaissNearestNeighbors(MLExecutor):
         )
 
     def fit(self, X: Dataset, Y: Optional[Dataset] = None) -> "MLExecutor":
-        return FaissExtension(self.n_neighbors).fit(X=X, y=Y)
+        return FaissExtension(self.n_neighbors).fit(X=X, Y=Y)
 
     def predict(self, X: Dataset) -> Dataset:
         return FaissExtension().predict(X)
@@ -73,9 +73,9 @@ class FaissNearestNeighbors(MLExecutor):
         else:
             grouping_data = data.ds.groupby(group_field, fields_list=features_fields)
         distances_keys = data.get_ids(MahalanobisDistance, ExperimentDataEnum.groups)
-        if len(distances_keys[MahalanobisDistance]["groups"]) > 0:
+        if len(distances_keys["MahalanobisDistance"]["groups"]) > 0:
             grouping_data = list(
-                data.groups[distances_keys[MahalanobisDistance]["groups"][0]].items()
+                data.groups[distances_keys["MahalanobisDistance"]["groups"][0]].items()
             )
         compare_result = self.calc(
             data=data.ds,
