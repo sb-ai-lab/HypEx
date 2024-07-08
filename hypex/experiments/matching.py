@@ -1,16 +1,15 @@
 from hypex.comparators.distances import MahalanobisDistance
 from hypex.dataset import TreatmentRole, TargetRole
+from hypex.encoders.encoders import DummyEncoder
 from hypex.experiments import Experiment
 from hypex.ml.faiss import FaissNearestNeighbors
-from hypex.operators.operators import MatchingMetrics, SMD
-from .preprocessing import PREPROCESSING_DATA
+from hypex.operators.operators import MatchingMetrics
 
 MATCHING = Experiment(
     executors=[
-        PREPROCESSING_DATA,
+        DummyEncoder(),
         MahalanobisDistance(grouping_role=TreatmentRole()),
         FaissNearestNeighbors(grouping_role=TreatmentRole(), two_sides=True),
         MatchingMetrics(grouping_role=TreatmentRole(), target_roles=[TargetRole()]),
-        SMD(target_roles=[TargetRole()], grouping_role=TreatmentRole()),
     ]
 )
