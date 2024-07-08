@@ -312,8 +312,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def max(self) -> Union[pd.DataFrame, float]:
         return self.agg(["max"])
 
-    def idxmax(self) -> pd.DataFrame:
-        return self._convert_agg_result(self.data.idxmax())
+    def idxmax(self) -> Union[pd.DataFrame, float]:
+        return self.agg(["idxmax"])
 
     def min(self) -> Union[pd.DataFrame, float]:
         return self.agg(["min"])
@@ -381,7 +381,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         ).reset_index()
 
     def fillna(self, values, method, **kwargs) -> pd.DataFrame:
-        return self.data.fillna(values, method=method, **kwargs)
+        return self.data.fillna(value=values, method=method, **kwargs)
 
     def na_counts(self) -> Union[pd.DataFrame, int]:
         data = self.data.isna().sum().to_frame().T

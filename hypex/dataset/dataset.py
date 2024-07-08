@@ -193,7 +193,7 @@ class Dataset(DatasetBase):
     def __or__(self, other):
         return self.__binary_magic_operator(other=other, func_name="__or__")
 
-    # Right arithmetic operators:
+    # Right math operators:
     def __radd__(self, other):
         return self.__binary_magic_operator(other=other, func_name="__radd__")
 
@@ -332,13 +332,13 @@ class Dataset(DatasetBase):
             data=self._backend.map(func=func, na_action=na_action, **kwargs),
         )
 
-    def is_empty(self):
+    def is_empty(self) -> bool:
         return self._backend.is_empty()
 
-    def unique(self):
+    def unique(self) -> Dict[str, List[Any]]:
         return self._backend.unique()
 
-    def nunique(self, dropna: bool = False):
+    def nunique(self, dropna: bool = False) -> Dict[str, int]:
         return self._backend.nunique(dropna)
 
     def isin(self, values: Iterable) -> "Dataset":
@@ -388,14 +388,15 @@ class Dataset(DatasetBase):
 
     def fillna(
         self,
-        values: Union[int, Dict[str, str]],
-        method: Optional[str] = None,
+        values: Union[ScalarType, Dict[str, ScalarType]] = None,
+        method: Literal["bfill", "ffill"] = None,
         **kwargs,
     ):
-        if method and method not in ["backfill", "bfill", "ffill"]:
+        if method and method not in ["bfill", "ffill"]:
             raise NameError("Unsupported fill method")
         return Dataset(
-            roles=self.roles, data=self.backend.fillna(values, method, **kwargs)
+            roles=self.roles,
+            data=self.backend.fillna(values=values, method=method, **kwargs),
         )
 
     def mean(self):

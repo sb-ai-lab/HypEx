@@ -6,11 +6,13 @@ from hypex.transformers.filters import (
     CVFilter,
     OutliersFilter,
 )
+from hypex.transformers.na_filler import NaFiller
 from hypex.transformers.category_agg import CategoryAggregator
 from hypex.encoders.encoders import DummyEncoder
 
 PREPROCESSING_DATA = Experiment(
     executors=[
+        NaFiller(method="ffill"),
         CategoryAggregator(),
         CorrFilter(),
         CVFilter(),
