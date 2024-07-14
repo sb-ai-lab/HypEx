@@ -1338,3 +1338,232 @@ class AATest:
             "split_stat": best_split_stat,
             "resume": resume,
         }
+    
+    def multi_group_split (self, index: list, **kwargs) -> pd.DataFrame:
+        """
+            Shuffles index column a specified number of times and divides it in a specified proportion
+        """
+        
+        groups = kwargs.get('groups',{'test': .5, 'control': .5})
+        iterations = kwargs.get('iterations',2_000)
+        show_pbar = kwargs.get('show_pbar',True)
+       
+        
+        assert np.sum(list(groups.values())) == 1
+                
+        split_results = pd.DataFrame()
+        edges = np.cumsum(list(groups.values())[:-1])
+
+        for _indx, experiment_index in tqdm(enumerate(range(1, iterations + 1)), total = iterations, disable = not show_pbar, desc='Generating random divisions'  ):
+            
+            shuffled_index= shuffle(index, random_state = _indx)
+            splitted_index = np.split(shuffled_index,[int(edge*len(index)) for edge in edges])
+            
+            series = []
+            for group_indx, group_name  in enumerate(groups):
+                series.append(pd.Series(
+                                    data = [group_name]*len(splitted_index[group_indx]),
+                                    index = splitted_index[group_indx],  dtype="category"
+                                )
+                            )
+            split_results[experiment_index] =  pd.DataFrame(pd.concat(series), dtype='category')
+        return split_results
+    
+
+    
+
+
+    def _get_experimen_metrics(self, df: pd.DataFrame, split_result: pd.Series, target_fields: list, alpha: float = .05)  -> dict:
+        """
+            Returns a dictionary containing experiment metrics.
+            For each target_field the average is calculated
+            For each combination of groups, the deviation of the averages is calculated
+        """  
+
+        
+        metrics = {}
+        test_scores =[]
+        
+        for field in target_fields:
+            field_values: dict = {}
+            [field_values.update({group: df.loc[split_result[lambda x: x == group].index][field]}) for group in split_result.cat.categories]
+
+            [metrics.update({f'{group} {field} mean':    np.mean(field_values[group]) }) for group in split_result.cat.categories]
+
+            for a,b in combinations(split_result.cat.categories, 2):
+                metrics.update({
+                        f'{field} mean delta ({a} - {b})':      np.mean(field_values[a]) - np.mean(field_values[b]),
+                        f'{field} mean delta% ({a} - {b})/{b}': (np.mean(field_values[a]) - np.mean(field_values[b]))*100/np.mean(field_values[b]),
+                        f'{field} t-test p-value ({a},{b})':    ttest_ind(field_values[a],field_values[b],nan_policy='omit').pvalue,
+                        f'{field} ks-test p-value ({a},{b})':   ks_2samp(field_values[a],field_values[b]).pvalue
+                })
+            
+            ttest_ind_pvalue    = np.mean([value for key, value in metrics.items() if 't-test p-value'  in key])
+            ks_2samp_pvalue     = np.mean([value for key, value in metrics.items() if 'ks-test p-value' in key])
+
+            metrics.update({
+                f'{field} mean t-test p-value':     ttest_ind_pvalue,
+                f'{field} mean ks-test p-value':    ks_2samp_pvalue,
+                f'{field} t-test passed':           ttest_ind_pvalue > alpha,
+                f'{field} ks-test passed':          ks_2samp_pvalue  > alpha
+            })
+            test_scores.append( (ttest_ind_pvalue + 2*ks_2samp_pvalue)/3)
+
+        metrics.update({
+            'mean of means t-test p-value':     np.mean([value for key, value in metrics.items() if 'mean t-test p-value'  in key]),
+            'mean of means ks-test p-value':    np.mean([value for key, value in metrics.items() if 'mean ks-test p-value' in key]),
+            't-test passed %':                  np.mean([passed*100  for key, passed in metrics.items() if 't-test passed' in key]),
+            'ks-test passed %':                 np.mean([passed*100 for key, passed in metrics.items() if 'ks-test passed' in key]),
+            'mean_test_score':                  np.mean(test_scores),
+            'experiment_index':                 int(split_result.name)
+
+        })
+        return metrics
+    
+    def _plot_distribution(self, df: pd.DataFrame, plots_group_name: str, fields: list[str]):
+        figsize =  (15, 3 * len(fields))
+        fig, axis = plt.subplots(nrows = math.ceil(len(fields)/2), ncols = 2, figsize = figsize)
+        fig.suptitle(plots_group_name, fontsize=16)
+        for field, ax in zip(fields, axis.flat):
+            sns.histplot(
+                        data=df,
+                        x = field,
+                        ax = ax,
+                        bins=20,
+                        stat="percent", 
+                        shrink=0.8,
+                    )
+    
+
+    def _plot_distributions(self, df: pd.DataFrame, target_fields: list[str]):
+        test = ['t-test','ks-test']
+
+        mean_of_means_pvalue = [f'mean of means {test_name} p-value' for test_name in test]
+        mean_of_means_title = 'Distribution of averages of average p-values ​​of each target_field'
+        self._plot_distribution(df=df,plots_group_name = mean_of_means_title,fields = mean_of_means_pvalue)
+
+        each_field_mean_pvalue = [[f'{field} mean {test_name} p-value'for field in target_fields][0] for test_name in test]
+        each_field_mean_title = 'Distribution of average p-values ​​of each target_field'
+        self._plot_distribution(df=df,plots_group_name = each_field_mean_title,fields = each_field_mean_pvalue)
+        
+        each_field_pvalue = [
+                            [
+                                [ field_name for field_name in df.columns 
+                                        if f'{field} {test} p-value' in field_name][0] 
+                                    for field in target_fields
+                            ][0]
+                            for test in test
+                        ]
+        each_field_title = 'Distribution of p-value for each group combination for each target_field'
+        self._plot_distribution(df=df,plots_group_name = each_field_title,fields = each_field_pvalue)        
+
+
+    def process_split (self, df: pd.DataFrame, target_fields: list[str], **kwargs) -> dict:
+        """
+        The function divides the passed DataFrame into the specified number of groups in specified proportions
+
+        Args:
+            df:
+                Input pd.DataFame
+            target_fields:
+                List or str with target columns. This fields should be numeric.
+            iterations:
+                Number of iterations for AA-test
+            alpha:
+                Level of significance
+            groups:
+                Group proportions   
+            pbar:
+                Show progress-bar
+            inPlace:
+                adds column to source DataFrame (True, False)
+            group_column_name:
+                group column name to be created after split
+            show_plots:
+                Is in necessary to show plots
+
+        Returns dict with following keys:
+            best metric:
+                best metric by scores
+            best_split:
+                Result of separation
+            all metrics:
+                DataFrame with all calculcated metrics
+            all splits:
+                DataFrame with all split results
+            best split DataFrame:
+                DataFrame  with groups column
+            get_resume:
+                returns function plotting p-value distribution
+        Example:
+        >>> import hypex as hp
+        >>> import pandas as pd
+        >>> import numpy as np
+        >>> data = {
+        >>>     'keys': range(1,100_001),
+        >>>     'values': np.random.uniform(10,100,100_000)
+        >>>     }
+        >>> df = pd.DataFrame(data)
+        >>> experiments = hp.AATest()
+        >>> results = experiments.process_split(df=df, groups={'test1': 0.2,'test2': 0.3,'control': 0.5}, target_fields=['values'], iterations=100)
+        """
+        iterations  = kwargs.get('iterations',2_000)
+        alpha       = kwargs.get('alpha', self.alpha)
+        groups      = kwargs.get('groups',{'test': .5, 'control': .5 })
+        show_pbar   = kwargs.get('show_pbar', True)
+        inPlace     = kwargs.get('inPlace', True)
+        group_column_name = kwargs.get('group_column_name','group')
+        show_plots = kwargs.get('show_plots',True)
+
+        split_results = self.multi_group_split(index = list(df.index), groups = groups, iterations = iterations, show_pbar = show_pbar)
+        
+        split_metrics: list[dict]=[]
+        
+
+        for _ , experiment_index in tqdm(enumerate(range(1, iterations + 1)), total = iterations, disable = not show_pbar, desc='Metrics calculations'  ):
+            split_metrics.append(self._get_experimen_metrics(df=df[target_fields], split_result=split_results[experiment_index], target_fields=target_fields, alpha = alpha))
+        
+        df_metrics = pd.DataFrame(split_metrics)
+            
+        best_metric: pd.Series = df_metrics.loc[df_metrics['mean_test_score'].idxmax()]
+        best_split: pd.Series  = split_results[best_metric.experiment_index]
+        
+        result_df: pd.DataFrame = df if inPlace == True else df.copy()
+        result_df[group_column_name] = best_split
+
+        def _plot_distributions():
+            test = ['t-test','ks-test']
+        
+            mean_of_means_pvalue = [f'mean of means {test_name} p-value' for test_name in test]
+            mean_of_means_title = 'Distribution of averages of average p-values ​​of each target_field'
+            self._plot_distribution(df=df_metrics,plots_group_name = mean_of_means_title,fields = mean_of_means_pvalue)
+        
+            each_field_mean_pvalue = [[f'{field} mean {test_name} p-value' for field in target_fields][0] for test_name in test]
+            each_field_mean_title = 'Distribution of average p-values ​​of each target_field'
+            self._plot_distribution(df=df_metrics,plots_group_name = each_field_mean_title,fields = each_field_mean_pvalue)
+        
+            each_field_pvalue = [
+                                [
+                                    [ field_name for field_name in df_metrics.columns 
+                                        if f'{field} {test} p-value' in field_name][0] 
+                                        for field in target_fields
+                                ][0]
+                                for test in test
+                            ]
+            each_field_title = 'Distribution of p-value for each group combination for each target_field'
+            self._plot_distribution(df=df_metrics,plots_group_name = each_field_title,fields = each_field_pvalue)               
+            pass
+            
+        if show_plots:
+            _plot_distributions()
+            
+        result = {
+                'best metric':    best_metric,
+                'best split':     best_split,
+                'all metrics':    df_metrics,
+                'all splits':     split_results,
+                'best split DataFrame':  result_df,
+                'get_resume':   _plot_distributions
+                }
+        return result
+        
