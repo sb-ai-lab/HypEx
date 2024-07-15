@@ -8,6 +8,7 @@ from hypex.dataset import Dataset, StatisticRole, DatasetAdapter
 from hypex.utils import ABNTestMethodsEnum
 from .abstract import Extension
 
+
 class ABMultiTest(Extension):
     def __init__(self, method: ABNTestMethodsEnum, alpha: float = 0.05):
         self.method = method
@@ -20,7 +21,15 @@ class ABMultiTest(Extension):
             p_values, method=self.method.value, alpha=self.alpha, **kwargs
         )
         return DatasetAdapter.to_dataset(
-            {"rejected": result[0], "new p-values": result[1]}, StatisticRole()
+            {
+                "old p-value": p_values,
+                "new p-value": result[1],
+                "correction": [
+                    i / j if j != 0 else 0.0 for i, j in zip(result[1], p_values)
+                ],
+                "rejected": result[0],
+            },
+            StatisticRole(),
         )
 
 
