@@ -13,7 +13,7 @@ class Output:
     def __init__(
         self,
         resume_reporter: Reporter,
-        additional_reporters: Optional[Dict[str, Reporter]],
+        additional_reporters: Optional[Dict[str, Reporter]] = None,
     ):
         self.resume_reporter = resume_reporter
         self.additional_reporters = additional_reporters or {}

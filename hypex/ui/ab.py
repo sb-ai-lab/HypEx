@@ -1,48 +1,30 @@
-import itertools
+from typing import Dict
 
 from .base import Output
-from ..analyzers.aa import AAScoreAnalyzer
-from ..dataset import Dataset, ExperimentData
-from ..reporters.aa import AAPassedReporter, AABestSplitReporter
+from ..analyzers.ab import ABAnalyzer
+from ..dataset import ExperimentData, Dataset
+from ..reporters.ab import ABDatasetReporter
 from ..utils import ExperimentDataEnum
-from ..utils.enums import RenameEnum
 
 
 class ABOutput(Output):
+    multitest_result: Dataset
+    all_analysis_results: Dict
+
     def __init__(self):
-        super().__init__(
-            resume_reporter=AAPassedReporter(),
-            additional_reporters={"best_split": AABestSplitReporter()},
+        super().__init__(resume_reporter=ABDatasetReporter())
+
+    def _extract_multitest_result(self, experiment_data: ExperimentData):
+        multitest_id = experiment_data.get_one_id(
+            ABAnalyzer, ExperimentDataEnum.analysis_tables
         )
+        if multitest_id:
+            self.multitest_result = experiment_data.analysis_tables[multitest_id]
 
-    def _extract_experiments(self, experiment_data: ExperimentData):
-        id_ = experiment_data.get_one_id(
-            "ParamsExperiment", ExperimentDataEnum.analysis_tables, "AATest"
-        )
-        self.experiments = self.replace_splitters(
-            experiment_data.analysis_tables[id_], RenameEnum.columns
-        )
-
-    def _extract_aa_score(self, experiment_data: ExperimentData):
-        def get_analyzer_id(key: str):
-            target_id = [i for i in aa_score_analyser_ids if i.endswith(key)]
-            if len(target_id):
-                return target_id[0]
-            else:
-                raise ValueError("Result of AAScoreAnalyzer does not found.")
-
-        aa_score_analyser_ids = experiment_data.get_ids(
-            AAScoreAnalyzer, ExperimentDataEnum.analysis_tables
-        )[AAScoreAnalyzer.__name__][ExperimentDataEnum.analysis_tables.value]
-
-        self.aa_score = experiment_data.analysis_tables[get_analyzer_id("aa score")]
-        self.aa_score = self.replace_splitters(self.aa_score, RenameEnum.index)
-
-        self.best_split_statistic = experiment_data.analysis_tables[
-            get_analyzer_id("best split statistics")
-        ]
+    def _set_all_analysis_results(self, experiment_data: ExperimentData):
+        self.all_analysis_results = experiment_data.analysis_tables
 
     def extract(self, experiment_data: ExperimentData):
         super().extract(experiment_data)
-        self._extract_experiments(experiment_data)
-        self._extract_aa_score(experiment_data)
+        self._extract_multitest_result(experiment_data)
+        self._set_all_analysis_results(experiment_data)

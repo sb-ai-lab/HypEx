@@ -36,7 +36,7 @@ class ABAnalyzer(Executor):
         self.quantiles = quantiles
         self.iteration_size = iteration_size
         self.random_state = random_state
-        super().__init__( key)
+        super().__init__(key)
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         return data.set_value(
@@ -92,9 +92,7 @@ class ABAnalyzer(Executor):
             t_data.data.index = analysis_ids
             for f in ["p-value", "pass"]:
                 value = t_data[f]
-                multitest_pvalues = self._add_pvalues(
-                    multitest_pvalues, value, f, c
-                )
+                multitest_pvalues = self._add_pvalues(multitest_pvalues, value, f, c)
                 analysis_data[f"{c} {f}"] = value.mean()
             if c not in ["UTest", "TTest"]:
                 indexes = t_data.index
@@ -111,7 +109,13 @@ class ABAnalyzer(Executor):
             BackendsEnum.pandas,
         )
         data = self.execute_multitest(
-            data, multitest_pvalues if multitest_pvalues.is_empty() else data.ds
+            data,
+            (
+                multitest_pvalues
+                if not multitest_pvalues.is_empty()
+                and self.multitest_method != ABNTestMethodsEnum.quantile
+                else data.ds
+            ),
         )
 
         return self._set_value(data, analysis_dataset)
