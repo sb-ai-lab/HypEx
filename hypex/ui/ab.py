@@ -8,7 +8,7 @@ from ..utils import ExperimentDataEnum
 
 
 class ABOutput(Output):
-    multitest_result: Dataset
+    multitest: Dataset
     all_analysis_results: Dict
 
     def __init__(self):
@@ -19,7 +19,7 @@ class ABOutput(Output):
             ABAnalyzer, ExperimentDataEnum.analysis_tables
         )
         if multitest_id:
-            self.multitest_result = experiment_data.analysis_tables[multitest_id]
+            self.multitest = experiment_data.analysis_tables[multitest_id]
 
     def _set_all_analysis_results(self, experiment_data: ExperimentData):
         self.all_analysis_results = experiment_data.analysis_tables
