@@ -19,6 +19,12 @@ from hypex.utils import (
 )
 
 
+# проверить на корректировку, если групп < 2, не корректировать
+# подписать тест, группу, фичу
+# делить наоборот
+# разделить таблички size и difference
+
+
 class ABAnalyzer(Executor):
     def __init__(
         self,
