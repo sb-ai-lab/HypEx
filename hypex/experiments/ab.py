@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Literal
 
 from hypex.analyzers.ab import ABAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes, TTest, UTest, Chi2Test
@@ -29,7 +29,21 @@ class ABTest(ExperimentShell):
 
     def __init__(
         self,
-        multitest_method: Optional[str] = None,
+        multitest_method: Optional[
+            Literal[
+                "bonferroni",
+                "sidak",
+                "holm-sidak",
+                "holm",
+                "simes-hochberg",
+                "hommel",
+                "fdr_bh",
+                "fdr_by",
+                "fdr_tsbh",
+                "fdr_tsbhy",
+                "quantile",
+            ]
+        ] = None,
     ):
         experiment = AB_TEST
         experiment.executors[2].multitest_method = ABNTestMethodsEnum(multitest_method)
