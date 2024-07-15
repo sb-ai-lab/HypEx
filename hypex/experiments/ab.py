@@ -46,7 +46,9 @@ class ABTest(ExperimentShell):
         ] = None,
     ):
         experiment = AB_TEST
-        experiment.executors[2].multitest_method = ABNTestMethodsEnum(multitest_method)
+        experiment.executors[2].multitest_method = (
+            ABNTestMethodsEnum(multitest_method) if multitest_method else None
+        )
         super().__init__(
             experiment=experiment,
             output=ABOutput(),

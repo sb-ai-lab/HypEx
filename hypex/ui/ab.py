@@ -18,7 +18,7 @@ class ABOutput(Output):
         multitest_id = experiment_data.get_one_id(
             ABAnalyzer, ExperimentDataEnum.analysis_tables
         )
-        if multitest_id:
+        if multitest_id and "MultiTest" in multitest_id:
             self.multitest = experiment_data.analysis_tables[multitest_id]
 
     def _set_all_analysis_results(self, experiment_data: ExperimentData):
