@@ -1,4 +1,6 @@
-from typing import Literal, Any, Dict, Optional
+from pathlib import Path
+from timeit import default_timer
+from typing import Literal, Any, Dict, Optional, Union
 
 from transformers import (
     AutoModelForCausalLM,
@@ -27,7 +29,7 @@ class HFModel:
         )
 
 
-class QwenShell(HFModel):
+class CausalShell(HFModel):
     def __init__(
         self, model_name: str = "Qwen/Qwen2-7B-Instruct", device: str = "cuda"
     ):
@@ -80,3 +82,47 @@ class Translator:
             max_length=max_length,
         )
         return tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)[0]
+
+
+class SaigaShell:
+    SYSTEM_PROMPT = "Ты — Сайга, русскоязычный автоматический ассистент. Ты разговариваешь с людьми и помогаешь им."
+
+    def __init__(
+        self,
+        model_path: Union[Path, str],
+        tokenizer_source: Optional[str] = None,
+        n_ctx=8192,
+    ):
+        self.model = Llama(
+            model_path=model_path,
+            n_ctx=n_ctx,
+            n_parts=1,
+            verbose=True,
+        )
+        # self.tokenizer = (
+        #     AutoTokenizer.from_pretrained(tokenizer_source)
+        #     if tokenizer_source
+        #     else None
+        # )
+
+    def generate(
+        self, prompt: str, generation_args: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        a = default_timer()
+        messages = [
+            {"role": "system", "content": self.SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ]
+        n_tokens = 0
+        for part in self.model.create_chat_completion(
+            messages,
+            **generation_args,
+        ):
+            n_tokens += part["usage"]["total_tokens"]
+            delta = part["choices"][0]["delta"]
+            if "content" in delta:
+                return {
+                    "n_tokens": n_tokens,
+                    "time": a - default_timer(),
+                    "generated_text": delta["content"],
+                }
