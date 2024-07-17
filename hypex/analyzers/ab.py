@@ -19,9 +19,6 @@ from hypex.utils import (
 )
 
 
-# проверить на корректировку, если групп < 2, не корректировать
-# подписать тест, группу, фичу
-# делить наоборот
 # разделить таблички size и difference
 
 
@@ -54,30 +51,47 @@ class ABAnalyzer(Executor):
 
     def execute_multitest(self, data: ExperimentData, p_values: Dataset, **kwargs):
         group_field = data.ds.search_columns(TreatmentRole())[0]
-        target_field = data.ds.search_columns(TargetRole())[0]
-        if self.multitest_method:
-            multitest_result = (
-                ABMultiTest(self.multitest_method).calc(p_values, **kwargs)
-                if self.multitest_method != ABNTestMethodsEnum.quantile
-                else ABMultitestQuantile(
-                    self.alpha,
-                    self.iteration_size,
-                    self.equal_variance,
-                    self.random_state,
-                ).calc(
-                    p_values,
-                    group_field=group_field,
-                    target_field=target_field,
-                    quantiles=self.quantiles,
+        target_fields = data.ds.search_columns(TargetRole(), search_types=[int, float])
+        if self.multitest_method and len(data.groups[group_field]) > 2:
+            if self.multitest_method != ABNTestMethodsEnum.quantile:
+                multitest_result = ABMultiTest(self.multitest_method).calc(
+                    p_values, **kwargs
                 )
-            )
+                groups = []
+                for i in list(data.groups[group_field].keys())[1:]:
+                    groups += [i] * len(target_fields)
+                multitest_result = multitest_result.add_column(
+                    groups
+                    * (
+                        len(multitest_result)
+                        // len(target_fields)
+                        // (len(data.groups[group_field]) - 1)
+                    ),
+                    role={"group": StatisticRole()},
+                )
+
+            else:
+                multitest_result = Dataset.create_empty()
+                for target_field in target_fields:
+                    multitest_result = multitest_result.append(
+                        ABMultitestQuantile(
+                            self.alpha,
+                            self.iteration_size,
+                            self.equal_variance,
+                            self.random_state,
+                        ).calc(
+                            p_values,
+                            group_field=group_field,
+                            target_field=target_field,
+                            quantiles=self.quantiles,
+                        )
+                    )
             return self._set_value(data, multitest_result, key="MultiTest")
         return data
 
-    def _add_pvalues(self, multitest_pvalues, value, field, class_name):
+    def _add_pvalues(self, multitest_pvalues, value, field):
         if (
-            class_name == "TTest"
-            and self.multitest_method
+            self.multitest_method
             and field == "p-value"
             and self.multitest_method != "quantile"
         ):
@@ -86,6 +100,8 @@ class ABAnalyzer(Executor):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         executor_ids = data.get_ids([TTest, UTest])
+        num_groups = len(data.groups[data.ds.search_columns(TreatmentRole())[0]]) - 1
+        groups = list(data.groups[data.ds.search_columns(TreatmentRole())[0]].items())
         multitest_pvalues = Dataset.create_empty()
         analysis_data = {}
         for c, spaces in executor_ids.items():
@@ -95,11 +111,16 @@ class ABAnalyzer(Executor):
             t_data = data.analysis_tables[analysis_ids[0]]
             for aid in analysis_ids[1:]:
                 t_data = t_data.append(data.analysis_tables[aid])
+            if len(analysis_ids) < len(t_data):
+                analysis_ids *= num_groups
             t_data.data.index = analysis_ids
             for f in ["p-value", "pass"]:
-                value = t_data[f]
-                multitest_pvalues = self._add_pvalues(multitest_pvalues, value, f, c)
-                analysis_data[f"{c} {f}"] = value.mean()
+                for i in range(0, len(analysis_ids), len(analysis_ids) // num_groups):
+                    value = t_data.iloc[i : i + len(analysis_ids) // num_groups][f]
+                    multitest_pvalues = self._add_pvalues(multitest_pvalues, value, f)
+                    analysis_data[f"{c} {f} {groups[i//num_groups + 1][0]}"] = (
+                        value.mean()
+                    )
             if c not in ["UTest", "TTest"]:
                 indexes = t_data.index
                 values = t_data.data.values.tolist()

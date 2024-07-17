@@ -16,15 +16,24 @@ class ABTest(ExperimentShell):
         test_mapping = {
             "t-test": TTest(grouping_role=TreatmentRole()),
             "u-test": UTest(grouping_role=TreatmentRole()),
-            "ch2-test": Chi2Test(grouping_role=TreatmentRole()),
+            "chi2-test": Chi2Test(grouping_role=TreatmentRole()),
         }
         on_role_executors = [GroupDifference(grouping_role=TreatmentRole())]
+        additional_tests = ["t-test"] if additional_tests is None else additional_tests
+        additional_tests = (
+            additional_tests
+            if isinstance(additional_tests, List)
+            else [additional_tests]
+        )
         for i in additional_tests:
             on_role_executors += [test_mapping[i]]
         return Experiment(
             executors=[
                 GroupSizes(grouping_role=TreatmentRole()),
-                OnRoleExperiment(executors=on_role_executors, role=TargetRole()),
+                OnRoleExperiment(
+                    executors=on_role_executors,
+                    role=TargetRole(),
+                ),
                 ABAnalyzer(
                     multitest_method=(
                         ABNTestMethodsEnum(multitest_method)
@@ -58,11 +67,6 @@ class ABTest(ExperimentShell):
             ]
         ] = None,
     ):
-        additional_tests = (
-            additional_tests
-            if isinstance(additional_tests, List)
-            else [additional_tests]
-        )
         super().__init__(
             experiment=self._make_experiment(additional_tests, multitest_method),
             output=ABOutput(),

@@ -232,11 +232,12 @@ class PandasNavigation(DatasetBackendNavigation):
         return self
 
     def to_dict(self) -> Dict[str, Any]:
-        data = self.data.to_dict()
-        for key, value in data.items():
-            data[key] = list(data[key].values())
-        index = list(self.index)
-        return {"data": data, "index": index}
+        return {
+            "data": {
+                column: self.data[column].to_list() for column in self.data.columns
+            },
+            "index": list(self.index),
+        }
 
     def to_records(self) -> List[Dict]:
         return self.data.to_dict(orient="records")

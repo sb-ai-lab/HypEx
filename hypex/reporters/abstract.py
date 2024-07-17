@@ -3,8 +3,8 @@ from typing import Dict, Any, Union, List
 
 from hypex.dataset import ExperimentData, Dataset
 from hypex.dataset.roles import ReportRole
-from hypex.utils.errors import AbstractMethodError
 from hypex.utils import ID_SPLIT_SYMBOL
+from hypex.utils.errors import AbstractMethodError
 
 
 class Reporter(ABC):
@@ -24,13 +24,15 @@ class DictReporter(Reporter, ABC):
     def _extract_from_comparator(self, data: ExperimentData, comparator_id: str):
         result = {}
         field = comparator_id[comparator_id.rfind(ID_SPLIT_SYMBOL) + 1 :]
-        executor_name = comparator_id[:comparator_id.find(ID_SPLIT_SYMBOL)]
+        executor_name = comparator_id[: comparator_id.find(ID_SPLIT_SYMBOL)]
         sep = " " if self.front else ID_SPLIT_SYMBOL
         analysis_dict = data.analysis_tables[comparator_id].to_dict()["data"]
         for i, index_value in enumerate(analysis_dict["index"]):
             for k, v in analysis_dict["data"].items():
                 key = sep.join(
-                    [field, executor_name, k, str(index_value)] if field else [executor_name, k, str(index_value)]
+                    [field, executor_name, k, str(index_value)]
+                    if field
+                    else [executor_name, k, str(index_value)]
                 )
                 result[key] = v[i]
         return result

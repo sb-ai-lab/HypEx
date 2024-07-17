@@ -138,6 +138,9 @@ class GroupComparator(GroupCalculator):
             grouping_data = list(data.groups[group_field[0]].items())
         else:
             grouping_data = None
+            data.groups[group_field[0]] = {
+                f"{int(group)}": ds for group, ds in data.ds.groupby(group_field[0])
+            }
         compare_result = self.calc(
             data=data.ds,
             group_field=group_field,
