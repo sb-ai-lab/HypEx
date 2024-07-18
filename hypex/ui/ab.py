@@ -24,7 +24,7 @@ class ABOutput(Output):
             self.multitest = experiment_data.analysis_tables[multitest_id]
         else:
             self.multitest = (
-                "There was less than three groups or multitest mathod wasn't provided"
+                "There was less than three groups or multitest method wasn't provided"
             )
 
     def _extract_differences(self, experiment_data: ExperimentData):
