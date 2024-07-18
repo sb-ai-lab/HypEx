@@ -27,20 +27,19 @@ class Matching(ExperimentShell):
         executors = []
         for i in filters:
             executors += [filters_mapping[i]]
-        executors += [distance_mapping[distance], 
-                      FaissNearestNeighbors(grouping_role=TreatmentRole(), two_sides=two_sides),
+        executors += [FaissNearestNeighbors(grouping_role=TreatmentRole(), two_sides=two_sides),
                       MatchingMetrics(grouping_role=TreatmentRole(), target_roles=[TargetRole()], metric=metric), 
                       MatchingAnalyzer()]
         if quality_tests != "auto": 
             warnings.warn("Now quality tests aren't supported yet")
         return Experiment(
-            executors=executors
+            executors=executors if distance == "l2" else [distance_mapping[distance]]+executors
         )
     
     def __init__(
         self,
         filters: Union[Literal["fillna", "const-filter", "na-filter", "dummy-encoder", "auto"], 
-                             List[Literal["fillna", "const-filter", "na-filter", "dummy-encoder", "auto"]]
+                             List[Literal["fillna", "const-filter", "na-filter", "dummy-encoder", "auto"]], None
                             ] = "auto",
         distance: Literal["mahalanobis", "l2"] = "mahalanobis",
         two_sides: bool = True,
