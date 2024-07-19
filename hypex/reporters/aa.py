@@ -126,6 +126,15 @@ class OneAADictReporter(DictReporter):
         return result
 
 
+class AADatasetReporter(OneAADictReporter):
+    def report(self, data: ExperimentData):
+        front_buffer = self.front
+        self.front = False
+        dict_report = super().report(data)
+        self.front = front_buffer
+        return self.convert_flat_dataset(dict_report)
+
+
 class AAPassedReporter(Reporter):
     @staticmethod
     def _reformat_aa_score_table(table: Dataset) -> Dataset:
@@ -204,3 +213,4 @@ class AABestSplitReporter(Reporter):
         markers = data.additional_fields.loc[:, best_split_id]
         markers = markers.rename({markers.columns[0]: "split"})
         return data.ds.merge(markers, left_index=True, right_index=True)
+

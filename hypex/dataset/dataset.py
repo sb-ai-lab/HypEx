@@ -193,7 +193,7 @@ class Dataset(DatasetBase):
     def __or__(self, other):
         return self.__binary_magic_operator(other=other, func_name="__or__")
 
-    # Right arithmetic operators:
+    # Right math operators:
     def __radd__(self, other):
         return self.__binary_magic_operator(other=other, func_name="__radd__")
 
@@ -332,13 +332,13 @@ class Dataset(DatasetBase):
             data=self._backend.map(func=func, na_action=na_action, **kwargs),
         )
 
-    def is_empty(self):
+    def is_empty(self) -> bool:
         return self._backend.is_empty()
 
-    def unique(self):
+    def unique(self) -> Dict[str, List[Any]]:
         return self._backend.unique()
 
-    def nunique(self, dropna: bool = False):
+    def nunique(self, dropna: bool = False) -> Dict[str, int]:
         return self._backend.nunique(dropna)
 
     def isin(self, values: Iterable) -> "Dataset":
