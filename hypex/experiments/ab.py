@@ -9,6 +9,7 @@ from hypex.ui.base import ExperimentShell
 from hypex.utils import ABNTestMethodsEnum
 
 
+# reset index
 class ABTest(ExperimentShell):
 
     @staticmethod

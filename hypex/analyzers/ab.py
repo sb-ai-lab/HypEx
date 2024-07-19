@@ -19,9 +19,6 @@ from hypex.utils import (
 )
 
 
-# разделить таблички size и difference
-
-
 class ABAnalyzer(Executor):
     def __init__(
         self,
