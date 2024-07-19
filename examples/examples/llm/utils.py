@@ -10,6 +10,9 @@ from transformers import (
     pipeline,
 )
 
+# import fire
+from llama_cpp import Llama
+
 
 class HFModel:
     def __init__(
@@ -59,7 +62,7 @@ class T5Shell(HFModel):
         self.model.eval()
         self.model.to(self.device)
 
-    def translate(self, text, to: Literal["ru", "en", "zh"]):
+    def translate(self, text, to: Literal["ru", "en", "zh", "sbl"]):
         prefix = f"translate to {to}: "
         input_ids = self.tokenizer(prefix + text, return_tensors="pt")
         generated_tokens = self.model.generate(**input_ids.to(self.device))
@@ -88,41 +91,37 @@ class SaigaShell:
     SYSTEM_PROMPT = "Ты — Сайга, русскоязычный автоматический ассистент. Ты разговариваешь с людьми и помогаешь им."
 
     def __init__(
-        self,
-        model_path: Union[Path, str],
-        tokenizer_source: Optional[str] = None,
-        n_ctx=8192,
+        self, model_path: Union[Path, str], n_ctx=8192, verbose=False, n_threads=None
     ):
         self.model = Llama(
-            model_path=model_path,
+            model_path=str(model_path),
             n_ctx=n_ctx,
             n_parts=1,
-            verbose=True,
+            verbose=verbose,
+            n_gpu_layers=-1,
+            n_threads=n_threads,
         )
-        # self.tokenizer = (
-        #     AutoTokenizer.from_pretrained(tokenizer_source)
-        #     if tokenizer_source
-        #     else None
-        # )
 
     def generate(
         self, prompt: str, generation_args: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
+        generation_args = generation_args or dict(
+            top_k=30,
+            top_p=0.9,
+            temperature=0.6,
+            repeat_penalty=1.1,
+        )
         a = default_timer()
         messages = [
             {"role": "system", "content": self.SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ]
-        n_tokens = 0
-        for part in self.model.create_chat_completion(
+        parts = self.model.create_chat_completion(
             messages,
             **generation_args,
-        ):
-            n_tokens += part["usage"]["total_tokens"]
-            delta = part["choices"][0]["delta"]
-            if "content" in delta:
-                return {
-                    "n_tokens": n_tokens,
-                    "time": a - default_timer(),
-                    "generated_text": delta["content"],
-                }
+        )
+        return {
+            "n_tokens": parts["usage"]["total_tokens"],
+            "time": default_timer() - a,
+            "generated_text": parts["choices"][0]["message"]["content"],
+        }
