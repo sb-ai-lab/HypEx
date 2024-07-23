@@ -6,7 +6,7 @@ from hypex.dataset import Dataset, DatasetAdapter
 from hypex.extensions.abstract import Extension
 
 
-class DummyEncoderExtension(Extension):
+class DummyEncoderExtension(Extension): # TODO: role types are being rewritten, needs to be fixed
 
     @staticmethod
     def _calc_pandas(data: Dataset, target_cols: Optional[str] = None, **kwargs):
