@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Tuple, Sequence, Literal
 
 from hypex.dataset import (
     ABCRole,
@@ -17,7 +17,8 @@ from hypex.utils import (
     FromDictTypes,
     SpaceEnum,
 )
-from hypex.utils.errors import AbstractMethodError
+from hypex.utils.adapter import Adapter
+from hypex.utils.errors import AbstractMethodError, ComparisonNotSuitableFieldError, NoRequiredArgumentError
 
 
 class GroupComparator(GroupCalculator):
@@ -60,36 +61,18 @@ class GroupComparator(GroupCalculator):
     @classmethod
     def _execute_inner_function(
         cls,
-        grouping_data,
-        target_fields: Optional[List[str]] = None,
-        old_data: Optional[Dataset] = None,
+        baseline_data: Union[Tuple[str, Dataset], List[Tuple[str, Dataset]]],
+        compared_data: Union[Tuple[str, Dataset], List[Tuple[str, Dataset]]],
         **kwargs,
     ) -> Dict:
+        baseline_data = Adapter.to_list(baseline_data)
+        compared_data = Adapter.to_list(compared_data)
         result = {}
-        for i in range(1, len(grouping_data)):
-            result_key = (
-                grouping_data[i][0]
-                if len(grouping_data[i][0]) > 1
-                else grouping_data[i][0][0]
-            )
-            # TODO roles
-            if target_fields:
-                grouping_data[i][1].tmp_roles = old_data.tmp_roles
-                result[result_key] = DatasetAdapter.to_dataset(
-                    cls._inner_function(
-                        data=grouping_data[0][1][target_fields],
-                        test_data=grouping_data[i][1][target_fields],
-                        **kwargs,
-                    ),
-                    InfoRole(),
-                )
-            else:
-                result[result_key] = DatasetAdapter.to_dataset(
-                    cls._inner_function(
-                        grouping_data[0][1],
-                        grouping_data[i][1],
-                        **kwargs,
-                    ),
+        for baseline in baseline_data:
+            result[baseline[0]] = {}
+            for compared in compared_data:
+                result[baseline[0]][compared[0]] = DatasetAdapter.to_dataset(
+                    cls._inner_function(baseline[1], compared[1], **kwargs),
                     InfoRole(),
                 )
         return result
@@ -125,6 +108,91 @@ class GroupComparator(GroupCalculator):
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
     # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
+
+    @staticmethod
+    def _split_data_to_buckets(
+            data: Dataset,
+            group_field: Union[str, List[str]],
+            target_fields: Union[str, List[str]],
+            compare_by: Literal[
+                "groups", "columns", "columns_in_groups", "cross"
+            ] = "groups",
+            baseline_column: Optional[str] = None,
+    ) -> Tuple:
+        """
+        Splits the given dataset into buckets into baseline and compared data, based on the specified comparison mode.
+
+        Args:
+            data (Dataset): The dataset to be split.
+            group_field (Union[Sequence[str], str]): The field(s) to group the data by.
+            target_fields (Union[str, List[str]]): The field(s) to target for comparison.
+            compare_by (Literal['groups', 'columns', 'columns_in_groups', 'cross'], optional): The method to compare the data. Defaults to 'groups'.
+            baseline_column (Optional[str], optional): The column to use as the baseline for comparison. Required if `compare_by` is 'columns' or 'columns_in_groups'. Defaults to None.
+
+        Returns:
+            Tuple: A tuple containing the baseline data and the compared data.
+
+        Raises:
+            NoRequiredArgumentError: If `baseline_column` is None and `compare_by` is 'columns' or 'columns_in_groups' or 'cross'.
+            ValueError: If `compare_by` is not one of the allowed values.
+        """
+        target_fields = Adapter.to_list(target_fields)
+        if compare_by == "groups":
+            data_buckets = data.groupby(by=group_field, fields_list=target_fields)
+            baseline_data = data_buckets.pop(0)
+            compared_data = data_buckets
+        else:
+            if baseline_column is None:
+                raise NoRequiredArgumentError("baseline_column")
+            elif compare_by == "columns":
+                baseline_data = (baseline_column, data[baseline_column])
+                compared_data = [
+                    (column, data[column])
+                    for column in target_fields
+                    if column != baseline_column
+                ]
+            elif compare_by == "columns_in_groups":
+                baseline_data = data.groupby(
+                    by=group_field, fields_list=baseline_column
+                )
+                compared_data = data.groupby(by=group_field, fields_list=target_fields)
+            elif compare_by == "cross":
+                data_buckets = data.groupby(by=group_field, fields_list=baseline_column)
+                baseline_data = data_buckets.pop(0)
+                compared_data = data.groupby(by=group_field, fields_list=target_fields)
+                compared_data.pop(0)
+            else:
+                raise ValueError("compare_by")
+        return baseline_data, compared_data
+
+    @classmethod
+    def calc(
+            cls,
+            data: Dataset,
+            group_field: Union[Sequence[str], str, None] = None,
+            grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
+            target_fields: Union[
+                str, List[str], None
+            ] = None,  # why is it possible to leave it None?
+            baseline_column: Optional[str] = None,
+            **kwargs,
+    ) -> Dict:
+        group_field = Adapter.to_list(group_field)
+
+        if grouping_data is None:
+            grouping_data = cls._split_data_to_buckets(
+                data=data,
+                group_field=group_field,
+                target_fields=target_fields,
+                baseline_column=baseline_column,
+            )
+        if len(grouping_data) < 2:
+            raise ComparisonNotSuitableFieldError(group_field)
+        baseline_data, compared_data = grouping_data
+        return cls._execute_inner_function(
+            baseline_data=baseline_data, compared_data=compared_data, **kwargs
+        )
+
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields = self._get_fields(data)
         self.key = str(

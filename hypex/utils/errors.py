@@ -62,3 +62,7 @@ class BackendTypeError(Exception):
 class MergeOnError(Exception):
     def __init__(self, on):
         super().__init__(f"Can only merge on one of the columns data. Got {on}")
+
+class NoRequiredArgumentError(Exception):
+    def __init__(self, argument_name):
+        super().__init__(f"The required argument {argument_name} has not been passed.")

@@ -353,7 +353,7 @@ class Dataset(DatasetBase):
         func: Optional[Union[str, List]] = None,
         fields_list: Optional[Union[str, List]] = None,
         **kwargs,
-    ):  # TODO: field list does not work in the tutorial
+    ):  # TODO: fields_list does not work in the tutorial
         datasets = [
             (i, Dataset(roles=self.roles, data=data))
             for i, data in self._backend.groupby(by=by, **kwargs)

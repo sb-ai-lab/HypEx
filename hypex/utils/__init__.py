@@ -17,6 +17,7 @@ from .errors import (
     BackendTypeError,
     MergeOnError,
     AbstractMethodError,
+    NoRequiredArgumentError,
 )
 
 from .typings import (
@@ -60,6 +61,7 @@ __all__ = [
     "DataTypeError",
     "BackendTypeError",
     "MergeOnError",
+    "NoRequiredArgumentError",
     "ScalarType",
     "ABNTestMethodsEnum",
     "SetParamsDictTypes",
