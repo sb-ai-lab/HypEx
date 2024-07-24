@@ -430,17 +430,26 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def merge(
         self,
         right: "PandasDataset",  # should be PandasDataset.
-        on: str = "",
-        left_on: str = "",
-        right_on: str = "",
-        left_index: bool = False,
-        right_index: bool = False,
+        on: str = None,
+        left_on: str = None,
+        right_on: str = None,
+        left_index: bool = None,
+        right_index: bool = None,
         suffixes: Tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> pd.DataFrame:
         for on_ in [on, left_on, right_on]:
-            if on_ and (on_ not in [*self.columns, *right.columns]):
+            if on_ and (
+                on_ not in [*self.columns, *right.columns]
+                if isinstance(on_, str)
+                else any(c not in [*self.columns, *right.columns] for c in on_)
+            ):
                 raise MergeOnError(on_)
+
+        if not all([on, left_on, right_on,]) and all([left_index is None, right_index is None]):
+            left_index = True
+            right_index = True
+
         return self.data.merge(
             right=right.data,
             on=on,
