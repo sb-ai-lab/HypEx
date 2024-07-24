@@ -58,12 +58,12 @@ from typing import Optional, Any, Dict, Union, Sequence
 import numpy as np
 from scipy.stats import norm
 
-from hypex.comparators.abstract import GroupComparator
+from hypex.comparators.abstract import Comparator
 from hypex.dataset import ABCRole, Dataset, ExperimentData, TargetRole
 from hypex.utils import SpaceEnum
 
 
-class MDEBySize(GroupComparator):
+class MDEBySize(Comparator):
     def __init__(
         self,
         grouping_role: Optional[ABCRole] = None,
@@ -103,7 +103,7 @@ class MDEBySize(GroupComparator):
         target_fields=None,
         **kwargs
     ):
-        return GroupComparator.calc(
+        return Comparator.calc(
             data=data,
             group_field=group_field,
             target_fields=target_fields,

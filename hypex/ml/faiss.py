@@ -1,7 +1,7 @@
 from typing import Optional, Any, Dict
 
 from hypex.comparators.distances import MahalanobisDistance
-from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData, TargetRole
+from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData
 from hypex.executor import MLExecutor
 from hypex.extensions.faiss import FaissExtension
 from hypex.utils import SpaceEnum, ExperimentDataEnum
@@ -19,8 +19,9 @@ class FaissNearestNeighbors(MLExecutor):
         self.n_neighbors = n_neighbors
         self.two_sides = two_sides
         super().__init__(
-            grouping_role=grouping_role, target_role=FeatureRole(), space=space, key=key
+            grouping_role=grouping_role, target_role=FeatureRole(), key=key
         )
+        self.space = space
 
     @classmethod
     def _execute_inner_function(

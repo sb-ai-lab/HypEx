@@ -1,13 +1,11 @@
 from abc import abstractmethod, ABC
-from copy import deepcopy
-from typing import Any, Dict, List, Optional, Sequence, Union, Tuple, Literal
+from typing import Any, Dict, List, Optional, Sequence, Union, Tuple
 
 from hypex.dataset import (
     ABCRole,
     Dataset,
     ExperimentData,
     GroupingRole,
-    TempTargetRole,
     FeatureRole,
     MatchingRole,
     TargetRole,
@@ -15,13 +13,11 @@ from hypex.dataset import (
 )
 from hypex.utils import (
     ComparisonNotSuitableFieldError,
-    NoColumnsError,
     SpaceEnum,
     AbstractMethodError,
     ID_SPLIT_SYMBOL,
     SetParamsDictTypes,
     ExperimentDataEnum,
-    NoRequiredArgumentError,
 )
 from hypex.utils.adapter import Adapter
 
@@ -127,21 +123,6 @@ class Calculator(Executor, ABC):
     def _inner_function(data: Dataset, **kwargs) -> Any:
         raise AbstractMethodError
 
-
-class GroupCalculator(Calculator):
-    def __init__(
-        self,
-        grouping_role: Optional[ABCRole] = None,
-        target_roles: Optional[List[ABCRole]] = None,
-        space: SpaceEnum = SpaceEnum.auto,
-        key: Any = "",
-    ):
-        self.grouping_role = grouping_role or GroupingRole()
-        self.space = space
-        self.__additional_mode = space == SpaceEnum.additional
-        self.target_roles = target_roles or []
-        super().__init__(key=key)
-
     @property
     def search_types(self):
         raise AbstractMethodError
@@ -154,7 +135,7 @@ class GroupCalculator(Calculator):
         search_types=None,
         space: Optional[SpaceEnum] = None,
     ):
-        space = space or self.space
+        space = space
         searched_field = []
         if space in [SpaceEnum.auto, SpaceEnum.data]:
             searched_field = data.ds.search_columns(
@@ -172,138 +153,39 @@ class GroupCalculator(Calculator):
         return searched_field
 
     @staticmethod
-    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
+    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset: # TODO to move away from Calculator. Where to?
         if test_data is None:
             raise ValueError("test_data is needed for comparison")
         return test_data
 
+# class GroupCalculator(Calculator):
+#     def __init__(
+#         self,
+#         grouping_role: Optional[ABCRole] = None,
+#         target_roles: Optional[List[ABCRole]] = None,
+#         space: SpaceEnum = SpaceEnum.auto,
+#         key: Any = "",
+#     ):
+#         self.grouping_role = grouping_role or GroupingRole()
+#         self.space = space
+#         self.__additional_mode = space == SpaceEnum.additional
+#         self.target_roles = target_roles or []
+#         super().__init__(key=key)
+#
+#     @property
+#     def search_types(self) -> Optional[List[type]]:
+#         return None
 
-    @staticmethod
-    def _field_arg_universalization(
-        field: Union[Sequence[str], str, None]
-    ) -> List[str]:
-        if not field:
-            raise NoColumnsError(field)
-        elif isinstance(field, str):
-            return [field]
-        return list(field)
-
-    @classmethod
-    @abstractmethod
-    def _inner_function(
-        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
-    ) -> Any:
-        raise AbstractMethodError
-
-    @classmethod
-    @abstractmethod
-    def _execute_inner_function(
-        cls,
-        baseline_data: Union[Tuple[str, Dataset], List[Tuple[str, Dataset]]],
-        compared_data: Union[Tuple[str, Dataset], List[Tuple[str, Dataset]]],
-        **kwargs,
-    ) -> Any:
-        raise AbstractMethodError
-
-    @classmethod
-    def calc(
-        cls,
-        data: Dataset,
-        group_field: Union[Sequence[str], str, None] = None,
-        grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
-        target_fields: Union[
-            str, List[str], None
-        ] = None,  # why is it possible to leave it None?
-        baseline_column: Optional[str] = None,
-        **kwargs,
-    ) -> Dict:
-        group_field = Adapter.to_list(group_field)
-
-        if grouping_data is None:
-            grouping_data = cls._split_data_to_buckets(
-                data=data,
-                group_field=group_field,
-                target_fields=target_fields,
-                baseline_column=baseline_column,
-            )
-        if len(grouping_data) < 2:
-            raise ComparisonNotSuitableFieldError(group_field)
-        baseline_data, compared_data = grouping_data
-        return cls._execute_inner_function(
-            baseline_data=baseline_data, compared_data=compared_data, **kwargs
-        )
-
-    @staticmethod
-    def _split_data_to_buckets(
-        data: Dataset,
-        group_field: Union[str, List[str]],
-        target_fields: Union[str, List[str]],
-        compare_by: Literal[
-            "groups", "columns", "columns_in_groups", "cross"
-        ] = "groups",
-        baseline_column: Optional[str] = None,
-    ) -> Tuple:
-        """
-        Splits the given dataset into buckets into baseline and compared data, based on the specified comparison mode.
-
-        Args:
-            data (Dataset): The dataset to be split.
-            group_field (Union[Sequence[str], str]): The field(s) to group the data by.
-            target_fields (Union[str, List[str]]): The field(s) to target for comparison.
-            compare_by (Literal['groups', 'columns', 'columns_in_groups', 'cross'], optional): The method to compare the data. Defaults to 'groups'.
-            baseline_column (Optional[str], optional): The column to use as the baseline for comparison. Required if `compare_by` is 'columns' or 'columns_in_groups'. Defaults to None.
-
-        Returns:
-            Tuple: A tuple containing the baseline data and the compared data.
-
-        Raises:
-            NoRequiredArgumentError: If `baseline_column` is None and `compare_by` is 'columns' or 'columns_in_groups' or 'cross'.
-            ValueError: If `compare_by` is not one of the allowed values.
-        """
-        target_fields = Adapter.to_list(target_fields)
-        if compare_by == "groups":
-            data_buckets = data.groupby(by=group_field, fields_list=target_fields)
-            baseline_data = data_buckets.pop(0)
-            compared_data = data_buckets
-        else:
-            if baseline_column is None:
-                raise NoRequiredArgumentError("baseline_column")
-            elif compare_by == "columns":
-                baseline_data = (baseline_column, data[baseline_column])
-                compared_data = [
-                    (column, data[column])
-                    for column in target_fields
-                    if column != baseline_column
-                ]
-            elif compare_by == "columns_in_groups":
-                baseline_data = data.groupby(
-                    by=group_field, fields_list=baseline_column
-                )
-                compared_data = data.groupby(by=group_field, fields_list=target_fields)
-            elif compare_by == "cross":
-                data_buckets = data.groupby(by=group_field, fields_list=baseline_column)
-                baseline_data = data_buckets.pop(0)
-                compared_data = data.groupby(by=group_field, fields_list=target_fields)
-                compared_data.pop(0)
-            else:
-                raise ValueError("compare_by")
-        return baseline_data, compared_data
-
-
-
-
-class MLExecutor(GroupCalculator, ABC):
+class MLExecutor(Calculator, ABC):
     def __init__(
         self,
         grouping_role: Optional[ABCRole] = None,
         target_role: Optional[ABCRole] = None,
-        space: SpaceEnum = SpaceEnum.auto,
         key: Any = "",
     ):
         self.target_role = target_role or TargetRole()
-        super().__init__(
-            grouping_role=grouping_role or GroupingRole(), space=space, key=key
-        )
+        super().__init__(key=key)
+        self.grouping_role = grouping_role or GroupingRole()
 
     def _get_fields(self, data: ExperimentData):
         group_field = self._field_searching(data, self.grouping_role)

@@ -1,11 +1,11 @@
 from typing import Dict, Optional, List
 
-from hypex.comparators.abstract import GroupComparator
+from hypex.comparators.abstract import Comparator
 from hypex.dataset import Dataset
 from hypex.utils.constants import NUMBER_TYPES_LIST
 
 
-class GroupDifference(GroupComparator):
+class GroupDifference(Comparator):
 
     @property
     def search_types(self) -> Optional[List[type]]:
@@ -30,7 +30,7 @@ class GroupDifference(GroupComparator):
         }
 
 
-class GroupSizes(GroupComparator):
+class GroupSizes(Comparator):
     @classmethod
     def _inner_function(
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs

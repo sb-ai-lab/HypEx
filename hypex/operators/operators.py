@@ -1,10 +1,9 @@
 from copy import deepcopy
 from typing import Optional, Any, List, Literal, Union, Dict
 
-from hypex.dataset import Dataset, ABCRole, ExperimentData, MatchingRole, TargetRole
+from hypex.dataset import Dataset, ABCRole, ExperimentData, TargetRole
 from hypex.ml.faiss import FaissNearestNeighbors
 from hypex.operators.abstract import GroupOperator
-from hypex.utils import SpaceEnum
 from hypex.utils.enums import ExperimentDataEnum
 
 
@@ -20,16 +19,13 @@ class SMD(GroupOperator):
 class MatchingMetrics(GroupOperator):
     def __init__(
         self,
-        grouping_role: Optional[ABCRole] = None,
         target_roles: Union[ABCRole, List[ABCRole], None] = None,
-        space: SpaceEnum = SpaceEnum.auto,
         metric: Optional[Literal["auto", "atc", "att", "ate"]] = None,
         key: Any = "",
     ):
         self.metric = metric or "auto"
-        super().__init__(
-            grouping_role=grouping_role, target_roles=target_roles, space=space, key=key
-        )
+        super().__init__(key=key)
+        self.target_roles = target_roles
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields = self._get_fields(data=data)

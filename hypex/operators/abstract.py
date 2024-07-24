@@ -1,11 +1,11 @@
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from hypex.dataset import (
     Dataset,
-    ExperimentData,
+    ExperimentData, TargetRole, GroupingRole, ABCRole,
 )
-from hypex.executor import GroupCalculator
+from hypex.executor import Calculator
 from hypex.utils import (
     ExperimentDataEnum,
     AbstractMethodError,
@@ -13,7 +13,18 @@ from hypex.utils import (
 )
 
 
-class GroupOperator(GroupCalculator):
+class GroupOperator(Calculator):
+
+    def __init__(
+        self,
+        grouping_role: Optional[ABCRole] = None,
+        target_roles: Union[ABCRole, List[ABCRole], None] = None,
+        key: Any = "",
+    ):
+        super().__init__(key=key)
+        self.target_roles = target_roles or TargetRole()
+        self.grouping_role = grouping_role or GroupingRole()
+
     @property
     def search_types(self):
         return None

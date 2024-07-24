@@ -8,9 +8,9 @@ from hypex.dataset import (
     StatisticRole,
     TempTargetRole,
     InfoRole,
-    DatasetAdapter,
+    DatasetAdapter, GroupingRole,
 )
-from hypex.executor import GroupCalculator
+from hypex.executor import Calculator
 from hypex.utils import (
     BackendsEnum,
     ExperimentDataEnum,
@@ -21,7 +21,7 @@ from hypex.utils.adapter import Adapter
 from hypex.utils.errors import AbstractMethodError, ComparisonNotSuitableFieldError, NoRequiredArgumentError
 
 
-class GroupComparator(GroupCalculator):
+class Comparator(Calculator):
     def __init__(
         self,
         grouping_role: Optional[ABCRole] = None,
@@ -29,7 +29,9 @@ class GroupComparator(GroupCalculator):
         key: Any = "",
     ):
         self.__additional_mode = space == SpaceEnum.additional
-        super().__init__(grouping_role=grouping_role, space=space, key=key)
+        super().__init__(key=key)
+        self.grouping_role = grouping_role or GroupingRole()
+        self.space = space
 
     @property
     def search_types(self) -> Optional[List[type]]:
@@ -221,7 +223,7 @@ class GroupComparator(GroupCalculator):
         return self._set_value(data, result_dataset)
 
 
-class StatHypothesisTesting(GroupComparator, ABC):
+class StatHypothesisTesting(Comparator, ABC):
     def __init__(
         self,
         grouping_role: Union[ABCRole, None] = None,
