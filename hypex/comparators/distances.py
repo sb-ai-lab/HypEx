@@ -7,7 +7,6 @@ from hypex.utils import ExperimentDataEnum
 
 
 class MahalanobisDistance(GroupCalculator):
-
     @classmethod
     def _execute_inner_function(
         cls,
@@ -41,7 +40,6 @@ class MahalanobisDistance(GroupCalculator):
             data = data.set_value(
                 ExperimentDataEnum.groups,
                 self.id,
-                str(self.__class__.__name__),
                 value_,
                 key=key,
             )

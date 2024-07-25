@@ -342,7 +342,6 @@ class MLExecutor(GroupCalculator, ABC):
         return data.set_value(
             ExperimentDataEnum.groups,
             self.id,
-            str(self.__class__.__name__),
             value=value,
             key=key,
         )

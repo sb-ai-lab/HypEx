@@ -60,9 +60,7 @@ class Experiment(Executor):
             )
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
-        return data.set_value(
-            ExperimentDataEnum.analysis_tables, self.id, self.__class__.__name__, value
-        )
+        return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data = deepcopy(data) if self.transformer else data
