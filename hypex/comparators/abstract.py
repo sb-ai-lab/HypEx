@@ -15,7 +15,7 @@ from hypex.utils import (
     BackendsEnum,
     ExperimentDataEnum,
     FromDictTypes,
-    SpaceEnum,
+    SpaceEnum, NAME_BORDER_SYMBOL,
 )
 from hypex.utils.adapter import Adapter
 from hypex.utils.errors import AbstractMethodError, ComparisonNotSuitableFieldError, NoRequiredArgumentError
@@ -112,13 +112,22 @@ class Comparator(Calculator):
     # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
 
     @staticmethod
-    def _split_data_to_buckets(
+    def _split_ds_into_columns(data: List[Tuple[str, Dataset]]) -> List[Tuple[str, Dataset]]:
+        result = []
+        for bucket in data:
+            for column in bucket[1].columns:
+                result.append((f"{bucket[0]}{NAME_BORDER_SYMBOL}{column}", bucket[1][column]))
+        return result
+
+    @classmethod
+    def split_data_to_buckets(
+            cls,
             data: Dataset,
-            group_field: Union[str, List[str]],
             target_fields: Union[str, List[str]],
             compare_by: Literal[
                 "groups", "columns", "columns_in_groups", "cross"
             ] = "groups",
+            group_field: Union[str, List[str], None] = None,
             baseline_column: Optional[str] = None,
     ) -> Tuple:
         """
@@ -138,33 +147,48 @@ class Comparator(Calculator):
             NoRequiredArgumentError: If `baseline_column` is None and `compare_by` is 'columns' or 'columns_in_groups' or 'cross'.
             ValueError: If `compare_by` is not one of the allowed values.
         """
+        if compare_by == "groups":
+            if isinstance(target_fields, List):
+                target_fields = Adapter.list_to_single(target_fields)
+            if not isinstance(target_fields, str):
+                raise TypeError(f"group_field must be one string, {type(group_field)} passed.")
+        elif baseline_column is None:
+                raise NoRequiredArgumentError("baseline_column")
+
+        if compare_by != "columns":
+            if group_field is None:
+                raise NoRequiredArgumentError("group_field")
+            elif isinstance(group_field, List):
+                group_field = Adapter.list_to_single(group_field)
+            if not isinstance(group_field, str):
+                raise TypeError(f"group_field must be one string, {type(group_field)} passed.")
+
         target_fields = Adapter.to_list(target_fields)
         if compare_by == "groups":
             data_buckets = data.groupby(by=group_field, fields_list=target_fields)
-            baseline_data = data_buckets.pop(0)
-            compared_data = data_buckets
+            baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
+            compared_data = cls._split_ds_into_columns(data=data_buckets)
+        elif compare_by == "columns":
+            baseline_data = [(f"0{NAME_BORDER_SYMBOL}{baseline_column}", data[baseline_column])]
+            compared_data = [
+                (f"0{NAME_BORDER_SYMBOL}{column}", data[column])
+                for column in target_fields
+                if column != baseline_column
+            ]
+        elif compare_by == "columns_in_groups":
+            baseline_data = cls._split_ds_into_columns(data.groupby(
+                by=group_field, fields_list=baseline_column
+            ))
+            compared_data = data.groupby(by=group_field, fields_list=target_fields)
+            compared_data = cls._split_ds_into_columns(data=compared_data)
+        elif compare_by == "cross":
+            data_buckets = data.groupby(by=group_field, fields_list=baseline_column)
+            baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
+            compared_data = data.groupby(by=group_field, fields_list=target_fields)
+            compared_data.pop(0)
+            compared_data = cls._split_ds_into_columns(data=compared_data)
         else:
-            if baseline_column is None:
-                raise NoRequiredArgumentError("baseline_column")
-            elif compare_by == "columns":
-                baseline_data = (baseline_column, data[baseline_column])
-                compared_data = [
-                    (column, data[column])
-                    for column in target_fields
-                    if column != baseline_column
-                ]
-            elif compare_by == "columns_in_groups":
-                baseline_data = data.groupby(
-                    by=group_field, fields_list=baseline_column
-                )
-                compared_data = data.groupby(by=group_field, fields_list=target_fields)
-            elif compare_by == "cross":
-                data_buckets = data.groupby(by=group_field, fields_list=baseline_column)
-                baseline_data = data_buckets.pop(0)
-                compared_data = data.groupby(by=group_field, fields_list=target_fields)
-                compared_data.pop(0)
-            else:
-                raise ValueError("compare_by")
+            raise ValueError("compare_by")
         return baseline_data, compared_data
 
     @classmethod
@@ -182,7 +206,7 @@ class Comparator(Calculator):
         group_field = Adapter.to_list(group_field)
 
         if grouping_data is None:
-            grouping_data = cls._split_data_to_buckets(
+            grouping_data = cls.split_data_to_buckets(
                 data=data,
                 group_field=group_field,
                 target_fields=target_fields,

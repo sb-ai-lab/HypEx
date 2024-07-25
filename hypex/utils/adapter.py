@@ -9,3 +9,13 @@ class Adapter:
         if isinstance(data, str):
             return [data]
         return list(data) if isinstance(data, Sequence) else [data]
+
+    @staticmethod
+    def list_to_single(data: List) -> Any:
+        if isinstance(data, List):
+            if len(data) == 0:
+                raise ValueError("The list is empty")
+            elif len(data) == 1:
+                return data[0]
+            else:
+                raise ValueError("Only a list of a single item can be accepted")
