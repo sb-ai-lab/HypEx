@@ -10,6 +10,8 @@ from hypex.dataset import (
     InfoRole,
     DatasetAdapter,
     GroupingRole,
+    TargetRole,
+    PreTargetRole,
 )
 from hypex.executor import Calculator
 from hypex.utils import (
@@ -30,7 +32,10 @@ from hypex.utils.errors import (
 class Comparator(Calculator):
     def __init__(
         self,
+        compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
         grouping_role: Optional[ABCRole] = None,
+        target_roles: Union[ABCRole, List[ABCRole], None] = None,
+        baseline_role: Optional[ABCRole] = None,
         space: SpaceEnum = SpaceEnum.auto,
         key: Any = "",
     ):
@@ -38,6 +43,9 @@ class Comparator(Calculator):
         super().__init__(key=key)
         self.grouping_role = grouping_role or GroupingRole()
         self.space = space
+        self.compare_by = compare_by
+        self.target_roles = target_roles or TargetRole()
+        self.baseline_role = baseline_role or PreTargetRole()
 
     @property
     def search_types(self) -> Optional[List[type]]:
@@ -134,15 +142,13 @@ class Comparator(Calculator):
         return result
 
     @classmethod
-    def split_data_to_buckets(
+    def _split_data_to_buckets(
         cls,
         data: Dataset,
+        compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
         target_fields: Union[str, List[str]],
         baseline_column: Optional[str] = None,
         group_field: Optional[str] = None,
-        compare_by: Literal[
-            "groups", "columns", "columns_in_groups", "cross"
-        ] = "groups",
     ) -> Tuple:
         """
         Splits the given dataset into buckets into baseline and compared data, based on the specified comparison mode.
@@ -214,24 +220,22 @@ class Comparator(Calculator):
     def calc(
         cls,
         data: Dataset,
+        compare_by: Literal["groups", "columns", "columns_in_groups", "cross"] = "groups",  # check if it is possible to make it mandatory
         target_fields: Union[str, List[str], None] = None,
         baseline_column: Optional[str] = None,
         group_field: Optional[str] = None,
-        compare_by: Literal[
-            "groups", "columns", "columns_in_groups", "cross"
-        ] = "groups",
         grouping_data: Optional[Tuple[List[Tuple[str, Dataset]]]] = None,
         **kwargs,
     ) -> Dict:
         target_fields = Adapter.to_list(target_fields)
 
         if grouping_data is None:
-            grouping_data = cls.split_data_to_buckets(
+            grouping_data = cls._split_data_to_buckets(
                 data=data,
+                compare_by=compare_by,
                 target_fields=target_fields,
                 baseline_column=baseline_column,
                 group_field=group_field,
-                compare_by=compare_by,
             )
         if len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1:
             raise ComparisonNotSuitableFieldError(group_field)
@@ -248,22 +252,27 @@ class Comparator(Calculator):
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
-        if (
-            not target_fields and data.ds.tmp_roles
-        ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
-            return data
-        if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
-            grouping_data = list(data.groups[group_field[0]].items())
-        else:
-            grouping_data = None
-            data.groups[group_field[0]] = {
-                f"{int(group)}": ds for group, ds in data.ds.groupby(group_field[0])
-            }
+        if not target_fields:
+            if data.ds.tmp_roles:  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
+                return data
+            else:
+                raise ComparisonNotSuitableFieldError(target_fields)
+        if not group_field and self.compare_by != "columns":
+            raise ComparisonNotSuitableFieldError(group_field)
+
+        # if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
+        #     grouping_data = list(data.groups[group_field[0]].items())
+        # else:
+        #     grouping_data = None
+        #     data.groups[group_field[0]] = {
+        #         f"{int(group)}": ds for group, ds in data.ds.groupby(group_field[0])
+        #     }
         compare_result = self.calc(
             data=data.ds,
-            group_field=group_field,
-            grouping_data=grouping_data,
+            compare_by=self.compare_by,
             target_fields=target_fields,
+            baseline_column=self.baseline_column,
+            group_field=group_field,
         )
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key in compare_result}
