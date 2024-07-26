@@ -72,7 +72,8 @@ class Comparator(Calculator):
             search_types=self.search_types,
             space=SpaceEnum.data,
         )
-        return group_field, target_fields
+        baseline_field = self._field_searching(data, self.baseline_role)
+        return group_field, target_fields, baseline_field
 
     @classmethod
     def _execute_inner_function(
@@ -147,7 +148,7 @@ class Comparator(Calculator):
         data: Dataset,
         compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
         target_fields: Union[str, List[str]],
-        baseline_column: Optional[str] = None,
+        baseline_field: Optional[str] = None,
         group_field: Optional[str] = None,
     ) -> Tuple:
         """
@@ -158,13 +159,13 @@ class Comparator(Calculator):
             group_field (Union[Sequence[str], str]): The field(s) to group the data by.
             target_fields (Union[str, List[str]]): The field(s) to target for comparison.
             compare_by (Literal['groups', 'columns', 'columns_in_groups', 'cross'], optional): The method to compare the data. Defaults to 'groups'.
-            baseline_column (Optional[str], optional): The column to use as the baseline for comparison. Required if `compare_by` is 'columns' or 'columns_in_groups'. Defaults to None.
+            baseline_field (Optional[str], optional): The column to use as the baseline for comparison. Required if `compare_by` is 'columns' or 'columns_in_groups'. Defaults to None.
 
         Returns:
             Tuple: A tuple containing the baseline data and the compared data.
 
         Raises:
-            NoRequiredArgumentError: If `baseline_column` is None and `compare_by` is 'columns' or 'columns_in_groups' or 'cross'.
+            NoRequiredArgumentError: If `baseline_field` is None and `compare_by` is 'columns' or 'columns_in_groups' or 'cross'.
             ValueError: If `compare_by` is not one of the allowed values.
         """
         if compare_by == "groups":
@@ -174,8 +175,8 @@ class Comparator(Calculator):
                 raise TypeError(
                     f"group_field must be one string, {type(group_field)} passed."
                 )
-        elif baseline_column is None:
-            raise NoRequiredArgumentError("baseline_column")
+        elif baseline_field is None:
+            raise NoRequiredArgumentError("baseline_field")
 
         if compare_by != "columns":
             if group_field is None:
@@ -194,7 +195,7 @@ class Comparator(Calculator):
             compared_data = cls._split_ds_into_columns(data=data_buckets)
         elif compare_by == "columns":
             baseline_data = [
-                (f"0{NAME_BORDER_SYMBOL}{baseline_column}", data[baseline_column])
+                (f"0{NAME_BORDER_SYMBOL}{baseline_field}", data[baseline_field])
             ]
             compared_data = [
                 (f"0{NAME_BORDER_SYMBOL}{column}", data[column])
@@ -202,12 +203,12 @@ class Comparator(Calculator):
             ]
         elif compare_by == "columns_in_groups":
             baseline_data = cls._split_ds_into_columns(
-                data.groupby(by=group_field, fields_list=baseline_column)
+                data.groupby(by=group_field, fields_list=baseline_field)
             )
             compared_data = data.groupby(by=group_field, fields_list=target_fields)
             compared_data = cls._split_ds_into_columns(data=compared_data)
         elif compare_by == "cross":
-            data_buckets = data.groupby(by=group_field, fields_list=baseline_column)
+            data_buckets = data.groupby(by=group_field, fields_list=baseline_field)
             baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
             compared_data = data.groupby(by=group_field, fields_list=target_fields)
             compared_data.pop(0)
@@ -222,7 +223,7 @@ class Comparator(Calculator):
         data: Dataset,
         compare_by: Literal["groups", "columns", "columns_in_groups", "cross"] = "groups",  # check if it is possible to make it mandatory
         target_fields: Union[str, List[str], None] = None,
-        baseline_column: Optional[str] = None,
+        baseline_field: Optional[str] = None,
         group_field: Optional[str] = None,
         grouping_data: Optional[Tuple[List[Tuple[str, Dataset]]]] = None,
         **kwargs,
@@ -234,7 +235,7 @@ class Comparator(Calculator):
                 data=data,
                 compare_by=compare_by,
                 target_fields=target_fields,
-                baseline_column=baseline_column,
+                baseline_field=baseline_field,
                 group_field=group_field,
             )
         if len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1:
@@ -248,7 +249,8 @@ class Comparator(Calculator):
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field, target_fields = self._get_fields(data)
+        group_field, target_fields, baseline_field = self._get_fields(data)
+        
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
@@ -271,7 +273,7 @@ class Comparator(Calculator):
             data=data.ds,
             compare_by=self.compare_by,
             target_fields=target_fields,
-            baseline_column=self.baseline_column,
+            baseline_field=baseline_field,
             group_field=group_field,
         )
         result_dataset = self._local_extract_dataset(
