@@ -25,7 +25,7 @@ from hypex.utils.adapter import Adapter
 from hypex.utils.errors import (
     AbstractMethodError,
     ComparisonNotSuitableFieldError,
-    NoRequiredArgumentError,
+    NoRequiredArgumentError, NoColumnsError,
 )
 
 
@@ -64,15 +64,20 @@ class Comparator(Calculator):
         raise AbstractMethodError
 
     def _get_fields(self, data: ExperimentData):
-        group_field = self._field_searching(data, self.grouping_role)
-        target_fields = self._field_searching(
-            data,
-            TempTargetRole(),
-            tmp_role=True,
+        group_field = self._field_searching(
+            data=data,
+            field=self.grouping_role,
             search_types=self.search_types,
             space=SpaceEnum.data,
         )
-        baseline_field = self._field_searching(data, self.baseline_role)
+        target_fields = self._field_searching(
+            data,
+            TempTargetRole(),
+            # tmp_role=True,
+            search_types=self.search_types,
+            space=SpaceEnum.data,
+        )
+        baseline_field = self._field_searching(data=data, field=self.baseline_role, space=SpaceEnum.data)
         return group_field, target_fields, baseline_field
 
     @classmethod
@@ -85,14 +90,14 @@ class Comparator(Calculator):
     ) -> Dict:
         result = {}
         for baseline in baseline_data:
-            result[baseline[0]] = {}
+        #     result[baseline[0]] = {}
             for compared in compared_data:
                 if (
                     compare_by != "columns_in_groups"
                     or baseline[0].split(NAME_BORDER_SYMBOL)[0]
                     == compared[0].split(NAME_BORDER_SYMBOL)[0]
                 ):  # this checks if compared data are in the same group for columns_in_groups mode
-                    result[baseline[0]][compared[0]] = DatasetAdapter.to_dataset(
+                    result[compared[0]] = DatasetAdapter.to_dataset(
                         cls._inner_function(baseline[1], compared[1], **kwargs),
                         InfoRole(),
                     )
@@ -221,7 +226,9 @@ class Comparator(Calculator):
     def calc(
         cls,
         data: Dataset,
-        compare_by: Literal["groups", "columns", "columns_in_groups", "cross"] = "groups",  # check if it is possible to make it mandatory
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross"
+        ] = "groups",  # check if it is possible to make it mandatory
         target_fields: Union[str, List[str], None] = None,
         baseline_field: Optional[str] = None,
         group_field: Optional[str] = None,
@@ -229,6 +236,8 @@ class Comparator(Calculator):
         **kwargs,
     ) -> Dict:
         target_fields = Adapter.to_list(target_fields)
+        baseline_data = Adapter.list_to_single(baseline_field)
+        group_field = Adapter.list_to_single(group_field)
 
         if grouping_data is None:
             grouping_data = cls._split_data_to_buckets(
@@ -250,15 +259,17 @@ class Comparator(Calculator):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields, baseline_field = self._get_fields(data)
-        
+
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
         if not target_fields:
-            if data.ds.tmp_roles:  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
+            if (
+                data.ds.tmp_roles
+            ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
                 return data
             else:
-                raise ComparisonNotSuitableFieldError(target_fields)
+                raise NoColumnsError(TargetRole().role_name)
         if not group_field and self.compare_by != "columns":
             raise ComparisonNotSuitableFieldError(group_field)
 
