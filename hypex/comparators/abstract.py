@@ -124,11 +124,11 @@ class Comparator(Calculator):
             cls,
             data: Dataset,
             target_fields: Union[str, List[str]],
+            baseline_column: Optional[str] = None,
+            group_field: Union[str, List[str], None] = None,
             compare_by: Literal[
                 "groups", "columns", "columns_in_groups", "cross"
             ] = "groups",
-            group_field: Union[str, List[str], None] = None,
-            baseline_column: Optional[str] = None,
     ) -> Tuple:
         """
         Splits the given dataset into buckets into baseline and compared data, based on the specified comparison mode.
@@ -173,7 +173,6 @@ class Comparator(Calculator):
             compared_data = [
                 (f"0{NAME_BORDER_SYMBOL}{column}", data[column])
                 for column in target_fields
-                if column != baseline_column
             ]
         elif compare_by == "columns_in_groups":
             baseline_data = cls._split_ds_into_columns(data.groupby(
