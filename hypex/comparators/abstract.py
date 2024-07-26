@@ -8,17 +8,23 @@ from hypex.dataset import (
     StatisticRole,
     TempTargetRole,
     InfoRole,
-    DatasetAdapter, GroupingRole,
+    DatasetAdapter,
+    GroupingRole,
 )
 from hypex.executor import Calculator
 from hypex.utils import (
     BackendsEnum,
     ExperimentDataEnum,
     FromDictTypes,
-    SpaceEnum, NAME_BORDER_SYMBOL,
+    SpaceEnum,
+    NAME_BORDER_SYMBOL,
 )
 from hypex.utils.adapter import Adapter
-from hypex.utils.errors import AbstractMethodError, ComparisonNotSuitableFieldError, NoRequiredArgumentError
+from hypex.utils.errors import (
+    AbstractMethodError,
+    ComparisonNotSuitableFieldError,
+    NoRequiredArgumentError,
+)
 
 
 class Comparator(Calculator):
@@ -65,18 +71,22 @@ class Comparator(Calculator):
         cls,
         baseline_data: List[Tuple[str, Dataset]],
         compared_data: List[Tuple[str, Dataset]],
+        compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
         **kwargs,
     ) -> Dict:
-        baseline_data = Adapter.to_list(baseline_data)
-        compared_data = Adapter.to_list(compared_data)
         result = {}
         for baseline in baseline_data:
             result[baseline[0]] = {}
             for compared in compared_data:
-                result[baseline[0]][compared[0]] = DatasetAdapter.to_dataset(
-                    cls._inner_function(baseline[1], compared[1], **kwargs),
-                    InfoRole(),
-                )
+                if (
+                    compare_by != "columns_in_groups"
+                    or baseline[0].split(NAME_BORDER_SYMBOL)[0]
+                    == compared[0].split(NAME_BORDER_SYMBOL)[0]
+                ):  # this checks if compared data are in the same group for columns_in_groups mode
+                    result[baseline[0]][compared[0]] = DatasetAdapter.to_dataset(
+                        cls._inner_function(baseline[1], compared[1], **kwargs),
+                        InfoRole(),
+                    )
         return result
 
     @staticmethod
@@ -112,23 +122,27 @@ class Comparator(Calculator):
     # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
 
     @staticmethod
-    def _split_ds_into_columns(data: List[Tuple[str, Dataset]]) -> List[Tuple[str, Dataset]]:
+    def _split_ds_into_columns(
+        data: List[Tuple[str, Dataset]]
+    ) -> List[Tuple[str, Dataset]]:
         result = []
         for bucket in data:
             for column in bucket[1].columns:
-                result.append((f"{bucket[0]}{NAME_BORDER_SYMBOL}{column}", bucket[1][column]))
+                result.append(
+                    (f"{bucket[0]}{NAME_BORDER_SYMBOL}{column}", bucket[1][column])
+                )
         return result
 
     @classmethod
     def split_data_to_buckets(
-            cls,
-            data: Dataset,
-            target_fields: Union[str, List[str]],
-            baseline_column: Optional[str] = None,
-            group_field: Union[str, List[str], None] = None,
-            compare_by: Literal[
-                "groups", "columns", "columns_in_groups", "cross"
-            ] = "groups",
+        cls,
+        data: Dataset,
+        target_fields: Union[str, List[str]],
+        baseline_column: Optional[str] = None,
+        group_field: Optional[str] = None,
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross"
+        ] = "groups",
     ) -> Tuple:
         """
         Splits the given dataset into buckets into baseline and compared data, based on the specified comparison mode.
@@ -151,9 +165,11 @@ class Comparator(Calculator):
             if isinstance(target_fields, List):
                 target_fields = Adapter.list_to_single(target_fields)
             if not isinstance(target_fields, str):
-                raise TypeError(f"group_field must be one string, {type(group_field)} passed.")
+                raise TypeError(
+                    f"group_field must be one string, {type(group_field)} passed."
+                )
         elif baseline_column is None:
-                raise NoRequiredArgumentError("baseline_column")
+            raise NoRequiredArgumentError("baseline_column")
 
         if compare_by != "columns":
             if group_field is None:
@@ -161,7 +177,9 @@ class Comparator(Calculator):
             elif isinstance(group_field, List):
                 group_field = Adapter.list_to_single(group_field)
             if not isinstance(group_field, str):
-                raise TypeError(f"group_field must be one string, {type(group_field)} passed.")
+                raise TypeError(
+                    f"group_field must be one string, {type(group_field)} passed."
+                )
 
         target_fields = Adapter.to_list(target_fields)
         if compare_by == "groups":
@@ -169,15 +187,17 @@ class Comparator(Calculator):
             baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
             compared_data = cls._split_ds_into_columns(data=data_buckets)
         elif compare_by == "columns":
-            baseline_data = [(f"0{NAME_BORDER_SYMBOL}{baseline_column}", data[baseline_column])]
+            baseline_data = [
+                (f"0{NAME_BORDER_SYMBOL}{baseline_column}", data[baseline_column])
+            ]
             compared_data = [
                 (f"0{NAME_BORDER_SYMBOL}{column}", data[column])
                 for column in target_fields
             ]
         elif compare_by == "columns_in_groups":
-            baseline_data = cls._split_ds_into_columns(data.groupby(
-                by=group_field, fields_list=baseline_column
-            ))
+            baseline_data = cls._split_ds_into_columns(
+                data.groupby(by=group_field, fields_list=baseline_column)
+            )
             compared_data = data.groupby(by=group_field, fields_list=target_fields)
             compared_data = cls._split_ds_into_columns(data=compared_data)
         elif compare_by == "cross":
@@ -192,30 +212,35 @@ class Comparator(Calculator):
 
     @classmethod
     def calc(
-            cls,
-            data: Dataset,
-            group_field: Union[Sequence[str], str, None] = None,
-            grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
-            target_fields: Union[
-                str, List[str], None
-            ] = None,  # why is it possible to leave it None?
-            baseline_column: Optional[str] = None,
-            **kwargs,
+        cls,
+        data: Dataset,
+        target_fields: Union[str, List[str], None] = None,
+        baseline_column: Optional[str] = None,
+        group_field: Optional[str] = None,
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross"
+        ] = "groups",
+        grouping_data: Optional[Tuple[List[Tuple[str, Dataset]]]] = None,
+        **kwargs,
     ) -> Dict:
-        group_field = Adapter.to_list(group_field)
+        target_fields = Adapter.to_list(target_fields)
 
         if grouping_data is None:
             grouping_data = cls.split_data_to_buckets(
                 data=data,
-                group_field=group_field,
                 target_fields=target_fields,
                 baseline_column=baseline_column,
+                group_field=group_field,
+                compare_by=compare_by,
             )
-        if len(grouping_data) < 2:
+        if len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1:
             raise ComparisonNotSuitableFieldError(group_field)
         baseline_data, compared_data = grouping_data
         return cls._execute_inner_function(
-            baseline_data=baseline_data, compared_data=compared_data, **kwargs
+            baseline_data=baseline_data,
+            compared_data=compared_data,
+            compare_by=compare_by,
+            **kwargs,
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
