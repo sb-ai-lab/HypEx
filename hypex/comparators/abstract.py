@@ -63,8 +63,8 @@ class Comparator(Calculator):
     @classmethod
     def _execute_inner_function(
         cls,
-        baseline_data: Union[Tuple[str, Dataset], List[Tuple[str, Dataset]]],
-        compared_data: Union[Tuple[str, Dataset], List[Tuple[str, Dataset]]],
+        baseline_data: List[Tuple[str, Dataset]],
+        compared_data: List[Tuple[str, Dataset]],
         **kwargs,
     ) -> Dict:
         baseline_data = Adapter.to_list(baseline_data)
