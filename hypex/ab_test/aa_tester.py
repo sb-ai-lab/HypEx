@@ -1436,24 +1436,26 @@ class AATest:
     
 
     def _plot_distributions(self, df: pd.DataFrame, target_fields: list[str]):
-        test = ['t-test','ks-test']
+        tests = ['t-test','ks-test']
 
-        mean_of_means_pvalue = [f'mean of means {test_name} p-value' for test_name in test]
+        mean_of_means_pvalue = [f'mean of means {test_name} p-value' for test_name in tests]
         mean_of_means_title = 'Distribution of averages of average p-values ​​of each target_field'
         self._plot_distribution(df=df,plots_group_name = mean_of_means_title,fields = mean_of_means_pvalue)
 
-        each_field_mean_pvalue = [[f'{field} mean {test_name} p-value'for field in target_fields][0] for test_name in test]
+        each_field_mean_pvalue = []
+        for test in tests:
+            for field in target_fields:
+                each_field_mean_pvalue.append(f'{field} mean {test} p-value')
         each_field_mean_title = 'Distribution of average p-values ​​of each target_field'
         self._plot_distribution(df=df,plots_group_name = each_field_mean_title,fields = each_field_mean_pvalue)
         
-        each_field_pvalue = [
-                            [
-                                [ field_name for field_name in df.columns 
-                                        if f'{field} {test} p-value' in field_name][0] 
-                                    for field in target_fields
-                            ][0]
-                            for test in test
-                        ]
+        each_field_pvalue = []
+        for test in tests:
+            for field in target_fields:
+                for column_name in df.columns:
+                    if f'{field} {test} p-value' in column_name:
+                        each_field_pvalue.append(column_name)
+
         each_field_title = 'Distribution of p-value for each group combination for each target_field'
         self._plot_distribution(df=df,plots_group_name = each_field_title,fields = each_field_pvalue)        
 
@@ -1532,24 +1534,26 @@ class AATest:
         result_df[group_column_name] = best_split
 
         def _plot_distributions():
-            test = ['t-test','ks-test']
+            tests = ['t-test','ks-test']
         
-            mean_of_means_pvalue = [f'mean of means {test_name} p-value' for test_name in test]
+            mean_of_means_pvalue = [f'mean of means {test_name} p-value' for test_name in tests]
             mean_of_means_title = 'Distribution of averages of average p-values ​​of each target_field'
             self._plot_distribution(df=df_metrics,plots_group_name = mean_of_means_title,fields = mean_of_means_pvalue)
-        
-            each_field_mean_pvalue = [[f'{field} mean {test_name} p-value' for field in target_fields][0] for test_name in test]
+            
+            each_field_mean_pvalue = []
+            for test in tests:
+                for field in target_fields:
+                    each_field_mean_pvalue.append(f'{field} mean {test} p-value')
             each_field_mean_title = 'Distribution of average p-values ​​of each target_field'
             self._plot_distribution(df=df_metrics,plots_group_name = each_field_mean_title,fields = each_field_mean_pvalue)
         
-            each_field_pvalue = [
-                                [
-                                    [ field_name for field_name in df_metrics.columns 
-                                        if f'{field} {test} p-value' in field_name][0] 
-                                        for field in target_fields
-                                ][0]
-                                for test in test
-                            ]
+            each_field_pvalue = []
+            for test in tests:
+                for field in target_fields:
+                    for column_name in df_metrics.columns:
+                        if f'{field} {test} p-value' in column_name:
+                            each_field_pvalue.append(column_name)
+
             each_field_title = 'Distribution of p-value for each group combination for each target_field'
             self._plot_distribution(df=df_metrics,plots_group_name = each_field_title,fields = each_field_pvalue)               
             pass
