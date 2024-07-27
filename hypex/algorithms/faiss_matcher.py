@@ -827,7 +827,7 @@ def f2(x: np.ndarray, y: np.ndarray) -> Any:
     return x[y]
 
 
-def _get_index(base: np.ndarray, new: np.ndarray, n_neighbors: int) -> list:
+def _get_index(base: np.ndarray, new: np.ndarray, n_neighbors: int = 1) -> list:
     """Gets array of indexes that match a new array.
 
     Args:
@@ -841,15 +841,21 @@ def _get_index(base: np.ndarray, new: np.ndarray, n_neighbors: int) -> list:
     Returns:
         An array of indexes containing all neighbours with minimum distance
     """
+    length = base.shape[0] + new.shape[0]
     index = faiss.IndexFlatL2(base.shape[1])
+    if length > 1_000_000:
+        index = faiss.IndexIVFFlat(index, base.shape[1], 1000)
+        index.train(base)
+
     index.add(base)
-    dist, indexes = index.search(new, 20)
+    dist, indexes = index.search(new, n_neighbors)
     if n_neighbors == 1:
         equal_dist = list(map(map_func, dist))
         indexes = [f2(i, j) for i, j in zip(indexes, equal_dist)]
     else:
         indexes = f3(indexes, dist, n_neighbors)
     return indexes
+
 
 
 def _transform_to_np(
