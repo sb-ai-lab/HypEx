@@ -1,7 +1,7 @@
 from copy import deepcopy
 from typing import Optional, Any, List, Literal, Union, Dict
 
-from hypex.dataset import Dataset, ABCRole, ExperimentData, MatchingRole, TargetRole
+from hypex.dataset import Dataset, ABCRole, ExperimentData, TargetRole
 from hypex.ml.faiss import FaissNearestNeighbors
 from hypex.operators.abstract import GroupOperator
 from hypex.utils import SpaceEnum
@@ -24,9 +24,11 @@ class MatchingMetrics(GroupOperator):
         target_roles: Union[ABCRole, List[ABCRole], None] = None,
         space: SpaceEnum = SpaceEnum.auto,
         metric: Optional[Literal["auto", "atc", "att", "ate"]] = None,
+        bias_estimation: bool = True,
         key: Any = "",
     ):
         self.metric = metric or "auto"
+        self.bias_estimation = bias_estimation
         super().__init__(
             grouping_role=grouping_role, target_roles=target_roles, space=space, key=key
         )
@@ -34,16 +36,21 @@ class MatchingMetrics(GroupOperator):
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields = self._get_fields(data=data)
         t_data = deepcopy(data.ds)
-        if len(target_fields) != 2: 
-            distances_keys = data.get_ids(FaissNearestNeighbors, ExperimentDataEnum.groups)
+        if len(target_fields) != 2:
+            distances_keys = data.get_ids(
+                FaissNearestNeighbors, ExperimentDataEnum.groups
+            )
             if len(distances_keys["FaissNearestNeighbors"]["groups"]) > 0:
-                target_fields += data.groups[distances_keys["FaissNearestNeighbors"]["groups"][0]]["matched_df"].search_columns(
-                    self.target_roles)
-            else: 
+                target_fields += data.groups[
+                    distances_keys["FaissNearestNeighbors"]["groups"][0]
+                ]["matched_df"].search_columns(self.target_roles)
+            else:
                 raise ValueError
         if target_fields[1] not in t_data.columns:
             t_data = t_data.add_column(
-                data.groups[distances_keys["FaissNearestNeighbors"]["groups"][0]]["matched_df"][target_fields[1]],
+                data.groups[distances_keys["FaissNearestNeighbors"]["groups"][0]][
+                    "matched_df"
+                ][target_fields[1]],
                 role={target_fields[1]: TargetRole()},
             )
         self.key = str(
@@ -59,8 +66,33 @@ class MatchingMetrics(GroupOperator):
             group_field=group_field,
             target_fields=target_fields,
             metric=self.metric,
+            bias_estimation=self.bias_estimation,
         )
         return self._set_value(data, compare_result)
+
+    @staticmethod
+    def bias_coefs(matches, Y_m, X_m):
+
+        # Computes OLS coefficient in bias correction regression. Constructs
+        # data for regression by including (possibly multiple times) every
+        # observation that has appeared in the matched sample.
+
+        flat_idx = reduce(lambda x, y: np.concatenate((x, y)), matches)
+        N, K = len(flat_idx), X_m.shape[1]
+
+        Y = Y_m[flat_idx]
+        X = np.empty((N, K + 1))
+        X[:, 0] = 1  # intercept term
+        X[:, 1:] = X_m[flat_idx]
+
+        return np.linalg.lstsq(X, Y)[0][1:]  # don't need intercept coef
+
+    @staticmethod
+    def bias(X, X_m, matches, coefs):
+        X_m_mean = [X_m[idx].mean(0) for idx in matches]
+        bias_list = [(X_j - X_i).dot(coefs) for X_i, X_j in zip(X, X_m_mean)]
+
+        return np.array(bias_list)
 
     @classmethod
     def _execute_inner_function(
@@ -87,23 +119,39 @@ class MatchingMetrics(GroupOperator):
                     == len(grouping_data[1][1])
                     else "ate"
                 )
-        att = (
+        itt = (
             grouping_data[0][1][target_fields[0]]
             - grouping_data[0][1][target_fields[1]]
         ).mean()
-        if metric == "att":
-            return {"ATT": att}
-        atc = (
+        itc = (
             grouping_data[1][1][target_fields[0]]
             - grouping_data[1][1][target_fields[1]]
         ).mean()
+        # if kwargs.get("bias_estimation", False):
+        #     bias_c = cls.bias(
+        #         X_c,
+        #         X_t,
+        #         matches_c,
+        #         cls.bias_coefs(grouping_data[0][1].drop(target_fields), Y_t, X_t),
+        #     )
+        #     bias_t = cls.bias(
+        #         X_t,
+        #         X_c,
+        #         matches_t,
+        #         cls.bias_coefs(grouping_data[1][1].drop(target_fields), Y_c, X_c),
+        #     )
+        #     itt = itt - bias_c
+        #     itc = itc + bias_t
+
         if metric == "atc":
-            return {"ATC": atc}
+            return {"ATC": itc}
+        if metric == "att":
+            return {"ATC": itt}
         len_test, len_control = len(grouping_data[0][1]), len(grouping_data[1][1])
         return {
-            "ATT": att,
-            "ATC": atc,
-            "ATE": (att * len_test + atc * len_control) / (len_test + len_control),
+            "ATT": itt,
+            "ATC": itc,
+            "ATE": (itt * len_test + itc * len_control) / (len_test + len_control),
         }
 
     @classmethod

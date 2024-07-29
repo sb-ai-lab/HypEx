@@ -1,4 +1,3 @@
-from hypex.dataset.roles import InfoRole
 from hypex.reporters.matching import MatchingDictReporter
 
 from .base import Output
@@ -19,11 +18,7 @@ class MatchingOutput(Output):
             ExperimentDataEnum.groups,
         )
         matched_data = experiment_data.groups[id_]["matched_df"]
-        left_on = experiment_data.ds.search_columns(InfoRole())[0]
-        right_on = matched_data.search_columns(InfoRole())[0]
-        self.full_data = experiment_data.ds.merge(
-            matched_data, left_on=left_on, right_on=right_on
-        )
+        self.full_data = experiment_data.ds.append(matched_data, axis=1)
 
     def extract(self, experiment_data: ExperimentData):
         super().extract(experiment_data)

@@ -15,7 +15,9 @@ from hypex.ui.matching import MatchingOutput
 class Matching(ExperimentShell):
 
     @staticmethod
-    def _make_experiment(filters, distance, two_sides, metric, quality_tests):
+    def _make_experiment(
+        filters, distance, two_sides, metric, quality_tests, bias_estimation
+    ):
         filters_mapping = {"dummy-encoder": DummyEncoder(), "auto": DummyEncoder()}
         distance_mapping = {
             "mahalanobis": MahalanobisDistance(grouping_role=TreatmentRole())
@@ -32,6 +34,7 @@ class Matching(ExperimentShell):
                 grouping_role=TreatmentRole(),
                 target_roles=[TargetRole()],
                 metric=metric,
+                bias_estimation=bias_estimation,
             ),
             MatchingAnalyzer(),
         ]
@@ -57,6 +60,7 @@ class Matching(ExperimentShell):
         distance: Literal["mahalanobis", "l2"] = "mahalanobis",
         two_sides: bool = True,
         metric: Literal["atc", "att", "ate", "auto"] = "auto",
+        bias_estimation: bool = True,
         quality_tests: Union[
             Literal["smd", "psi", "ks-test", "repeats", "auto"],
             List[Literal["smd", "psi", "ks-test", "repeats", "auto"]],
@@ -64,7 +68,7 @@ class Matching(ExperimentShell):
     ):
         super().__init__(
             experiment=self._make_experiment(
-                filters, distance, two_sides, metric, quality_tests
+                filters, distance, two_sides, metric, quality_tests, bias_estimation
             ),
             output=MatchingOutput(),
         )

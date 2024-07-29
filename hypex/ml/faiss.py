@@ -102,7 +102,7 @@ class FaissNearestNeighbors(MLExecutor):
                 if compare_result.columns[i] == "test"
                 else grouping_data[1][1]
             )
-            new_target = new_target.reindex(group.index, fill_value=0).rename(
+            new_target = new_target.reindex(group.index, fill_value=-1).rename(
                 {field: field + "_matched" for field in new_target.columns}
             )
             matched_df = matched_df.append(new_target).sort()
