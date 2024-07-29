@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Union, Optional
+from typing import Any, Optional
 
 from hypex.comparators.comparators import Comparator
 from hypex.dataset import ExperimentData, ABCRole, Dataset
@@ -15,7 +15,12 @@ class TestPower(Comparator, ABC):
         power: float = 0.8,
         key: Any = "",
     ):
-        super().__init__(grouping_role, space, key)
+        super().__init__(
+            compare_by="groups",
+            grouping_role=grouping_role,
+            space=space,
+            key=key,
+        )
         self.significance = significance
         self.power = power
 
