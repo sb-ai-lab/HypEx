@@ -228,7 +228,7 @@ class Comparator(Calculator):
         data: Dataset,
         compare_by: Literal[
             "groups", "columns", "columns_in_groups", "cross"
-        ] = "groups",  # check if it is possible to make it mandatory
+        ],  # check if it is possible to make it mandatory
         target_fields: Union[str, List[str], None] = None,
         baseline_field: Optional[str] = None,
         group_field: Optional[str] = None,
@@ -236,8 +236,11 @@ class Comparator(Calculator):
         **kwargs,
     ) -> Dict:
         target_fields = Adapter.to_list(target_fields)
-        baseline_data = Adapter.list_to_single(baseline_field)
+        baseline_field = Adapter.list_to_single(baseline_field)
         group_field = Adapter.list_to_single(group_field)
+
+        if compare_by == "columns_in_groups" and len(target_fields) > 1:
+            raise ComparisonNotSuitableFieldError("target_fields")
 
         if grouping_data is None:
             grouping_data = cls._split_data_to_buckets(
@@ -248,7 +251,7 @@ class Comparator(Calculator):
                 group_field=group_field,
             )
         if len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1:
-            raise ComparisonNotSuitableFieldError(group_field)
+            raise ComparisonNotSuitableFieldError("group_field")
         baseline_data, compared_data = grouping_data
         return cls._execute_inner_function(
             baseline_data=baseline_data,
@@ -271,7 +274,7 @@ class Comparator(Calculator):
             else:
                 raise NoColumnsError(TargetRole().role_name)
         if not group_field and self.compare_by != "columns":
-            raise ComparisonNotSuitableFieldError(group_field)
+            raise ComparisonNotSuitableFieldError("group_field")
 
         # if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
         #     grouping_data = list(data.groups[group_field[0]].items())
