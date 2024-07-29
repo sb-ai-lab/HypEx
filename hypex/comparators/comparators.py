@@ -39,7 +39,9 @@ class GroupDifference(Comparator):
 
 class GroupSizes(Comparator):
     def __init__(
-        self, grouping_role: Optional[ABCRole] = None, space: SpaceEnum = SpaceEnum.auto
+        self,
+        grouping_role: Optional[ABCRole] = None,
+        space: SpaceEnum = SpaceEnum.auto
     ):
         super().__init__(compare_by="groups", grouping_role=grouping_role, space=space)
 
