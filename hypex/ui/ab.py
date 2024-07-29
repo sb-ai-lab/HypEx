@@ -10,7 +10,6 @@ from ..utils import ExperimentDataEnum, ID_SPLIT_SYMBOL
 
 class ABOutput(Output):
     multitest: Union[Dataset, str]
-    all_analysis_results: Dict
 
     def __init__(self):
         self._groups = []
@@ -41,15 +40,15 @@ class ABOutput(Output):
         )[1:]
         for i in self._groups:
             groups += [i] * len(ids)
-        self.difference = Dataset.create_empty()
-        for i in range(0, len(ids)):
-            self.difference = self.difference.append(
+        diff = Dataset.create_empty()
+        for i in range(len(ids)):
+            diff = diff.append(
                 experiment_data.analysis_tables[ids[i]]
             )
             targets += [ids[i].split(ID_SPLIT_SYMBOL)[-1]]
-        self.difference = self.difference.add_column(
+        return diff.add_column(
             groups, role={"group": StatisticRole()}
-        ).add_column(targets * len(self._groups), role={"field": StatisticRole()})
+        ).add_column(targets * len(self._groups), role={"feature": StatisticRole()})
 
     def _extract_sizes(self, experiment_data: ExperimentData):
         ids = experiment_data.get_ids(
@@ -62,6 +61,8 @@ class ABOutput(Output):
 
     def extract(self, experiment_data: ExperimentData):
         super().extract(experiment_data)
+        self.resume = self.resume.merge(
+            self._extract_differences(experiment_data), on=["group", "feature"]
+        )
         self._extract_multitest_result(experiment_data)
-        self._extract_differences(experiment_data)
         self._extract_sizes(experiment_data)

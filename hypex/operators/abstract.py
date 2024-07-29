@@ -78,7 +78,6 @@ class GroupOperator(Calculator):
         data.set_value(
             ExperimentDataEnum.variables,
             self.id,
-            str(self.__class__.__name__),
             value,
         )
         return data

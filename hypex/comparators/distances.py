@@ -49,7 +49,6 @@ class MahalanobisDistance(Calculator):
             data = data.set_value(
                 ExperimentDataEnum.groups,
                 self.id,
-                str(self.__class__.__name__),
                 value_,
                 key=key,
             )

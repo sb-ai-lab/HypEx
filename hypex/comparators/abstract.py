@@ -30,7 +30,7 @@ from hypex.utils.errors import (
 )
 
 
-class Comparator(Calculator):
+class Comparator(Calculator, ABC):
     def __init__(
         self,
         compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
@@ -119,7 +119,6 @@ class Comparator(Calculator):
         data.set_value(
             ExperimentDataEnum.analysis_tables,
             self.id,
-            str(self.__class__.__name__),
             value,
         )
         return data
@@ -134,6 +133,7 @@ class Comparator(Calculator):
             result = cr_list_v[0]
             if len(cr_list_v) > 1:
                 result = result.append(cr_list_v[1:])
+            result.index = list(compare_result.keys())
             return result
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 

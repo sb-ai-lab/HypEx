@@ -11,7 +11,6 @@ from hypex.utils import (
 
 
 class Encoder(Calculator):
-
     def __init__(
         self,
         target_roles: Optional[Union[str, Sequence[str]]] = None,
@@ -46,7 +45,6 @@ class Encoder(Calculator):
         return data.set_value(
             space=ExperimentDataEnum.additional_fields,
             executor_id=self._ids_to_names(value.columns),
-            name=str(self.__class__.__name__),
             value=value,
             role=value.roles,
         )

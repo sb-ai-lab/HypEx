@@ -11,9 +11,7 @@ from hypex.utils import BackendsEnum, ExperimentDataEnum, ID_SPLIT_SYMBOL
 
 class OneAAStatAnalyzer(Executor):
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
-        return data.set_value(
-            ExperimentDataEnum.analysis_tables, self.id, self.__class__.__name__, value
-        )
+        return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         analysis_tests: List[type] = [TTest, KSTest, Chi2Test]
@@ -138,7 +136,7 @@ class AAScoreAnalyzer(Executor):
         self.key = "best splitter"
         best_splitter_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
         result = data.set_value(
-            ExperimentDataEnum.variables, self.id, self.key, best_splitter_id, self.key
+            ExperimentDataEnum.variables, self.id, best_splitter_id, self.key
         )
         best_splitter = self.build_splitter_from_id(best_splitter_id)
         best_splitter.save_groups = False
