@@ -72,11 +72,6 @@ class MatchingMetrics(GroupOperator):
 
     @staticmethod
     def bias_coefs(matches, Y_m, X_m):
-
-        # Computes OLS coefficient in bias correction regression. Constructs
-        # data for regression by including (possibly multiple times) every
-        # observation that has appeared in the matched sample.
-
         flat_idx = reduce(lambda x, y: np.concatenate((x, y)), matches)
         N, K = len(flat_idx), X_m.shape[1]
 

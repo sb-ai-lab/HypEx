@@ -1,7 +1,7 @@
 from typing import Optional, Any, Dict
 
 from hypex.comparators.distances import MahalanobisDistance
-from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData, TargetRole
+from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData
 from hypex.executor import MLExecutor
 from hypex.extensions.faiss import FaissExtension
 from hypex.utils import SpaceEnum, ExperimentDataEnum
@@ -107,5 +107,5 @@ class FaissNearestNeighbors(MLExecutor):
             )
             matched_df = matched_df.append(new_target).sort()
         if len(matched_df) < len(data.ds):
-            matched_df = matched_df.reindex(data.ds.index, fill_value=0)
+            matched_df = matched_df.reindex(data.ds.index, fill_value=-1)
         return self._set_value(data, matched_df, key="matched_df")
