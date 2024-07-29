@@ -1,11 +1,18 @@
 from typing import Dict, Optional, List
 
 from hypex.comparators.abstract import Comparator
-from hypex.dataset import Dataset
+from hypex.dataset import Dataset, ABCRole
 from hypex.utils.constants import NUMBER_TYPES_LIST
+from hypex.utils import SpaceEnum
 
 
 class GroupDifference(Comparator):
+    def __init__(
+        self,
+        grouping_role: Optional[ABCRole] = None,
+        space: SpaceEnum = SpaceEnum.auto,
+    ):
+        super().__init__(compare_by="groups", grouping_role=grouping_role, space=space)
 
     @property
     def search_types(self) -> Optional[List[type]]:
@@ -31,6 +38,13 @@ class GroupDifference(Comparator):
 
 
 class GroupSizes(Comparator):
+    def __init__(
+        self,
+        grouping_role: Optional[ABCRole] = None,
+        space: SpaceEnum = SpaceEnum.auto
+    ):
+        super().__init__(compare_by="groups", grouping_role=grouping_role, space=space)
+
     @classmethod
     def _inner_function(
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
