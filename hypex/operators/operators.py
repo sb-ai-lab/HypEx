@@ -36,10 +36,8 @@ class MatchingMetrics(GroupOperator):
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields = self._get_fields(data=data)
         t_data = deepcopy(data.ds)
+        distances_keys = data.get_ids(FaissNearestNeighbors, ExperimentDataEnum.groups)
         if len(target_fields) != 2:
-            distances_keys = data.get_ids(
-                FaissNearestNeighbors, ExperimentDataEnum.groups
-            )
             if len(distances_keys["FaissNearestNeighbors"]["groups"]) > 0:
                 target_fields += data.groups[
                     distances_keys["FaissNearestNeighbors"]["groups"][0]
