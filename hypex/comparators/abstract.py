@@ -25,7 +25,8 @@ from hypex.utils.adapter import Adapter
 from hypex.utils.errors import (
     AbstractMethodError,
     ComparisonNotSuitableFieldError,
-    NoRequiredArgumentError, NoColumnsError,
+    NoRequiredArgumentError,
+    NoColumnsError,
 )
 
 
@@ -64,20 +65,23 @@ class Comparator(Calculator):
         raise AbstractMethodError
 
     def _get_fields(self, data: ExperimentData):
+        tmp_role = True if data.ds.tmp_roles else False
         group_field = self._field_searching(
             data=data,
             field=self.grouping_role,
             search_types=self.search_types,
-            space=SpaceEnum.data,
+            space=self.space,
         )
         target_fields = self._field_searching(
             data,
             TempTargetRole(),
-            # tmp_role=True,
+            tmp_role=tmp_role,
             search_types=self.search_types,
-            space=SpaceEnum.data,
+            space=self.space,
         )
-        baseline_field = self._field_searching(data=data, field=self.baseline_role, space=SpaceEnum.data)
+        baseline_field = self._field_searching(
+            data=data, field=self.baseline_role, space=SpaceEnum.data
+        )
         return group_field, target_fields, baseline_field
 
     @classmethod
@@ -90,7 +94,7 @@ class Comparator(Calculator):
     ) -> Dict:
         result = {}
         for baseline in baseline_data:
-        #     result[baseline[0]] = {}
+            #     result[baseline[0]] = {}
             for compared in compared_data:
                 if (
                     compare_by != "columns_in_groups"
@@ -226,9 +230,7 @@ class Comparator(Calculator):
     def calc(
         cls,
         data: Dataset,
-        compare_by: Literal[
-            "groups", "columns", "columns_in_groups", "cross"
-        ],  # check if it is possible to make it mandatory
+        compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
         target_fields: Union[str, List[str], None] = None,
         baseline_field: Optional[str] = None,
         group_field: Optional[str] = None,
@@ -275,14 +277,6 @@ class Comparator(Calculator):
                 raise NoColumnsError(TargetRole().role_name)
         if not group_field and self.compare_by != "columns":
             raise ComparisonNotSuitableFieldError("group_field")
-
-        # if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
-        #     grouping_data = list(data.groups[group_field[0]].items())
-        # else:
-        #     grouping_data = None
-        #     data.groups[group_field[0]] = {
-        #         f"{int(group)}": ds for group, ds in data.ds.groupby(group_field[0])
-        #     }
         compare_result = self.calc(
             data=data.ds,
             compare_by=self.compare_by,
@@ -299,10 +293,13 @@ class Comparator(Calculator):
 class StatHypothesisTesting(Comparator, ABC):
     def __init__(
         self,
+        compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
         grouping_role: Union[ABCRole, None] = None,
         space: SpaceEnum = SpaceEnum.auto,
         reliability: float = 0.05,
         key: Any = "",
     ):
-        super().__init__(grouping_role, space, key)
+        super().__init__(
+            compare_by=compare_by, grouping_role=grouping_role, space=space, key=key
+        )
         self.reliability = reliability

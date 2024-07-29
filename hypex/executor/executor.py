@@ -153,28 +153,12 @@ class Calculator(Executor, ABC):
         return searched_field
 
     @staticmethod
-    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset: # TODO to move away from Calculator. Where to?
+    def _check_test_data(
+        test_data: Optional[Dataset] = None,
+    ) -> Dataset:  # TODO to move away from Calculator. Where to?
         if test_data is None:
             raise ValueError("test_data is needed for comparison")
         return test_data
-
-# class GroupCalculator(Calculator):
-#     def __init__(
-#         self,
-#         grouping_role: Optional[ABCRole] = None,
-#         target_roles: Optional[List[ABCRole]] = None,
-#         space: SpaceEnum = SpaceEnum.auto,
-#         key: Any = "",
-#     ):
-#         self.grouping_role = grouping_role or GroupingRole()
-#         self.space = space
-#         self.__additional_mode = space == SpaceEnum.additional
-#         self.target_roles = target_roles or []
-#         super().__init__(key=key)
-#
-#     @property
-#     def search_types(self) -> Optional[List[type]]:
-#         return None
 
 class MLExecutor(Calculator, ABC):
     def __init__(

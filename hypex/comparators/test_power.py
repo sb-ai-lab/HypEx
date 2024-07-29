@@ -73,13 +73,24 @@ class MDEBySize(Comparator):
         power: float = 0.8,
         significance: float = 0.95,
     ):
-        super().__init__(grouping_role, space, full_name, key)
+        super().__init__(
+            compare_by="groups",
+            grouping_role=grouping_role,
+            space=space,
+            full_name=full_name,
+            key=key,
+        )
         self.power = power
         self.significance = significance
 
-    @staticmethod
+    @classmethod
     def _inner_function(
-        control_data, test_data, significance=0.95, power=0.8, **kwargs
+        cls,
+        control_data: Dataset,
+        test_data: Dataset,
+        significance: float = 0.95,
+        power: float = 0.8,
+        **kwargs
     ) -> Dict[str, Any]:
         result = {}
         m = norm.ppf(1 - significance / 2) - norm.ppf(power)
