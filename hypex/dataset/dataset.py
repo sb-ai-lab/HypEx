@@ -284,7 +284,7 @@ class Dataset(DatasetBase):
         if type(other._backend) is not type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
 
-    def append(self, other, index: bool = False) -> "Dataset":
+    def append(self, other, reset_index: bool = False, axis: int = 0) -> "Dataset":
         if isinstance(other, Dataset):
             other = [other]
 
@@ -293,7 +293,9 @@ class Dataset(DatasetBase):
             self._check_other_dataset(o)
             new_roles.update(o.roles)
 
-        return Dataset(roles=new_roles, data=self.backend.append(other, index))
+        return Dataset(
+            roles=new_roles, data=self.backend.append(other, reset_index, axis)
+        )
 
     # TODO: set backend by backend object
     @staticmethod
@@ -737,16 +739,15 @@ class DatasetAdapter(Adapter):
             raise ValueError(f"Unsupported data type {type(data)}")
 
     @staticmethod
-    def value_to_dataset(data: ScalarType, roles: Union[ABCRole, Dict[str, ABCRole]]) -> Dataset:
+    def value_to_dataset(
+        data: ScalarType, roles: Union[ABCRole, Dict[str, ABCRole]]
+    ) -> Dataset:
         """
         Convert a float to a Dataset
         """
         if isinstance(roles, ABCRole):
-            roles= {"0": roles}
-        return Dataset(
-            roles=roles,
-            data=pd.DataFrame({list(roles.keys())[0]: [data]})
-        )
+            roles = {"0": roles}
+        return Dataset(roles=roles, data=pd.DataFrame({list(roles.keys())[0]: [data]}))
 
     @staticmethod
     def dict_to_dataset(
