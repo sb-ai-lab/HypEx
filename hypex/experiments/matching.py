@@ -34,7 +34,6 @@ class Matching(ExperimentShell):
                 grouping_role=TreatmentRole(),
                 target_roles=[TargetRole()],
                 metric=metric,
-                bias_estimation=bias_estimation,
             ),
             MatchingAnalyzer(),
         ]
