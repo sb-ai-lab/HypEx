@@ -353,7 +353,7 @@ class Dataset(DatasetBase):
         func: Optional[Union[str, List]] = None,
         fields_list: Optional[Union[str, List]] = None,
         **kwargs,
-    ):
+    ):  # TODO: field list does not work in the tutorial
         datasets = [
             (i, Dataset(roles=self.roles, data=data))
             for i, data in self._backend.groupby(by=by, **kwargs)
@@ -617,7 +617,6 @@ class ExperimentData:
         self,
         space: ExperimentDataEnum,
         executor_id: Union[str, Dict[str, str]],
-        name: str,
         value: Any,
         key: Optional[str] = None,
         role=None,
@@ -640,23 +639,17 @@ class ExperimentData:
         elif space == ExperimentDataEnum.analysis_tables:
             self.analysis_tables[executor_id] = value
         elif space == ExperimentDataEnum.variables:
-            if executor_id not in self.variables:
-                if isinstance(value, Dict):
-                    self.variables[executor_id] = value
-                else:
-                    self.variables[executor_id] = {key: value}
-            else:
+            if executor_id in self.variables:
                 self.variables[executor_id][key] = value
+            elif isinstance(value, Dict):
+                self.variables[executor_id] = value
+            else:
+                self.variables[executor_id] = {key: value}
         elif space == ExperimentDataEnum.groups:
             if executor_id not in self.groups:
                 self.groups[executor_id] = {key: value}
             else:
                 self.groups[executor_id][key] = value
-        if len(executor_id) == 1:
-            self.id_name_mapping[executor_id] = name
-        else:  # TODO если str, то записывается побуквенно
-            for id_ in executor_id:
-                self.id_name_mapping[id_] = name
         return self
 
     def get_ids(
@@ -667,7 +660,6 @@ class ExperimentData:
         ] = None,
         key: Optional[str] = None,
     ) -> Dict[str, Dict[str, List[str]]]:
-
         def check_id(id_: str, class_: str) -> bool:
             result = id_[: id_.find(ID_SPLIT_SYMBOL)] == class_
 
@@ -745,13 +737,15 @@ class DatasetAdapter(Adapter):
             raise ValueError(f"Unsupported data type {type(data)}")
 
     @staticmethod
-    def value_to_dataset(data: ScalarType, roles: Dict[str, ABCRole]) -> Dataset:
+    def value_to_dataset(data: ScalarType, roles: Union[ABCRole, Dict[str, ABCRole]]) -> Dataset:
         """
         Convert a float to a Dataset
         """
+        if isinstance(roles, ABCRole):
+            roles= {"0": roles}
         return Dataset(
             roles=roles,
-            data=pd.DataFrame(data=data, columns=[list(roles.keys())[0]]),
+            data=pd.DataFrame({list(roles.keys())[0]: [data]})
         )
 
     @staticmethod

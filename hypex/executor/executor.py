@@ -340,16 +340,10 @@ class MLExecutor(GroupCalculator, ABC):
         self, data: ExperimentData, value: Any, key: Any = None
     ) -> ExperimentData:
         return data.set_value(
-            ExperimentDataEnum.additional_fields,
-            (
-                f"{self.id}{value.columns[0]}"
-                if len(value.columns) == 1
-                else {i: f"{self.id}{i}" for i in value.columns}
-            ),
-            str(self.__class__.__name__),
+            ExperimentDataEnum.groups,
+            self.id,
             value=value,
             key=key,
-            role=TargetRole(),
         )
 
     @classmethod

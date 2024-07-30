@@ -58,7 +58,6 @@ class AASplitter(Calculator):
         data = data.set_value(
             ExperimentDataEnum.additional_fields,
             self._id,
-            str(self.__class__.__name__),
             value,
             role=TreatmentRole(),
         )

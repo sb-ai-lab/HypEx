@@ -85,9 +85,8 @@ class FaissNearestNeighbors(MLExecutor):
             n_neighbors=self.n_neighbors,
             two_sides=self.two_sides,
         )
-        matched_target = Dataset.create_empty()
+        matched_df = Dataset.create_empty()
 
-        target_field = data.ds.search_columns(TargetRole())[0]
         index_field = compare_result.fillna(-1)
         for i in range(len(compare_result.columns)):
             t_index_field = index_field[index_field.columns[i]]
@@ -96,7 +95,7 @@ class FaissNearestNeighbors(MLExecutor):
             )
             new_target = data.ds.iloc[
                 list(map(lambda x: x[0], filtered_field.get_values()))
-            ][target_field]
+            ]
             new_target.index = filtered_field.index
             group = (
                 grouping_data[0][1]
@@ -104,9 +103,9 @@ class FaissNearestNeighbors(MLExecutor):
                 else grouping_data[1][1]
             )
             new_target = new_target.reindex(group.index, fill_value=0).rename(
-                {target_field: target_field + "_matched"}
+                {field: field + "_matched" for field in new_target.columns}
             )
-            matched_target = matched_target.append(new_target).sort()
-        if len(matched_target) < len(data.ds):
-            matched_target = matched_target.reindex(data.ds.index, fill_value=0)
-        return self._set_value(data, matched_target)
+            matched_df = matched_df.append(new_target).sort()
+        if len(matched_df) < len(data.ds):
+            matched_df = matched_df.reindex(data.ds.index, fill_value=0)
+        return self._set_value(data, matched_df, key="matched_df")
