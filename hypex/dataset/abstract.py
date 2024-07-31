@@ -8,7 +8,7 @@ from hypex.dataset.backends import PandasDataset
 from hypex.dataset.roles import (
     ABCRole,
     default_roles,
-    FeatureRole,
+    FeatureRole, DefaultRole,
 )
 from hypex.utils import BackendsEnum, RoleColumnError
 
@@ -41,7 +41,7 @@ class DatasetBase(ABC):
         keys = list(roles.keys())
         for column in self.columns:
             if column not in keys:
-                roles[column] = FeatureRole()
+                roles[column] = DefaultRole()
         return roles
 
     def _set_empty_types(self, roles):

@@ -35,7 +35,7 @@ from .roles import (
     InfoRole,
     ABCRole,
     FilterRole,
-    FeatureRole,
+    FeatureRole, DefaultRole,
 )
 from ..utils.adapter import Adapter
 
@@ -101,7 +101,7 @@ class Dataset(DatasetBase):
             value = value.data
         if key not in self.columns and isinstance(key, str):
             self.add_column(value, {key: InfoRole()})
-            warnings.warn("Column must be added by add_column", category=SyntaxWarning)
+            warnings.warn("Column must be added by using add_column method.", category=SyntaxWarning)
         self.data[key] = value
 
     def __binary_magic_operator(self, other, func_name: str) -> Any:
@@ -285,10 +285,9 @@ class Dataset(DatasetBase):
             raise ConcatBackendError(type(other._backend), type(self._backend))
 
     def append(self, other, index: bool = False) -> "Dataset":
-        if isinstance(other, Dataset):
-            other = [other]
+        other = Adapter.to_list(other)
 
-        new_roles = copy(self.roles)
+        new_roles = deepcopy(self.roles)
         for o in other:
             self._check_other_dataset(o)
             new_roles.update(o.roles)
@@ -353,7 +352,7 @@ class Dataset(DatasetBase):
         func: Optional[Union[str, List]] = None,
         fields_list: Optional[Union[str, List]] = None,
         **kwargs,
-    ):  # TODO: field list does not work in the tutorial
+    ):  # TODO: field is not working in the tutorial
         datasets = [
             (i, Dataset(roles=self.roles, data=data))
             for i, data in self._backend.groupby(by=by, **kwargs)
@@ -555,13 +554,13 @@ class Dataset(DatasetBase):
         result_data = self.backend.transpose(roles_names)
         if roles is None or isinstance(roles, List):
             names = result_data.columns if roles is None else roles
-            roles = {column: FeatureRole() for column in names}
+            roles = {column: DefaultRole() for column in names}
         return Dataset(roles=roles, data=result_data)
 
     def cov(self):
         t_data = self.backend.cov()
         return Dataset(
-            {column: FeatureRole() for column in t_data.columns}, data=t_data
+            {column: DefaultRole() for column in t_data.columns}, data=t_data
         )
 
     def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
