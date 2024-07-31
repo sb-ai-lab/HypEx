@@ -90,6 +90,13 @@ class FaissNearestNeighbors(MLExecutor):
         index_field = compare_result.fillna(-1)
         for i in range(len(compare_result.columns)):
             t_index_field = index_field[index_field.columns[i]]
+            group = (
+                grouping_data[1][1]
+                if compare_result.columns[i] == "test"
+                else grouping_data[0][1]
+            )
+            t_index_field = t_index_field.loc[: len(group) - 1]
+            t_index_field.index = group.index
             filtered_field = t_index_field.drop(
                 t_index_field[t_index_field[t_index_field.columns[0]] == -1], axis=0
             )
@@ -97,11 +104,6 @@ class FaissNearestNeighbors(MLExecutor):
                 list(map(lambda x: x[0], filtered_field.get_values()))
             ]
             new_target.index = filtered_field.index
-            group = (
-                grouping_data[0][1]
-                if compare_result.columns[i] == "test"
-                else grouping_data[1][1]
-            )
             new_target = new_target.reindex(group.index, fill_value=-1).rename(
                 {field: field + "_matched" for field in new_target.columns}
             )
