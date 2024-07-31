@@ -73,8 +73,8 @@ class Comparator(Calculator, ABC):
             space=self.space,
         )
         target_fields = self._field_searching(
-            data,
-            TempTargetRole(),
+            data=data,
+            field=TempTargetRole() if tmp_role else self.target_roles,
             tmp_role=tmp_role,
             search_types=self.search_types,
             space=self.space,
@@ -178,12 +178,8 @@ class Comparator(Calculator, ABC):
             ValueError: If `compare_by` is not one of the allowed values.
         """
         if compare_by == "groups":
-            if isinstance(target_fields, List):
-                target_fields = Adapter.list_to_single(target_fields)
-            if not isinstance(target_fields, str):
-                raise TypeError(
-                    f"group_field must be one string, {type(group_field)} passed."
-                )
+            if isinstance(target_fields, List) and len (target_fields) > 1:
+                raise ValueError("Only one Target field can be passed when the comparison is done by groups")
         elif baseline_field is None:
             raise NoRequiredArgumentError("baseline_field")
 

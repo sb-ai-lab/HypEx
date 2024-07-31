@@ -14,7 +14,7 @@ class Adapter:
     def list_to_single(data: List) -> Any:
         if isinstance(data, List):
             if len(data) == 0:
-                raise ValueError("The list is empty")
+                return None
             elif len(data) == 1:
                 return data[0]
             else:
