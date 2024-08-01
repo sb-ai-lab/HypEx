@@ -85,6 +85,7 @@ class FaissMatcher:
             n_neighbors: int = 10,
             silent: bool = True,
             pbar: bool = True,
+            algo: str = 'fast'
     ):
         """Construct all the necessary attributes.
 
@@ -176,6 +177,7 @@ class FaissMatcher:
         self.silent = silent
         self.pbar = pbar
         self.tqdm = None
+        self.algo = algo
         self.results = pd.DataFrame()
 
     def __getstate__(self) -> dict:
@@ -684,12 +686,12 @@ class FaissMatcher:
 
             if self.pbar:
                 self.tqdm.set_description(desc=f"Get untreated index by group {group}")
-            matches_u_i = _get_index(std_treated_np, std_untreated_np, self.n_neighbors)
+            matches_u_i = _get_index(std_treated_np, std_untreated_np, self.n_neighbors, algo=self.algo)
 
             if self.pbar:
                 self.tqdm.update(1)
                 self.tqdm.set_description(desc=f"Get treated index by group {group}")
-            matches_t_i = _get_index(std_untreated_np, std_treated_np, self.n_neighbors)
+            matches_t_i = _get_index(std_untreated_np, std_treated_np, self.n_neighbors, algo=self.algo)
             if self.pbar:
                 self.tqdm.update(1)
                 self.tqdm.refresh()
@@ -744,12 +746,12 @@ class FaissMatcher:
             self.tqdm = tqdm(total=len(std_treated_np) + len(std_untreated_np))
             self.tqdm.set_description(desc="Get untreated index")
 
-        untreated_index = _get_index(std_treated_np, std_untreated_np, self.n_neighbors)
+        untreated_index = _get_index(std_treated_np, std_untreated_np, self.n_neighbors, algo=self.algo)
 
         if self.pbar:
             self.tqdm.update(len(std_treated_np))
             self.tqdm.set_description(desc="Get treated index")
-        treated_index = _get_index(std_untreated_np, std_treated_np, self.n_neighbors)
+        treated_index = _get_index(std_untreated_np, std_treated_np, self.n_neighbors, algo=self.algo)
 
         if self.pbar:
             self.tqdm.update(len(std_untreated_np))
@@ -827,7 +829,7 @@ def f2(x: np.ndarray, y: np.ndarray) -> Any:
     return x[y]
 
 
-def _get_index(base: np.ndarray, new: np.ndarray, n_neighbors: int = 1) -> list:
+def _get_index(base: np.ndarray, new: np.ndarray, algo: str, n_neighbors: int = 1, ) -> list:
     """Gets array of indexes that match a new array.
 
     Args:
@@ -835,6 +837,8 @@ def _get_index(base: np.ndarray, new: np.ndarray, n_neighbors: int = 1) -> list:
             A numpy array serving as the reference for matching
         new:
             A numpy array that needs to be matched with the base
+        algo:
+            Define which algo is use for matching
         n_neighbors:
             The number of neighbors to use for the matching
 
@@ -843,7 +847,7 @@ def _get_index(base: np.ndarray, new: np.ndarray, n_neighbors: int = 1) -> list:
     """
     length = base.shape[0] + new.shape[0]
     index = faiss.IndexFlatL2(base.shape[1])
-    if length > 1_000_000:
+    if length > 1_000_000 and algo == 'fast':
         index = faiss.IndexIVFFlat(index, base.shape[1], 1000)
         index.train(base)
 
