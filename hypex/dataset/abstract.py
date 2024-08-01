@@ -1,5 +1,6 @@
 import json  # type: ignore
 from abc import ABC
+from copy import deepcopy
 from typing import Iterable, Dict, Union, List, Optional, Any
 
 import pandas as pd  # type: ignore
@@ -11,6 +12,7 @@ from hypex.dataset.roles import (
     FeatureRole, DefaultRole,
 )
 from hypex.utils import BackendsEnum, RoleColumnError
+from hypex.utils.adapter import Adapter
 
 
 def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
@@ -116,6 +118,32 @@ class DatasetBase(ABC):
                 for r in roles
             )
         ]
+
+    def replace_roles(
+            self,
+            to_replace_roles: Union[ABCRole, str, List[Union[ABCRole, str]]],
+            values: Union[ABCRole, List[ABCRole]],
+            to_replace_types: Optional[List] = None,
+            tmp_role: bool = False,
+
+    ):
+        to_replace_roles = Adapter.to_list(to_replace_roles)
+
+        if not isinstance(values, List) or len(values) == 1:
+            values = [values] * len(to_replace_roles)
+        elif len(values) != len(to_replace_roles):
+            raise ValueError("to_replace and value must have the same length")
+
+        for to_replace_role, new_role in zip(to_replace_roles, values):
+            columns = self.search_columns(to_replace_role, tmp_role=tmp_role, search_types=to_replace_types)
+            for column in columns:
+                if tmp_role:
+                    self._tmp_roles[column] = new_role
+                    self._tmp_roles[column].data_type = to_replace_role.data_type
+                else:
+                    self.roles[column] = new_role
+                    self.roles[column].data_type = to_replace_role.data_type
+        return self.roles
 
     @property
     def index(self):
