@@ -390,7 +390,7 @@ class Dataset(DatasetBase):
 
     def fillna(
         self,
-        values: Union[int, Dict[str, str]],
+        values: Union[int, Dict[str, str]] = None,
         method: Optional[str] = None,
         **kwargs,
     ):

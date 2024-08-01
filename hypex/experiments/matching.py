@@ -7,7 +7,7 @@ from hypex.dataset import TreatmentRole, TargetRole
 from hypex.encoders.encoders import DummyEncoder
 from hypex.experiments import Experiment
 from hypex.ml.faiss import FaissNearestNeighbors
-from hypex.operators.operators import MatchingMetrics
+from hypex.operators.operators import MatchingMetrics, Bias
 from hypex.ui.base import ExperimentShell
 from hypex.ui.matching import MatchingOutput
 
@@ -28,8 +28,20 @@ class Matching(ExperimentShell):
         executors = []
         for i in filters:
             executors += [filters_mapping[i]]
+        if bias_estimation:
+            executors += [
+                FaissNearestNeighbors(
+                    grouping_role=TreatmentRole(), two_sides=two_sides
+                ),
+                Bias(grouping_role=TreatmentRole(), target_roles=[TargetRole()]),
+            ]
+        else:
+            executors += [
+                FaissNearestNeighbors(
+                    grouping_role=TreatmentRole(), two_sides=two_sides
+                )
+            ]
         executors += [
-            FaissNearestNeighbors(grouping_role=TreatmentRole(), two_sides=two_sides),
             MatchingMetrics(
                 grouping_role=TreatmentRole(),
                 target_roles=[TargetRole()],

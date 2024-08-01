@@ -62,3 +62,8 @@ class BackendTypeError(Exception):
 class MergeOnError(Exception):
     def __init__(self, on):
         super().__init__(f"Can only merge on one of the columns data. Got {on}")
+
+
+class NoneArgumentError(Exception):
+    def __init__(self, arg, process):
+        super().__init__(f"Argument {arg} is None in process {process}.")
