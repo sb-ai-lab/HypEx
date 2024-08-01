@@ -143,12 +143,11 @@ class Comparator(Calculator, ABC):
     def _split_ds_into_columns(
         data: List[Tuple[str, Dataset]]
     ) -> List[Tuple[str, Dataset]]:
-        result = []
-        for bucket in data:
-            for column in bucket[1].columns:
-                result.append(
-                    (f"{bucket[0]}{NAME_BORDER_SYMBOL}{column}", bucket[1][column])
-                )
+        result = [
+            ("{bucket[0]}{NAME_BORDER_SYMBOL}{column}", bucket[1][column])
+            for bucket in data
+            for column in bucket[1].columns
+        ]
         return result
 
     @classmethod
@@ -178,8 +177,10 @@ class Comparator(Calculator, ABC):
             ValueError: If `compare_by` is not one of the allowed values.
         """
         if compare_by == "groups":
-            if isinstance(target_fields, List) and len (target_fields) > 1:
-                raise ValueError("Only one Target field can be passed when the comparison is done by groups")
+            if isinstance(target_fields, List) and len(target_fields) > 1:
+                raise ValueError(
+                    "Only one Target field can be passed when the comparison is done by groups"
+                )
         elif baseline_field is None:
             raise NoRequiredArgumentError("baseline_field")
 
