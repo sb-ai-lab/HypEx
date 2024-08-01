@@ -43,5 +43,5 @@ __all__ = [
     "ABCRole",
     "default_roles",
     "DatasetBase",
-    "DatasetAdapter"
+    "DatasetAdapter",
 ]

@@ -219,6 +219,7 @@ class DefaultRole(ABCRole):
 
     _role_name: RoleNameType = "Default"
 
+
 class ReportRole(ABCRole):
     """ """
 

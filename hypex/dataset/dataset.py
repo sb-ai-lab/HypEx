@@ -35,7 +35,8 @@ from .roles import (
     InfoRole,
     ABCRole,
     FilterRole,
-    FeatureRole, DefaultRole,
+    FeatureRole,
+    DefaultRole,
 )
 from ..utils.adapter import Adapter
 
@@ -101,7 +102,10 @@ class Dataset(DatasetBase):
             value = value.data
         if key not in self.columns and isinstance(key, str):
             self.add_column(value, {key: InfoRole()})
-            warnings.warn("Column must be added by using add_column method.", category=SyntaxWarning)
+            warnings.warn(
+                "Column must be added by using add_column method.",
+                category=SyntaxWarning,
+            )
         self.data[key] = value
 
     def __binary_magic_operator(self, other, func_name: str) -> Any:
@@ -736,16 +740,15 @@ class DatasetAdapter(Adapter):
             raise ValueError(f"Unsupported data type {type(data)}")
 
     @staticmethod
-    def value_to_dataset(data: ScalarType, roles: Union[ABCRole, Dict[str, ABCRole]]) -> Dataset:
+    def value_to_dataset(
+        data: ScalarType, roles: Union[ABCRole, Dict[str, ABCRole]]
+    ) -> Dataset:
         """
         Convert a float to a Dataset
         """
         if isinstance(roles, ABCRole):
-            roles= {"0": roles}
-        return Dataset(
-            roles=roles,
-            data=pd.DataFrame({list(roles.keys())[0]: [data]})
-        )
+            roles = {"0": roles}
+        return Dataset(roles=roles, data=pd.DataFrame({list(roles.keys())[0]: [data]}))
 
     @staticmethod
     def dict_to_dataset(
