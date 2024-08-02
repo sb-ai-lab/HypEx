@@ -161,7 +161,7 @@ class DatasetBase(ABC):
     @roles.setter
     def roles(self, value):
         self.set_roles(new_roles_map=value, temp_role=False)
-        self._set_empty_types(self._roles)
+        # self._set_empty_types(self._roles)
 
     @data.setter
     def data(self, value):
@@ -224,12 +224,14 @@ class DatasetBase(ABC):
         keys, values = list(new_roles_map.keys()), list(new_roles_map.values())
         roles, columns_sets = (keys, values) if isinstance(keys[0], ABCRole) else (values, keys)
 
+        new_roles = {}
         for role, columns in zip(roles, columns_sets):
             columns = Adapter.to_list(columns)
             for column in columns:
+                new_roles[column] = role
                 if temp_role:
-                    self._tmp_roles[column] = role
+                    self._tmp_roles = new_roles
                 else:
-                    self._roles[column] = role
+                    self._roles = new_roles
 
         return self._roles
