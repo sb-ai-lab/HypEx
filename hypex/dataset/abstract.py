@@ -161,7 +161,6 @@ class DatasetBase(ABC):
     @roles.setter
     def roles(self, value):
         self.set_roles(new_roles_map=value, temp_role=False)
-        # self._set_empty_types(self._roles)
 
     @data.setter
     def data(self, value):
