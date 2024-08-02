@@ -68,7 +68,10 @@ class AAScoreAnalyzer(Executor):
         self, data: ExperimentData, value: Any, key: Any = None
     ) -> ExperimentData:
         return data.set_value(
-            ExperimentDataEnum.analysis_tables, self.id, self.key, value
+            ExperimentDataEnum.analysis_tables,
+            executor_id=self.id,
+            key=self.key,
+            value=value,
         )
 
     def _analyze_aa_score(

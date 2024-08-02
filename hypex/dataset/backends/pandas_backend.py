@@ -446,7 +446,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             ):
                 raise MergeOnError(on_)
 
-        if not all([on, left_on, right_on,]) and all([left_index is None, right_index is None]):
+        if not all(
+            [
+                on,
+                left_on,
+                right_on,
+            ]
+        ) and all([left_index is None, right_index is None]):
             left_index = True
             right_index = True
 

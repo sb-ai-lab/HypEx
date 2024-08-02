@@ -211,6 +211,15 @@ class TempGroupingRole(GroupingRole):
     _role_name: RoleNameType = "TempGrouping"
 
 
+class DefaultRole(ABCRole):
+    """The default role for a  newly created columns or any column for which another role has not been defined.
+    Attributes:
+        _role_name (RoleNameType): A name identifying the role as 'Default'.
+    """
+
+    _role_name: RoleNameType = "Default"
+
+
 class ReportRole(ABCRole):
     """ """
 
@@ -219,6 +228,7 @@ class ReportRole(ABCRole):
 
 default_roles: Dict[RoleNameType, ABCRole] = {
     "info": InfoRole(),
+    "default": DefaultRole(),
     "feature": FeatureRole(),
     "treatment": TreatmentRole(),
     "grouping": GroupingRole(),

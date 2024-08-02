@@ -1,5 +1,6 @@
 import json  # type: ignore
 from abc import ABC
+from copy import deepcopy
 from typing import Iterable, Dict, Union, List, Optional, Any
 
 import pandas as pd  # type: ignore
@@ -9,8 +10,10 @@ from hypex.dataset.roles import (
     ABCRole,
     default_roles,
     FeatureRole,
+    DefaultRole,
 )
 from hypex.utils import BackendsEnum, RoleColumnError
+from hypex.utils.adapter import Adapter
 
 
 def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
@@ -41,7 +44,7 @@ class DatasetBase(ABC):
         keys = list(roles.keys())
         for column in self.columns:
             if column not in keys:
-                roles[column] = FeatureRole()
+                roles[column] = DefaultRole()
         return roles
 
     def _set_empty_types(self, roles):
@@ -76,7 +79,7 @@ class DatasetBase(ABC):
             if backend
             else self._select_backend_from_data(data)
         )
-        roles = (
+        roles = (  # What does this all mean?
             parse_roles(roles)
             if any(isinstance(role, type) for role in roles.keys())
             else roles
@@ -88,7 +91,7 @@ class DatasetBase(ABC):
         if data is not None:
             roles = self._set_all_roles(roles)
             self._set_empty_types(roles)
-        self.roles: Dict[Union[str, int], ABCRole] = roles
+        self._roles: Dict[Union[str, int], ABCRole] = roles
         self._tmp_roles: Union[
             Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
         ] = {}
@@ -117,6 +120,32 @@ class DatasetBase(ABC):
             )
         ]
 
+    def replace_roles(
+        self,
+        to_replace_roles: Union[ABCRole, str, List[Union[ABCRole, str]]],
+        values: Union[ABCRole, List[ABCRole]],
+        to_replace_types: Optional[List] = None,
+        tmp_role: bool = False,
+    ):
+        to_replace_roles = Adapter.to_list(to_replace_roles)
+
+        if not isinstance(values, List) or len(values) == 1:
+            values = [values] * len(to_replace_roles)
+        elif len(values) != len(to_replace_roles):
+            raise ValueError("to_replace_roles and values must have the same length")
+
+        for to_replace_role, new_role in zip(to_replace_roles, values):
+            columns = self.search_columns(
+                to_replace_role, tmp_role=tmp_role, search_types=to_replace_types
+            )
+            for column in columns:
+                new_role.data_type = new_role.data_type or self.roles[column].data_type
+                if tmp_role:
+                    self._tmp_roles[column] = new_role
+                else:
+                    self.roles[column] = new_role
+        return self.roles
+
     @property
     def index(self):
         return self._backend.index
@@ -124,6 +153,14 @@ class DatasetBase(ABC):
     @property
     def data(self):
         return self._backend.data
+
+    @property
+    def roles(self):
+        return self._roles
+
+    @roles.setter
+    def roles(self, value):
+        self.set_roles(new_roles_map=value, temp_role=False)
 
     @data.setter
     def data(self, value):
@@ -139,7 +176,7 @@ class DatasetBase(ABC):
 
     @tmp_roles.setter
     def tmp_roles(self, value):
-        self._tmp_roles = value
+        self.set_roles(new_roles_map=value, temp_role=True)
         self._set_empty_types(self._tmp_roles)
 
     def to_dict(self):
@@ -171,3 +208,29 @@ class DatasetBase(ABC):
         column: Optional[str] = None,
     ) -> Any:
         return self._backend.get_values(row=row, column=column)
+
+    def set_roles(
+        self,
+        new_roles_map: Union[
+            Dict[ABCRole, Union[List[str], str]],
+            Dict[Union[List[str], str], ABCRole]
+        ],
+        temp_role: bool = False,
+    ):
+        if not new_roles_map:
+            return self._roles
+
+        keys, values = list(new_roles_map.keys()), list(new_roles_map.values())
+        roles, columns_sets = (keys, values) if isinstance(keys[0], ABCRole) else (values, keys)
+
+        new_roles = {}
+        for role, columns in zip(roles, columns_sets):
+            columns = Adapter.to_list(columns)
+            for column in columns:
+                new_roles[column] = role
+                if temp_role:
+                    self._tmp_roles = new_roles
+                else:
+                    self._roles = new_roles
+
+        return self._roles
