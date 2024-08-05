@@ -1,3 +1,3 @@
-from .executor import Executor, Calculator, MLExecutor
+from .executor import Executor, Calculator, MLExecutor, MatchingMetrics
 
-__all__ = ["Executor", "Calculator", "MLExecutor"]
+__all__ = ["Executor", "Calculator", "MLExecutor", "MatchingMetrics"]

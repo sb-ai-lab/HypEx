@@ -1,7 +1,7 @@
 from hypex.dataset.dataset import DatasetAdapter, ExperimentData
 from hypex.dataset.roles import StatisticRole
 from hypex.executor.executor import Executor
-from hypex.comparators.comparators import MatchingMetrics
+from hypex.executor import MatchingMetrics
 from hypex.utils.enums import ExperimentDataEnum
 
 

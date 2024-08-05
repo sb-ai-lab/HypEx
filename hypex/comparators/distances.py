@@ -1,12 +1,11 @@
 from typing import Optional, List, Dict, Any
 
+from hypex.comparators.abstract import Comparator
 from hypex.dataset import Dataset, ExperimentData, FeatureRole, GroupingRole, ABCRole
-from hypex.executor import Calculator
 from hypex.extensions.scipy_linalg import CholeskyExtension, InverseExtension
-from hypex.utils import ExperimentDataEnum
 
 
-class MahalanobisDistance(Calculator):
+class MahalanobisDistance(Comparator):
 
     def __init__(
         self,
