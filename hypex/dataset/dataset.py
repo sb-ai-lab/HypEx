@@ -388,14 +388,13 @@ class Dataset(DatasetBase):
 
     def fillna(
         self,
-        values: Union[int, Dict[str, str]],
-        method: Optional[str] = None,
+        values: Union[ScalarType, Dict[str, ScalarType], None] = None,
+        method: Optional[Literal["bfill", "ffill"]] = None,
         **kwargs,
     ):
-        if method and method not in ["backfill", "bfill", "ffill"]:
-            raise NameError("Unsupported fill method")
         return Dataset(
-            roles=self.roles, data=self.backend.fillna(values, method, **kwargs)
+            roles=self.roles,
+            data=self.backend.fillna(values=values, method=method, **kwargs),
         )
 
     def mean(self):

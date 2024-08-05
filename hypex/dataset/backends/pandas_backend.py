@@ -382,7 +382,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         ).reset_index()
 
     def fillna(self, values, method, **kwargs) -> pd.DataFrame:
-        return self.data.fillna(values, method=method, **kwargs)
+        return self.data.fillna(value=values, method=method, **kwargs)
 
     def na_counts(self) -> Union[pd.DataFrame, int]:
         data = self.data.isna().sum().to_frame().T
