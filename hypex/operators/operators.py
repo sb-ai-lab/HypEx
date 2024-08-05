@@ -97,10 +97,10 @@ class MatchingMetrics(GroupOperator):
             if len(
                 grouping_data[0][1][grouping_data[0][1][target_fields[1]] == -1]
             ) == len(grouping_data[0][1]):
-                metric = "atc"
+                metric = "att"
             else:
                 metric = (
-                    "att"
+                    "atс"
                     if len(
                         grouping_data[1][1][grouping_data[1][1][target_fields[1]] == -1]
                     )
@@ -124,11 +124,11 @@ class MatchingMetrics(GroupOperator):
         **kwargs
     ) -> Any:
         metric = kwargs.get("metric", "ate")
-        itc = test_data[target_fields[0]] - test_data[target_fields[1]]
-        itt = data[target_fields[1]] - data[target_fields[0]]
+        itt = test_data[target_fields[0]] - test_data[target_fields[1]]
+        itc = data[target_fields[1]] - data[target_fields[0]]
         if kwargs.get("bias", False):
-            itt += Dataset.from_dict({"test": kwargs.get("bias")["test"]}, roles={})
-            itc -= Dataset.from_dict(
+            itc += Dataset.from_dict({"test": kwargs.get("bias")["test"]}, roles={})
+            itt -= Dataset.from_dict(
                 {"control": kwargs.get("bias")["control"]}, roles={}
             )
         itt = itt.mean()
@@ -248,14 +248,16 @@ class Bias(GroupOperator):
 
     @staticmethod
     def calc_coefficients(X: Dataset, Y: Dataset) -> List[float]:
-        X_l = Dataset.create_empty(roles={"term": InfoRole()}, index=X.index).fillna(1)
-        X_l = X_l.append(X, axis=1).fillna(0)
-        return np.linalg.lstsq(X_l.data.values, Y.data.values, rcond=-1)[0][1:]
+        X_l = Dataset.create_empty(roles={"temp": InfoRole()}, index=X.index).fillna(1)
+        return np.linalg.lstsq(
+            X_l.append(X, axis=1).data.values, Y.data.values, rcond=-1
+        )[0][1:]
 
     @staticmethod
     def calc_bias(
         X: Dataset, X_matched: Dataset, coefficients: List[float]
     ) -> List[float]:
-        X = X.data.values
-        X_matched = X_matched.data.values
-        return [(j - i).dot(coefficients)[0] for i, j in zip(X, X_matched)]
+        return [
+            (j - i).dot(coefficients)[0]
+            for i, j in zip(X.data.values, X_matched.data.values)
+        ]
