@@ -68,8 +68,8 @@ class Dataset(DatasetBase):
     def __init__(
         self,
         roles: Union[
-            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
-            Dict[Union[str, int], ABCRole],
+            Dict[ABCRole, Union[List[str], str]],
+            Dict[str, ABCRole],
         ],
         data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
@@ -252,9 +252,8 @@ class Dataset(DatasetBase):
     def _convert_data_after_agg(self, result) -> Union["Dataset", float]:
         if isinstance(result, float):
             return result
-        return Dataset(
-            data=result, roles={column: StatisticRole() for column in self.roles}
-        )
+        role: ABCRole = StatisticRole()
+        return Dataset(data=result, roles={column: role for column in self.roles})
 
     def add_column(
         self,
@@ -302,8 +301,8 @@ class Dataset(DatasetBase):
     def from_dict(
         data: FromDictTypes,
         roles: Union[
-            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
-            Dict[Union[str, int], ABCRole],
+            Dict[ABCRole, Union[List[str], str]],
+            Dict[str, ABCRole],
         ],
         backend: BackendsEnum = BackendsEnum.pandas,
         index=None,
@@ -344,8 +343,9 @@ class Dataset(DatasetBase):
         return self._backend.nunique(dropna)
 
     def isin(self, values: Iterable) -> "Dataset":
+        role: ABCRole = FilterRole()
         return Dataset(
-            roles={column: FilterRole() for column in self.roles.keys()},
+            roles={column: role for column in self.roles.keys()},
             data=self._backend.isin(values),
         )
 
@@ -390,7 +390,7 @@ class Dataset(DatasetBase):
 
     def fillna(
         self,
-        values: Union[int, Dict[str, str]] = None,
+        values: Union[int, Dict[str, str], None] = None,
         method: Optional[str] = None,
         **kwargs,
     ):
@@ -551,9 +551,11 @@ class Dataset(DatasetBase):
 
     def transpose(
         self,
-        roles: Optional[Union[Dict[Union[str, int], ABCRole], List]] = None,
+        roles: Optional[Union[Dict[str, ABCRole], List]] = None,
     ) -> "Dataset":
-        roles_names = roles.keys() or {} if isinstance(roles, Dict) else roles
+        roles_names: List[str] = (
+            roles.keys() or {} if isinstance(roles, Dict) else roles
+        )
         result_data = self.backend.transpose(roles_names)
         if roles is None or isinstance(roles, List):
             names = result_data.columns if roles is None else roles
@@ -590,7 +592,7 @@ class ExperimentData:
         self._data = data
         self.additional_fields = Dataset.create_empty(index=data.index)
         self.variables: Dict[str, Dict[str, Union[int, float]]] = {}
-        self.groups: Dict[str, Dict[Hashable, Dataset]] = {}
+        self.groups: Dict[str, Dict[str, Dataset]] = {}
         self.analysis_tables: Dict[str, Dataset] = {}
         self.id_name_mapping: Dict[str, str] = {}
 
@@ -728,8 +730,12 @@ class DatasetAdapter(Adapter):
         if isinstance(data, Dict):
             return DatasetAdapter.dict_to_dataset(data, roles)
         elif isinstance(data, pd.DataFrame):
+            if isinstance(roles, ABCRole):
+                raise ValueError("")
             return DatasetAdapter.frame_to_dataset(data, roles)
         elif isinstance(data, List):
+            if isinstance(roles, ABCRole):
+                raise ValueError("")
             return DatasetAdapter.list_to_dataset(data, roles)
         elif any(isinstance(data, t) for t in [str, int, float, bool]):
             return DatasetAdapter.value_to_dataset(data, roles)

@@ -26,6 +26,7 @@ class FaissNearestNeighbors(MLExecutor):
     def _execute_inner_function(
         cls,
         grouping_data,
+        target_field: Optional[str] = None,
         n_neighbors: Optional[int] = None,
         two_sides: Optional[bool] = None,
         **kwargs,
@@ -53,6 +54,7 @@ class FaissNearestNeighbors(MLExecutor):
         cls,
         data: Dataset,
         test_data: Optional[Dataset] = None,
+        target_data: Optional[Dataset] = None,
         n_neighbors: Optional[int] = None,
         **kwargs,
     ) -> Any:

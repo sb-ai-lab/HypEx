@@ -1,7 +1,7 @@
 from copy import deepcopy
 from typing import Optional, Any, List, Literal, Union, Dict
 
-from plotly.figure_factory import np
+import numpy as np
 
 from hypex.dataset import (
     Dataset,
@@ -37,8 +37,14 @@ class MatchingMetrics(GroupOperator):
         key: Any = "",
     ):
         self.metric = metric or "auto"
+        target_roles = target_roles or TargetRole()
         super().__init__(
-            grouping_role=grouping_role, target_roles=target_roles, space=space, key=key
+            grouping_role=grouping_role,
+            target_roles=(
+                target_roles if isinstance(target_roles, List) else [target_roles]
+            ),
+            space=space,
+            key=key,
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -123,12 +129,17 @@ class MatchingMetrics(GroupOperator):
         target_fields: Optional[List[str]] = None,
         **kwargs
     ) -> Any:
+        if target_fields is None or test_data is None:
+            raise NoneArgumentError(
+                ["target_fields", "test_data"], "att, atc, ate estimation"
+            )
         metric = kwargs.get("metric", "ate")
         itt = test_data[target_fields[0]] - test_data[target_fields[1]]
         itc = data[target_fields[1]] - data[target_fields[0]]
-        if kwargs.get("bias", False):
-            itc -= Dataset.from_dict({"test": kwargs.get("bias")["control"]}, roles={})
-            itt += Dataset.from_dict({"control": kwargs.get("bias")["test"]}, roles={})
+        bias = kwargs.get("bias", {})
+        if len(bias) > 0:
+            itc -= Dataset.from_dict({"test": bias["control"]}, roles={})
+            itt += Dataset.from_dict({"control": bias["test"]}, roles={})
         itt = itt.mean()
         itc = itc.mean()
         if metric == "atc":

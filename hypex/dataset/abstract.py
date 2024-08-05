@@ -65,8 +65,8 @@ class DatasetBase(ABC):
     def __init__(
         self,
         roles: Union[
-            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
-            Dict[Union[str, int], ABCRole],
+            Dict[ABCRole, Union[List[str], str]],
+            Dict[str, ABCRole],
         ],
         data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
@@ -88,7 +88,7 @@ class DatasetBase(ABC):
         if data is not None:
             roles = self._set_all_roles(roles)
             self._set_empty_types(roles)
-        self.roles: Dict[Union[str, int], ABCRole] = roles
+        self.roles: Dict[str, ABCRole] = roles
         self._tmp_roles: Union[
             Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
         ] = {}
