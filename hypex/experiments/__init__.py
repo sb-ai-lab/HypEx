@@ -9,8 +9,6 @@ from .homogeneity import HOMOGENEITY_TEST
 from .matching import Matching
 
 __all__ = [
-    "Experiment",
-    "OnRoleExperiment",
     "CycledExperiment",
     "GroupExperiment",
     "AATest",

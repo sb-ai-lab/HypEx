@@ -5,7 +5,7 @@ from hypex.analyzers.matching import MatchingAnalyzer
 from hypex.comparators.distances import MahalanobisDistance
 from hypex.dataset import TreatmentRole, TargetRole
 from hypex.encoders.encoders import DummyEncoder
-from hypex.experiments import Experiment
+from hypex.experiments.base import Experiment
 from hypex.ml.faiss import FaissNearestNeighbors
 from hypex.operators.operators import MatchingMetrics, Bias
 from hypex.ui.base import ExperimentShell

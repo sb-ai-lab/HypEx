@@ -3,7 +3,7 @@ from typing import Optional, Literal, Union, List
 from hypex.analyzers.ab import ABAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes, TTest, UTest, Chi2Test
 from hypex.dataset import TargetRole, TreatmentRole
-from hypex.experiments import Experiment, OnRoleExperiment
+from hypex.experiments.base import Experiment, OnRoleExperiment
 from hypex.ui.ab import ABOutput
 from hypex.ui.base import ExperimentShell
 from hypex.utils import ABNTestMethodsEnum
