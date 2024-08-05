@@ -16,7 +16,21 @@ class Matching(ExperimentShell):
 
     @staticmethod
     def _make_experiment(
-        filters, distance, two_sides, metric, quality_tests, bias_estimation
+        filters: Union[
+            Literal["fillna", "const-filter", "na-filter", "dummy-encoder", "auto"],
+            List[
+                Literal["fillna", "const-filter", "na-filter", "dummy-encoder", "auto"]
+            ],
+            None,
+        ] = "auto",
+        distance: Literal["mahalanobis", "l2"] = "mahalanobis",
+        two_sides: bool = True,
+        metric: Literal["atc", "att", "ate", "auto"] = "auto",
+        bias_estimation: bool = True,
+        quality_tests: Union[
+            Literal["smd", "psi", "ks-test", "repeats", "auto"],
+            List[Literal["smd", "psi", "ks-test", "repeats", "auto"]],
+        ] = "auto",
     ):
         filters_mapping = {"dummy-encoder": DummyEncoder(), "auto": DummyEncoder()}
         distance_mapping = {
@@ -79,7 +93,7 @@ class Matching(ExperimentShell):
     ):
         super().__init__(
             experiment=self._make_experiment(
-                filters, distance, two_sides, metric, quality_tests, bias_estimation
+                filters, distance, two_sides, metric, bias_estimation, quality_tests
             ),
             output=MatchingOutput(),
         )
