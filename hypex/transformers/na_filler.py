@@ -14,9 +14,9 @@ class NaFiller(Transformer):
     def __init__(
         self,
         target_roles: Optional[Union[str, Sequence[str]]] = None,
+        values: Union[ScalarType, Dict[str, ScalarType], None] = None,
+        method: Optional[Literal["bfill", "ffill"]] = None,
         key: Any = "",
-        values: Union[ScalarType, Dict[str, ScalarType]] = None,
-        method: Literal["bfill", "ffill"] = None,
     ):
         """
         Initializes a NaFiller object.
@@ -40,11 +40,10 @@ class NaFiller(Transformer):
     def _inner_function(
         data: Dataset,
         target_cols: Optional[str] = None,
-        values: Union[ScalarType, Dict[str, ScalarType]] = None,
-        method: Literal["bfill", "ffill"] = None,
+        values: Union[ScalarType, Dict[str, ScalarType], None] = None,
+        method: Optional[Literal["bfill", "ffill"]] = None,
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
-        print(target_cols)
         for column in target_cols:
             value = values[column] if isinstance(values, dict) else values
             data[column] = data[column].fillna(values=value, method=method)

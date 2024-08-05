@@ -388,12 +388,10 @@ class Dataset(DatasetBase):
 
     def fillna(
         self,
-        values: Union[ScalarType, Dict[str, ScalarType]] = None,
-        method: Literal["bfill", "ffill"] = None,
+        values: Union[ScalarType, Dict[str, ScalarType], None] = None,
+        method: Optional[Literal["bfill", "ffill"]] = None,
         **kwargs,
     ):
-        if method and method not in ["bfill", "ffill"]:
-            raise NameError("Unsupported fill method")
         return Dataset(
             roles=self.roles,
             data=self.backend.fillna(values=values, method=method, **kwargs),
