@@ -124,11 +124,11 @@ class MatchingMetrics(GroupOperator):
         **kwargs
     ) -> Any:
         metric = kwargs.get("metric", "ate")
-        itc = data[target_fields[0]] - data[target_fields[1]]
-        itt = test_data[target_fields[0]] - test_data[target_fields[1]]
+        itc = test_data[target_fields[0]] - test_data[target_fields[1]]
+        itt = data[target_fields[1]] - data[target_fields[0]]
         if kwargs.get("bias", False):
-            itt -= Dataset.from_dict({"test": kwargs.get("bias")["test"]}, roles={})
-            itc += Dataset.from_dict(
+            itt += Dataset.from_dict({"test": kwargs.get("bias")["test"]}, roles={})
+            itc -= Dataset.from_dict(
                 {"control": kwargs.get("bias")["control"]}, roles={}
             )
         itt = itt.mean()
