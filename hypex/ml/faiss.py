@@ -85,26 +85,29 @@ class FaissNearestNeighbors(MLExecutor):
             n_neighbors=self.n_neighbors,
             two_sides=self.two_sides,
         )
+        ds = data.ds.groupby(group_field)
         matched_df = Dataset.create_empty()
-
-        index_field = compare_result.fillna(-1)
         for i in range(len(compare_result.columns)):
-            t_index_field = index_field[index_field.columns[i]]
+            t_index_field = compare_result[compare_result.columns[i]]
             group = (
                 grouping_data[1][1]
                 if compare_result.columns[i] == "test"
                 else grouping_data[0][1]
             )
+            t_ds = ds[0][1] if compare_result.columns[i] == "test" else ds[1][1]
+            indexes = group.index
             t_index_field = t_index_field.loc[: len(group) - 1]
-            t_index_field.index = group.index
+            if t_index_field.isna().sum() > 0:
+                raise ValueError("")
+            t_index_field.index = indexes
             filtered_field = t_index_field.drop(
                 t_index_field[t_index_field[t_index_field.columns[0]] == -1], axis=0
             )
-            new_target = data.ds.iloc[
-                list(map(lambda x: x[0], filtered_field.get_values()))
+            new_target = t_ds.iloc[
+                list(map(lambda x: int(x[0]), filtered_field.get_values()))
             ]
             new_target.index = filtered_field.index
-            new_target = new_target.reindex(group.index, fill_value=-1).rename(
+            new_target = new_target.reindex(indexes, fill_value=-1).rename(
                 {field: field + "_matched" for field in new_target.columns}
             )
             matched_df = matched_df.append(new_target).sort()
