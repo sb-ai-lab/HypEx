@@ -100,7 +100,7 @@ class MatchingMetrics(GroupOperator):
                 metric = "att"
             else:
                 metric = (
-                    "atс"
+                    "atc"
                     if len(
                         grouping_data[1][1][grouping_data[1][1][target_fields[1]] == -1]
                     )
@@ -127,16 +127,14 @@ class MatchingMetrics(GroupOperator):
         itt = test_data[target_fields[0]] - test_data[target_fields[1]]
         itc = data[target_fields[1]] - data[target_fields[0]]
         if kwargs.get("bias", False):
-            itc += Dataset.from_dict({"test": kwargs.get("bias")["test"]}, roles={})
-            itt -= Dataset.from_dict(
-                {"control": kwargs.get("bias")["control"]}, roles={}
-            )
+            itc -= Dataset.from_dict({"test": kwargs.get("bias")["control"]}, roles={})
+            itt += Dataset.from_dict({"control": kwargs.get("bias")["test"]}, roles={})
         itt = itt.mean()
         itc = itc.mean()
         if metric == "atc":
             return {"ATC": itc}
         if metric == "att":
-            return {"ATC": itt}
+            return {"ATT": itt}
         len_test, len_control = len(data), len(test_data)
         return {
             "ATT": itt,
@@ -232,16 +230,16 @@ class Bias(GroupOperator):
                 test_data[features_fields[: len(features_fields) // 2]],
                 test_data[features_fields[len(features_fields) // 2 :]],
                 cls.calc_coefficients(
-                    data[features_fields[len(features_fields) // 2 :]],
-                    data[target_fields[1]],
+                    test_data[features_fields[len(features_fields) // 2 :]],
+                    test_data[target_fields[1]],
                 ),
             ),
             "control": cls.calc_bias(
                 data[features_fields[: len(features_fields) // 2]],
                 data[features_fields[len(features_fields) // 2 :]],
                 cls.calc_coefficients(
-                    test_data[features_fields[len(features_fields) // 2 :]],
-                    test_data[target_fields[1]],
+                    data[features_fields[len(features_fields) // 2 :]],
+                    data[target_fields[1]],
                 ),
             ),
         }
