@@ -103,7 +103,7 @@ class Executor(ABC):
         return False
 
     def _set_value(
-        self, data: ExperimentData, value: Any, key: Any = None
+        self, data: ExperimentData, space: ExperimentDataEnum, value: Any, key: Any = None
     ) -> ExperimentData:
         # defined in order to avoid  unnecessary redefinition in classes like transformer
         return data
@@ -114,6 +114,16 @@ class Executor(ABC):
 
 
 class Calculator(Executor, ABC):
+    def _set_value(
+        self, data: ExperimentData, space: ExperimentDataEnum, value: Any, key: Any = None
+    ) -> ExperimentData:
+        return data.set_value(
+            value=value,
+            space=space,
+            executor_id=self.id,
+            key=key,
+        )
+
     @classmethod
     def calc(cls, data: Dataset, **kwargs):
         return cls._inner_function(data, **kwargs)
@@ -224,16 +234,6 @@ class MLExecutor(Calculator, ABC):
             **kwargs,
         )
 
-    def _set_value(
-        self, data: ExperimentData, value: Any, key: Any = None
-    ) -> ExperimentData:
-        return data.set_value(
-            ExperimentDataEnum.groups,
-            self.id,
-            value=value,
-            key=key,
-        )
-
     @classmethod
     def calc(
         cls,
@@ -283,4 +283,4 @@ class MLExecutor(Calculator, ABC):
             target_fields=target_fields,
             features_fields=features_fields,
         )
-        return self._set_value(data, compare_result)
+        return self._set_value(data=data, value=compare_result, space=ExperimentDataEnum.groups)

@@ -113,16 +113,6 @@ class Comparator(Calculator, ABC):
             raise ValueError("test_data is needed for evaluation")
         return test_data
 
-    def _set_value(
-        self, data: ExperimentData, value: Optional[Dataset] = None, key: Any = None
-    ) -> ExperimentData:
-        data.set_value(
-            ExperimentDataEnum.analysis_tables,
-            self.id,
-            value,
-        )
-        return data
-
     # TODO compare_result.values(), но тайпинг для нее FromDictTypes
     @staticmethod
     def _extract_dataset(
@@ -144,7 +134,7 @@ class Comparator(Calculator, ABC):
         data: List[Tuple[str, Dataset]]
     ) -> List[Tuple[str, Dataset]]:
         result = [
-            ("{bucket[0]}{NAME_BORDER_SYMBOL}{column}", bucket[1][column])
+            (f"{bucket[0]}{NAME_BORDER_SYMBOL}{column}", bucket[1][column])
             for bucket in data
             for column in bucket[1].columns
         ]
@@ -274,13 +264,13 @@ class Comparator(Calculator, ABC):
             data=data.ds,
             compare_by=self.compare_by,
             target_fields=target_fields,
-            baseline_field=baseline_field,
-            group_field=group_field,
+            baseline_field=Adapter.list_to_single(baseline_field),
+            group_field=Adapter.list_to_single(group_field),
         )
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key in compare_result}
         )
-        return self._set_value(data, result_dataset)
+        return self._set_value(data=data, space=ExperimentDataEnum.analysis_tables, value=result_dataset)
 
 
 class StatHypothesisTesting(Comparator, ABC):

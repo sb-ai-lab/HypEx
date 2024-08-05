@@ -72,12 +72,3 @@ class GroupOperator(Calculator):
             )
         return result
 
-    def _set_value(
-        self, data: ExperimentData, value: Optional[Dict] = None, key: Any = None
-    ) -> ExperimentData:
-        data.set_value(
-            ExperimentDataEnum.variables,
-            self.id,
-            value,
-        )
-        return data

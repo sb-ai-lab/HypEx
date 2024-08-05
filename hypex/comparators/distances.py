@@ -42,18 +42,6 @@ class MahalanobisDistance(Calculator):
             )
         return result
 
-    def _set_value(
-        self, data: ExperimentData, value: Optional[Dict] = None, key: Any = None
-    ) -> ExperimentData:
-        for key, value_ in value.items():
-            data = data.set_value(
-                ExperimentDataEnum.groups,
-                self.id,
-                value_,
-                key=key,
-            )
-        return data
-
     def _get_fields(self, data: ExperimentData):
         group_field = self._field_searching(data, self.grouping_role)
         target_fields = self._field_searching(

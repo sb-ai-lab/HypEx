@@ -1,14 +1,17 @@
 from hypex.dataset.dataset import DatasetAdapter, ExperimentData
 from hypex.dataset.roles import StatisticRole
 from hypex.executor.executor import Executor
-from hypex.operators.operators import MatchingMetrics
+from hypex.comparators.comparators import MatchingMetrics
 from hypex.utils.enums import ExperimentDataEnum
 
 
 class MatchingAnalyzer(Executor):
-    def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
+    def _set_value(self, space: ExperimentDataEnum, data: ExperimentData, value, key=None) -> ExperimentData:
         return data.set_value(
-            ExperimentDataEnum.analysis_tables, self.id, value, key=key
+            space=space,
+            executor_id=self.id,
+            value=value,
+            key=key,
         )
 
     def execute(self, data: ExperimentData):
@@ -16,8 +19,9 @@ class MatchingAnalyzer(Executor):
             data.get_one_id(MatchingMetrics, space=ExperimentDataEnum.variables)
         ]
         return self._set_value(
-            data,
-            DatasetAdapter.to_dataset(
+            space=ExperimentDataEnum.variables,
+            data=data,
+            value=DatasetAdapter.to_dataset(
                 variables,
                 {field: StatisticRole() for field in list(variables.keys())},
             ),
