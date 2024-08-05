@@ -187,8 +187,6 @@ class Comparator(Calculator, ABC):
         if compare_by != "columns":
             if group_field is None:
                 raise NoRequiredArgumentError("group_field")
-            elif isinstance(group_field, List):
-                group_field = Adapter.list_to_single(group_field)
             if not isinstance(group_field, str):
                 raise TypeError(
                     f"group_field must be one string, {type(group_field)} passed."
@@ -235,8 +233,6 @@ class Comparator(Calculator, ABC):
         **kwargs,
     ) -> Dict:
         target_fields = Adapter.to_list(target_fields)
-        baseline_field = Adapter.list_to_single(baseline_field)
-        group_field = Adapter.list_to_single(group_field)
 
         if compare_by == "columns_in_groups" and len(target_fields) > 1:
             raise ComparisonNotSuitableFieldError("target_fields")
