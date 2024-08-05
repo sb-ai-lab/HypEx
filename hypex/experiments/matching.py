@@ -5,6 +5,7 @@ from hypex.analyzers.matching import MatchingAnalyzer
 from hypex.comparators.distances import MahalanobisDistance
 from hypex.dataset import TreatmentRole, TargetRole
 from hypex.encoders.encoders import DummyEncoder
+from hypex.executor import Executor
 from hypex.experiments.base import Experiment
 from hypex.ml.faiss import FaissNearestNeighbors
 from hypex.operators.operators import MatchingMetrics, Bias
@@ -21,7 +22,6 @@ class Matching(ExperimentShell):
             List[
                 Literal["fillna", "const-filter", "na-filter", "dummy-encoder", "auto"]
             ],
-            None,
         ] = "auto",
         distance: Literal["mahalanobis", "l2"] = "mahalanobis",
         two_sides: bool = True,
@@ -31,7 +31,7 @@ class Matching(ExperimentShell):
             Literal["smd", "psi", "ks-test", "repeats", "auto"],
             List[Literal["smd", "psi", "ks-test", "repeats", "auto"]],
         ] = "auto",
-    ):
+    ) -> Experiment:
         filters_mapping = {"dummy-encoder": DummyEncoder(), "auto": DummyEncoder()}
         distance_mapping = {
             "mahalanobis": MahalanobisDistance(grouping_role=TreatmentRole())
@@ -39,7 +39,7 @@ class Matching(ExperimentShell):
         filters = filters if isinstance(filters, List) else [filters]
         if any(filter_ not in filters_mapping for filter_ in filters):
             warnings.warn("Сurrently only dummy encoder is supported")
-        executors = []
+        executors: List[Executor] = []
         for i in filters:
             executors += [filters_mapping[i]]
         if bias_estimation:
@@ -80,7 +80,6 @@ class Matching(ExperimentShell):
             List[
                 Literal["fillna", "const-filter", "na-filter", "dummy-encoder", "auto"]
             ],
-            None,
         ] = "auto",
         distance: Literal["mahalanobis", "l2"] = "mahalanobis",
         two_sides: bool = True,
