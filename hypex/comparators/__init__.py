@@ -1,9 +1,10 @@
 from .abstract import StatHypothesisTesting
-from .comparators import GroupDifference, GroupSizes
+from .comparators import GroupDifference, GroupSizes, SMD
 from .distances import MahalanobisDistance
 from .hypothesis_testing import TTest, KSTest, UTest, Chi2Test
 
 __all__ = [
+    "SMD",
     "GroupDifference",
     "GroupSizes",
     "StatHypothesisTesting",

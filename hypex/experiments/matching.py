@@ -7,7 +7,7 @@ from hypex.dataset import TreatmentRole, TargetRole
 from hypex.encoders.encoders import DummyEncoder
 from hypex.experiments import Experiment
 from hypex.ml.faiss import FaissNearestNeighbors
-from hypex.operators.operators import MatchingMetrics
+from hypex.executor import MatchingMetrics
 from hypex.ui.base import ExperimentShell
 from hypex.ui.matching import MatchingOutput
 

@@ -1,12 +1,20 @@
 from typing import Optional, List, Dict, Any
 
-from hypex.dataset import Dataset, ExperimentData, FeatureRole
-from hypex.executor import GroupCalculator
+from hypex.comparators.abstract import Comparator
+from hypex.dataset import Dataset, ExperimentData, FeatureRole, GroupingRole, ABCRole
 from hypex.extensions.scipy_linalg import CholeskyExtension, InverseExtension
-from hypex.utils import ExperimentDataEnum
 
 
-class MahalanobisDistance(GroupCalculator):
+class MahalanobisDistance(Comparator):
+
+    def __init__(
+        self,
+        grouping_role: Optional[ABCRole] = None,
+        key: Any = "",
+    ):
+        super().__init__(key=key)
+        self.grouping_role = grouping_role or GroupingRole()
+
     @classmethod
     def _execute_inner_function(
         cls,
@@ -32,18 +40,6 @@ class MahalanobisDistance(GroupCalculator):
                 )
             )
         return result
-
-    def _set_value(
-        self, data: ExperimentData, value: Optional[Dict] = None, key: Any = None
-    ) -> ExperimentData:
-        for key, value_ in value.items():
-            data = data.set_value(
-                ExperimentDataEnum.groups,
-                self.id,
-                value_,
-                key=key,
-            )
-        return data
 
     def _get_fields(self, data: ExperimentData):
         group_field = self._field_searching(data, self.grouping_role)
