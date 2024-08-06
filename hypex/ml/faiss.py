@@ -1,7 +1,7 @@
 from typing import Optional, Any, Dict
 
 from hypex.comparators.distances import MahalanobisDistance
-from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData
+from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData, MatchingRole
 from hypex.executor import MLExecutor
 from hypex.extensions.faiss import FaissExtension
 from hypex.utils import SpaceEnum, ExperimentDataEnum
@@ -88,31 +88,34 @@ class FaissNearestNeighbors(MLExecutor):
             two_sides=self.two_sides,
         )
         ds = data.ds.groupby(group_field)
-        matched_df = Dataset.create_empty()
+        matched_indexes = Dataset.create_empty()
         for i in range(len(compare_result.columns)):
-            t_index_field = compare_result[compare_result.columns[i]]
             group = (
                 grouping_data[1][1]
                 if compare_result.columns[i] == "test"
                 else grouping_data[0][1]
             )
             t_ds = ds[0][1] if compare_result.columns[i] == "test" else ds[1][1]
-            indexes = group.index
-            t_index_field = t_index_field.loc[: len(group) - 1]
+            t_index_field = (
+                compare_result[compare_result.columns[i]]
+                .loc[: len(group) - 1]
+                .rename({compare_result.columns[i]: "indexes"})
+            )
             if t_index_field.isna().sum() > 0:
                 raise ValueError("")
-            t_index_field.index = indexes
-            filtered_field = t_index_field.drop(
-                t_index_field[t_index_field[t_index_field.columns[0]] == -1], axis=0
-            )
-            new_target = t_ds.iloc[
-                list(map(lambda x: int(x[0]), filtered_field.get_values()))
-            ]
-            new_target.index = filtered_field.index
-            new_target = new_target.reindex(indexes, fill_value=-1).rename(
-                {field: field + "_matched" for field in new_target.columns}
-            )
-            matched_df = matched_df.append(new_target).sort()
-        if len(matched_df) < len(data.ds):
-            matched_df = matched_df.reindex(data.ds.index, fill_value=-1)
-        return self._set_value(data, matched_df, key="matched_df")
+            matched_indexes = matched_indexes.append(
+                Dataset.from_dict(
+                    data={
+                        "indexes": t_ds.iloc[
+                            list(map(lambda x: int(x[0]), t_index_field.get_values()))
+                        ].index
+                    },
+                    roles={"indexes": MatchingRole()},
+                    index=group.index,
+                )
+            ).sort()
+        if len(matched_indexes) < len(data.ds) and not self.two_sides:
+            matched_indexes = matched_indexes.reindex(data.ds.index, fill_value=-1)
+        elif len(matched_indexes) < len(data.ds) and self.two_sides:
+            raise ValueError("")
+        return self._set_value(data, matched_indexes, key="matched")

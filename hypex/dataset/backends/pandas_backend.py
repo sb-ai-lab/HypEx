@@ -227,7 +227,7 @@ class PandasNavigation(DatasetBackendNavigation):
         self, data: FromDictTypes, index: Union[Iterable, Sized, None] = None
     ):
         self.data = pd.DataFrame().from_records(data)
-        if index:
+        if index is not None:
             self.data.index = index
         return self
 

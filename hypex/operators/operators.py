@@ -10,12 +10,12 @@ from hypex.dataset import (
     TargetRole,
     InfoRole,
     FeatureRole,
+    MatchingRole,
 )
-from hypex.ml.faiss import FaissNearestNeighbors
 from hypex.operators.abstract import GroupOperator
 from hypex.utils import SpaceEnum
 from hypex.utils.enums import ExperimentDataEnum
-from hypex.utils.errors import NoneArgumentError, NotFoundInExperimentDataError
+from hypex.utils.errors import NoneArgumentError
 
 
 class SMD(GroupOperator):
@@ -56,19 +56,25 @@ class MatchingMetrics(GroupOperator):
             else None
         )
         t_data = deepcopy(data.ds)
-        distances_keys = data.get_ids(FaissNearestNeighbors, ExperimentDataEnum.groups)
         if len(target_fields) != 2:
-            if len(distances_keys["FaissNearestNeighbors"]["groups"]) > 0:
-                target_fields += data.groups[
-                    distances_keys["FaissNearestNeighbors"]["groups"][0]
-                ]["matched_df"].search_columns(self.target_roles)
-            else:
-                raise ValueError
-        if target_fields[1] not in t_data.columns:
+            indexes = self._field_searching(data, MatchingRole())
+            if len(indexes) != 1:
+                raise ValueError(f"")
+            new_target = data.ds.search_columns(TargetRole())[0]
+            indexes = data.additional_fields[indexes[0]]
+            indexes.index = t_data.index
+            filtered_field = indexes.drop(
+                indexes[indexes[indexes.columns[0]] == -1], axis=0
+            )
+            matched_data = data.ds.loc[
+                list(map(lambda x: x[0], filtered_field.get_values()))
+            ][new_target].rename(
+                {new_target: new_target + "_matched" for i in data.ds.columns}
+            )
+            matched_data.index = filtered_field.index
+            target_fields += [matched_data.search_columns(TargetRole())[0]]
             t_data = t_data.add_column(
-                data.groups[distances_keys["FaissNearestNeighbors"]["groups"][0]][
-                    "matched_df"
-                ][target_fields[1]],
+                matched_data.reindex(t_data.index, fill_value=-1),
                 role={target_fields[1]: TargetRole()},
             )
         self.key = str(
@@ -127,7 +133,7 @@ class MatchingMetrics(GroupOperator):
         data: Dataset,
         test_data: Optional[Dataset] = None,
         target_fields: Optional[List[str]] = None,
-        **kwargs
+        **kwargs,
     ) -> Any:
         if target_fields is None or test_data is None:
             raise NoneArgumentError(
@@ -160,34 +166,31 @@ class Bias(GroupOperator):
         grouping_role: Optional[ABCRole] = None,
         target_roles: Optional[List[ABCRole]] = None,
         space: SpaceEnum = SpaceEnum.auto,
-        data_space: ExperimentDataEnum = ExperimentDataEnum.groups,
-        executor_name: str = "FaissNearestNeighbors",
         key: Any = "",
     ):
         super().__init__(
             grouping_role=grouping_role, target_roles=target_roles, space=space, key=key
         )
-        self.data_space = data_space
-        self.executor_name = executor_name
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields = self._get_fields(data)
         t_data = deepcopy(data.ds)
-        distances_keys = data.get_ids(self.executor_name, self.data_space)
-        if (
-            len(distances_keys[self.executor_name]["groups"]) > 0
-        ):  # добавить поиск в analysis_tables
-            matched_data_key = list(
-                data.groups[distances_keys[self.executor_name]["groups"][0]].keys()
-            )[0]
-            matched_data = data.groups[distances_keys[self.executor_name]["groups"][0]][
-                matched_data_key
+        if len(target_fields) < 2:
+            indexes = data.additional_fields[
+                self._field_searching(data, MatchingRole())[0]
             ]
-            target_fields += matched_data.search_columns(
-                self.target_roles
-            )  # нужно проверять, что таргетов не 2
-        else:
-            raise NotFoundInExperimentDataError(self.executor_name)
+            indexes.index = t_data.index
+            filtered_field = indexes.drop(
+                indexes[indexes[indexes.columns[0]] == -1], axis=0
+            )
+            matched_data = data.ds.loc[
+                list(map(lambda x: x[0], filtered_field.get_values()))
+            ].rename({i: i + "_matched" for i in data.ds.columns})
+            matched_data.index = filtered_field.index
+            target_fields += [matched_data.search_columns(TargetRole())[0]]
+            t_data = t_data.append(
+                matched_data.reindex(t_data.index, fill_value=-1), axis=1
+            )
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
@@ -197,13 +200,12 @@ class Bias(GroupOperator):
             return data
 
         compare_result = self.calc(
-            data=t_data.append(matched_data, axis=1),
+            data=t_data,
             group_field=group_field,
             target_fields=target_fields,
             features_fields=t_data.search_columns(
                 FeatureRole(), search_types=[int, float]
-            )
-            + matched_data.search_columns(FeatureRole(), search_types=[int, float]),
+            ),
         )
         return self._set_value(data, compare_result)
 
@@ -213,14 +215,14 @@ class Bias(GroupOperator):
         grouping_data,
         target_fields: Optional[List[str]] = None,
         features_fields: Optional[List[str]] = None,
-        **kwargs
+        **kwargs,
     ) -> Dict:
         return cls._inner_function(
             grouping_data[0][1],
             test_data=grouping_data[1][1],
             target_fields=target_fields,
             features_fields=features_fields,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod
@@ -230,7 +232,7 @@ class Bias(GroupOperator):
         test_data: Optional[Dataset] = None,
         target_fields: Optional[List[str]] = None,
         features_fields: Optional[List[str]] = None,
-        **kwargs
+        **kwargs,
     ) -> Dict:
         if target_fields is None or features_fields is None or test_data is None:
             raise NoneArgumentError(
