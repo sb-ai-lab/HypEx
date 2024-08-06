@@ -67,3 +67,10 @@ class MergeOnError(Exception):
 class NoneArgumentError(Exception):
     def __init__(self, arg, process):
         super().__init__(f"Argument {arg} is None in process {process}.")
+
+
+class InvalidArgumentError(Exception):
+    def __init__(self, arg, possible_type):
+        super().__init__(
+            f"Invalid type for argument {arg}, possible type is is {possible_type}."
+        )

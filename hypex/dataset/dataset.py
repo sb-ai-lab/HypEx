@@ -38,6 +38,7 @@ from .roles import (
     FeatureRole,
 )
 from ..utils.adapter import Adapter
+from ..utils.errors import InvalidArgumentError
 
 
 class Dataset(DatasetBase):
@@ -731,18 +732,18 @@ class DatasetAdapter(Adapter):
             return DatasetAdapter.dict_to_dataset(data, roles)
         elif isinstance(data, pd.DataFrame):
             if isinstance(roles, ABCRole):
-                raise ValueError("")
+                raise InvalidArgumentError("roles", "Dict[str, ABCRole]")
             return DatasetAdapter.frame_to_dataset(data, roles)
         elif isinstance(data, List):
             if isinstance(roles, ABCRole):
-                raise ValueError("")
+                raise InvalidArgumentError("roles", "Dict[str, ABCRole]")
             return DatasetAdapter.list_to_dataset(data, roles)
         elif any(isinstance(data, t) for t in [str, int, float, bool]):
             return DatasetAdapter.value_to_dataset(data, roles)
         elif isinstance(data, Dataset):
             return data
         else:
-            raise ValueError(f"Unsupported data type {type(data)}")
+            raise InvalidArgumentError("data", "Dict, pd.DataFrame, List, Dataset")
 
     @staticmethod
     def value_to_dataset(
