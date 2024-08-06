@@ -1,5 +1,6 @@
 from abc import abstractmethod, ABC
-from typing import Any, Dict, List, Optional, Sequence, Union, Tuple
+from copy import deepcopy
+from typing import Any, Dict, List, Optional, Sequence, Union, Tuple, Iterable
 
 from hypex.dataset import (
     ABCRole,
@@ -11,8 +12,9 @@ from hypex.dataset import (
     TargetRole,
     DatasetAdapter,
 )
+from hypex.dataset.roles import AdditionalRole
 from hypex.utils import (
-    ComparisonNotSuitableFieldError,
+    GroupFieldNotSuitableFieldError,
     SpaceEnum,
     AbstractMethodError,
     ID_SPLIT_SYMBOL,
@@ -127,29 +129,24 @@ class Calculator(Executor, ABC):
     def search_types(self):
         raise AbstractMethodError
 
-    def _field_searching(
-        self,
-        data: ExperimentData,
-        field,
-        tmp_role: bool = False,
-        search_types=None,
-        space: Optional[SpaceEnum] = None,
-    ):
-        space = space
+    def _field_searching(self, data: ExperimentData, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role: bool = False,
+                         search_types=None):
         searched_field = []
-        if space in [SpaceEnum.auto, SpaceEnum.data]:
-            searched_field = data.ds.search_columns(
-                field, tmp_role=tmp_role, search_types=search_types
+        roles = Adapter.to_list(roles)
+        field_in_additional = [role for role in roles if isinstance(role, AdditionalRole)]
+        field_in_data = [role for role in roles if role not in field_in_additional]
+        if field_in_data:
+            searched_field += data.ds.search_columns(
+                field_in_data, tmp_role=tmp_role, search_types=search_types
             )
         if (
-            space in [SpaceEnum.auto, SpaceEnum.additional]
-            and searched_field == []
+            field_in_additional
             and isinstance(data, ExperimentData)
         ):
-            searched_field = data.additional_fields.search_columns(
-                field, tmp_role=tmp_role, search_types=search_types
+            searched_field += data.additional_fields.search_columns(
+                field_in_additional, tmp_role=tmp_role, search_types=search_types
             )
-            self.__additional_mode = True
+            # self.__additional_mode = True
         return searched_field
 
     @staticmethod
@@ -173,9 +170,7 @@ class MLExecutor(Calculator, ABC):
 
     def _get_fields(self, data: ExperimentData):
         group_field = self._field_searching(data, self.grouping_role)
-        target_field = self._field_searching(
-            data, self.target_role, search_types=self.search_types
-        )
+        target_field = self._field_searching(data, self.target_role, search_types=self.search_types)
         return group_field, target_field
 
     @abstractmethod
@@ -251,7 +246,7 @@ class MLExecutor(Calculator, ABC):
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
-            raise ComparisonNotSuitableFieldError(group_field)
+            raise GroupFieldNotSuitableFieldError(group_field)
         result = cls._execute_inner_function(
             grouping_data, target_field=target_field, **kwargs
         )

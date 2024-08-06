@@ -217,6 +217,36 @@ class ReportRole(ABCRole):
     _role_name: RoleNameType = "Report"
 
 
+class AdditionalRole(ABCRole):
+    """ """
+
+    _role_name: RoleNameType = "Additional"
+
+
+class AdditionalTreatmentRole(AdditionalRole):
+    """ """
+
+    _role_name: RoleNameType = "AdditionalTreatment"
+
+
+class AdditionalGroupingRole(AdditionalRole):
+    """ """
+
+    _role_name: RoleNameType = "AdditionalGrouping"
+
+
+class AdditionalTargetRole(AdditionalRole):
+    """ """
+
+    _role_name: RoleNameType = "AdditionalTarget"
+
+
+class AdditionalPreTargetRole(AdditionalRole):
+    """ """
+
+    _role_name: RoleNameType = "AdditionalPreTarget"
+
+
 default_roles: Dict[RoleNameType, ABCRole] = {
     "info": InfoRole(),
     "feature": FeatureRole(),
@@ -227,4 +257,8 @@ default_roles: Dict[RoleNameType, ABCRole] = {
     "stratification": StratificationRole(),
     "statistic": StatisticRole(),
     "filter": FilterRole(),
+    "additionaltreatment": AdditionalTreatmentRole(),
+    "additionalgrouping": AdditionalGroupingRole(),
+    "additionaltarget": AdditionalTargetRole(),
+    "additionalpretarget": AdditionalPreTargetRole(),
 }

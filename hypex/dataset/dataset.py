@@ -737,16 +737,15 @@ class DatasetAdapter(Adapter):
             raise ValueError(f"Unsupported data type {type(data)}")
 
     @staticmethod
-    def value_to_dataset(data: ScalarType, roles: Union[ABCRole, Dict[str, ABCRole]]) -> Dataset:
+    def value_to_dataset(
+        data: ScalarType, roles: Union[ABCRole, Dict[str, ABCRole]]
+    ) -> Dataset:
         """
         Convert a float to a Dataset
         """
         if isinstance(roles, ABCRole):
-            roles= {"0": roles}
-        return Dataset(
-            roles=roles,
-            data=pd.DataFrame({list(roles.keys())[0]: [data]})
-        )
+            roles = {"0": roles}
+        return Dataset(roles=roles, data=pd.DataFrame({list(roles.keys())[0]: [data]}))
 
     @staticmethod
     def dict_to_dataset(

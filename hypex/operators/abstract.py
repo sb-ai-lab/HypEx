@@ -9,7 +9,6 @@ from hypex.executor import Calculator
 from hypex.utils import (
     ExperimentDataEnum,
     AbstractMethodError,
-    SpaceEnum,
 )
 
 
@@ -38,16 +37,9 @@ class GroupOperator(Calculator):
 
     def _get_fields(self, data: ExperimentData):
         group_field = self._field_searching(data, self.grouping_role)
-        target_fields = self._field_searching(
-            data, self.target_roles, search_types=self.search_types
-        )
+        target_fields = self._field_searching(data, self.target_roles, search_types=self.search_types)
         if len(target_fields) != 2:
-            target_fields += self._field_searching(
-                data,
-                self.target_roles,
-                search_types=self.search_types,
-                space=SpaceEnum.additional,
-            )
+            target_fields += self._field_searching(data, self.target_roles, search_types=self.search_types)
         return group_field, target_fields
 
     @classmethod

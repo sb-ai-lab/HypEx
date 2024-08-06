@@ -18,15 +18,14 @@ from hypex.utils import (
     BackendsEnum,
     ExperimentDataEnum,
     FromDictTypes,
-    SpaceEnum,
     NAME_BORDER_SYMBOL,
 )
 from hypex.utils.adapter import Adapter
 from hypex.utils.errors import (
     AbstractMethodError,
-    ComparisonNotSuitableFieldError,
+    GroupFieldNotSuitableFieldError,
     NoRequiredArgumentError,
-    NoColumnsError,
+    NoColumnsError, TargetFieldNotSuitableFieldError,
 )
 
 
@@ -37,13 +36,10 @@ class Comparator(Calculator, ABC):
         grouping_role: Optional[ABCRole] = None,
         target_roles: Union[ABCRole, List[ABCRole], None] = None,
         baseline_role: Optional[ABCRole] = None,
-        space: SpaceEnum = SpaceEnum.auto,
         key: Any = "",
     ):
-        self.__additional_mode = space == SpaceEnum.additional
         super().__init__(key=key)
         self.grouping_role = grouping_role or GroupingRole()
-        self.space = space
         self.compare_by = compare_by
         self.target_roles = target_roles or TargetRole()
         self.baseline_role = baseline_role or PreTargetRole()
@@ -66,22 +62,10 @@ class Comparator(Calculator, ABC):
 
     def _get_fields(self, data: ExperimentData):
         tmp_role = True if data.ds.tmp_roles else False
-        group_field = self._field_searching(
-            data=data,
-            field=self.grouping_role,
-            search_types=self.search_types,
-            space=self.space,
-        )
-        target_fields = self._field_searching(
-            data=data,
-            field=TempTargetRole() if tmp_role else self.target_roles,
-            tmp_role=tmp_role,
-            search_types=self.search_types,
-            space=self.space,
-        )
-        baseline_field = self._field_searching(
-            data=data, field=self.baseline_role, space=SpaceEnum.data
-        )
+        group_field = self._field_searching(data=data, roles=self.grouping_role, search_types=self.search_types)
+        target_fields = self._field_searching(data=data, roles=TempTargetRole() if tmp_role else self.target_roles,
+                                              tmp_role=tmp_role, search_types=self.search_types)
+        baseline_field = self._field_searching(data=data, roles=self.baseline_role)
         return group_field, target_fields, baseline_field
 
     @classmethod
@@ -89,22 +73,27 @@ class Comparator(Calculator, ABC):
         cls,
         baseline_data: List[Tuple[str, Dataset]],
         compared_data: List[Tuple[str, Dataset]],
-        compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
         **kwargs,
     ) -> Dict:
         result = {}
-        for baseline in baseline_data:
-            #     result[baseline[0]] = {}
-            for compared in compared_data:
-                if (
-                    compare_by != "columns_in_groups"
-                    or baseline[0].split(NAME_BORDER_SYMBOL)[0]
-                    == compared[0].split(NAME_BORDER_SYMBOL)[0]
-                ):  # this checks if compared data are in the same group for columns_in_groups mode
-                    result[compared[0]] = DatasetAdapter.to_dataset(
-                        cls._inner_function(baseline[1], compared[1], **kwargs),
-                        InfoRole(),
-                    )
+        for i in range(len(compared_data)):
+            result[compared_data[i][0]] = DatasetAdapter.to_dataset(
+                cls._inner_function(
+                    baseline_data[0 if len(baseline_data) == 1 else i][1],
+                    compared_data[i][1],
+                    **kwargs,
+                ),
+                InfoRole(),
+            )
+        # if len(baseline_data) == 1:
+        #
+        # # for baseline in baseline_data:
+        #     #     result[baseline[0]] = {}
+        #     for compared in compared_data:
+        #             result[compared[0]] = DatasetAdapter.to_dataset(
+        #                 cls._inner_function(baseline_data[0][1], compared[1], **kwargs),
+        #                 InfoRole(),
+        #             )
         return result
 
     @staticmethod
@@ -144,7 +133,7 @@ class Comparator(Calculator, ABC):
         data: List[Tuple[str, Dataset]]
     ) -> List[Tuple[str, Dataset]]:
         result = [
-            ("{bucket[0]}{NAME_BORDER_SYMBOL}{column}", bucket[1][column])
+            (f"{bucket[0]}{NAME_BORDER_SYMBOL}{column}", bucket[1][column])
             for bucket in data
             for column in bucket[1].columns
         ]
@@ -235,7 +224,7 @@ class Comparator(Calculator, ABC):
         target_fields = Adapter.to_list(target_fields)
 
         if compare_by == "columns_in_groups" and len(target_fields) > 1:
-            raise ComparisonNotSuitableFieldError("target_fields")
+            raise TargetFieldNotSuitableFieldError(target_fields)
 
         if grouping_data is None:
             grouping_data = cls._split_data_to_buckets(
@@ -246,7 +235,7 @@ class Comparator(Calculator, ABC):
                 group_field=group_field,
             )
         if len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1:
-            raise ComparisonNotSuitableFieldError("group_field")
+            raise GroupFieldNotSuitableFieldError(group_field)
         baseline_data, compared_data = grouping_data
         return cls._execute_inner_function(
             baseline_data=baseline_data,
@@ -269,13 +258,13 @@ class Comparator(Calculator, ABC):
             else:
                 raise NoColumnsError(TargetRole().role_name)
         if not group_field and self.compare_by != "columns":
-            raise ComparisonNotSuitableFieldError("group_field")
+            raise GroupFieldNotSuitableFieldError(group_field)
         compare_result = self.calc(
             data=data.ds,
             compare_by=self.compare_by,
             target_fields=target_fields,
-            baseline_field=baseline_field,
-            group_field=group_field,
+            baseline_field=Adapter.list_to_single(baseline_field),
+            group_field=Adapter.list_to_single(group_field),
         )
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key in compare_result}
@@ -288,11 +277,8 @@ class StatHypothesisTesting(Comparator, ABC):
         self,
         compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
         grouping_role: Union[ABCRole, None] = None,
-        space: SpaceEnum = SpaceEnum.auto,
         reliability: float = 0.05,
         key: Any = "",
     ):
-        super().__init__(
-            compare_by=compare_by, grouping_role=grouping_role, space=space, key=key
-        )
+        super().__init__(compare_by=compare_by, grouping_role=grouping_role, key=key)
         self.reliability = reliability

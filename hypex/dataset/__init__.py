@@ -19,6 +19,10 @@ from .roles import (
     FilterRole,
     MatchingRole,
     ABCRole,
+    AdditionalTreatmentRole,
+    AdditionalGroupingRole,
+    AdditionalTargetRole,
+    AdditionalPreTargetRole,
     default_roles,
 )
 
@@ -38,8 +42,12 @@ __all__ = [
     "TempTreatmentRole",
     "TempGroupingRole",
     "TempTargetRole",
+    "AdditionalTreatmentRole",
+    "AdditionalGroupingRole",
+    "AdditionalTargetRole",
+    "AdditionalPreTargetRole",
     "ABCRole",
     "default_roles",
     "DatasetBase",
-    "DatasetAdapter"
+    "DatasetAdapter",
 ]

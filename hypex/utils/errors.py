@@ -28,9 +28,13 @@ class NoColumnsError(Exception):
         super().__init__(f"No columns found by role {role}")
 
 
-class ComparisonNotSuitableFieldError(Exception):
+class GroupFieldNotSuitableFieldError(Exception):
     def __init__(self, group_field):
         super().__init__(f"Group field {group_field} is not suitable for comparison")
+
+class TargetFieldNotSuitableFieldError(Exception):
+    def __init__(self, target_field):
+        super().__init__(f"Target field(s) {target_field} is (are) not suitable for comparison")
 
 
 class NotFoundInExperimentDataError(Exception):
