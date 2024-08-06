@@ -5,6 +5,7 @@ from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData, Matchin
 from hypex.executor import MLExecutor
 from hypex.extensions.faiss import FaissExtension
 from hypex.utils import SpaceEnum, ExperimentDataEnum
+from hypex.utils.errors import PairsNotFoundError
 
 
 class FaissNearestNeighbors(MLExecutor):
@@ -102,7 +103,7 @@ class FaissNearestNeighbors(MLExecutor):
                 .rename({compare_result.columns[i]: "indexes"})
             )
             if t_index_field.isna().sum() > 0:
-                raise ValueError("")
+                raise PairsNotFoundError
             matched_indexes = matched_indexes.append(
                 Dataset.from_dict(
                     data={
@@ -117,5 +118,5 @@ class FaissNearestNeighbors(MLExecutor):
         if len(matched_indexes) < len(data.ds) and not self.two_sides:
             matched_indexes = matched_indexes.reindex(data.ds.index, fill_value=-1)
         elif len(matched_indexes) < len(data.ds) and self.two_sides:
-            raise ValueError("")
+            raise PairsNotFoundError
         return self._set_value(data, matched_indexes, key="matched")

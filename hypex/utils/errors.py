@@ -74,3 +74,10 @@ class InvalidArgumentError(Exception):
         super().__init__(
             f"Invalid type for argument {arg}, possible type is is {possible_type}."
         )
+
+
+class PairsNotFoundError(Exception):
+    def __init__(self):
+        super().__init__(
+            "Pairs are not found. Check your input data and try execute preprocessing pipline before matching estimation."
+        )
