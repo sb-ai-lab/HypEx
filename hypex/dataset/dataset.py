@@ -716,7 +716,10 @@ class ExperimentData:
 
 class DatasetAdapter(Adapter):
     @staticmethod
-    def to_dataset(data: Any, roles: Union[ABCRole, Dict[str, ABCRole]]) -> Dataset:
+    def to_dataset(
+        data: Union[Dict, Dataset, pd.DataFrame, List, str, int, float, bool],
+        roles: Union[ABCRole, Dict[str, ABCRole]],
+    ) -> Dataset:
         """
         Convert various data types to a Dataset object.
         Args:
@@ -725,7 +728,7 @@ class DatasetAdapter(Adapter):
         Returns:
         Dataset: A Dataset object generated from the input data.
         Raises:
-        ValueError: If the data type is not supported.
+        InvalidArgumentError: If the data type is not supported.
         """
         # Convert data based on its type
         if isinstance(data, Dict):
@@ -753,7 +756,7 @@ class DatasetAdapter(Adapter):
         Convert a float to a Dataset
         """
         if isinstance(roles, ABCRole):
-            roles = {"0": roles}
+            roles = {"value": roles}
         return Dataset(roles=roles, data=pd.DataFrame({list(roles.keys())[0]: [data]}))
 
     @staticmethod
