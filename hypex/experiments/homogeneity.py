@@ -3,6 +3,8 @@ from hypex.comparators import GroupDifference, GroupSizes
 from hypex.comparators import TTest, KSTest, Chi2Test
 from hypex.dataset import TargetRole, TreatmentRole
 from hypex.experiments.base import Experiment, OnRoleExperiment
+from hypex.ui.base import ExperimentShell
+from hypex.ui.homo import HomoOutput
 from hypex.utils import SpaceEnum
 
 HOMOGENEITY_TEST = Experiment(
@@ -20,3 +22,11 @@ HOMOGENEITY_TEST = Experiment(
         OneAAStatAnalyzer(),
     ]
 )
+
+
+class HomogeneityTest(ExperimentShell):
+    def __init__(self):
+        super().__init__(
+            experiment=HOMOGENEITY_TEST, 
+            output=HomoOutput(),
+        )

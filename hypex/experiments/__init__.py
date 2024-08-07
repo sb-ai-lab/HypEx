@@ -5,7 +5,7 @@ from .base import (
     OnRoleExperiment,
 )
 from .base_complex import GroupExperiment, CycledExperiment
-from .homogeneity import HOMOGENEITY_TEST
+from .homogeneity import HomogeneityTest
 from .matching import Matching
 
 __all__ = [
@@ -14,5 +14,5 @@ __all__ = [
     "AATest",
     "ABTest",
     "Matching",
-    "HOMOGENEITY_TEST",
+    "HomogeneityTest",
 ]
