@@ -27,6 +27,6 @@ HOMOGENEITY_TEST = Experiment(
 class HomogeneityTest(ExperimentShell):
     def __init__(self):
         super().__init__(
-            experiment=HOMOGENEITY_TEST, 
+            experiment=HOMOGENEITY_TEST,
             output=HomoOutput(),
         )
