@@ -550,7 +550,7 @@ class Dataset(DatasetBase):
 
     def transpose(
         self,
-        roles: Optional[Union[Dict[str, ABCRole], List]] = None,
+        roles: Optional[Union[Dict[str, ABCRole], List[str]]] = None,
     ) -> "Dataset":
         roles_names: List[str] = (
             roles.keys() or {} if isinstance(roles, Dict) else roles
