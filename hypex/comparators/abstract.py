@@ -1,3 +1,4 @@
+import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Union, Tuple, Sequence, Literal
 
@@ -25,7 +26,8 @@ from hypex.utils.errors import (
     AbstractMethodError,
     GroupFieldNotSuitableFieldError,
     NoRequiredArgumentError,
-    NoColumnsError, TargetFieldNotSuitableFieldError,
+    NoColumnsError,
+    TargetFieldNotSuitableFieldError,
 )
 
 
@@ -62,9 +64,15 @@ class Comparator(Calculator, ABC):
 
     def _get_fields(self, data: ExperimentData):
         tmp_role = True if data.ds.tmp_roles else False
-        group_field = self._field_searching(data=data, roles=self.grouping_role, search_types=self.search_types)
-        target_fields = self._field_searching(data=data, roles=TempTargetRole() if tmp_role else self.target_roles,
-                                              tmp_role=tmp_role, search_types=self.search_types)
+        group_field = self._field_searching(
+            data=data, roles=self.grouping_role, search_types=self.search_types
+        )
+        target_fields = self._field_searching(
+            data=data,
+            roles=TempTargetRole() if tmp_role else self.target_roles,
+            tmp_role=tmp_role,
+            search_types=self.search_types,
+        )
         baseline_field = self._field_searching(data=data, roles=self.baseline_role)
         return group_field, target_fields, baseline_field
 
@@ -85,15 +93,6 @@ class Comparator(Calculator, ABC):
                 ),
                 InfoRole(),
             )
-        # if len(baseline_data) == 1:
-        #
-        # # for baseline in baseline_data:
-        #     #     result[baseline[0]] = {}
-        #     for compared in compared_data:
-        #             result[compared[0]] = DatasetAdapter.to_dataset(
-        #                 cls._inner_function(baseline_data[0][1], compared[1], **kwargs),
-        #                 InfoRole(),
-        #             )
         return result
 
     @staticmethod
@@ -198,7 +197,7 @@ class Comparator(Calculator, ABC):
             baseline_data = cls._split_ds_into_columns(
                 data.groupby(by=group_field, fields_list=baseline_field)
             )
-            compared_data = data.groupby(by=group_field, fields_list=target_fields)
+            compared_data = data.groupby(by=group_field, fields_list=target_fields[0])
             compared_data = cls._split_ds_into_columns(data=compared_data)
         elif compare_by == "cross":
             data_buckets = data.groupby(by=group_field, fields_list=baseline_field)
@@ -224,7 +223,9 @@ class Comparator(Calculator, ABC):
         target_fields = Adapter.to_list(target_fields)
 
         if compare_by == "columns_in_groups" and len(target_fields) > 1:
-            raise TargetFieldNotSuitableFieldError(target_fields)
+            warnings.warn(
+                f"Too many fields passed as Target fields {target_fields}, only {target_fields[0]} will be used"
+            )
 
         if grouping_data is None:
             grouping_data = cls._split_data_to_buckets(
@@ -277,8 +278,16 @@ class StatHypothesisTesting(Comparator, ABC):
         self,
         compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
         grouping_role: Union[ABCRole, None] = None,
+        target_role: Union[ABCRole, None] = None,
+        baseline_role: Union[ABCRole, None] = None,
         reliability: float = 0.05,
         key: Any = "",
     ):
-        super().__init__(compare_by=compare_by, grouping_role=grouping_role, key=key)
+        super().__init__(
+            compare_by=compare_by,
+            grouping_role=grouping_role,
+            target_roles=target_role,
+            baseline_role=baseline_role,
+            key=key,
+        )
         self.reliability = reliability
