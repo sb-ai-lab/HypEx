@@ -1,6 +1,6 @@
 from hypex.analyzers.matching import MatchingAnalyzer
 from hypex.dataset.dataset import ExperimentData
-from hypex.reporters.abstract import DictReporter
+from hypex.reporters.abstract import DatasetReporter, DictReporter
 from hypex.utils.enums import ExperimentDataEnum
 
 
@@ -14,4 +14,7 @@ class MatchingDictReporter(DictReporter):
         result = {} 
         result.update(self._extract_from_analyser(experiment_data)) 
         return result 
-        
+    
+class MatchingDatasetReporter(DatasetReporter):
+    def __init__(self) -> None:
+        self.dict_reporter = MatchingDictReporter() 

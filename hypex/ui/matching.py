@@ -1,4 +1,4 @@
-from hypex.reporters.matching import MatchingDictReporter
+from hypex.reporters.matching import MatchingDatasetReporter
 
 from .base import Output
 from ..dataset import Dataset, ExperimentData, MatchingRole
@@ -9,7 +9,7 @@ class MatchingOutput(Output):
     full_data: Dataset
 
     def __init__(self):
-        super().__init__(resume_reporter=MatchingDictReporter())
+        super().__init__(resume_reporter=MatchingDatasetReporter())
 
     def _extract_full_data(self, experiment_data: ExperimentData):
         indexes = experiment_data.additional_fields[
