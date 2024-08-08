@@ -1420,7 +1420,7 @@ class AATest:
         })
         return metrics
     
-    def _plot_distribution(self, df: pd.DataFrame, plots_group_name: str, fields: list[str]):
+    def _plot_distribution(self, df: pd.DataFrame, plots_group_name: str, fields: List[str]):
         figsize =  (15, 3 * len(fields))
         fig, axis = plt.subplots(nrows = math.ceil(len(fields)/2), ncols = 2, figsize = figsize)
         fig.suptitle(plots_group_name, fontsize=16)
@@ -1435,7 +1435,7 @@ class AATest:
                     )
     
 
-    def _plot_distributions(self, df: pd.DataFrame, target_fields: list[str]):
+    def _plot_distributions(self, df: pd.DataFrame, target_fields: List[str]):
         tests = ['t-test','ks-test']
 
         mean_of_means_pvalue = [f'mean of means {test_name} p-value' for test_name in tests]
@@ -1460,7 +1460,7 @@ class AATest:
         self._plot_distribution(df=df,plots_group_name = each_field_title,fields = each_field_pvalue)        
 
 
-    def process_split (self, df: pd.DataFrame, target_fields: list[str], **kwargs) -> dict:
+    def process_split (self, df: pd.DataFrame, target_fields: List[str], **kwargs) -> dict:
         """
         The function divides the passed DataFrame into the specified number of groups in specified proportions
 
@@ -1519,7 +1519,7 @@ class AATest:
 
         split_results = self.multi_group_split(index = list(df.index), groups = groups, iterations = iterations, show_pbar = show_pbar)
         
-        split_metrics: list[dict]=[]
+        split_metrics =[]
         
 
         for _ , experiment_index in tqdm(enumerate(range(1, iterations + 1)), total = iterations, disable = not show_pbar, desc='Metrics calculations'  ):
