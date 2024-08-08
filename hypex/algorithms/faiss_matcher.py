@@ -686,12 +686,12 @@ class FaissMatcher:
 
             if self.pbar:
                 self.tqdm.set_description(desc=f"Get untreated index by group {group}")
-            matches_u_i = _get_index(std_treated_np, std_untreated_np, self.n_neighbors, algo=self.algo)
+            matches_u_i = _get_index(std_treated_np, std_untreated_np, algo=self.algo, n_neighbors=self.n_neighbors)
 
             if self.pbar:
                 self.tqdm.update(1)
                 self.tqdm.set_description(desc=f"Get treated index by group {group}")
-            matches_t_i = _get_index(std_untreated_np, std_treated_np, self.n_neighbors, algo=self.algo)
+            matches_t_i = _get_index(std_untreated_np, std_treated_np, algo=self.algo, n_neighbors=self.n_neighbors)
             if self.pbar:
                 self.tqdm.update(1)
                 self.tqdm.refresh()
@@ -746,12 +746,12 @@ class FaissMatcher:
             self.tqdm = tqdm(total=len(std_treated_np) + len(std_untreated_np))
             self.tqdm.set_description(desc="Get untreated index")
 
-        untreated_index = _get_index(std_treated_np, std_untreated_np, self.n_neighbors, algo=self.algo)
+        untreated_index = _get_index(std_treated_np, std_untreated_np, algo=self.algo, n_neighbors=self.n_neighbors)
 
         if self.pbar:
             self.tqdm.update(len(std_treated_np))
             self.tqdm.set_description(desc="Get treated index")
-        treated_index = _get_index(std_untreated_np, std_treated_np, self.n_neighbors, algo=self.algo)
+        treated_index = _get_index(std_untreated_np, std_treated_np, algo=self.algo, n_neighbors=self.n_neighbors)
 
         if self.pbar:
             self.tqdm.update(len(std_untreated_np))
