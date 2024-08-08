@@ -12,8 +12,7 @@ from hypex.reporters import DatasetReporter
 from hypex.splitters import AASplitter, AASplitterWithStratification
 from hypex.ui.aa import AAOutput
 from hypex.ui.base import ExperimentShell
-
-
+from hypex.utils import SpaceEnum
 
 ONE_AA_TEST = Experiment(
     executors=[
@@ -56,6 +55,7 @@ AA_TEST = Experiment(
                 AASplitter: {"random_state": range(2000), "control_size": [0.5]},
                 Comparator: {
                     "grouping_role": [TreatmentRole()],
+                    "space": [SpaceEnum.additional],
                 },
             },
             reporter=DatasetReporter(OneAADictReporter(front=False)),
@@ -73,6 +73,7 @@ AA_TEST_WITH_STRATIFICATION = Experiment(
                 AASplitter: {"random_state": range(2000), "control_size": [0.5]},
                 Comparator: {
                     "grouping_role": [TreatmentRole()],
+                    "space": [SpaceEnum.additional],
                 },
             },
             reporter=DatasetReporter(OneAADictReporter(front=False)),
@@ -98,6 +99,7 @@ class AATest(ExperimentShell):
             AASplitter: {"random_state": random_states, "control_size": [control_size]},
             Comparator: {
                 "grouping_role": [TreatmentRole()],
+                "space": [SpaceEnum.additional],
             },
         }
 
