@@ -163,7 +163,7 @@ class AAPassedReporter(Reporter):
             names={c: c[: c.rfind("pass") - 1] for c in passed.columns}
         )
         passed.roles = {c: r.__class__(int) for c, r in passed.roles.items()}
-        passed = passed.replace("OK", 1).replace("NOT OK", 0)
+        passed = passed.replace("NOT OK", 0).replace("OK", 1)
         return passed
 
     def _detect_pass(self, analyzer_tables: Dict[str, Dataset]):
@@ -213,4 +213,3 @@ class AABestSplitReporter(Reporter):
         markers = data.additional_fields.loc[:, best_split_id]
         markers = markers.rename({markers.columns[0]: "split"})
         return data.ds.merge(markers, left_index=True, right_index=True)
-
