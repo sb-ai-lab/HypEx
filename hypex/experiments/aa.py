@@ -12,21 +12,19 @@ from hypex.reporters import DatasetReporter
 from hypex.splitters import AASplitter, AASplitterWithStratification
 from hypex.ui.aa import AAOutput
 from hypex.ui.base import ExperimentShell
-from hypex.utils import SpaceEnum
+
 
 
 ONE_AA_TEST = Experiment(
     executors=[
         AASplitter(),
-        GroupSizes(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
+        GroupSizes(grouping_role=TreatmentRole()),
         OnRoleExperiment(
             executors=[
-                GroupDifference(
-                    grouping_role=TreatmentRole(), space=SpaceEnum.additional
-                ),
-                TTest(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
-                KSTest(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
-                Chi2Test(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
+                GroupDifference(compare_by="groups", grouping_role=TreatmentRole()),
+                TTest(compare_by="groups", grouping_role=TreatmentRole()),
+                KSTest(compare_by="groups", grouping_role=TreatmentRole()),
+                Chi2Test(compare_by="groups", grouping_role=TreatmentRole()),
             ],
             role=TargetRole(),
         ),
@@ -37,15 +35,13 @@ ONE_AA_TEST = Experiment(
 ONE_AA_TEST_WITH_STRATIFICATION = Experiment(
     executors=[
         AASplitterWithStratification(),
-        GroupSizes(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
+        GroupSizes(grouping_role=TreatmentRole()),
         OnRoleExperiment(
             executors=[
-                GroupDifference(
-                    grouping_role=TreatmentRole(), space=SpaceEnum.additional
-                ),
-                TTest(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
-                KSTest(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
-                Chi2Test(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
+                GroupDifference(compare_by="groups", grouping_role=TreatmentRole()),
+                TTest(compare_by="groups", grouping_role=TreatmentRole()),
+                KSTest(compare_by="groups", grouping_role=TreatmentRole()),
+                Chi2Test(compare_by="groups", grouping_role=TreatmentRole()),
             ],
             role=TargetRole(),
         ),
@@ -60,7 +56,6 @@ AA_TEST = Experiment(
                 AASplitter: {"random_state": range(2000), "control_size": [0.5]},
                 Comparator: {
                     "grouping_role": [TreatmentRole()],
-                    "space": [SpaceEnum.additional],
                 },
             },
             reporter=DatasetReporter(OneAADictReporter(front=False)),
@@ -78,7 +73,6 @@ AA_TEST_WITH_STRATIFICATION = Experiment(
                 AASplitter: {"random_state": range(2000), "control_size": [0.5]},
                 Comparator: {
                     "grouping_role": [TreatmentRole()],
-                    "space": [SpaceEnum.additional],
                 },
             },
             reporter=DatasetReporter(OneAADictReporter(front=False)),
@@ -104,7 +98,6 @@ class AATest(ExperimentShell):
             AASplitter: {"random_state": random_states, "control_size": [control_size]},
             Comparator: {
                 "grouping_role": [TreatmentRole()],
-                "space": [SpaceEnum.additional],
             },
         }
 

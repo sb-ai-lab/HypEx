@@ -12,7 +12,7 @@ from hypex.utils import (
 )
 
 
-class GroupOperator(Calculator):
+class GroupOperator(Calculator):  #TODO: change the derive from Calculator to COmparator
 
     def __init__(
         self,

@@ -62,7 +62,7 @@ class Comparator(Calculator, ABC):
     ) -> Any:
         raise AbstractMethodError
 
-    def _get_fields(self, data: ExperimentData):
+    def _get_fields(self, data: ExperimentData) -> Dict[str, Union[str, List[str]]]:
         tmp_role = True if data.ds.tmp_roles else False
         group_field = self._field_searching(
             data=data, roles=self.grouping_role, search_types=self.search_types
@@ -74,7 +74,11 @@ class Comparator(Calculator, ABC):
             search_types=self.search_types,
         )
         baseline_field = self._field_searching(data=data, roles=self.baseline_role)
-        return group_field, target_fields, baseline_field
+        return {
+            "group_field": group_field,
+            "target_fields": target_fields,
+            "baseline_field": baseline_field,
+        }
 
     @classmethod
     def _execute_inner_function(
@@ -164,49 +168,106 @@ class Comparator(Calculator, ABC):
             NoRequiredArgumentError: If `baseline_field` is None and `compare_by` is 'columns' or 'columns_in_groups' or 'cross'.
             ValueError: If `compare_by` is not one of the allowed values.
         """
-        if compare_by == "groups":
-            if isinstance(target_fields, List) and len(target_fields) > 1:
-                raise ValueError(
-                    "Only one Target field can be passed when the comparison is done by groups"
-                )
-        elif baseline_field is None:
-            raise NoRequiredArgumentError("baseline_field")
-
-        if compare_by != "columns":
-            if group_field is None:
-                raise NoRequiredArgumentError("group_field")
-            if not isinstance(group_field, str):
-                raise TypeError(
-                    f"group_field must be one string, {type(group_field)} passed."
-                )
 
         target_fields = Adapter.to_list(target_fields)
         if compare_by == "groups":
-            data_buckets = data.groupby(by=group_field, fields_list=target_fields)
-            baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
-            compared_data = cls._split_ds_into_columns(data=data_buckets)
-        elif compare_by == "columns":
-            baseline_data = [
-                (f"0{NAME_BORDER_SYMBOL}{baseline_field}", data[baseline_field])
-            ]
-            compared_data = [
-                (f"0{NAME_BORDER_SYMBOL}{column}", data[column])
-                for column in target_fields
-            ]
-        elif compare_by == "columns_in_groups":
-            baseline_data = cls._split_ds_into_columns(
-                data.groupby(by=group_field, fields_list=baseline_field)
+            baseline_data, compared_data = cls._split_for_groups_mode(
+                data, group_field, target_fields
             )
-            compared_data = data.groupby(by=group_field, fields_list=target_fields[0])
-            compared_data = cls._split_ds_into_columns(data=compared_data)
+        elif compare_by == "columns":
+            baseline_data, compared_data = cls._split_for_columns_mode(
+                data, baseline_field, target_fields
+            )
+        elif compare_by == "columns_in_groups":
+            baseline_data, compared_data = cls._split_for_columns_in_groups_mode(
+                data, group_field, baseline_field, target_fields
+            )
         elif compare_by == "cross":
-            data_buckets = data.groupby(by=group_field, fields_list=baseline_field)
-            baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
-            compared_data = data.groupby(by=group_field, fields_list=target_fields)
-            compared_data.pop(0)
-            compared_data = cls._split_ds_into_columns(data=compared_data)
+            baseline_data, compared_data = cls._split_for_cross_mode(
+                data, group_field, baseline_field, target_fields
+            )
         else:
-            raise ValueError("compare_by")
+            raise ValueError(
+                f"Wrong compare_by argument passed {compare_by}. It can be only one of the following modes: 'groups', 'columns', 'columns_in_groups', 'cross'."
+            )
+        return baseline_data, compared_data
+
+    @classmethod
+    def _split_for_groups_mode(
+        cls, data: Dataset, group_field: str, target_fields: List[str]
+    ):
+        if isinstance(target_fields, List) and len(target_fields) > 1:
+            raise ValueError(
+                "Only one Target field can be passed when the comparison is done by groups"
+            )
+        if not isinstance(group_field, str):
+            raise TypeError(
+                f"group_field must be one string, {type(group_field)} passed."
+            )
+
+        data_buckets = sorted(data.groupby(by=group_field, fields_list=target_fields))
+        baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
+        compared_data = cls._split_ds_into_columns(data=data_buckets)
+        return baseline_data, compared_data
+
+    @classmethod
+    def _split_for_columns_mode(
+        cls, data: Dataset, baseline_field: str, target_fields: List[str]
+    ):
+
+        baseline_data = [(f"{baseline_field}", data[baseline_field])]
+        compared_data = [(f"{column}", data[column]) for column in target_fields]
+        return baseline_data, compared_data
+
+    @classmethod
+    def _split_for_columns_in_groups_mode(
+        cls,
+        data: Dataset,
+        group_field: str,
+        baseline_field: str,
+        target_fields: List[str],
+    ):
+        if baseline_field is None:
+            raise NoRequiredArgumentError("baseline_field")
+        if group_field is None:
+            raise NoRequiredArgumentError("group_field")
+        if not isinstance(group_field, str):
+            raise TypeError(
+                f"group_field must be one string, {type(group_field)} passed."
+            )
+        if len(target_fields) > 1:
+            warnings.warn(
+                f"Too many fields passed as Target fields {target_fields}, only {target_fields[0]} will be used"
+            )
+
+        baseline_data = cls._split_ds_into_columns(
+            data.groupby(by=group_field, fields_list=baseline_field)
+        )
+        compared_data = data.groupby(by=group_field, fields_list=target_fields[0])
+        compared_data = cls._split_ds_into_columns(data=compared_data)
+        return baseline_data, compared_data
+
+    @classmethod
+    def _split_for_cross_mode(
+        cls,
+        data: Dataset,
+        group_field: str,
+        baseline_field: str,
+        target_fields: List[str],
+    ):
+        if baseline_field is None:
+            raise NoRequiredArgumentError("baseline_field")
+        if group_field is None:
+            raise NoRequiredArgumentError("group_field")
+        if not isinstance(group_field, str):
+            raise TypeError(
+                f"group_field must be one string, {type(group_field)} passed."
+            )
+        data_buckets = sorted(data.groupby(by=group_field, fields_list=baseline_field))
+        baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
+        compared_data = sorted(data.groupby(by=group_field, fields_list=target_fields))
+        compared_data.pop(0)
+        compared_data = cls._split_ds_into_columns(data=compared_data)
         return baseline_data, compared_data
 
     @classmethod
@@ -221,11 +282,6 @@ class Comparator(Calculator, ABC):
         **kwargs,
     ) -> Dict:
         target_fields = Adapter.to_list(target_fields)
-
-        if compare_by == "columns_in_groups" and len(target_fields) > 1:
-            warnings.warn(
-                f"Too many fields passed as Target fields {target_fields}, only {target_fields[0]} will be used"
-            )
 
         if grouping_data is None:
             grouping_data = cls._split_data_to_buckets(
@@ -246,7 +302,11 @@ class Comparator(Calculator, ABC):
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field, target_fields, baseline_field = self._get_fields(data)
+        fields = self._get_fields(data)
+
+        group_field = fields["group_field"]
+        target_fields = fields["target_fields"]
+        baseline_field = fields["baseline_field"]
 
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")

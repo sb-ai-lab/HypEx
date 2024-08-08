@@ -15,9 +15,9 @@ class ABTest(ExperimentShell):
     @staticmethod
     def _make_experiment(additional_tests, multitest_method):
         test_mapping = {
-            "t-test": TTest(grouping_role=TreatmentRole()),
-            "u-test": UTest(grouping_role=TreatmentRole()),
-            "chi2-test": Chi2Test(grouping_role=TreatmentRole()),
+            "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
+            "u-test": UTest(compare_by="groups", grouping_role=TreatmentRole()),
+            "chi2-test": Chi2Test(compare_by="groups", grouping_role=TreatmentRole()),
         }
         on_role_executors = [GroupDifference(grouping_role=TreatmentRole())]
         additional_tests = ["t-test"] if additional_tests is None else additional_tests
