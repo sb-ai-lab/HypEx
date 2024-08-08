@@ -320,6 +320,9 @@ class Comparator(Calculator, ABC):
                 raise NoColumnsError(TargetRole().role_name)
         if not group_field and self.compare_by != "columns":
             raise GroupFieldNotSuitableFieldError(group_field)
+        data.groups[group_field[0]] = {
+            f"{group}": ds for group, ds in data.ds.groupby(group_field[0])
+        }
         compare_result = self.calc(
             data=data.ds,
             compare_by=self.compare_by,
