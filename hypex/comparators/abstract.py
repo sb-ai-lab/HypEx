@@ -65,7 +65,7 @@ class Comparator(Calculator, ABC):
     def _get_fields(self, data: ExperimentData) -> Dict[str, Union[str, List[str]]]:
         tmp_role = True if data.ds.tmp_roles else False
         group_field = self._field_searching(
-            data=data, roles=self.grouping_role, search_types=self.search_types
+            data=data, roles=self.grouping_role,
         )
         target_fields = self._field_searching(
             data=data,
@@ -73,7 +73,9 @@ class Comparator(Calculator, ABC):
             tmp_role=tmp_role,
             search_types=self.search_types,
         )
-        baseline_field = self._field_searching(data=data, roles=self.baseline_role)
+        baseline_field = self._field_searching(data=data,
+            roles=self.baseline_role # TODO: check if there can be a temp baseline role
+        )
         return {
             "group_field": group_field,
             "target_fields": target_fields,
@@ -214,6 +216,8 @@ class Comparator(Calculator, ABC):
     def _split_for_columns_mode(
         cls, data: Dataset, baseline_field: str, target_fields: List[str]
     ):
+        if baseline_field is None:
+            raise NoRequiredArgumentError("baseline_field")
 
         baseline_data = [(f"{baseline_field}", data[baseline_field])]
         compared_data = [(f"{column}", data[column]) for column in target_fields]

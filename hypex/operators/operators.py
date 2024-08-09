@@ -19,12 +19,12 @@ class SMD(GroupOperator):
 class MatchingMetrics(GroupOperator):
     def __init__(
         self,
+        grouping_role: Optional[ABCRole] = None,
         target_roles: Union[ABCRole, List[ABCRole], None] = None,
         metric: Optional[Literal["auto", "atc", "att", "ate"]] = None,
-        key: Any = "",
     ):
         self.metric = metric or "auto"
-        super().__init__(key=key)
+        super().__init__(grouping_role=grouping_role)
         self.target_roles = target_roles
 
     def execute(self, data: ExperimentData) -> ExperimentData:
