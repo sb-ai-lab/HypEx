@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Sequence, Tuple
 
 from hypex.dataset import (
     Dataset,
@@ -8,8 +8,9 @@ from hypex.dataset import (
 from hypex.executor import Calculator
 from hypex.utils import (
     ExperimentDataEnum,
-    AbstractMethodError,
+    AbstractMethodError, GroupFieldNotSuitableFieldError,
 )
+from hypex.utils.adapter import Adapter
 
 
 class GroupOperator(Calculator):  #TODO: change the derive from Calculator to COmparator
@@ -63,6 +64,27 @@ class GroupOperator(Calculator):  #TODO: change the derive from Calculator to CO
                 **kwargs,
             )
         return result
+
+    @classmethod
+    def calc(
+            cls,
+            data: Dataset,
+            group_field: Union[Sequence[str], str, None] = None,
+            grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
+            target_fields: Union[str, List[str], None] = None,
+            **kwargs,
+    ) -> Dict:
+        group_field = Adapter.to_list(group_field)
+
+        if grouping_data is None:
+            grouping_data = data.groupby(group_field)
+        if len(grouping_data) > 1:
+            grouping_data[0][1].tmp_roles = data.tmp_roles
+        else:
+            raise GroupFieldNotSuitableFieldError(group_field)
+        return cls._execute_inner_function(
+            grouping_data, target_fields=target_fields, old_data=data, **kwargs
+        )
 
     def _set_value(
         self, data: ExperimentData, value: Optional[Dict] = None, key: Any = None
