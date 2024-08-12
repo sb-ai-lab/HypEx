@@ -1,5 +1,4 @@
 from abc import abstractmethod, ABC
-from copy import deepcopy
 from typing import Any, Dict, List, Optional, Sequence, Union, Tuple, Iterable
 
 from hypex.dataset import (
@@ -14,12 +13,10 @@ from hypex.dataset import (
 )
 from hypex.dataset.roles import AdditionalRole
 from hypex.utils import (
-    GroupFieldNotSuitableFieldError,
-    SpaceEnum,
     AbstractMethodError,
     ID_SPLIT_SYMBOL,
     SetParamsDictTypes,
-    ExperimentDataEnum,
+    ExperimentDataEnum, FieldNotSuitableFieldError,
 )
 from hypex.utils.adapter import Adapter
 
@@ -246,7 +243,7 @@ class MLExecutor(Calculator, ABC):
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
-            raise GroupFieldNotSuitableFieldError(group_field)
+            raise FieldNotSuitableFieldError(group_field, "Grouping")
         result = cls._execute_inner_function(
             grouping_data, target_field=target_field, **kwargs
         )

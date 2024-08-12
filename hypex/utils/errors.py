@@ -1,3 +1,6 @@
+from typing import Literal
+
+
 class RoleColumnError(Exception):
     def __init__(self, roles, columns):
         super().__init__(
@@ -28,14 +31,9 @@ class NoColumnsError(Exception):
         super().__init__(f"No columns found by role {role}")
 
 
-class GroupFieldNotSuitableFieldError(Exception):
-    def __init__(self, group_field):
-        super().__init__(f"Group field {group_field} is not suitable for comparison")
-
-class TargetFieldNotSuitableFieldError(Exception):
-    def __init__(self, target_field):
-        super().__init__(f"Target field(s) {target_field} is (are) not suitable for comparison")
-
+class FieldNotSuitableFieldError(Exception):
+    def __init__(self, field, field_role:Literal["Grouping", "Target", "Baseline"]):
+        super().__init__(f"{field_role} field {field} is not suitable for comparison")
 
 class NotFoundInExperimentDataError(Exception):
     def __init__(self, class_: str):

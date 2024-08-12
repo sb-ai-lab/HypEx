@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Any, Union, Sequence, Tuple
 from hypex.dataset import Dataset, ExperimentData, FeatureRole, GroupingRole, ABCRole, TargetRole, TempTargetRole
 from hypex.executor import Calculator
 from hypex.extensions.scipy_linalg import CholeskyExtension, InverseExtension
-from hypex.utils import ExperimentDataEnum, GroupFieldNotSuitableFieldError
+from hypex.utils import ExperimentDataEnum, FieldNotSuitableFieldError
 from hypex.utils.adapter import Adapter
 
 
@@ -97,7 +97,7 @@ class MahalanobisDistance(Calculator):
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
-            raise GroupFieldNotSuitableFieldError(group_field)
+            raise FieldNotSuitableFieldError(group_field, "Grouping")
         return cls._execute_inner_function(
             grouping_data, target_fields=target_fields, old_data=data, **kwargs
         )

@@ -198,6 +198,17 @@ class TempTargetRole(TargetRole):
 
     _role_name: RoleNameType = "TempTarget"
 
+class TempPreTargetRole(TargetRole):
+    """Role for temp pre-target column.
+    A temporary role for pre-target variables used in intermediate stages of data processing
+    or during certain executions in the analysis pipeline. It facilitates operations on
+    pre-target data that may not be final or are used for testing scenarios.
+    Attributes:
+        _role_name (RoleNameType): A name identifying the role as 'TempPreTarget'.
+    """
+
+    _role_name: RoleNameType = "TempPreTarget"
+
 
 class TempGroupingRole(GroupingRole):
     """Role for temp grouping column.
