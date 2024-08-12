@@ -4,7 +4,7 @@ from hypex.analyzers.aa import OneAAStatAnalyzer, AAScoreAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes
 from hypex.comparators.abstract import Comparator
 from hypex.comparators.hypothesis_testing import TTest, KSTest, Chi2Test
-from hypex.dataset import TargetRole, TreatmentRole
+from hypex.dataset import TargetRole, TreatmentRole, AdditionalTreatmentRole
 from hypex.experiments import Experiment, OnRoleExperiment
 from hypex.experiments.base_complex import ParamsExperiment
 from hypex.reporters.aa import OneAADictReporter
@@ -54,7 +54,7 @@ AA_TEST = Experiment(
             params={
                 AASplitter: {"random_state": range(2000), "control_size": [0.5]},
                 Comparator: {
-                    "grouping_role": [TreatmentRole()],
+                    "grouping_role": [AdditionalTreatmentRole()],
                     "space": [SpaceEnum.additional],
                 },
             },
@@ -72,7 +72,7 @@ AA_TEST_WITH_STRATIFICATION = Experiment(
             params={
                 AASplitter: {"random_state": range(2000), "control_size": [0.5]},
                 Comparator: {
-                    "grouping_role": [TreatmentRole()],
+                    "grouping_role": [AdditionalTreatmentRole()],
                     "space": [SpaceEnum.additional],
                 },
             },
@@ -98,7 +98,7 @@ class AATest(ExperimentShell):
         params = {
             AASplitter: {"random_state": random_states, "control_size": [control_size]},
             Comparator: {
-                "grouping_role": [TreatmentRole()],
+                "grouping_role": [AdditionalTreatmentRole()],
                 "space": [SpaceEnum.additional],
             },
         }
