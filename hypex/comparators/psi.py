@@ -29,8 +29,7 @@ class PSI(MatchingComparator):
         Categories that are absent in actual column (empty list for non-categorical data)
     """
 
-    def __init__(
-        self, expected: Dataset, actual: Dataset, column_name: str):
+    def __init__(self, expected: Dataset, actual: Dataset, column_name: str):
         """Initializes the PSI class with given parameters.
 
         Args:
@@ -68,7 +67,9 @@ class PSI(MatchingComparator):
         x = set(self.expected_uniqs)
         y = set(self.expected_uniqs)
 
-        logger.info(f"Jacquard similarity is {len(x.intersection(y)) / len(x.union(y)): .6f}")
+        logger.info(
+            f"Jacquard similarity is {len(x.intersection(y)) / len(x.union(y)): .6f}"
+        )
 
         jac_sim_index = len(x.intersection(y)) / len(x.union(y))
 
@@ -111,10 +112,15 @@ class PSI(MatchingComparator):
         breakpoints = np.arange(0, buckets / 10, 0.1)
 
         # Заплатка, на случай, если в актуальной таблице появились значения отличные от null
-        if self.expected_nulls == self.expected_len and self.actual_nulls != self.actual_len:
+        if (
+            self.expected_nulls == self.expected_len
+            and self.actual_nulls != self.actual_len
+        ):
             breakpoints = np.array(list(sorted(set(Я(self.actual, breakpoints)))))
         else:
-            breakpoints = np.array(list(sorted(set(np.nanquantile(self.expected, breakpoints)))))
+            breakpoints = np.array(
+                list(sorted(set(np.nanquantile(self.expected, breakpoints))))
+            )
 
         actual_nulls = self.actual_nulls / self.actual_len
         expected_nulls = self.expected_nulls / self.expected_len
@@ -138,12 +144,17 @@ class PSI(MatchingComparator):
             nulls = True
 
         points = [i for i in breakpoints]
-        intervals = [f"({np.round(points[i], 5)};{np.round(points[i + 1], 5)})" for i in range(len(points) - 1)]
+        intervals = [
+            f"({np.round(points[i], 5)};{np.round(points[i + 1], 5)})"
+            for i in range(len(points) - 1)
+        ]
         if nulls:
             intervals = np.append(intervals, "empty_values")
 
         if self.plot:
-            self.plots(expected_percents, actual_percents, breakpoints, intervals)  # в функции нет аргумента nulls
+            self.plots(
+                expected_percents, actual_percents, breakpoints, intervals
+            )  # в функции нет аргумента nulls
 
         psi_dict = {}
         for i in range(0, len(expected_percents)):
@@ -151,7 +162,9 @@ class PSI(MatchingComparator):
             psi_dict.update({intervals[i]: psi_val})
 
         psi_value = np.sum(list(psi_dict.values()))
-        psi_dict = {k: v for k, v in sorted(psi_dict.items(), key=lambda x: x[1], reverse=True)}
+        psi_dict = {
+            k: v for k, v in sorted(psi_dict.items(), key=lambda x: x[1], reverse=True)
+        }
         new_cats = []
         abs_cats = []
 
@@ -181,7 +194,9 @@ class PSI(MatchingComparator):
 
         breakpoints = ["good_data", "nulls"]
         if self.plot:
-            self.plots(expected_percents, actual_percents, breakpoints, breakpoints)  # в функции нет аргумента nulls
+            self.plots(
+                expected_percents, actual_percents, breakpoints, breakpoints
+            )  # в функции нет аргумента nulls
 
         psi_dict = {}
         for i in range(0, len(expected_percents)):
@@ -194,7 +209,9 @@ class PSI(MatchingComparator):
         psi_value = np.sum(list(psi_dict.values()))
         jac_metric = self.jac()
         new_cats, abs_cats = [], []
-        psi_dict = {k: v for k, v in sorted(psi_dict.items(), key=lambda x: x[1], reverse=True)}
+        psi_dict = {
+            k: v for k, v in sorted(psi_dict.items(), key=lambda x: x[1], reverse=True)
+        }
 
         if psi_value >= 0.2:  # что такое 0.2? Может перенести его в константу?
             psi_value = psi_value
@@ -274,10 +291,14 @@ class PSI(MatchingComparator):
             reminder = g_counts % group_num
             for g_n in range(group_num):
                 if g_n < group_num - reminder:
-                    group_values = category_names[int(current_pos) : int(current_pos + group_size)]
+                    group_values = category_names[
+                        int(current_pos) : int(current_pos + group_size)
+                    ]
                     current_pos += group_size
                 else:
-                    group_values = category_names[int(current_pos) : int(current_pos + group_size + 1)]
+                    group_values = category_names[
+                        int(current_pos) : int(current_pos + group_size + 1)
+                    ]
                     current_pos += group_size + 1
                 for val in group_values:
                     groups[val] = g_n
@@ -327,7 +348,9 @@ class PSI(MatchingComparator):
             else:
                 psi_dict.update({breakpoints[i]: psi_val})
         psi_value = np.sum(list(psi_dict.values()))
-        psi_dict = {k: v for k, v in sorted(psi_dict.items(), key=lambda x: x[1], reverse=True)}
+        psi_dict = {
+            k: v for k, v in sorted(psi_dict.items(), key=lambda x: x[1], reverse=True)
+        }
 
         return psi_value, psi_dict, new_cats, abs_cats
 
@@ -348,7 +371,8 @@ class PSI(MatchingComparator):
 
         for i in range(0, len(psi_values)):
             if (self.column_type == np.dtype("O")) or (
-                self.expected_nulls == self.expected_len and self.actual_nulls == self.actual_len
+                self.expected_nulls == self.expected_len
+                and self.actual_nulls == self.actual_len
             ):
                 psi_values, psi_dict, new_cats, abs_cats = self.psi_categ()
             else:

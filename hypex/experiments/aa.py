@@ -5,15 +5,14 @@ from hypex.comparators import GroupDifference, GroupSizes
 from hypex.comparators.abstract import GroupComparator
 from hypex.comparators.hypothesis_testing import TTest, KSTest, Chi2Test
 from hypex.dataset import TargetRole, TreatmentRole
-from hypex.experiments import Experiment, OnRoleExperiment
+from hypex.experiments.base import Experiment, OnRoleExperiment
 from hypex.experiments.base_complex import ParamsExperiment
-from hypex.reporters.aa import OneAADictReporter
 from hypex.reporters import DatasetReporter
+from hypex.reporters.aa import OneAADictReporter
 from hypex.splitters import AASplitter, AASplitterWithStratification
 from hypex.ui.aa import AAOutput
 from hypex.ui.base import ExperimentShell
 from hypex.utils import SpaceEnum
-
 
 ONE_AA_TEST = Experiment(
     executors=[

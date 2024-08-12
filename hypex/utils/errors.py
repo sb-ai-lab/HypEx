@@ -62,3 +62,22 @@ class BackendTypeError(Exception):
 class MergeOnError(Exception):
     def __init__(self, on):
         super().__init__(f"Can only merge on one of the columns data. Got {on}")
+
+
+class NoneArgumentError(Exception):
+    def __init__(self, arg, process):
+        super().__init__(f"Argument {arg} is None in process {process}.")
+
+
+class InvalidArgumentError(Exception):
+    def __init__(self, arg, possible_type):
+        super().__init__(
+            f"Invalid type for argument {arg}, possible type is is {possible_type}."
+        )
+
+
+class PairsNotFoundError(Exception):
+    def __init__(self):
+        super().__init__(
+            "Pairs are not found. Check your input data and try execute preprocessing pipline before matching estimation."
+        )

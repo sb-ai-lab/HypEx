@@ -340,10 +340,11 @@ class MLExecutor(GroupCalculator, ABC):
         self, data: ExperimentData, value: Any, key: Any = None
     ) -> ExperimentData:
         return data.set_value(
-            ExperimentDataEnum.groups,
+            ExperimentDataEnum.additional_fields,
             self.id,
             value=value,
             key=key,
+            role=MatchingRole(),
         )
 
     @classmethod
