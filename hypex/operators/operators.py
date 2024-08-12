@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Optional, Any, List, Literal, Union, Dict
+from typing import Optional, Any, List, Literal, Union, Dict, Tuple
 
 import numpy as np
 
@@ -47,34 +47,110 @@ class MatchingMetrics(GroupOperator):
             key=key,
         )
 
+    @classmethod
+    def _inner_function(
+        cls,
+        data: Dataset,
+        test_data: Optional[Dataset] = None,
+        target_fields: Optional[List[str]] = None,
+        **kwargs,
+    ) -> Any:
+        if target_fields is None or test_data is None:
+            raise NoneArgumentError(
+                ["target_fields", "test_data"], "att, atc, ate estimation"
+            )
+        metric = kwargs.get("metric", "ate")
+        itt = test_data[target_fields[0]] - test_data[target_fields[1]]
+        itc = data[target_fields[1]] - data[target_fields[0]]
+        bias = kwargs.get("bias", {})
+        if len(bias) > 0:
+            if metric in ["atc", "ate"]:
+                itc -= Dataset.from_dict({"test": bias["control"]}, roles={})
+            itt += Dataset.from_dict({"control": bias["test"]}, roles={})
+        itt = itt.mean()
+        itc = itc.mean()
+        if metric == "atc":
+            return {"ATC": itc}
+        if metric == "att":
+            return {"ATT": itt}
+        len_test, len_control = len(data), len(test_data)
+        return {
+            "ATT": itt,
+            "ATC": itc,
+            "ATE": (itt * len_test + itc * len_control) / (len_test + len_control),
+        }
+
+    @staticmethod
+    def _define_metric(
+        grouping_data: List[Tuple[Union[int, str], Dataset]], target_fields
+    ):
+        if grouping_data[0][1][target_fields[1]].isna().sum() == len(
+            grouping_data[0][1]
+        ):
+            return "att"
+        else:
+            return (
+                "atc"
+                if grouping_data[0][1][target_fields[1]].isna().sum()
+                == len(grouping_data[1][1])
+                else "ate"
+            )
+
+    @classmethod
+    def _execute_inner_function(
+        cls, grouping_data, target_fields: Optional[List[str]] = None, **kwargs
+    ) -> Dict:
+        metric = kwargs.get("metric", "auto")
+        if target_fields is None or len(target_fields) != 2:
+            raise ValueError(
+                "This operator works with 2 targets, but got {}".format(
+                    len(target_fields) if target_fields else None
+                )
+            )
+        if metric == "auto":
+            metric = cls._define_metric(grouping_data, target_fields)
+        return cls._inner_function(
+            data=grouping_data[0][1],
+            test_data=grouping_data[1][1],
+            target_fields=target_fields,
+            metric=metric,
+            bias=kwargs.get("bias_estimation", None),
+        )
+
+    def _prepare_new_target(self, data: ExperimentData, t_data: Dataset) -> Dataset:
+        indexes = self._field_searching(data, MatchingRole())
+        if len(indexes) == 0:
+            raise ValueError(f"No indexes were found")
+        new_target = data.ds.search_columns(TargetRole())[0]
+        indexes = data.additional_fields[indexes[0]]
+        indexes.index = t_data.index
+        filtered_field = indexes.drop(
+            indexes[indexes[indexes.columns[0]] == -1], axis=0
+        )
+        matched_data = data.ds.loc[
+            list(map(lambda x: x[0], filtered_field.get_values()))
+        ][new_target].rename(
+            {new_target: new_target + "_matched" for _ in data.ds.columns}
+        )
+        matched_data.index = filtered_field.index
+        return matched_data
+
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields = self._get_fields(data=data)
         bias = (
             data.variables[data.get_one_id(Bias, ExperimentDataEnum.variables)]
-            if data.get_ids(Bias, ExperimentDataEnum.variables)["Bias"]["variables"]
-            != []
+            if len(
+                data.get_ids(Bias, ExperimentDataEnum.variables)["Bias"]["variables"]
+            )
+            > 0
             else None
         )
         t_data = deepcopy(data.ds)
         if len(target_fields) != 2:
-            indexes = self._field_searching(data, MatchingRole())
-            if len(indexes) != 1:
-                raise ValueError(f"")
-            new_target = data.ds.search_columns(TargetRole())[0]
-            indexes = data.additional_fields[indexes[0]]
-            indexes.index = t_data.index
-            filtered_field = indexes.drop(
-                indexes[indexes[indexes.columns[0]] == -1], axis=0
-            )
-            matched_data = data.ds.loc[
-                list(map(lambda x: x[0], filtered_field.get_values()))
-            ][new_target].rename(
-                {new_target: new_target + "_matched" for i in data.ds.columns}
-            )
-            matched_data.index = filtered_field.index
+            matched_data = self._prepare_new_target(data, t_data)
             target_fields += [matched_data.search_columns(TargetRole())[0]]
             t_data = t_data.add_column(
-                matched_data.reindex(t_data.index, fill_value=-1),
+                matched_data.reindex(t_data.index),
                 role={target_fields[1]: TargetRole()},
             )
         self.key = str(
@@ -94,71 +170,6 @@ class MatchingMetrics(GroupOperator):
         )
         return self._set_value(data, compare_result)
 
-    @classmethod
-    def _execute_inner_function(
-        cls, grouping_data, target_fields: Optional[List[str]] = None, **kwargs
-    ) -> Dict:
-        metric = kwargs.get("metric", "auto")
-        if target_fields is None or len(target_fields) != 2:
-            raise ValueError(
-                "This operator works with 2 targets, but got {}".format(
-                    len(target_fields) if target_fields else None
-                )
-            )
-        if metric == "auto":
-            if len(
-                grouping_data[0][1][grouping_data[0][1][target_fields[1]] == -1]
-            ) == len(grouping_data[0][1]):
-                metric = "att"
-            else:
-                metric = (
-                    "atc"
-                    if len(
-                        grouping_data[1][1][grouping_data[1][1][target_fields[1]] == -1]
-                    )
-                    == len(grouping_data[1][1])
-                    else "ate"
-                )
-        return cls._inner_function(
-            data=grouping_data[0][1],
-            test_data=grouping_data[1][1],
-            target_fields=target_fields,
-            metric=metric,
-            bias=kwargs.get("bias_estimation", None),
-        )
-
-    @classmethod
-    def _inner_function(
-        cls,
-        data: Dataset,
-        test_data: Optional[Dataset] = None,
-        target_fields: Optional[List[str]] = None,
-        **kwargs,
-    ) -> Any:
-        if target_fields is None or test_data is None:
-            raise NoneArgumentError(
-                ["target_fields", "test_data"], "att, atc, ate estimation"
-            )
-        metric = kwargs.get("metric", "ate")
-        itt = test_data[target_fields[0]] - test_data[target_fields[1]]
-        itc = data[target_fields[1]] - data[target_fields[0]]
-        bias = kwargs.get("bias", {})
-        if len(bias) > 0:
-            itc -= Dataset.from_dict({"test": bias["control"]}, roles={})
-            itt += Dataset.from_dict({"control": bias["test"]}, roles={})
-        itt = itt.mean()
-        itc = itc.mean()
-        if metric == "atc":
-            return {"ATC": itc}
-        if metric == "att":
-            return {"ATT": itt}
-        len_test, len_control = len(data), len(test_data)
-        return {
-            "ATT": itt,
-            "ATC": itc,
-            "ATE": (itt * len_test + itc * len_control) / (len_test + len_control),
-        }
-
 
 class Bias(GroupOperator):
     def __init__(
@@ -172,42 +183,56 @@ class Bias(GroupOperator):
             grouping_role=grouping_role, target_roles=target_roles, space=space, key=key
         )
 
-    def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field, target_fields = self._get_fields(data)
-        t_data = deepcopy(data.ds)
-        if len(target_fields) < 2:
-            indexes = data.additional_fields[
-                self._field_searching(data, MatchingRole())[0]
-            ]
-            indexes.index = t_data.index
-            filtered_field = indexes.drop(
-                indexes[indexes[indexes.columns[0]] == -1], axis=0
-            )
-            matched_data = data.ds.loc[
-                list(map(lambda x: x[0], filtered_field.get_values()))
-            ].rename({i: i + "_matched" for i in data.ds.columns})
-            matched_data.index = filtered_field.index
-            target_fields += [matched_data.search_columns(TargetRole())[0]]
-            t_data = t_data.append(
-                matched_data.reindex(t_data.index, fill_value=-1), axis=1
-            )
-        self.key = str(
-            target_fields[0] if len(target_fields) == 1 else (target_fields or "")
-        )
-        if (
-            not target_fields and data.ds.tmp_roles
-        ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
-            return data
+    @staticmethod
+    def calc_coefficients(X: Dataset, Y: Dataset) -> List[float]:
+        X_l = Dataset.create_empty(roles={"temp": InfoRole()}, index=X.index).fillna(1)
+        return np.linalg.lstsq(
+            X_l.append(X, axis=1).data.values, Y.data.values, rcond=-1
+        )[0][1:]
 
-        compare_result = self.calc(
-            data=t_data,
-            group_field=group_field,
-            target_fields=target_fields,
-            features_fields=t_data.search_columns(
-                FeatureRole(), search_types=[int, float]
+    @staticmethod
+    def calc_bias(
+        X: Dataset, X_matched: Dataset, coefficients: List[float]
+    ) -> List[float]:
+        return [
+            (j - i).dot(coefficients)[0]
+            for i, j in zip(X.data.values, X_matched.data.values)
+        ]
+
+    @classmethod
+    def _inner_function(
+        cls,
+        data: Dataset,
+        test_data: Optional[Dataset] = None,
+        target_fields: Optional[List[str]] = None,
+        features_fields: Optional[List[str]] = None,
+        **kwargs,
+    ) -> Dict:
+        if target_fields is None or features_fields is None or test_data is None:
+            raise NoneArgumentError(
+                ["target_fields", "features_fields", "test_data"], "bias_estimation"
+            )
+        test_result = cls.calc_bias(
+            test_data[features_fields[: len(features_fields) // 2]],
+            test_data[features_fields[len(features_fields) // 2 :]],
+            cls.calc_coefficients(
+                test_data[features_fields[len(features_fields) // 2 :]],
+                test_data[target_fields[1]],
             ),
         )
-        return self._set_value(data, compare_result)
+        if data[target_fields[1]].isna().sum() > 0:
+            return {"test": test_result}
+        return {
+            "test": test_result,
+            "control": cls.calc_bias(
+                data[features_fields[: len(features_fields) // 2]],
+                data[features_fields[len(features_fields) // 2 :]],
+                cls.calc_coefficients(
+                    data[features_fields[len(features_fields) // 2 :]],
+                    data[target_fields[1]],
+                ),
+            ),
+        }
 
     @classmethod
     def _execute_inner_function(
@@ -225,50 +250,39 @@ class Bias(GroupOperator):
             **kwargs,
         )
 
-    @classmethod
-    def _inner_function(
-        cls,
-        data: Dataset,
-        test_data: Optional[Dataset] = None,
-        target_fields: Optional[List[str]] = None,
-        features_fields: Optional[List[str]] = None,
-        **kwargs,
-    ) -> Dict:
-        if target_fields is None or features_fields is None or test_data is None:
-            raise NoneArgumentError(
-                ["target_fields", "features_fields", "test_data"], "bias_estimation"
-            )
-        return {
-            "test": cls.calc_bias(
-                test_data[features_fields[: len(features_fields) // 2]],
-                test_data[features_fields[len(features_fields) // 2 :]],
-                cls.calc_coefficients(
-                    test_data[features_fields[len(features_fields) // 2 :]],
-                    test_data[target_fields[1]],
-                ),
-            ),
-            "control": cls.calc_bias(
-                data[features_fields[: len(features_fields) // 2]],
-                data[features_fields[len(features_fields) // 2 :]],
-                cls.calc_coefficients(
-                    data[features_fields[len(features_fields) // 2 :]],
-                    data[target_fields[1]],
-                ),
-            ),
-        }
+    def _prepare_data(self, data: ExperimentData, t_data: Dataset) -> Dataset:
+        indexes = data.additional_fields[self._field_searching(data, MatchingRole())[0]]
+        indexes.index = t_data.index
+        filtered_field = indexes.drop(
+            indexes[indexes[indexes.columns[0]] == -1], axis=0
+        )
+        matched_data = data.ds.loc[
+            list(map(lambda x: x[0], filtered_field.get_values()))
+        ].rename({i: i + "_matched" for i in data.ds.columns})
+        matched_data.index = filtered_field.index
+        return matched_data
 
-    @staticmethod
-    def calc_coefficients(X: Dataset, Y: Dataset) -> List[float]:
-        X_l = Dataset.create_empty(roles={"temp": InfoRole()}, index=X.index).fillna(1)
-        return np.linalg.lstsq(
-            X_l.append(X, axis=1).data.values, Y.data.values, rcond=-1
-        )[0][1:]
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        group_field, target_fields = self._get_fields(data)
+        t_data = deepcopy(data.ds)
+        if len(target_fields) < 2:
+            matched_data = self._prepare_data(data, t_data)
+            target_fields += [matched_data.search_columns(TargetRole())[0]]
+            t_data = t_data.append(matched_data.reindex(t_data.index), axis=1)
+        self.key = str(
+            target_fields[0] if len(target_fields) == 1 else (target_fields or "")
+        )
+        if (
+            not target_fields and data.ds.tmp_roles
+        ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
+            return data
 
-    @staticmethod
-    def calc_bias(
-        X: Dataset, X_matched: Dataset, coefficients: List[float]
-    ) -> List[float]:
-        return [
-            (j - i).dot(coefficients)[0]
-            for i, j in zip(X.data.values, X_matched.data.values)
-        ]
+        compare_result = self.calc(
+            data=t_data,
+            group_field=group_field,
+            target_fields=target_fields,
+            features_fields=t_data.search_columns(
+                FeatureRole(), search_types=[int, float]
+            ),
+        )
+        return self._set_value(data, compare_result)

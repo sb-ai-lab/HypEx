@@ -25,7 +25,7 @@ class MatchingOutput(Output):
         matched_data.index = filtered_field.index
         self.indexes = indexes
         self.full_data = experiment_data.ds.append(
-            matched_data.reindex(experiment_data.ds.index, fill_value=-1), axis=1
+            matched_data.reindex(experiment_data.ds.index), axis=1
         )
 
     def extract(self, experiment_data: ExperimentData):

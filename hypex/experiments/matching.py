@@ -4,7 +4,6 @@ from typing import List, Literal, Union
 from hypex.analyzers.matching import MatchingAnalyzer
 from hypex.comparators.distances import MahalanobisDistance
 from hypex.dataset import TreatmentRole, TargetRole
-from hypex.encoders.encoders import DummyEncoder
 from hypex.executor import Executor
 from hypex.experiments.base import Experiment
 from hypex.ml.faiss import FaissNearestNeighbors
@@ -17,12 +16,6 @@ class Matching(ExperimentShell):
 
     @staticmethod
     def _make_experiment(
-        filters: Union[
-            Literal["fillna", "const-filter", "na-filter", "dummy-encoder", "auto"],
-            List[
-                Literal["fillna", "const-filter", "na-filter", "dummy-encoder", "auto"]
-            ],
-        ] = "auto",
         distance: Literal["mahalanobis", "l2"] = "mahalanobis",
         two_sides: bool = True,
         metric: Literal["atc", "att", "ate", "auto"] = "auto",
@@ -32,16 +25,10 @@ class Matching(ExperimentShell):
             List[Literal["smd", "psi", "ks-test", "repeats", "auto"]],
         ] = "auto",
     ) -> Experiment:
-        filters_mapping = {"dummy-encoder": DummyEncoder(), "auto": DummyEncoder()}
         distance_mapping = {
             "mahalanobis": MahalanobisDistance(grouping_role=TreatmentRole())
         }
-        filters = filters if isinstance(filters, List) else [filters]
-        if any(filter_ not in filters_mapping for filter_ in filters):
-            warnings.warn("Сurrently only dummy encoder is supported")
         executors: List[Executor] = []
-        for i in filters:
-            executors += [filters_mapping[i]]
         if bias_estimation:
             executors += [
                 FaissNearestNeighbors(
@@ -55,6 +42,8 @@ class Matching(ExperimentShell):
                     grouping_role=TreatmentRole(), two_sides=two_sides
                 )
             ]
+        if metric in ["atc", "ate"] and not two_sides:
+            raise ValueError(f"Can not estimate {metric} while two_sides is False")
         executors += [
             MatchingMetrics(
                 grouping_role=TreatmentRole(),
@@ -75,12 +64,6 @@ class Matching(ExperimentShell):
 
     def __init__(
         self,
-        filters: Union[
-            Literal["fillna", "const-filter", "na-filter", "dummy-encoder", "auto"],
-            List[
-                Literal["fillna", "const-filter", "na-filter", "dummy-encoder", "auto"]
-            ],
-        ] = "auto",
         distance: Literal["mahalanobis", "l2"] = "mahalanobis",
         two_sides: bool = True,
         metric: Literal["atc", "att", "ate", "auto"] = "auto",
@@ -92,7 +75,7 @@ class Matching(ExperimentShell):
     ):
         super().__init__(
             experiment=self._make_experiment(
-                filters, distance, two_sides, metric, bias_estimation, quality_tests
+                distance, two_sides, metric, bias_estimation, quality_tests
             ),
             output=MatchingOutput(),
         )

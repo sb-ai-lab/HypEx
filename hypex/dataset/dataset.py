@@ -395,6 +395,8 @@ class Dataset(DatasetBase):
         method: Optional[Literal["bfill", "ffill"]] = None,
         **kwargs,
     ):
+        if values is None and method is None:
+            raise ValueError("Value or filling method must be provided")
         return Dataset(
             roles=self.roles, data=self.backend.fillna(values, method, **kwargs)
         )
@@ -552,8 +554,8 @@ class Dataset(DatasetBase):
         self,
         roles: Optional[Union[Dict[str, ABCRole], List[str]]] = None,
     ) -> "Dataset":
-        roles_names: List[str] = (
-            roles.keys() or {} if isinstance(roles, Dict) else roles
+        roles_names: List[Union[str, None]] = (
+            list(roles.keys()) or [] if isinstance(roles, Dict) else roles
         )
         result_data = self.backend.transpose(roles_names)
         if roles is None or isinstance(roles, List):
