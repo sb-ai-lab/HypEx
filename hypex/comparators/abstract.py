@@ -146,8 +146,12 @@ class Comparator(Calculator, ABC):
             baseline_data = Adapter.to_list(grouping_data[0])
             compared_data = Adapter.to_list(grouping_data[1])
         elif isinstance(grouping_data, Dict):
-            baseline_data = [("control", grouping_data["control"])]
-            compared_data = [("test", grouping_data["test"])]
+            compared_data = []
+            for i, item in zip(range(len(grouping_data)), grouping_data.items()):
+                if i == 0:
+                    baseline_data = [(item[0], item[1])]
+                else:
+                    compared_data.append((item[0], item[1]))
         else:
             raise TypeError(
                 f"Grouping data must be tuple or list or tuple of lists, but got {type(grouping_data)}"
