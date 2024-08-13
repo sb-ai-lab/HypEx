@@ -32,8 +32,9 @@ class NoColumnsError(Exception):
 
 
 class FieldNotSuitableFieldError(Exception):
-    def __init__(self, field, field_role:Literal["Grouping", "Target", "Baseline"]):
+    def __init__(self, field, field_role: Literal["Grouping", "Target", "Baseline"]):
         super().__init__(f"{field_role} field {field} is not suitable for comparison")
+
 
 class NotFoundInExperimentDataError(Exception):
     def __init__(self, class_: str):
@@ -64,6 +65,7 @@ class BackendTypeError(Exception):
 class MergeOnError(Exception):
     def __init__(self, on):
         super().__init__(f"Can only merge on one of the columns data. Got {on}")
+
 
 class NoRequiredArgumentError(Exception):
     def __init__(self, argument_name):

@@ -16,7 +16,8 @@ from hypex.utils import (
     AbstractMethodError,
     ID_SPLIT_SYMBOL,
     SetParamsDictTypes,
-    ExperimentDataEnum, FieldNotSuitableFieldError,
+    ExperimentDataEnum,
+    FieldNotSuitableFieldError,
 )
 from hypex.utils.adapter import Adapter
 
@@ -126,24 +127,27 @@ class Calculator(Executor, ABC):
     def search_types(self):
         raise AbstractMethodError
 
-    def _field_searching(self, data: ExperimentData, roles: Union[ABCRole, Iterable[ABCRole]], tmp_role: bool = False,
-                         search_types=None):
+    def _field_searching(
+        self,
+        data: ExperimentData,
+        roles: Union[ABCRole, Iterable[ABCRole]],
+        tmp_role: bool = False,
+        search_types=None,
+    ):
         searched_field = []
         roles = Adapter.to_list(roles)
-        field_in_additional = [role for role in roles if isinstance(role, AdditionalRole)]
+        field_in_additional = [
+            role for role in roles if isinstance(role, AdditionalRole)
+        ]
         field_in_data = [role for role in roles if role not in field_in_additional]
         if field_in_data:
             searched_field += data.ds.search_columns(
                 field_in_data, tmp_role=tmp_role, search_types=search_types
             )
-        if (
-            field_in_additional
-            and isinstance(data, ExperimentData)
-        ):
+        if field_in_additional and isinstance(data, ExperimentData):
             searched_field += data.additional_fields.search_columns(
                 field_in_additional, tmp_role=tmp_role, search_types=search_types
             )
-            # self.__additional_mode = True
         return searched_field
 
     @staticmethod
@@ -153,6 +157,7 @@ class Calculator(Executor, ABC):
         if test_data is None:
             raise ValueError("test_data is needed for comparison")
         return test_data
+
 
 class MLExecutor(Calculator, ABC):
     def __init__(
@@ -167,7 +172,9 @@ class MLExecutor(Calculator, ABC):
 
     def _get_fields(self, data: ExperimentData):
         group_field = self._field_searching(data, self.grouping_role)
-        target_field = self._field_searching(data, self.target_role, search_types=self.search_types)
+        target_field = self._field_searching(
+            data, self.target_role, search_types=self.search_types
+        )
         return group_field, target_field
 
     @abstractmethod

@@ -3,17 +3,24 @@ from typing import Any, Dict, List, Optional, Union, Sequence, Tuple
 
 from hypex.dataset import (
     Dataset,
-    ExperimentData, TargetRole, GroupingRole, ABCRole, AdditionalTargetRole,
+    ExperimentData,
+    TargetRole,
+    GroupingRole,
+    ABCRole,
+    AdditionalTargetRole,
 )
 from hypex.executor import Calculator
 from hypex.utils import (
     ExperimentDataEnum,
-    AbstractMethodError, FieldNotSuitableFieldError,
+    AbstractMethodError,
+    FieldNotSuitableFieldError,
 )
 from hypex.utils.adapter import Adapter
 
 
-class GroupOperator(Calculator):  #TODO: change the derive from Calculator to COmparator
+class GroupOperator(
+    Calculator
+):  # TODO: change the derive from Calculator to COmparator
 
     def __init__(
         self,
@@ -38,9 +45,13 @@ class GroupOperator(Calculator):  #TODO: change the derive from Calculator to CO
 
     def _get_fields(self, data: ExperimentData):
         group_field = self._field_searching(data, self.grouping_role)
-        target_fields = self._field_searching(data, self.target_roles, search_types=self.search_types)
+        target_fields = self._field_searching(
+            data, self.target_roles, search_types=self.search_types
+        )
         if len(target_fields) != 2:
-            target_fields += self._field_searching(data, AdditionalTargetRole(), search_types=self.search_types)
+            target_fields += self._field_searching(
+                data, AdditionalTargetRole(), search_types=self.search_types
+            )
         return group_field, target_fields
 
     @classmethod
@@ -67,12 +78,12 @@ class GroupOperator(Calculator):  #TODO: change the derive from Calculator to CO
 
     @classmethod
     def calc(
-            cls,
-            data: Dataset,
-            group_field: Union[Sequence[str], str, None] = None,
-            grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
-            target_fields: Union[str, List[str], None] = None,
-            **kwargs,
+        cls,
+        data: Dataset,
+        group_field: Union[Sequence[str], str, None] = None,
+        grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
+        target_fields: Union[str, List[str], None] = None,
+        **kwargs,
     ) -> Dict:
         group_field = Adapter.to_list(group_field)
 

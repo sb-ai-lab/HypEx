@@ -5,7 +5,8 @@ from hypex.dataset import (
     Dataset,
     ExperimentData,
     TreatmentRole,
-    StratificationRole, AdditionalTreatmentRole,
+    StratificationRole,
+    AdditionalTreatmentRole,
 )
 from hypex.executor import Calculator
 from hypex.utils import ExperimentDataEnum
@@ -85,8 +86,8 @@ class AASplitter(Calculator):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result = self.calc(
-                data.ds, random_state=self.random_state, control_size=self.control_size
-            )
+            data.ds, random_state=self.random_state, control_size=self.control_size
+        )
         return self._set_value(
             data,
             result,

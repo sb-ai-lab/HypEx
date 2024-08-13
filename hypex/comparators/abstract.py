@@ -13,7 +13,6 @@ from hypex.dataset import (
     GroupingRole,
     TargetRole,
     PreTargetRole,
-    TempPreTargetRole,
 )
 from hypex.executor import Calculator
 from hypex.utils import (
@@ -146,12 +145,8 @@ class Comparator(Calculator, ABC):
             baseline_data = Adapter.to_list(grouping_data[0])
             compared_data = Adapter.to_list(grouping_data[1])
         elif isinstance(grouping_data, Dict):
-            compared_data = []
-            for i, item in zip(range(len(grouping_data)), grouping_data.items()):
-                if i == 0:
-                    baseline_data = [(item[0], item[1])]
-                else:
-                    compared_data.append((item[0], item[1]))
+            compared_data = [(item[0], item[1]) for item in grouping_data.items()]
+            baseline_data = [compared_data.pop()]
         else:
             raise TypeError(
                 f"Grouping data must be tuple or list or tuple of lists, but got {type(grouping_data)}"
@@ -243,8 +238,8 @@ class Comparator(Calculator, ABC):
     def _split_for_cross_mode(
         cls,
         data: Dataset,
-        group_field: str,
-        baseline_field: str,
+        group_field: Optional[str],
+        baseline_field: Optional[str],
         target_fields: List[str],
     ):
         if baseline_field is None:
@@ -338,8 +333,6 @@ class Comparator(Calculator, ABC):
             raise FieldNotSuitableFieldError(group_field, "Grouping")
 
         baseline_data, compared_data = grouping_data
-        # baseline_data = [baseline_data] if not isinstance(baseline_data, list) else baseline_data
-        # compared_data = [compared_data] if not isinstance(compared_data, list) else compared_data
         return cls._execute_inner_function(
             baseline_data=baseline_data,
             compared_data=compared_data,
@@ -376,7 +369,6 @@ class Comparator(Calculator, ABC):
                 target_fields=target_fields,
                 baseline_field=baseline_field,
             )
-            # grouping_data = list(data.groups[group_field[0]].items())
         else:
             grouping_data = None
             data.groups[group_field[0]] = {
