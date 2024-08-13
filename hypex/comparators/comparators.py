@@ -52,7 +52,9 @@ class GroupSizes(Comparator):
         grouping_role: Optional[ABCRole] = None,
     ):
         super().__init__(
-            compare_by=compare_by, grouping_role=grouping_role, target_roles=grouping_role
+            compare_by=compare_by,
+            grouping_role=grouping_role,
+            target_roles=grouping_role,
         )
 
     @classmethod

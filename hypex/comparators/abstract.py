@@ -12,7 +12,8 @@ from hypex.dataset import (
     DatasetAdapter,
     GroupingRole,
     TargetRole,
-    PreTargetRole, TempPreTargetRole,
+    PreTargetRole,
+    TempPreTargetRole,
 )
 from hypex.executor import Calculator
 from hypex.utils import (
@@ -64,7 +65,8 @@ class Comparator(Calculator, ABC):
     def _get_fields(self, data: ExperimentData) -> Dict[str, Union[str, List[str]]]:
         tmp_role = True if data.ds.tmp_roles else False
         group_field = self._field_searching(
-            data=data, roles=self.grouping_role,
+            data=data,
+            roles=self.grouping_role,
         )
         target_fields = self._field_searching(
             data=data,
@@ -72,8 +74,10 @@ class Comparator(Calculator, ABC):
             tmp_role=tmp_role,
             search_types=self.search_types,
         )
-        baseline_field = self._field_searching(data=data,
-            roles=self.baseline_role, tmp_role=tmp_role,
+        baseline_field = self._field_searching(
+            data=data,
+            roles=self.baseline_role,
+            tmp_role=tmp_role,
         )
         return {
             "group_field": group_field,
@@ -130,6 +134,37 @@ class Comparator(Calculator, ABC):
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
     # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
+
+    def _grouping_data_split(
+        self,
+        grouping_data: Union[Tuple[List[Tuple[str, Dataset]]], Dict[str, Dataset]],
+        compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
+        target_fields: List[str],
+        baseline_field: Optional[str],
+    ):
+        if isinstance(grouping_data, Tuple):
+            baseline_data = Adapter.to_list(grouping_data[0])
+            compared_data = Adapter.to_list(grouping_data[1])
+        elif isinstance(grouping_data, Dict):
+            baseline_data = [("control", grouping_data["control"])]
+            compared_data = [("test", grouping_data["test"])]
+        else:
+            raise TypeError(
+                f"Grouping data must be tuple or list or tuple of lists, but got {type(grouping_data)}"
+            )
+
+        baseline_data = [
+            (
+                bucket[0],
+                bucket[1][target_fields if compare_by == "groups" else baseline_field],
+            )
+            for bucket in baseline_data
+        ]
+        compared_data = [
+            (bucket[0], bucket[1][target_fields]) for bucket in compared_data
+        ]
+
+        return baseline_data, compared_data
 
     @staticmethod
     def _split_ds_into_columns(
@@ -278,7 +313,7 @@ class Comparator(Calculator, ABC):
         cls,
         data: Dataset,
         compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
-        target_fields: Union[str, List[str], None] = None,
+        target_fields: Union[str, List[str]],
         baseline_field: Optional[str] = None,
         group_field: Optional[str] = None,
         grouping_data: Optional[Tuple[List[Tuple[str, Dataset]]]] = None,
@@ -294,13 +329,16 @@ class Comparator(Calculator, ABC):
                 baseline_field=baseline_field,
                 group_field=group_field,
             )
+
         if len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1:
             raise FieldNotSuitableFieldError(group_field, "Grouping")
+
         baseline_data, compared_data = grouping_data
+        # baseline_data = [baseline_data] if not isinstance(baseline_data, list) else baseline_data
+        # compared_data = [compared_data] if not isinstance(compared_data, list) else compared_data
         return cls._execute_inner_function(
             baseline_data=baseline_data,
             compared_data=compared_data,
-            compare_by=compare_by,
             **kwargs,
         )
 
@@ -321,17 +359,33 @@ class Comparator(Calculator, ABC):
                 return data
             else:
                 raise NoColumnsError(TargetRole().role_name)
+
         if not group_field and self.compare_by != "columns":
             raise FieldNotSuitableFieldError(group_field, "Grouping")
-        data.groups[group_field[0]] = {
-            f"{group}": ds for group, ds in data.ds.groupby(group_field[0])
-        }
+
+        if (
+            group_field[0] in data.groups
+        ):  # TODO: propper split between groups and columns
+            grouping_data = self._grouping_data_split(
+                grouping_data=data.groups[group_field[0]],
+                compare_by=self.compare_by,
+                target_fields=target_fields,
+                baseline_field=baseline_field,
+            )
+            # grouping_data = list(data.groups[group_field[0]].items())
+        else:
+            grouping_data = None
+            data.groups[group_field[0]] = {
+                f"{group}": ds for group, ds in data.ds.groupby(group_field[0])
+            }
+
         compare_result = self.calc(
             data=data.ds,
             compare_by=self.compare_by,
             target_fields=target_fields,
             baseline_field=Adapter.list_to_single(baseline_field),
             group_field=Adapter.list_to_single(group_field),
+            grouping_data=grouping_data,
         )
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key in compare_result}

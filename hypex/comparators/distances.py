@@ -1,7 +1,15 @@
 from copy import deepcopy
 from typing import Optional, List, Dict, Any, Union, Sequence, Tuple
 
-from hypex.dataset import Dataset, ExperimentData, FeatureRole, GroupingRole, ABCRole, TargetRole, TempTargetRole
+from hypex.dataset import (
+    Dataset,
+    ExperimentData,
+    FeatureRole,
+    GroupingRole,
+    ABCRole,
+    TargetRole,
+    TempTargetRole,
+)
 from hypex.executor import Calculator
 from hypex.extensions.scipy_linalg import CholeskyExtension, InverseExtension
 from hypex.utils import ExperimentDataEnum, FieldNotSuitableFieldError
@@ -83,12 +91,12 @@ class MahalanobisDistance(Calculator):
 
     @classmethod
     def calc(
-            cls,
-            data: Dataset,
-            group_field: Union[Sequence[str], str, None] = None,
-            grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
-            target_fields: Union[str, List[str], None] = None,
-            **kwargs,
+        cls,
+        data: Dataset,
+        group_field: Union[Sequence[str], str, None] = None,
+        grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
+        target_fields: Union[str, List[str], None] = None,
+        **kwargs,
     ) -> Dict:
         group_field = Adapter.to_list(group_field)
 
@@ -109,7 +117,7 @@ class MahalanobisDistance(Calculator):
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
         if (
-                not target_fields and data.ds.tmp_roles
+            not target_fields and data.ds.tmp_roles
         ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
             return data
         if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
