@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Union, Sequence, Tuple
 
 from hypex.dataset import (
     Dataset,
-    ExperimentData, TargetRole, GroupingRole, ABCRole,
+    ExperimentData, TargetRole, GroupingRole, ABCRole, AdditionalTargetRole,
 )
 from hypex.executor import Calculator
 from hypex.utils import (
@@ -40,7 +40,7 @@ class GroupOperator(Calculator):  #TODO: change the derive from Calculator to CO
         group_field = self._field_searching(data, self.grouping_role)
         target_fields = self._field_searching(data, self.target_roles, search_types=self.search_types)
         if len(target_fields) != 2:
-            target_fields += self._field_searching(data, self.target_roles, search_types=self.search_types)
+            target_fields += self._field_searching(data, AdditionalTargetRole(), search_types=self.search_types)
         return group_field, target_fields
 
     @classmethod
