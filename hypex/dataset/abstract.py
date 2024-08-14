@@ -68,8 +68,7 @@ class DatasetBase(ABC):
     def __init__(
         self,
         roles: Union[
-            Dict[ABCRole, Union[List[str], str]],
-            Dict[Union[List[str], str], ABCRole]
+            Dict[ABCRole, Union[List[str], str]], Dict[Union[List[str], str], ABCRole]
         ],
         data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
@@ -93,8 +92,7 @@ class DatasetBase(ABC):
             self._set_empty_types(roles)
         self._roles: Dict[Union[str, int], ABCRole] = roles
         self._tmp_roles: Union[
-            Dict[ABCRole, Union[List[str], str]],
-            Dict[Union[List[str], str], ABCRole]
+            Dict[ABCRole, Union[List[str], str]], Dict[Union[List[str], str], ABCRole]
         ] = {}
 
     def __repr__(self):
@@ -121,31 +119,60 @@ class DatasetBase(ABC):
             )
         ]
 
+    # def replace_roles(
+    #     self,
+    #     to_replace_roles: Union[ABCRole, List[ABCRole]],
+    #     values: Union[ABCRole, List[ABCRole]],
+    #     to_replace_types: Optional[List] = None,
+    #     tmp_role: bool = False,
+    # ):
+    #     to_replace_roles = Adapter.to_list(to_replace_roles)
+    #
+    #     if not isinstance(values, List) or len(values) == 1:
+    #         values = [values] * len(to_replace_roles)
+    #     elif len(values) != len(to_replace_roles):
+    #         raise ValueError("to_replace_roles and values must have the same length")
+    #
+    #     for to_replace_role, new_role in zip(to_replace_roles, values):
+    #         columns = self.search_columns(
+    #             to_replace_role, tmp_role=tmp_role, search_types=to_replace_types
+    #         )
+    #         for column in columns:
+    #             new_role.data_type = new_role.data_type or self.roles[column].data_type
+    #             if tmp_role:
+    #                 self._tmp_roles[column] = new_role
+    #             else:
+    #                 self.roles[column] = new_role
+    #     return self.roles
+
     def replace_roles(
         self,
-        to_replace_roles: Union[ABCRole, List[ABCRole]],
-        values: Union[ABCRole, List[ABCRole]],
-        to_replace_types: Optional[List] = None,
+        new_roles_mapping: Dict[Union[ABCRole, str], ABCRole],
+        # to_replace_types: Optional[List] = None,
         tmp_role: bool = False,
     ):
-        to_replace_roles = Adapter.to_list(to_replace_roles)
+        new_roles_mapping = parse_roles(
+            {
+                role: (
+                    self.search_columns(column, tmp_role)
+                    if isinstance(column, ABCRole)
+                    else column
+                )
+                for column, role in new_roles_mapping.items()
+            }
+        )
 
-        if not isinstance(values, List) or len(values) == 1:
-            values = [values] * len(to_replace_roles)
-        elif len(values) != len(to_replace_roles):
-            raise ValueError("to_replace_roles and values must have the same length")
+        new_roles = {
+            column: new_roles_mapping[column] if column in new_roles_mapping else role
+            for column, role in self.roles.items()
+        }
 
-        for to_replace_role, new_role in zip(to_replace_roles, values):
-            columns = self.search_columns(
-                to_replace_role, tmp_role=tmp_role, search_types=to_replace_types
-            )
-            for column in columns:
-                new_role.data_type = new_role.data_type or self.roles[column].data_type
-                if tmp_role:
-                    self._tmp_roles[column] = new_role
-                else:
-                    self.roles[column] = new_role
-        return self.roles
+        if tmp_role:
+            self._tmp_roles = new_roles
+        else:
+            self.roles = new_roles
+
+        return self
 
     @property
     def index(self):
@@ -161,7 +188,7 @@ class DatasetBase(ABC):
 
     @roles.setter
     def roles(self, value):
-        self.set_roles(new_roles_map=value, temp_role=False)
+        self._set_roles(new_roles_map=value, temp_role=False)
 
     @data.setter
     def data(self, value):
@@ -177,7 +204,7 @@ class DatasetBase(ABC):
 
     @tmp_roles.setter
     def tmp_roles(self, value):
-        self.set_roles(new_roles_map=value, temp_role=True)
+        self._set_roles(new_roles_map=value, temp_role=True)
         self._set_empty_types(self._tmp_roles)
 
     def to_dict(self):
@@ -210,11 +237,10 @@ class DatasetBase(ABC):
     ) -> Any:
         return self._backend.get_values(row=row, column=column)
 
-    def set_roles(
+    def _set_roles(
         self,
         new_roles_map: Union[
-            Dict[ABCRole, Union[List[str], str]],
-            Dict[Union[List[str], str], ABCRole]
+            Dict[ABCRole, Union[List[str], str]], Dict[Union[List[str], str], ABCRole]
         ],
         temp_role: bool = False,
     ):
@@ -222,9 +248,17 @@ class DatasetBase(ABC):
             return self._roles
 
         keys, values = list(new_roles_map.keys()), list(new_roles_map.values())
-        roles, columns_sets = (keys, values) if isinstance(keys[0], ABCRole) else (values, keys)
+        roles, columns_sets = (
+            (keys, values) if isinstance(keys[0], ABCRole) else (values, keys)
+        )
 
-        new_roles = parse_roles({role: columns for role, columns in zip(roles, columns_sets)})
+        new_roles = {}
+        for role, columns in zip(roles, columns_sets):
+            if isinstance(columns, list):
+                for column in columns:
+                    new_roles[column] = role
+            else:
+                new_roles[columns] = role
 
         if temp_role:
             self._tmp_roles = new_roles
@@ -232,15 +266,3 @@ class DatasetBase(ABC):
             self._roles = new_roles
 
         return self
-
-# def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
-#     new_roles = {}
-#     roles = roles or {}
-#     for role in roles:
-#         r = default_roles.get(role, role)
-#         if isinstance(roles[role], list):
-#             for i in roles[role]:
-#                 new_roles[i] = r
-#         else:
-#             new_roles[roles[role]] = r
-#     return new_roles or roles
