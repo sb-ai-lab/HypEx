@@ -68,8 +68,8 @@ class DatasetBase(ABC):
     def __init__(
         self,
         roles: Union[
-            Dict[ABCRole, Union[List[Union[str, int]], str, int]],
-            Dict[Union[str, int], ABCRole],
+            Dict[ABCRole, Union[List[str], str]],
+            Dict[Union[List[str], str], ABCRole]
         ],
         data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
@@ -93,7 +93,8 @@ class DatasetBase(ABC):
             self._set_empty_types(roles)
         self._roles: Dict[Union[str, int], ABCRole] = roles
         self._tmp_roles: Union[
-            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
+            Dict[ABCRole, Union[List[str], str]],
+            Dict[Union[List[str], str], ABCRole]
         ] = {}
 
     def __repr__(self):
@@ -122,7 +123,7 @@ class DatasetBase(ABC):
 
     def replace_roles(
         self,
-        to_replace_roles: Union[ABCRole, str, List[Union[ABCRole, str]]],
+        to_replace_roles: Union[ABCRole, List[ABCRole]],
         values: Union[ABCRole, List[ABCRole]],
         to_replace_types: Optional[List] = None,
         tmp_role: bool = False,
@@ -223,14 +224,23 @@ class DatasetBase(ABC):
         keys, values = list(new_roles_map.keys()), list(new_roles_map.values())
         roles, columns_sets = (keys, values) if isinstance(keys[0], ABCRole) else (values, keys)
 
-        new_roles = {}
-        for role, columns in zip(roles, columns_sets):
-            columns = Adapter.to_list(columns)
-            for column in columns:
-                new_roles[column] = role
-                if temp_role:
-                    self._tmp_roles = new_roles
-                else:
-                    self._roles = new_roles
+        new_roles = parse_roles({role: columns for role, columns in zip(roles, columns_sets)})
 
-        return self._roles
+        if temp_role:
+            self._tmp_roles = new_roles
+        else:
+            self._roles = new_roles
+
+        return self
+
+# def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
+#     new_roles = {}
+#     roles = roles or {}
+#     for role in roles:
+#         r = default_roles.get(role, role)
+#         if isinstance(roles[role], list):
+#             for i in roles[role]:
+#                 new_roles[i] = r
+#         else:
+#             new_roles[roles[role]] = r
+#     return new_roles or roles

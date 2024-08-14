@@ -7,6 +7,7 @@ TargetRoleTypes = Union[float, int, bool]
 CategoricalTypes = Union[str]
 ScalarType = Union[float, int, str, bool]
 
+
 MultiFieldKeyTypes = Union[str, Sequence[str]]
 
 FromDictTypes = Union[
