@@ -91,7 +91,7 @@ class DatasetBase(ABC):
         if data is not None:
             roles = self._set_all_roles(roles)
             self._set_empty_types(roles)
-        self.roles: Dict[str, ABCRole] = roles
+        self._roles: Dict[str, ABCRole] = roles
         self._tmp_roles: Union[
             Dict[ABCRole, Union[List[str], str]], Dict[Union[List[str], str], ABCRole]
         ] = {}
@@ -219,7 +219,7 @@ class DatasetBase(ABC):
         temp_role: bool = False,
     ):
         if not new_roles_map:
-            return self._roles
+            return self.roles
 
         keys, values = list(new_roles_map.keys()), list(new_roles_map.values())
         roles, columns_sets = (
