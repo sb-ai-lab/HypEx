@@ -1,10 +1,10 @@
-from typing import Union, Optional, List
+from typing import Union, Optional, List, Literal
 
 from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu  # type: ignore
 
 from .abstract import StatHypothesisTesting
 from ..dataset import Dataset, ABCRole
-from ..extensions.hypothesis_testing import (
+from ..extensions.scipy_stats import (
     TTestExtension,
     KSTestExtension,
     UTestExtension,
@@ -15,18 +15,6 @@ from ..utils.constants import NUMBER_TYPES_LIST
 
 
 class TTest(StatHypothesisTesting):
-    def __init__(
-        self,
-        grouping_role: Union[ABCRole, None] = None,
-        space: SpaceEnum = SpaceEnum.auto,
-        reliability: float = 0.05,
-    ):
-        super().__init__(
-            grouping_role=grouping_role,
-            space=space,
-            reliability=reliability,
-        )
-
     @property
     def search_types(self) -> Optional[List[type]]:
         return NUMBER_TYPES_LIST
@@ -41,17 +29,6 @@ class TTest(StatHypothesisTesting):
 
 
 class KSTest(StatHypothesisTesting):
-    def __init__(
-        self,
-        grouping_role: Union[ABCRole, None] = None,
-        space: SpaceEnum = SpaceEnum.auto,
-        reliability: float = 0.05,
-    ):
-        super().__init__(
-            grouping_role=grouping_role,
-            space=space,
-            reliability=reliability,
-        )
 
     @property
     def search_types(self) -> Optional[List[type]]:
@@ -67,17 +44,6 @@ class KSTest(StatHypothesisTesting):
 
 
 class UTest(StatHypothesisTesting):
-    def __init__(
-        self,
-        grouping_role: Union[ABCRole, None] = None,
-        space: SpaceEnum = SpaceEnum.auto,
-        reliability: float = 0.05,
-    ):
-        super().__init__(
-            grouping_role=grouping_role,
-            space=space,
-            reliability=reliability,
-        )
 
     @property
     def search_types(self) -> Optional[List[type]]:
@@ -93,17 +59,6 @@ class UTest(StatHypothesisTesting):
 
 
 class Chi2Test(StatHypothesisTesting):
-    def __init__(
-        self,
-        grouping_role: Union[ABCRole, None] = None,
-        space: SpaceEnum = SpaceEnum.auto,
-        reliability: float = 0.05,
-    ):
-        super().__init__(
-            grouping_role=grouping_role,
-            space=space,
-            reliability=reliability,
-        )
 
     @property
     def search_types(self) -> Optional[List[type]]:

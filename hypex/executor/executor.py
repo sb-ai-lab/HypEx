@@ -1,21 +1,23 @@
 from abc import abstractmethod, ABC
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Union, Tuple, Iterable
 
 from hypex.dataset import (
     ABCRole,
     Dataset,
     ExperimentData,
     GroupingRole,
-    TempTargetRole,
+    FeatureRole,
+    AdditionalMatchingRole,
+    TargetRole,
+    DatasetAdapter,
 )
+from hypex.dataset.roles import AdditionalRole
 from hypex.utils import (
-    ComparisonNotSuitableFieldError,
-    FieldKeyTypes,
-    NoColumnsError,
-    SpaceEnum,
     AbstractMethodError,
     ID_SPLIT_SYMBOL,
     SetParamsDictTypes,
+    ExperimentDataEnum,
+    FieldNotSuitableFieldError,
 )
 from hypex.utils.adapter import Adapter
 
@@ -61,6 +63,19 @@ class Executor(ABC):
                 "params must be a dict of str to dict or a dict of class to dict"
             )
         self._generate_id()
+
+    def init_from_hash(self, hash: str) -> None:
+        self._params_hash = hash
+        self._generate_id()
+
+    @classmethod
+    def build_from_id(cls, executor_id: str):
+        splitted_id = executor_id.split(ID_SPLIT_SYMBOL)
+        if splitted_id[0] != cls.__name__:
+            raise ValueError(f"{executor_id} is not a valid {cls.__name__} id")
+        result = cls()
+        result.init_from_hash(splitted_id[1])
+        return result
 
     @property
     def id(self) -> str:
@@ -108,127 +123,148 @@ class Calculator(Executor, ABC):
     def _inner_function(data: Dataset, **kwargs) -> Any:
         raise AbstractMethodError
 
-
-class GroupCalculator(Calculator):
-    def __init__(
-        self,
-        grouping_role: Optional[ABCRole] = None,
-        target_roles: Optional[List[ABCRole]] = None,
-        space: SpaceEnum = SpaceEnum.auto,
-        key: Any = "",
-    ):
-        self.grouping_role = grouping_role or GroupingRole()
-        self.space = space
-        self.__additional_mode = space == SpaceEnum.additional
-        self.target_roles = target_roles or []
-        super().__init__(key=key)
-
     @property
     def search_types(self):
         raise AbstractMethodError
 
     def _field_searching(
-        self, data: ExperimentData, field, tmp_role: bool = False, search_types=None
+        self,
+        data: ExperimentData,
+        roles: Union[ABCRole, Iterable[ABCRole]],
+        tmp_role: bool = False,
+        search_types=None,
     ):
         searched_field = []
-        if self.space in [SpaceEnum.auto, SpaceEnum.data]:
-            searched_field = data.ds.search_columns(
-                field, tmp_role=tmp_role, search_types=search_types
+        roles = Adapter.to_list(roles)
+        field_in_additional = [
+            role for role in roles if isinstance(role, AdditionalRole)
+        ]
+        field_in_data = [role for role in roles if role not in field_in_additional]
+        if field_in_data:
+            searched_field += data.ds.search_columns(
+                field_in_data, tmp_role=tmp_role, search_types=search_types
             )
-        if (
-            self.space in [SpaceEnum.auto, SpaceEnum.additional]
-            and searched_field == []
-            and isinstance(data, ExperimentData)
-        ):
-            searched_field = data.additional_fields.search_columns(
-                field, tmp_role=tmp_role, search_types=search_types
+        if field_in_additional and isinstance(data, ExperimentData):
+            searched_field += data.additional_fields.search_columns(
+                field_in_additional, tmp_role=tmp_role, search_types=search_types
             )
-            self.__additional_mode = True
         return searched_field
 
-    def _get_fields(self, data: ExperimentData):
-        group_field = self._field_searching(data, self.grouping_role)
-        if len(group_field) == 0:
-            raise NoColumnsError(group_field)
-        target_fields = self._field_searching(
-            data, self.target_roles, search_types=self.search_types
-        )
-        return group_field, target_fields
-
     @staticmethod
-    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
+    def _check_test_data(
+        test_data: Optional[Dataset] = None,
+    ) -> Dataset:  # TODO to move away from Calculator. Where to?
         if test_data is None:
             raise ValueError("test_data is needed for comparison")
         return test_data
 
-    def _get_grouping_data(self, data: ExperimentData, group_field: str):
-        if self.__additional_mode:
-            t_groups = list(data.additional_fields.groupby(group_field))
-            result = [
-                (group, data.ds.loc[subdata.index]) for (group, subdata) in t_groups
-            ]
-        else:
-            result = list(data.ds.groupby(group_field))
 
-        result = [
-            (group[0] if len(group) == 1 else group, subdata)
-            for (group, subdata) in result
-        ]
-        return result
+class MLExecutor(Calculator, ABC):
+    def __init__(
+        self,
+        grouping_role: Optional[ABCRole] = None,
+        target_role: Optional[ABCRole] = None,
+        key: Any = "",
+    ):
+        self.target_role = target_role or TargetRole()
+        super().__init__(key=key)
+        self.grouping_role = grouping_role or GroupingRole()
 
-    @staticmethod
-    def _field_arg_universalization(
-        field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None]
-    ) -> List[FieldKeyTypes]:
-        if not field:
-            raise NoColumnsError(field)
-        elif isinstance(field, FieldKeyTypes):
-            return [field]
-        return list(field)
+    def _get_fields(self, data: ExperimentData):
+        group_field = self._field_searching(data, self.grouping_role)
+        target_field = self._field_searching(
+            data, self.target_role, search_types=self.search_types
+        )
+        return group_field, target_field
+
+    @abstractmethod
+    def fit(self, X: Dataset, Y: Optional[Dataset] = None) -> "MLExecutor":
+        raise NotImplementedError
+
+    @abstractmethod
+    def predict(self, X: Dataset) -> Dataset:
+        raise NotImplementedError
+
+    def score(self, X: Dataset, Y: Dataset) -> float:
+        raise NotImplementedError
+
+    @property
+    def search_types(self):
+        return [int, float]
 
     @classmethod
     @abstractmethod
     def _inner_function(
-        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+        cls,
+        data: Dataset,
+        test_data: Optional[Dataset] = None,
+        target_data: Optional[Dataset] = None,
+        **kwargs,
     ) -> Any:
         raise AbstractMethodError
 
     @classmethod
-    @abstractmethod
-    def _execute_inner_function(cls, grouping_data, **kwargs) -> Dict:
-        raise AbstractMethodError
+    def _execute_inner_function(
+        cls,
+        grouping_data,
+        target_field: Optional[str] = None,
+        **kwargs,
+    ) -> Any:
+        if target_field:
+            return cls._inner_function(
+                data=grouping_data[0][1].drop(target_field),
+                target_data=grouping_data[0][1][target_field],
+                test_data=grouping_data[1][1].drop(target_field),
+                **kwargs,
+            )
+        return cls._inner_function(
+            data=grouping_data[0][1],
+            test_data=grouping_data[1][1],
+            **kwargs,
+        )
+
+    def _set_value(
+        self, data: ExperimentData, value: Any, key: Any = None
+    ) -> ExperimentData:
+        return data.set_value(
+            ExperimentDataEnum.additional_fields,
+            self.id,
+            value=value,
+            key=key,
+            role=AdditionalMatchingRole(),
+        )
 
     @classmethod
     def calc(
         cls,
         data: Dataset,
-        group_field: Union[Sequence[FieldKeyTypes], FieldKeyTypes, None] = None,
-        grouping_data: Optional[Dict[FieldKeyTypes, Dataset]] = None,
-        target_fields: Optional[List[FieldKeyTypes]] = None,
+        group_field: Union[Sequence[str], str, None] = None,
+        grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
+        target_field: Union[str, List[str], None] = None,
+        features_fields: Union[str, List[str], None] = None,
         **kwargs,
-    ) -> Dict:
+    ) -> Dataset:
         group_field = Adapter.to_list(group_field)
-
+        features_fields = Adapter.to_list(features_fields)
         if grouping_data is None:
-            grouping_data = data.groupby(group_field)
+            grouping_data = data.groupby(group_field, fields_list=features_fields)
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
-            raise ComparisonNotSuitableFieldError(group_field)
-        return cls._execute_inner_function(
-            grouping_data, target_fields=target_fields, old_data=data, **kwargs
+            raise FieldNotSuitableFieldError(group_field, "Grouping")
+        result = cls._execute_inner_function(
+            grouping_data, target_field=target_field, **kwargs
         )
-    
-    def _get_fields(self, data: ExperimentData): 
-        group_field = self._field_searching(data, self.grouping_role)
-        target_fields = self._field_searching(
-            data, TempTargetRole(), tmp_role=True, search_types=self.search_types
+        return DatasetAdapter.to_dataset(
+            result,
+            {i: AdditionalMatchingRole() for i in list(result.keys())},
         )
-        return group_field, target_fields
 
-    # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields = self._get_fields(data=data)
+        features_fields = data.ds.search_columns(
+            FeatureRole(), search_types=self.search_types
+        )
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
@@ -243,7 +279,8 @@ class GroupCalculator(Calculator):
         compare_result = self.calc(
             data=data.ds,
             group_field=group_field,
-            target_fields=target_fields,
             grouping_data=grouping_data,
+            target_fields=target_fields,
+            features_fields=features_fields,
         )
         return self._set_value(data, compare_result)

@@ -171,10 +171,6 @@ class FilterRole(ABCRole):
     _role_name: RoleNameType = "Filter"
 
 
-class MatchingRole(ABCRole):
-    _role_name: RoleNameType = "Matching"
-
-
 class TempTreatmentRole(TreatmentRole):
     """Role for temp treatment column.
     A temporary role used for transient treatment assignments in executables or during
@@ -211,14 +207,59 @@ class TempGroupingRole(GroupingRole):
     _role_name: RoleNameType = "TempGrouping"
 
 
+class DefaultRole(ABCRole):
+    """The default role for a  newly created columns or any column for which another role has not been defined.
+    Attributes:
+        _role_name (RoleNameType): A name identifying the role as 'Default'.
+    """
+
+    _role_name: RoleNameType = "Default"
+
+
 class ReportRole(ABCRole):
     """ """
 
     _role_name: RoleNameType = "Report"
 
 
+class AdditionalRole(ABCRole):
+    """ """
+
+    _role_name: RoleNameType = "Additional"
+
+
+class AdditionalTreatmentRole(AdditionalRole):
+    """ """
+
+    _role_name: RoleNameType = "AdditionalTreatment"
+
+
+class AdditionalGroupingRole(AdditionalRole):
+    """ """
+
+    _role_name: RoleNameType = "AdditionalGrouping"
+
+
+class AdditionalTargetRole(AdditionalRole):
+    """ """
+
+    _role_name: RoleNameType = "AdditionalTarget"
+
+
+class AdditionalPreTargetRole(AdditionalRole):
+    """ """
+
+    _role_name: RoleNameType = "AdditionalPreTarget"
+
+
+class AdditionalMatchingRole(AdditionalRole):
+
+    _role_name: RoleNameType = "AdditionalMatching"
+
+
 default_roles: Dict[RoleNameType, ABCRole] = {
     "info": InfoRole(),
+    "default": DefaultRole(),
     "feature": FeatureRole(),
     "treatment": TreatmentRole(),
     "grouping": GroupingRole(),
@@ -227,4 +268,9 @@ default_roles: Dict[RoleNameType, ABCRole] = {
     "stratification": StratificationRole(),
     "statistic": StatisticRole(),
     "filter": FilterRole(),
+    "additionaltreatment": AdditionalTreatmentRole(),
+    "additionalgrouping": AdditionalGroupingRole(),
+    "additionaltarget": AdditionalTargetRole(),
+    "additionalpretarget": AdditionalPreTargetRole(),
+    "additionalpretarget": AdditionalPreTargetRole(),
 }

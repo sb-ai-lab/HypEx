@@ -191,11 +191,11 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def _get_column_type(self, column_name: str) -> str:
+    def get_column_type(self, column_name: str) -> str:
         raise AbstractMethodError
 
     @abstractmethod
-    def _update_column_type(self, column_name: str, type_name: str):
+    def update_column_type(self, column_name: str, type_name: str):
         raise AbstractMethodError
 
     @abstractmethod
@@ -266,8 +266,8 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     @abstractmethod
     def get_values(
         self,
-        row: Optional[FieldKeyTypes] = None,
-        column: Optional[FieldKeyTypes] = None,
+        row: Optional[str] = None,
+        column: Optional[str] = None,
     ) -> Any:
         raise AbstractMethodError
 
@@ -360,9 +360,9 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     def merge(
         self,
         right: Any,
-        on: Optional[FieldKeyTypes] = None,
-        left_on: Optional[FieldKeyTypes] = None,
-        right_on: Optional[FieldKeyTypes] = None,
+        on: Optional[str] = None,
+        left_on: Optional[str] = None,
+        right_on: Optional[str] = None,
         left_index: bool = False,
         right_index: bool = False,
         suffixes: Tuple[str, str] = ("_x", "_y"),
@@ -373,7 +373,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     @abstractmethod
     def drop(
         self,
-        labels: Union[FieldKeyTypes, Sequence[FieldKeyTypes], None] = None,
+        labels: Union[str, Sequence[str], None] = None,
         axis: int = 1,
     ) -> Any:
         raise AbstractMethodError

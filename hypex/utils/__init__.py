@@ -1,4 +1,4 @@
-from .constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
+from .constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL, NUMBER_TYPES_LIST
 from .enums import (
     SpaceEnum,
     BackendsEnum,
@@ -12,11 +12,12 @@ from .errors import (
     ConcatDataError,
     ConcatBackendError,
     NotFoundInExperimentDataError,
-    ComparisonNotSuitableFieldError,
+    FieldNotSuitableFieldError,
     DataTypeError,
     BackendTypeError,
     MergeOnError,
     AbstractMethodError,
+    NoRequiredArgumentError,
     DatasetSizeError,
 )
 
@@ -27,7 +28,6 @@ from .typings import (
     StratificationRoleTypes,
     CategoricalTypes,
     MultiFieldKeyTypes,
-    FieldKeyTypes,
     DecoratedType,
     DocstringInheritDecorator,
     RoleNameType,
@@ -38,6 +38,7 @@ from .typings import (
 __all__ = [
     "NAME_BORDER_SYMBOL",
     "ID_SPLIT_SYMBOL",
+    "NUMBER_TYPES_LIST",
     "SpaceEnum",
     "BackendsEnum",
     "ExperimentDataEnum",
@@ -47,14 +48,13 @@ __all__ = [
     "ConcatDataError",
     "ConcatBackendError",
     "NotFoundInExperimentDataError",
-    "ComparisonNotSuitableFieldError",
+    "FieldNotSuitableFieldError",
     "AbstractMethodError",
     "FromDictTypes",
     "TargetRoleTypes",
     "CategoricalTypes",
     "DefaultRoleTypes",
     "StratificationRoleTypes",
-    "FieldKeyTypes",
     "RoleNameType",
     "DecoratedType",
     "DocstringInheritDecorator",
@@ -62,6 +62,7 @@ __all__ = [
     "DataTypeError",
     "BackendTypeError",
     "MergeOnError",
+    "NoRequiredArgumentError",
     "ScalarType",
     "ABNTestMethodsEnum",
     "SetParamsDictTypes",

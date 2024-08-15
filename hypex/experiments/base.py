@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Iterable, Dict, Union, Any, List, Optional
+from typing import Iterable, Dict, Union, Any, List, Optional, Sequence
 
 from hypex.dataset import (
     ExperimentData,
@@ -36,11 +36,11 @@ class Experiment(Executor):
 
     def __init__(
         self,
-        executors: List[Executor],
+        executors: Sequence[Executor],
         transformer: Optional[bool] = None,
         key: Any = "",
     ):
-        self.executors: List[Executor] = executors
+        self.executors: Sequence[Executor] = executors
         self.transformer: bool = (
             transformer if transformer is not None else self._detect_transformer()
         )
@@ -60,9 +60,7 @@ class Experiment(Executor):
             )
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
-        return data.set_value(
-            ExperimentDataEnum.analysis_tables, self.id, self.__class__.__name__, value
-        )
+        return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data = deepcopy(data) if self.transformer else data
@@ -76,11 +74,11 @@ class OnRoleExperiment(Experiment):
     def __init__(
         self,
         executors: List[Executor],
-        role: ABCRole,
+        role: Union[ABCRole, Sequence[ABCRole]],
         transformer: Optional[bool] = None,
         key: Any = "",
     ):
-        self.role: ABCRole = role
+        self.role: List[ABCRole] = [role] if isinstance(role, ABCRole) else list(role)
         super().__init__(executors, transformer, key)
 
     def execute(self, data: ExperimentData) -> ExperimentData:

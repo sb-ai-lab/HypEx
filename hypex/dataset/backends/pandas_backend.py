@@ -187,21 +187,29 @@ class PandasNavigation(DatasetBackendNavigation):
             else self.data.columns.get_indexer(column_name)
         )[0]
 
-    def _get_column_type(self, column_name: str) -> str:
+    def get_column_type(self, column_name: str) -> str:
         return str(self.data.dtypes[column_name])
 
     # try try-except if necessary
-    def _update_column_type(self, column_name: str, type_name: str):
+    def update_column_type(self, column_name: str, type_name: str):
         if self.data[column_name].isna().sum() == 0:
-            self.data.loc[:, column_name] = self.data[column_name].astype(type_name)
+            self.data = self.data.astype({column_name: type_name})
         return self
 
     def add_column(
         self,
         data: Union[Sequence],
-        name: str,
+        name: Union[str, List[str]],
         index: Optional[Sequence] = None,
     ):
+        if isinstance(name, List) and len(name) == 1:
+            name = name[0]
+        if isinstance(data, pd.DataFrame):
+            data = data.values
+        if len(self.data) != len(data):
+            if len(data[0]) == 1:
+                data = data.squeeze()
+            data = pd.Series(data)
         if index:
             self.data = self.data.join(
                 pd.DataFrame(data, columns=[name], index=list(index))
@@ -209,9 +217,9 @@ class PandasNavigation(DatasetBackendNavigation):
         else:
             self.data.loc[:, name] = data
 
-    def append(self, other, index: bool = False) -> pd.DataFrame:
-        new_data = pd.concat([self.data] + [d.data for d in other])
-        if index:
+    def append(self, other, reset_index: bool = False, axis: int = 0) -> pd.DataFrame:
+        new_data = pd.concat([self.data] + [d.data for d in other], axis=axis)
+        if reset_index:
             new_data = new_data.reset_index(drop=True)
         return new_data
 
@@ -219,16 +227,17 @@ class PandasNavigation(DatasetBackendNavigation):
         self, data: FromDictTypes, index: Union[Iterable, Sized, None] = None
     ):
         self.data = pd.DataFrame().from_records(data)
-        if index:
+        if index is not None:
             self.data.index = index
         return self
 
     def to_dict(self) -> Dict[str, Any]:
-        data = self.data.to_dict()
-        for key, value in data.items():
-            data[key] = list(data[key].values())
-        index = list(self.index)
-        return {"data": data, "index": index}
+        return {
+            "data": {
+                column: self.data[column].to_list() for column in self.data.columns
+            },
+            "index": list(self.index),
+        }
 
     def to_records(self) -> List[Dict]:
         return self.data.to_dict(orient="records")
@@ -260,8 +269,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def get_values(
         self,
-        row: Optional[FieldKeyTypes] = None,
-        column: Optional[FieldKeyTypes] = None,
+        row: Optional[str] = None,
+        column: Optional[str] = None,
     ) -> Any:
         if (column is not None) and (row is not None):
             return self.data.loc[row, column]
@@ -304,8 +313,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def max(self) -> Union[pd.DataFrame, float]:
         return self.agg(["max"])
 
-    def idxmax(self) -> pd.DataFrame:
-        return self._convert_agg_result(self.data.idxmax())
+    def idxmax(self) -> Union[pd.DataFrame, float]:
+        return self.agg(["idxmax"])
 
     def min(self) -> Union[pd.DataFrame, float]:
         return self.agg(["min"])
@@ -373,7 +382,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         ).reset_index()
 
     def fillna(self, values, method, **kwargs) -> pd.DataFrame:
-        return self.data.fillna(values, method=method, **kwargs)
+        return self.data.fillna(value=values, method=method, **kwargs)
 
     def na_counts(self) -> Union[pd.DataFrame, int]:
         data = self.data.isna().sum().to_frame().T
@@ -393,11 +402,14 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     ) -> pd.DataFrame:
         return self.data.dropna(how=how, subset=subset)
 
-    def transpose(self, names: Optional[Sequence[FieldKeyTypes]]) -> pd.DataFrame:
+    def transpose(self, names: Optional[Sequence[str]]) -> pd.DataFrame:
         result = self.data.transpose()
         if names:
             result.columns = names
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+
+    def cov(self):
+        return self.data.cov(ddof=0)
 
     def shuffle(self, random_state: Optional[int] = None) -> pd.DataFrame:
         return self.data.sample(self.data.shape[0], random_state=random_state)
@@ -407,8 +419,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def select_dtypes(
         self,
-        include: Optional[FieldKeyTypes] = None,
-        exclude: Optional[FieldKeyTypes] = None,
+        include: Optional[str] = None,
+        exclude: Optional[str] = None,
     ) -> pd.DataFrame:
         return self.data.select_dtypes(include=include, exclude=exclude)
 
@@ -418,17 +430,32 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def merge(
         self,
         right: "PandasDataset",  # should be PandasDataset.
-        on: FieldKeyTypes = "",
-        left_on: FieldKeyTypes = "",
-        right_on: FieldKeyTypes = "",
-        left_index: bool = False,
-        right_index: bool = False,
+        on: str = None,
+        left_on: str = None,
+        right_on: str = None,
+        left_index: bool = None,
+        right_index: bool = None,
         suffixes: Tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> pd.DataFrame:
         for on_ in [on, left_on, right_on]:
-            if on_ and (on_ not in [*self.columns, *right.columns]):
+            if on_ and (
+                on_ not in [*self.columns, *right.columns]
+                if isinstance(on_, str)
+                else any(c not in [*self.columns, *right.columns] for c in on_)
+            ):
                 raise MergeOnError(on_)
+
+        if not all(
+            [
+                on,
+                left_on,
+                right_on,
+            ]
+        ) and all([left_index is None, right_index is None]):
+            left_index = True
+            right_index = True
+
         return self.data.merge(
             right=right.data,
             on=on,
@@ -440,7 +467,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             how=how,
         )
 
-    def drop(self, labels: FieldKeyTypes = "", axis: int = 1) -> pd.DataFrame:
+    def drop(self, labels: str = "", axis: int = 1) -> pd.DataFrame:
         return self.data.drop(labels=labels, axis=axis)
 
     def filter(
@@ -463,6 +490,11 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         elif isinstance(to_replace, pd.Series):
             to_replace = to_replace.to_list()
         return self.data.replace(to_replace=to_replace, value=value, regex=regex)
+
+    def reindex(
+        self, labels: str = "", fill_value: Optional[str] = None
+    ) -> pd.DataFrame:
+        return self.data.reindex(labels, fill_value=fill_value)
 
     def cut(
         self,

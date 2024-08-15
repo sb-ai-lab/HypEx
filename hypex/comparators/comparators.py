@@ -1,11 +1,24 @@
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Literal, Union
 
-from hypex.comparators.abstract import GroupComparator
-from hypex.dataset import Dataset
+from hypex.comparators.abstract import Comparator
+from hypex.dataset import Dataset, ABCRole
 from hypex.utils.constants import NUMBER_TYPES_LIST
 
 
-class GroupDifference(GroupComparator):
+class GroupDifference(Comparator):
+    def __init__(
+        self,
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross"
+        ] = "groups",
+        grouping_role: Optional[ABCRole] = None,
+        target_roles: Union[ABCRole, List[ABCRole], None] = None,
+    ):
+        super().__init__(
+            compare_by=compare_by,
+            grouping_role=grouping_role,
+            target_roles=target_roles,
+        )
 
     @property
     def search_types(self) -> Optional[List[type]]:
@@ -18,6 +31,7 @@ class GroupDifference(GroupComparator):
         test_data: Optional[Dataset] = None,
         **kwargs,
     ) -> Dict:
+        test_data = cls._check_test_data(test_data)
         control_mean = data.mean()
         test_mean = test_data.mean()
 
@@ -29,7 +43,20 @@ class GroupDifference(GroupComparator):
         }
 
 
-class GroupSizes(GroupComparator):
+class GroupSizes(Comparator):
+    def __init__(
+        self,
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross"
+        ] = "groups",
+        grouping_role: Optional[ABCRole] = None,
+    ):
+        super().__init__(
+            compare_by=compare_by,
+            grouping_role=grouping_role,
+            target_roles=grouping_role,
+        )
+
     @classmethod
     def _inner_function(
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs

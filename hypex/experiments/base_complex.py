@@ -3,17 +3,17 @@ from typing import Optional, List, Dict, Sequence, Any
 
 from tqdm.auto import tqdm
 
-from hypex.dataset import ExperimentData, Dataset, TempGroupingRole
-from hypex.dataset import ExperimentData, Dataset, ABCRole
+from hypex.dataset import ExperimentData, Dataset
+from hypex.dataset import TempGroupingRole
 from hypex.executor import Executor
-from hypex.experiments import Experiment
+from hypex.experiments.base import Experiment
 from hypex.reporters import Reporter, DatasetReporter
 
 
 class ExperimentWithReporter(Experiment):
     def __init__(
         self,
-        executors: List[Executor],
+        executors: Sequence[Executor],
         reporter: Reporter,
         transformer: Optional[bool] = None,
         key: str = "",
@@ -70,7 +70,7 @@ class GroupExperiment(ExperimentWithReporter):
 class ParamsExperiment(ExperimentWithReporter):
     def __init__(
         self,
-        executors: List[Executor],
+        executors: Sequence[Executor],
         reporter: DatasetReporter,
         params: Dict[type, Dict[str, Sequence[Any]]],
         transformer: Optional[bool] = None,
