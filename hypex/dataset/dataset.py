@@ -394,14 +394,15 @@ class Dataset(DatasetBase):
 
     def fillna(
         self,
-        values: Union[int, Dict[str, str], None] = None,
+        values: Union[ScalarType, Dict[str, ScalarType], None] = None,
         method: Optional[Literal["bfill", "ffill"]] = None,
         **kwargs,
     ):
         if values is None and method is None:
             raise ValueError("Value or filling method must be provided")
         return Dataset(
-            roles=self.roles, data=self.backend.fillna(values, method, **kwargs)
+            roles=self.roles,
+            data=self.backend.fillna(values=values, method=method, **kwargs),
         )
 
     def mean(self):
