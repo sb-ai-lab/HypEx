@@ -12,11 +12,12 @@ from .errors import (
     ConcatDataError,
     ConcatBackendError,
     NotFoundInExperimentDataError,
-    ComparisonNotSuitableFieldError,
+    FieldNotSuitableFieldError,
     DataTypeError,
     BackendTypeError,
     MergeOnError,
     AbstractMethodError,
+    NoRequiredArgumentError,
 )
 
 from .typings import (
@@ -46,7 +47,7 @@ __all__ = [
     "ConcatDataError",
     "ConcatBackendError",
     "NotFoundInExperimentDataError",
-    "ComparisonNotSuitableFieldError",
+    "FieldNotSuitableFieldError",
     "AbstractMethodError",
     "FromDictTypes",
     "TargetRoleTypes",
@@ -60,6 +61,7 @@ __all__ = [
     "DataTypeError",
     "BackendTypeError",
     "MergeOnError",
+    "NoRequiredArgumentError",
     "ScalarType",
     "ABNTestMethodsEnum",
     "SetParamsDictTypes",

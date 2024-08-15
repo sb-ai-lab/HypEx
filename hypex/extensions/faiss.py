@@ -4,7 +4,7 @@ import faiss  # type: ignore
 import numpy as np
 import pandas as pd  # type: ignore
 
-from hypex.dataset import Dataset, MatchingRole
+from hypex.dataset import Dataset, AdditionalMatchingRole
 from hypex.extensions.abstract import MLExtension
 
 
@@ -23,14 +23,10 @@ class FaissExtension(MLExtension):
         ]
         return new
 
-    @staticmethod
-    def _filter_index(x):
-        return np.where(x == x[0])[0]
-
     def _predict(self, data: Dataset, test_data: Dataset, X: np.ndarray) -> pd.Series:
         dist, indexes = self.index.search(X, k=self.n_neighbors)
         if self.n_neighbors == 1:
-            equal_dist = list(map(self._filter_index, dist))
+            equal_dist = list(map(lambda x: np.where(x == x[0])[0], dist))
             indexes = [
                 (
                     int(index[dist][0])
@@ -70,5 +66,5 @@ class FaissExtension(MLExtension):
 
     def predict(self, X: Dataset, **kwargs) -> Dataset:
         return self.result_to_dataset(
-            super().calc(X, mode="predict", **kwargs), MatchingRole()
+            super().calc(X, mode="predict", **kwargs), AdditionalMatchingRole()
         )

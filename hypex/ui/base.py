@@ -1,7 +1,7 @@
 from typing import Dict, Union, Any, Optional
 
 from hypex.dataset import ExperimentData, Dataset
-from hypex.experiments import Experiment
+from hypex.experiments.base import Experiment
 from hypex.reporters import Reporter
 from hypex.utils import ID_SPLIT_SYMBOL
 from hypex.utils.enums import RenameEnum

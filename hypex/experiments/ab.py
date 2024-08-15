@@ -3,21 +3,20 @@ from typing import Optional, Literal, Union, List
 from hypex.analyzers.ab import ABAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes, TTest, UTest, Chi2Test
 from hypex.dataset import TargetRole, TreatmentRole
-from hypex.experiments import Experiment, OnRoleExperiment
+from hypex.experiments.base import Experiment, OnRoleExperiment
 from hypex.ui.ab import ABOutput
 from hypex.ui.base import ExperimentShell
 from hypex.utils import ABNTestMethodsEnum
 
 
-# reset index
 class ABTest(ExperimentShell):
 
     @staticmethod
     def _make_experiment(additional_tests, multitest_method):
         test_mapping = {
-            "t-test": TTest(grouping_role=TreatmentRole()),
-            "u-test": UTest(grouping_role=TreatmentRole()),
-            "chi2-test": Chi2Test(grouping_role=TreatmentRole()),
+            "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
+            "u-test": UTest(compare_by="groups", grouping_role=TreatmentRole()),
+            "chi2-test": Chi2Test(compare_by="groups", grouping_role=TreatmentRole()),
         }
         on_role_executors = [GroupDifference(grouping_role=TreatmentRole())]
         additional_tests = ["t-test"] if additional_tests is None else additional_tests
