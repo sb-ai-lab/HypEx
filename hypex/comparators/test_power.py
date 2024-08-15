@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import Any, Union, Optional
+from typing import Any, Optional
 
-from hypex.comparators.comparators import GroupComparator
+from hypex.comparators.comparators import Comparator
 from hypex.dataset import ExperimentData, ABCRole, Dataset
 from hypex.utils import SpaceEnum, ExperimentDataEnum
 
 
-class TestPower(GroupComparator, ABC):
+class TestPower(Comparator, ABC):
     def __init__(
         self,
         grouping_role: Optional[ABCRole] = None,
@@ -15,7 +15,12 @@ class TestPower(GroupComparator, ABC):
         power: float = 0.8,
         key: Any = "",
     ):
-        super().__init__(grouping_role, space, key)
+        super().__init__(
+            compare_by="groups",
+            grouping_role=grouping_role,
+            space=space,
+            key=key,
+        )
         self.significance = significance
         self.power = power
 
@@ -90,7 +95,7 @@ from typing import Optional, Any, Dict, Union, Sequence
 import numpy as np
 from scipy.stats import norm
 
-from hypex.comparators.abstract import GroupComparator
+from hypex.comparators.abstract import Comparator
 from hypex.dataset import ABCRole, Dataset, ExperimentData, TargetRole
 from hypex.utils import SpaceEnum
 

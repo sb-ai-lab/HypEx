@@ -1,7 +1,7 @@
 from typing import Optional, Any, Dict
 
 from hypex.comparators.distances import MahalanobisDistance
-from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData, MatchingRole
+from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData, AdditionalMatchingRole
 from hypex.executor import MLExecutor
 from hypex.extensions.faiss import FaissExtension
 from hypex.utils import SpaceEnum, ExperimentDataEnum
@@ -20,7 +20,7 @@ class FaissNearestNeighbors(MLExecutor):
         self.n_neighbors = n_neighbors
         self.two_sides = two_sides
         super().__init__(
-            grouping_role=grouping_role, target_role=FeatureRole(), space=space, key=key
+            grouping_role=grouping_role, target_role=FeatureRole(), key=key
         )
 
     @classmethod
@@ -111,7 +111,7 @@ class FaissNearestNeighbors(MLExecutor):
                             list(map(lambda x: int(x[0]), t_index_field.get_values()))
                         ].index
                     },
-                    roles={"indexes": MatchingRole()},
+                    roles={"indexes": AdditionalMatchingRole()},
                     index=group.index,
                 )
             ).sort()

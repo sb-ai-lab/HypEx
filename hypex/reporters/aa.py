@@ -213,4 +213,3 @@ class AABestSplitReporter(Reporter):
         markers = data.additional_fields.loc[:, best_split_id]
         markers = markers.rename({markers.columns[0]: "split"})
         return data.ds.merge(markers, left_index=True, right_index=True)
-
