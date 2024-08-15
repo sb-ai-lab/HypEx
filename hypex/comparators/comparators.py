@@ -1,9 +1,13 @@
 from typing import Dict, Optional, List, Literal, Union
 
+import numpy as np
+from mpmath import ln
+
 from hypex.comparators.abstract import Comparator
 from hypex.dataset import Dataset, ABCRole
 from hypex.utils.constants import NUMBER_TYPES_LIST
 
+NUM_OF_BUCKETS: int = 20
 
 class GroupDifference(Comparator):
     def __init__(
@@ -70,3 +74,33 @@ class GroupSizes(Comparator):
             "control size %": (size_a / (size_a + size_b)) * 100,
             "test size %": (size_b / (size_a + size_b)) * 100,
         }
+
+class PSI(Comparator):
+
+    @classmethod
+    def _inner_function(cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs):
+        test_data = cls._check_test_data(test_data=test_data)
+        data.sort(ascending=False)
+        test_data.sort(ascending=False)
+        data_column = data.iloc[:, 0]
+        test_data_column = test_data.iloc[:, 0]
+        data_bins = np.arange(
+            data_column.min(),
+            data_column.max(),
+            (data_column.max() - data_column.min()) / NUM_OF_BUCKETS,
+        )
+        test_data_bins = np.arange(
+            test_data_column.min(),
+            test_data_column.max(),
+            (test_data_column.max() - test_data_column.min()) / NUM_OF_BUCKETS,
+        )
+        data_groups = data_column.groupby(
+            data_column.cut(data_bins).get_values(column=data.columns[0])
+        )
+        test_data_groups = test_data_column.groupby(
+            test_data_column.cut(test_data_bins).get_values(column=test_data.columns[0])
+        )
+        data_psi = np.array(x[1].count() for x in data_groups)
+        test_data_psi = np.array(x[1].count() for x in test_data_groups)
+        psi = (data_psi - test_data_psi) * ln(data_psi / test_data_psi)
+        return {"PSI": psi.sum()}
