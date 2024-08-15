@@ -119,51 +119,24 @@ class DatasetBase(ABC):
             )
         ]
 
-    # def replace_roles(
-    #     self,
-    #     to_replace_roles: Union[ABCRole, List[ABCRole]],
-    #     values: Union[ABCRole, List[ABCRole]],
-    #     to_replace_types: Optional[List] = None,
-    #     tmp_role: bool = False,
-    # ):
-    #     to_replace_roles = Adapter.to_list(to_replace_roles)
-    #
-    #     if not isinstance(values, List) or len(values) == 1:
-    #         values = [values] * len(to_replace_roles)
-    #     elif len(values) != len(to_replace_roles):
-    #         raise ValueError("to_replace_roles and values must have the same length")
-    #
-    #     for to_replace_role, new_role in zip(to_replace_roles, values):
-    #         columns = self.search_columns(
-    #             to_replace_role, tmp_role=tmp_role, search_types=to_replace_types
-    #         )
-    #         for column in columns:
-    #             new_role.data_type = new_role.data_type or self.roles[column].data_type
-    #             if tmp_role:
-    #                 self._tmp_roles[column] = new_role
-    #             else:
-    #                 self.roles[column] = new_role
-    #     return self.roles
-
     def replace_roles(
         self,
-        new_roles_mapping: Dict[Union[ABCRole, str], ABCRole],
-        # to_replace_types: Optional[List] = None,
+        new_roles_map: Dict[Union[ABCRole, str], ABCRole],
         tmp_role: bool = False,
     ):
-        new_roles_mapping = parse_roles(
+        new_roles_map = parse_roles(
             {
                 role: (
                     self.search_columns(column, tmp_role)
                     if isinstance(column, ABCRole)
                     else column
                 )
-                for column, role in new_roles_mapping.items()
+                for column, role in new_roles_map.items()
             }
         )
 
         new_roles = {
-            column: new_roles_mapping[column] if column in new_roles_mapping else role
+            column: new_roles_map[column] if column in new_roles_map else role
             for column, role in self.roles.items()
         }
 
