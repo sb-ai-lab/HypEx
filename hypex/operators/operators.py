@@ -10,7 +10,7 @@ from hypex.dataset import (
     TargetRole,
     InfoRole,
     FeatureRole,
-    MatchingRole,
+    AdditionalMatchingRole,
 )
 from hypex.ml.faiss import FaissNearestNeighbors
 from hypex.operators.abstract import GroupOperator
@@ -44,7 +44,6 @@ class MatchingMetrics(GroupOperator):
             target_roles=(
                 target_roles if isinstance(target_roles, List) else [target_roles]
             ),
-            space=space,
             key=key,
         )
 
@@ -119,7 +118,7 @@ class MatchingMetrics(GroupOperator):
         )
 
     def _prepare_new_target(self, data: ExperimentData, t_data: Dataset) -> Dataset:
-        indexes = self._field_searching(data, MatchingRole())
+        indexes = self._field_searching(data, AdditionalMatchingRole())
         if len(indexes) == 0:
             raise ValueError(f"No indexes were found")
         new_target = data.ds.search_columns(TargetRole())[0]
@@ -177,11 +176,10 @@ class Bias(GroupOperator):
         self,
         grouping_role: Optional[ABCRole] = None,
         target_roles: Optional[List[ABCRole]] = None,
-        space: SpaceEnum = SpaceEnum.auto,
         key: Any = "",
     ):
         super().__init__(
-            grouping_role=grouping_role, target_roles=target_roles, space=space, key=key
+            grouping_role=grouping_role, target_roles=target_roles, key=key
         )
 
     @staticmethod
@@ -252,7 +250,7 @@ class Bias(GroupOperator):
         )
 
     def _prepare_data(self, data: ExperimentData, t_data: Dataset) -> Dataset:
-        indexes = data.additional_fields[self._field_searching(data, MatchingRole())[0]]
+        indexes = data.additional_fields[self._field_searching(data, AdditionalMatchingRole())[0]]
         indexes.index = t_data.index
         filtered_field = indexes.drop(
             indexes[indexes[indexes.columns[0]] == -1], axis=0

@@ -4,8 +4,7 @@ from hypex.analyzers.aa import OneAAStatAnalyzer, AAScoreAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes
 from hypex.comparators.abstract import Comparator
 from hypex.comparators.hypothesis_testing import TTest, KSTest, Chi2Test
-from hypex.dataset import TargetRole, TreatmentRole, AdditionalTreatmentRole
-from hypex.experiments import Experiment, OnRoleExperiment
+from hypex.dataset import AdditionalTreatmentRole
 from hypex.dataset import TargetRole, TreatmentRole
 from hypex.experiments.base import Experiment, OnRoleExperiment
 from hypex.experiments.base_complex import ParamsExperiment

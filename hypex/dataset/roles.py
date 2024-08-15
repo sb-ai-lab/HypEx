@@ -171,10 +171,6 @@ class FilterRole(ABCRole):
     _role_name: RoleNameType = "Filter"
 
 
-class MatchingRole(ABCRole):
-    _role_name: RoleNameType = "Matching"
-
-
 class TempTreatmentRole(TreatmentRole):
     """Role for temp treatment column.
     A temporary role used for transient treatment assignments in executables or during
@@ -198,6 +194,7 @@ class TempTargetRole(TargetRole):
 
     _role_name: RoleNameType = "TempTarget"
 
+
 class TempGroupingRole(GroupingRole):
     """Role for temp grouping column.
     Used temporarily to manage groups in the context of execution cursors or during
@@ -208,7 +205,6 @@ class TempGroupingRole(GroupingRole):
     """
 
     _role_name: RoleNameType = "TempGrouping"
-
 
 class ReportRole(ABCRole):
     """ """
@@ -246,6 +242,11 @@ class AdditionalPreTargetRole(AdditionalRole):
     _role_name: RoleNameType = "AdditionalPreTarget"
 
 
+class AdditionalMatchingRole(AdditionalRole):
+
+    _role_name: RoleNameType = "AdditionalMatching"
+
+
 default_roles: Dict[RoleNameType, ABCRole] = {
     "info": InfoRole(),
     "feature": FeatureRole(),
@@ -259,5 +260,6 @@ default_roles: Dict[RoleNameType, ABCRole] = {
     "additionaltreatment": AdditionalTreatmentRole(),
     "additionalgrouping": AdditionalGroupingRole(),
     "additionaltarget": AdditionalTargetRole(),
+    "additionalpretarget": AdditionalPreTargetRole(),
     "additionalpretarget": AdditionalPreTargetRole(),
 }

@@ -7,7 +7,7 @@ from hypex.dataset import (
     ExperimentData,
     GroupingRole,
     FeatureRole,
-    MatchingRole,
+    AdditionalMatchingRole,
     TargetRole,
     DatasetAdapter,
 )
@@ -231,7 +231,7 @@ class MLExecutor(Calculator, ABC):
             self.id,
             value=value,
             key=key,
-            role=MatchingRole(),
+            role=AdditionalMatchingRole(),
         )
 
     @classmethod
@@ -257,7 +257,7 @@ class MLExecutor(Calculator, ABC):
         )
         return DatasetAdapter.to_dataset(
             result,
-            {i: MatchingRole() for i in list(result.keys())},
+            {i: AdditionalMatchingRole() for i in list(result.keys())},
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:

@@ -4,7 +4,7 @@ import faiss  # type: ignore
 import numpy as np
 import pandas as pd  # type: ignore
 
-from hypex.dataset import Dataset, MatchingRole
+from hypex.dataset import Dataset, AdditionalMatchingRole
 from hypex.extensions.abstract import MLExtension
 
 
@@ -66,5 +66,5 @@ class FaissExtension(MLExtension):
 
     def predict(self, X: Dataset, **kwargs) -> Dataset:
         return self.result_to_dataset(
-            super().calc(X, mode="predict", **kwargs), MatchingRole()
+            super().calc(X, mode="predict", **kwargs), AdditionalMatchingRole()
         )

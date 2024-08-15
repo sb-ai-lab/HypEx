@@ -11,11 +11,11 @@ HOMOGENEITY_TEST = Experiment(
     executors=[
         OnRoleExperiment(
             executors=[
-                GroupSizes(grouping_role=TreatmentRole(), space=SpaceEnum.data),
-                GroupDifference(grouping_role=TreatmentRole(), space=SpaceEnum.data),
-                TTest(grouping_role=TreatmentRole(), space=SpaceEnum.data),
-                KSTest(grouping_role=TreatmentRole(), space=SpaceEnum.data),
-                Chi2Test(grouping_role=TreatmentRole(), space=SpaceEnum.data),
+                GroupSizes(grouping_role=TreatmentRole(), compare_by="groups"),
+                GroupDifference(grouping_role=TreatmentRole(), compare_by="groups"),
+                TTest(grouping_role=TreatmentRole(), compare_by="groups"),
+                KSTest(grouping_role=TreatmentRole(), compare_by="groups"),
+                Chi2Test(grouping_role=TreatmentRole(), compare_by="groups"),
             ],
             role=TargetRole(),
         ),
