@@ -1,6 +1,7 @@
 from hypex.encoders.encoders import DummyEncoder
 from hypex.experiments.base import Experiment
 from hypex.transformers.category_agg import CategoryAggregator
+from hypex.transformers.na_filler import NaFiller
 from hypex.transformers.filters import (
     NanFilter,
     CorrFilter,
@@ -8,10 +9,6 @@ from hypex.transformers.filters import (
     CVFilter,
     OutliersFilter,
 )
-
-from hypex.transformers.na_filler import NaFiller
-from hypex.transformers.category_agg import CategoryAggregator
-from hypex.encoders.encoders import DummyEncoder
 
 PREPROCESSING_DATA = Experiment(
     executors=[
