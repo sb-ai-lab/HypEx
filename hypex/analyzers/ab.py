@@ -114,9 +114,9 @@ class ABAnalyzer(Executor):
                 for i in range(0, len(analysis_ids), len(analysis_ids) // num_groups):
                     value = t_data.iloc[i : i + len(analysis_ids) // num_groups][f]
                     multitest_pvalues = self._add_pvalues(multitest_pvalues, value, f)
-                    analysis_data[
-                        f"{c} {f} {groups[i//num_groups + 1][0]}"
-                    ] = value.mean()
+                    analysis_data[f"{c} {f} {groups[i//num_groups + 1][0]}"] = (
+                        value.mean()
+                    )
             if c not in ["UTest", "TTest"]:
                 indexes = t_data.index
                 values = t_data.data.values.tolist()

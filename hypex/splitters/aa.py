@@ -6,6 +6,7 @@ from hypex.dataset import (
     ExperimentData,
     TreatmentRole,
     StratificationRole,
+    AdditionalTreatmentRole,
 )
 from hypex.executor import Calculator
 from hypex.utils import ExperimentDataEnum
@@ -59,7 +60,7 @@ class AASplitter(Calculator):
             ExperimentDataEnum.additional_fields,
             self._id,
             value,
-            role=TreatmentRole(),
+            role=AdditionalTreatmentRole(),
         )
 
         if self.save_groups:
@@ -84,11 +85,12 @@ class AASplitter(Calculator):
         return ["control" if i in control_indexes else "test" for i in data.index]
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        result = self.calc(
+            data.ds, random_state=self.random_state, control_size=self.control_size
+        )
         return self._set_value(
             data,
-            self.calc(
-                data.ds, random_state=self.random_state, control_size=self.control_size
-            ),
+            result,
         )
 
 

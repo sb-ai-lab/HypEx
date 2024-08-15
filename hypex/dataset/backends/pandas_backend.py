@@ -217,9 +217,9 @@ class PandasNavigation(DatasetBackendNavigation):
         else:
             self.data.loc[:, name] = data
 
-    def append(self, other, index: bool = False) -> pd.DataFrame:
-        new_data = pd.concat([self.data] + [d.data for d in other])
-        if index:
+    def append(self, other, reset_index: bool = False, axis: int = 0) -> pd.DataFrame:
+        new_data = pd.concat([self.data] + [d.data for d in other], axis=axis)
+        if reset_index:
             new_data = new_data.reset_index(drop=True)
         return new_data
 
@@ -227,7 +227,7 @@ class PandasNavigation(DatasetBackendNavigation):
         self, data: FromDictTypes, index: Union[Iterable, Sized, None] = None
     ):
         self.data = pd.DataFrame().from_records(data)
-        if index:
+        if index is not None:
             self.data.index = index
         return self
 
@@ -382,7 +382,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         ).reset_index()
 
     def fillna(self, values, method, **kwargs) -> pd.DataFrame:
-        return self.data.fillna(values, method=method, **kwargs)
+        return self.data.fillna(value=values, method=method, **kwargs)
 
     def na_counts(self) -> Union[pd.DataFrame, int]:
         data = self.data.isna().sum().to_frame().T
@@ -446,7 +446,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             ):
                 raise MergeOnError(on_)
 
-        if not all([on, left_on, right_on,]) and all([left_index is None, right_index is None]):
+        if not all(
+            [
+                on,
+                left_on,
+                right_on,
+            ]
+        ) and all([left_index is None, right_index is None]):
             left_index = True
             right_index = True
 

@@ -2,31 +2,29 @@ from typing import Optional, Dict, Any, Iterable
 
 from hypex.analyzers.aa import OneAAStatAnalyzer, AAScoreAnalyzer
 from hypex.comparators import GroupDifference, GroupSizes
-from hypex.comparators.abstract import GroupComparator
+from hypex.comparators.abstract import Comparator
 from hypex.comparators.hypothesis_testing import TTest, KSTest, Chi2Test
+from hypex.dataset import AdditionalTreatmentRole
 from hypex.dataset import TargetRole, TreatmentRole
-from hypex.experiments import Experiment, OnRoleExperiment
+from hypex.experiments.base import Experiment, OnRoleExperiment
 from hypex.experiments.base_complex import ParamsExperiment
-from hypex.reporters.aa import OneAADictReporter
 from hypex.reporters import DatasetReporter
+from hypex.reporters.aa import OneAADictReporter
 from hypex.splitters import AASplitter, AASplitterWithStratification
 from hypex.ui.aa import AAOutput
 from hypex.ui.base import ExperimentShell
 from hypex.utils import SpaceEnum
 
-
 ONE_AA_TEST = Experiment(
     executors=[
         AASplitter(),
-        GroupSizes(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
+        GroupSizes(grouping_role=TreatmentRole()),
         OnRoleExperiment(
             executors=[
-                GroupDifference(
-                    grouping_role=TreatmentRole(), space=SpaceEnum.additional
-                ),
-                TTest(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
-                KSTest(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
-                Chi2Test(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
+                GroupDifference(compare_by="groups", grouping_role=TreatmentRole()),
+                TTest(compare_by="groups", grouping_role=TreatmentRole()),
+                KSTest(compare_by="groups", grouping_role=TreatmentRole()),
+                Chi2Test(compare_by="groups", grouping_role=TreatmentRole()),
             ],
             role=TargetRole(),
         ),
@@ -37,15 +35,13 @@ ONE_AA_TEST = Experiment(
 ONE_AA_TEST_WITH_STRATIFICATION = Experiment(
     executors=[
         AASplitterWithStratification(),
-        GroupSizes(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
+        GroupSizes(grouping_role=TreatmentRole()),
         OnRoleExperiment(
             executors=[
-                GroupDifference(
-                    grouping_role=TreatmentRole(), space=SpaceEnum.additional
-                ),
-                TTest(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
-                KSTest(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
-                Chi2Test(grouping_role=TreatmentRole(), space=SpaceEnum.additional),
+                GroupDifference(compare_by="groups", grouping_role=TreatmentRole()),
+                TTest(compare_by="groups", grouping_role=TreatmentRole()),
+                KSTest(compare_by="groups", grouping_role=TreatmentRole()),
+                Chi2Test(compare_by="groups", grouping_role=TreatmentRole()),
             ],
             role=TargetRole(),
         ),
@@ -58,8 +54,8 @@ AA_TEST = Experiment(
             executors=([ONE_AA_TEST]),
             params={
                 AASplitter: {"random_state": range(2000), "control_size": [0.5]},
-                GroupComparator: {
-                    "grouping_role": [TreatmentRole()],
+                Comparator: {
+                    "grouping_role": [AdditionalTreatmentRole()],
                     "space": [SpaceEnum.additional],
                 },
             },
@@ -76,8 +72,8 @@ AA_TEST_WITH_STRATIFICATION = Experiment(
             executors=([ONE_AA_TEST_WITH_STRATIFICATION]),
             params={
                 AASplitter: {"random_state": range(2000), "control_size": [0.5]},
-                GroupComparator: {
-                    "grouping_role": [TreatmentRole()],
+                Comparator: {
+                    "grouping_role": [AdditionalTreatmentRole()],
                     "space": [SpaceEnum.additional],
                 },
             },
@@ -102,8 +98,8 @@ class AATest(ExperimentShell):
         additional_params = additional_params or {}
         params = {
             AASplitter: {"random_state": random_states, "control_size": [control_size]},
-            GroupComparator: {
-                "grouping_role": [TreatmentRole()],
+            Comparator: {
+                "grouping_role": [AdditionalTreatmentRole()],
                 "space": [SpaceEnum.additional],
             },
         }

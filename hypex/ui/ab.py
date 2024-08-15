@@ -1,4 +1,4 @@
-from typing import Dict, Union
+from typing import Union
 
 from .base import Output
 from ..analyzers.ab import ABAnalyzer
@@ -42,13 +42,11 @@ class ABOutput(Output):
             groups += [i] * len(ids)
         diff = Dataset.create_empty()
         for i in range(len(ids)):
-            diff = diff.append(
-                experiment_data.analysis_tables[ids[i]]
-            )
+            diff = diff.append(experiment_data.analysis_tables[ids[i]])
             targets += [ids[i].split(ID_SPLIT_SYMBOL)[-1]]
-        return diff.add_column(
-            groups, role={"group": StatisticRole()}
-        ).add_column(targets * len(self._groups), role={"feature": StatisticRole()})
+        return diff.add_column(groups, role={"group": StatisticRole()}).add_column(
+            targets * len(self._groups), role={"feature": StatisticRole()}
+        )
 
     def _extract_sizes(self, experiment_data: ExperimentData):
         ids = experiment_data.get_ids(

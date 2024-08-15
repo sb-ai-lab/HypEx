@@ -6,6 +6,7 @@ from .abstract import DatasetBase
 from .dataset import Dataset, ExperimentData, DatasetAdapter
 from .roles import (
     InfoRole,
+    DefaultRole,
     TargetRole,
     FeatureRole,
     GroupingRole,
@@ -17,8 +18,12 @@ from .roles import (
     TempGroupingRole,
     TempTargetRole,
     FilterRole,
-    MatchingRole,
+    AdditionalMatchingRole,
     ABCRole,
+    AdditionalTreatmentRole,
+    AdditionalGroupingRole,
+    AdditionalTargetRole,
+    AdditionalPreTargetRole,
     default_roles,
 )
 
@@ -26,6 +31,7 @@ __all__ = [
     "Dataset",
     "ExperimentData",
     "InfoRole",
+    "DefaultRole",
     "TargetRole",
     "FeatureRole",
     "GroupingRole",
@@ -34,12 +40,16 @@ __all__ = [
     "StatisticRole",
     "TreatmentRole",
     "FilterRole",
-    "MatchingRole",
+    "AdditionalMatchingRole",
     "TempTreatmentRole",
     "TempGroupingRole",
     "TempTargetRole",
+    "AdditionalTreatmentRole",
+    "AdditionalGroupingRole",
+    "AdditionalTargetRole",
+    "AdditionalPreTargetRole",
     "ABCRole",
     "default_roles",
     "DatasetBase",
-    "DatasetAdapter"
+    "DatasetAdapter",
 ]
