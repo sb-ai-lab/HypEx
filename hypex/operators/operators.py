@@ -250,7 +250,9 @@ class Bias(GroupOperator):
         )
 
     def _prepare_data(self, data: ExperimentData, t_data: Dataset) -> Dataset:
-        indexes = data.additional_fields[self._field_searching(data, AdditionalMatchingRole())[0]]
+        indexes = data.additional_fields[
+            self._field_searching(data, AdditionalMatchingRole())[0]
+        ]
         indexes.index = t_data.index
         filtered_field = indexes.drop(
             indexes[indexes[indexes.columns[0]] == -1], axis=0

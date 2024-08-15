@@ -1,6 +1,6 @@
+import copy
 import json  # type: ignore
 from abc import ABC
-from copy import deepcopy
 from typing import Iterable, Dict, Union, List, Optional, Any
 
 import pandas as pd  # type: ignore
@@ -9,11 +9,9 @@ from hypex.dataset.backends import PandasDataset
 from hypex.dataset.roles import (
     ABCRole,
     default_roles,
-    FeatureRole,
     DefaultRole,
 )
 from hypex.utils import BackendsEnum, RoleColumnError
-from hypex.utils.adapter import Adapter
 
 
 def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
@@ -23,7 +21,7 @@ def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
         r = default_roles.get(role, role)
         if isinstance(roles[role], list):
             for i in roles[role]:
-                new_roles[i] = r
+                new_roles[i] = copy.deepcopy(r)
         else:
             new_roles[roles[role]] = r
     return new_roles or roles
@@ -124,6 +122,7 @@ class DatasetBase(ABC):
         self,
         new_roles_map: Dict[Union[ABCRole, str], ABCRole],
         tmp_role: bool = False,
+        auto_roles_types: bool = False,
     ):
         new_roles_map = parse_roles(
             {
@@ -145,6 +144,8 @@ class DatasetBase(ABC):
             self._tmp_roles = new_roles
         else:
             self.roles = new_roles
+            if auto_roles_types:
+                self._set_empty_types(new_roles_map)
 
         return self
 
@@ -230,7 +231,7 @@ class DatasetBase(ABC):
         for role, columns in zip(roles, columns_sets):
             if isinstance(columns, list):
                 for column in columns:
-                    new_roles[column] = role
+                    new_roles[column] = copy.deepcopy(role)
             else:
                 new_roles[columns] = role
 
