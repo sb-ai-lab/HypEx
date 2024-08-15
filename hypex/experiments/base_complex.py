@@ -3,10 +3,10 @@ from typing import Optional, List, Dict, Sequence, Any
 
 from tqdm.auto import tqdm
 
-from hypex.dataset import TempGroupingRole
 from hypex.dataset import ExperimentData, Dataset
+from hypex.dataset import TempGroupingRole
 from hypex.executor import Executor
-from hypex.experiments import Experiment
+from hypex.experiments.base import Experiment
 from hypex.reporters import Reporter, DatasetReporter
 
 

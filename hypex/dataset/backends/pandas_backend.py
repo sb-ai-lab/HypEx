@@ -217,9 +217,9 @@ class PandasNavigation(DatasetBackendNavigation):
         else:
             self.data.loc[:, name] = data
 
-    def append(self, other, index: bool = False) -> pd.DataFrame:
-        new_data = pd.concat([self.data] + [d.data for d in other])
-        if index:
+    def append(self, other, reset_index: bool = False, axis: int = 0) -> pd.DataFrame:
+        new_data = pd.concat([self.data] + [d.data for d in other], axis=axis)
+        if reset_index:
             new_data = new_data.reset_index(drop=True)
         return new_data
 
@@ -227,7 +227,7 @@ class PandasNavigation(DatasetBackendNavigation):
         self, data: FromDictTypes, index: Union[Iterable, Sized, None] = None
     ):
         self.data = pd.DataFrame().from_records(data)
-        if index:
+        if index is not None:
             self.data.index = index
         return self
 
