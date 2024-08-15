@@ -5,8 +5,9 @@ from scipy.stats import norm  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
 
 from hypex.dataset import Dataset, StatisticRole, DatasetAdapter
-from hypex.utils import ABNTestMethodsEnum
+from hypex.utils import ABNTestMethodsEnum, ID_SPLIT_SYMBOL
 from .abstract import Extension
+
 
 class ABMultiTest(Extension):
     def __init__(self, method: ABNTestMethodsEnum, alpha: float = 0.05):
@@ -16,11 +17,21 @@ class ABMultiTest(Extension):
 
     def _calc_pandas(self, data: Dataset, **kwargs):
         p_values = data.data.values.flatten()
-        result = multipletests(
+        new_pvalues = multipletests(
             p_values, method=self.method.value, alpha=self.alpha, **kwargs
         )
         return DatasetAdapter.to_dataset(
-            {"rejected": result[0], "new p-values": result[1]}, StatisticRole()
+            {
+                "field": [i.split(ID_SPLIT_SYMBOL)[2] for i in data.index],
+                "test": [i.split(ID_SPLIT_SYMBOL)[0] for i in data.index],
+                "old p-value": p_values,
+                "new p-value": new_pvalues[1],
+                "correction": [
+                    j / i if j != 0 else 0.0 for i, j in zip(new_pvalues[1], p_values)
+                ],
+                "rejected": new_pvalues[0],
+            },
+            StatisticRole(),
         )
 
 
@@ -72,9 +83,12 @@ class ABMultitestQuantile(Extension):
                     min_t_value = min(min_t_value, t_value)
             if min_t_value > quantiles[j]:
                 return DatasetAdapter.to_dataset(
-                    {"accepted hypothesis": [j + 1]}, StatisticRole()
+                    {"field": target_field, "accepted hypothesis": j + 1},
+                    StatisticRole(),
                 )
-        return DatasetAdapter.to_dataset({"accepted hypothesis": [0]}, StatisticRole())
+        return DatasetAdapter.to_dataset(
+            {"field": target_field, "accepted hypothesis": 0}, StatisticRole()
+        )
 
     def quantile_of_marginal_distribution(
         self,

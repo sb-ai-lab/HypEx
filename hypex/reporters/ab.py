@@ -1,7 +1,7 @@
 from typing import Dict, Any
 
 from hypex.analyzers.ab import ABAnalyzer
-from hypex.dataset import ExperimentData
+from hypex.dataset import ExperimentData, Dataset
 from hypex.utils import ExperimentDataEnum
 from .aa import OneAADictReporter
 from ..comparators import TTest, UTest, Chi2Test
@@ -40,9 +40,14 @@ class ABDictReporter(OneAADictReporter):
 
 
 class ABDatasetReporter(ABDictReporter):
+    @staticmethod
+    def _invert_aa_format(table: Dataset) -> Dataset:
+        return table.replace('NOT OK', 'N').replace('OK', 'NOT OK').replace('N', 'OK')
+
     def report(self, data: ExperimentData):
         front_buffer = self.front
         self.front = False
         dict_report = super().report(data)
         self.front = front_buffer
-        return self.convert_flat_dataset(dict_report)
+        result = self.convert_flat_dataset(dict_report)
+        return self._invert_aa_format(result)

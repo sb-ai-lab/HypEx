@@ -20,7 +20,7 @@ from hypex.utils import (
 from hypex.utils.errors import AbstractMethodError
 
 
-class GroupComparator(GroupCalculator):
+class GroupComparator(GroupCalculator, ABC):
     def __init__(
         self,
         grouping_role: Optional[ABCRole] = None,
@@ -106,7 +106,6 @@ class GroupComparator(GroupCalculator):
         data.set_value(
             ExperimentDataEnum.analysis_tables,
             self.id,
-            str(self.__class__.__name__),
             value,
         )
         return data
@@ -121,6 +120,7 @@ class GroupComparator(GroupCalculator):
             result = cr_list_v[0]
             if len(cr_list_v) > 1:
                 result = result.append(cr_list_v[1:])
+            result.index = list(compare_result.keys())
             return result
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
@@ -138,6 +138,9 @@ class GroupComparator(GroupCalculator):
             grouping_data = list(data.groups[group_field[0]].items())
         else:
             grouping_data = None
+            data.groups[group_field[0]] = {
+                f"{group}": ds for group, ds in data.ds.groupby(group_field[0])
+            }
         compare_result = self.calc(
             data=data.ds,
             group_field=group_field,
