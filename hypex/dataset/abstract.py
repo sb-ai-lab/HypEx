@@ -1,5 +1,6 @@
 import json  # type: ignore
 from abc import ABC
+from copy import deepcopy
 from typing import Iterable, Dict, Union, List, Optional, Any
 
 import pandas as pd  # type: ignore
@@ -9,8 +10,10 @@ from hypex.dataset.roles import (
     ABCRole,
     default_roles,
     FeatureRole,
+    DefaultRole,
 )
 from hypex.utils import BackendsEnum, RoleColumnError
+from hypex.utils.adapter import Adapter
 
 
 def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
@@ -41,7 +44,7 @@ class DatasetBase(ABC):
         keys = list(roles.keys())
         for column in self.columns:
             if column not in keys:
-                roles[column] = FeatureRole()
+                roles[column] = DefaultRole()
         return roles
 
     def _set_empty_types(self, roles):
@@ -88,9 +91,9 @@ class DatasetBase(ABC):
         if data is not None:
             roles = self._set_all_roles(roles)
             self._set_empty_types(roles)
-        self.roles: Dict[str, ABCRole] = roles
+        self._roles: Dict[str, ABCRole] = roles
         self._tmp_roles: Union[
-            Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]
+            Dict[ABCRole, Union[List[str], str]], Dict[Union[List[str], str], ABCRole]
         ] = {}
 
     def __repr__(self):
@@ -117,6 +120,34 @@ class DatasetBase(ABC):
             )
         ]
 
+    def replace_roles(
+        self,
+        new_roles_map: Dict[Union[ABCRole, str], ABCRole],
+        tmp_role: bool = False,
+    ):
+        new_roles_map = parse_roles(
+            {
+                role: (
+                    self.search_columns(column, tmp_role)
+                    if isinstance(column, ABCRole)
+                    else column
+                )
+                for column, role in new_roles_map.items()
+            }
+        )
+
+        new_roles = {
+            column: new_roles_map[column] if column in new_roles_map else role
+            for column, role in self.roles.items()
+        }
+
+        if tmp_role:
+            self._tmp_roles = new_roles
+        else:
+            self.roles = new_roles
+
+        return self
+
     @property
     def index(self):
         return self._backend.index
@@ -124,6 +155,14 @@ class DatasetBase(ABC):
     @property
     def data(self):
         return self._backend.data
+
+    @property
+    def roles(self):
+        return self._roles
+
+    @roles.setter
+    def roles(self, value):
+        self._set_roles(new_roles_map=value, temp_role=False)
 
     @data.setter
     def data(self, value):
@@ -139,7 +178,7 @@ class DatasetBase(ABC):
 
     @tmp_roles.setter
     def tmp_roles(self, value):
-        self._tmp_roles = value
+        self._set_roles(new_roles_map=value, temp_role=True)
         self._set_empty_types(self._tmp_roles)
 
     def to_dict(self):
@@ -171,3 +210,33 @@ class DatasetBase(ABC):
         column: Optional[str] = None,
     ) -> Any:
         return self._backend.get_values(row=row, column=column)
+
+    def _set_roles(
+        self,
+        new_roles_map: Union[
+            Dict[ABCRole, Union[List[str], str]], Dict[Union[List[str], str], ABCRole]
+        ],
+        temp_role: bool = False,
+    ):
+        if not new_roles_map:
+            return self.roles
+
+        keys, values = list(new_roles_map.keys()), list(new_roles_map.values())
+        roles, columns_sets = (
+            (keys, values) if isinstance(keys[0], ABCRole) else (values, keys)
+        )
+
+        new_roles = {}
+        for role, columns in zip(roles, columns_sets):
+            if isinstance(columns, list):
+                for column in columns:
+                    new_roles[column] = role
+            else:
+                new_roles[columns] = role
+
+        if temp_role:
+            self._tmp_roles = new_roles
+        else:
+            self._roles = new_roles
+
+        return self

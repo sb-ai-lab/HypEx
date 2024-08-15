@@ -6,6 +6,7 @@ from .abstract import DatasetBase
 from .dataset import Dataset, ExperimentData, DatasetAdapter
 from .roles import (
     InfoRole,
+    DefaultRole,
     TargetRole,
     FeatureRole,
     GroupingRole,
@@ -30,6 +31,7 @@ __all__ = [
     "Dataset",
     "ExperimentData",
     "InfoRole",
+    "DefaultRole",
     "TargetRole",
     "FeatureRole",
     "GroupingRole",

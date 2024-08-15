@@ -36,6 +36,7 @@ from .roles import (
     ABCRole,
     FilterRole,
     FeatureRole,
+    DefaultRole,
 )
 from ..utils.adapter import Adapter
 from ..utils.errors import InvalidArgumentError
@@ -102,7 +103,10 @@ class Dataset(DatasetBase):
             value = value.data
         if key not in self.columns and isinstance(key, str):
             self.add_column(value, {key: InfoRole()})
-            warnings.warn("Column must be added by add_column", category=SyntaxWarning)
+            warnings.warn(
+                "Column must be added by using add_column method.",
+                category=SyntaxWarning,
+            )
         self.data[key] = value
 
     def __binary_magic_operator(self, other, func_name: str) -> Any:
@@ -284,11 +288,10 @@ class Dataset(DatasetBase):
         if type(other._backend) is not type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
 
-    def append(self, other, reset_index: bool = False, axis: int = 0) -> "Dataset":
-        if isinstance(other, Dataset):
-            other = [other]
+    def append(self, other, reset_index=False, axis=0) -> "Dataset":
+        other = Adapter.to_list(other)
 
-        new_roles = copy(self.roles)
+        new_roles = deepcopy(self.roles)
         for o in other:
             self._check_other_dataset(o)
             new_roles.update(o.roles)
@@ -560,13 +563,13 @@ class Dataset(DatasetBase):
         result_data = self.backend.transpose(roles_names)
         if roles is None or isinstance(roles, List):
             names = result_data.columns if roles is None else roles
-            roles = {column: FeatureRole() for column in names}
+            roles = {column: DefaultRole() for column in names}
         return Dataset(roles=roles, data=result_data)
 
     def cov(self):
         t_data = self.backend.cov()
         return Dataset(
-            {column: FeatureRole() for column in t_data.columns}, data=t_data
+            {column: DefaultRole() for column in t_data.columns}, data=t_data
         )
 
     def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
