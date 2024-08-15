@@ -1,3 +1,6 @@
+from typing import Literal
+
+
 class RoleColumnError(Exception):
     def __init__(self, roles, columns):
         super().__init__(
@@ -28,9 +31,9 @@ class NoColumnsError(Exception):
         super().__init__(f"No columns found by role {role}")
 
 
-class ComparisonNotSuitableFieldError(Exception):
-    def __init__(self, group_field):
-        super().__init__(f"Group field {group_field} is not suitable for comparison")
+class FieldNotSuitableFieldError(Exception):
+    def __init__(self, field, field_role: Literal["Grouping", "Target", "Baseline"]):
+        super().__init__(f"{field_role} field {field} is not suitable for comparison")
 
 
 class NotFoundInExperimentDataError(Exception):
@@ -62,6 +65,11 @@ class BackendTypeError(Exception):
 class MergeOnError(Exception):
     def __init__(self, on):
         super().__init__(f"Can only merge on one of the columns data. Got {on}")
+
+
+class NoRequiredArgumentError(Exception):
+    def __init__(self, argument_name):
+        super().__init__(f"The required argument {argument_name} has not been passed.")
 
 
 class NoneArgumentError(Exception):

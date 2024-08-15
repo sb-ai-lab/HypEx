@@ -288,7 +288,7 @@ class Dataset(DatasetBase):
         if type(other._backend) is not type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
 
-    def append(self, other, index: bool = False) -> "Dataset":
+    def append(self, other, reset_index=False, axis=0) -> "Dataset":
         other = Adapter.to_list(other)
 
         new_roles = deepcopy(self.roles)
@@ -359,7 +359,7 @@ class Dataset(DatasetBase):
         func: Optional[Union[str, List]] = None,
         fields_list: Optional[Union[str, List]] = None,
         **kwargs,
-    ):  # TODO: field list does not work in the tutorial
+    ):  # TODO: fields_list does not work in the tutorial
         datasets = [
             (i, Dataset(roles=self.roles, data=data))
             for i, data in self._backend.groupby(by=by, **kwargs)
