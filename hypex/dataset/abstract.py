@@ -42,7 +42,7 @@ class DatasetBase(ABC):
         keys = list(roles.keys())
         for column in self.columns:
             if column not in keys:
-                roles[column] = DefaultRole()
+                roles[column] = copy.deepcopy(self.default_role) or DefaultRole()
         return roles
 
     def _set_empty_types(self, roles):
@@ -71,12 +71,14 @@ class DatasetBase(ABC):
         ],
         data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
+        default_role: Optional[ABCRole] = None,
     ):
         self._backend = (
             self._select_backend_from_str(data, backend)
             if backend
             else self._select_backend_from_data(data)
         )
+        self.default_role = default_role
         roles = (
             parse_roles(roles)
             if any(isinstance(role, type) for role in roles.keys())

@@ -75,8 +75,9 @@ class Dataset(DatasetBase):
         ],
         data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
+        default_role: Optional[ABCRole] = None,
     ):
-        super().__init__(roles, data, backend)
+        super().__init__(roles, data, backend, default_role)
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
 
