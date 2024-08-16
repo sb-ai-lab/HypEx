@@ -31,7 +31,7 @@ class NoColumnsError(Exception):
         super().__init__(f"No columns found by role {role}")
 
 
-class FieldNotSuitableFieldError(Exception):
+class NotSuitableFieldError(Exception):
     def __init__(self, field, field_role: Literal["Grouping", "Target", "Baseline"]):
         super().__init__(f"{field_role} field {field} is not suitable for comparison")
 

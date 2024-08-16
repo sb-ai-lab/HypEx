@@ -13,7 +13,7 @@ from hypex.executor import Calculator
 from hypex.utils import (
     ExperimentDataEnum,
     AbstractMethodError,
-    FieldNotSuitableFieldError,
+    NotSuitableFieldError,
 )
 from hypex.utils.adapter import Adapter
 
@@ -92,7 +92,7 @@ class GroupOperator(
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
-            raise FieldNotSuitableFieldError(group_field, "Grouping")
+            raise NotSuitableFieldError(group_field, "Grouping")
         return cls._execute_inner_function(
             grouping_data, target_fields=target_fields, old_data=data, **kwargs
         )

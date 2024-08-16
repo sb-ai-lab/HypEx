@@ -235,7 +235,7 @@ class DatasetBase(ABC):
                 for column in columns:
                     new_roles[column] = copy.deepcopy(role)
             else:
-                new_roles[columns] = role
+                new_roles[columns] = copy.deepcopy(role)
 
         if temp_role:
             self._tmp_roles = new_roles

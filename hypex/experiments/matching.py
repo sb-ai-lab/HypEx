@@ -2,14 +2,19 @@ import warnings
 from typing import List, Literal, Union
 
 from hypex.analyzers.matching import MatchingAnalyzer
+from hypex.comparators import TTest
 from hypex.comparators.distances import MahalanobisDistance
-from hypex.dataset import TreatmentRole, TargetRole
+from hypex.dataset import TreatmentRole, TargetRole, AdditionalTargetRole
 from hypex.executor import Executor
 from hypex.experiments.base import Experiment
 from hypex.ml.faiss import FaissNearestNeighbors
 from hypex.operators.operators import MatchingMetrics, Bias
 from hypex.ui.base import ExperimentShell
 from hypex.ui.matching import MatchingOutput
+
+
+class TtargetRole:
+    pass
 
 
 class Matching(ExperimentShell):
@@ -43,6 +48,7 @@ class Matching(ExperimentShell):
                 target_roles=[TargetRole()],
                 metric=metric,
             ),
+            TTest(compare_by="columns_in_groups", baseline_role=AdditionalTargetRole(), target_role=TargetRole(), grouping_role=TreatmentRole()),
             MatchingAnalyzer(),
         ]
         if quality_tests != "auto":

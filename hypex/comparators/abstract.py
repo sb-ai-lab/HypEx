@@ -24,7 +24,7 @@ from hypex.utils import (
 from hypex.utils.adapter import Adapter
 from hypex.utils.errors import (
     AbstractMethodError,
-    FieldNotSuitableFieldError,
+    NotSuitableFieldError,
     NoRequiredArgumentError,
     NoColumnsError,
 )
@@ -132,11 +132,23 @@ class Comparator(Calculator, ABC):
             return result
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
-
-    def _group_by_extenal_fields(self, data: Dataset) -> List[Tuple[str, Dataset]]:
-        return data
-
     # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
+
+    @staticmethod
+    def _source_select(
+        field: Union[str, List[str]],
+        comparison_role: Literal["Grouping", "Target", "Baseline"],
+        data: Dataset,
+        additional_fields: Optional[Dataset] = None,
+    ) -> Dataset:
+        if all(field_item in data.columns for field_item in Adapter.to_list(field)):
+            return data
+        elif additional_fields is not None and all(
+            field_item in additional_fields.columns
+            for field_item in Adapter.to_list(field)
+        ):
+            return additional_fields
+        raise NotSuitableFieldError(field, comparison_role)
 
     @staticmethod
     def _grouping_data_split(
@@ -178,85 +190,134 @@ class Comparator(Calculator, ABC):
             for bucket in data
             for column in bucket[1].columns
         ]
+
         return result
 
     @classmethod
     def _split_for_groups_mode(
-        cls, data: Dataset, group_field: str, target_fields: List[str]
+        cls,
+        data: Dataset,
+        group_field: Optional[Union[str, Dataset]],
+        target_fields: List[str],
+        additional_fields: Optional[Dataset] = None,
     ):
         if isinstance(target_fields, List) and len(target_fields) > 1:
             warnings.warn(
                 f"Only one Target field can be passed when the comparison is done by groups. {len(target_fields)} passed. {target_fields[0]} will be used.",
             )
             target_fields = target_fields[0]
-        if not isinstance(group_field, str):
+        if not isinstance(group_field, Dataset) and not isinstance(group_field, str):
             raise TypeError(
-                f"group_field must be one string, {type(group_field)} passed."
+                f"group_field must be one string or Dataset, {type(group_field)} passed."
             )
 
-        data_buckets = sorted(data.group_by_external_field(by=group_field, fields_list=target_fields))
+        data_buckets = sorted(
+            cls._source_select(
+                target_fields, "Target", data, additional_fields
+            ).group_by_external_field(by=group_field, fields_list=target_fields)
+        )
+
         baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
         compared_data = cls._split_ds_into_columns(data=data_buckets)
+
         return baseline_data, compared_data
 
     @classmethod
     def _split_for_columns_mode(
-        cls, data: Dataset, baseline_field: Optional[str], target_fields: List[str]
+        cls,
+        data: Dataset,
+        baseline_field: Optional[str],
+        target_fields: List[str],
+        additional_fields: Optional[Dataset] = None,
     ):
-        if baseline_field is None:
-            raise NoRequiredArgumentError("baseline_field")
+        baseline_data = [
+            (
+                f"{baseline_field}",
+                cls._source_select(baseline_field, "Baseline", data, additional_fields)[
+                    baseline_field
+                ],
+            )
+        ]
 
-        baseline_data = [(f"{baseline_field}", data[baseline_field])]
-        compared_data = [(f"{column}", data[column]) for column in target_fields]
+        compared_data = [
+            (
+                f"{column}",
+                cls._source_select(target_fields, "Target", data, additional_fields)[
+                    column
+                ],
+            )
+            for column in target_fields
+        ]
+
         return baseline_data, compared_data
 
     @classmethod
     def _split_for_columns_in_groups_mode(
         cls,
         data: Dataset,
-        group_field: Optional[str],
+        group_field: Optional[Union[str, Dataset]],
         baseline_field: Optional[str],
         target_fields: List[str],
+        additional_fields: Optional[Dataset] = None,
     ):
         if baseline_field is None:
             raise NoRequiredArgumentError("baseline_field")
         if group_field is None:
             raise NoRequiredArgumentError("group_field")
-        if not isinstance(group_field, str):
+        if not isinstance(group_field, Dataset) and not isinstance(group_field, str):
             raise TypeError(
-                f"group_field must be one string, {type(group_field)} passed."
+                f"group_field must be one string or Dataset, {type(group_field)} passed."
             )
         if len(target_fields) > 1:
             warnings.warn(
                 f"Too many fields passed as Target fields {target_fields}, only {target_fields[0]} will be used"
             )
+            target_fields = target_fields[0]
 
         baseline_data = cls._split_ds_into_columns(
-            data.group_by_external_field(by=group_field, fields_list=baseline_field)
+            cls._source_select(
+                baseline_field, "Baseline", data, additional_fields
+            ).group_by_external_field(by=group_field, fields_list=baseline_field)
         )
-        compared_data = data.group_by_external_field(by=group_field, fields_list=target_fields[0])
+
+        compared_data = cls._source_select(
+            target_fields, "Target", data, additional_fields
+        ).group_by_external_field(by=group_field, fields_list=target_fields)
+
         compared_data = cls._split_ds_into_columns(data=compared_data)
+
         return baseline_data, compared_data
 
     @classmethod
     def _split_for_cross_mode(
         cls,
         data: Dataset,
-        group_field: Optional[str],
+        group_field: Optional[Union[str, Dataset]],
         baseline_field: Optional[str],
         target_fields: List[str],
+        additional_fields: Optional[Dataset] = None,
     ):
         if baseline_field is None:
             raise NoRequiredArgumentError("baseline_field")
         if group_field is None:
             raise NoRequiredArgumentError("group_field")
-        if not isinstance(group_field, str):
+        if not isinstance(group_field, Dataset) and not isinstance(group_field, str):
             raise TypeError(
-                f"group_field must be one string, {type(group_field)} passed."
+                f"group_field must be one string or Dataset, {type(group_field)} passed."
             )
-        data_buckets = sorted(data.group_by_external_field(by=group_field, fields_list=baseline_field))
+        data_buckets = sorted(
+            cls._source_select(
+                baseline_field, "Baseline", data, additional_fields
+            ).group_by_external_field(by=group_field, fields_list=baseline_field)
+        )
+
         baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
-        compared_data = sorted(data.group_by_external_field(by=group_field, fields_list=target_fields))
+
+        compared_data = sorted(
+            cls._source_select(
+                target_fields, "Target", data, additional_fields
+            ).group_by_external_field(by=group_field, fields_list=target_fields)
+        )
         compared_data.pop(0)
         compared_data = cls._split_ds_into_columns(data=compared_data)
         return baseline_data, compared_data
@@ -269,6 +330,7 @@ class Comparator(Calculator, ABC):
         target_fields: Union[str, List[str]],
         baseline_field: Optional[str] = None,
         group_field: Optional[Union[str, Dataset]] = None,
+        additional_fields: Optional[Dataset] = None,
     ) -> Tuple:
         """
         Splits the given dataset into buckets into baseline and compared data, based on the specified comparison mode.
@@ -291,19 +353,19 @@ class Comparator(Calculator, ABC):
         target_fields = Adapter.to_list(target_fields)
         if compare_by == "groups":
             baseline_data, compared_data = cls._split_for_groups_mode(
-                data, group_field, target_fields
+                data, group_field, target_fields, additional_fields
             )
         elif compare_by == "columns":
             baseline_data, compared_data = cls._split_for_columns_mode(
-                data, baseline_field, target_fields
+                data, baseline_field, target_fields, additional_fields
             )
         elif compare_by == "columns_in_groups":
             baseline_data, compared_data = cls._split_for_columns_in_groups_mode(
-                data, group_field, baseline_field, target_fields
+                data, group_field, baseline_field, target_fields, additional_fields
             )
         elif compare_by == "cross":
             baseline_data, compared_data = cls._split_for_cross_mode(
-                data, group_field, baseline_field, target_fields
+                data, group_field, baseline_field, target_fields, additional_fields
             )
         else:
             raise ValueError(
@@ -320,6 +382,7 @@ class Comparator(Calculator, ABC):
         baseline_field: Optional[str] = None,
         group_field: Optional[str] = None,
         grouping_data: Optional[Tuple[List[Tuple[str, Dataset]]]] = None,
+        additional_fields: Optional[Dataset] = None,
         **kwargs,
     ) -> Dict:
         target_fields = Adapter.to_list(target_fields)
@@ -331,10 +394,11 @@ class Comparator(Calculator, ABC):
                 target_fields=target_fields,
                 baseline_field=baseline_field,
                 group_field=group_field,
+                additional_fields=additional_fields,
             )
 
         if len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1:
-            raise FieldNotSuitableFieldError(group_field, "Grouping")
+            raise NotSuitableFieldError(group_field, "Grouping")
 
         baseline_data, compared_data = grouping_data
         return cls._execute_inner_function(
@@ -362,7 +426,7 @@ class Comparator(Calculator, ABC):
                 raise NoColumnsError(TargetRole().role_name)
 
         if not group_field and self.compare_by != "columns":
-            raise FieldNotSuitableFieldError(group_field, "Grouping")
+            raise NotSuitableFieldError(group_field, "Grouping")
 
         if (
             group_field[0] in data.groups
@@ -374,9 +438,15 @@ class Comparator(Calculator, ABC):
                 baseline_field=baseline_field,
             )
         else:
-            grouping_mask = data.additional_fields[group_field] if (group_field not in data.ds.columns and group_field in data.additional_fields.columns) else None
+            groupiung_mask_data = self._source_select(
+                group_field, "Grouping", data.ds, data.additional_fields
+            )
+            grouping_mask = groupiung_mask_data[group_field]
             data.groups[group_field] = {
-                f"{group}": ds for group, ds in data.ds.group_by_external_field(grouping_mask or group_field)
+                f"{group}": ds
+                for group, ds in data.ds.group_by_external_field(
+                    grouping_mask or group_field
+                )
             }
             grouping_data = self._split_data_to_buckets(
                 data=data.ds,
@@ -384,10 +454,11 @@ class Comparator(Calculator, ABC):
                 target_fields=target_fields,
                 baseline_field=baseline_field,
                 group_field=grouping_mask or group_field,
+                additional_fields=data.additional_fields,
             )
 
         if len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1:
-            raise FieldNotSuitableFieldError(group_field, "Grouping")
+            raise NotSuitableFieldError(group_field, "Grouping")
 
         compare_result = self.calc(
             data=data.ds,
