@@ -28,19 +28,12 @@ class Matching(ExperimentShell):
         distance_mapping = {
             "mahalanobis": MahalanobisDistance(grouping_role=TreatmentRole())
         }
-        executors: List[Executor] = []
+        executors: List[Executor] = [
+            FaissNearestNeighbors(grouping_role=TreatmentRole(), two_sides=two_sides)
+        ]
         if bias_estimation:
             executors += [
-                FaissNearestNeighbors(
-                    grouping_role=TreatmentRole(), two_sides=two_sides
-                ),
                 Bias(grouping_role=TreatmentRole(), target_roles=[TargetRole()]),
-            ]
-        else:
-            executors += [
-                FaissNearestNeighbors(
-                    grouping_role=TreatmentRole(), two_sides=two_sides
-                )
             ]
         if metric in ["atc", "ate"] and not two_sides:
             raise ValueError(f"Can not estimate {metric} while two_sides is False")

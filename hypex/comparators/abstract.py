@@ -134,8 +134,8 @@ class Comparator(Calculator, ABC):
 
     # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
 
+    @staticmethod
     def _grouping_data_split(
-        self,
         grouping_data: Union[Tuple[List[Tuple[str, Dataset]]], Dict[str, Dataset]],
         compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
         target_fields: List[str],
