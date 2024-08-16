@@ -68,14 +68,14 @@ class Dataset(DatasetBase):
             )
 
     def __init__(
-        self,
-        roles: Union[
-            Dict[ABCRole, Union[List[str], str]],
-            Dict[str, ABCRole],
-        ],
-        data: Optional[Union[pd.DataFrame, str]] = None,
-        backend: Optional[BackendsEnum] = None,
-        default_role: Optional[ABCRole] = None,
+            self,
+            roles: Union[
+                Dict[ABCRole, Union[List[str], str]],
+                Dict[str, ABCRole],
+            ],
+            data: Optional[Union[pd.DataFrame, str]] = None,
+            backend: Optional[BackendsEnum] = None,
+            default_role: Optional[ABCRole] = None,
     ):
         super().__init__(roles, data, backend, default_role)
         self.loc = self.Locker(self._backend, self.roles)
@@ -112,7 +112,7 @@ class Dataset(DatasetBase):
 
     def __binary_magic_operator(self, other, func_name: str) -> Any:
         if not any(
-            isinstance(other, t) for t in [Dataset, str, int, float, bool, Sequence]
+                isinstance(other, t) for t in [Dataset, str, int, float, bool, Sequence]
         ):
             raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
@@ -262,10 +262,10 @@ class Dataset(DatasetBase):
         return Dataset(data=result, roles={column: role for column in self.roles})
 
     def add_column(
-        self,
-        data,
-        role: Optional[Dict[str, ABCRole]] = None,
-        index: Optional[Iterable[Hashable]] = None,
+            self,
+            data,
+            role: Optional[Dict[str, ABCRole]] = None,
+            index: Optional[Iterable[Hashable]] = None,
     ):
         if role is None:
             if not isinstance(data, Dataset):
@@ -304,13 +304,13 @@ class Dataset(DatasetBase):
     # TODO: set backend by backend object
     @staticmethod
     def from_dict(
-        data: FromDictTypes,
-        roles: Union[
-            Dict[ABCRole, Union[List[str], str]],
-            Dict[str, ABCRole],
-        ],
-        backend: BackendsEnum = BackendsEnum.pandas,
-        index=None,
+            data: FromDictTypes,
+            roles: Union[
+                Dict[ABCRole, Union[List[str], str]],
+                Dict[str, ABCRole],
+            ],
+            backend: BackendsEnum = BackendsEnum.pandas,
+            index=None,
     ) -> "Dataset":
         ds = Dataset(roles=roles, backend=backend)
         ds._backend = ds._backend.from_dict(data, index)
@@ -319,11 +319,11 @@ class Dataset(DatasetBase):
 
     # What is going to happen when a matrix is returned?
     def apply(
-        self,
-        func: Callable,
-        role: Dict[str, ABCRole],
-        axis: int = 0,
-        **kwargs,
+            self,
+            func: Callable,
+            role: Dict[str, ABCRole],
+            axis: int = 0,
+            **kwargs,
     ) -> "Dataset":
         return Dataset(
             data=self._backend.apply(
@@ -355,20 +355,45 @@ class Dataset(DatasetBase):
         )
 
     def groupby(
-        self,
-        by: Any,
-        func: Optional[Union[str, List]] = None,
-        fields_list: Optional[Union[str, List]] = None,
-        **kwargs,
-    ):  # TODO: fields_list does not work in the tutorial
+            self,
+            by: Any,
+            func: Optional[Union[str, List]] = None,
+            fields_list: Optional[Union[str, List]] = None,
+            **kwargs,
+    ) -> List[Tuple[str, "Dataset"]]:  # TODO: fields_list does not work in the tutorial
         datasets = [
             (i, Dataset(roles=self.roles, data=data))
             for i, data in self._backend.groupby(by=by, **kwargs)
         ]
         if fields_list:
-            fields_list = (
-                fields_list if isinstance(fields_list, Iterable) else [fields_list]
-            )
+            fields_list = Adapter.to_list(fields_list)
+            datasets = [(i, data[fields_list]) for i, data in datasets]
+        if func:
+            datasets = [(i, data.agg(func)) for i, data in datasets]
+        for dataset in datasets:
+            if isinstance(dataset, Dataset):
+                dataset[1].tmp_roles = self.tmp_roles
+        return datasets
+
+    def group_by_external_field(
+            self,
+            by: Any,
+            func: Optional[Union[str, List]] = None,
+            fields_list: Optional[Union[str, List]] = None,
+            **kwargs,
+    ) -> List[Tuple[str, "Dataset"]]:
+        if isinstance(by, Dataset) and len(by.columns) == 1:
+            datasets = [
+                (group, Dataset(roles=self.roles, data=self.data.loc[group_data.index]))
+                for group, group_data in by._backend.groupby(by=by.columns[0], **kwargs)
+            ]
+        else:
+            datasets = [
+                (group, Dataset(roles=self.roles, data=data))
+                for group, data in self._backend.groupby(by=by, **kwargs)
+            ]
+        if fields_list:
+            fields_list = Adapter.to_list(fields_list)
             datasets = [(i, data[fields_list]) for i, data in datasets]
         if func:
             datasets = [(i, data.agg(func)) for i, data in datasets]
@@ -378,10 +403,10 @@ class Dataset(DatasetBase):
         return datasets
 
     def sort(
-        self,
-        by: Optional[MultiFieldKeyTypes] = None,
-        ascending: bool = True,
-        **kwargs,
+            self,
+            by: Optional[MultiFieldKeyTypes] = None,
+            ascending: bool = True,
+            **kwargs,
     ):
         if by is None:
             return Dataset(
@@ -394,10 +419,10 @@ class Dataset(DatasetBase):
         )
 
     def fillna(
-        self,
-        values: Union[ScalarType, Dict[str, ScalarType], None] = None,
-        method: Optional[Literal["bfill", "ffill"]] = None,
-        **kwargs,
+            self,
+            values: Union[ScalarType, Dict[str, ScalarType], None] = None,
+            method: Optional[Literal["bfill", "ffill"]] = None,
+            **kwargs,
     ):
         if values is None and method is None:
             raise ValueError("Value or filling method must be provided")
@@ -457,11 +482,11 @@ class Dataset(DatasetBase):
         return Dataset(roles=t_roles, data=t_data)
 
     def value_counts(
-        self,
-        normalize: bool = False,
-        sort: bool = True,
-        ascending: bool = False,
-        dropna: bool = True,
+            self,
+            normalize: bool = False,
+            sort: bool = True,
+            ascending: bool = False,
+            dropna: bool = True,
     ):
         t_data = self._backend.value_counts(
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
@@ -474,9 +499,9 @@ class Dataset(DatasetBase):
         return self._convert_data_after_agg(self._backend.na_counts())
 
     def dropna(
-        self,
-        how: Literal["any", "all"] = "any",
-        subset: Union[str, Iterable[str], None] = None,
+            self,
+            how: Literal["any", "all"] = "any",
+            subset: Union[str, Iterable[str], None] = None,
     ):
         return Dataset(
             roles=self.roles, data=self._backend.dropna(how=how, subset=subset)
@@ -494,15 +519,15 @@ class Dataset(DatasetBase):
         return Dataset(roles=t_roles, data=t_data)
 
     def merge(
-        self,
-        right,
-        on: Optional[str] = None,
-        left_on: Optional[str] = None,
-        right_on: Optional[str] = None,
-        left_index: bool = False,
-        right_index: bool = False,
-        suffixes: Tuple[str, str] = ("_x", "_y"),
-        how: Literal["left", "right", "outer", "inner", "cross"] = "inner",
+            self,
+            right,
+            on: Optional[str] = None,
+            left_on: Optional[str] = None,
+            right_on: Optional[str] = None,
+            left_index: bool = False,
+            right_index: bool = False,
+            suffixes: Tuple[str, str] = ("_x", "_y"),
+            how: Literal["left", "right", "outer", "inner", "cross"] = "inner",
     ):
         if not any([on, left_on, right_on, left_index, right_index]):
             left_index = True
@@ -543,11 +568,11 @@ class Dataset(DatasetBase):
         return Dataset(roles=t_roles, data=t_data)
 
     def filter(
-        self,
-        items: Optional[List] = None,
-        like: Optional[str] = None,
-        regex: Optional[str] = None,
-        axis: Optional[int] = None,
+            self,
+            items: Optional[List] = None,
+            like: Optional[str] = None,
+            regex: Optional[str] = None,
+            axis: Optional[int] = None,
     ) -> "Dataset":
         t_data = self._backend.filter(items=items, like=like, regex=regex, axis=axis)
         return Dataset(roles=self.roles, data=t_data)
@@ -556,8 +581,8 @@ class Dataset(DatasetBase):
         return Dataset(roles=other.roles, data=self.backend.dot(other.backend))
 
     def transpose(
-        self,
-        roles: Optional[Union[Dict[str, ABCRole], List[str]]] = None,
+            self,
+            roles: Optional[Union[Dict[str, ABCRole], List[str]]] = None,
     ) -> "Dataset":
         roles_names: List[Union[str, None]] = (
             list(roles.keys()) or [] if isinstance(roles, Dict) else roles
@@ -582,10 +607,10 @@ class Dataset(DatasetBase):
         return Dataset(roles, data=self.backend.rename(names))
 
     def replace(
-        self,
-        to_replace: Any = None,
-        value: Any = None,
-        regex: bool = False,
+            self,
+            to_replace: Any = None,
+            value: Any = None,
+            regex: bool = False,
     ) -> "Dataset":
         return Dataset(
             self.roles,

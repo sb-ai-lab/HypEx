@@ -132,6 +132,10 @@ class Comparator(Calculator, ABC):
             return result
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
+
+    def _group_by_extenal_fields(self, data: Dataset) -> List[Tuple[str, Dataset]]:
+        return data
+
     # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
 
     @staticmethod
@@ -190,7 +194,7 @@ class Comparator(Calculator, ABC):
                 f"group_field must be one string, {type(group_field)} passed."
             )
 
-        data_buckets = sorted(data.groupby(by=group_field, fields_list=target_fields))
+        data_buckets = sorted(data.group_by_external_field(by=group_field, fields_list=target_fields))
         baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
         compared_data = cls._split_ds_into_columns(data=data_buckets)
         return baseline_data, compared_data
@@ -228,9 +232,9 @@ class Comparator(Calculator, ABC):
             )
 
         baseline_data = cls._split_ds_into_columns(
-            data.groupby(by=group_field, fields_list=baseline_field)
+            data.group_by_external_field(by=group_field, fields_list=baseline_field)
         )
-        compared_data = data.groupby(by=group_field, fields_list=target_fields[0])
+        compared_data = data.group_by_external_field(by=group_field, fields_list=target_fields[0])
         compared_data = cls._split_ds_into_columns(data=compared_data)
         return baseline_data, compared_data
 
@@ -250,9 +254,9 @@ class Comparator(Calculator, ABC):
             raise TypeError(
                 f"group_field must be one string, {type(group_field)} passed."
             )
-        data_buckets = sorted(data.groupby(by=group_field, fields_list=baseline_field))
+        data_buckets = sorted(data.group_by_external_field(by=group_field, fields_list=baseline_field))
         baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
-        compared_data = sorted(data.groupby(by=group_field, fields_list=target_fields))
+        compared_data = sorted(data.group_by_external_field(by=group_field, fields_list=target_fields))
         compared_data.pop(0)
         compared_data = cls._split_ds_into_columns(data=compared_data)
         return baseline_data, compared_data
@@ -264,7 +268,7 @@ class Comparator(Calculator, ABC):
         compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
         target_fields: Union[str, List[str]],
         baseline_field: Optional[str] = None,
-        group_field: Optional[str] = None,
+        group_field: Optional[Union[str, Dataset]] = None,
     ) -> Tuple:
         """
         Splits the given dataset into buckets into baseline and compared data, based on the specified comparison mode.
@@ -342,9 +346,9 @@ class Comparator(Calculator, ABC):
     def execute(self, data: ExperimentData) -> ExperimentData:
         fields = self._get_fields(data)
 
-        group_field = fields["group_field"]
+        group_field = Adapter.list_to_single(fields["group_field"])
         target_fields = fields["target_fields"]
-        baseline_field = fields["baseline_field"]
+        baseline_field = Adapter.list_to_single(fields["baseline_field"])
 
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
@@ -362,7 +366,7 @@ class Comparator(Calculator, ABC):
 
         if (
             group_field[0] in data.groups
-        ):  # TODO: propper split between groups and columns
+        ):  # TODO: proper split between groups and columns
             grouping_data = self._grouping_data_split(
                 grouping_data=data.groups[group_field[0]],
                 compare_by=self.compare_by,
@@ -370,17 +374,27 @@ class Comparator(Calculator, ABC):
                 baseline_field=baseline_field,
             )
         else:
-            grouping_data = None
-            data.groups[group_field[0]] = {
-                f"{group}": ds for group, ds in data.ds.groupby(group_field[0])
+            grouping_mask = data.additional_fields[group_field] if (group_field not in data.ds.columns and group_field in data.additional_fields.columns) else None
+            data.groups[group_field] = {
+                f"{group}": ds for group, ds in data.ds.group_by_external_field(grouping_mask or group_field)
             }
+            grouping_data = self._split_data_to_buckets(
+                data=data.ds,
+                compare_by=self.compare_by,
+                target_fields=target_fields,
+                baseline_field=baseline_field,
+                group_field=grouping_mask or group_field,
+            )
+
+        if len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1:
+            raise FieldNotSuitableFieldError(group_field, "Grouping")
 
         compare_result = self.calc(
             data=data.ds,
             compare_by=self.compare_by,
             target_fields=target_fields,
-            baseline_field=Adapter.list_to_single(baseline_field),
-            group_field=Adapter.list_to_single(group_field),
+            baseline_field=baseline_field,
+            group_field=group_field,
             grouping_data=grouping_data,
         )
         result_dataset = self._local_extract_dataset(
