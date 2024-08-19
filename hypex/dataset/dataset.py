@@ -354,27 +354,6 @@ class Dataset(DatasetBase):
             data=self._backend.isin(values),
         )
 
-    # def groupby(
-    #     self,
-    #     by: Any,
-    #     func: Optional[Union[str, List]] = None,
-    #     fields_list: Optional[Union[str, List]] = None,
-    #     **kwargs,
-    # ) -> List[Tuple[str, "Dataset"]]:  # TODO: fields_list does not work in the tutorial
-    #     datasets = [
-    #         (i, Dataset(roles=self.roles, data=data))
-    #         for i, data in self._backend.groupby(by=by, **kwargs)
-    #     ]
-    #     if fields_list:
-    #         fields_list = Adapter.to_list(fields_list)
-    #         datasets = [(i, data[fields_list]) for i, data in datasets]
-    #     if func:
-    #         datasets = [(i, data.agg(func)) for i, data in datasets]
-    #     for dataset in datasets:
-    #         if isinstance(dataset, Dataset):
-    #             dataset[1].tmp_roles = self.tmp_roles
-    #     return datasets
-
     def groupby(
         self,
         by: Any,
