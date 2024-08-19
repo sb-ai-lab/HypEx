@@ -214,7 +214,7 @@ class Comparator(Calculator, ABC):
         data_buckets = sorted(
             cls._source_select(
                 target_fields, "Target", data, additional_fields
-            ).group_by_external_field(by=group_field, fields_list=target_fields)
+            ).groupby(by=group_field, fields_list=target_fields)
         )
 
         baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
@@ -277,12 +277,12 @@ class Comparator(Calculator, ABC):
         baseline_data = cls._split_ds_into_columns(
             cls._source_select(
                 baseline_field, "Baseline", data, additional_fields
-            ).group_by_external_field(by=group_field, fields_list=baseline_field)
+            ).groupby(by=group_field, fields_list=baseline_field)
         )
 
         compared_data = cls._source_select(
             target_fields, "Target", data, additional_fields
-        ).group_by_external_field(by=group_field, fields_list=target_fields)
+        ).groupby(by=group_field, fields_list=target_fields)
 
         compared_data = cls._split_ds_into_columns(data=compared_data)
 
@@ -308,7 +308,7 @@ class Comparator(Calculator, ABC):
         data_buckets = sorted(
             cls._source_select(
                 baseline_field, "Baseline", data, additional_fields
-            ).group_by_external_field(by=group_field, fields_list=baseline_field)
+            ).groupby(by=group_field, fields_list=baseline_field)
         )
 
         baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
@@ -316,7 +316,7 @@ class Comparator(Calculator, ABC):
         compared_data = sorted(
             cls._source_select(
                 target_fields, "Target", data, additional_fields
-            ).group_by_external_field(by=group_field, fields_list=target_fields)
+            ).groupby(by=group_field, fields_list=target_fields)
         )
         compared_data.pop(0)
         compared_data = cls._split_ds_into_columns(data=compared_data)
@@ -444,9 +444,7 @@ class Comparator(Calculator, ABC):
             grouping_mask = groupiung_mask_data[group_field]
             data.groups[group_field] = {
                 f"{group}": ds
-                for group, ds in data.ds.group_by_external_field(
-                    grouping_mask or group_field
-                )
+                for group, ds in data.ds.groupby(grouping_mask or group_field)
             }
             grouping_data = self._split_data_to_buckets(
                 data=data.ds,
