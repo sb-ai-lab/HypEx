@@ -84,7 +84,9 @@ class Dataset(DatasetBase):
     def __getitem__(self, item: Union[Iterable, str, int]) -> "Dataset":
         if isinstance(item, Dataset):
             item = item.data
-        items = Adapter.to_list(item)
+        items = (
+            [item] if isinstance(item, str) or not isinstance(item, Iterable) else item
+        )
         roles: Dict = {
             column: (
                 self.roles[column]
