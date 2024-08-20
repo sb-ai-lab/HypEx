@@ -35,7 +35,6 @@ from .roles import (
     InfoRole,
     ABCRole,
     FilterRole,
-    FeatureRole,
     DefaultRole,
 )
 from ..utils.adapter import Adapter
@@ -567,6 +566,17 @@ class Dataset(DatasetBase):
             names = result_data.columns if roles is None else roles
             roles = {column: DefaultRole() for column in names}
         return Dataset(roles=roles, data=result_data)
+
+    def sample(
+        self,
+        frac: Optional[float] = None,
+        n: Optional[int] = None,
+        random_state: Optional[int] = None,
+    ) -> "Dataset":
+        return Dataset(
+            self.roles,
+            data=self.backend.sample(frac=frac, n=n, random_state=random_state),
+        )
 
     def cov(self):
         t_data = self.backend.cov()

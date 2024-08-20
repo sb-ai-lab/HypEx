@@ -12,6 +12,7 @@ from hypex.dataset import (
     DatasetAdapter,
 )
 from hypex.dataset.roles import AdditionalRole
+from hypex.experiments import Experiment
 from hypex.utils import (
     AbstractMethodError,
     ID_SPLIT_SYMBOL,
@@ -284,3 +285,16 @@ class MLExecutor(Calculator, ABC):
             features_fields=features_fields,
         )
         return self._set_value(data, compare_result)
+
+
+class IfExecutor(Executor, ABC):
+    def __init__(
+        self, if_executor: Experiment, else_executor: Experiment, key: Any = ""
+    ):
+        self.if_executor = if_executor
+        self.else_executor = else_executor
+        super().__init__(key)
+
+    @abstractmethod
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        raise AbstractMethodError
