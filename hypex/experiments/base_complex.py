@@ -129,3 +129,28 @@ class ParamsExperiment(ExperimentWithReporter):
             report = self.reporter.report(t_data)
             results.append(report)
         return self._set_result(data, results)
+
+class WhileExperiment(ExperimentWithReporter): 
+    def __init__(
+        self,
+        executors: Sequence[Executor],
+        reporter: Reporter,
+        max_iterations: int, 
+        additional_rule: Optional[callable] = None, 
+        transformer: Optional[bool] = None,
+        key: str = "",
+    ):
+        self.max_iterations = max_iterations 
+        self.additional_rule = additional_rule
+        super().__init__(executors, reporter, transformer, key)
+    
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        i = 0
+        result = None
+        additional_rule = self.additional_rule if self.additional_rule is not None else lambda x: False
+        while i < self.max_iterations:
+            result = self.one_iteration(data)
+            if additional_rule(result): 
+                break
+            i += 1
+        return self._set_value(data, result)
