@@ -67,7 +67,8 @@ class MatchingMetrics(GroupOperator):
         if len(bias) > 0:
             if metric in ["atc", "ate"]:
                 itc -= Dataset.from_dict({"test": bias["control"]}, roles={})
-            itt += Dataset.from_dict({"control": bias["test"]}, roles={})
+            if metric in ["att", "ate"]:
+                itt += Dataset.from_dict({"control": bias["test"]}, roles={})
         itt = itt.mean()
         itc = itc.mean()
         if metric == "atc":
@@ -81,35 +82,17 @@ class MatchingMetrics(GroupOperator):
             "ATE": (itt * len_test + itc * len_control) / (len_test + len_control),
         }
 
-    @staticmethod
-    def _define_metric(
-        grouping_data: List[Tuple[Union[int, str], Dataset]], target_fields
-    ):
-        if grouping_data[0][1][target_fields[1]].isna().sum() == len(
-            grouping_data[0][1]
-        ):
-            return "att"
-        else:
-            return (
-                "atc"
-                if grouping_data[0][1][target_fields[1]].isna().sum()
-                == len(grouping_data[1][1])
-                else "ate"
-            )
-
     @classmethod
     def _execute_inner_function(
         cls, grouping_data, target_fields: Optional[List[str]] = None, **kwargs
     ) -> Dict:
-        metric = kwargs.get("metric", "auto")
+        metric = kwargs.get("metric", "ate")
         if target_fields is None or len(target_fields) != 2:
             raise ValueError(
                 "This operator works with 2 targets, but got {}".format(
                     len(target_fields) if target_fields else None
                 )
             )
-        if metric == "auto":
-            metric = cls._define_metric(grouping_data, target_fields)
         return cls._inner_function(
             data=grouping_data[0][1],
             test_data=grouping_data[1][1],
@@ -218,18 +201,33 @@ class Bias(GroupOperator):
             raise NoneArgumentError(
                 ["target_fields", "features_fields", "test_data"], "bias_estimation"
             )
-        test_result = cls.calc_bias(
+        if data[target_fields[1]].isna().sum() > 0:     
+            return {"test": cls.calc_bias(
             test_data[features_fields[: len(features_fields) // 2]],
             test_data[features_fields[len(features_fields) // 2 :]],
             cls.calc_coefficients(
                 test_data[features_fields[len(features_fields) // 2 :]],
                 test_data[target_fields[1]],
             ),
-        )
-        if data[target_fields[1]].isna().sum() > 0:
-            return {"test": test_result}
+        )}
+        if test_data[target_fields[1]].isna().sum() > 0:     
+            return {"control": cls.calc_bias(
+                data[features_fields[: len(features_fields) // 2]],
+                data[features_fields[len(features_fields) // 2 :]],
+                cls.calc_coefficients(
+                    data[features_fields[len(features_fields) // 2 :]],
+                    data[target_fields[1]],
+                ),
+            )}
         return {
-            "test": test_result,
+            "test": cls.calc_bias(
+                test_data[features_fields[: len(features_fields) // 2]],
+                test_data[features_fields[len(features_fields) // 2 :]],
+                cls.calc_coefficients(
+                    test_data[features_fields[len(features_fields) // 2 :]],
+                    test_data[target_fields[1]],
+                ),
+            ),
             "control": cls.calc_bias(
                 data[features_fields[: len(features_fields) // 2]],
                 data[features_fields[len(features_fields) // 2 :]],
