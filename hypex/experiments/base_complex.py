@@ -28,7 +28,7 @@ class ExperimentWithReporter(Experiment):
         return self.reporter.report(t_data)
 
     def _set_result(self, data: ExperimentData, result: List[Dataset]):
-        result = result[0].append(result[1:], True)
+        result = result[0].append(result[1:], True) if len(result) > 1 else result[0]
         return self._set_value(data, result)
 
 
@@ -130,27 +130,28 @@ class ParamsExperiment(ExperimentWithReporter):
             results.append(report)
         return self._set_result(data, results)
 
-class WhileExperiment(ExperimentWithReporter): 
+
+class IfParamsExperiment(ParamsExperiment):
     def __init__(
         self,
         executors: Sequence[Executor],
-        reporter: Reporter,
-        max_iterations: int, 
-        additional_rule: Optional[callable] = None, 
+        reporter: DatasetReporter,
+        params: Dict[type, Dict[str, Sequence[Any]]],
+        stopping_criterion: Executor,
         transformer: Optional[bool] = None,
         key: str = "",
     ):
-        self.max_iterations = max_iterations 
-        self.additional_rule = additional_rule
-        super().__init__(executors, reporter, transformer, key)
-    
+        self.stopping_criterion = stopping_criterion
+        super().__init__(executors, reporter, params, transformer, key)
+
     def execute(self, data: ExperimentData) -> ExperimentData:
-        i = 0
-        result = None
-        additional_rule = self.additional_rule if self.additional_rule is not None else lambda x: False
-        while i < self.max_iterations:
-            result = self.one_iteration(data)
-            if additional_rule(result): 
-                break
-            i += 1
-        return self._set_value(data, result)
+        self._update_flat_params()
+        for flat_param in self._flat_params:
+            t_data = ExperimentData(data.ds)
+            for executor in self.executors:
+                executor.set_params(flat_param)
+                t_data = executor.execute(t_data)
+            if_result = self.stopping_criterion.execute(t_data)
+            if if_result:
+                return self._set_result(data, [self.reporter.report(t_data)])
+        return data

@@ -3,7 +3,7 @@ from typing import Dict, List, Any
 from hypex.comparators import KSTest, TTest, Chi2Test
 from hypex.dataset import Dataset, ExperimentData, StatisticRole
 from hypex.executor import Executor
-from hypex.experiments.base_complex import ParamsExperiment
+from hypex.experiments.base_complex import ParamsExperiment, IfParamsExperiment
 from hypex.reporters.aa import OneAADictReporter
 from hypex.splitters import AASplitter, AASplitterWithStratification
 from hypex.utils import BackendsEnum, ExperimentDataEnum, ID_SPLIT_SYMBOL
@@ -157,10 +157,18 @@ class AAScoreAnalyzer(Executor):
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        score_table_id = data.get_one_id(
+        param_experiment_id = data.get_one_id(
             ParamsExperiment, ExperimentDataEnum.analysis_tables, "AATest"
         )
-        score_table = data.analysis_tables[score_table_id]
+        ifparam_experiment_id = data.get_ids(
+            IfParamsExperiment,
+            ExperimentDataEnum.analysis_tables,
+        )
+        if len(ifparam_experiment_id["IfParamsExperiment"]["analysis_tables"]) > 0:
+            param_experiment_id = ifparam_experiment_id["IfParamsExperiment"][
+                "analysis_tables"
+            ][0]
+        score_table = data.analysis_tables[param_experiment_id]
 
         data = self._analyze_aa_score(data, score_table)
         data = self._analyze_best_split(data, score_table)

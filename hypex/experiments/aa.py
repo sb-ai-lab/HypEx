@@ -1,14 +1,17 @@
 from typing import Optional, Dict, Any, Iterable
 
 from hypex.analyzers.aa import OneAAStatAnalyzer, AAScoreAnalyzer
-from hypex.comparators import GroupDifference, GroupSizes
-from hypex.comparators.abstract import Comparator
-from hypex.comparators.hypothesis_testing import TTest, KSTest, Chi2Test
-from hypex.dataset import AdditionalTreatmentRole
-from hypex.dataset import TargetRole, TreatmentRole
-from hypex.dataset.dataset import Dataset
+from hypex.comparators import (
+    Comparator,
+    GroupDifference,
+    GroupSizes,
+    TTest,
+    KSTest,
+    Chi2Test,
+)
+from hypex.dataset import AdditionalTreatmentRole, TargetRole, TreatmentRole
 from hypex.experiments.base import Experiment, OnRoleExperiment
-from hypex.experiments.base_complex import ParamsExperiment, WhileExperiment
+from hypex.experiments.base_complex import ParamsExperiment, IfParamsExperiment
 from hypex.forks.aa import IfAAExecutor
 from hypex.reporters import DatasetReporter
 from hypex.reporters.aa import OneAADictReporter
@@ -16,7 +19,6 @@ from hypex.splitters import AASplitter, AASplitterWithStratification
 from hypex.ui.aa import AAOutput
 from hypex.ui.base import ExperimentShell
 from hypex.utils import SpaceEnum
-from hypex.utils.constants import ID_SPLIT_SYMBOL
 
 ONE_AA_TEST = Experiment(
     executors=[
@@ -51,16 +53,6 @@ ONE_AA_TEST_WITH_STRATIFICATION = Experiment(
         OneAAStatAnalyzer(),
     ]
 )
-
-def additional_rule(data: Dataset): 
-    search_flag = f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}"
-    feature_pass = [
-            True if data.loc[:, column] > 0 else False
-            for column in data.columns
-            if search_flag in column
-        ]
-    return True
-
 
 
 class AATest(ExperimentShell):
@@ -121,18 +113,25 @@ class AATest(ExperimentShell):
                         ),
                         reporter=DatasetReporter(OneAADictReporter(front=False)),
                     ),
-                    IfAAExecutor(if_executor=WhileExperiment(
-                        executors=[ 
-                            (
-                                ONE_AA_TEST_WITH_STRATIFICATION
-                                if stratification
-                                else ONE_AA_TEST
-                            )
-                        ], 
+                    IfParamsExperiment(
+                        executors=(
+                            [
+                                (
+                                    ONE_AA_TEST_WITH_STRATIFICATION
+                                    if stratification
+                                    else ONE_AA_TEST
+                                )
+                            ]
+                        ),
+                        params=self._prepare_params(
+                            n_iterations,
+                            control_size,
+                            random_states,
+                            additional_params,
+                        ),
                         reporter=DatasetReporter(OneAADictReporter(front=False)),
-                        max_iterations=10, 
-                        additional_rule=additional_rule
-                    ), sample_size=sample_size),
+                        stopping_criterion=IfAAExecutor(sample_size=sample_size),
+                    ),
                     AAScoreAnalyzer(),
                 ],
                 key="AATest",
