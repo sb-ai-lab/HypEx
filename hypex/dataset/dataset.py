@@ -96,7 +96,9 @@ class Dataset(DatasetBase):
             for column in items
         }
         result = Dataset(data=self._backend.__getitem__(item), roles=roles)
-        result.tmp_roles = {key: value for key, value in self.tmp_roles.items() if key in items}
+        result.tmp_roles = {
+            key: value for key, value in self.tmp_roles.items() if key in items
+        }
         return result
 
     def __setitem__(self, key: str, value: Any):

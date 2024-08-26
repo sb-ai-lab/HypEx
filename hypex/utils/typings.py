@@ -11,7 +11,10 @@ ScalarType = Union[float, int, str, bool]
 MultiFieldKeyTypes = Union[str, Sequence[str]]
 
 FromDictTypes = Union[
-    Dict[str, List[Any]], List[Dict[Any, Any]], Dict[str, Dict[Any, List]]
+    Dict[str, List[Any]],
+    List[Dict[Any, Any]],
+    Dict[str, Dict[Any, List]],
+    Dict[str, "Dataset"],
 ]
 RoleNameType = str
 DecoratedType = TypeVar("DecoratedType", bound=Union[Callable[..., Any], property])

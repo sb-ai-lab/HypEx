@@ -23,7 +23,7 @@ def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
             for i in roles[role]:
                 new_roles[i] = copy.deepcopy(r)
         else:
-            new_roles[roles[role]] = r
+            new_roles[roles[role]] = copy.deepcopy(r)
     return new_roles or roles
 
 

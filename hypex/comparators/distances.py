@@ -65,8 +65,8 @@ class MahalanobisDistance(Calculator):
         return data
 
     def _get_fields(self, data: ExperimentData):
-        group_field = self._field_searching(data, self.grouping_role)
-        target_fields = self._field_searching(
+        group_field = self._field_search(data, self.grouping_role)
+        target_fields = self._field_search(
             data, FeatureRole(), search_types=self.search_types
         )
         return group_field, target_fields

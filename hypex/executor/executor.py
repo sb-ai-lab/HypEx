@@ -127,13 +127,13 @@ class Calculator(Executor, ABC):
     def search_types(self):
         raise AbstractMethodError
 
-    def _field_searching(
-        self,
+    @staticmethod
+    def _field_search(
         data: ExperimentData,
         roles: Union[ABCRole, Iterable[ABCRole]],
         tmp_role: bool = False,
         search_types=None,
-    ):
+    ) -> List[str]:
         searched_field = []
         roles = Adapter.to_list(roles)
         field_in_additional = [
@@ -149,6 +149,34 @@ class Calculator(Executor, ABC):
                 field_in_additional, tmp_role=tmp_role, search_types=search_types
             )
         return searched_field
+
+    @staticmethod
+    def _field_data_search(
+        data: ExperimentData,
+        roles: Union[ABCRole, Iterable[ABCRole]],
+        tmp_role: bool = False,
+        search_types=None,
+    ) -> Dataset:
+        searched_data: Dataset = (
+            Dataset.create_empty()
+        )  # TODO: backend check to be added
+        roles = Adapter.to_list(roles)
+        roles_columns_map = {
+            role: Calculator._field_search(data, role, tmp_role, search_types)
+            for role in roles
+        }
+        for role, columns in roles_columns_map.items():
+            if isinstance(role, AdditionalRole):
+                for column in columns:
+                    searched_data = searched_data.add_column(
+                        data=data.additional_fields[column], role={column: role}
+                    )
+            else:
+                for column in columns:
+                    searched_data = searched_data.add_column(
+                        data=data.ds[column], role={column: role}
+                    )
+        return searched_data
 
     @staticmethod
     def _check_test_data(
@@ -171,8 +199,11 @@ class MLExecutor(Calculator, ABC):
         self.grouping_role = grouping_role or GroupingRole()
 
     def _get_fields(self, data: ExperimentData):
-        group_field = self._field_searching(data, self.grouping_role)
-        target_field = self._field_searching(
+        group_field = self._field_search(
+            data,
+            self.grouping_role,
+        )
+        target_field = self._field_search(
             data, self.target_role, search_types=self.search_types
         )
         return group_field, target_field
