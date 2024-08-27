@@ -70,7 +70,11 @@ class MatchingMetrics(GroupOperator):
             if metric in ["att", "ate"]:
                 itt += Dataset.from_dict({"control": bias["test"]}, roles={})
         itt = itt.mean()
+        var = itt.var().get_values()[0][0]
+        vars_t = [var for _ in range(len(itt))] 
         itc = itc.mean()
+        var = itt.var().get_values()[0][0]
+        vars_c = [var for _ in range(len(itc))] 
         if metric == "atc":
             return {"ATC": itc}
         if metric == "att":
