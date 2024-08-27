@@ -14,14 +14,15 @@ from hypex.dataset import (
     TargetRole,
     PreTargetRole,
 )
+
 from hypex.executor import Calculator
 from hypex.utils import (
     BackendsEnum,
     ExperimentDataEnum,
     FromDictTypes,
     NAME_BORDER_SYMBOL,
+    GroupingDataType,
 )
-from hypex.utils.adapter import Adapter
 from hypex.utils.errors import (
     AbstractMethodError,
     NotSuitableFieldError,
@@ -134,7 +135,7 @@ class Comparator(Calculator, ABC):
         compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
         target_fields: List[str],
         baseline_field: Optional[str],
-    ) -> Tuple[List[Tuple[str, Dataset]], List[Tuple[str, Dataset]]]:
+    ) -> GroupingDataType:
         if isinstance(grouping_data, Dict):
             compared_data = [(name, data) for name, data in grouping_data.items()]
             baseline_data = [compared_data.pop()]
@@ -191,7 +192,7 @@ class Comparator(Calculator, ABC):
         cls,
         group_field_data: Dataset,
         target_fields_data: Dataset,
-    ) -> Tuple[List[Tuple[str, Dataset]], List[Tuple[str, Dataset]]]:
+    ) -> GroupingDataType:
         target_fields_data = cls._field_validity_check(
             target_fields_data, "target_fields_data", "groups"
         )
@@ -211,7 +212,7 @@ class Comparator(Calculator, ABC):
         cls,
         baseline_field_data: Dataset,
         target_fields_data: Dataset,
-    ) -> Tuple[List[Tuple[str, Dataset]], List[Tuple[str, Dataset]]]:
+    ) -> GroupingDataType:
         baseline_field_data = cls._field_validity_check(
             baseline_field_data, "baseline_field_data", "columns"
         )
@@ -233,7 +234,7 @@ class Comparator(Calculator, ABC):
         group_field_data: Dataset,
         baseline_field_data: Dataset,
         target_fields_data: Dataset,
-    ) -> Tuple[List[Tuple[str, Dataset]], List[Tuple[str, Dataset]]]:
+    ) -> GroupingDataType:
         baseline_field_data = cls._field_validity_check(
             baseline_field_data, "baseline_field_data", "columns_in_groups"
         )
@@ -258,7 +259,7 @@ class Comparator(Calculator, ABC):
         group_field_data: Dataset,
         baseline_field_data: Dataset,
         target_fields_data: Dataset,
-    ) -> Tuple[List[Tuple[str, Dataset]], List[Tuple[str, Dataset]]]:
+    ) -> GroupingDataType:
         baseline_field_data = cls._field_validity_check(
             baseline_field_data, "baseline_field_data", "cross"
         )
@@ -286,7 +287,7 @@ class Comparator(Calculator, ABC):
         target_fields_data: Dataset,
         baseline_field_data: Dataset,
         group_field_data: Dataset,
-    ) -> Tuple[List[Tuple[str, Dataset]], List[Tuple[str, Dataset]]]:
+    ) -> GroupingDataType:
         """
         Splits the given dataset into buckets into baseline and compared data, based on the specified comparison mode.
 

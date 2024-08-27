@@ -32,6 +32,7 @@ from .typings import (
     RoleNameType,
     ScalarType,
     SetParamsDictTypes,
+    GroupingDataType,
 )
 
 __all__ = [
@@ -65,4 +66,5 @@ __all__ = [
     "ScalarType",
     "ABNTestMethodsEnum",
     "SetParamsDictTypes",
+    "GroupingDataType",
 ]

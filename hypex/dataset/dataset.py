@@ -761,16 +761,15 @@ class ExperimentData:
             role: self.field_search(role, tmp_role, search_types) for role in roles
         }
         for role, columns in roles_columns_map.items():
-            if isinstance(role, AdditionalRole):
-                for column in columns:
-                    searched_data = searched_data.add_column(
-                        data=self.additional_fields[column], role={column: role}
-                    )
-            else:
-                for column in columns:
-                    searched_data = searched_data.add_column(
-                        data=self.ds[column], role={column: role}
-                    )
+            for column in columns:
+                t_data = (
+                    self.additional_fields[column]
+                    if isinstance(role, AdditionalRole)
+                    else self.ds[column]
+                )
+                searched_data = searched_data.add_column(
+                    data=t_data, role={column: role}
+                )
         return searched_data
 
 
