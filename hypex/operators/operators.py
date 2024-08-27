@@ -39,6 +39,7 @@ class MatchingMetrics(GroupOperator):
         key: Any = "",
     ):
         self.metric = metric or "auto"
+        self.__scaled_counts = {}
         target_roles = target_roles or TargetRole()
         super().__init__(
             grouping_role=grouping_role,
@@ -48,21 +49,26 @@ class MatchingMetrics(GroupOperator):
             key=key,
         )
 
+    def _calc_scaled_counts(self, matches, group):
+        s_counts = [x[0] for x in matches.value_counts()['count'].get_values()]
+        extra_counts = [0 for _ in range(len(matches) - len(s_counts))]
+        self.__scaled_counts[group] = s_counts + extra_counts
+
     @staticmethod 
     def _calc_vars(value): 
         var = value.var()
         return [var for _ in range(len(value))] 
 
     @staticmethod
-    def _calc_se(var_c, var_t, is_ate=False): 
+    def _calc_se(var_c, var_t, scaled_counts, is_ate=False): 
         n_c, n_t = len(var_c), len(var_t) 
         if not is_ate: 
-            weights_c = np.zeros(n_c)
+            weights_c = n_c / n_t * np.array(scaled_counts)
             weights_t = np.ones(n_t) 
         else: 
             n = n_c + n_t
-            weights_c = (n_c / n) * np.ones(n_c)
-            weights_t = (n_t / n) * np.ones(n_t)
+            weights_c = (n_c / n) * np.array(scaled_counts["control"])
+            weights_t = (n_t / n) * np.array(scaled_counts["test"])
 
         return (weights_t ** 2 * var_t).sum() / n_t ** 2 + (weights_c ** 2 * var_c).sum() / n_c ** 2
 
@@ -79,18 +85,19 @@ class MatchingMetrics(GroupOperator):
                 ["target_fields", "test_data"], "att, atc, ate estimation"
             )
         metric = kwargs.get("metric", "ate")
+        scaled_counts = kwargs.get("scaled_counts") 
         itt = test_data[target_fields[0]] - test_data[target_fields[1]]
         itc = data[target_fields[1]] - data[target_fields[0]]
         bias = kwargs.get("bias", {})
         if len(bias) > 0:
             if metric in ["atc", "ate"]:
-                itc -= Dataset.from_dict({"test": bias["control"]}, roles={})
+                itc -= Dataset.from_dict({"test": bias["control"]}, roles={}, index=itc.index)
             if metric in ["att", "ate"]:
-                itt += Dataset.from_dict({"control": bias["test"]}, roles={})
+                itt += Dataset.from_dict({"control": bias["test"]}, roles={}, index=itt.index)
         var_t = cls._calc_vars(itt) 
         var_c = cls._calc_vars(itc)
-        itt_se = cls._calc_se(var_c, var_t) 
-        itc_se = cls._calc_se(var_t, var_c) 
+        itt_se = cls._calc_se(var_c, var_t, scaled_counts["control"]) 
+        itc_se = cls._calc_se(var_t, var_c, scaled_counts["test"]) 
         itt = itt.mean()
         itc = itc.mean()
         if metric == "atc":
@@ -99,10 +106,10 @@ class MatchingMetrics(GroupOperator):
             return {"ATT": [itt, itt_se]}
         len_test, len_control = len(data), len(test_data)
         return {
-            "ATT": [itc, itc_se],
-            "ATC": [itt, itt_se],
+            "ATT": [itt, itt_se],
+            "ATC": [itc, itc_se],
             "ATE": [(itt * len_test + itc * len_control) / (len_test + len_control), 
-                    cls._calc_se(var_c, var_t, is_ate=True)],
+                    cls._calc_se(var_c, var_t, scaled_counts, is_ate=True)],
         }
 
     @classmethod
@@ -122,15 +129,21 @@ class MatchingMetrics(GroupOperator):
             target_fields=target_fields,
             metric=metric,
             bias=kwargs.get("bias_estimation", None),
+            scaled_counts=kwargs.get("scaled_counts")
         )
 
-    def _prepare_new_target(self, data: ExperimentData, t_data: Dataset) -> Dataset:
+    def _prepare_new_target(self, data: ExperimentData, t_data: Dataset, group_field: str) -> Dataset:
         indexes = self._field_searching(data, AdditionalMatchingRole())
         if len(indexes) == 0:
             raise ValueError(f"No indexes were found")
         new_target = data.ds.search_columns(TargetRole())[0]
         indexes = data.additional_fields[indexes[0]]
         indexes.index = t_data.index
+        grouped_data = data.ds.groupby(group_field) 
+        control_indexes = indexes.loc[grouped_data[0][1].index] 
+        test_indexes = indexes.loc[grouped_data[1][1].index] 
+        self._calc_scaled_counts(control_indexes, "control") 
+        self._calc_scaled_counts(test_indexes, "test")
         filtered_field = indexes.drop(
             indexes[indexes[indexes.columns[0]] == -1], axis=0
         )
@@ -154,7 +167,7 @@ class MatchingMetrics(GroupOperator):
         )
         t_data = deepcopy(data.ds)
         if len(target_fields) != 2:
-            matched_data = self._prepare_new_target(data, t_data)
+            matched_data = self._prepare_new_target(data, t_data, group_field)
             target_fields += [matched_data.search_columns(TargetRole())[0]]
             data.set_value(
                 ExperimentDataEnum.additional_fields,
@@ -180,6 +193,7 @@ class MatchingMetrics(GroupOperator):
             target_fields=target_fields,
             metric=self.metric,
             bias_estimation=bias,
+            scaled_counts=self.__scaled_counts
         )
         return self._set_value(data, compare_result)
 
