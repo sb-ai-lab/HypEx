@@ -63,15 +63,14 @@ class Comparator(Calculator, ABC):
 
     def _get_fields_data(self, data: ExperimentData) -> Dict[str, Dataset]:
         tmp_role = True if data.ds.tmp_roles else False
-        group_field_data = self._field_data_search(data=data, roles=self.grouping_role)
-        target_fields_data = self._field_data_search(
-            data=data,
+        group_field_data = data.field_data_search(roles=self.grouping_role)
+        target_fields_data = data.field_data_search(
             roles=TempTargetRole() if tmp_role else self.target_roles,
             tmp_role=tmp_role,
             search_types=self.search_types,
         )
-        baseline_field_data = self._field_data_search(
-            data=data, roles=self.baseline_role, tmp_role=tmp_role
+        baseline_field_data = data.field_data_search(
+            roles=self.baseline_role, tmp_role=tmp_role
         )
         return {
             "group_field": group_field_data,

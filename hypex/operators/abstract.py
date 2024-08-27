@@ -44,13 +44,13 @@ class GroupOperator(
         raise AbstractMethodError
 
     def _get_fields(self, data: ExperimentData):
-        group_field = self._field_search(data, self.grouping_role)
-        target_fields = self._field_search(
-            data, self.target_roles, search_types=self.search_types
+        group_field = data.field_search(self.grouping_role)
+        target_fields = data.field_search(
+            self.target_roles, search_types=self.search_types
         )
         if len(target_fields) != 2:
-            target_fields += self._field_search(
-                data, AdditionalTargetRole(), search_types=self.search_types
+            target_fields += data.field_search(
+                AdditionalTargetRole(), search_types=self.search_types
             )
         return group_field, target_fields
 
