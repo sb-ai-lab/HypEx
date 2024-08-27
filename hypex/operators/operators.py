@@ -11,15 +11,17 @@ from hypex.dataset import (
     InfoRole,
     FeatureRole,
     AdditionalMatchingRole,
+    AdditionalTargetRole,
 )
-from hypex.ml.faiss import FaissNearestNeighbors
 from hypex.operators.abstract import GroupOperator
-from hypex.utils import SpaceEnum
 from hypex.utils.enums import ExperimentDataEnum
 from hypex.utils.errors import NoneArgumentError
 
 
 class SMD(GroupOperator):
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        pass
+
     @classmethod
     def _inner_function(
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
@@ -33,7 +35,6 @@ class MatchingMetrics(GroupOperator):
         self,
         grouping_role: Optional[ABCRole] = None,
         target_roles: Union[ABCRole, List[ABCRole], None] = None,
-        space: SpaceEnum = SpaceEnum.auto,
         metric: Optional[Literal["auto", "atc", "att", "ate"]] = None,
         key: Any = "",
     ):
@@ -118,7 +119,7 @@ class MatchingMetrics(GroupOperator):
         )
 
     def _prepare_new_target(self, data: ExperimentData, t_data: Dataset) -> Dataset:
-        indexes = self._field_searching(data, AdditionalMatchingRole())
+        indexes = data.field_search(AdditionalMatchingRole())
         if len(indexes) == 0:
             raise ValueError(f"No indexes were found")
         new_target = data.ds.search_columns(TargetRole())[0]
@@ -149,6 +150,12 @@ class MatchingMetrics(GroupOperator):
         if len(target_fields) != 2:
             matched_data = self._prepare_new_target(data, t_data)
             target_fields += [matched_data.search_columns(TargetRole())[0]]
+            data.set_value(
+                ExperimentDataEnum.additional_fields,
+                self.id,
+                matched_data,
+                role=AdditionalTargetRole(),
+            )
             t_data = t_data.add_column(
                 matched_data.reindex(t_data.index),
                 role={target_fields[1]: TargetRole()},
@@ -250,9 +257,7 @@ class Bias(GroupOperator):
         )
 
     def _prepare_data(self, data: ExperimentData, t_data: Dataset) -> Dataset:
-        indexes = data.additional_fields[
-            self._field_searching(data, AdditionalMatchingRole())[0]
-        ]
+        indexes = data.additional_fields[data.field_search(AdditionalMatchingRole())[0]]
         indexes.index = t_data.index
         filtered_field = indexes.drop(
             indexes[indexes[indexes.columns[0]] == -1], axis=0

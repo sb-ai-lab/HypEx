@@ -23,7 +23,7 @@ def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
             for i in roles[role]:
                 new_roles[i] = copy.deepcopy(r)
         else:
-            new_roles[roles[role]] = r
+            new_roles[roles[role]] = copy.deepcopy(r)
     return new_roles or roles
 
 
@@ -42,7 +42,7 @@ class DatasetBase(ABC):
         keys = list(roles.keys())
         for column in self.columns:
             if column not in keys:
-                roles[column] = DefaultRole()
+                roles[column] = copy.deepcopy(self.default_role) or DefaultRole()
         return roles
 
     def _set_empty_types(self, roles):
@@ -71,12 +71,14 @@ class DatasetBase(ABC):
         ],
         data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
+        default_role: Optional[ABCRole] = None,
     ):
         self._backend = (
             self._select_backend_from_str(data, backend)
             if backend
             else self._select_backend_from_data(data)
         )
+        self.default_role = default_role
         roles = (
             parse_roles(roles)
             if any(isinstance(role, type) for role in roles.keys())
@@ -233,7 +235,7 @@ class DatasetBase(ABC):
                 for column in columns:
                     new_roles[column] = copy.deepcopy(role)
             else:
-                new_roles[columns] = role
+                new_roles[columns] = copy.deepcopy(role)
 
         if temp_role:
             self._tmp_roles = new_roles
