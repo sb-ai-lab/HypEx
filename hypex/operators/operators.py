@@ -48,6 +48,24 @@ class MatchingMetrics(GroupOperator):
             key=key,
         )
 
+    @staticmethod 
+    def _calc_vars(value): 
+        var = value.var()
+        return [var for _ in range(len(value))] 
+
+    @staticmethod
+    def _calc_se(var_c, var_t, is_ate=False): 
+        n_c, n_t = len(var_c), len(var_t) 
+        if not is_ate: 
+            weights_c = np.zeros(n_c)
+            weights_t = np.ones(n_t) 
+        else: 
+            n = n_c + n_t
+            weights_c = (n_c / n) * np.ones(n_c)
+            weights_t = (n_t / n) * np.ones(n_t)
+
+        return (weights_t ** 2 * var_t).sum() / n_t ** 2 + (weights_c ** 2 * var_c).sum() / n_c ** 2
+
     @classmethod
     def _inner_function(
         cls,
@@ -69,21 +87,22 @@ class MatchingMetrics(GroupOperator):
                 itc -= Dataset.from_dict({"test": bias["control"]}, roles={})
             if metric in ["att", "ate"]:
                 itt += Dataset.from_dict({"control": bias["test"]}, roles={})
+        var_t = cls._calc_vars(itt) 
+        var_c = cls._calc_vars(itc)
+        itt_se = cls._calc_se(var_c, var_t) 
+        itc_se = cls._calc_se(var_t, var_c) 
         itt = itt.mean()
-        var = itt.var().get_values()[0][0]
-        vars_t = [var for _ in range(len(itt))] 
         itc = itc.mean()
-        var = itt.var().get_values()[0][0]
-        vars_c = [var for _ in range(len(itc))] 
         if metric == "atc":
-            return {"ATC": itc}
+            return {"ATC": [itc, itc_se]}
         if metric == "att":
-            return {"ATT": itt}
+            return {"ATT": [itt, itt_se]}
         len_test, len_control = len(data), len(test_data)
         return {
-            "ATT": itt,
-            "ATC": itc,
-            "ATE": (itt * len_test + itc * len_control) / (len_test + len_control),
+            "ATT": [itc, itc_se],
+            "ATC": [itt, itt_se],
+            "ATE": [(itt * len_test + itc * len_control) / (len_test + len_control), 
+                    cls._calc_se(var_c, var_t, is_ate=True)],
         }
 
     @classmethod
