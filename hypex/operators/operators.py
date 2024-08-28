@@ -70,7 +70,7 @@ class MatchingMetrics(GroupOperator):
             weights_c = (n_c / n) * np.array(scaled_counts["control"])
             weights_t = (n_t / n) * np.array(scaled_counts["test"])
 
-        return (weights_t ** 2 * var_t).sum() / n_t ** 2 + (weights_c ** 2 * var_c).sum() / n_c ** 2
+        return np.sqrt((weights_t ** 2 * var_t).sum() / n_t ** 2 + (weights_c ** 2 * var_c).sum() / n_c ** 2)
 
     @classmethod
     def _inner_function(
