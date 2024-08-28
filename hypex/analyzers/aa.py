@@ -141,10 +141,8 @@ class AAScoreAnalyzer(Executor):
         self, data: ExperimentData, score_table: Dataset, best_index: int, if_param_scores: Optional[Dataset] = None
     ) -> ExperimentData:
         self.key = "best splitter"
-        if if_param_scores is None: 
-            best_splitter_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0) 
-        else: 
-            best_splitter_id = if_param_scores.loc[best_index, "splitter_id"].get_values(0, 0)
+        scores = score_table if if_param_scores is None else if_param_scores
+        best_splitter_id = scores.loc[best_index, "splitter_id"].get_values(0, 0) 
         result = data.set_value(
             ExperimentDataEnum.variables, self.id, best_splitter_id, self.key
         )

@@ -584,9 +584,6 @@ class Dataset(DatasetBase):
             {column: DefaultRole() for column in t_data.columns}, data=t_data
         )
 
-    def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
-        return Dataset(self.roles, data=self.backend.shuffle(random_state))
-
     def rename(self, names: Dict[str, str]):
         roles = {names.get(column, column): role for column, role in self.roles.items()}
         return Dataset(roles, data=self.backend.rename(names))

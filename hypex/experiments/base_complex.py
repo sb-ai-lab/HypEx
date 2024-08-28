@@ -6,8 +6,10 @@ from tqdm.auto import tqdm
 from hypex.dataset import ExperimentData, Dataset
 from hypex.dataset import TempGroupingRole
 from hypex.executor import Executor
+from hypex.executor.executor import IfExecutor
 from hypex.experiments.base import Experiment
 from hypex.reporters import Reporter, DatasetReporter
+from hypex.utils.enums import ExperimentDataEnum
 
 
 class ExperimentWithReporter(Experiment):
@@ -137,7 +139,7 @@ class IfParamsExperiment(ParamsExperiment):
         executors: Sequence[Executor],
         reporter: DatasetReporter,
         params: Dict[type, Dict[str, Sequence[Any]]],
-        stopping_criterion: Executor,
+        stopping_criterion: IfExecutor,
         transformer: Optional[bool] = None,
         key: str = "",
     ):
@@ -152,6 +154,7 @@ class IfParamsExperiment(ParamsExperiment):
                 executor.set_params(flat_param)
                 t_data = executor.execute(t_data)
             if_result = self.stopping_criterion.execute(t_data)
-            if if_result:
+            if_executor_id = if_result.get_one_id(self.stopping_criterion.__class__, ExperimentDataEnum.variables)
+            if if_result.variables[if_executor_id]["response"]:
                 return self._set_result(data, [self.reporter.report(t_data)])
         return data
