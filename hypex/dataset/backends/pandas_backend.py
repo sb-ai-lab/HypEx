@@ -424,9 +424,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def cov(self):
         return self.data.cov(ddof=0)
 
-    def shuffle(self, random_state: Optional[int] = None) -> pd.DataFrame:
-        return self.data.sample(self.data.shape[0], random_state=random_state)
-
     def quantile(self, q: float = 0.5) -> pd.DataFrame:
         return self.agg(func="quantile", q=q)
 

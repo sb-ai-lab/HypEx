@@ -193,6 +193,5 @@ class AAScoreAnalyzer(Executor):
                 ifparam_experiment_id["IfParamsExperiment"]["analysis_tables"][0]
             ]
         )
-
         data = self._analyze_aa_score(data, score_table)
         return self._analyze_best_split(data, score_table, if_param_scores)

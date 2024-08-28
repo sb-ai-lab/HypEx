@@ -1,7 +1,6 @@
 from typing import Optional
 
 from hypex.analyzers.aa import OneAAStatAnalyzer
-from hypex.dataset import ExperimentData
 from hypex.executor.executor import Executor, IfExecutor
 from hypex.utils.enums import ExperimentDataEnum
 
@@ -16,7 +15,7 @@ class IfAAExecutor(IfExecutor):
     ):
         self.sample_size = sample_size
         super().__init__(if_executor, else_executor, key)
-    
+
     def check_rule(self, data, **kwargs) -> bool:
         if self.sample_size is not None:
             score_table_id = data.get_one_id(

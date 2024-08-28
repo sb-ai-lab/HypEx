@@ -80,8 +80,6 @@ class AASplitter(Calculator):
         **kwargs,
     ) -> List[str]:
         sample_size = 1.0 if sample_size is None else sample_size
-
-
         experiment_data = data.sample(frac=sample_size, random_state=random_state)
         addition_indexes = list(experiment_data.index)
         edge = int(len(addition_indexes) * control_size)
