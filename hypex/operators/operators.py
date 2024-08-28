@@ -13,6 +13,7 @@ from hypex.dataset import (
     AdditionalMatchingRole,
     AdditionalTargetRole,
 )
+from hypex.extensions.scipy_stats import NormCDF
 from hypex.operators.abstract import GroupOperator
 from hypex.utils.enums import ExperimentDataEnum
 from hypex.utils.errors import NoneArgumentError
@@ -55,8 +56,8 @@ class MatchingMetrics(GroupOperator):
         self.__scaled_counts[group] = s_counts + extra_counts
 
     @staticmethod 
-    def _calc_vars(value): 
-        var = value.var()
+    def _calc_vars(value):
+        var = 0 if value[value.columns[0]].isna().sum() > 0 else value.var()
         return [var for _ in range(len(value))] 
 
     @staticmethod
@@ -100,16 +101,20 @@ class MatchingMetrics(GroupOperator):
         itc_se = cls._calc_se(var_t, var_c, scaled_counts["test"]) 
         itt = itt.mean()
         itc = itc.mean()
+        p_val_itt = NormCDF().calc(Dataset.from_dict({"value": [itt/itt_se]}, roles={"value": InfoRole()})).get_values()[0][0]
+        p_val_itc = NormCDF().calc(Dataset.from_dict({"value": [itc/itc_se]}, roles={"value": InfoRole()})).get_values()[0][0]
         if metric == "atc":
-            return {"ATC": [itc, itc_se]}
+            return {"ATC": [itc, itc_se, p_val_itc, itc - 1.96 * itc_se, itc + 1.96 * itc_se]}
         if metric == "att":
-            return {"ATT": [itt, itt_se]}
+            return {"ATT": [itt, itt_se, p_val_itt, itt - 1.96 * itt_se, itt + 1.96 * itt_se]}
         len_test, len_control = len(data), len(test_data)
+        ate = (itt * len_test + itc * len_control) / (len_test + len_control) 
+        ate_se = cls._calc_se(var_c, var_t, scaled_counts, is_ate=True)
+        p_val_ate = NormCDF().calc(Dataset.from_dict({"value": [ate/ate_se]}, roles={"value": InfoRole()})).get_values()[0][0]
         return {
-            "ATT": [itt, itt_se],
-            "ATC": [itc, itc_se],
-            "ATE": [(itt * len_test + itc * len_control) / (len_test + len_control), 
-                    cls._calc_se(var_c, var_t, scaled_counts, is_ate=True)],
+            "ATT": [itt, itt_se, p_val_itt, itt - 1.96 * itt_se, itt + 1.96 * itt_se],
+            "ATC": [itc, itc_se, p_val_itc, itc - 1.96 * itc_se, itc + 1.96 * itc_se],
+            "ATE": [ate, ate_se, p_val_ate, ate - 1.96 * ate_se, ate + 1.96 * ate_se],
         }
 
     @classmethod
@@ -212,8 +217,9 @@ class Bias(GroupOperator):
     @staticmethod
     def calc_coefficients(X: Dataset, Y: Dataset) -> List[float]:
         X_l = Dataset.create_empty(roles={"temp": InfoRole()}, index=X.index).fillna(1)
+        X = X_l.append(X, axis=1).data.values
         return np.linalg.lstsq(
-            X_l.append(X, axis=1).data.values, Y.data.values, rcond=-1
+            X, Y.data.values, rcond=-1
         )[0][1:]
 
     @staticmethod
