@@ -1,19 +1,18 @@
 from copy import deepcopy
 from typing import Optional, List, Dict, Any, Union, Sequence, Tuple
 
-from hypex.dataset import (
+from ..dataset import (
     Dataset,
     ExperimentData,
     FeatureRole,
     GroupingRole,
     ABCRole,
     TargetRole,
-    TempTargetRole,
 )
-from hypex.executor import Calculator
-from hypex.extensions.scipy_linalg import CholeskyExtension, InverseExtension
-from hypex.utils import ExperimentDataEnum, NotSuitableFieldError
-from hypex.utils.adapter import Adapter
+from ..executor import Calculator
+from ..extensions.scipy_linalg import CholeskyExtension, InverseExtension
+from ..utils import ExperimentDataEnum, FieldNotSuitableFieldError
+from ..utils.adapter import Adapter
 
 
 class MahalanobisDistance(Calculator):

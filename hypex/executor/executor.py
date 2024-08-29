@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 from typing import Any, Dict, List, Optional, Sequence, Union, Tuple, Iterable
 
-from hypex.dataset import (
+from ..dataset import (
     ABCRole,
     Dataset,
     ExperimentData,
@@ -11,15 +11,15 @@ from hypex.dataset import (
     TargetRole,
     DatasetAdapter,
 )
-from hypex.dataset.roles import AdditionalRole
-from hypex.utils import (
+from ..dataset.roles import AdditionalRole
+from ..utils import (
     AbstractMethodError,
     ID_SPLIT_SYMBOL,
     SetParamsDictTypes,
     ExperimentDataEnum,
     NotSuitableFieldError,
 )
-from hypex.utils.adapter import Adapter
+from ..utils.adapter import Adapter
 
 
 class Executor(ABC):

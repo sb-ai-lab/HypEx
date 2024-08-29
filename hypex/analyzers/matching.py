@@ -1,8 +1,8 @@
-from hypex.dataset.dataset import DatasetAdapter, ExperimentData
-from hypex.dataset.roles import StatisticRole
-from hypex.executor.executor import Executor
-from hypex.operators.operators import MatchingMetrics
-from hypex.utils.enums import ExperimentDataEnum
+from ..dataset.dataset import DatasetAdapter, ExperimentData
+from ..dataset.roles import StatisticRole
+from ..executor.executor import Executor
+from ..operators.operators import MatchingMetrics
+from ..utils.enums import ExperimentDataEnum
 
 
 class MatchingAnalyzer(Executor):

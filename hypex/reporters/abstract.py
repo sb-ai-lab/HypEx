@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Union, List
 
-from hypex.dataset import ExperimentData, Dataset
-from hypex.dataset.roles import ReportRole
-from hypex.utils import ID_SPLIT_SYMBOL
-from hypex.utils.errors import AbstractMethodError
+from ..dataset import ExperimentData, Dataset
+from ..dataset.roles import ReportRole
+from ..utils import ID_SPLIT_SYMBOL
+from ..utils.errors import AbstractMethodError
 
 
 class Reporter(ABC):

@@ -2,7 +2,7 @@ import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Union, Tuple, Sequence, Literal
 
-from hypex.dataset import (
+from ..dataset import (
     ABCRole,
     Dataset,
     ExperimentData,
@@ -14,16 +14,16 @@ from hypex.dataset import (
     TargetRole,
     PreTargetRole,
 )
-
-from hypex.executor import Calculator
-from hypex.utils import (
+from ..executor import Calculator
+from ..utils import (
     BackendsEnum,
     ExperimentDataEnum,
     FromDictTypes,
     NAME_BORDER_SYMBOL,
     GroupingDataType,
 )
-from hypex.utils.errors import (
+from ..utils.adapter import Adapter
+from ..utils.errors import (
     AbstractMethodError,
     NotSuitableFieldError,
     NoRequiredArgumentError,
@@ -330,8 +330,8 @@ class Comparator(Calculator, ABC):
     @classmethod
     def calc(
         cls,
-        compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
-        target_fields_data: Dataset,
+        compare_by: Optional[Literal["groups", "columns", "columns_in_groups", "cross"]],
+        target_fields_data: Optional[Dataset],
         baseline_field_data: Optional[Dataset] = None,
         group_field_data: Optional[Dataset] = None,
         grouping_data: Optional[
@@ -339,6 +339,12 @@ class Comparator(Calculator, ABC):
         ] = None,
         **kwargs,
     ) -> Dict:
+
+        if compare_by is None and target_fields is None:
+            raise ValueError(
+                "You should pass either compare_by or target_fields argument."
+            )
+
         if grouping_data is None:
             grouping_data = cls._split_data_to_buckets(
                 compare_by=compare_by,

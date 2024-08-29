@@ -1,9 +1,9 @@
 from abc import abstractmethod
 from typing import Any
 
-from hypex.dataset import Dataset, ExperimentData, ABCRole
-from hypex.executor import Calculator
-from hypex.utils import AbstractMethodError
+from ..dataset import Dataset, ExperimentData, ABCRole
+from ..executor import Calculator
+from ..utils import AbstractMethodError
 
 
 class Transformer(Calculator):

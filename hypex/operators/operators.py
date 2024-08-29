@@ -3,7 +3,7 @@ from typing import Optional, Any, List, Literal, Union, Dict, Tuple
 
 import numpy as np
 
-from hypex.dataset import (
+from ..dataset import (
     Dataset,
     ABCRole,
     ExperimentData,
@@ -13,9 +13,9 @@ from hypex.dataset import (
     AdditionalMatchingRole,
     AdditionalTargetRole,
 )
-from hypex.operators.abstract import GroupOperator
-from hypex.utils.enums import ExperimentDataEnum
-from hypex.utils.errors import NoneArgumentError
+from .abstract import GroupOperator
+from ..utils.enums import ExperimentDataEnum
+from ..utils.errors import NoneArgumentError
 
 
 class SMD(GroupOperator):

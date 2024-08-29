@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-from hypex.comparators.comparators import Comparator
-from hypex.dataset import ExperimentData, ABCRole, Dataset
-from hypex.utils import SpaceEnum, ExperimentDataEnum
+from .comparators import Comparator
+from ..dataset import ExperimentData, ABCRole, Dataset
+from ..utils import SpaceEnum, ExperimentDataEnum
 
 
 class TestPower(Comparator, ABC):
@@ -95,9 +95,9 @@ from typing import Optional, Any, Dict, Union, Sequence
 import numpy as np
 from scipy.stats import norm
 
-from hypex.comparators.abstract import Comparator
-from hypex.dataset import ABCRole, Dataset, ExperimentData, TargetRole
-from hypex.utils import SpaceEnum
+from ..comparators.abstract import Comparator
+from ..dataset import ABCRole, Dataset, ExperimentData, TargetRole
+from ..utils import SpaceEnum
 
 
 # class MDEBySize(GroupComparator):

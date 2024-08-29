@@ -3,8 +3,8 @@ from typing import Optional
 
 import pandas as pd  # type: ignore
 
-from hypex.dataset import Dataset, DatasetAdapter
-from hypex.extensions.abstract import Extension
+from ..dataset import Dataset, DatasetAdapter
+from .abstract import Extension
 
 
 class DummyEncoderExtension(Extension): # TODO: role types are being rewritten, needs to be fixed

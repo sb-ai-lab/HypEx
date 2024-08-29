@@ -1,20 +1,16 @@
 import warnings
 from typing import List, Literal, Union
 
-from hypex.analyzers.matching import MatchingAnalyzer
-from hypex.comparators import TTest
-from hypex.comparators.distances import MahalanobisDistance
-from hypex.dataset import TreatmentRole, TargetRole, AdditionalTargetRole
-from hypex.executor import Executor
-from hypex.experiments.base import Experiment
-from hypex.ml.faiss import FaissNearestNeighbors
-from hypex.operators.operators import MatchingMetrics, Bias
-from hypex.ui.base import ExperimentShell
-from hypex.ui.matching import MatchingOutput
-
-
-class TtargetRole:
-    pass
+from .analyzers.matching import MatchingAnalyzer
+from .comparators import TTest
+from .comparators.distances import MahalanobisDistance
+from .dataset import TreatmentRole, TargetRole
+from .executor import Executor
+from .experiments.base import Experiment
+from .ml.faiss import FaissNearestNeighbors
+from .operators.operators import MatchingMetrics, Bias
+from .ui.base import ExperimentShell
+from .ui.matching import MatchingOutput
 
 
 class Matching(ExperimentShell):

@@ -1,12 +1,12 @@
 from typing import Dict, List, Any
 
-from hypex.comparators import KSTest, TTest, Chi2Test
-from hypex.dataset import Dataset, ExperimentData, StatisticRole
-from hypex.executor import Executor
-from hypex.experiments.base_complex import ParamsExperiment
-from hypex.reporters.aa import OneAADictReporter
-from hypex.splitters import AASplitter, AASplitterWithStratification
-from hypex.utils import BackendsEnum, ExperimentDataEnum, ID_SPLIT_SYMBOL
+from ..comparators import KSTest, TTest, Chi2Test
+from ..dataset import Dataset, ExperimentData, StatisticRole
+from ..executor import Executor
+from ..experiments.base_complex import ParamsExperiment
+from ..reporters.aa import OneAADictReporter
+from ..splitters import AASplitter, AASplitterWithStratification
+from ..utils import BackendsEnum, ExperimentDataEnum, ID_SPLIT_SYMBOL
 
 
 class OneAAStatAnalyzer(Executor):

@@ -1,10 +1,10 @@
 from typing import Dict, Union, Any, Optional
 
-from hypex.dataset import ExperimentData, Dataset
-from hypex.experiments.base import Experiment
-from hypex.reporters import Reporter
-from hypex.utils import ID_SPLIT_SYMBOL
-from hypex.utils.enums import RenameEnum
+from ..dataset import ExperimentData, Dataset
+from ..experiments.base import Experiment
+from ..reporters import Reporter
+from ..utils import ID_SPLIT_SYMBOL
+from ..utils.enums import RenameEnum
 
 
 class Output:

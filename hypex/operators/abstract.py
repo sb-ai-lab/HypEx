@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional, Union, Sequence, Tuple
 
-from hypex.dataset import (
+from ..dataset import (
     Dataset,
     ExperimentData,
     TargetRole,
@@ -9,13 +9,13 @@ from hypex.dataset import (
     ABCRole,
     AdditionalTargetRole,
 )
-from hypex.executor import Calculator
-from hypex.utils import (
+from ..executor import Calculator
+from ..utils import (
     ExperimentDataEnum,
     AbstractMethodError,
     NotSuitableFieldError,
 )
-from hypex.utils.adapter import Adapter
+from ..utils.adapter import Adapter
 
 
 class GroupOperator(

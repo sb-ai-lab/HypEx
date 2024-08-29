@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import Optional, Dict
 
-from hypex.utils import (
+from ..utils import (
     TargetRoleTypes,
     DefaultRoleTypes,
     CategoricalTypes,

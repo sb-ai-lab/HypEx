@@ -16,7 +16,7 @@ from typing import (
 import numpy as np
 import pandas as pd  # type: ignore
 
-from hypex.utils import FromDictTypes, MergeOnError
+from ...utils import FromDictTypes, MergeOnError
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 

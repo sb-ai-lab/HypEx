@@ -16,7 +16,7 @@ from typing import (
 
 import pandas as pd  # type: ignore
 
-from hypex.utils import (
+from ..utils import (
     ID_SPLIT_SYMBOL,
     BackendsEnum,
     ConcatBackendError,
