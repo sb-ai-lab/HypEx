@@ -16,7 +16,7 @@ from typing import (
 
 import pandas as pd  # type: ignore
 
-from hypex.utils import (
+from ..utils import (
     ID_SPLIT_SYMBOL,
     BackendsEnum,
     ConcatBackendError,
@@ -38,6 +38,7 @@ from .roles import (
     FilterRole,
     FeatureRole,
     DefaultRole,
+    AdditionalRole,
 )
 from ..utils.adapter import Adapter
 from ..utils.errors import InvalidArgumentError
@@ -76,8 +77,9 @@ class Dataset(DatasetBase):
         ],
         data: Optional[Union[pd.DataFrame, str]] = None,
         backend: Optional[BackendsEnum] = None,
+        default_role: Optional[ABCRole] = None,
     ):
-        super().__init__(roles, data, backend)
+        super().__init__(roles, data, backend, default_role)
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
 
@@ -96,7 +98,9 @@ class Dataset(DatasetBase):
             for column in items
         }
         result = Dataset(data=self._backend.__getitem__(item), roles=roles)
-        result.tmp_roles = self.tmp_roles
+        result.tmp_roles = {
+            key: value for key, value in self.tmp_roles.items() if key in items
+        }
         return result
 
     def __setitem__(self, key: str, value: Any):
@@ -360,15 +364,19 @@ class Dataset(DatasetBase):
         func: Optional[Union[str, List]] = None,
         fields_list: Optional[Union[str, List]] = None,
         **kwargs,
-    ):  # TODO: fields_list does not work in the tutorial
-        datasets = [
-            (i, Dataset(roles=self.roles, data=data))
-            for i, data in self._backend.groupby(by=by, **kwargs)
-        ]
+    ) -> List[Tuple[str, "Dataset"]]:
+        if isinstance(by, Dataset) and len(by.columns) == 1:
+            datasets = [
+                (group, Dataset(roles=self.roles, data=self.data.loc[group_data.index]))
+                for group, group_data in by._backend.groupby(by=by.columns[0], **kwargs)
+            ]
+        else:
+            datasets = [
+                (group, Dataset(roles=self.roles, data=data))
+                for group, data in self._backend.groupby(by=by, **kwargs)
+            ]
         if fields_list:
-            fields_list = (
-                fields_list if isinstance(fields_list, Iterable) else [fields_list]
-            )
+            fields_list = Adapter.to_list(fields_list)
             datasets = [(i, data[fields_list]) for i, data in datasets]
         if func:
             datasets = [(i, data.agg(func)) for i, data in datasets]
@@ -744,6 +752,53 @@ class ExperimentData:
         if data is not None:
             result._data = data
         return result
+
+    def field_search(
+        self,
+        roles: Union[ABCRole, Iterable[ABCRole]],
+        tmp_role: bool = False,
+        search_types=None,
+    ) -> List[str]:
+        searched_field = []
+        roles = Adapter.to_list(roles)
+        field_in_additional = [
+            role for role in roles if isinstance(role, AdditionalRole)
+        ]
+        field_in_data = [role for role in roles if role not in field_in_additional]
+        if field_in_data:
+            searched_field += self.ds.search_columns(
+                field_in_data, tmp_role=tmp_role, search_types=search_types
+            )
+        if field_in_additional and isinstance(self, ExperimentData):
+            searched_field += self.additional_fields.search_columns(
+                field_in_additional, tmp_role=tmp_role, search_types=search_types
+            )
+        return searched_field
+
+    def field_data_search(
+        self,
+        roles: Union[ABCRole, Iterable[ABCRole]],
+        tmp_role: bool = False,
+        search_types=None,
+    ) -> Dataset:
+        searched_data: Dataset = (
+            Dataset.create_empty()
+        )  # TODO: backend check to be added
+        roles = Adapter.to_list(roles)
+        roles_columns_map = {
+            role: self.field_search(role, tmp_role, search_types) for role in roles
+        }
+        for role, columns in roles_columns_map.items():
+            for column in columns:
+                t_data = (
+                    self.additional_fields[column]
+                    if isinstance(role, AdditionalRole)
+                    else self.ds[column]
+                )
+                searched_data = searched_data.add_column(
+                    data=t_data, role={column: role}
+                )
+        return searched_data
 
 
 class DatasetAdapter(Adapter):

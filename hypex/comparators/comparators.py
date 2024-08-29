@@ -3,9 +3,9 @@ from typing import Dict, Optional, List, Literal, Union
 import numpy as np
 from mpmath import ln
 
-from hypex.comparators.abstract import Comparator
-from hypex.dataset import Dataset, ABCRole
-from hypex.utils.constants import NUMBER_TYPES_LIST
+from .abstract import Comparator
+from ..dataset import Dataset, ABCRole
+from ..utils.constants import NUMBER_TYPES_LIST
 
 NUM_OF_BUCKETS: int = 20
 

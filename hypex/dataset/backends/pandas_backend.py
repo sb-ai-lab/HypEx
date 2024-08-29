@@ -16,7 +16,7 @@ from typing import (
 import numpy as np
 import pandas as pd  # type: ignore
 
-from hypex.utils import FromDictTypes, FieldKeyTypes, MergeOnError, ScalarType
+from ...utils import FromDictTypes, FieldKeyTypes, MergeOnError, ScalarType
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -302,7 +302,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return {column: self.data[column].nunique() for column in self.data.columns}
 
     def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> List[Tuple]:
-        groups = self.data.groupby(by, **kwargs)
+        groups = self.data.groupby(by=by, observed=False, **kwargs)
         return list(groups)
 
     def agg(self, func: Union[str, List], **kwargs) -> Union[pd.DataFrame, float]:

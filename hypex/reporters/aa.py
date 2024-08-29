@@ -1,15 +1,15 @@
 from typing import Dict, Any
 
-from hypex.comparators import GroupDifference, GroupSizes, TTest, KSTest, Chi2Test
-from hypex.dataset import (
+from ..comparators import GroupDifference, GroupSizes, TTest, KSTest, Chi2Test
+from ..dataset import (
     ExperimentData,
     Dataset,
     InfoRole,
     TreatmentRole,
     StatisticRole,
 )
-from hypex.splitters import AASplitter, AASplitterWithStratification
-from hypex.utils import (
+from ..splitters import AASplitter, AASplitterWithStratification
+from ..utils import (
     ExperimentDataEnum,
     ID_SPLIT_SYMBOL,
     NotFoundInExperimentDataError,

@@ -1,11 +1,11 @@
 from typing import Optional, Any, Dict
 
-from hypex.comparators.distances import MahalanobisDistance
-from hypex.dataset import Dataset, ABCRole, FeatureRole, ExperimentData, AdditionalMatchingRole
-from hypex.executor import MLExecutor
-from hypex.extensions.faiss import FaissExtension
-from hypex.utils import SpaceEnum, ExperimentDataEnum
-from hypex.utils.errors import PairsNotFoundError
+from ..comparators.distances import MahalanobisDistance
+from ..dataset import Dataset, ABCRole, FeatureRole, ExperimentData, AdditionalMatchingRole
+from ..executor import MLExecutor
+from ..extensions.faiss import FaissExtension
+from ..utils import SpaceEnum, ExperimentDataEnum
+from ..utils.errors import PairsNotFoundError
 
 
 class FaissNearestNeighbors(MLExecutor):

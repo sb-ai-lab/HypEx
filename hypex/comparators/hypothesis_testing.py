@@ -1,16 +1,15 @@
-from typing import Union, Optional, List, Literal
+from typing import Optional, List
 
 from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu  # type: ignore
 
 from .abstract import StatHypothesisTesting
-from ..dataset import Dataset, ABCRole
+from ..dataset import Dataset
 from ..extensions.scipy_stats import (
     TTestExtension,
     KSTestExtension,
     UTestExtension,
     Chi2TestExtension,
 )
-from ..utils import SpaceEnum
 from ..utils.constants import NUMBER_TYPES_LIST
 
 

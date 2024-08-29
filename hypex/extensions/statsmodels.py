@@ -4,8 +4,8 @@ import numpy as np
 from scipy.stats import norm  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
 
-from hypex.dataset import Dataset, StatisticRole, DatasetAdapter
-from hypex.utils import ABNTestMethodsEnum, ID_SPLIT_SYMBOL
+from ..dataset import Dataset, StatisticRole, DatasetAdapter
+from ..utils import ABNTestMethodsEnum, ID_SPLIT_SYMBOL
 from .abstract import Extension
 
 

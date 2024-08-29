@@ -1,13 +1,13 @@
 from copy import deepcopy
 from typing import Iterable, Dict, Union, Any, List, Optional, Sequence
 
-from hypex.dataset import (
+from ..dataset import (
     ExperimentData,
     ABCRole,
     TempTargetRole,
 )
-from hypex.executor import Executor
-from hypex.utils import ExperimentDataEnum
+from ..executor import Executor
+from ..utils import ExperimentDataEnum
 
 
 class Experiment(Executor):

@@ -1,19 +1,18 @@
 from copy import deepcopy
 from typing import Optional, List, Dict, Any, Union, Sequence, Tuple
 
-from hypex.dataset import (
+from ..dataset import (
     Dataset,
     ExperimentData,
     FeatureRole,
     GroupingRole,
     ABCRole,
     TargetRole,
-    TempTargetRole,
 )
-from hypex.executor import Calculator
-from hypex.extensions.scipy_linalg import CholeskyExtension, InverseExtension
-from hypex.utils import ExperimentDataEnum, FieldNotSuitableFieldError
-from hypex.utils.adapter import Adapter
+from ..executor import Calculator
+from ..extensions.scipy_linalg import CholeskyExtension, InverseExtension
+from ..utils import ExperimentDataEnum, NotSuitableFieldError
+from ..utils.adapter import Adapter
 
 
 class MahalanobisDistance(Calculator):
@@ -65,10 +64,8 @@ class MahalanobisDistance(Calculator):
         return data
 
     def _get_fields(self, data: ExperimentData):
-        group_field = self._field_searching(data, self.grouping_role)
-        target_fields = self._field_searching(
-            data, FeatureRole(), search_types=self.search_types
-        )
+        group_field = data.field_search(self.grouping_role)
+        target_fields = data.field_search(FeatureRole(), search_types=self.search_types)
         return group_field, target_fields
 
     @property
@@ -105,7 +102,7 @@ class MahalanobisDistance(Calculator):
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
-            raise FieldNotSuitableFieldError(group_field, "Grouping")
+            raise NotSuitableFieldError(group_field, "Grouping")
         return cls._execute_inner_function(
             grouping_data, target_fields=target_fields, old_data=data, **kwargs
         )

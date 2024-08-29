@@ -1,15 +1,15 @@
 from collections import Counter
 from typing import Any, List, Optional, Dict
 
-from hypex.dataset import (
+from ..dataset import (
     Dataset,
     ExperimentData,
     TreatmentRole,
     StratificationRole,
     AdditionalTreatmentRole,
 )
-from hypex.executor import Calculator
-from hypex.utils import ExperimentDataEnum
+from ..executor import Calculator
+from ..utils import ExperimentDataEnum
 
 
 class AASplitter(Calculator):

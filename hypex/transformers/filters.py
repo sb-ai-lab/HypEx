@@ -1,15 +1,15 @@
 from typing import Any, Optional, Union, Sequence
 
-from hypex.dataset.dataset import Dataset
-from hypex.dataset.dataset import ExperimentData
-from hypex.dataset.roles import (
+from ..dataset.dataset import Dataset
+from ..dataset.dataset import ExperimentData
+from ..dataset.roles import (
     InfoRole,
     FeatureRole,
     PreTargetRole,
     TargetRole,
 )
-from hypex.transformers.abstract import Transformer
-from hypex.utils.adapter import Adapter
+from .abstract import Transformer
+from ..utils.adapter import Adapter
 
 
 class CVFilter(Transformer):

@@ -1,4 +1,4 @@
-from hypex.reporters.matching import MatchingDatasetReporter
+from ..reporters.matching import MatchingDatasetReporter
 
 from .base import Output
 from ..dataset import Dataset, ExperimentData, AdditionalMatchingRole

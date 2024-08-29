@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional, Union, Sequence, Tuple
 
-from hypex.dataset import (
+from ..dataset import (
     Dataset,
     ExperimentData,
     TargetRole,
@@ -9,13 +9,13 @@ from hypex.dataset import (
     ABCRole,
     AdditionalTargetRole,
 )
-from hypex.executor import Calculator
-from hypex.utils import (
+from ..executor import Calculator
+from ..utils import (
     ExperimentDataEnum,
     AbstractMethodError,
-    FieldNotSuitableFieldError,
+    NotSuitableFieldError,
 )
-from hypex.utils.adapter import Adapter
+from ..utils.adapter import Adapter
 
 
 class GroupOperator(
@@ -44,13 +44,13 @@ class GroupOperator(
         raise AbstractMethodError
 
     def _get_fields(self, data: ExperimentData):
-        group_field = self._field_searching(data, self.grouping_role)
-        target_fields = self._field_searching(
-            data, self.target_roles, search_types=self.search_types
+        group_field = data.field_search(self.grouping_role)
+        target_fields = data.field_search(
+            self.target_roles, search_types=self.search_types
         )
         if len(target_fields) != 2:
-            target_fields += self._field_searching(
-                data, AdditionalTargetRole(), search_types=self.search_types
+            target_fields += data.field_search(
+                AdditionalTargetRole(), search_types=self.search_types
             )
         return group_field, target_fields
 
@@ -92,7 +92,7 @@ class GroupOperator(
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
-            raise FieldNotSuitableFieldError(group_field, "Grouping")
+            raise NotSuitableFieldError(group_field, "Grouping")
         return cls._execute_inner_function(
             grouping_data, target_fields=target_fields, old_data=data, **kwargs
         )

@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Union, Any, Dict, Optional, Literal
 
-from hypex.dataset import Dataset, ABCRole
-from hypex.dataset.backends import PandasDataset
-from hypex.dataset.dataset import DatasetAdapter
-from hypex.utils.errors import AbstractMethodError
+from ..dataset import Dataset, ABCRole
+from ..dataset.backends import PandasDataset
+from ..dataset.dataset import DatasetAdapter
+from ..utils.errors import AbstractMethodError
 
 
 class Extension(ABC):

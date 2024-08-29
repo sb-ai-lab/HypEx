@@ -1,15 +1,16 @@
 import warnings
 from typing import List, Literal, Union
 
-from hypex.analyzers.matching import MatchingAnalyzer
-from hypex.comparators.distances import MahalanobisDistance
-from hypex.dataset import TreatmentRole, TargetRole
-from hypex.executor import Executor
-from hypex.experiments.base import Experiment
-from hypex.ml.faiss import FaissNearestNeighbors
-from hypex.operators.operators import MatchingMetrics, Bias
-from hypex.ui.base import ExperimentShell
-from hypex.ui.matching import MatchingOutput
+from .analyzers.matching import MatchingAnalyzer
+from .comparators import TTest
+from .comparators.distances import MahalanobisDistance
+from .dataset import TreatmentRole, TargetRole, AdditionalTargetRole
+from .executor import Executor
+from .experiments.base import Experiment
+from .ml.faiss import FaissNearestNeighbors
+from .operators.operators import MatchingMetrics, Bias
+from .ui.base import ExperimentShell
+from .ui.matching import MatchingOutput
 
 
 class Matching(ExperimentShell):
@@ -28,19 +29,12 @@ class Matching(ExperimentShell):
         distance_mapping = {
             "mahalanobis": MahalanobisDistance(grouping_role=TreatmentRole())
         }
-        executors: List[Executor] = []
+        executors: List[Executor] = [
+            FaissNearestNeighbors(grouping_role=TreatmentRole(), two_sides=two_sides)
+        ]
         if bias_estimation:
             executors += [
-                FaissNearestNeighbors(
-                    grouping_role=TreatmentRole(), two_sides=two_sides
-                ),
                 Bias(grouping_role=TreatmentRole(), target_roles=[TargetRole()]),
-            ]
-        else:
-            executors += [
-                FaissNearestNeighbors(
-                    grouping_role=TreatmentRole(), two_sides=two_sides
-                )
             ]
         if metric in ["atc", "ate"] and not two_sides:
             raise ValueError(f"Can not estimate {metric} while two_sides is False")
@@ -49,6 +43,12 @@ class Matching(ExperimentShell):
                 grouping_role=TreatmentRole(),
                 target_roles=[TargetRole()],
                 metric=metric,
+            ),
+            TTest(
+                compare_by="columns_in_groups",
+                baseline_role=AdditionalTargetRole(),
+                target_role=TargetRole(),
+                grouping_role=TreatmentRole(),
             ),
             MatchingAnalyzer(),
         ]
