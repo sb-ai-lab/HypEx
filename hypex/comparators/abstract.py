@@ -311,14 +311,21 @@ class Comparator(Calculator, ABC):
     def calc(
         cls,
         data: Dataset,
-        compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
-        target_fields: Union[str, List[str]],
+        compare_by: Optional[
+            Literal["groups", "columns", "columns_in_groups", "cross"]
+        ] = None,
+        target_fields: Optional[Union[str, List[str]]] = None,
         baseline_field: Optional[str] = None,
         group_field: Optional[str] = None,
         grouping_data: Optional[Tuple[List[Tuple[str, Dataset]]]] = None,
         **kwargs,
     ) -> Dict:
         target_fields = Adapter.to_list(target_fields)
+
+        if compare_by is None and target_fields is None:
+            raise ValueError(
+                "You should pass either compare_by or target_fields argument."
+            )
 
         if grouping_data is None:
             grouping_data = cls._split_data_to_buckets(
