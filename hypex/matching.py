@@ -4,7 +4,7 @@ from typing import List, Literal, Union
 from .analyzers.matching import MatchingAnalyzer
 from .comparators import TTest
 from .comparators.distances import MahalanobisDistance
-from .dataset import TreatmentRole, TargetRole
+from .dataset import TreatmentRole, TargetRole, AdditionalTargetRole
 from .executor import Executor
 from .experiments.base import Experiment
 from .ml.faiss import FaissNearestNeighbors
@@ -44,7 +44,12 @@ class Matching(ExperimentShell):
                 target_roles=[TargetRole()],
                 metric=metric,
             ),
-            TTest(compare_by="columns_in_groups", baseline_role=AdditionalTargetRole(), target_role=TargetRole(), grouping_role=TreatmentRole()),
+            TTest(
+                compare_by="columns_in_groups",
+                baseline_role=AdditionalTargetRole(),
+                target_role=TargetRole(),
+                grouping_role=TreatmentRole(),
+            ),
             MatchingAnalyzer(),
         ]
         if quality_tests != "auto":

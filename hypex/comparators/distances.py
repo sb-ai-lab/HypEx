@@ -11,7 +11,7 @@ from ..dataset import (
 )
 from ..executor import Calculator
 from ..extensions.scipy_linalg import CholeskyExtension, InverseExtension
-from ..utils import ExperimentDataEnum, FieldNotSuitableFieldError
+from ..utils import ExperimentDataEnum, NotSuitableFieldError
 from ..utils.adapter import Adapter
 
 

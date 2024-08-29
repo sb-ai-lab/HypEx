@@ -340,7 +340,7 @@ class Comparator(Calculator, ABC):
         **kwargs,
     ) -> Dict:
 
-        if compare_by is None and target_fields is None:
+        if compare_by is None and target_fields_data is None:
             raise ValueError(
                 "You should pass either compare_by or target_fields argument."
             )
@@ -390,7 +390,11 @@ class Comparator(Calculator, ABC):
             grouping_data = self._grouping_data_split(
                 grouping_data=data.groups[group_field_data.columns[0]],
                 compare_by=self.compare_by,
-                target_fields=list(target_fields_data.columns),
+                target_fields=(
+                    [data.ds.columns[0]]
+                    if group_field_data.columns[0] == target_fields_data.columns[0]
+                    else list(target_fields_data.columns)
+                ),
                 baseline_field=(
                     baseline_field_data.columns[0]
                     if len(baseline_field_data.columns) > 0
