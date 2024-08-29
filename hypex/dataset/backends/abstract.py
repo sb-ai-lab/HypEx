@@ -13,7 +13,7 @@ from typing import (
     Tuple,
 )
 
-from ...utils import AbstractMethodError, FromDictTypes, FieldKeyTypes, ScalarType
+from ...utils import AbstractMethodError, FromDictTypes, ScalarType
 
 
 class DatasetBackendNavigation(ABC):

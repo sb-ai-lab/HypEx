@@ -16,7 +16,7 @@ from typing import (
 import numpy as np
 import pandas as pd  # type: ignore
 
-from ...utils import FromDictTypes, FieldKeyTypes, MergeOnError, ScalarType
+from ...utils import FromDictTypes, MergeOnError, ScalarType
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 

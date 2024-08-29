@@ -1,13 +1,13 @@
 from typing import Dict, Optional, List, Literal, Union
 
 import numpy as np
-from mpmath import ln
 
 from .abstract import Comparator
 from ..dataset import Dataset, ABCRole
 from ..utils.constants import NUMBER_TYPES_LIST
 
 NUM_OF_BUCKETS: int = 20
+
 
 class GroupDifference(Comparator):
     def __init__(
@@ -75,10 +75,13 @@ class GroupSizes(Comparator):
             "test size %": (size_b / (size_a + size_b)) * 100,
         }
 
+
 class PSI(Comparator):
 
     @classmethod
-    def _inner_function(cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs):
+    def _inner_function(
+        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+    ) -> Dict[str, float]:
         test_data = cls._check_test_data(test_data=test_data)
         data.sort(ascending=False)
         test_data.sort(ascending=False)
@@ -100,7 +103,8 @@ class PSI(Comparator):
         test_data_groups = test_data_column.groupby(
             test_data_column.cut(test_data_bins).get_values(column=test_data.columns[0])
         )
-        data_psi = np.array(x[1].count() for x in data_groups)
-        test_data_psi = np.array(x[1].count() for x in test_data_groups)
-        psi = (data_psi - test_data_psi) * ln(data_psi / test_data_psi)
-        return {"PSI": psi.sum()}
+
+        data_psi = [x[1].count() / len(data) for x in data_groups]
+        test_data_psi = [x[1].count() / len(test_data) for x in test_data_groups]
+        psi = [(y - x) * np.log(y / x) for x, y in zip(data_psi, test_data_psi)]
+        return {"PSI": sum(psi)}
