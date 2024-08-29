@@ -13,7 +13,7 @@ from typing import (
     Tuple,
 )
 
-from hypex.utils import AbstractMethodError, FromDictTypes
+from ...utils import AbstractMethodError, FromDictTypes
 
 
 class DatasetBackendNavigation(ABC):

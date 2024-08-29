@@ -1,7 +1,7 @@
-from hypex.analyzers.matching import MatchingAnalyzer
-from hypex.dataset.dataset import ExperimentData
-from hypex.reporters.abstract import DatasetReporter, DictReporter
-from hypex.utils.enums import ExperimentDataEnum
+from ..analyzers.matching import MatchingAnalyzer
+from ..dataset.dataset import ExperimentData
+from .abstract import DatasetReporter, DictReporter
+from ..utils.enums import ExperimentDataEnum
 
 
 class MatchingDictReporter(DictReporter):

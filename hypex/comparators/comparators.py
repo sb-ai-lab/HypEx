@@ -1,8 +1,8 @@
 from typing import Dict, Optional, List, Literal, Union
 
-from hypex.comparators.abstract import Comparator
-from hypex.dataset import Dataset, ABCRole
-from hypex.utils.constants import NUMBER_TYPES_LIST
+from .abstract import Comparator
+from ..dataset import Dataset, ABCRole
+from ..utils.constants import NUMBER_TYPES_LIST
 
 
 class GroupDifference(Comparator):

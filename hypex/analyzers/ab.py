@@ -1,16 +1,16 @@
 from typing import Optional, Any, Union, List
 
-from hypex.comparators import TTest, UTest
-from hypex.dataset import (
+from ..comparators import TTest, UTest
+from ..dataset import (
     Dataset,
     ExperimentData,
     StatisticRole,
     TreatmentRole,
     TargetRole,
 )
-from hypex.experiments.base import Executor
-from hypex.extensions.statsmodels import ABMultiTest, ABMultitestQuantile
-from hypex.utils import (
+from ..experiments.base import Executor
+from ..extensions.statsmodels import ABMultiTest, ABMultitestQuantile
+from ..utils import (
     ID_SPLIT_SYMBOL,
     NAME_BORDER_SYMBOL,
     BackendsEnum,

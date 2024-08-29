@@ -1,8 +1,8 @@
 from typing import Any, Optional, List, Union, Sequence
 
-from hypex.dataset import Dataset, ExperimentData, FeatureRole
-from hypex.executor import Calculator
-from hypex.utils import (
+from ..dataset import Dataset, ExperimentData, FeatureRole
+from ..executor import Calculator
+from ..utils import (
     AbstractMethodError,
     CategoricalTypes,
     NAME_BORDER_SYMBOL,

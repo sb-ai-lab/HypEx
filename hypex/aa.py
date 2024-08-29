@@ -1,19 +1,19 @@
 from typing import Optional, Dict, Any, Iterable
 
-from hypex.analyzers.aa import OneAAStatAnalyzer, AAScoreAnalyzer
-from hypex.comparators import GroupDifference, GroupSizes
-from hypex.comparators.abstract import Comparator
-from hypex.comparators.hypothesis_testing import TTest, KSTest, Chi2Test
-from hypex.dataset import AdditionalTreatmentRole
-from hypex.dataset import TargetRole, TreatmentRole
-from hypex.experiments.base import Experiment, OnRoleExperiment
-from hypex.experiments.base_complex import ParamsExperiment
-from hypex.reporters import DatasetReporter
-from hypex.reporters.aa import OneAADictReporter
-from hypex.splitters import AASplitter, AASplitterWithStratification
-from hypex.ui.aa import AAOutput
-from hypex.ui.base import ExperimentShell
-from hypex.utils import SpaceEnum
+from .analyzers.aa import OneAAStatAnalyzer, AAScoreAnalyzer
+from .comparators import GroupDifference, GroupSizes
+from .comparators.abstract import Comparator
+from .comparators.hypothesis_testing import TTest, KSTest, Chi2Test
+from .dataset import AdditionalTreatmentRole
+from .dataset import TargetRole, TreatmentRole
+from .experiments.base import Experiment, OnRoleExperiment
+from .experiments.base_complex import ParamsExperiment
+from .reporters import DatasetReporter
+from .reporters.aa import OneAADictReporter
+from .splitters import AASplitter, AASplitterWithStratification
+from .ui.aa import AAOutput
+from .ui.base import ExperimentShell
+from .utils import SpaceEnum
 
 ONE_AA_TEST = Experiment(
     executors=[

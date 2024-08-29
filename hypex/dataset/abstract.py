@@ -5,13 +5,13 @@ from typing import Iterable, Dict, Union, List, Optional, Any
 
 import pandas as pd  # type: ignore
 
-from hypex.dataset.backends import PandasDataset
-from hypex.dataset.roles import (
+from .backends import PandasDataset
+from .roles import (
     ABCRole,
     default_roles,
     DefaultRole,
 )
-from hypex.utils import BackendsEnum, RoleColumnError
+from ..utils import BackendsEnum, RoleColumnError
 
 
 def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:

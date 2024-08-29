@@ -1,4 +1,4 @@
-from hypex.reporters.homo import HomoDatasetReporter
+from ..reporters.homo import HomoDatasetReporter
 
 from .base import Output
 from ..dataset import Dataset, ExperimentData

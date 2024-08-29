@@ -2,8 +2,8 @@ from typing import Callable, Union, Optional
 
 from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind  # type: ignore
 
-from hypex.dataset import Dataset, StatisticRole, DatasetAdapter
-from hypex.extensions.abstract import CompareExtension
+from ..dataset import Dataset, StatisticRole, DatasetAdapter
+from .abstract import CompareExtension
 
 
 class StatTest(CompareExtension):

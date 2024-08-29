@@ -1,8 +1,8 @@
 from typing import Optional
 
-from hypex.dataset import Dataset
-from hypex.encoders.abstract import Encoder
-from hypex.extensions.encoders import DummyEncoderExtension
+from ..dataset import Dataset
+from .abstract import Encoder
+from ..extensions.encoders import DummyEncoderExtension
 
 
 class DummyEncoder(Encoder):

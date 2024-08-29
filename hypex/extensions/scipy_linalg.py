@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd  # type: ignore
 
-from hypex.dataset import Dataset
-from hypex.dataset.roles import FeatureRole
+from ..dataset import Dataset
+from ..dataset.roles import FeatureRole
 from .abstract import Extension
 
 

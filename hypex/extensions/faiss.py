@@ -4,8 +4,8 @@ import faiss  # type: ignore
 import numpy as np
 import pandas as pd  # type: ignore
 
-from hypex.dataset import Dataset, AdditionalMatchingRole
-from hypex.extensions.abstract import MLExtension
+from ..dataset import Dataset, AdditionalMatchingRole
+from .abstract import MLExtension
 
 
 class FaissExtension(MLExtension):

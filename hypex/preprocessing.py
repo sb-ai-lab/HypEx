@@ -1,8 +1,8 @@
-from hypex.encoders.encoders import DummyEncoder
-from hypex.experiments.base import Experiment
-from hypex.transformers.category_agg import CategoryAggregator
-from hypex.transformers.na_filler import NaFiller
-from hypex.transformers.filters import (
+from .encoders.encoders import DummyEncoder
+from .experiments.base import Experiment
+from .transformers.category_agg import CategoryAggregator
+from .transformers.na_filler import NaFiller
+from .transformers.filters import (
     NanFilter,
     CorrFilter,
     ConstFilter,

@@ -2,7 +2,7 @@ import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Union, Tuple, Sequence, Literal
 
-from hypex.dataset import (
+from ..dataset import (
     ABCRole,
     Dataset,
     ExperimentData,
@@ -14,15 +14,15 @@ from hypex.dataset import (
     TargetRole,
     PreTargetRole,
 )
-from hypex.executor import Calculator
-from hypex.utils import (
+from ..executor import Calculator
+from ..utils import (
     BackendsEnum,
     ExperimentDataEnum,
     FromDictTypes,
     NAME_BORDER_SYMBOL,
 )
-from hypex.utils.adapter import Adapter
-from hypex.utils.errors import (
+from ..utils.adapter import Adapter
+from ..utils.errors import (
     AbstractMethodError,
     FieldNotSuitableFieldError,
     NoRequiredArgumentError,

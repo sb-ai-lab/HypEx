@@ -1,11 +1,10 @@
-from hypex.analyzers.aa import OneAAStatAnalyzer
-from hypex.comparators import GroupDifference, GroupSizes
-from hypex.comparators import TTest, KSTest, Chi2Test
-from hypex.dataset import TargetRole, TreatmentRole
-from hypex.experiments.base import Experiment, OnRoleExperiment
-from hypex.ui.base import ExperimentShell
-from hypex.ui.homo import HomoOutput
-from hypex.utils import SpaceEnum
+from .analyzers.aa import OneAAStatAnalyzer
+from .comparators import GroupDifference, GroupSizes
+from .comparators import TTest, KSTest, Chi2Test
+from .dataset import TargetRole, TreatmentRole
+from .experiments.base import Experiment, OnRoleExperiment
+from .ui.base import ExperimentShell
+from .ui.homo import HomoOutput
 
 HOMOGENEITY_TEST = Experiment(
     executors=[
