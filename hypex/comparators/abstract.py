@@ -330,8 +330,10 @@ class Comparator(Calculator, ABC):
     @classmethod
     def calc(
         cls,
-        compare_by: Optional[Literal["groups", "columns", "columns_in_groups", "cross"]],
-        target_fields_data: Optional[Dataset],
+        compare_by: Optional[
+            Literal["groups", "columns", "columns_in_groups", "cross"]
+        ] = None,
+        target_fields_data: Optional[Dataset] = None,
         baseline_field_data: Optional[Dataset] = None,
         group_field_data: Optional[Dataset] = None,
         grouping_data: Optional[
