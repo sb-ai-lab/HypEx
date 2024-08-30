@@ -399,10 +399,6 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def shuffle(self, random_state) -> Any:
-        raise AbstractMethodError
-
-    @abstractmethod
     def rename(self, columns: Dict[str, str]) -> Any:
         return AbstractMethodError
 
