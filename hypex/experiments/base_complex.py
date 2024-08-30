@@ -5,9 +5,10 @@ from tqdm.auto import tqdm
 
 from ..dataset import ExperimentData, Dataset
 from ..dataset import TempGroupingRole
-from ..executor import Executor
+from ..executor import Executor, IfExecutor
 from .base import Experiment
 from ..reporters import Reporter, DatasetReporter
+from ..utils.enums import ExperimentDataEnum
 
 
 class ExperimentWithReporter(Experiment):
@@ -28,7 +29,7 @@ class ExperimentWithReporter(Experiment):
         return self.reporter.report(t_data)
 
     def _set_result(self, data: ExperimentData, result: List[Dataset]):
-        result = result[0].append(result[1:], True)
+        result = result[0].append(result[1:], True) if len(result) > 1 else result[0]
         return self._set_value(data, result)
 
 
@@ -129,3 +130,30 @@ class ParamsExperiment(ExperimentWithReporter):
             report = self.reporter.report(t_data)
             results.append(report)
         return self._set_result(data, results)
+
+
+class IfParamsExperiment(ParamsExperiment):
+    def __init__(
+        self,
+        executors: Sequence[Executor],
+        reporter: DatasetReporter,
+        params: Dict[type, Dict[str, Sequence[Any]]],
+        stopping_criterion: IfExecutor,
+        transformer: Optional[bool] = None,
+        key: str = "",
+    ):
+        self.stopping_criterion = stopping_criterion
+        super().__init__(executors, reporter, params, transformer, key)
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        self._update_flat_params()
+        for flat_param in self._flat_params:
+            t_data = ExperimentData(data.ds)
+            for executor in self.executors:
+                executor.set_params(flat_param)
+                t_data = executor.execute(t_data)
+            if_result = self.stopping_criterion.execute(t_data)
+            if_executor_id = if_result.get_one_id(self.stopping_criterion.__class__, ExperimentDataEnum.variables)
+            if if_result.variables[if_executor_id]["response"]:
+                return self._set_result(data, [self.reporter.report(t_data)])
+        return data

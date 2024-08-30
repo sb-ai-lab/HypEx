@@ -35,7 +35,6 @@ from .roles import (
     InfoRole,
     ABCRole,
     FilterRole,
-    FeatureRole,
     DefaultRole,
     AdditionalRole,
 )
@@ -575,14 +574,22 @@ class Dataset(DatasetBase):
             roles = {column: DefaultRole() for column in names}
         return Dataset(roles=roles, data=result_data)
 
+    def sample(
+        self,
+        frac: Optional[float] = None,
+        n: Optional[int] = None,
+        random_state: Optional[int] = None,
+    ) -> "Dataset":
+        return Dataset(
+            self.roles,
+            data=self.backend.sample(frac=frac, n=n, random_state=random_state),
+        )
+
     def cov(self):
         t_data = self.backend.cov()
         return Dataset(
             {column: DefaultRole() for column in t_data.columns}, data=t_data
         )
-
-    def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
-        return Dataset(self.roles, data=self.backend.shuffle(random_state))
 
     def rename(self, names: Dict[str, str]):
         roles = {names.get(column, column): role for column, role in self.roles.items()}
