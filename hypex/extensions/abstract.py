@@ -33,6 +33,7 @@ class CompareExtension(Extension, ABC):
 
 
 class MLExtension(Extension):
+    #   TODO: add model
     def _calc_pandas(
         self,
         data: Dataset,

@@ -56,6 +56,7 @@ class CycledExperiment(ExperimentWithReporter):
 
 
 class GroupExperiment(ExperimentWithReporter):
+    #   TODO: make init with search role setup
     def generate_params_hash(self) -> str:
         return f"GroupExperiment: {self.reporter.__class__.__name__}"
 
@@ -153,7 +154,9 @@ class IfParamsExperiment(ParamsExperiment):
                 executor.set_params(flat_param)
                 t_data = executor.execute(t_data)
             if_result = self.stopping_criterion.execute(t_data)
-            if_executor_id = if_result.get_one_id(self.stopping_criterion.__class__, ExperimentDataEnum.variables)
+            if_executor_id = if_result.get_one_id(
+                self.stopping_criterion.__class__, ExperimentDataEnum.variables
+            )
             if if_result.variables[if_executor_id]["response"]:
                 return self._set_result(data, [self.reporter.report(t_data)])
         return data
