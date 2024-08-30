@@ -341,7 +341,6 @@ class Comparator(Calculator, ABC):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         fields = self._get_fields(data)
-
         group_field = fields["group_field"]
         target_fields = fields["target_fields"]
         baseline_field = fields["baseline_field"]

@@ -1,13 +1,18 @@
 from typing import Optional, Dict, Any, Iterable
 
 from hypex.analyzers.aa import OneAAStatAnalyzer, AAScoreAnalyzer
-from hypex.comparators import GroupDifference, GroupSizes
-from hypex.comparators.abstract import Comparator
-from hypex.comparators.hypothesis_testing import TTest, KSTest, Chi2Test
-from hypex.dataset import AdditionalTreatmentRole
-from hypex.dataset import TargetRole, TreatmentRole
+from hypex.comparators import (
+    Comparator,
+    GroupDifference,
+    GroupSizes,
+    TTest,
+    KSTest,
+    Chi2Test,
+)
+from hypex.dataset import AdditionalTreatmentRole, TargetRole, TreatmentRole
 from hypex.experiments.base import Experiment, OnRoleExperiment
-from hypex.experiments.base_complex import ParamsExperiment
+from hypex.experiments.base_complex import ParamsExperiment, IfParamsExperiment
+from hypex.forks.aa import IfAAExecutor
 from hypex.reporters import DatasetReporter
 from hypex.reporters.aa import OneAADictReporter
 from hypex.splitters import AASplitter, AASplitterWithStratification
@@ -48,41 +53,6 @@ ONE_AA_TEST_WITH_STRATIFICATION = Experiment(
         OneAAStatAnalyzer(),
     ]
 )
-AA_TEST = Experiment(
-    [
-        ParamsExperiment(
-            executors=([ONE_AA_TEST]),
-            params={
-                AASplitter: {"random_state": range(2000), "control_size": [0.5]},
-                Comparator: {
-                    "grouping_role": [AdditionalTreatmentRole()],
-                    "space": [SpaceEnum.additional],
-                },
-            },
-            reporter=DatasetReporter(OneAADictReporter(front=False)),
-        ),
-        AAScoreAnalyzer(),
-    ],
-    key="AATest",
-)
-
-AA_TEST_WITH_STRATIFICATION = Experiment(
-    [
-        ParamsExperiment(
-            executors=([ONE_AA_TEST_WITH_STRATIFICATION]),
-            params={
-                AASplitter: {"random_state": range(2000), "control_size": [0.5]},
-                Comparator: {
-                    "grouping_role": [AdditionalTreatmentRole()],
-                    "space": [SpaceEnum.additional],
-                },
-            },
-            reporter=DatasetReporter(OneAADictReporter(front=False)),
-        ),
-        AAScoreAnalyzer(),
-    ],
-    key="AATest",
-)
 
 
 class AATest(ExperimentShell):
@@ -92,12 +62,17 @@ class AATest(ExperimentShell):
         n_iterations: int,
         control_size: float,
         random_states: Optional[Iterable[int]] = None,
+        sample_size: Optional[float] = None,
         additional_params: Optional[Dict[str, Any]] = None,
     ) -> Dict[type, Dict[str, Any]]:
         random_states = random_states or range(n_iterations)
         additional_params = additional_params or {}
         params = {
-            AASplitter: {"random_state": random_states, "control_size": [control_size]},
+            AASplitter: {
+                "random_state": random_states,
+                "control_size": [control_size],
+                "sample_size": [sample_size],
+            },
             Comparator: {
                 "grouping_role": [AdditionalTreatmentRole()],
                 "space": [SpaceEnum.additional],
@@ -112,10 +87,10 @@ class AATest(ExperimentShell):
         n_iterations: int = 2000,
         control_size: float = 0.5,
         stratification: bool = False,
+        sample_size: Optional[float] = None,
         additional_params: Optional[Dict[str, Any]] = None,
         random_states: Optional[Iterable[int]] = None,
     ):
-
         super().__init__(
             experiment=Experiment(
                 [
@@ -130,9 +105,32 @@ class AATest(ExperimentShell):
                             ]
                         ),
                         params=self._prepare_params(
-                            n_iterations, control_size, random_states, additional_params
+                            n_iterations,
+                            control_size,
+                            random_states,
+                            sample_size,
+                            additional_params,
                         ),
                         reporter=DatasetReporter(OneAADictReporter(front=False)),
+                    ),
+                    IfParamsExperiment(
+                        executors=(
+                            [
+                                (
+                                    ONE_AA_TEST_WITH_STRATIFICATION
+                                    if stratification
+                                    else ONE_AA_TEST
+                                )
+                            ]
+                        ),
+                        params=self._prepare_params(
+                            n_iterations,
+                            control_size,
+                            random_states,
+                            additional_params,
+                        ),
+                        reporter=DatasetReporter(OneAADictReporter(front=False)),
+                        stopping_criterion=IfAAExecutor(sample_size=sample_size),
                     ),
                     AAScoreAnalyzer(),
                 ],
