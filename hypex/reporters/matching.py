@@ -1,16 +1,17 @@
 from hypex.analyzers.matching import MatchingAnalyzer
 from hypex.dataset.dataset import ExperimentData
-from hypex.dataset.roles import StatisticRole
 from hypex.reporters.abstract import Reporter
 from hypex.utils.enums import ExperimentDataEnum
 
 
 class MatchingDatasetReporter(Reporter):
+    def __init__(self, searching_class: type = MatchingAnalyzer):
+        self.searching_class = searching_class
+        super().__init__()
 
     def report(self, data: ExperimentData):
         analyzer_id = data.get_one_id(
-            MatchingAnalyzer, ExperimentDataEnum.analysis_tables
+            self.searching_class, ExperimentDataEnum.analysis_tables
         )
-        columns = ["Effect Size", "Standart Error", "P-value", "CI Lower", "CI Upper"]
-        result = data.analysis_tables[analyzer_id].transpose(roles={column: StatisticRole() for column in columns}) 
+        result = data.analysis_tables[analyzer_id]
         return result

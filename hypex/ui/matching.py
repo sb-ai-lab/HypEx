@@ -1,6 +1,7 @@
 from hypex.reporters.matching import MatchingDatasetReporter
 
 from .base import Output
+from ..analyzers.matching import MatchingAnalyzer
 from ..dataset import Dataset, ExperimentData, AdditionalMatchingRole
 
 
@@ -8,12 +9,14 @@ class MatchingOutput(Output):
     resume: Dataset
     full_data: Dataset
 
-    def __init__(self):
-        super().__init__(resume_reporter=MatchingDatasetReporter())
+    def __init__(self, searching_class: type = MatchingAnalyzer):
+        super().__init__(resume_reporter=MatchingDatasetReporter(searching_class))
 
     def _extract_full_data(self, experiment_data: ExperimentData):
         indexes = experiment_data.additional_fields[
-            experiment_data.additional_fields.search_columns(AdditionalMatchingRole())[0]
+            experiment_data.additional_fields.search_columns(AdditionalMatchingRole())[
+                0
+            ]
         ]
         indexes.index = experiment_data.ds.index
         filtered_field = indexes.drop(

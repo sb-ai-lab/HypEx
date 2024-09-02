@@ -3,8 +3,7 @@ from typing import Optional, List, Dict, Sequence, Any
 
 from tqdm.auto import tqdm
 
-from hypex.dataset import ExperimentData, Dataset
-from hypex.dataset import TempGroupingRole
+from hypex.dataset import ExperimentData, Dataset, GroupingRole, ABCRole, TempRole
 from hypex.executor import Executor
 from hypex.experiments.base import Experiment
 from hypex.reporters import Reporter, DatasetReporter
@@ -55,13 +54,25 @@ class CycledExperiment(ExperimentWithReporter):
 
 
 class GroupExperiment(ExperimentWithReporter):
+    def __init__(
+        self,
+        executors: Sequence[Executor],
+        reporter: Reporter,
+        searching_role: ABCRole = GroupingRole(),
+        transformer: Optional[bool] = None,
+        key: str = "",
+    ):
+        self.searching_role = searching_role
+        super().__init__(executors, reporter, transformer, key)
+
     def generate_params_hash(self) -> str:
         return f"GroupExperiment: {self.reporter.__class__.__name__}"
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field = data.ds.search_columns(TempGroupingRole(), tmp_role=True)
+        tmp_role = True if isinstance(self.searching_role, TempRole) else False
+        group_field = data.ds.search_columns(self.searching_role, tmp_role=tmp_role)
         result: List[Dataset] = [
-            self.one_iteration(group_data, str(group))
+            self.one_iteration(ExperimentData(group_data), str(group))
             for group, group_data in tqdm(data.ds.groupby(group_field))
         ]
         return self._set_result(data, result)
