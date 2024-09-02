@@ -1,6 +1,6 @@
 from typing import Callable, Union, Optional
 
-from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind  # type: ignore
+from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind, norm  # type: ignore
 
 from hypex.dataset import Dataset, StatisticRole, DatasetAdapter
 from hypex.extensions.abstract import CompareExtension
@@ -93,5 +93,15 @@ class Chi2TestExtension(StatTest):
                 "statistic": one_result.statistic,
                 "pass": one_result.pvalue < self.reliability,
             },
+            StatisticRole(),
+        )
+
+class NormCDF(StatTest): 
+    def _calc_pandas(
+        self, data: Dataset, other: Optional[Dataset] = None, **kwargs
+    ) -> Union[float, Dataset]:
+        result = norm.cdf(abs(data.get_values()[0][0]))
+        return DatasetAdapter.to_dataset(
+            {"p-value": 2 * (1 - result)},
             StatisticRole(),
         )
