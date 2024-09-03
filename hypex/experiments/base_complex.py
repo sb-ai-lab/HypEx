@@ -20,14 +20,21 @@ class ExperimentWithReporter(Experiment):
         super().__init__(executors, transformer, key)
         self.reporter = reporter
 
-    def one_iteration(self, data: ExperimentData, key: str = ""):
+    def one_iteration(
+        self, data: ExperimentData, key: str = "", set_key_as_index: bool = False
+    ):
         t_data = ExperimentData(data.ds)
         self.key = key
         t_data = super().execute(t_data)
-        return self.reporter.report(t_data)
+        result = self.reporter.report(t_data)
+        if set_key_as_index:
+            result.index = [key]
+        return result
 
-    def _set_result(self, data: ExperimentData, result: List[Dataset]):
-        result = result[0].append(result[1:], True)
+    def _set_result(
+        self, data: ExperimentData, result: List[Dataset], reset_index: bool = True
+    ):
+        result = result[0].append(result[1:], reset_index=reset_index)
         return self._set_value(data, result)
 
 
@@ -72,10 +79,12 @@ class GroupExperiment(ExperimentWithReporter):
         tmp_role = True if isinstance(self.searching_role, TempRole) else False
         group_field = data.ds.search_columns(self.searching_role, tmp_role=tmp_role)
         result: List[Dataset] = [
-            self.one_iteration(ExperimentData(group_data), str(group))
+            self.one_iteration(
+                ExperimentData(group_data), str(group[0]), set_key_as_index=True
+            )
             for group, group_data in tqdm(data.ds.groupby(group_field))
         ]
-        return self._set_result(data, result)
+        return self._set_result(data, result, reset_index=False)
 
 
 class ParamsExperiment(ExperimentWithReporter):

@@ -1,8 +1,7 @@
-from hypex.dataset.dataset import DatasetAdapter, ExperimentData
-from hypex.dataset.roles import StatisticRole
-from hypex.executor.executor import Executor
-from hypex.operators.operators import MatchingMetrics
-from hypex.utils.enums import ExperimentDataEnum
+from ..dataset import DatasetAdapter, ExperimentData, StatisticRole
+from ..executor import Executor
+from ..operators.operators import MatchingMetrics
+from ..utils.enums import ExperimentDataEnum
 
 
 class MatchingAnalyzer(Executor):
@@ -23,5 +22,3 @@ class MatchingAnalyzer(Executor):
                 {field: StatisticRole() for field in list(variables.keys())},
             ).transpose(roles={column: StatisticRole() for column in columns}),
         )
-
-    # здесь будет анализ всех тестов
