@@ -20,7 +20,7 @@ class MatchingOutput(Output):
     def __init__(self, searching_class: type = MatchingAnalyzer):
         super().__init__(resume_reporter=MatchingDictReporter(searching_class))
 
-    def _extract_full_data(self, experiment_data: ExperimentData, indexes):
+    def _extract_full_data(self, experiment_data: ExperimentData, indexes: Dataset):
         indexes.index = experiment_data.ds.index
         filtered_field = indexes.drop(
             indexes[indexes[indexes.columns[0]] == -1], axis=0
