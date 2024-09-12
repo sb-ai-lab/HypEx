@@ -200,7 +200,9 @@ class Comparator(Calculator, ABC):
             group_field_data, "group_field_data", "groups"
         )
 
-        data_buckets = sorted(target_fields_data.groupby(by=group_field_data))
+        data_buckets = sorted(
+            target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+        )
 
         baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
         compared_data = cls._split_ds_into_columns(data=data_buckets)
@@ -245,7 +247,7 @@ class Comparator(Calculator, ABC):
             group_field_data, "group_field_data", "columns_in_groups"
         )
 
-        baseline_data = sorted(baseline_field_data.groupby(by=group_field_data))
+        baseline_data = baseline_field_data.groupby(by=group_field_data)
 
         compared_data = cls._split_ds_into_columns(
             target_fields_data.groupby(by=group_field_data)
@@ -271,10 +273,14 @@ class Comparator(Calculator, ABC):
         )
 
         baseline_data = [
-            sorted(baseline_field_data.groupby(by=group_field_data)).pop(0)
+            sorted(
+                baseline_field_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+            ).pop(0)
         ]
 
-        compared_data = sorted(target_fields_data.groupby(by=group_field_data))
+        compared_data = sorted(
+            target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+        )
         compared_data.pop(0)
         compared_data = cls._split_ds_into_columns(data=compared_data)
 
