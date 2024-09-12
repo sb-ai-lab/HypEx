@@ -65,7 +65,7 @@ class ABTest(ExperimentShell):
                 "fdr_tsbhy",
                 "quantile",
             ]
-        ] = None,
+        ] = "holm",
     ):
         super().__init__(
             experiment=self._make_experiment(additional_tests, multitest_method),

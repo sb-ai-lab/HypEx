@@ -10,7 +10,7 @@ from ..dataset import (
     TargetRole,
 )
 from ..experiments.base import Executor
-from ..extensions.statsmodels import ABMultiTest, ABMultitestQuantile
+from ..extensions.statsmodels import MultiTest, MultitestQuantile
 from ..utils import (
     ID_SPLIT_SYMBOL,
     NAME_BORDER_SYMBOL,
@@ -51,7 +51,7 @@ class ABAnalyzer(Executor):
         target_fields = data.ds.search_columns(TargetRole(), search_types=[int, float])
         if self.multitest_method and len(data.groups[group_field]) > 2:
             if self.multitest_method != ABNTestMethodsEnum.quantile:
-                multitest_result = ABMultiTest(self.multitest_method).calc(
+                multitest_result = MultiTest(self.multitest_method).calc(
                     p_values, **kwargs
                 )
                 groups = []
@@ -71,7 +71,7 @@ class ABAnalyzer(Executor):
                 multitest_result = Dataset.create_empty()
                 for target_field in target_fields:
                     multitest_result = multitest_result.append(
-                        ABMultitestQuantile(
+                        MultitestQuantile(
                             self.alpha,
                             self.iteration_size,
                             self.equal_variance,

@@ -1,12 +1,12 @@
 from typing import Callable, Union, Optional
 
-from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind  # type: ignore
+from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind, norm  # type: ignore
 
 from ..dataset import Dataset, StatisticRole, DatasetAdapter
 from .abstract import CompareExtension
 
 
-class StatTestExtension(CompareExtension):
+class StatTest(CompareExtension):
     def __init__(
         self, test_function: Optional[Callable] = None, reliability: float = 0.05
     ):
@@ -53,22 +53,22 @@ class StatTestExtension(CompareExtension):
         return one_result
 
 
-class TTestExtensionExtension(StatTestExtension):
+class TTestExtensionExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ttest_ind, reliability=reliability)
 
 
-class KSTestExtensionExtension(StatTestExtension):
+class KSTestExtensionExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ks_2samp, reliability=reliability)
 
 
-class UTestExtensionExtension(StatTestExtension):
+class UTestExtensionExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(mannwhitneyu, reliability=reliability)
 
 
-class Chi2TestExtensionExtension(StatTestExtension):
+class Chi2TestExtensionExtension(StatTest):
     @staticmethod
     def matrix_preparation(data: Dataset, other: Dataset):
         proportion = len(data) / (len(data) + len(other))
@@ -93,5 +93,15 @@ class Chi2TestExtensionExtension(StatTestExtension):
                 "statistic": one_result.statistic,
                 "pass": one_result.pvalue < self.reliability,
             },
+            StatisticRole(),
+        )
+
+class NormCDF(StatTest): 
+    def _calc_pandas(
+        self, data: Dataset, other: Optional[Dataset] = None, **kwargs
+    ) -> Union[float, Dataset]:
+        result = norm.cdf(abs(data.get_values()[0][0]))
+        return DatasetAdapter.to_dataset(
+            {"p-value": 2 * (1 - result)},
             StatisticRole(),
         )

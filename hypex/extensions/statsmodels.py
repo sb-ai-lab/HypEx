@@ -9,7 +9,7 @@ from ..utils import ABNTestMethodsEnum, ID_SPLIT_SYMBOL
 from .abstract import Extension
 
 
-class ABMultiTest(Extension):
+class MultiTest(Extension):
     def __init__(self, method: ABNTestMethodsEnum, alpha: float = 0.05):
         self.method = method
         self.alpha = alpha
@@ -35,7 +35,7 @@ class ABMultiTest(Extension):
         )
 
 
-class ABMultitestQuantile(Extension):
+class MultitestQuantile(Extension):
     def __init__(
         self,
         alpha: float = 0.05,

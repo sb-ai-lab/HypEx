@@ -7,7 +7,7 @@ from .scipy_stats import (
     UTestExtensionExtension,
     Chi2TestExtensionExtension,
 )
-from .statsmodels import ABMultiTest, ABMultitestQuantile
+from .statsmodels import MultiTest, MultitestQuantile
 
 __all__ = [
     "DummyEncoderExtension",
@@ -18,6 +18,6 @@ __all__ = [
     "CholeskyExtension",
     "InverseExtension",
     "FaissExtension",
-    "ABMultiTest",
-    "ABMultitestQuantile",
+    "MultiTest",
+    "MultitestQuantile",
 ]

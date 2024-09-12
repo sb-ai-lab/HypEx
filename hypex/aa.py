@@ -49,6 +49,41 @@ ONE_AA_TEST_WITH_STRATIFICATION = Experiment(
         OneAAStatAnalyzer(),
     ]
 )
+AA_TEST = Experiment(
+    [
+        ParamsExperiment(
+            executors=([ONE_AA_TEST]),
+            params={
+                AASplitter: {"random_state": range(2000), "control_size": [0.5]},
+                Comparator: {
+                    "grouping_role": [AdditionalTreatmentRole()],
+                    "space": [SpaceEnum.additional],
+                },
+            },
+            reporter=DatasetReporter(OneAADictReporter(front=False)),
+        ),
+        AAScoreAnalyzer(),
+    ],
+    key="AATest",
+)
+
+AA_TEST_WITH_STRATIFICATION = Experiment(
+    [
+        ParamsExperiment(
+            executors=([ONE_AA_TEST_WITH_STRATIFICATION]),
+            params={
+                AASplitter: {"random_state": range(2000), "control_size": [0.5]},
+                Comparator: {
+                    "grouping_role": [AdditionalTreatmentRole()],
+                    "space": [SpaceEnum.additional],
+                },
+            },
+            reporter=DatasetReporter(OneAADictReporter(front=False)),
+        ),
+        AAScoreAnalyzer(),
+    ],
+    key="AATest",
+)
 
 
 class AATest(ExperimentShell):
@@ -87,6 +122,7 @@ class AATest(ExperimentShell):
         additional_params: Optional[Dict[str, Any]] = None,
         random_states: Optional[Iterable[int]] = None,
     ):
+
         super().__init__(
             experiment=Experiment(
                 [
