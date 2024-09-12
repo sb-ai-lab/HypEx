@@ -3,7 +3,7 @@ from typing import Optional, List, Dict, Sequence, Any
 
 from tqdm.auto import tqdm
 
-from ..dataset import ExperimentData, Dataset
+from ..dataset import ExperimentData, Dataset, GroupingRole, ABCRole
 from ..executor import Executor, IfExecutor
 from .base import Experiment
 from ..reporters import Reporter, DatasetReporter
@@ -77,8 +77,7 @@ class GroupExperiment(ExperimentWithReporter):
         return f"GroupExperiment: {self.reporter.__class__.__name__}"
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        tmp_role = True if isinstance(self.searching_role, TempRole) else False
-        group_field = data.ds.search_columns(self.searching_role, tmp_role=tmp_role)
+        group_field = data.ds.search_columns(self.searching_role)
         result: List[Dataset] = [
             self.one_iteration(
                 ExperimentData(group_data), str(group[0]), set_key_as_index=True

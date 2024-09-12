@@ -138,7 +138,7 @@ class MatchingMetrics(GroupOperator):
         )
 
     def _prepare_new_target(self, data: ExperimentData, t_data: Dataset, group_field: str) -> Dataset:
-        indexes = self._field_searching(data, AdditionalMatchingRole())
+        indexes = data.field_search(AdditionalMatchingRole())
         if len(indexes) == 0:
             raise ValueError(f"No indexes were found")
         new_target = data.ds.search_columns(TargetRole())[0]
@@ -298,9 +298,7 @@ class Bias(GroupOperator):
         )
 
     def _prepare_data(self, data: ExperimentData, t_data: Dataset) -> Dataset:
-        indexes = data.additional_fields[
-            self._field_searching(data, AdditionalMatchingRole())[0]
-        ]
+        indexes = data.additional_fields[data.field_search(AdditionalMatchingRole())[0]]
         indexes.index = t_data.index
         filtered_field = indexes.drop(
             indexes[indexes[indexes.columns[0]] == -1], axis=0

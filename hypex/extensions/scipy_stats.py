@@ -6,7 +6,7 @@ from ..dataset import Dataset, StatisticRole, DatasetAdapter
 from .abstract import CompareExtension
 
 
-class StatTestExtension(CompareExtension):
+class StatTest(CompareExtension):
     def __init__(
         self, test_function: Optional[Callable] = None, reliability: float = 0.05
     ):
@@ -53,22 +53,22 @@ class StatTestExtension(CompareExtension):
         return one_result
 
 
-class TTestExtensionExtension(StatTestExtension):
+class TTestExtensionExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ttest_ind, reliability=reliability)
 
 
-class KSTestExtensionExtension(StatTestExtension):
+class KSTestExtensionExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ks_2samp, reliability=reliability)
 
 
-class UTestExtensionExtension(StatTestExtension):
+class UTestExtensionExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(mannwhitneyu, reliability=reliability)
 
 
-class Chi2TestExtensionExtension(StatTestExtension):
+class Chi2TestExtensionExtension(StatTest):
     @staticmethod
     def matrix_preparation(data: Dataset, other: Dataset):
         proportion = len(data) / (len(data) + len(other))

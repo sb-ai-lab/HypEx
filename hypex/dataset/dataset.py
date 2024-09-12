@@ -364,6 +364,7 @@ class Dataset(DatasetBase):
         **kwargs,
     ) -> List[Tuple[str, "Dataset"]]:
         if isinstance(by, Dataset) and len(by.columns) == 1:
+            self.data = self.data.reset_index(drop=True)
             datasets = [
                 (group, Dataset(roles=self.roles, data=self.data.loc[group_data.index]))
                 for group, group_data in by._backend.groupby(by=by.columns[0], **kwargs)
