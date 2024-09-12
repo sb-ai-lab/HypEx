@@ -10,7 +10,7 @@ from ..dataset import (
     GroupingRole,
 )
 from ..reporters.matching import MatchingDictReporter
-from ..utils import ID_SPLIT_SYMBOL
+from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL
 
 
 class MatchingOutput(Output):
@@ -48,7 +48,11 @@ class MatchingOutput(Output):
             group_indexes_id = experiment_data.ds.search_columns(GroupingRole())
             indexes = [
                 Dataset.from_dict(
-                    {"indexes": list(map(int, values.split("||")))},
+                    {
+                        "indexes": list(
+                            map(int, values.split(MATCHING_INDEXES_SPLITTER_SYMBOL))
+                        )
+                    },
                     index=experiment_data.ds[
                         experiment_data.ds[group_indexes_id] == group
                     ].index,
@@ -59,7 +63,14 @@ class MatchingOutput(Output):
             indexes = indexes[0].append(indexes[1:]).sort()
         else:
             indexes = Dataset.from_dict(
-                {"indexes": list(map(int, resume["indexes"].split("||")))},
+                {
+                    "indexes": list(
+                        map(
+                            int,
+                            resume["indexes"].split(MATCHING_INDEXES_SPLITTER_SYMBOL),
+                        )
+                    )
+                },
                 roles={"indexes": AdditionalMatchingRole()},
             )
         self.resume = Dataset.from_dict(

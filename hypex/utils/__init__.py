@@ -1,4 +1,9 @@
-from .constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL, NUMBER_TYPES_LIST
+from .constants import (
+    ID_SPLIT_SYMBOL,
+    NAME_BORDER_SYMBOL,
+    NUMBER_TYPES_LIST,
+    MATCHING_INDEXES_SPLITTER_SYMBOL,
+)
 from .enums import (
     SpaceEnum,
     BackendsEnum,
@@ -38,6 +43,7 @@ __all__ = [
     "NAME_BORDER_SYMBOL",
     "ID_SPLIT_SYMBOL",
     "NUMBER_TYPES_LIST",
+    "MATCHING_INDEXES_SPLITTER_SYMBOL",
     "SpaceEnum",
     "BackendsEnum",
     "ExperimentDataEnum",

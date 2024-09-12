@@ -4,7 +4,11 @@ from hypex.analyzers.matching import MatchingAnalyzer
 from hypex.dataset.dataset import ExperimentData, Dataset
 from hypex.ml import FaissNearestNeighbors
 from hypex.reporters.abstract import DictReporter, DatasetReporter
-from hypex.utils import ExperimentDataEnum, ID_SPLIT_SYMBOL
+from hypex.utils import (
+    ExperimentDataEnum,
+    ID_SPLIT_SYMBOL,
+    MATCHING_INDEXES_SPLITTER_SYMBOL,
+)
 
 
 class MatchingDictReporter(DictReporter):
@@ -35,7 +39,7 @@ class MatchingDictReporter(DictReporter):
             FaissNearestNeighbors, ExperimentDataEnum.additional_fields
         )
         return {
-            "indexes": "||".join(
+            "indexes": MATCHING_INDEXES_SPLITTER_SYMBOL.join(
                 str(i)
                 for i in data.additional_fields[indexes_id].to_dict()["data"]["data"][
                     indexes_id
