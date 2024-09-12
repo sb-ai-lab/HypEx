@@ -1,12 +1,10 @@
-from .aa import AATest
-from .ab import ABTest
+from HypEx.hypex.ab import ABTest
 from .base import (
     Experiment,
     OnRoleExperiment,
 )
 from .base_complex import GroupExperiment, CycledExperiment
-from .homogeneity import HomogeneityTest
-from .matching import Matching
+from HypEx.hypex.matching import Matching
 
 __all__ = [
     "CycledExperiment",
