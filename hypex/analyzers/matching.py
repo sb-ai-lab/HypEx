@@ -1,5 +1,6 @@
-from ..dataset import DatasetAdapter, ExperimentData, StatisticRole
-from ..executor import Executor
+from ..dataset.dataset import DatasetAdapter, ExperimentData
+from ..dataset.roles import StatisticRole
+from ..executor.executor import Executor
 from ..operators.operators import MatchingMetrics
 from ..utils.enums import ExperimentDataEnum
 

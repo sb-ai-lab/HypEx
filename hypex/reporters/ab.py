@@ -1,8 +1,8 @@
 from typing import Dict, Any
 
-from hypex.analyzers.ab import ABAnalyzer
-from hypex.dataset import ExperimentData, Dataset
-from hypex.utils import ExperimentDataEnum
+from ..analyzers.ab import ABAnalyzer
+from ..dataset import ExperimentData, Dataset
+from ..utils import ExperimentDataEnum
 from .aa import OneAADictReporter
 from ..comparators import TTest, UTest, Chi2Test
 

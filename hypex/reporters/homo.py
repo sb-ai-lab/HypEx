@@ -1,16 +1,11 @@
 from typing import Dict, Any, Union
 
-from hypex.dataset import (
+from ..dataset import (
     ExperimentData,
-    Dataset,
-    InfoRole,
-    TreatmentRole,
-    TargetRole,
-    StatisticRole,
+    Dataset
 )
 from .aa import OneAADictReporter
 from .abstract import DatasetReporter
-from ..utils import ID_SPLIT_SYMBOL
 
 
 class HomoDictReporter(OneAADictReporter):

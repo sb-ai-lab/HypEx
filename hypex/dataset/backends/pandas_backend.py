@@ -16,7 +16,7 @@ from typing import (
 import numpy as np
 import pandas as pd  # type: ignore
 
-from hypex.utils import FromDictTypes, MergeOnError
+from ...utils import FromDictTypes, MergeOnError, ScalarType
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -302,7 +302,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return {column: self.data[column].nunique() for column in self.data.columns}
 
     def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> List[Tuple]:
-        groups = self.data.groupby(by, **kwargs)
+        groups = self.data.groupby(by=by, observed=False, **kwargs)
         return list(groups)
 
     def agg(self, func: Union[str, List], **kwargs) -> Union[pd.DataFrame, float]:
@@ -381,7 +381,12 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
         ).reset_index()
 
-    def fillna(self, values, method, **kwargs) -> pd.DataFrame:
+    def fillna(
+        self,
+        values: Union[ScalarType, Dict[str, ScalarType], None] = None,
+        method: Optional[Literal["bfill", "ffill"]] = None,
+        **kwargs,
+    ) -> pd.DataFrame:
         return self.data.fillna(value=values, method=method, **kwargs)
 
     def na_counts(self) -> Union[pd.DataFrame, int]:
@@ -402,17 +407,22 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     ) -> pd.DataFrame:
         return self.data.dropna(how=how, subset=subset)
 
-    def transpose(self, names: Optional[Sequence[str]]) -> pd.DataFrame:
+    def transpose(self, names: Optional[Sequence[str]] = None) -> pd.DataFrame:
         result = self.data.transpose()
-        if names:
+        if names is not None:
             result.columns = names
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
+    def sample(
+        self,
+        frac: Optional[float] = None,
+        n: Optional[int] = None,
+        random_state: Optional[int] = None,
+    ) -> pd.DataFrame:
+        return self.data.sample(n=n, frac=frac, random_state=random_state)
+
     def cov(self):
         return self.data.cov(ddof=0)
-
-    def shuffle(self, random_state: Optional[int] = None) -> pd.DataFrame:
-        return self.data.sample(self.data.shape[0], random_state=random_state)
 
     def quantile(self, q: float = 0.5) -> pd.DataFrame:
         return self.agg(func="quantile", q=q)
@@ -429,12 +439,12 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def merge(
         self,
-        right: "PandasDataset",  # should be PandasDataset.
-        on: str = None,
-        left_on: str = None,
-        right_on: str = None,
-        left_index: bool = None,
-        right_index: bool = None,
+        right: "PandasDataset",
+        on: Optional[str] = None,
+        left_on: Optional[str] = None,
+        right_on: Optional[str] = None,
+        left_index: Optional[bool] = None,
+        right_index: Optional[bool] = None,
         suffixes: Tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> pd.DataFrame:

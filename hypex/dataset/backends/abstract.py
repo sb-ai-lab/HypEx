@@ -13,7 +13,7 @@ from typing import (
     Tuple,
 )
 
-from hypex.utils import AbstractMethodError, FromDictTypes
+from ...utils import AbstractMethodError, FromDictTypes
 
 
 class DatasetBackendNavigation(ABC):
@@ -396,10 +396,6 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
 
     @abstractmethod
     def transpose(self, names) -> Any:
-        raise AbstractMethodError
-
-    @abstractmethod
-    def shuffle(self, random_state) -> Any:
         raise AbstractMethodError
 
     @abstractmethod

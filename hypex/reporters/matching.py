@@ -1,14 +1,15 @@
 from typing import Dict, Any
 
-from hypex.analyzers.matching import MatchingAnalyzer
-from hypex.dataset.dataset import ExperimentData, Dataset
-from hypex.ml import FaissNearestNeighbors
-from hypex.reporters.abstract import DictReporter, DatasetReporter
-from hypex.utils import (
+from ..dataset.dataset import ExperimentData, Dataset
+from ..ml import FaissNearestNeighbors
+from ..reporters.abstract import DictReporter, DatasetReporter
+from ..utils import (
     ExperimentDataEnum,
     ID_SPLIT_SYMBOL,
     MATCHING_INDEXES_SPLITTER_SYMBOL,
 )
+from ..analyzers.matching import MatchingAnalyzer
+from .abstract import DatasetReporter, DictReporter
 
 
 class MatchingDictReporter(DictReporter):

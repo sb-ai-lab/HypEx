@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Union, List
 
-from hypex.dataset import ExperimentData, Dataset
-from hypex.dataset.roles import ReportRole
-from hypex.utils import ID_SPLIT_SYMBOL
-from hypex.utils.errors import AbstractMethodError
+from ..dataset import ExperimentData, Dataset
+from ..dataset.roles import ReportRole
+from ..utils import ID_SPLIT_SYMBOL
+from ..utils.errors import AbstractMethodError
 
 
 class Reporter(ABC):
@@ -58,7 +58,9 @@ class OnDictReporter(Reporter, ABC):
 class DatasetReporter(OnDictReporter):
     def report(self, data: ExperimentData) -> Union[Dict[str, Dataset], Dataset]:
         dict_result = self.dict_reporter.report(data)
-        return self.convert_to_dataset(dict_result)
+        return self.convert_to_dataset(
+            dict_result
+        )  #   TODO: change to DatasetAdapter.to_dataset()
 
     @staticmethod
     def convert_to_dataset(data: Dict) -> Union[Dict[str, Dataset], Dataset]:

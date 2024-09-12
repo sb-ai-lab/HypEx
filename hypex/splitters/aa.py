@@ -1,15 +1,14 @@
-from collections import Counter
-from typing import Any, List, Optional, Dict
+from typing import Any, List, Optional
 
-from hypex.dataset import (
+from ..dataset import (
     Dataset,
     ExperimentData,
     TreatmentRole,
     StratificationRole,
     AdditionalTreatmentRole,
 )
-from hypex.executor import Calculator
-from hypex.utils import ExperimentDataEnum
+from ..executor import Calculator
+from ..utils import ExperimentDataEnum
 
 
 class AASplitter(Calculator):
@@ -17,6 +16,7 @@ class AASplitter(Calculator):
         self,
         control_size: float = 0.5,
         random_state: Optional[int] = None,
+        sample_size: Optional[float] = None,
         constant_key: bool = True,
         save_groups: bool = True,
         key: Any = "",
@@ -26,6 +26,7 @@ class AASplitter(Calculator):
         self._key = key
         self.constant_key = constant_key
         self.save_groups = save_groups
+        self.sample_size = sample_size
         super().__init__(key)
 
     def _generate_params_hash(self):
@@ -75,9 +76,11 @@ class AASplitter(Calculator):
         data: Dataset,
         random_state: Optional[int] = None,
         control_size: float = 0.5,
+        sample_size: Optional[float] = None,
         **kwargs,
     ) -> List[str]:
-        experiment_data = data.shuffle(random_state)
+        sample_size = 1.0 if sample_size is None else sample_size
+        experiment_data = data.sample(frac=sample_size, random_state=random_state)
         addition_indexes = list(experiment_data.index)
         edge = int(len(addition_indexes) * control_size)
         control_indexes = addition_indexes[:edge]
@@ -86,7 +89,10 @@ class AASplitter(Calculator):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result = self.calc(
-            data.ds, random_state=self.random_state, control_size=self.control_size
+            data.ds,
+            random_state=self.random_state,
+            control_size=self.control_size,
+            sample_size=self.sample_size,
         )
         return self._set_value(
             data,

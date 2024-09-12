@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
-from hypex.dataset import Dataset, ExperimentData
-from hypex.executor.executor import Calculator
+from ..dataset import Dataset, ExperimentData
+from ..executor.executor import Calculator
 
 
 class Shuffle(Calculator):

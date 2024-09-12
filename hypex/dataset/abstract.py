@@ -5,13 +5,13 @@ from typing import Iterable, Dict, Union, List, Optional, Any
 
 import pandas as pd  # type: ignore
 
-from hypex.dataset.backends import PandasDataset
-from hypex.dataset.roles import (
+from .backends import PandasDataset
+from .roles import (
     ABCRole,
     default_roles,
     DefaultRole,
 )
-from hypex.utils import BackendsEnum, RoleColumnError
+from ..utils import BackendsEnum, RoleColumnError
 
 
 def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
@@ -23,7 +23,7 @@ def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
             for i in roles[role]:
                 new_roles[i] = copy.deepcopy(r)
         else:
-            new_roles[roles[role]] = r
+            new_roles[roles[role]] = copy.deepcopy(r)
     return new_roles or roles
 
 
@@ -235,7 +235,7 @@ class DatasetBase(ABC):
                 for column in columns:
                     new_roles[column] = copy.deepcopy(role)
             else:
-                new_roles[columns] = role
+                new_roles[columns] = copy.deepcopy(role)
 
         if temp_role:
             self._tmp_roles = new_roles

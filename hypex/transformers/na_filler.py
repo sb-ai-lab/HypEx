@@ -1,13 +1,13 @@
 from typing import Any, Optional, Union, Sequence, Literal, Dict
 
-from hypex.dataset.dataset import Dataset
-from hypex.dataset.dataset import ExperimentData
-from hypex.dataset.roles import (
+from ..dataset.dataset import Dataset
+from ..dataset.dataset import ExperimentData
+from ..dataset.roles import (
     FeatureRole,
 )
-from hypex.transformers.abstract import Transformer
-from hypex.utils.adapter import Adapter
-from hypex.utils import ScalarType
+from .abstract import Transformer
+from ..utils.adapter import Adapter
+from ..utils import ScalarType
 
 
 class NaFiller(Transformer):

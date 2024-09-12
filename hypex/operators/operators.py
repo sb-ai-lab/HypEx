@@ -3,7 +3,7 @@ from typing import Optional, Any, List, Literal, Union, Dict, Tuple
 
 import numpy as np
 
-from hypex.dataset import (
+from ..dataset import (
     Dataset,
     ABCRole,
     ExperimentData,
@@ -13,10 +13,10 @@ from hypex.dataset import (
     AdditionalMatchingRole,
     AdditionalTargetRole,
 )
-from hypex.extensions.scipy_stats import NormCDF
-from hypex.operators.abstract import GroupOperator
-from hypex.utils.enums import ExperimentDataEnum
-from hypex.utils.errors import NoneArgumentError
+from ..extensions.scipy_stats import NormCDF
+from .abstract import GroupOperator
+from ..utils.enums import ExperimentDataEnum
+from ..utils.errors import NoneArgumentError
 
 
 class SMD(GroupOperator):
@@ -55,18 +55,18 @@ class MatchingMetrics(GroupOperator):
         extra_counts = [0 for _ in range(len(matches) - len(s_counts))]
         self.__scaled_counts[group] = s_counts + extra_counts
 
-    @staticmethod 
+    @staticmethod
     def _calc_vars(value):
         var = 0 if value[value.columns[0]].isna().sum() > 0 else value.var()
-        return [var for _ in range(len(value))] 
+        return [var for _ in range(len(value))]
 
     @staticmethod
-    def _calc_se(var_c, var_t, scaled_counts, is_ate=False): 
-        n_c, n_t = len(var_c), len(var_t) 
-        if not is_ate: 
+    def _calc_se(var_c, var_t, scaled_counts, is_ate=False):
+        n_c, n_t = len(var_c), len(var_t)
+        if not is_ate:
             weights_c = n_c / n_t * np.array(scaled_counts)
-            weights_t = np.ones(n_t) 
-        else: 
+            weights_t = np.ones(n_t)
+        else:
             n = n_c + n_t
             weights_c = (n_c / n) * np.array(scaled_counts["control"])
             weights_t = (n_t / n) * np.array(scaled_counts["test"])
@@ -86,7 +86,7 @@ class MatchingMetrics(GroupOperator):
                 ["target_fields", "test_data"], "att, atc, ate estimation"
             )
         metric = kwargs.get("metric", "ate")
-        scaled_counts = kwargs.get("scaled_counts") 
+        scaled_counts = kwargs.get("scaled_counts")
         itt = test_data[target_fields[0]] - test_data[target_fields[1]]
         itc = data[target_fields[1]] - data[target_fields[0]]
         bias = kwargs.get("bias", {})
@@ -95,10 +95,10 @@ class MatchingMetrics(GroupOperator):
                 itc -= Dataset.from_dict({"test": bias["control"]}, roles={}, index=itc.index)
             if metric in ["att", "ate"]:
                 itt += Dataset.from_dict({"control": bias["test"]}, roles={}, index=itt.index)
-        var_t = cls._calc_vars(itt) 
+        var_t = cls._calc_vars(itt)
         var_c = cls._calc_vars(itc)
-        itt_se = cls._calc_se(var_c, var_t, scaled_counts["control"]) 
-        itc_se = cls._calc_se(var_t, var_c, scaled_counts["test"]) 
+        itt_se = cls._calc_se(var_c, var_t, scaled_counts["control"])
+        itc_se = cls._calc_se(var_t, var_c, scaled_counts["test"])
         itt = itt.mean()
         itc = itc.mean()
         p_val_itt = NormCDF().calc(Dataset.from_dict({"value": [itt/itt_se]}, roles={"value": InfoRole()})).get_values()[0][0]
@@ -108,7 +108,7 @@ class MatchingMetrics(GroupOperator):
         if metric == "att":
             return {"ATT": [itt, itt_se, p_val_itt, itt - 1.96 * itt_se, itt + 1.96 * itt_se]}
         len_test, len_control = len(data), len(test_data)
-        ate = (itt * len_test + itc * len_control) / (len_test + len_control) 
+        ate = (itt * len_test + itc * len_control) / (len_test + len_control)
         ate_se = cls._calc_se(var_c, var_t, scaled_counts, is_ate=True)
         p_val_ate = NormCDF().calc(Dataset.from_dict({"value": [ate/ate_se]}, roles={"value": InfoRole()})).get_values()[0][0]
         return {
@@ -144,10 +144,10 @@ class MatchingMetrics(GroupOperator):
         new_target = data.ds.search_columns(TargetRole())[0]
         indexes = data.additional_fields[indexes[0]]
         indexes.index = t_data.index
-        grouped_data = data.ds.groupby(group_field) 
-        control_indexes = indexes.loc[grouped_data[0][1].index] 
-        test_indexes = indexes.loc[grouped_data[1][1].index] 
-        self._calc_scaled_counts(control_indexes, "control") 
+        grouped_data = data.ds.groupby(group_field)
+        control_indexes = indexes.loc[grouped_data[0][1].index]
+        test_indexes = indexes.loc[grouped_data[1][1].index]
+        self._calc_scaled_counts(control_indexes, "control")
         self._calc_scaled_counts(test_indexes, "test")
         filtered_field = indexes.drop(
             indexes[indexes[indexes.columns[0]] == -1], axis=0
@@ -244,7 +244,7 @@ class Bias(GroupOperator):
             raise NoneArgumentError(
                 ["target_fields", "features_fields", "test_data"], "bias_estimation"
             )
-        if data[target_fields[1]].isna().sum() > 0:     
+        if data[target_fields[1]].isna().sum() > 0:
             return {"test": cls.calc_bias(
             test_data[features_fields[: len(features_fields) // 2]],
             test_data[features_fields[len(features_fields) // 2 :]],
@@ -253,7 +253,7 @@ class Bias(GroupOperator):
                 test_data[target_fields[1]],
             ),
         )}
-        if test_data[target_fields[1]].isna().sum() > 0:     
+        if test_data[target_fields[1]].isna().sum() > 0:
             return {"control": cls.calc_bias(
                 data[features_fields[: len(features_fields) // 2]],
                 data[features_fields[len(features_fields) // 2 :]],

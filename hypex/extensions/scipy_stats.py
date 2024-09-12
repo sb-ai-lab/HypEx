@@ -2,11 +2,11 @@ from typing import Callable, Union, Optional
 
 from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind, norm  # type: ignore
 
-from hypex.dataset import Dataset, StatisticRole, DatasetAdapter
-from hypex.extensions.abstract import CompareExtension
+from ..dataset import Dataset, StatisticRole, DatasetAdapter
+from .abstract import CompareExtension
 
 
-class StatTest(CompareExtension):
+class StatTestExtension(CompareExtension):
     def __init__(
         self, test_function: Optional[Callable] = None, reliability: float = 0.05
     ):
@@ -14,7 +14,7 @@ class StatTest(CompareExtension):
         self.test_function = test_function
         self.reliability = reliability
 
-    @staticmethod
+    @staticmethod  # TODO: remove
     def check_other(other: Union[Dataset, None]) -> Dataset:
         if other is None:
             raise ValueError("No other dataset provided")
@@ -53,22 +53,22 @@ class StatTest(CompareExtension):
         return one_result
 
 
-class TTestExtension(StatTest):
+class TTestExtensionExtension(StatTestExtension):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ttest_ind, reliability=reliability)
 
 
-class KSTestExtension(StatTest):
+class KSTestExtensionExtension(StatTestExtension):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ks_2samp, reliability=reliability)
 
 
-class UTestExtension(StatTest):
+class UTestExtensionExtension(StatTestExtension):
     def __init__(self, reliability: float = 0.05):
         super().__init__(mannwhitneyu, reliability=reliability)
 
 
-class Chi2TestExtension(StatTest):
+class Chi2TestExtensionExtension(StatTestExtension):
     @staticmethod
     def matrix_preparation(data: Dataset, other: Dataset):
         proportion = len(data) / (len(data) + len(other))
