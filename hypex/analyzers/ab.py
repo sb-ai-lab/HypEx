@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Optional, Any, Union, List
 
 from ..comparators import TTest, UTest
@@ -104,7 +105,7 @@ class ABAnalyzer(Executor):
             analysis_ids = spaces.get("analysis_tables", [])
             if len(analysis_ids) == 0:
                 continue
-            t_data = data.analysis_tables[analysis_ids[0]]
+            t_data = deepcopy(data.analysis_tables[analysis_ids[0]])
             for aid in analysis_ids[1:]:
                 t_data = t_data.append(data.analysis_tables[aid])
             if len(analysis_ids) < len(t_data):
