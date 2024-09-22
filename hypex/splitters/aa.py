@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
 from ..dataset import (
     Dataset,
@@ -7,6 +7,7 @@ from ..dataset import (
     StratificationRole,
     AdditionalTreatmentRole,
 )
+from ..dataset.roles import ConstGroupRole
 from ..executor import Calculator
 from ..utils import ExperimentDataEnum
 
@@ -77,22 +78,38 @@ class AASplitter(Calculator):
         random_state: Optional[int] = None,
         control_size: float = 0.5,
         sample_size: Optional[float] = None,
+        const_group_field: Optional[str] = None,
         **kwargs,
     ) -> List[str]:
         sample_size = 1.0 if sample_size is None else sample_size
-        experiment_data = data.sample(frac=sample_size, random_state=random_state)
+        control_indexes = []
+        if const_group_field:
+            const_data = dict(data.groupby(const_group_field))
+            control_data = const_data.get("control")
+            if control_data is not None:
+                control_indexes = list(control_data.index)
+        experiment_data = data[data[const_group_field].isna()]
+        experiment_data = experiment_data.sample(
+            frac=sample_size, random_state=random_state
+        )
         addition_indexes = list(experiment_data.index)
+        # TODO: calc new control size
         edge = int(len(addition_indexes) * control_size)
-        control_indexes = addition_indexes[:edge]
+        control_indexes += addition_indexes[:edge]
 
         return ["control" if i in control_indexes else "test" for i in data.index]
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        const_group_fields = data.ds.search_columns(ConstGroupRole())
+        const_group_fields = (
+            const_group_fields[0] if len(const_group_fields) > 0 else None
+        )
         result = self.calc(
             data.ds,
             random_state=self.random_state,
             control_size=self.control_size,
             sample_size=self.sample_size,
+            const_group_field=const_group_fields,
         )
         return self._set_value(
             data,
@@ -108,7 +125,7 @@ class AASplitterWithStratification(AASplitter):
         control_size: float = 0.5,
         grouping_fields=None,
         **kwargs,
-    ) -> Dataset:
+    ) -> Union[List[str], Dataset]:
         if not grouping_fields:
             return AASplitter._inner_function(
                 data, random_state, control_size, **kwargs

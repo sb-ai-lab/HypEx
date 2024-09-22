@@ -171,6 +171,11 @@ class FilterRole(ABCRole):
     _role_name: RoleNameType = "Filter"
 
 
+class ConstGroupRole(ABCRole):
+    _role_name: RoleNameType = "ConstGroup"
+
+
+# ___________________________________________________________________________________________
 class TempRole(ABCRole):
     _role_name: RoleNameType = "Temp"
 
@@ -226,6 +231,7 @@ class ReportRole(ABCRole):
     _role_name: RoleNameType = "Report"
 
 
+# ___________________________________________________________________________________________
 class AdditionalRole(ABCRole):
     """ """
 
