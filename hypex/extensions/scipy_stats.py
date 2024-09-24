@@ -1,3 +1,4 @@
+import warnings
 from typing import Callable, Union, Optional
 
 from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind, norm  # type: ignore
@@ -70,11 +71,13 @@ class UTestExtensionExtension(StatTest):
 
 class Chi2TestExtensionExtension(StatTest):
     @staticmethod
-    def matrix_preparation(data: Dataset, other: Dataset):
+    def matrix_preparation(data: Dataset, other: Dataset) -> Optional[Dataset]:
         proportion = len(data) / (len(data) + len(other))
         counted_data = data.value_counts()
         data_vc = counted_data["count"] * (1 - proportion)
         other_vc = other.value_counts()["count"] * proportion
+        if len(counted_data) < 2:
+            return None
         data_vc = data_vc.add_column(counted_data[counted_data.columns[0]])
         other_vc = other_vc.add_column(counted_data[counted_data.columns[0]])
         return data_vc.merge(other_vc, on=counted_data.columns[0])[
@@ -86,6 +89,16 @@ class Chi2TestExtensionExtension(StatTest):
     ) -> Union[float, Dataset]:
         other = self.check_data(data, other)
         matrix = self.matrix_preparation(data, other)
+        if matrix is None:
+            warnings.warn(f"Matrix Chi2 is empty for {data.columns[0]}. Returning None")
+            return DatasetAdapter.to_dataset(
+                {
+                    "p-value": None,
+                    "statistic": None,
+                    "pass": None,
+                },
+                StatisticRole(),
+            )
         one_result = chi2_contingency(matrix.backend.data)
         return DatasetAdapter.to_dataset(
             {
@@ -96,7 +109,8 @@ class Chi2TestExtensionExtension(StatTest):
             StatisticRole(),
         )
 
-class NormCDF(StatTest): 
+
+class NormCDF(StatTest):
     def _calc_pandas(
         self, data: Dataset, other: Optional[Dataset] = None, **kwargs
     ) -> Union[float, Dataset]:
