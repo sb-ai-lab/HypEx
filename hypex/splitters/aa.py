@@ -1,5 +1,4 @@
-from collections import Counter
-from typing import Any, List, Optional, Dict
+from typing import Any, List, Optional, Union
 
 from ..dataset import (
     Dataset,
@@ -8,6 +7,7 @@ from ..dataset import (
     StratificationRole,
     AdditionalTreatmentRole,
 )
+from ..dataset.roles import ConstGroupRole
 from ..executor import Calculator
 from ..utils import ExperimentDataEnum
 
@@ -17,6 +17,7 @@ class AASplitter(Calculator):
         self,
         control_size: float = 0.5,
         random_state: Optional[int] = None,
+        sample_size: Optional[float] = None,
         constant_key: bool = True,
         save_groups: bool = True,
         key: Any = "",
@@ -26,6 +27,7 @@ class AASplitter(Calculator):
         self._key = key
         self.constant_key = constant_key
         self.save_groups = save_groups
+        self.sample_size = sample_size
         super().__init__(key)
 
     def _generate_params_hash(self):
@@ -75,18 +77,42 @@ class AASplitter(Calculator):
         data: Dataset,
         random_state: Optional[int] = None,
         control_size: float = 0.5,
+        sample_size: Optional[float] = None,
+        const_group_field: Optional[str] = None,
         **kwargs,
     ) -> List[str]:
-        experiment_data = data.shuffle(random_state)
+        sample_size = 1.0 if sample_size is None else sample_size
+        control_indexes = []
+        if const_group_field:
+            const_data = dict(data.groupby(const_group_field))
+            control_data = const_data.get("control")
+            if control_data is not None:
+                control_indexes = list(control_data.index)
+            const_size = sum(len(cd) for cd in const_data.values())
+            control_size = (len(data) * control_size - const_size) / (
+                len(data) - const_size
+            )
+        experiment_data = data[data[const_group_field].isna()] if const_group_field else data
+        experiment_data = experiment_data.sample(
+            frac=sample_size, random_state=random_state
+        )
         addition_indexes = list(experiment_data.index)
         edge = int(len(addition_indexes) * control_size)
-        control_indexes = addition_indexes[:edge]
+        control_indexes += addition_indexes[:edge]
 
         return ["control" if i in control_indexes else "test" for i in data.index]
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        const_group_fields = data.ds.search_columns(ConstGroupRole())
+        const_group_fields = (
+            const_group_fields[0] if len(const_group_fields) > 0 else None
+        )
         result = self.calc(
-            data.ds, random_state=self.random_state, control_size=self.control_size
+            data.ds,
+            random_state=self.random_state,
+            control_size=self.control_size,
+            sample_size=self.sample_size,
+            const_group_field=const_group_fields,
         )
         return self._set_value(
             data,
@@ -102,7 +128,7 @@ class AASplitterWithStratification(AASplitter):
         control_size: float = 0.5,
         grouping_fields=None,
         **kwargs,
-    ) -> Dataset:
+    ) -> Union[List[str], Dataset]:
         if not grouping_fields:
             return AASplitter._inner_function(
                 data, random_state, control_size, **kwargs

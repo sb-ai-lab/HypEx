@@ -138,7 +138,7 @@ class Comparator(Calculator, ABC):
     ) -> GroupingDataType:
         if isinstance(grouping_data, Dict):
             compared_data = [(name, data) for name, data in grouping_data.items()]
-            baseline_data = [compared_data.pop()]
+            baseline_data = [compared_data.pop(0)]
         else:
             raise TypeError(
                 f"Grouping data must be dict of strings and datasets, but got {type(grouping_data)}"
@@ -200,7 +200,9 @@ class Comparator(Calculator, ABC):
             group_field_data, "group_field_data", "groups"
         )
 
-        data_buckets = sorted(target_fields_data.groupby(by=group_field_data))
+        data_buckets = sorted(
+            target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+        )
 
         baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
         compared_data = cls._split_ds_into_columns(data=data_buckets)
@@ -271,10 +273,14 @@ class Comparator(Calculator, ABC):
         )
 
         baseline_data = [
-            sorted(baseline_field_data.groupby(by=group_field_data)).pop(0)
+            sorted(
+                baseline_field_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+            ).pop(0)
         ]
 
-        compared_data = sorted(target_fields_data.groupby(by=group_field_data))
+        compared_data = sorted(
+            target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+        )
         compared_data.pop(0)
         compared_data = cls._split_ds_into_columns(data=compared_data)
 
@@ -330,8 +336,10 @@ class Comparator(Calculator, ABC):
     @classmethod
     def calc(
         cls,
-        compare_by: Optional[Literal["groups", "columns", "columns_in_groups", "cross"]],
-        target_fields_data: Optional[Dataset],
+        compare_by: Optional[
+            Literal["groups", "columns", "columns_in_groups", "cross"]
+        ] = None,
+        target_fields_data: Optional[Dataset] = None,
         baseline_field_data: Optional[Dataset] = None,
         group_field_data: Optional[Dataset] = None,
         grouping_data: Optional[

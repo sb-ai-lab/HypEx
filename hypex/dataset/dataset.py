@@ -28,7 +28,6 @@ from ..utils import (
     DataTypeError,
     BackendTypeError,
     ScalarType,
-    DatasetSizeError,
 )
 from .abstract import DatasetBase
 from .roles import (
@@ -36,7 +35,6 @@ from .roles import (
     InfoRole,
     ABCRole,
     FilterRole,
-    FeatureRole,
     DefaultRole,
     AdditionalRole,
 )
@@ -366,6 +364,7 @@ class Dataset(DatasetBase):
         **kwargs,
     ) -> List[Tuple[str, "Dataset"]]:
         if isinstance(by, Dataset) and len(by.columns) == 1:
+            self.data = self.data.reset_index(drop=True)
             datasets = [
                 (group, Dataset(roles=self.roles, data=self.data.loc[group_data.index]))
                 for group, group_data in by._backend.groupby(by=by.columns[0], **kwargs)
@@ -475,7 +474,10 @@ class Dataset(DatasetBase):
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
         )
         t_roles = self.roles
-        t_roles["proportion" if normalize else "count"] = StatisticRole()
+        column_name = "proportion" if normalize else "count"
+        if column_name not in t_data:
+            t_data = t_data.rename(columns={0: column_name})
+        t_roles[column_name] = StatisticRole()
         return Dataset(roles=t_roles, data=t_data)
 
     def na_counts(self):
@@ -576,14 +578,22 @@ class Dataset(DatasetBase):
             roles = {column: DefaultRole() for column in names}
         return Dataset(roles=roles, data=result_data)
 
+    def sample(
+        self,
+        frac: Optional[float] = None,
+        n: Optional[int] = None,
+        random_state: Optional[int] = None,
+    ) -> "Dataset":
+        return Dataset(
+            self.roles,
+            data=self.backend.sample(frac=frac, n=n, random_state=random_state),
+        )
+
     def cov(self):
         t_data = self.backend.cov()
         return Dataset(
             {column: DefaultRole() for column in t_data.columns}, data=t_data
         )
-
-    def shuffle(self, random_state: Optional[int] = None) -> "Dataset":
-        return Dataset(self.roles, data=self.backend.shuffle(random_state))
 
     def rename(self, names: Dict[str, str]):
         roles = {names.get(column, column): role for column, role in self.roles.items()}
@@ -598,33 +608,6 @@ class Dataset(DatasetBase):
         return Dataset(
             self.roles,
             data=self._backend.replace(to_replace=to_replace, value=value, regex=regex),
-        )
-
-    def cut(
-        self,
-        bins: Union[int, Sequence[ScalarType]],
-        right: bool = True,
-        labels: Union[Sequence[ScalarType], bool, None] = None,
-        retbins: bool = False,
-        precision: int = 3,
-        include_lowest: bool = False,
-        duplicates: Literal["raise", "drop"] = "raise",
-        ordered: bool = True,
-    ) -> "Dataset":
-        if len(self.columns) > 1:
-            raise DatasetSizeError(len(self.columns))
-        return Dataset(
-            self.roles,
-            data=self._backend.cut(
-                bins=bins,
-                right=right,
-                labels=labels,
-                retbins=retbins,
-                precision=precision,
-                include_lowest=include_lowest,
-                duplicates=duplicates,
-                ordered=ordered,
-            ),
         )
 
 
@@ -855,7 +838,11 @@ class DatasetAdapter(Adapter):
         """
         roles_names = list(data.keys())
         if any(
-            isinstance(i, Union[int, str, float, bool]) for i in list(data.values())
+            # isinstance(i, Union[int, str, float, bool]) for i in list(data.values())
+            [
+                any(isinstance(i, t) for t in [int, str, float, bool])
+                for i in list(data.values())
+            ]
         ):
             data = [data]
         if isinstance(roles, Dict):

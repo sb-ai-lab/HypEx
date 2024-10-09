@@ -1,9 +1,9 @@
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 from ..comparators import KSTest, TTest, Chi2Test
 from ..dataset import Dataset, ExperimentData, StatisticRole
 from ..executor import Executor
-from ..experiments.base_complex import ParamsExperiment
+from ..experiments.base_complex import ParamsExperiment, IfParamsExperiment
 from ..reporters.aa import OneAADictReporter
 from ..splitters import AASplitter, AASplitterWithStratification
 from ..utils import BackendsEnum, ExperimentDataEnum, ID_SPLIT_SYMBOL
@@ -32,17 +32,24 @@ class OneAAStatAnalyzer(Executor):
                 # t_data.data.index = analysis_ids
                 for field in ["p-value", "pass"]:
                     analysis_data[f"mean {class_} {field}"] = t_data[field].mean()
-        analysis_data["mean test score"] = (
-            analysis_data["mean TTest p-value"]
-            + 2 * analysis_data["mean KSTest p-value"]
-        )
+        analysis_data["mean test score"] = 0
+        sum_weight = 0
+        if (
+            "mean TTest p-value" in analysis_data
+            and "mean KSTest p-value" in analysis_data
+        ):
+            analysis_data["mean test score"] = (
+                analysis_data["mean TTest p-value"]
+                + 2 * analysis_data["mean KSTest p-value"]
+            )
+            sum_weight += 3
         if "mean Chi2Test p-value" in analysis_data:
             analysis_data["mean test score"] += (
                 2 * analysis_data["mean Chi2Test p-value"]
             )
-            analysis_data["mean test score"] /= 5
-        else:
-            analysis_data["mean test score"] /= 3
+            sum_weight += 2
+        if sum_weight:
+            analysis_data["mean test score"] /= sum_weight
 
         analysis_dataset = Dataset.from_dict(
             [analysis_data],
@@ -104,40 +111,51 @@ class AAScoreAnalyzer(Executor):
         return splitter_class.build_from_id(splitter_id)
 
     def _get_best_split(
-        self, data: ExperimentData, score_table: Dataset
+        self,
+        data: ExperimentData,
+        score_table: Dataset,
+        if_param_scores: Optional[Dataset] = None,
     ) -> Dict[str, Any]:
-        aa_split_scores = score_table.apply(
-            lambda x: (
-                (
+        if if_param_scores is None:
+            aa_split_scores = score_table.apply(
+                lambda x: (
                     (
                         (
-                            sum(
-                                x[key] * value
-                                for key, value in self.__feature_weights.items()
+                            (
+                                sum(
+                                    x[key] * value
+                                    for key, value in self.__feature_weights.items()
+                                    if isinstance(value, float) and value > 0
+                                )
+                                / len(self.__feature_weights)
                             )
-                            / len(self.__feature_weights)
+                            * 2
                         )
-                        * 2
+                        / 3
                     )
-                    / 3
-                )
-                + x["mean test score"] / 3
-            ),
-            axis=1,
-            role={"aa split score": StatisticRole()},
-        )
-        best_index = aa_split_scores.idxmax()
-        score_dict = score_table.loc[best_index, :].transpose().to_records()[0]
+                    + x["mean test score"] / 3
+                ),
+                axis=1,
+                role={"aa split score": StatisticRole()},
+            )
+            best_index = aa_split_scores.idxmax()
+            best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
+            score_dict = score_table.loc[best_index, :].transpose().to_records()[0]
+        else:
+            best_index = 0
+            best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
+            score_dict = if_param_scores.loc[best_index, :].transpose().to_records()[0]
         best_score_stat = OneAADictReporter.convert_flat_dataset(score_dict)
         self.key = "best split statistics"
         result = self._set_value(data, best_score_stat)
-        return {"index": best_index, "data": result}
+        return {"best_split_id": best_split_id, "data": result}
 
     def _set_best_split(
-        self, data: ExperimentData, score_table: Dataset, best_index: int
+        self,
+        data: ExperimentData,
+        best_splitter_id: str,
     ) -> ExperimentData:
         self.key = "best splitter"
-        best_splitter_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
         result = data.set_value(
             ExperimentDataEnum.variables, self.id, best_splitter_id, self.key
         )
@@ -149,19 +167,29 @@ class AAScoreAnalyzer(Executor):
         return result
 
     def _analyze_best_split(
-        self, data: ExperimentData, score_table: Dataset
+        self,
+        data: ExperimentData,
+        score_table: Dataset,
+        if_param_scores: Optional[Dataset] = None,
     ) -> ExperimentData:
-        best_split = self._get_best_split(data, score_table)
-        return self._set_best_split(
-            best_split["data"], score_table, best_split["index"]
-        )
+        best_split = self._get_best_split(data, score_table, if_param_scores)
+        return self._set_best_split(best_split["data"], best_split["best_split_id"])
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        score_table_id = data.get_one_id(
+        param_experiment_id = data.get_one_id(
             ParamsExperiment, ExperimentDataEnum.analysis_tables, "AATest"
         )
-        score_table = data.analysis_tables[score_table_id]
-
+        ifparam_experiment_id = data.get_ids(
+            IfParamsExperiment,
+            ExperimentDataEnum.analysis_tables,
+        )
+        score_table = data.analysis_tables[param_experiment_id]
+        if_param_scores = (
+            None
+            if len(ifparam_experiment_id["IfParamsExperiment"]["analysis_tables"]) == 0
+            else data.analysis_tables[
+                ifparam_experiment_id["IfParamsExperiment"]["analysis_tables"][0]
+            ]
+        )
         data = self._analyze_aa_score(data, score_table)
-        data = self._analyze_best_split(data, score_table)
-        return data
+        return self._analyze_best_split(data, score_table, if_param_scores)

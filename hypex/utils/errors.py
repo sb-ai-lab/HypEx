@@ -89,7 +89,3 @@ class PairsNotFoundError(Exception):
         super().__init__(
             "Pairs are not found. Check your input data and try execute preprocessing pipline before matching estimation."
         )
-
-class DatasetSizeError(Exception):
-    def __init__(self, size):
-        super().__init__(f"The Dataset is of wrong size. Got {size}")

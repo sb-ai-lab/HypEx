@@ -3,11 +3,11 @@ from typing import Optional, List, Dict, Sequence, Any
 
 from tqdm.auto import tqdm
 
-from ..dataset import ExperimentData, Dataset
-from ..dataset import TempGroupingRole
-from ..executor import Executor
+from ..dataset import ExperimentData, Dataset, GroupingRole, ABCRole
+from ..executor import Executor, IfExecutor
 from .base import Experiment
 from ..reporters import Reporter, DatasetReporter
+from ..utils.enums import ExperimentDataEnum
 
 
 class ExperimentWithReporter(Experiment):
@@ -21,14 +21,25 @@ class ExperimentWithReporter(Experiment):
         super().__init__(executors, transformer, key)
         self.reporter = reporter
 
-    def one_iteration(self, data: ExperimentData, key: str = ""):
+    def one_iteration(
+        self, data: ExperimentData, key: str = "", set_key_as_index: bool = False
+    ):
         t_data = ExperimentData(data.ds)
         self.key = key
         t_data = super().execute(t_data)
-        return self.reporter.report(t_data)
+        result = self.reporter.report(t_data)
+        if set_key_as_index:
+            result.index = [key]
+        return result
 
-    def _set_result(self, data: ExperimentData, result: List[Dataset]):
-        result = result[0].append(result[1:], True)
+    def _set_result(
+        self, data: ExperimentData, result: List[Dataset], reset_index: bool = True
+    ):
+        result = (
+            result[0].append(result[1:], reset_index=reset_index)
+            if len(result) > 1
+            else result[0]
+        )
         return self._set_value(data, result)
 
 
@@ -55,16 +66,29 @@ class CycledExperiment(ExperimentWithReporter):
 
 
 class GroupExperiment(ExperimentWithReporter):
+    def __init__(
+        self,
+        executors: Sequence[Executor],
+        reporter: Reporter,
+        searching_role: ABCRole = GroupingRole(),
+        transformer: Optional[bool] = None,
+        key: str = "",
+    ):
+        self.searching_role = searching_role
+        super().__init__(executors, reporter, transformer, key)
+
     def generate_params_hash(self) -> str:
         return f"GroupExperiment: {self.reporter.__class__.__name__}"
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field = data.ds.search_columns(TempGroupingRole(), tmp_role=True)
+        group_field = data.ds.search_columns(self.searching_role)
         result: List[Dataset] = [
-            self.one_iteration(group_data, str(group))
+            self.one_iteration(
+                ExperimentData(group_data), str(group[0]), set_key_as_index=True
+            )
             for group, group_data in tqdm(data.ds.groupby(group_field))
         ]
-        return self._set_result(data, result)
+        return self._set_result(data, result, reset_index=False)
 
 
 class ParamsExperiment(ExperimentWithReporter):
@@ -129,3 +153,32 @@ class ParamsExperiment(ExperimentWithReporter):
             report = self.reporter.report(t_data)
             results.append(report)
         return self._set_result(data, results)
+
+
+class IfParamsExperiment(ParamsExperiment):
+    def __init__(
+        self,
+        executors: Sequence[Executor],
+        reporter: DatasetReporter,
+        params: Dict[type, Dict[str, Sequence[Any]]],
+        stopping_criterion: IfExecutor,
+        transformer: Optional[bool] = None,
+        key: str = "",
+    ):
+        self.stopping_criterion = stopping_criterion
+        super().__init__(executors, reporter, params, transformer, key)
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        self._update_flat_params()
+        for flat_param in self._flat_params:
+            t_data = ExperimentData(data.ds)
+            for executor in self.executors:
+                executor.set_params(flat_param)
+                t_data = executor.execute(t_data)
+            if_result = self.stopping_criterion.execute(t_data)
+            if_executor_id = if_result.get_one_id(
+                self.stopping_criterion.__class__, ExperimentDataEnum.variables
+            )
+            if if_result.variables[if_executor_id]["response"]:
+                return self._set_result(data, [self.reporter.report(t_data)])
+        return data

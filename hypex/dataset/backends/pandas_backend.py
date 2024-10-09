@@ -381,7 +381,12 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
         ).reset_index()
 
-    def fillna(self, values, method, **kwargs) -> pd.DataFrame:
+    def fillna(
+        self,
+        values: Union[ScalarType, Dict[str, ScalarType], None] = None,
+        method: Optional[Literal["bfill", "ffill"]] = None,
+        **kwargs,
+    ) -> pd.DataFrame:
         return self.data.fillna(value=values, method=method, **kwargs)
 
     def na_counts(self) -> Union[pd.DataFrame, int]:
@@ -402,17 +407,22 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     ) -> pd.DataFrame:
         return self.data.dropna(how=how, subset=subset)
 
-    def transpose(self, names: Optional[Sequence[str]]) -> pd.DataFrame:
+    def transpose(self, names: Optional[Sequence[str]] = None) -> pd.DataFrame:
         result = self.data.transpose()
-        if names:
+        if names is not None:
             result.columns = names
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
+    def sample(
+        self,
+        frac: Optional[float] = None,
+        n: Optional[int] = None,
+        random_state: Optional[int] = None,
+    ) -> pd.DataFrame:
+        return self.data.sample(n=n, frac=frac, random_state=random_state)
+
     def cov(self):
         return self.data.cov(ddof=0)
-
-    def shuffle(self, random_state: Optional[int] = None) -> pd.DataFrame:
-        return self.data.sample(self.data.shape[0], random_state=random_state)
 
     def quantile(self, q: float = 0.5) -> pd.DataFrame:
         return self.agg(func="quantile", q=q)
@@ -429,12 +439,12 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def merge(
         self,
-        right: "PandasDataset",  # should be PandasDataset.
-        on: str = None,
-        left_on: str = None,
-        right_on: str = None,
-        left_index: bool = None,
-        right_index: bool = None,
+        right: "PandasDataset",
+        on: Optional[str] = None,
+        left_on: Optional[str] = None,
+        right_on: Optional[str] = None,
+        left_index: Optional[bool] = None,
+        right_index: Optional[bool] = None,
         suffixes: Tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> pd.DataFrame:
@@ -495,26 +505,3 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         self, labels: str = "", fill_value: Optional[str] = None
     ) -> pd.DataFrame:
         return self.data.reindex(labels, fill_value=fill_value)
-
-    def cut(
-        self,
-        bins: Union[int, Sequence[ScalarType]],
-        right: bool = True,
-        labels: Union[Sequence[ScalarType], bool, None] = None,
-        retbins: bool = False,
-        precision: int = 3,
-        include_lowest: bool = False,
-        duplicates: Literal["raise", "drop"] = "raise",
-        ordered: bool = True,
-    ) -> pd.DataFrame:
-        return pd.cut(
-                x=self.data.iloc[:, 0],
-                bins=bins,
-                right=right,
-                labels=labels,
-                retbins=retbins,
-                precision=precision,
-                include_lowest=include_lowest,
-                duplicates=duplicates,
-                ordered=ordered,
-        )

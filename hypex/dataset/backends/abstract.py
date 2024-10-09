@@ -13,7 +13,7 @@ from typing import (
     Tuple,
 )
 
-from ...utils import AbstractMethodError, FromDictTypes, ScalarType
+from ...utils import AbstractMethodError, FromDictTypes
 
 
 class DatasetBackendNavigation(ABC):
@@ -399,29 +399,11 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def shuffle(self, random_state) -> Any:
-        raise AbstractMethodError
-
-    @abstractmethod
     def rename(self, columns: Dict[str, str]) -> Any:
         return AbstractMethodError
 
     @abstractmethod
     def replace(
         self, to_replace: Any = None, value: Any = None, regex: bool = False
-    ) -> Any:
-        raise AbstractMethodError
-
-    @abstractmethod
-    def cut(
-        self,
-        bins: Union[int, Sequence[ScalarType]],
-        right: bool = True,
-        labels: Union[Sequence[ScalarType], bool, None] = None,
-        retbins: bool = False,
-        precision: int = 3,
-        include_lowest: bool = False,
-        duplicates: Literal["raise", "drop"] = "raise",
-        ordered: bool = True,
     ) -> Any:
         raise AbstractMethodError

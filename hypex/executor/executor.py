@@ -261,3 +261,39 @@ class MLExecutor(Calculator, ABC):
             features_fields=features_fields,
         )
         return self._set_value(data, compare_result)
+
+
+class IfExecutor(Executor, ABC):
+    def __init__(
+        self,
+        if_executor: Optional[Executor] = None,
+        else_executor: Optional[Executor] = None,
+        key: Any = "",
+    ):
+        self.if_executor = if_executor
+        self.else_executor = else_executor
+        super().__init__(key)
+
+    @abstractmethod
+    def check_rule(self, data, **kwargs) -> bool:
+        raise AbstractMethodError
+
+    def _set_value(
+        self, data: ExperimentData, value: Any, key: Any = None
+    ) -> ExperimentData:
+        return data.set_value(
+            ExperimentDataEnum.variables, self.id, value, key="response"
+        )
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        if self.check_rule(data):
+            return (
+                self.if_executor.execute(data)
+                if self.if_executor is not None
+                else self._set_value(data, True)
+            )
+        return (
+            self.else_executor.execute(data)
+            if self.else_executor is not None
+            else self._set_value(data, False)
+        )

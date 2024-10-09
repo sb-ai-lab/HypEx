@@ -58,7 +58,9 @@ class OnDictReporter(Reporter, ABC):
 class DatasetReporter(OnDictReporter):
     def report(self, data: ExperimentData) -> Union[Dict[str, Dataset], Dataset]:
         dict_result = self.dict_reporter.report(data)
-        return self.convert_to_dataset(dict_result)
+        return self.convert_to_dataset(
+            dict_result
+        )  #   TODO: change to DatasetAdapter.to_dataset()
 
     @staticmethod
     def convert_to_dataset(data: Dict) -> Union[Dict[str, Dataset], Dataset]:
