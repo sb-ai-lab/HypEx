@@ -22,7 +22,9 @@ ONE_AA_TEST = Experiment(
         GroupSizes(grouping_role=AdditionalTreatmentRole()),
         OnRoleExperiment(
             executors=[
-                GroupDifference(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
+                GroupDifference(
+                    compare_by="groups", grouping_role=AdditionalTreatmentRole()
+                ),
                 TTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
                 KSTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
                 Chi2Test(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
@@ -39,7 +41,9 @@ ONE_AA_TEST_WITH_STRATIFICATION = Experiment(
         GroupSizes(grouping_role=AdditionalTreatmentRole()),
         OnRoleExperiment(
             executors=[
-                GroupDifference(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
+                GroupDifference(
+                    compare_by="groups", grouping_role=AdditionalTreatmentRole()
+                ),
                 TTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
                 KSTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
                 Chi2Test(compare_by="groups", grouping_role=AdditionalTreatmentRole()),

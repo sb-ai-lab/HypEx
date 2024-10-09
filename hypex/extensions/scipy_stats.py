@@ -9,7 +9,7 @@ from .abstract import CompareExtension
 
 class StatTest(CompareExtension):
     def __init__(
-        self, test_function: Optional[Callable] = None, reliability: float = 0.05
+            self, test_function: Optional[Callable] = None, reliability: float = 0.05
     ):
         super().__init__()
         self.test_function = test_function
@@ -35,7 +35,7 @@ class StatTest(CompareExtension):
         return other
 
     def _calc_pandas(
-        self, data: Dataset, other: Union[Dataset, None] = None, **kwargs
+            self, data: Dataset, other: Union[Dataset, None] = None, **kwargs
     ) -> Union[float, Dataset]:
         other = self.check_data(data, other)
         if self.test_function is None:
@@ -85,7 +85,7 @@ class Chi2TestExtensionExtension(StatTest):
         ].fillna(0)
 
     def _calc_pandas(
-        self, data: Dataset, other: Optional[Dataset] = None, **kwargs
+            self, data: Dataset, other: Optional[Dataset] = None, **kwargs
     ) -> Union[float, Dataset]:
         other = self.check_data(data, other)
         matrix = self.matrix_preparation(data, other)
@@ -102,9 +102,9 @@ class Chi2TestExtensionExtension(StatTest):
         one_result = chi2_contingency(matrix.backend.data)
         return DatasetAdapter.to_dataset(
             {
-                "p-value": one_result.pvalue,
-                "statistic": one_result.statistic,
-                "pass": one_result.pvalue < self.reliability,
+                "p-value": one_result[1] if isinstance(one_result, tuple) else one_result.pvalue,
+                "statistic": one_result[0] if isinstance(one_result, tuple) else one_result.statistic,
+                "pass": (one_result[1] if isinstance(one_result, tuple) else one_result.pvalue) < self.reliability,
             },
             StatisticRole(),
         )
@@ -112,7 +112,7 @@ class Chi2TestExtensionExtension(StatTest):
 
 class NormCDF(StatTest):
     def _calc_pandas(
-        self, data: Dataset, other: Optional[Dataset] = None, **kwargs
+            self, data: Dataset, other: Optional[Dataset] = None, **kwargs
     ) -> Union[float, Dataset]:
         result = norm.cdf(abs(data.get_values()[0][0]))
         return DatasetAdapter.to_dataset(

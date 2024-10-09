@@ -35,7 +35,11 @@ class ExperimentWithReporter(Experiment):
     def _set_result(
         self, data: ExperimentData, result: List[Dataset], reset_index: bool = True
     ):
-        result = result[0].append(result[1:], reset_index=reset_index) if len(result) > 1 else result[0]
+        result = (
+            result[0].append(result[1:], reset_index=reset_index)
+            if len(result) > 1
+            else result[0]
+        )
         return self._set_value(data, result)
 
 

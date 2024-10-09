@@ -32,17 +32,24 @@ class OneAAStatAnalyzer(Executor):
                 # t_data.data.index = analysis_ids
                 for field in ["p-value", "pass"]:
                     analysis_data[f"mean {class_} {field}"] = t_data[field].mean()
-        analysis_data["mean test score"] = (
-            analysis_data["mean TTest p-value"]
-            + 2 * analysis_data["mean KSTest p-value"]
-        )
+        analysis_data["mean test score"] = 0
+        sum_weight = 0
+        if (
+            "mean TTest p-value" in analysis_data
+            and "mean KSTest p-value" in analysis_data
+        ):
+            analysis_data["mean test score"] = (
+                analysis_data["mean TTest p-value"]
+                + 2 * analysis_data["mean KSTest p-value"]
+            )
+            sum_weight += 3
         if "mean Chi2Test p-value" in analysis_data:
             analysis_data["mean test score"] += (
                 2 * analysis_data["mean Chi2Test p-value"]
             )
-            analysis_data["mean test score"] /= 5
-        else:
-            analysis_data["mean test score"] /= 3
+            sum_weight += 2
+        if sum_weight:
+            analysis_data["mean test score"] /= sum_weight
 
         analysis_dataset = Dataset.from_dict(
             [analysis_data],
@@ -118,6 +125,7 @@ class AAScoreAnalyzer(Executor):
                                 sum(
                                     x[key] * value
                                     for key, value in self.__feature_weights.items()
+                                    if isinstance(value, float) and value > 0
                                 )
                                 / len(self.__feature_weights)
                             )
@@ -131,31 +139,23 @@ class AAScoreAnalyzer(Executor):
                 role={"aa split score": StatisticRole()},
             )
             best_index = aa_split_scores.idxmax()
+            best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
             score_dict = score_table.loc[best_index, :].transpose().to_records()[0]
         else:
             best_index = 0
+            best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
             score_dict = if_param_scores.loc[best_index, :].transpose().to_records()[0]
         best_score_stat = OneAADictReporter.convert_flat_dataset(score_dict)
         self.key = "best split statistics"
         result = self._set_value(data, best_score_stat)
-        return {"index": best_index, "data": result}
+        return {"best_split_id": best_split_id, "data": result}
 
     def _set_best_split(
         self,
         data: ExperimentData,
-        score_table: Dataset,
-        best_index: int,
-        if_param_scores: Optional[Dataset] = None,
+        best_splitter_id: str,
     ) -> ExperimentData:
         self.key = "best splitter"
-        if if_param_scores is None:
-            best_splitter_id = score_table.loc[best_index, "splitter_id"].get_values(
-                0, 0
-            )
-        else:
-            best_splitter_id = if_param_scores.loc[
-                best_index, "splitter_id"
-            ].get_values(0, 0)
         result = data.set_value(
             ExperimentDataEnum.variables, self.id, best_splitter_id, self.key
         )
@@ -173,9 +173,7 @@ class AAScoreAnalyzer(Executor):
         if_param_scores: Optional[Dataset] = None,
     ) -> ExperimentData:
         best_split = self._get_best_split(data, score_table, if_param_scores)
-        return self._set_best_split(
-            best_split["data"], score_table, best_split["index"], if_param_scores
-        )
+        return self._set_best_split(best_split["data"], best_split["best_split_id"])
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         param_experiment_id = data.get_one_id(

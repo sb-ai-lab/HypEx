@@ -31,7 +31,7 @@ class OneAADictReporter(DictReporter):
         for key, value in data.items():
             if ID_SPLIT_SYMBOL in key:
                 key_split = key.split(ID_SPLIT_SYMBOL)
-                if key_split[2] in ("pass", "p-value"):
+                if key_split[2] in ("pass", "p-value", "difference", "difference %"):
                     if key_split[0] not in dict_result:
                         dict_result[key_split[0]] = {
                             key_split[3]: {key_split[1]: {key_split[2]: value}}
@@ -57,8 +57,12 @@ class OneAADictReporter(DictReporter):
             for group, tests in groups.items():
                 t_values = {"feature": feature, "group": group}
                 for test, values in tests.items():
-                    t_values[f"{test} pass"] = values["pass"]
-                    t_values[f"{test} p-value"] = values["p-value"]
+                    if test == "GroupDifference":
+                        t_values["difference"] = values["difference"]
+                        t_values["difference %"] = values["difference %"]
+                    else:
+                        t_values[f"{test} pass"] = values["pass"]
+                        t_values[f"{test} p-value"] = values["p-value"]
                 result.append(t_values)
         result = [OneAADictReporter.rename_passed(d) for d in result]
         return Dataset.from_dict(
@@ -152,7 +156,7 @@ class AAPassedReporter(Reporter):
 
     @staticmethod
     def _reformat_best_split_table(table: Dataset) -> Dataset:
-        passed = table.loc[:, [c for c in table.columns if c.endswith("pass")]]
+        passed = table.loc[:, [c for c in table.columns if (c.endswith("pass"))]]
         new_index = table.apply(
             lambda x: f"{x['feature']}{ID_SPLIT_SYMBOL}{x['group']}",
             {"index": InfoRole()},
@@ -197,12 +201,17 @@ class AAPassedReporter(Reporter):
             "AAScoreAnalyzer", ExperimentDataEnum.analysis_tables
         )
         analyser_tables = {
-            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1 :]: data.analysis_tables[id_]
+            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1:]: data.analysis_tables[id_]
             for id_ in analyser_ids["AAScoreAnalyzer"][
                 ExperimentDataEnum.analysis_tables.value
             ]
         }
-        return self._detect_pass(analyser_tables)
+        result = self._detect_pass(analyser_tables)
+        differences = analyser_tables["best split statistics"].loc[:,
+                      ["feature", "group", "difference", "difference %"]]
+        result = result.merge(differences, on=["feature", "group"], how="left")
+        result = result[["feature", "group"] + [c for c in result.columns if c not in ["feature", "group"]]]
+        return result
 
 
 class AABestSplitReporter(Reporter):

@@ -1,8 +1,8 @@
 from typing import Optional
 
-from hypex.analyzers.aa import OneAAStatAnalyzer
-from hypex.executor.executor import Executor, IfExecutor
-from hypex.utils.enums import ExperimentDataEnum
+from ..analyzers.aa import OneAAStatAnalyzer
+from ..executor.executor import Executor, IfExecutor
+from ..utils.enums import ExperimentDataEnum
 
 
 class IfAAExecutor(IfExecutor):

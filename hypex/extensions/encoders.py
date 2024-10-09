@@ -7,7 +7,9 @@ from ..dataset import Dataset, DatasetAdapter
 from .abstract import Extension
 
 
-class DummyEncoderExtension(Extension): # TODO: role types are being rewritten, needs to be fixed
+class DummyEncoderExtension(
+    Extension
+):  # TODO: role types are being rewritten, needs to be fixed
 
     @staticmethod
     def _calc_pandas(data: Dataset, target_cols: Optional[str] = None, **kwargs):

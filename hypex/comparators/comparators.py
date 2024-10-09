@@ -39,7 +39,9 @@ class GroupDifference(Comparator):
             "control mean": control_mean,
             "test mean": test_mean,
             "difference": test_mean - control_mean,
-            "difference %": (test_mean / control_mean - 1) * 100,
+            "difference %": (
+                (test_mean / control_mean - 1) * 100 if control_mean != 0 else None
+            ),
         }
 
 
