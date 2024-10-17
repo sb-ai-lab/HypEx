@@ -74,12 +74,23 @@ class Chi2TestExtensionExtension(StatTest):
     def mini_category_replace(counts: Dataset) -> Dataset:
         mini_counts = counts["count"][counts["count"] < 7]
         if len(mini_counts) > 0:
-            counts["other"] = mini_counts["count"].sum()
+            counts = counts[
+                ~counts.iloc[:, 0].isin(
+                    mini_counts.get_values(column=mini_counts.columns[0])
+                )
+            ]
+            counts = counts.append(
+                Dataset.from_dict(
+                    [{counts.columns[0]: "other", "count": mini_counts["count"].sum()}],
+                    roles=mini_counts.roles,
+                )
+            )
+        return counts
 
-    @staticmethod
-    def matrix_preparation(data: Dataset, other: Dataset) -> Optional[Dataset]:
+    def matrix_preparation(self, data: Dataset, other: Dataset) -> Optional[Dataset]:
         proportion = len(data) / (len(data) + len(other))
         counted_data = data.value_counts()
+        counted_data = self.mini_category_replace(counted_data)
         data_vc = counted_data["count"] * (1 - proportion)
         other_vc = other.value_counts()["count"] * proportion
         if len(counted_data) < 2:
@@ -108,12 +119,16 @@ class Chi2TestExtensionExtension(StatTest):
         one_result = chi2_contingency(matrix.backend.data)
         return DatasetAdapter.to_dataset(
             {
-                "p-value": one_result[1]
-                if isinstance(one_result, tuple)
-                else one_result.pvalue,
-                "statistic": one_result[0]
-                if isinstance(one_result, tuple)
-                else one_result.statistic,
+                "p-value": (
+                    one_result[1]
+                    if isinstance(one_result, tuple)
+                    else one_result.pvalue
+                ),
+                "statistic": (
+                    one_result[0]
+                    if isinstance(one_result, tuple)
+                    else one_result.statistic
+                ),
                 "pass": (
                     one_result[1]
                     if isinstance(one_result, tuple)
