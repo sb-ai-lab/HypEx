@@ -74,17 +74,13 @@ class Chi2TestExtensionExtension(StatTest):
     def mini_category_replace(counts: Dataset) -> Dataset:
         mini_counts = counts["count"][counts["count"] < 7]
         if len(mini_counts) > 0:
-            counts = counts[
-                ~counts.iloc[:, 0].isin(
-                    mini_counts.get_values(column=mini_counts.columns[0])
-                )
-            ]
             counts = counts.append(
                 Dataset.from_dict(
                     [{counts.columns[0]: "other", "count": mini_counts["count"].sum()}],
                     roles=mini_counts.roles,
                 )
             )
+            counts = counts[counts["other"] >= 7]
         return counts
 
     def matrix_preparation(self, data: Dataset, other: Dataset) -> Optional[Dataset]:
@@ -92,7 +88,11 @@ class Chi2TestExtensionExtension(StatTest):
         counted_data = data.value_counts()
         counted_data = self.mini_category_replace(counted_data)
         data_vc = counted_data["count"] * (1 - proportion)
-        other_vc = other.value_counts()["count"] * proportion
+
+        counted_other = other.value_counts()
+        counted_other = self.mini_category_replace(counted_other)
+        other_vc = counted_other["count"] * proportion
+
         if len(counted_data) < 2:
             return None
         data_vc = data_vc.add_column(counted_data[counted_data.columns[0]])
