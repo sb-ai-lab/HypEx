@@ -80,7 +80,7 @@ class Chi2TestExtensionExtension(StatTest):
                     roles=mini_counts.roles,
                 )
             )
-            counts = counts[counts["other"] >= 7]
+            counts = counts[counts["count"] >= 7]
         return counts
 
     def matrix_preparation(self, data: Dataset, other: Dataset) -> Optional[Dataset]:
