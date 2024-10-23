@@ -1,6 +1,8 @@
 import warnings
 from typing import List, Literal, Union
 
+from .experiments import GroupExperiment
+from .reporters.matching import MatchingDatasetReporter
 from .analyzers.matching import MatchingAnalyzer
 from .comparators import TTest
 from .comparators.distances import MahalanobisDistance
@@ -17,9 +19,9 @@ class Matching(ExperimentShell):
 
     @staticmethod
     def _make_experiment(
+        group_match: bool = False,
         distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-        two_sides: bool = True,
-        metric: Literal["atc", "att", "ate", "auto"] = "auto",
+        metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: Union[
             Literal["smd", "psi", "ks-test", "repeats", "auto"],
@@ -29,15 +31,19 @@ class Matching(ExperimentShell):
         distance_mapping = {
             "mahalanobis": MahalanobisDistance(grouping_role=TreatmentRole())
         }
+        two_sides = True if metric == "ate" else False
+        test_pairs = True if metric == "atc" else False
         executors: List[Executor] = [
-            FaissNearestNeighbors(grouping_role=TreatmentRole(), two_sides=two_sides)
+            FaissNearestNeighbors(
+                grouping_role=TreatmentRole(),
+                two_sides=two_sides,
+                test_pairs=test_pairs,
+            )
         ]
         if bias_estimation:
             executors += [
                 Bias(grouping_role=TreatmentRole(), target_roles=[TargetRole()]),
             ]
-        if metric in ["atc", "ate"] and not two_sides:
-            raise ValueError(f"Can not estimate {metric} while two_sides is False")
         executors += [
             MatchingMetrics(
                 grouping_role=TreatmentRole(),
@@ -54,19 +60,30 @@ class Matching(ExperimentShell):
         ]
         if quality_tests != "auto":
             warnings.warn("Now quality tests aren't supported yet")
-        return Experiment(
-            executors=(
-                executors
-                if distance == "l2"
-                else [distance_mapping[distance]] + executors
+        return (
+            Experiment(
+                executors=(
+                    executors
+                    if distance == "l2"
+                    else [distance_mapping[distance]] + executors
+                )
+            )
+            if not group_match
+            else GroupExperiment(
+                executors=(
+                    executors
+                    if distance == "l2"
+                    else [distance_mapping[distance]] + executors
+                ),
+                reporter=MatchingDatasetReporter(),
             )
         )
 
     def __init__(
         self,
+        group_match: bool = False,
         distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-        two_sides: bool = True,
-        metric: Literal["atc", "att", "ate", "auto"] = "auto",
+        metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: Union[
             Literal["smd", "psi", "ks-test", "repeats", "auto"],
@@ -75,7 +92,7 @@ class Matching(ExperimentShell):
     ):
         super().__init__(
             experiment=self._make_experiment(
-                distance, two_sides, metric, bias_estimation, quality_tests
+                group_match, distance, metric, bias_estimation, quality_tests
             ),
-            output=MatchingOutput(),
+            output=MatchingOutput(GroupExperiment if group_match else MatchingAnalyzer),
         )

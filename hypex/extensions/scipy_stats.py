@@ -1,6 +1,7 @@
+import warnings
 from typing import Callable, Union, Optional
 
-from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind  # type: ignore
+from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind, norm  # type: ignore
 
 from ..dataset import Dataset, StatisticRole, DatasetAdapter
 from .abstract import CompareExtension
@@ -14,7 +15,7 @@ class StatTest(CompareExtension):
         self.test_function = test_function
         self.reliability = reliability
 
-    @staticmethod
+    @staticmethod  # TODO: remove
     def check_other(other: Union[Dataset, None]) -> Dataset:
         if other is None:
             raise ValueError("No other dataset provided")
@@ -53,28 +54,47 @@ class StatTest(CompareExtension):
         return one_result
 
 
-class TTestExtension(StatTest):
+class TTestExtensionExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ttest_ind, reliability=reliability)
 
 
-class KSTestExtension(StatTest):
+class KSTestExtensionExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ks_2samp, reliability=reliability)
 
 
-class UTestExtension(StatTest):
+class UTestExtensionExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(mannwhitneyu, reliability=reliability)
 
 
-class Chi2TestExtension(StatTest):
+class Chi2TestExtensionExtension(StatTest):
     @staticmethod
-    def matrix_preparation(data: Dataset, other: Dataset):
+    def mini_category_replace(counts: Dataset) -> Dataset:
+        mini_counts = counts["count"][counts["count"] < 7]
+        if len(mini_counts) > 0:
+            counts = counts.append(
+                Dataset.from_dict(
+                    [{counts.columns[0]: "other", "count": mini_counts["count"].sum()}],
+                    roles=mini_counts.roles,
+                )
+            )
+            counts = counts[counts["other"] >= 7]
+        return counts
+
+    def matrix_preparation(self, data: Dataset, other: Dataset) -> Optional[Dataset]:
         proportion = len(data) / (len(data) + len(other))
         counted_data = data.value_counts()
+        counted_data = self.mini_category_replace(counted_data)
         data_vc = counted_data["count"] * (1 - proportion)
-        other_vc = other.value_counts()["count"] * proportion
+
+        counted_other = other.value_counts()
+        counted_other = self.mini_category_replace(counted_other)
+        other_vc = counted_other["count"] * proportion
+
+        if len(counted_data) < 2:
+            return None
         data_vc = data_vc.add_column(counted_data[counted_data.columns[0]])
         other_vc = other_vc.add_column(counted_data[counted_data.columns[0]])
         return data_vc.merge(other_vc, on=counted_data.columns[0])[
@@ -86,12 +106,46 @@ class Chi2TestExtension(StatTest):
     ) -> Union[float, Dataset]:
         other = self.check_data(data, other)
         matrix = self.matrix_preparation(data, other)
+        if matrix is None:
+            warnings.warn(f"Matrix Chi2 is empty for {data.columns[0]}. Returning None")
+            return DatasetAdapter.to_dataset(
+                {
+                    "p-value": None,
+                    "statistic": None,
+                    "pass": None,
+                },
+                StatisticRole(),
+            )
         one_result = chi2_contingency(matrix.backend.data)
         return DatasetAdapter.to_dataset(
             {
-                "p-value": one_result.pvalue,
-                "statistic": one_result.statistic,
-                "pass": one_result.pvalue < self.reliability,
+                "p-value": (
+                    one_result[1]
+                    if isinstance(one_result, tuple)
+                    else one_result.pvalue
+                ),
+                "statistic": (
+                    one_result[0]
+                    if isinstance(one_result, tuple)
+                    else one_result.statistic
+                ),
+                "pass": (
+                    one_result[1]
+                    if isinstance(one_result, tuple)
+                    else one_result.pvalue
+                )
+                < self.reliability,
             },
+            StatisticRole(),
+        )
+
+
+class NormCDF(StatTest):
+    def _calc_pandas(
+        self, data: Dataset, other: Optional[Dataset] = None, **kwargs
+    ) -> Union[float, Dataset]:
+        result = norm.cdf(abs(data.get_values()[0][0]))
+        return DatasetAdapter.to_dataset(
+            {"p-value": 2 * (1 - result)},
             StatisticRole(),
         )

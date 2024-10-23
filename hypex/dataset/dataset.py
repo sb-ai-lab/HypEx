@@ -364,6 +364,7 @@ class Dataset(DatasetBase):
         **kwargs,
     ) -> List[Tuple[str, "Dataset"]]:
         if isinstance(by, Dataset) and len(by.columns) == 1:
+            self.data = self.data.reset_index(drop=True)
             datasets = [
                 (group, Dataset(roles=self.roles, data=self.data.loc[group_data.index]))
                 for group, group_data in by._backend.groupby(by=by.columns[0], **kwargs)
@@ -473,7 +474,10 @@ class Dataset(DatasetBase):
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
         )
         t_roles = self.roles
-        t_roles["proportion" if normalize else "count"] = StatisticRole()
+        column_name = "proportion" if normalize else "count"
+        if column_name not in t_data:
+            t_data = t_data.rename(columns={0: column_name})
+        t_roles[column_name] = StatisticRole()
         return Dataset(roles=t_roles, data=t_data)
 
     def na_counts(self):
@@ -834,7 +838,11 @@ class DatasetAdapter(Adapter):
         """
         roles_names = list(data.keys())
         if any(
-            isinstance(i, Union[int, str, float, bool]) for i in list(data.values())
+            # isinstance(i, Union[int, str, float, bool]) for i in list(data.values())
+            [
+                any(isinstance(i, t) for t in [int, str, float, bool])
+                for i in list(data.values())
+            ]
         ):
             data = [data]
         if isinstance(roles, Dict):

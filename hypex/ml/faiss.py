@@ -1,7 +1,13 @@
 from typing import Optional, Any, Dict
 
 from ..comparators.distances import MahalanobisDistance
-from ..dataset import Dataset, ABCRole, FeatureRole, ExperimentData, AdditionalMatchingRole
+from ..dataset import (
+    Dataset,
+    ABCRole,
+    FeatureRole,
+    ExperimentData,
+    AdditionalMatchingRole,
+)
 from ..executor import MLExecutor
 from ..extensions.faiss import FaissExtension
 from ..utils import SpaceEnum, ExperimentDataEnum
@@ -13,12 +19,13 @@ class FaissNearestNeighbors(MLExecutor):
         self,
         n_neighbors: int = 1,
         two_sides: bool = False,
+        test_pairs: bool = False,
         grouping_role: Optional[ABCRole] = None,
-        space: SpaceEnum = SpaceEnum.auto,
         key: Any = "",
     ):
         self.n_neighbors = n_neighbors
         self.two_sides = two_sides
+        self.test_pairs = test_pairs
         super().__init__(
             grouping_role=grouping_role, target_role=FeatureRole(), key=key
         )
@@ -30,19 +37,38 @@ class FaissNearestNeighbors(MLExecutor):
         target_field: Optional[str] = None,
         n_neighbors: Optional[int] = None,
         two_sides: Optional[bool] = None,
+        test_pairs: Optional[bool] = None,
         **kwargs,
     ) -> Dict:
+        if test_pairs is not True:
+            data = cls._inner_function(
+                data=grouping_data[0][1],
+                test_data=grouping_data[1][1],
+                n_neighbors=n_neighbors or 1,
+                **kwargs,
+            )
+            if two_sides is not True:
+                return {"test": data}
+            return {
+                "test": data,
+                "control": cls._inner_function(
+                    data=grouping_data[1][1],
+                    test_data=grouping_data[0][1],
+                    n_neighbors=n_neighbors or 1,
+                    **kwargs,
+                ),
+            }
         data = cls._inner_function(
-            data=grouping_data[0][1],
-            test_data=grouping_data[1][1],
+            data=grouping_data[1][1],
+            test_data=grouping_data[0][1],
             n_neighbors=n_neighbors or 1,
             **kwargs,
         )
-        if two_sides is None or two_sides == False:
-            return {"test": data}
+        if two_sides is not True:
+            return {"control": data}
         return {
-            "test": data,
-            "control": cls._inner_function(
+            "control": data,
+            "test": cls._inner_function(
                 data=grouping_data[1][1],
                 test_data=grouping_data[0][1],
                 n_neighbors=n_neighbors or 1,
@@ -87,6 +113,7 @@ class FaissNearestNeighbors(MLExecutor):
             features_fields=features_fields,
             n_neighbors=self.n_neighbors,
             two_sides=self.two_sides,
+            test_pairs=self.test_pairs,
         )
         ds = data.ds.groupby(group_field)
         matched_indexes = Dataset.create_empty()

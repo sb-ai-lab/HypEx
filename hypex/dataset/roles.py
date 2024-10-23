@@ -171,7 +171,16 @@ class FilterRole(ABCRole):
     _role_name: RoleNameType = "Filter"
 
 
-class TempTreatmentRole(TreatmentRole):
+class ConstGroupRole(ABCRole):
+    _role_name: RoleNameType = "ConstGroup"
+
+
+# ___________________________________________________________________________________________
+class TempRole(ABCRole):
+    _role_name: RoleNameType = "Temp"
+
+
+class TempTreatmentRole(TempRole, TreatmentRole):
     """Role for temp treatment column.
     A temporary role used for transient treatment assignments in executables or during
     experimental processing phases. This role can help manage dynamic treatment group
@@ -183,7 +192,7 @@ class TempTreatmentRole(TreatmentRole):
     _role_name: RoleNameType = "TempTreatment"
 
 
-class TempTargetRole(TargetRole):
+class TempTargetRole(TempRole, TargetRole):
     """Role for temp target column.
     A temporary role for target variables used in intermediate stages of data processing
     or during certain executions in the analysis pipeline. It facilitates operations on
@@ -195,7 +204,7 @@ class TempTargetRole(TargetRole):
     _role_name: RoleNameType = "TempTarget"
 
 
-class TempGroupingRole(GroupingRole):
+class TempGroupingRole(TempRole, GroupingRole):
     """Role for temp grouping column.
     Used temporarily to manage groups in the context of execution cursors or during
     specific phases of data manipulation. This role assists in keeping track of groups
@@ -222,6 +231,7 @@ class ReportRole(ABCRole):
     _role_name: RoleNameType = "Report"
 
 
+# ___________________________________________________________________________________________
 class AdditionalRole(ABCRole):
     """ """
 
@@ -271,6 +281,5 @@ default_roles: Dict[RoleNameType, ABCRole] = {
     "additionaltreatment": AdditionalTreatmentRole(),
     "additionalgrouping": AdditionalGroupingRole(),
     "additionaltarget": AdditionalTargetRole(),
-    "additionalpretarget": AdditionalPreTargetRole(),
     "additionalpretarget": AdditionalPreTargetRole(),
 }

@@ -1,9 +1,6 @@
 from typing import Dict, Any, Union
 
-from ..dataset import (
-    ExperimentData,
-    Dataset
-)
+from ..dataset import ExperimentData, Dataset
 from .aa import OneAADictReporter
 from .abstract import DatasetReporter
 

@@ -42,7 +42,7 @@ class ABDictReporter(OneAADictReporter):
 class ABDatasetReporter(ABDictReporter):
     @staticmethod
     def _invert_aa_format(table: Dataset) -> Dataset:
-        return table.replace('NOT OK', 'N').replace('OK', 'NOT OK').replace('N', 'OK')
+        return table.replace("NOT OK", "N").replace("OK", "NOT OK").replace("N", "OK")
 
     def report(self, data: ExperimentData):
         front_buffer = self.front

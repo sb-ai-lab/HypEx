@@ -10,7 +10,7 @@ class TestPower(Comparator, ABC):
     def __init__(
         self,
         grouping_role: Optional[ABCRole] = None,
-        space: SpaceEnum = SpaceEnum.auto,
+        # space: SpaceEnum = SpaceEnum.auto,
         significance: float = 0.95,
         power: float = 0.8,
         key: Any = "",
@@ -18,7 +18,7 @@ class TestPower(Comparator, ABC):
         super().__init__(
             compare_by="groups",
             grouping_role=grouping_role,
-            space=space,
+            # space=space,
             key=key,
         )
         self.significance = significance
@@ -65,13 +65,11 @@ class MDEBySize(TestPower):
             raise ValueError("test_data is required")
 
         n_test, n_control = len(test_data), len(data)
-        proportion = n_test / (n_test + n_control)
-        p = np.sqrt(1 / (proportion * (1 - proportion)))
 
         var_test, var_control = test_data.var(ddof=1), data.var(ddof=1)
         s = np.sqrt(var_test / n_test + var_control / n_control)
 
-        return p * m * s
+        return m * s
 
 
 #

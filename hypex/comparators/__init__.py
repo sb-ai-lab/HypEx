@@ -2,6 +2,7 @@ from .abstract import StatHypothesisTesting, Comparator
 from .comparators import GroupDifference, GroupSizes
 from .distances import MahalanobisDistance
 from .hypothesis_testing import TTest, KSTest, UTest, Chi2Test
+from .test_power import TestPower, MDEBySize
 
 __all__ = [
     "GroupDifference",
@@ -13,4 +14,6 @@ __all__ = [
     "TTest",
     "Chi2Test",
     "MahalanobisDistance",
+    "TestPower",
+    "MDEBySize",
 ]
