@@ -5,8 +5,8 @@ from pathlib import Path
 from hypex import Matcher
 from hypex.utils.tutorial_data_creation import create_test_data
 
-ROOT = Path("").absolute().parents[0]
-sys.path.append(str(ROOT))
+# ROOT = Path("").absolute().parents[0]
+# sys.path.append(str(ROOT))
 
 
 # добавить дату в данные и пофиксить баги с этим
