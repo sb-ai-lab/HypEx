@@ -4,7 +4,7 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-
+from scipy import stats as st
 
 def permutation_test(df: pd.DataFrame, treatment: str):
     """Replaces real treatment with a random placebo treatment.
