@@ -46,7 +46,7 @@ pip install hypex
 
 ```python
 from hypex import Matcher
-from hypex.utils.tutorial_data_creation import create_test_data
+from hypex.utils import create_test_data
 
 # Define your data and parameters
 df = create_test_data(rs=42, na_step=45, nan_cols=['age', 'gender'])
@@ -62,7 +62,7 @@ results, quality_results, df_matched = model.estimate()
 
 ```python
 from hypex import AATest
-from hypex.utils.tutorial_data_creation import create_test_data
+from hypex.utils import create_test_data
 
 data = create_test_data(rs=52, na_step=10, nan_cols=['age', 'gender'])
 
@@ -78,7 +78,7 @@ results.keys()
 
 ```python
 from hypex import ABTest
-from hypex.utils.tutorial_data_creation import create_test_data
+from hypex.utils import create_test_data
 
 data = create_test_data(rs=52, na_step=10, nan_cols=['age', 'gender'])
 
