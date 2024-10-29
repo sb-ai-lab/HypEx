@@ -40,6 +40,13 @@ from .typings import (
     GroupingDataType,
 )
 
+from .tutorial_data_creation import (
+    create_test_data,
+    gen_special_medicine_df,
+    gen_oracle_df,
+    gen_control_variates_df,
+)
+
 __all__ = [
     "NAME_BORDER_SYMBOL",
     "ID_SPLIT_SYMBOL",
