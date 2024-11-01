@@ -132,6 +132,14 @@ class Dataset(DatasetBase):
             ).backend
         return Dataset(roles=t_roles, data=func(other))
 
+    def _repr_html_(self):
+        df = pd.DataFrame(self.data, columns=self.columns)
+        return df._repr_html_()
+
+    def __repr__(self):
+        df = pd.DataFrame(self.data, columns=self.columns)
+        return repr(df)
+
     # comparison operators:
     def __eq__(self, other):
         return self.__binary_magic_operator(other=other, func_name="__eq__")

@@ -8,6 +8,7 @@ from ..dataset import (
     AdditionalMatchingRole,
     StatisticRole,
     GroupingRole,
+    TargetRole,
 )
 from ..reporters.matching import MatchingDictReporter
 from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL
@@ -73,6 +74,12 @@ class MatchingOutput(Output):
                 },
                 roles={"indexes": AdditionalMatchingRole()},
             )
+
+        reformatted_resume["outcome"] = {
+            key: experiment_data.field_search(TargetRole())[0]
+            for key in reformatted_resume[list(reformatted_resume.keys())[0]].keys()
+        }
+
         self.resume = Dataset.from_dict(
             reformatted_resume,
             roles={

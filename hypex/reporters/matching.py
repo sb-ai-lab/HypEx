@@ -25,7 +25,9 @@ class MatchingDictReporter(DictReporter):
         result = {}
         for key, values in df.items():
             for index, value in zip(indexes, values):
-                result[f"{key}{ID_SPLIT_SYMBOL}{index}"] = value
+                result[f"{key}{ID_SPLIT_SYMBOL}{index}"] = (
+                    round(value, 2) if isinstance(value, float) else value
+                )
         return result
 
     def _extract_from_analyser(self, data: ExperimentData):
