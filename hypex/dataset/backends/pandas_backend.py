@@ -226,7 +226,10 @@ class PandasNavigation(DatasetBackendNavigation):
     def from_dict(
         self, data: FromDictTypes, index: Union[Iterable, Sized, None] = None
     ):
-        self.data = pd.DataFrame().from_records(data)
+        if isinstance(data, Dict):
+            self.data = pd.DataFrame().from_records(data, columns=list(data.keys()))
+        else:
+            self.data = pd.DataFrame().from_records(data)
         if index is not None:
             self.data.index = index
         return self
