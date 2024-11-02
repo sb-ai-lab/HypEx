@@ -170,6 +170,7 @@ def create_test_data(
 
     return data
 
+
 def sigmoid(x: np.ndarray) -> np.ndarray:
     """Logistic sigmoid ufunc for ndarrays.
 
@@ -202,20 +203,14 @@ def sigmoid_division(x, dependent_division=True) -> np.ndarray:
         Binary array coordinated with variable x.
     """
     if dependent_division:
-        division = np.random.binomial(
-            1,
-            sigmoid((x - x.mean()) / x.std())
-        )
+        division = np.random.binomial(1, sigmoid((x - x.mean()) / x.std()))
     else:
         division = np.random.binomial(1, 0.5, size=len(x))
     return division
 
 
 def gen_special_medicine_df(
-        data_size=100,
-        *,
-        dependent_division=True,
-        random_state=None
+    data_size=100, *, dependent_division=True, random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
 
@@ -239,29 +234,27 @@ def gen_special_medicine_df(
         np.random.seed(random_state)
 
     disease_degree = np.random.choice(
-        [1, 2, 3, 4, 5],
-        p=[0.3, 0.3, 0.2, 0.1, 0.1],
-        size=data_size
+        [1, 2, 3, 4, 5], p=[0.3, 0.3, 0.2, 0.1, 0.1], size=data_size
     ).astype(int)
 
     experimental_treatment = sigmoid_division(disease_degree, dependent_division)
 
-    residual_lifetime = np.random.exponential(13 - 2.5 * disease_degree + 1 * experimental_treatment)
+    residual_lifetime = np.random.exponential(
+        13 - 2.5 * disease_degree + 1 * experimental_treatment
+    )
 
-    df = pd.DataFrame(dict(
-        disease_degree=disease_degree,
-        experimental_treatment=experimental_treatment,
-        residual_lifetime=residual_lifetime,
-    ))
+    df = pd.DataFrame(
+        dict(
+            disease_degree=disease_degree,
+            experimental_treatment=experimental_treatment,
+            residual_lifetime=residual_lifetime,
+        )
+    )
     return df
 
 
 def gen_oracle_df(
-        data_size=8,
-        *,
-        dependent_division=True,
-        factual_only=False,
-        random_state=None
+    data_size=8, *, dependent_division=True, factual_only=False, random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
 
@@ -290,18 +283,13 @@ def gen_oracle_df(
     treatment = np.random.binomial(1, 0.5, size=data_size)
 
     if dependent_division:
-        target_feature = np.random.binomial(
-            1,
-            0.3 + 0.4 * treatment
-        )
+        target_feature = np.random.binomial(1, 0.3 + 0.4 * treatment)
     else:
         target_feature = np.random.binomial(1, 0.5, size=data_size)
 
-    target_untreated = np.random.uniform(
-        low=300,
-        high=800,
-        size=data_size
-    ).round(-2).astype(int)
+    target_untreated = (
+        np.random.uniform(low=300, high=800, size=data_size).round(-2).astype(int)
+    )
 
     target_treated = target_untreated + 50 + target_feature * 100
 
@@ -309,26 +297,25 @@ def gen_oracle_df(
         target_untreated = np.where(1 - treatment, target_untreated, np.nan)
         target_treated = np.where(treatment, target_treated, np.nan)
 
-    y_factual = np.where(treatment, target_treated, target_untreated).astype('int')
+    y_factual = np.where(treatment, target_treated, target_untreated).astype("int")
 
     treatment_effect = target_treated - target_untreated
 
-    df = pd.DataFrame(dict(
-        X=target_feature,
-        Target_untreated=target_untreated,
-        Target_treated=target_treated,
-        Treatment=treatment,
-        Target=y_factual,
-        TE=treatment_effect,
-    ))
+    df = pd.DataFrame(
+        dict(
+            X=target_feature,
+            Target_untreated=target_untreated,
+            Target_treated=target_treated,
+            Treatment=treatment,
+            Target=y_factual,
+            TE=treatment_effect,
+        )
+    )
     return df
 
 
 def gen_control_variates_df(
-        data_size=1000,
-        *,
-        dependent_division=True,
-        random_state=None
+    data_size=1000, *, dependent_division=True, random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
 
@@ -344,7 +331,7 @@ def gen_control_variates_df(
             groups independent on the features.
         random_state:
             If specified - defines numpy random seed. Defaults to None.
-            
+
     Returns:
         Synthetic dataframe also containing fictional information about
         features and lagged features.
@@ -362,11 +349,13 @@ def gen_control_variates_df(
     target_lag_1 = 200 + x_feature_lag_1 * 100
     target_factual = 200 + x_feature * 100 + treatment * 10
 
-    df = pd.DataFrame(dict(
-        X_lag_1=x_feature_lag_1,
-        Target_lag_1=target_lag_1,
-        X=x_feature,
-        Treatment=treatment,
-        Target=target_factual,
-    ))
+    df = pd.DataFrame(
+        dict(
+            X_lag_1=x_feature_lag_1,
+            Target_lag_1=target_lag_1,
+            X=x_feature,
+            Treatment=treatment,
+            Target=target_factual,
+        )
+    )
     return df

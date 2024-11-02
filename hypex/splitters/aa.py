@@ -92,7 +92,9 @@ class AASplitter(Calculator):
             control_size = (len(data) * control_size - const_size) / (
                 len(data) - const_size
             )
-        experiment_data = data[data[const_group_field].isna()] if const_group_field else data
+        experiment_data = (
+            data[data[const_group_field].isna()] if const_group_field else data
+        )
         experiment_data = experiment_data.sample(
             frac=sample_size, random_state=random_state
         )

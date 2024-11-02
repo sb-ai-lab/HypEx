@@ -175,6 +175,10 @@ class DatasetBackendNavigation(ABC):
     @abstractmethod
     def __repr__(self):
         raise AbstractMethodError
+    
+    @abstractmethod
+    def _repr_html_(self):
+        raise AbstractMethodError
 
     @abstractmethod
     def create_empty(

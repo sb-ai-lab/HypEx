@@ -201,16 +201,20 @@ class AAPassedReporter(Reporter):
             "AAScoreAnalyzer", ExperimentDataEnum.analysis_tables
         )
         analyser_tables = {
-            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1:]: data.analysis_tables[id_]
+            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1 :]: data.analysis_tables[id_]
             for id_ in analyser_ids["AAScoreAnalyzer"][
                 ExperimentDataEnum.analysis_tables.value
             ]
         }
         result = self._detect_pass(analyser_tables)
-        differences = analyser_tables["best split statistics"].loc[:,
-                      ["feature", "group", "difference", "difference %"]]
+        differences = analyser_tables["best split statistics"].loc[
+            :, ["feature", "group", "difference", "difference %"]
+        ]
         result = result.merge(differences, on=["feature", "group"], how="left")
-        result = result[["feature", "group"] + [c for c in result.columns if c not in ["feature", "group"]]]
+        result = result[
+            ["feature", "group"]
+            + [c for c in result.columns if c not in ["feature", "group"]]
+        ]
         return result
 
 

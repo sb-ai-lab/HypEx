@@ -162,6 +162,9 @@ class PandasNavigation(DatasetBackendNavigation):
     def __repr__(self):
         return self.data.__repr__()
 
+    def _repr_html_(self):
+        return self.data._repr_html_()
+
     def create_empty(
         self,
         index: Optional[Iterable] = None,
@@ -226,7 +229,10 @@ class PandasNavigation(DatasetBackendNavigation):
     def from_dict(
         self, data: FromDictTypes, index: Union[Iterable, Sized, None] = None
     ):
-        self.data = pd.DataFrame().from_records(data)
+        if isinstance(data, Dict):
+            self.data = pd.DataFrame().from_records(data, columns=list(data.keys()))
+        else:
+            self.data = pd.DataFrame().from_records(data)
         if index is not None:
             self.data.index = index
         return self

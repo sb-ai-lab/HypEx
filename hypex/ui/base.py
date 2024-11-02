@@ -9,6 +9,7 @@ from ..utils.enums import RenameEnum
 
 class Output:
     resume: Dataset
+    _experiment_data: ExperimentData
 
     def __init__(
         self,
@@ -22,6 +23,7 @@ class Output:
         self.resume = self.resume_reporter.report(experiment_data)
         for attribute, reporter in self.additional_reporters.items():
             setattr(self, attribute, reporter.report(experiment_data))
+        self._experiment_data = experiment_data
 
     @staticmethod
     def replace_splitters(

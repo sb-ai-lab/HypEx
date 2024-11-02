@@ -98,6 +98,9 @@ class DatasetBase(ABC):
 
     def __repr__(self):
         return self.data.__repr__()
+    
+    def _repr_html_(self):
+        return self.data._repr_html_()
 
     def __len__(self):
         return self._backend.__len__()
