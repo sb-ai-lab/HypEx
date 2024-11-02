@@ -75,8 +75,9 @@ class MatchingOutput(Output):
                 roles={"indexes": AdditionalMatchingRole()},
             )
 
+        outcome = experiment_data.field_search(TargetRole())[0]
         reformatted_resume["outcome"] = {
-            key: experiment_data.field_search(TargetRole())[0]
+            key: outcome
             for key in reformatted_resume[list(reformatted_resume.keys())[0]].keys()
         }
 
