@@ -162,6 +162,9 @@ class PandasNavigation(DatasetBackendNavigation):
     def __repr__(self):
         return self.data.__repr__()
 
+    def _repr_html_(self):
+        return self.data._repr_html_()
+
     def create_empty(
         self,
         index: Optional[Iterable] = None,
