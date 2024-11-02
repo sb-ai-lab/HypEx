@@ -57,7 +57,6 @@ class MatchingDictReporter(DictReporter):
 
 
 class MatchingDatasetReporter(DatasetReporter):
-
     def __init__(self, searching_class: type = MatchingAnalyzer) -> None:
         self.dict_reporter = MatchingDictReporter(searching_class)
         super().__init__(self.dict_reporter)

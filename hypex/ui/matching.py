@@ -83,3 +83,4 @@ class MatchingOutput(Output):
             experiment_data,
             indexes,
         )
+        self.resume = round(self.resume, 2)

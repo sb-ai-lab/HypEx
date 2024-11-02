@@ -101,7 +101,7 @@ class PandasNavigation(DatasetBackendNavigation):
         return ~self.data
 
     def __round__(self, ndigits: int = 0) -> Any:
-        return round(self.data)
+        return round(self.data, ndigits)
 
     # Binary operations:
     def __add__(self, other) -> Any:
