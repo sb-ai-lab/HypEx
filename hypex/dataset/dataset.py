@@ -54,6 +54,13 @@ class Dataset(DatasetBase):
                 data=t_data,
                 roles={k: v for k, v in self.roles.items() if k in t_data.columns},
             )
+        
+        def __setitem__(self, item, value):
+            column_name = item[1]
+            if column_name not in self.backend.data.columns:
+                raise KeyError("Column must be added by using add_column method.")
+            else:
+                self.backend.data.loc[item] = value
 
     class ILocker:
         def __init__(self, backend, roles):
@@ -66,6 +73,13 @@ class Dataset(DatasetBase):
                 data=t_data,
                 roles={k: v for k, v in self.roles.items() if k in t_data.columns},
             )
+        
+        def __setitem__(self, item, value):
+            column_index = item[1]
+            if column_index >= len(self.backend.data.columns):
+                raise IndexError("Column must be added by using add_column method.")
+            else:
+                self.backend.data.iloc[item] = value
 
     def __init__(
         self,
