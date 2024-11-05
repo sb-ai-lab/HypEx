@@ -4,8 +4,10 @@ import numpy as np
 import pandas as pd
 
 
-DATA_SIZE = 1000
 
+@pytest.fixture(scope="session",autouse=True)
+def data_size():
+    return 1_000
 
 @pytest.fixture
 def ab_test():
@@ -13,12 +15,12 @@ def ab_test():
 
 
 @pytest.fixture
-def data():
+def data(data_size):
     # Generate synthetic data for group A
-    group_a_data = np.random.normal(loc=10, scale=2, size=DATA_SIZE)
+    group_a_data = np.random.normal(loc=10, scale=2, size=data_size)
     # Generate synthetic data for group B
-    group_b_data = np.random.normal(loc=12, scale=2, size=DATA_SIZE)
-    group_bp_data = np.random.normal(loc=10, scale=2, size=DATA_SIZE * 2)
+    group_b_data = np.random.normal(loc=12, scale=2, size=data_size)
+    group_bp_data = np.random.normal(loc=10, scale=2, size=data_size * 2)
     return pd.DataFrame(
         {
             "group": ["control"] * len(group_a_data) + ["test"] * len(group_b_data),
@@ -26,7 +28,9 @@ def data():
             "previous_value": group_bp_data,
         }
     )
-
+@pytest.fixture
+def split_ab_result(ab_test, data, group_field):
+    return ab_test.split_ab(data, group_field)
 
 @pytest.fixture
 def target_field():
@@ -39,7 +43,7 @@ def group_field():
 
 
 @pytest.fixture
-def previous_value():
+def previous_value_field():
     return "previous_value"
 
 
