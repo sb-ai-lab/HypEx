@@ -5,7 +5,7 @@ import warnings
 from decimal import Decimal
 from itertools import combinations
 from pathlib import Path
-from typing import Iterable, Union, Optional, Dict, Any, Tuple, List
+from typing import Iterable, Union, Optional, Dict, Any, Tuple, List, Literal
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -86,13 +86,13 @@ class AATest:
     """
 
     def __init__(
-            self,
-            target_fields: Union[Iterable[str], str] = None,
-            group_cols: Union[str, Iterable[str]] = None,
-            info_cols: Union[str, Iterable[str]] = None,
-            quant_field: str = None,
-            mode: str = "simple",
-            alpha: float = 0.05,
+        self,
+        target_fields: Union[Iterable[str], str] = None,
+        group_cols: Union[str, Iterable[str]] = None,
+        info_cols: Union[str, Iterable[str]] = None,
+        quant_field: str = None,
+        mode: str = "simple",
+        alpha: float = 0.05,
     ):
         """Initialize the AATest class.
 
@@ -117,8 +117,8 @@ class AATest:
             [target_fields] if isinstance(target_fields, str) else target_fields
         )
         self.group_cols = (
-                              [group_cols] if isinstance(group_cols, str) else group_cols
-                          ) or []
+            [group_cols] if isinstance(group_cols, str) else group_cols
+        ) or []
         self.info_cols = [info_cols] if isinstance(info_cols, str) else info_cols
         self.quant_field = quant_field
         self.mode = mode
@@ -150,7 +150,7 @@ class AATest:
         }
 
     def __simple_mode(
-            self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
     ) -> Dict:
         """Separates data on A and B samples within simple mode.
         Separation performed to divide groups of equal sizes - equal amount of records
@@ -188,7 +188,7 @@ class AATest:
         return result
 
     def split(
-            self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
     ) -> Dict:
         """Divides sample on two groups.
 
@@ -255,8 +255,8 @@ class AATest:
 
     @staticmethod
     def merge_groups(
-            control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
-            test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
+        control_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
+        test_group: Union[Iterable[pd.DataFrame], pd.DataFrame],
     ) -> pd.DataFrame:
         """Merges test and control groups in one DataFrame and creates column "group".
         Column "group" contains of "test" and "control" values.
@@ -320,7 +320,7 @@ class AATest:
             return 1 - a_mean / b_mean
 
     def sampling_metrics(
-            self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
+        self, data: pd.DataFrame, random_state: int = None, test_size: float = 0.5
     ) -> Dict:
         """Calculates metrics of one sampling.
 
@@ -363,15 +363,15 @@ class AATest:
             ).pvalue
             t_result[f"{tf} ks-test p-value"] = ks_2samp(ta, tb).pvalue
             t_result[f"{tf} t-test passed"] = (
-                    t_result[f"{tf} t-test p-value"] < self.alpha
+                t_result[f"{tf} t-test p-value"] < self.alpha
             )
             t_result[f"{tf} ks-test passed"] = (
-                    t_result[f"{tf} ks-test p-value"] < self.alpha
+                t_result[f"{tf} ks-test p-value"] < self.alpha
             )
             scores.append(
                 (
-                        t_result[f"{tf} t-test p-value"]
-                        + 2 * t_result[f"{tf} ks-test p-value"]
+                    t_result[f"{tf} t-test p-value"]
+                    + 2 * t_result[f"{tf} ks-test p-value"]
                 )
                 / 3
             )
@@ -400,16 +400,16 @@ class AATest:
         return {"metrics": t_result, "data_from_experiment": data_from_sampling_dict}
 
     def calc_uniform_tests(
-            self,
-            data: pd.DataFrame,
-            test_size: float = 0.5,
-            iterations: int = 2000,
-            file_name: Union[Path, str] = None,
-            experiment_write_mode: str = "full",
-            split_write_mode: str = "full",
-            write_step: int = None,
-            pbar: bool = True,
-            **kwargs,
+        self,
+        data: pd.DataFrame,
+        test_size: float = 0.5,
+        iterations: int = 2000,
+        file_name: Union[Path, str] = None,
+        experiment_write_mode: str = "full",
+        split_write_mode: str = "full",
+        write_step: int = None,
+        pbar: bool = True,
+        **kwargs,
     ) -> Optional[Tuple[pd.DataFrame, Dict[Any, Dict]]]:
         """Performs multiple separation experiments for different random states.
 
@@ -457,7 +457,7 @@ class AATest:
             split_write_mode = "full"
 
         for i, rs in tqdm(
-                enumerate(random_states), total=len(random_states), disable=not pbar
+            enumerate(random_states), total=len(random_states), disable=not pbar
         ):
             res = self.sampling_metrics(data, random_state=rs, test_size=test_size)
 
@@ -503,7 +503,7 @@ class AATest:
             return results, data_from_sampling
 
     def features_p_value_distribution(
-            self, experiment_results: pd.DataFrame, figsize=None, bin_step=0.05
+        self, experiment_results: pd.DataFrame, figsize=None, bin_step=0.05
     ):
         """Process plots of features' p-value distribution.
 
@@ -581,7 +581,7 @@ class AATest:
         return result
 
     def uniform_tests_interpretation(
-            self, experiment_results: pd.DataFrame, **kwargs
+        self, experiment_results: pd.DataFrame, **kwargs
     ) -> pd.DataFrame:
         """Process plotting of p-value distribution and results of AA-test.
 
@@ -604,11 +604,11 @@ class AATest:
         return self.aa_score(experiment_results)
 
     def num_feature_uniform_analysis(
-            self,
-            control_data: pd.Series,
-            test_data: pd.Series,
-            plot_set: Tuple = ("hist", "cumulative", "percentile"),
-            **kwargs,
+        self,
+        control_data: pd.Series,
+        test_data: pd.Series,
+        plot_set: Tuple = ("hist", "cumulative", "percentile"),
+        **kwargs,
     ):
         """Show plots of distribution in groups with uniform tests.
 
@@ -646,8 +646,8 @@ class AATest:
             min(control_data.min(), test_data.min()),
             max(control_data.max(), test_data.max()),
             (
-                    max(control_data.max(), test_data.max())
-                    - min(control_data.min(), test_data.min())
+                max(control_data.max(), test_data.max())
+                - min(control_data.min(), test_data.min())
             )
             / kwargs.get("bins", 100),
         )
@@ -727,7 +727,7 @@ class AATest:
         plt.show()
 
     def cat_feature_uniform_analysis(
-            self, control_data: pd.Series, test_data: pd.Series, **kwargs
+        self, control_data: pd.Series, test_data: pd.Series, **kwargs
     ):
         """Show plots of distribution in groups.
 
@@ -775,12 +775,12 @@ class AATest:
         plt.show()
 
     def __get_test_and_control_series(
-            self,
-            test_group: pd.Series = None,
-            control_group: pd.Series = None,
-            data: pd.DataFrame = None,
-            group_field: str = "group",
-            target_field: str = None,
+        self,
+        test_group: pd.Series = None,
+        control_group: pd.Series = None,
+        data: pd.DataFrame = None,
+        group_field: str = "group",
+        target_field: str = None,
     ):
         if test_group is None and control_group is None:
             if data is None or target_field is None:
@@ -793,11 +793,11 @@ class AATest:
         return {"test_group": test_group, "control_group": control_group}
 
     def __mde_unbalanced_non_binomial(
-            self,
-            control_group_size: int,
-            all_data_size: int,
-            standard_deviation: float = 2.0,
-            power: float = 0.8,
+        self,
+        control_group_size: int,
+        all_data_size: int,
+        standard_deviation: float = 2.0,
+        power: float = 0.8,
     ) -> Tuple:
         """Calculates minimum detectable effect (MDE) and significance
         of the effect size for unbalanced non-binomial groups.
@@ -830,11 +830,11 @@ class AATest:
         )
 
     def __mde_unbalanced_binomial(
-            self,
-            control_group_size: int,
-            all_data_size: int,
-            fact_conversion: float,
-            power: float = 0.8,
+        self,
+        control_group_size: int,
+        all_data_size: int,
+        fact_conversion: float,
+        power: float = 0.8,
     ) -> Tuple:
         """Calculates minimum detectable effect (MDE) and significance
         of the effect size (Cohen's d) for unbalanced binomial groups.
@@ -860,7 +860,7 @@ class AATest:
             (1 + proportion) / (control_group_size * proportion)
         )  # effect_size
         expect_conversion = (
-                math.sin(math.asin(math.sqrt(fact_conversion)) + cohen_d / 2) ** 2
+            math.sin(math.asin(math.sqrt(fact_conversion)) + cohen_d / 2) ** 2
         )  # expect_conversion
         mde = abs(expect_conversion - fact_conversion)
 
@@ -870,11 +870,11 @@ class AATest:
         )
 
     def calc_mde(
-            self,
-            data: pd.DataFrame,
-            target_field: str,
-            group_field: str,
-            power: float = 0.8,
+        self,
+        data: pd.DataFrame,
+        target_field: str,
+        group_field: str,
+        power: float = 0.8,
     ) -> Tuple:
         """Finds minimum detectable effect (MDE) and effect size for unbalanced groups.
 
@@ -919,15 +919,15 @@ class AATest:
         return res
 
     def calc_sample_size(
-            self,
-            test_group: pd.Series = None,
-            control_group: pd.Series = None,
-            data: pd.DataFrame = None,
-            target_field: str = None,
-            group_field: str = "group",
-            mde: float = None,
-            significance: float = 0.05,
-            power: float = 0.8,
+        self,
+        test_group: pd.Series = None,
+        control_group: pd.Series = None,
+        data: pd.DataFrame = None,
+        target_field: str = None,
+        group_field: str = "group",
+        mde: float = None,
+        significance: float = 0.05,
+        power: float = 0.8,
     ) -> float:
         """Calculates sample size of dataframe depends on mde and power.
 
@@ -960,9 +960,9 @@ class AATest:
             p2 = mde[1]
 
             return (
-                    (z_alpha + z_beta) ** 2
-                    * (p1 * (1 - p1) + p2 * (1 - p2))
-                    / (p1 - p2) ** 2
+                (z_alpha + z_beta) ** 2
+                * (p1 * (1 - p1) + p2 * (1 - p2))
+                / (p1 - p2) ** 2
             )
         else:
             groups = self.__get_test_and_control_series(
@@ -970,7 +970,7 @@ class AATest:
                 control_group=control_group,
                 data=data,
                 target_field=target_field,
-                group_field=group_field
+                group_field=group_field,
             )
             control_group = groups["control_group"]
             test_group = groups["test_group"]
@@ -988,15 +988,15 @@ class AATest:
             control_proportion = 1 - test_proportion
 
             d = ((norm.ppf(1 - significance / 2) + norm.ppf(power)) / mde) ** 2
-            s = test_std ** 2 / test_proportion + control_std ** 2 / control_proportion
+            s = test_std**2 / test_proportion + control_std**2 / control_proportion
             return d * s
 
     def calc_imbalanced_sample_size(
-            self,
-            target_data: pd.Series,
-            expected_mean: float,
-            proportion: float = 0.5,
-            power: float = 0.8,
+        self,
+        target_data: pd.Series,
+        expected_mean: float,
+        proportion: float = 0.5,
+        power: float = 0.8,
     ) -> Tuple:
         """Calculates imbalanced sample size for control and test group.
 
@@ -1022,20 +1022,20 @@ class AATest:
         z_alpha = norm.ppf(1 - self.alpha / 2)
         z_power = norm.ppf(power)
         if target_data.nunique() == 2:
-            h_cohen = 2 * np.arcsin(target_mean ** 0.5) - 2 * np.arcsin(
-                expected_mean ** 0.5
+            h_cohen = 2 * np.arcsin(target_mean**0.5) - 2 * np.arcsin(
+                expected_mean**0.5
             )
             control_size = (
-                    (1 + proportion) / proportion * ((z_alpha + z_power) / h_cohen) ** 2
+                (1 + proportion) / proportion * ((z_alpha + z_power) / h_cohen) ** 2
             )
         else:
             mde = abs(expected_mean - target_mean)
             control_size = (
-                    (1 + proportion)
-                    / proportion
-                    * (target_data.std() ** 2)
-                    * (z_alpha + z_power) ** 2
-                    / mde ** 2
+                (1 + proportion)
+                / proportion
+                * (target_data.std() ** 2)
+                * (z_alpha + z_power) ** 2
+                / mde**2
             )
         test_size = proportion * control_size
 
@@ -1043,10 +1043,10 @@ class AATest:
 
     @staticmethod
     def calc_power(
-            effect_size: float,
-            control_size: float,
-            test_size: float,
-            significance: float = 0.05,
+        effect_size: float,
+        control_size: float,
+        test_size: float,
+        significance: float = 0.05,
     ) -> float:
         """Statistical power calculations for t-test for two independent sample and known significance.
 
@@ -1141,7 +1141,7 @@ class AATest:
             targets_dict[tf] = {}
             for i in experiment.index:
                 if i.startswith(f"{tf} "):
-                    targets_dict[tf][i[len(tf) + 1:]] = experiment[i]
+                    targets_dict[tf][i[len(tf) + 1 :]] = experiment[i]
 
         return {
             "best_experiment_stat": pd.DataFrame(targets_dict).T,
@@ -1149,7 +1149,9 @@ class AATest:
         }
 
     @staticmethod
-    def split_splited_data(splitted_data: pd.DataFrame, group_field) -> Dict[str, pd.DataFrame]:
+    def split_splited_data(
+        splitted_data: pd.DataFrame, group_field
+    ) -> Dict[str, pd.DataFrame]:
         """Splits a pandas DataFrame into two separate dataframes based on a specified group field.
 
         Args:
@@ -1199,12 +1201,12 @@ class AATest:
         result = {"aa test passed": {}, "split is uniform": {}}
         for field in self.target_fields:
             result["aa test passed"][field] = (
-                    aa_score.loc[field, "t-test aa passed"]
-                    or aa_score.loc[field, "ks-test aa passed"]
+                aa_score.loc[field, "t-test aa passed"]
+                or aa_score.loc[field, "ks-test aa passed"]
             )
             result["split is uniform"][field] = (
-                    best_experiment_stat.loc[field, "t-test passed"]
-                    or best_experiment_stat.loc[field, "ks-test passed"]
+                best_experiment_stat.loc[field, "t-test passed"]
+                or best_experiment_stat.loc[field, "ks-test passed"]
             )
         result = pd.DataFrame(result)
         result["split is uniform"] = (
@@ -1220,15 +1222,16 @@ class AATest:
         return result
 
     def process(
-            self,
-            data: pd.DataFrame,
-            optimize_groups: bool = False,
-            iterations: int = 2000,
-            show_plots: bool = True,
-            test_size: float = 0.5,
-            pbar: bool = True,
-            group_field: str = "group",
-            **kwargs,
+        self,
+        data: pd.DataFrame,
+        optimize_groups: bool = False,
+        iterations: int = 2000,
+        show_plots: bool = True,
+        test_size: float = 0.5,
+        pbar: bool = True,
+        group_field: str = "group",
+        write_mode: Optional[Literal["any", "all", "full"]] = "all",
+        **kwargs,
     ):
         """Main function for AATest estimation.
 
@@ -1295,8 +1298,8 @@ class AATest:
         else:
             best_results, best_split = self.calc_uniform_tests(
                 data,
-                experiment_write_mode="full",
-                split_write_mode="any",
+                experiment_write_mode=write_mode,
+                split_write_mode=write_mode,
                 iterations=iterations,
                 test_size=test_size,
                 pbar=pbar,
@@ -1315,7 +1318,9 @@ class AATest:
             ]
             final_split = best_split[best_rs]
             if show_plots:
-                self.split_analysis(splited_data=final_split, group_field=group_field, **kwargs)
+                self.split_analysis(
+                    splited_data=final_split, group_field=group_field, **kwargs
+                )
 
             transformed_results = self.experiment_result_transform(
                 best_results[best_results["random_state"] == best_rs].iloc[0]
@@ -1338,129 +1343,206 @@ class AATest:
             "split_stat": best_split_stat,
             "resume": resume,
         }
-    
-    def multi_group_split (self, index: list, **kwargs) -> pd.DataFrame:
+
+    def multi_group_split(self, index: list, **kwargs) -> pd.DataFrame:
         """
-            Shuffles index column a specified number of times and divides it in a specified proportion
+        Shuffles index column a specified number of times and divides it in a specified proportion
         """
-        
-        groups = kwargs.get('groups',{'test': .5, 'control': .5})
-        iterations = kwargs.get('iterations',2_000)
-        show_pbar = kwargs.get('show_pbar',True)
-       
-        
+
+        groups = kwargs.get("groups", {"test": 0.5, "control": 0.5})
+        iterations = kwargs.get("iterations", 2_000)
+        show_pbar = kwargs.get("show_pbar", True)
+
         assert np.sum(list(groups.values())) == 1
-                
+
         split_results = pd.DataFrame()
         edges = np.cumsum(list(groups.values())[:-1])
 
-        for _indx, experiment_index in tqdm(enumerate(range(1, iterations + 1)), total = iterations, disable = not show_pbar, desc='Generating random divisions'  ):
-            
-            shuffled_index= shuffle(index, random_state = _indx)
-            splitted_index = np.split(shuffled_index,[int(edge*len(index)) for edge in edges])
-            
+        for _indx, experiment_index in tqdm(
+            enumerate(range(1, iterations + 1)),
+            total=iterations,
+            disable=not show_pbar,
+            desc="Generating random divisions",
+        ):
+
+            shuffled_index = shuffle(index, random_state=_indx)
+            splitted_index = np.split(
+                shuffled_index, [int(edge * len(index)) for edge in edges]
+            )
+
             series = []
-            for group_indx, group_name  in enumerate(groups):
-                series.append(pd.Series(
-                                    data = [group_name]*len(splitted_index[group_indx]),
-                                    index = splitted_index[group_indx],  dtype="category"
-                                )
-                            )
-            split_results[experiment_index] =  pd.DataFrame(pd.concat(series), dtype='category')
+            for group_indx, group_name in enumerate(groups):
+                series.append(
+                    pd.Series(
+                        data=[group_name] * len(splitted_index[group_indx]),
+                        index=splitted_index[group_indx],
+                        dtype="category",
+                    )
+                )
+            split_results[experiment_index] = pd.DataFrame(
+                pd.concat(series), dtype="category"
+            )
         return split_results
-    
 
-    
-
-
-    def _get_experimen_metrics(self, df: pd.DataFrame, split_result: pd.Series, target_fields: list, alpha: float = .05)  -> dict:
+    def _get_experimen_metrics(
+        self,
+        df: pd.DataFrame,
+        split_result: pd.Series,
+        target_fields: list,
+        alpha: float = 0.05,
+    ) -> dict:
         """
-            Returns a dictionary containing experiment metrics.
-            For each target_field the average is calculated
-            For each combination of groups, the deviation of the averages is calculated
-        """  
+        Returns a dictionary containing experiment metrics.
+        For each target_field the average is calculated
+        For each combination of groups, the deviation of the averages is calculated
+        """
 
-        
         metrics = {}
-        test_scores =[]
-        
+        test_scores = []
+
         for field in target_fields:
             field_values: dict = {}
-            [field_values.update({group: df.loc[split_result[lambda x: x == group].index][field]}) for group in split_result.cat.categories]
+            [
+                field_values.update(
+                    {group: df.loc[split_result[lambda x: x == group].index][field]}
+                )
+                for group in split_result.cat.categories
+            ]
 
-            [metrics.update({f'{group} {field} mean':    np.mean(field_values[group]) }) for group in split_result.cat.categories]
+            [
+                metrics.update({f"{group} {field} mean": np.mean(field_values[group])})
+                for group in split_result.cat.categories
+            ]
 
-            for a,b in combinations(split_result.cat.categories, 2):
-                metrics.update({
-                        f'{field} mean delta ({a} - {b})':      np.mean(field_values[a]) - np.mean(field_values[b]),
-                        f'{field} mean delta% ({a} - {b})/{b}': (np.mean(field_values[a]) - np.mean(field_values[b]))*100/np.mean(field_values[b]),
-                        f'{field} t-test p-value ({a},{b})':    ttest_ind(field_values[a],field_values[b],nan_policy='omit').pvalue,
-                        f'{field} ks-test p-value ({a},{b})':   ks_2samp(field_values[a],field_values[b]).pvalue
-                })
-            
-            ttest_ind_pvalue    = np.mean([value for key, value in metrics.items() if 't-test p-value'  in key])
-            ks_2samp_pvalue     = np.mean([value for key, value in metrics.items() if 'ks-test p-value' in key])
+            for a, b in combinations(split_result.cat.categories, 2):
+                metrics.update(
+                    {
+                        f"{field} mean delta ({a} - {b})": np.mean(field_values[a])
+                        - np.mean(field_values[b]),
+                        f"{field} mean delta% ({a} - {b})/{b}": (
+                            np.mean(field_values[a]) - np.mean(field_values[b])
+                        )
+                        * 100
+                        / np.mean(field_values[b]),
+                        f"{field} t-test p-value ({a},{b})": ttest_ind(
+                            field_values[a], field_values[b], nan_policy="omit"
+                        ).pvalue,
+                        f"{field} ks-test p-value ({a},{b})": ks_2samp(
+                            field_values[a], field_values[b]
+                        ).pvalue,
+                    }
+                )
 
-            metrics.update({
-                f'{field} mean t-test p-value':     ttest_ind_pvalue,
-                f'{field} mean ks-test p-value':    ks_2samp_pvalue,
-                f'{field} t-test passed':           ttest_ind_pvalue > alpha,
-                f'{field} ks-test passed':          ks_2samp_pvalue  > alpha
-            })
-            test_scores.append( (ttest_ind_pvalue + 2*ks_2samp_pvalue)/3)
+            ttest_ind_pvalue = np.mean(
+                [value for key, value in metrics.items() if "t-test p-value" in key]
+            )
+            ks_2samp_pvalue = np.mean(
+                [value for key, value in metrics.items() if "ks-test p-value" in key]
+            )
 
-        metrics.update({
-            'mean of means t-test p-value':     np.mean([value for key, value in metrics.items() if 'mean t-test p-value'  in key]),
-            'mean of means ks-test p-value':    np.mean([value for key, value in metrics.items() if 'mean ks-test p-value' in key]),
-            't-test passed %':                  np.mean([passed*100  for key, passed in metrics.items() if 't-test passed' in key]),
-            'ks-test passed %':                 np.mean([passed*100 for key, passed in metrics.items() if 'ks-test passed' in key]),
-            'mean_test_score':                  np.mean(test_scores),
-            'experiment_index':                 int(split_result.name)
+            metrics.update(
+                {
+                    f"{field} mean t-test p-value": ttest_ind_pvalue,
+                    f"{field} mean ks-test p-value": ks_2samp_pvalue,
+                    f"{field} t-test passed": ttest_ind_pvalue > alpha,
+                    f"{field} ks-test passed": ks_2samp_pvalue > alpha,
+                }
+            )
+            test_scores.append((ttest_ind_pvalue + 2 * ks_2samp_pvalue) / 3)
 
-        })
+        metrics.update(
+            {
+                "mean of means t-test p-value": np.mean(
+                    [
+                        value
+                        for key, value in metrics.items()
+                        if "mean t-test p-value" in key
+                    ]
+                ),
+                "mean of means ks-test p-value": np.mean(
+                    [
+                        value
+                        for key, value in metrics.items()
+                        if "mean ks-test p-value" in key
+                    ]
+                ),
+                "t-test passed %": np.mean(
+                    [
+                        passed * 100
+                        for key, passed in metrics.items()
+                        if "t-test passed" in key
+                    ]
+                ),
+                "ks-test passed %": np.mean(
+                    [
+                        passed * 100
+                        for key, passed in metrics.items()
+                        if "ks-test passed" in key
+                    ]
+                ),
+                "mean_test_score": np.mean(test_scores),
+                "experiment_index": int(split_result.name),
+            }
+        )
         return metrics
-    
-    def _plot_distribution(self, df: pd.DataFrame, plots_group_name: str, fields: list[str]):
-        figsize =  (15, 3 * len(fields))
-        fig, axis = plt.subplots(nrows = math.ceil(len(fields)/2), ncols = 2, figsize = figsize)
+
+    def _plot_distribution(
+        self, df: pd.DataFrame, plots_group_name: str, fields: List[str]
+    ):
+        figsize = (15, 3 * len(fields))
+        fig, axis = plt.subplots(
+            nrows=math.ceil(len(fields) / 2), ncols=2, figsize=figsize
+        )
         fig.suptitle(plots_group_name, fontsize=16)
         for field, ax in zip(fields, axis.flat):
             sns.histplot(
-                        data=df,
-                        x = field,
-                        ax = ax,
-                        bins=20,
-                        stat="percent", 
-                        shrink=0.8,
-                    )
-    
+                data=df,
+                x=field,
+                ax=ax,
+                bins=20,
+                stat="percent",
+                shrink=0.8,
+            )
 
-    def _plot_distributions(self, df: pd.DataFrame, target_fields: list[str]):
-        tests = ['t-test','ks-test']
+    def _plot_distributions(self, df: pd.DataFrame, target_fields: List[str]):
+        tests = ["t-test", "ks-test"]
 
-        mean_of_means_pvalue = [f'mean of means {test_name} p-value' for test_name in tests]
-        mean_of_means_title = 'Distribution of averages of average p-values ​​of each target_field'
-        self._plot_distribution(df=df,plots_group_name = mean_of_means_title,fields = mean_of_means_pvalue)
+        mean_of_means_pvalue = [
+            f"mean of means {test_name} p-value" for test_name in tests
+        ]
+        mean_of_means_title = (
+            "Distribution of averages of average p-values ​​of each target_field"
+        )
+        self._plot_distribution(
+            df=df, plots_group_name=mean_of_means_title, fields=mean_of_means_pvalue
+        )
 
         each_field_mean_pvalue = []
         for test in tests:
             for field in target_fields:
-                each_field_mean_pvalue.append(f'{field} mean {test} p-value')
-        each_field_mean_title = 'Distribution of average p-values ​​of each target_field'
-        self._plot_distribution(df=df,plots_group_name = each_field_mean_title,fields = each_field_mean_pvalue)
-        
+                each_field_mean_pvalue.append(f"{field} mean {test} p-value")
+        each_field_mean_title = "Distribution of average p-values ​​of each target_field"
+        self._plot_distribution(
+            df=df, plots_group_name=each_field_mean_title, fields=each_field_mean_pvalue
+        )
+
         each_field_pvalue = []
         for test in tests:
             for field in target_fields:
                 for column_name in df.columns:
-                    if f'{field} {test} p-value' in column_name:
+                    if f"{field} {test} p-value" in column_name:
                         each_field_pvalue.append(column_name)
 
-        each_field_title = 'Distribution of p-value for each group combination for each target_field'
-        self._plot_distribution(df=df,plots_group_name = each_field_title,fields = each_field_pvalue)        
+        each_field_title = (
+            "Distribution of p-value for each group combination for each target_field"
+        )
+        self._plot_distribution(
+            df=df, plots_group_name=each_field_title, fields=each_field_pvalue
+        )
 
-
-    def process_split (self, df: pd.DataFrame, target_fields: list[str], **kwargs) -> dict:
+    def process_split(
+        self, df: pd.DataFrame, target_fields: List[str], **kwargs
+    ) -> dict:
         """
         The function divides the passed DataFrame into the specified number of groups in specified proportions
 
@@ -1474,7 +1556,7 @@ class AATest:
             alpha:
                 Level of significance
             groups:
-                Group proportions   
+                Group proportions
             pbar:
                 Show progress-bar
             inPlace:
@@ -1509,65 +1591,98 @@ class AATest:
         >>> experiments = hp.AATest()
         >>> results = experiments.process_split(df=df, groups={'test1': 0.2,'test2': 0.3,'control': 0.5}, target_fields=['values'], iterations=100)
         """
-        iterations  = kwargs.get('iterations',2_000)
-        alpha       = kwargs.get('alpha', self.alpha)
-        groups      = kwargs.get('groups',{'test': .5, 'control': .5 })
-        show_pbar   = kwargs.get('show_pbar', True)
-        inPlace     = kwargs.get('inPlace', True)
-        group_column_name = kwargs.get('group_column_name','group')
-        show_plots = kwargs.get('show_plots',True)
+        iterations = kwargs.get("iterations", 2_000)
+        alpha = kwargs.get("alpha", self.alpha)
+        groups = kwargs.get("groups", {"test": 0.5, "control": 0.5})
+        show_pbar = kwargs.get("show_pbar", True)
+        inPlace = kwargs.get("inPlace", True)
+        group_column_name = kwargs.get("group_column_name", "group")
+        show_plots = kwargs.get("show_plots", True)
 
-        split_results = self.multi_group_split(index = list(df.index), groups = groups, iterations = iterations, show_pbar = show_pbar)
-        
-        split_metrics: list[dict]=[]
-        
+        split_results = self.multi_group_split(
+            index=list(df.index),
+            groups=groups,
+            iterations=iterations,
+            show_pbar=show_pbar,
+        )
 
-        for _ , experiment_index in tqdm(enumerate(range(1, iterations + 1)), total = iterations, disable = not show_pbar, desc='Metrics calculations'  ):
-            split_metrics.append(self._get_experimen_metrics(df=df[target_fields], split_result=split_results[experiment_index], target_fields=target_fields, alpha = alpha))
-        
+        split_metrics = []
+
+        for _, experiment_index in tqdm(
+            enumerate(range(1, iterations + 1)),
+            total=iterations,
+            disable=not show_pbar,
+            desc="Metrics calculations",
+        ):
+            split_metrics.append(
+                self._get_experimen_metrics(
+                    df=df[target_fields],
+                    split_result=split_results[experiment_index],
+                    target_fields=target_fields,
+                    alpha=alpha,
+                )
+            )
+
         df_metrics = pd.DataFrame(split_metrics)
-            
-        best_metric: pd.Series = df_metrics.loc[df_metrics['mean_test_score'].idxmax()]
-        best_split: pd.Series  = split_results[best_metric.experiment_index]
-        
+
+        best_metric: pd.Series = df_metrics.loc[df_metrics["mean_test_score"].idxmax()]
+        best_split: pd.Series = split_results[best_metric.experiment_index]
+
         result_df: pd.DataFrame = df if inPlace == True else df.copy()
         result_df[group_column_name] = best_split
 
         def _plot_distributions():
-            tests = ['t-test','ks-test']
-        
-            mean_of_means_pvalue = [f'mean of means {test_name} p-value' for test_name in tests]
-            mean_of_means_title = 'Distribution of averages of average p-values ​​of each target_field'
-            self._plot_distribution(df=df_metrics,plots_group_name = mean_of_means_title,fields = mean_of_means_pvalue)
-            
+            tests = ["t-test", "ks-test"]
+
+            mean_of_means_pvalue = [
+                f"mean of means {test_name} p-value" for test_name in tests
+            ]
+            mean_of_means_title = (
+                "Distribution of averages of average p-values ​​of each target_field"
+            )
+            self._plot_distribution(
+                df=df_metrics,
+                plots_group_name=mean_of_means_title,
+                fields=mean_of_means_pvalue,
+            )
+
             each_field_mean_pvalue = []
             for test in tests:
                 for field in target_fields:
-                    each_field_mean_pvalue.append(f'{field} mean {test} p-value')
-            each_field_mean_title = 'Distribution of average p-values ​​of each target_field'
-            self._plot_distribution(df=df_metrics,plots_group_name = each_field_mean_title,fields = each_field_mean_pvalue)
-        
+                    each_field_mean_pvalue.append(f"{field} mean {test} p-value")
+            each_field_mean_title = (
+                "Distribution of average p-values ​​of each target_field"
+            )
+            self._plot_distribution(
+                df=df_metrics,
+                plots_group_name=each_field_mean_title,
+                fields=each_field_mean_pvalue,
+            )
+
             each_field_pvalue = []
             for test in tests:
                 for field in target_fields:
                     for column_name in df_metrics.columns:
-                        if f'{field} {test} p-value' in column_name:
+                        if f"{field} {test} p-value" in column_name:
                             each_field_pvalue.append(column_name)
 
-            each_field_title = 'Distribution of p-value for each group combination for each target_field'
-            self._plot_distribution(df=df_metrics,plots_group_name = each_field_title,fields = each_field_pvalue)               
+            each_field_title = "Distribution of p-value for each group combination for each target_field"
+            self._plot_distribution(
+                df=df_metrics,
+                plots_group_name=each_field_title,
+                fields=each_field_pvalue,
+            )
             pass
-            
+
         if show_plots:
             _plot_distributions()
-            
+
         result = {
-                'best metric':    best_metric,
-                'best split':     best_split,
-                'all metrics':    df_metrics,
-                'all splits':     split_results,
-                'best split DataFrame':  result_df,
-                'get_resume':   _plot_distributions
-                }
+            "best metric": best_metric,
+            "best split": best_split,
+            "all metrics": df_metrics,
+            "all splits": split_results,
+            "best split DataFrame": result_df,
+            "get_resume": _plot_distributions,
+        }
         return result
-        

@@ -136,6 +136,7 @@ class Matcher:
             pbar: bool = True,
             max_categories: int = 100,
             fill_gaps: bool = False,
+            algo: str = 'fast'
     ):
         """Initialize the Matcher object.
 
@@ -195,7 +196,8 @@ class Matcher:
                 The maximum number of categories. Default to 100.
             fill_gaps:
                 Determines whether to automatically fill NaN values in categorical columns used for grouping.
-
+            algo:
+                Detect algo for Matching. Bootstrap (high quality but less speed) or quick (less quality but more speed)
         ..warnings::
             Multitarget involves studying the impact on multiple targets.
             The algorithm is implemented as a repetition of the same matching on the same feature space and samples, but with
@@ -279,6 +281,7 @@ class Matcher:
         self.silent = silent
         self.pbar = pbar
         self.max_categories = max_categories
+        self.algo = 'fast'
         self._preprocessing_data()
 
     def _convert_categorical_to_dummy(self):
@@ -669,6 +672,7 @@ class Matcher:
             refuter=refuter,
             n_neighbors=self.n_neighbors,
             pbar=False if validation else self.pbar,
+            algo=self.algo
         )
 
     def _perform_validation(self):
