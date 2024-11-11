@@ -54,6 +54,17 @@ class Dataset(DatasetBase):
                 data=t_data,
                 roles={k: v for k, v in self.roles.items() if k in t_data.columns},
             )
+        
+        def __setitem__(self, item, value):
+            column_name = item[1]
+            column_data_type = self.roles[column_name].data_type
+            if column_data_type == None or isinstance(value, column_data_type):
+                if column_name not in self.backend.data.columns:
+                    raise KeyError("Column must be added by using add_column method.")
+                else:
+                    self.backend.data.loc[item] = value
+            else:
+                raise TypeError("Value type does not match the expected data type.")
 
     class ILocker:
         def __init__(self, backend, roles):
@@ -66,6 +77,18 @@ class Dataset(DatasetBase):
                 data=t_data,
                 roles={k: v for k, v in self.roles.items() if k in t_data.columns},
             )
+        
+        def __setitem__(self, item, value):
+            column_index = item[1]
+            column_name = self.backend.data.columns[column_index]
+            column_data_type = self.roles[column_name].data_type
+            if column_data_type == None or isinstance(value, column_data_type):
+                if column_index >= len(self.backend.data.columns):
+                    raise IndexError("Column must be added by using add_column method.")
+                else:
+                    self.backend.data.iloc[item] = value
+            else:
+                raise TypeError("Value type does not match the expected data type.")
 
     def __init__(
         self,
@@ -110,7 +133,13 @@ class Dataset(DatasetBase):
                 "Column must be added by using add_column method.",
                 category=SyntaxWarning,
             )
-        self.data[key] = value
+            self.data[key] = value
+        else:
+            column_data_type = self.roles[key].data_type
+            if column_data_type == None or isinstance(value, column_data_type):
+                self.data[key] = value
+            else:
+                raise TypeError("Value type does not match the expected data type.")
 
     def __binary_magic_operator(self, other, func_name: str) -> Any:
         if not any(
