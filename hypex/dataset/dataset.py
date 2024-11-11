@@ -28,6 +28,7 @@ from ..utils import (
     DataTypeError,
     BackendTypeError,
     ScalarType,
+    DefaultRoleTypes,
 )
 from .abstract import DatasetBase
 from .roles import (
@@ -320,7 +321,7 @@ class Dataset(DatasetBase):
         if type(other._backend) is not type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
         
-    def astype(self, dtype: Dict[str, Any], errors: Literal["raise", "ignore"] = "raise") -> "Dataset":
+    def astype(self, dtype: Dict[str, DefaultRoleTypes], errors: Literal["raise", "ignore"] = "raise") -> "Dataset":
         """
         Change the data type of one or more columns.
         
