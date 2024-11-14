@@ -321,7 +321,11 @@ class Dataset(DatasetBase):
         if type(other._backend) is not type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
         
-    def astype(self, dtype: Dict[str, DefaultRoleTypes], errors: Literal["raise", "ignore"] = "raise") -> "Dataset":
+    def astype(
+        self,
+        dtype: Dict[str, DefaultRoleTypes],
+        errors: Literal["raise", "ignore"] = "raise"
+    ) -> "Dataset":
         """
         Change the data type of one or more columns.
         
@@ -332,26 +336,21 @@ class Dataset(DatasetBase):
         Returns:
         - A new Dataset object with the specified data types applied.
         """
-        new_data = self._backend.data.copy()
-        new_roles = deepcopy(self.roles)
         
-        for col, target_type in dtype.items():
-            if col not in new_data.columns:
+        for col, _ in dtype.items():
+            if col not in self.columns:
                 if errors == "raise":
                     raise KeyError(f"Column '{col}' does not exist in the Dataset.")
-                elif errors == "ignore":
-                    warnings.warn(f"Column '{col}' does not exist. Skipping conversion.", category=UserWarning)
-                    continue
-            
-            try:
-                new_data[col] = new_data[col].astype(target_type)
-            except (TypeError, ValueError) as e:
-                if errors == "raise":
-                    raise DataTypeError(f"Could not convert column '{col}' to {target_type}: {e}")
-                elif errors == "ignore":
-                    warnings.warn(f"Could not convert column '{col}' to {target_type}: {e}", category=UserWarning)
-            else:
-                new_roles[col].data_type = target_type
+
+        new_data = self._backend.astype(dtype, errors)
+        new_roles = deepcopy(self.roles)
+        
+        if errors == "ignore":
+            for col, target_type in dtype.items():
+                pass #TODO
+        elif errors == 'raise':
+            for col, target_type in dtype.items():
+                new_roles[col].data_type = target_type 
         
         return Dataset(roles=new_roles, data=new_data)
 
