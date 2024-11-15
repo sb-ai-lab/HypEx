@@ -1,5 +1,5 @@
 from pathlib import Path
-from copy import copy, deepcopy
+
 from typing import (
     Any,
     Callable,
@@ -203,6 +203,13 @@ class PandasNavigation(DatasetBackendNavigation):
             return bool
         else:
             return None
+        
+    def astype(
+        self,
+        dtype: Dict[str, DefaultRoleTypes],
+        errors: Literal["raise", "ignore"] = "raise"
+    ) -> pd.DataFrame:
+        return self.data.astype(dtype=dtype, errors=errors)
 
     def update_column_type(self, column_name: str, type_name: DefaultRoleTypes):
         self.data = self.data.astype({column_name: type_name})
@@ -520,10 +527,4 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         self, labels: str = "", fill_value: Optional[str] = None
     ) -> pd.DataFrame:
         return self.data.reindex(labels, fill_value=fill_value)
-    
-    def astype(
-        self,
-        dtype: Dict[str, DefaultRoleTypes],
-        errors: Literal["raise", "ignore"] = "raise"
-    ) -> pd.DataFrame:
-        return self.data.astype(dtype=dtype, errors=errors)
+

@@ -199,6 +199,14 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
     
     @abstractmethod
+    def astype(
+        self,
+        dtype: Dict[str, DefaultRoleTypes],
+        errors: Literal["raise", "ignore"] = "raise"
+    ) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
     def update_column_type(self, column_name: str, type_name: DefaultRoleTypes):
         raise AbstractMethodError
 
@@ -411,11 +419,4 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         self, to_replace: Any = None, value: Any = None, regex: bool = False
     ) -> Any:
         raise AbstractMethodError
-    
-    @abstractmethod
-    def astype(
-        self,
-        dtype: Dict[str, DefaultRoleTypes],
-        errors: Literal["raise", "ignore"] = "raise"
-    ) -> Any:
-        raise AbstractMethodError
+
