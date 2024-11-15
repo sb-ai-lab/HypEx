@@ -342,17 +342,19 @@ class Dataset(DatasetBase):
                 if errors == "raise":
                     raise KeyError(f"Column '{col}' does not exist in the Dataset.")
 
-        new_data = self._backend.astype(dtype, errors)
+        new_backend = deepcopy(self._backend)
+        new_backend.data = new_backend.astype(dtype, errors)
         new_roles = deepcopy(self.roles)
         
         if errors == "ignore":
             for col, target_type in dtype.items():
-                pass #TODO
+                if new_backend.get_column_type(col) == target_type:
+                    new_roles[col].data_type = target_type
         elif errors == 'raise':
             for col, target_type in dtype.items():
-                new_roles[col].data_type = target_type 
+                new_roles[col].data_type = target_type
         
-        return Dataset(roles=new_roles, data=new_data)
+        return Dataset(roles=new_roles, data=new_backend.data)
 
     def append(self, other, reset_index=False, axis=0) -> "Dataset":
         other = Adapter.to_list(other)
