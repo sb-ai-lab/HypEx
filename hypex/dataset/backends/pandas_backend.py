@@ -212,7 +212,8 @@ class PandasNavigation(DatasetBackendNavigation):
         return self.data.astype(dtype=dtype, errors=errors)
 
     def update_column_type(self, column_name: str, type_name: DefaultRoleTypes):
-        self.data = self.data.astype({column_name: type_name})
+        if self.data[column_name].isna().sum() == 0:
+            self.data = self.data.astype({column_name: type_name})
         return self
 
     def add_column(
