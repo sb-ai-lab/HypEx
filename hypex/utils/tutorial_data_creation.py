@@ -237,14 +237,21 @@ def gen_special_medicine_df(
         [1, 2, 3, 4, 5], p=[0.3, 0.3, 0.2, 0.1, 0.1], size=data_size
     ).astype(int)
 
+    age = np.random.normal(
+        40, scale=8, size=data_size
+    ).astype(int)
+
+    age_effect = (age^2 - 400) / 1000
+
     experimental_treatment = sigmoid_division(disease_degree, dependent_division)
 
     residual_lifetime = np.random.exponential(
-        13 - 2.5 * disease_degree + 1 * experimental_treatment
+        17 - 2.5 * disease_degree + 1 * experimental_treatment - age_effect
     )
 
     df = pd.DataFrame(
         dict(
+            age=age,
             disease_degree=disease_degree,
             experimental_treatment=experimental_treatment,
             residual_lifetime=residual_lifetime,
