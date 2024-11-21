@@ -25,7 +25,7 @@ from ..utils.adapter import Adapter
 class Executor(ABC):
     def __init__(
         self,
-        key: Any = "",
+        key: str = "",
     ):
         self._id: str = ""
         self._params_hash = ""

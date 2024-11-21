@@ -11,6 +11,9 @@ class DatasetSpace(Enum):
 
 
 class ExecutorState:
+    ID_SPLIT_SYMBOL = "\u2534"
+    NAME_BORDER_SYMBOL = "\u2506"
+
     def __init__(
         self,
         executor: Union[str, type],
