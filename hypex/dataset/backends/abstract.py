@@ -13,7 +13,7 @@ from typing import (
     Tuple,
 )
 
-from ...utils import AbstractMethodError, FromDictTypes, DefaultRoleTypes
+from ...utils import AbstractMethodError, FromDictTypes
 
 
 class DatasetBackendNavigation(ABC):
@@ -195,19 +195,19 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def get_column_type(self, column_name: str) -> Union[DefaultRoleTypes, None]:
+    def get_column_type(self, column_name: str) -> Union[type, None]:
         raise AbstractMethodError
     
     @abstractmethod
     def astype(
         self,
-        dtype: Dict[str, DefaultRoleTypes],
+        dtype: Dict[str, type],
         errors: Literal["raise", "ignore"] = "raise"
     ) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
-    def update_column_type(self, column_name: str, type_name: DefaultRoleTypes):
+    def update_column_type(self, column_name: str, type_name: type):
         raise AbstractMethodError
 
     @abstractmethod

@@ -28,7 +28,6 @@ from ..utils import (
     DataTypeError,
     BackendTypeError,
     ScalarType,
-    DefaultRoleTypes,
 )
 from .abstract import DatasetBase
 from .roles import (
@@ -323,7 +322,7 @@ class Dataset(DatasetBase):
         
     def astype(
         self,
-        dtype: Dict[str, DefaultRoleTypes],
+        dtype: Dict[str, type],
         errors: Literal["raise", "ignore"] = "raise"
     ) -> "Dataset":
         """

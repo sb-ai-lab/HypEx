@@ -17,7 +17,7 @@ from typing import (
 import numpy as np
 import pandas as pd  # type: ignore
 
-from ...utils import FromDictTypes, MergeOnError, ScalarType, DefaultRoleTypes
+from ...utils import FromDictTypes, MergeOnError, ScalarType
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -191,7 +191,7 @@ class PandasNavigation(DatasetBackendNavigation):
             else self.data.columns.get_indexer(column_name)
         )[0]
 
-    def get_column_type(self, column_name: str) -> Union[DefaultRoleTypes, None]:
+    def get_column_type(self, column_name: str) -> Union[type, None]:
         dtype = self.data.dtypes[column_name]
         if pd.api.types.is_integer_dtype(dtype):
             return int
@@ -206,12 +206,12 @@ class PandasNavigation(DatasetBackendNavigation):
         
     def astype(
         self,
-        dtype: Dict[str, DefaultRoleTypes],
+        dtype: Dict[str, type],
         errors: Literal["raise", "ignore"] = "raise"
     ) -> pd.DataFrame:
         return self.data.astype(dtype=dtype, errors=errors)
 
-    def update_column_type(self, column_name: str, type_name: DefaultRoleTypes):
+    def update_column_type(self, column_name: str, type_name: type):
         if self.data[column_name].isna().sum() == 0:
             self.data = self.data.astype({column_name: type_name})
         return self
