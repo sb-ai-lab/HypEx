@@ -337,9 +337,8 @@ class Dataset(DatasetBase):
         """
         
         for col, _ in dtype.items():
-            if col not in self.columns:
-                if errors == "raise":
-                    raise KeyError(f"Column '{col}' does not exist in the Dataset.")
+            if (errors == "raise") and (col not in self.columns):
+                raise KeyError(f"Column '{col}' does not exist in the Dataset.")
 
         new_backend = deepcopy(self._backend)
         new_backend.data = new_backend.astype(dtype, errors)
