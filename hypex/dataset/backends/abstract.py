@@ -195,11 +195,19 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def get_column_type(self, column_name: str) -> str:
+    def get_column_type(self, column_name: str) -> Union[type, None]:
+        raise AbstractMethodError
+    
+    @abstractmethod
+    def astype(
+        self,
+        dtype: Dict[str, type],
+        errors: Literal["raise", "ignore"] = "raise"
+    ) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
-    def update_column_type(self, column_name: str, type_name: str):
+    def update_column_type(self, column_name: str, type_name: type):
         raise AbstractMethodError
 
     @abstractmethod
@@ -411,3 +419,4 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         self, to_replace: Any = None, value: Any = None, regex: bool = False
     ) -> Any:
         raise AbstractMethodError
+

@@ -46,21 +46,12 @@ class DatasetBase(ABC):
         return roles
 
     def _set_empty_types(self, roles):
-        types_map = {
-            "int": int,
-            "float": float,
-            "object": str,
-            "bool": bool,
-            "category": str,
-        }
-        reversed_map = {int: "int", float: "float", str: "category", bool: "bool"}
         for column, role in roles.items():
             if role.data_type is None:
-                d_type = self.backend.get_column_type(column)
-
-                role.data_type = [v for k, v in types_map.items() if k in d_type][0]
-            self._backend = self.backend.update_column_type(
-                column, reversed_map[role.data_type]
+                role.data_type = self._backend.get_column_type(column)
+            self._backend = self._backend.update_column_type(
+                column,
+                role.data_type
             )
 
     def __init__(

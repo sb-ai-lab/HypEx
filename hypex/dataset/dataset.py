@@ -319,6 +319,40 @@ class Dataset(DatasetBase):
             raise ConcatDataError(type(other))
         if type(other._backend) is not type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
+        
+    def astype(
+        self,
+        dtype: Dict[str, type],
+        errors: Literal["raise", "ignore"] = "raise"
+    ) -> "Dataset":
+        """
+        Change the data type of one or more columns.
+        
+        Parameters:
+        - dtype: Dictionary where keys are column names and values are target types.
+        - errors: If 'raise', raises an error on invalid types; if 'ignore', skips invalid types.
+        
+        Returns:
+        - A new Dataset object with the specified data types applied.
+        """
+        
+        for col, _ in dtype.items():
+            if (errors == "raise") and (col not in self.columns):
+                raise KeyError(f"Column '{col}' does not exist in the Dataset.")
+
+        new_backend = deepcopy(self._backend)
+        new_backend.data = new_backend.astype(dtype, errors)
+        new_roles = deepcopy(self.roles)
+        
+        if errors == "ignore":
+            for col, target_type in dtype.items():
+                if new_backend.get_column_type(col) == target_type:
+                    new_roles[col].data_type = target_type
+        elif errors == 'raise':
+            for col, target_type in dtype.items():
+                new_roles[col].data_type = target_type
+        
+        return Dataset(roles=new_roles, data=new_backend.data)
 
     def append(self, other, reset_index=False, axis=0) -> "Dataset":
         other = Adapter.to_list(other)

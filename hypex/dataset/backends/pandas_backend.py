@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from typing import (
     Any,
     Callable,
@@ -190,11 +191,27 @@ class PandasNavigation(DatasetBackendNavigation):
             else self.data.columns.get_indexer(column_name)
         )[0]
 
-    def get_column_type(self, column_name: str) -> str:
-        return str(self.data.dtypes[column_name])
+    def get_column_type(self, column_name: str) -> Union[type, None]:
+        dtype = self.data.dtypes[column_name]
+        if pd.api.types.is_integer_dtype(dtype):
+            return int
+        elif pd.api.types.is_float_dtype(dtype):
+            return float
+        elif pd.api.types.is_string_dtype(dtype) or pd.api.types.is_object_dtype(dtype) or dtype.name == 'category':
+            return str
+        elif pd.api.types.is_bool_dtype(dtype):
+            return bool
+        else:
+            return None
+        
+    def astype(
+        self,
+        dtype: Dict[str, type],
+        errors: Literal["raise", "ignore"] = "raise"
+    ) -> pd.DataFrame:
+        return self.data.astype(dtype=dtype, errors=errors)
 
-    # try try-except if necessary
-    def update_column_type(self, column_name: str, type_name: str):
+    def update_column_type(self, column_name: str, type_name: type):
         if self.data[column_name].isna().sum() == 0:
             self.data = self.data.astype({column_name: type_name})
         return self
@@ -511,3 +528,4 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         self, labels: str = "", fill_value: Optional[str] = None
     ) -> pd.DataFrame:
         return self.data.reindex(labels, fill_value=fill_value)
+
