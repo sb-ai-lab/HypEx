@@ -1,6 +1,8 @@
 from abc import abstractmethod, ABC
+from copy import copy
 from typing import Any, Dict, List, Optional, Sequence, Union, Tuple, Iterable
 
+from .executor_state import ExecutorState, DatasetSpace
 from ..dataset import (
     ABCRole,
     Dataset,
@@ -23,33 +25,27 @@ from ..utils.adapter import Adapter
 
 
 class Executor(ABC):
-    def __init__(
-        self,
-        key: str = "",
-    ):
-        self._id: str = ""
-        self._params_hash = ""
+    def _get_params_dict(self):
+        return {k: str(v) for k, v in copy(self.__dict__).items()}
 
-        self.key: Any = key
-        self._generate_id()
+    def __init__(self, key: str = "", save_space: Optional[DatasetSpace] = None):
+        self._state = ExecutorState(
+            self.__class__.__name__, self._get_params_dict(), key, save_space
+        )
+
+    def refresh_state(
+        self, key: Optional[str] = None, save_space: Optional[DatasetSpace] = None
+    ):
+        if key is not None:
+            self._state.key = key
+        if save_space is not None:
+            self._state.save_space = save_space
+        self._state.set_params(self._get_params_dict())
 
     def check_and_setattr(self, params: Dict[str, Any]):
         for key, value in params.items():
             if key in self.__dir__():
                 setattr(self, key, value)
-
-    def _generate_params_hash(self):
-        self._params_hash = ""
-
-    def _generate_id(self):
-        self._generate_params_hash()
-        self._id = ID_SPLIT_SYMBOL.join(
-            [
-                self.__class__.__name__,
-                self._params_hash.replace(ID_SPLIT_SYMBOL, "|"),
-                str(self._key).replace(ID_SPLIT_SYMBOL, "|"),
-            ]
-        )
 
     def set_params(self, params: SetParamsDictTypes) -> None:
         if isinstance(list(params)[0], str):
@@ -62,41 +58,11 @@ class Executor(ABC):
             raise ValueError(
                 "params must be a dict of str to dict or a dict of class to dict"
             )
-        self._generate_id()
+        self.refresh_state()
 
-    def init_from_hash(self, hash: str) -> None:
-        self._params_hash = hash
-        self._generate_id()
-
-    @classmethod
-    def build_from_id(cls, executor_id: str):
-        splitted_id = executor_id.split(ID_SPLIT_SYMBOL)
-        if splitted_id[0] != cls.__name__:
-            raise ValueError(f"{executor_id} is not a valid {cls.__name__} id")
-        result = cls()
-        result.init_from_hash(splitted_id[1])
-        return result
-
-    @property
-    def id(self) -> str:
-        return self._id
-
-    @property
-    def key(self) -> Any:
-        return self._key
-
-    @key.setter
-    def key(self, value: Any):
-        self._key = value
-        self._generate_id()
-
-    @property
-    def params_hash(self) -> str:
-        return self._params_hash
-
-    @property
-    def id_for_name(self) -> str:
-        return self.id.replace(ID_SPLIT_SYMBOL, "_")
+    def refresh_from_state(self, state: [ExecutorState, str]) -> None:
+        self._state = ExecutorState.create_from_str(str(state))
+        self.check_and_setattr(self._state.get_params_dict())
 
     @property
     def _is_transformer(self) -> bool:
