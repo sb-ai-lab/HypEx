@@ -16,9 +16,8 @@ from .ui.aa import AAOutput
 from .ui.base import ExperimentShell
 from .utils import SpaceEnum
 
-ONE_AA_TEST = Experiment(
+AA_METRICS = Experiment(
     executors=[
-        AASplitter(),
         GroupSizes(grouping_role=AdditionalTreatmentRole()),
         OnRoleExperiment(
             executors=[
@@ -35,24 +34,11 @@ ONE_AA_TEST = Experiment(
     ]
 )
 
+ONE_AA_TEST = Experiment(executors=[AASplitter(), AA_METRICS])
 ONE_AA_TEST_WITH_STRATIFICATION = Experiment(
-    executors=[
-        AASplitterWithStratification(),
-        GroupSizes(grouping_role=AdditionalTreatmentRole()),
-        OnRoleExperiment(
-            executors=[
-                GroupDifference(
-                    compare_by="groups", grouping_role=AdditionalTreatmentRole()
-                ),
-                TTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
-                KSTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
-                Chi2Test(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
-            ],
-            role=TargetRole(),
-        ),
-        OneAAStatAnalyzer(),
-    ]
+    executors=[AASplitterWithStratification(), AA_METRICS]
 )
+
 AA_TEST = Experiment(
     [
         ParamsExperiment(
@@ -70,7 +56,6 @@ AA_TEST = Experiment(
     ],
     key="AATest",
 )
-
 AA_TEST_WITH_STRATIFICATION = Experiment(
     [
         ParamsExperiment(
@@ -91,7 +76,6 @@ AA_TEST_WITH_STRATIFICATION = Experiment(
 
 
 class AATest(ExperimentShell):
-
     @staticmethod
     def _prepare_params(
         n_iterations: int,

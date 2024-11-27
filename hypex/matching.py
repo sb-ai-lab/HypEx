@@ -31,8 +31,8 @@ class Matching(ExperimentShell):
         distance_mapping = {
             "mahalanobis": MahalanobisDistance(grouping_role=TreatmentRole())
         }
-        two_sides = True if metric == "ate" else False
-        test_pairs = True if metric == "atc" else False
+        two_sides = metric == "ate"
+        test_pairs = metric == "atc"
         executors: List[Executor] = [
             FaissNearestNeighbors(
                 grouping_role=TreatmentRole(),
