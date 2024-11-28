@@ -1,8 +1,16 @@
+from typing import Any, Union, Iterable
+
+from ..dataset import Dataset
+from ..utils import BackendsEnum
+from ..executor.executor_state import DatasetSpace, ExecutorState
+
+
 class ExperimentData:
     def __init__(self, data: Dataset):
-        self._data = data
         self._data = {
             "data": data,
+        }
+        self._index = {
             "additional_fields": {},
             "variables": {},
             "groups": {},
@@ -27,54 +35,41 @@ class ExperimentData:
         ds = Dataset.create_empty(backend, roles, index)
         return ExperimentData(ds)
 
-    def check_hash(self, executor_id: int, space: ExperimentDataEnum) -> bool:
-        if space == ExperimentDataEnum.additional_fields:
-            return executor_id in self.additional_fields.columns
-        elif space == ExperimentDataEnum.variables:
-            return executor_id in self.variables.keys()
-        elif space == ExperimentDataEnum.analysis_tables:
-            return executor_id in self.analysis_tables
-        else:
-            return any(self.check_hash(executor_id, s) for s in ExperimentDataEnum)
-
     def set_value(
         self,
-        space: ExperimentDataEnum,
-        executor_id: Union[str, Dict[str, str]],
+        executor_state: ExecutorState,
         value: Any,
-        key: Optional[str] = None,
-        role=None,
     ) -> "ExperimentData":
-        if space == ExperimentDataEnum.additional_fields:
-            if not isinstance(value, Dataset) or len(value.columns) == 1:
-                self.additional_fields = self.additional_fields.add_column(
-                    data=value, role={executor_id: role}
+        def refresh_index_structure():
+            if executor_state.save_space is None:
+                raise ValueError(
+                    "The ExecutorState must contain an indication of the save_space"
                 )
-            else:
-                rename_dict = (
-                    {value.columns[0]: executor_id}
-                    if isinstance(executor_id, str)
-                    else executor_id
-                )
-                value = value.rename(names=rename_dict)
-                self.additional_fields = self.additional_fields.merge(
-                    right=value, left_index=True, right_index=True
-                )
-        elif space == ExperimentDataEnum.analysis_tables:
-            self.analysis_tables[executor_id] = value
-        elif space == ExperimentDataEnum.variables:
-            if executor_id in self.variables:
-                self.variables[executor_id][key] = value
-            elif isinstance(value, Dict):
-                self.variables[executor_id] = value
-            else:
-                self.variables[executor_id] = {key: value}
-        elif space == ExperimentDataEnum.groups:
-            if executor_id not in self.groups:
-                self.groups[executor_id] = {key: value}
-            else:
-                self.groups[executor_id][key] = value
+            if executor_state.executor not in self._index:  # add executor in index
+                self._index[executor_state.save_space][
+                    executor_state.executor
+                ] = executor_state.get_dict_for_index()
+            elif (
+                executor_state.parameters
+                not in self._index[executor_state.save_space][executor_state.executor]
+            ):  # add executor parameters in index
+                self._index[executor_state.save_space][executor_state.executor][
+                    executor_state.parameters
+                ].update(executor_state.get_dict_for_index())
+
+        refresh_index_structure()
+        self._data[str(executor_state)] = value
+        self._index[executor_state.save_space][executor_state.executor][
+            executor_state.parameters
+        ][executor_state.key] = str(executor_state)
         return self
+
+    def search_state(
+        self,
+        space: Union[Iterable[DatasetSpace], DatasetSpace, None] = None,
+        executor: Union[type, str, None] = None,
+    ):
+        pass
 
     def get_ids(
         self,

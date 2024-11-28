@@ -19,40 +19,34 @@ class ExecutorState:
     def dict_to_str(new_parameters):
         return "".join(f"{key}:{value}" for key, value in new_parameters.items())
 
-    def set_params(self, new_parameters: Union[str, dict, None]):
-        if new_parameters is None:
-            self.parameters = ""
+    def set_params(self, new_parameters: Union[str, dict]):
         if isinstance(new_parameters, str):
             self.parameters = new_parameters
         elif isinstance(new_parameters, dict):
             self.parameters = self.dict_to_str(new_parameters)
 
-    def set_executor(self, executor: Union[str, type]):
-        self.executor = (
-            executor.__class__.__name__ if isinstance(executor, type) else executor
-        )
-
     def __init__(
         self,
         executor: Union[str, type],
-        parameters: Union[str, dict, None] = None,
-        key: Optional[str] = None,
+        parameters: Union[str, dict] = "",
+        key: str = "",
         *,
         save_space: Optional[DatasetSpace] = None,
     ):
         self.executor = (
             executor.__class__.__name__ if isinstance(executor, type) else executor
         )
-        self.executor = None
-        self.parameters = None
 
-        self.set_executor(executor)
+        self.parameters = ""
         self.key = key
         self.save_space = save_space
         self.set_params(parameters)
 
     def __str__(self):
         return f"{self.executor}{self.SPLIT_SYMBOL}{self.parameters}{self.SPLIT_SYMBOL}{self.key}"
+
+    def get_dict_for_index(self):
+        return {self.parameters: {self.key: {}}}
 
     @staticmethod
     def create_from_str(string: str) -> "ExecutorState":

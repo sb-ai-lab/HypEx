@@ -33,6 +33,10 @@ class Executor(ABC):
             self.__class__.__name__, self._get_params_dict(), key, save_space
         )
 
+    @property
+    def state(self):
+        return self._state
+
     def refresh_state(
         self, key: Optional[str] = None, save_space: Optional[DatasetSpace] = None
     ):
@@ -87,10 +91,6 @@ class Calculator(Executor, ABC):
     @staticmethod
     @abstractmethod
     def _inner_function(data: Dataset, **kwargs) -> Any:
-        raise AbstractMethodError
-
-    @property
-    def search_types(self):
         raise AbstractMethodError
 
     @staticmethod
@@ -171,7 +171,7 @@ class MLExecutor(Calculator, ABC):
     ) -> ExperimentData:
         return data.set_value(
             ExperimentDataEnum.additional_fields,
-            self.id,
+            self.state,
             value=value,
             key=key,
             role=AdditionalMatchingRole(),

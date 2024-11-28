@@ -2,14 +2,6 @@ import enum
 
 
 @enum.unique
-class ExperimentDataEnum(enum.Enum):
-    variables = "variables"
-    additional_fields = "additional_fields"
-    analysis_tables = "analysis_tables"
-    groups = "groups"
-
-
-@enum.unique
 class BackendsEnum(enum.Enum):
     pandas = "pandas"
 
