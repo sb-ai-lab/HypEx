@@ -70,6 +70,7 @@ class AAScoreAnalyzer(Executor):
         super().__init__(key=key)
         self.alpha = alpha
         self.__feature_weights = {}
+        self.threshold = 1 - (self.alpha * 1.2)
 
     def _set_value(
         self, data: ExperimentData, value: Any, key: Any = None
@@ -84,19 +85,18 @@ class AAScoreAnalyzer(Executor):
     def _analyze_aa_score(
         self, data: ExperimentData, score_table: Dataset
     ) -> ExperimentData:
-        search_flag = f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}"
+        search_flag = f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}"
         self.__feature_weights = {
             column: 1 - abs(self.alpha - score_table.loc[:, column].mean())
             for column in score_table.columns
             if search_flag in column
         }
         aa_scores = {
-            class_.replace(f"{ID_SPLIT_SYMBOL}p-value", ""): value
+            class_.replace(f"{ID_SPLIT_SYMBOL}pass", ""): value
             for class_, value in self.__feature_weights.items()
         }
         aa_passed = {
-            class_: value >= (1 - self.alpha * 1.2)
-            for class_, value in aa_scores.items()
+            class_: value >= self.threshold for class_, value in aa_scores.items()
         }
         result = Dataset.from_dict({"score": aa_scores, "pass": aa_passed}, roles={})
         self.key = "aa score"
@@ -116,6 +116,7 @@ class AAScoreAnalyzer(Executor):
         score_table: Dataset,
         if_param_scores: Optional[Dataset] = None,
     ) -> Dict[str, Any]:
+        # TODO: add split_scores in ExperimentData
         if if_param_scores is None:
             aa_split_scores = score_table.apply(
                 lambda x: (
@@ -123,7 +124,7 @@ class AAScoreAnalyzer(Executor):
                         (
                             (
                                 sum(
-                                    x[key] * value
+                                    x[key.replace("pass", "p-value")] * value
                                     for key, value in self.__feature_weights.items()
                                     if isinstance(value, float) and value > 0
                                 )

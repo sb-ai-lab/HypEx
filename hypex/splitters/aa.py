@@ -152,6 +152,8 @@ class AASplitterWithStratification(AASplitter):
             control_size=self.control_size,
             grouping_fields=grouping_fields,
         )
+        if isinstance(result, Dataset):
+            result = result.replace_roles({"split": AdditionalTreatmentRole()})
         return self._set_value(data, result)
 
 

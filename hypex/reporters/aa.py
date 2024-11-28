@@ -21,7 +21,8 @@ class OneAADictReporter(DictReporter):
     @staticmethod
     def rename_passed(data: Dict[str, bool]):
         return {
-            c: ("NOT OK" if v else "OK") if "pass" in c else v for c, v in data.items()
+            c: ("NOT OK" if (v is True or v == "True") else "OK") if "pass" in c else v
+            for c, v in data.items()
         }
 
     @staticmethod
@@ -167,7 +168,7 @@ class AAPassedReporter(Reporter):
             names={c: c[: c.rfind("pass") - 1] for c in passed.columns}
         )
         passed = passed.replace("OK", 1).replace("NOT OK", 0)
-        passed.roles = {c: r.__class__(int) for c, r in passed.roles.items()}
+        passed = passed.astype({c: int for c in passed.columns})
         return passed
 
     def _detect_pass(self, analyzer_tables: Dict[str, Dataset]):
@@ -189,7 +190,12 @@ class AAPassedReporter(Reporter):
         )
         result = result.merge(resume_table, left_index=True, right_index=True)
         result.roles = {c: r.__class__(str) for c, r in result.roles.items()}
-        result = result.replace(0, "NOT OK").replace(1, "OK")
+        result = (
+            result.replace(0, "NOT OK")
+            .replace(1, "OK")
+            .replace("0", "NOT OK")
+            .replace("1", "OK")
+        )
         splitted_index = [str(i).split(ID_SPLIT_SYMBOL) for i in result.index]
         result.add_column([i[0] for i in splitted_index], role={"feature": InfoRole()})
         result.add_column([i[1] for i in splitted_index], role={"group": InfoRole()})
