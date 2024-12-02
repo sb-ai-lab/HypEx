@@ -1,5 +1,6 @@
 import warnings
 from copy import copy, deepcopy
+from collections.abc import Iterable
 from typing import (
     Union,
     List,
@@ -59,7 +60,7 @@ class Dataset(DatasetBase):
             column_name = item[1]
             column_data_type = self.roles[column_name].data_type
             if (column_data_type == None or 
-                (isinstance(value, list) and all(isinstance(v, column_data_type) for v in value)) or #check for backend specific list (?)
+                (isinstance(value, Iterable) and all(isinstance(v, column_data_type) for v in value)) or
                 isinstance(value, column_data_type)):
                 if column_name not in self.backend.data.columns:
                     raise KeyError("Column must be added by using add_column method.")
@@ -85,7 +86,7 @@ class Dataset(DatasetBase):
             column_name = self.backend.data.columns[column_index]
             column_data_type = self.roles[column_name].data_type
             if (column_data_type == None or 
-                (isinstance(value, list) and all(isinstance(v, column_data_type) for v in value)) or #check for backend specific list (?)
+                (isinstance(value, Iterable) and all(isinstance(v, column_data_type) for v in value)) or #check for backend specific list (?)
                 isinstance(value, column_data_type)):
                 if column_index >= len(self.backend.data.columns):
                     raise IndexError("Column must be added by using add_column method.")
@@ -141,7 +142,7 @@ class Dataset(DatasetBase):
         else:
             column_data_type = self.roles[key].data_type
             if (column_data_type == None or 
-                (isinstance(value, list) and all(isinstance(v, column_data_type) for v in value)) or #check for backend specific list (?)
+                (isinstance(value, Iterable) and all(isinstance(v, column_data_type) for v in value)) or #check for backend specific list (?)
                 isinstance(value, column_data_type)):
                 self.data[key] = value
             else:
