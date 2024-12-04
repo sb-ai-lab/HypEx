@@ -1,5 +1,6 @@
 import warnings
 from copy import copy, deepcopy
+from collections.abc import Iterable
 from typing import (
     Union,
     List,
@@ -58,7 +59,9 @@ class Dataset(DatasetBase):
         def __setitem__(self, item, value):
             column_name = item[1]
             column_data_type = self.roles[column_name].data_type
-            if column_data_type == None or isinstance(value, column_data_type):
+            if (column_data_type == None or 
+                (isinstance(value, Iterable) and all(isinstance(v, column_data_type) for v in value)) or
+                isinstance(value, column_data_type)):
                 if column_name not in self.backend.data.columns:
                     raise KeyError("Column must be added by using add_column method.")
                 else:
@@ -82,7 +85,9 @@ class Dataset(DatasetBase):
             column_index = item[1]
             column_name = self.backend.data.columns[column_index]
             column_data_type = self.roles[column_name].data_type
-            if column_data_type == None or isinstance(value, column_data_type):
+            if (column_data_type == None or 
+                (isinstance(value, Iterable) and all(isinstance(v, column_data_type) for v in value)) or #check for backend specific list (?)
+                isinstance(value, column_data_type)):
                 if column_index >= len(self.backend.data.columns):
                     raise IndexError("Column must be added by using add_column method.")
                 else:
@@ -136,7 +141,9 @@ class Dataset(DatasetBase):
             self.data[key] = value
         else:
             column_data_type = self.roles[key].data_type
-            if column_data_type == None or isinstance(value, column_data_type):
+            if (column_data_type == None or 
+                (isinstance(value, Iterable) and all(isinstance(v, column_data_type) for v in value)) or #check for backend specific list (?)
+                isinstance(value, column_data_type)):
                 self.data[key] = value
             else:
                 raise TypeError("Value type does not match the expected data type.")
