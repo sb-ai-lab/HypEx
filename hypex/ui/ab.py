@@ -59,8 +59,6 @@ class ABOutput(Output):
 
     def extract(self, experiment_data: ExperimentData):
         super().extract(experiment_data)
-        self.resume = self.resume.merge(
-            self._extract_differences(experiment_data), on=["group", "feature"]
-        )
+        self._extract_differences(experiment_data)
         self._extract_multitest_result(experiment_data)
         self._extract_sizes(experiment_data)
