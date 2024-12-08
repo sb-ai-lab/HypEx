@@ -1,4 +1,5 @@
-from typing import Any, Union, Iterable
+from copy import deepcopy
+from typing import Any, Union, Iterable, Dict, List, Optional
 
 from ..dataset import Dataset
 from ..utils import BackendsEnum
@@ -68,58 +69,66 @@ class ExperimentData:
         self,
         space: Union[Iterable[DatasetSpace], DatasetSpace, None] = None,
         executor: Union[type, str, None] = None,
-    ):
-        pass
+        parameters: Union[Dict[str, Any], str, None] = None,
+        key: Union[str, None] = None,
+    ) -> List[ExecutorState]:
+        """
+        After each step of the search takes place at a lower level.
+        """
+        def space_step():
+            if space is None:
+                return self._index.keys()
+            return [space] if isinstance(space, DatasetSpace) else space
 
-    def get_ids(
-        self,
-        classes: Union[type, Iterable[type], str, Iterable[str]],
-        searched_space: Union[
-            ExperimentDataEnum, Iterable[ExperimentDataEnum], None
-        ] = None,
-        key: Optional[str] = None,
-    ) -> Dict[str, Dict[str, List[str]]]:
-        def check_id(id_: str, class_: str) -> bool:
-            result = id_[: id_.find(ID_SPLIT_SYMBOL)] == class_
-
-            if result and key is not None:
-                result = id_[id_.rfind(ID_SPLIT_SYMBOL) + 1 :] == key
-            return result
-
-        spaces = {
-            ExperimentDataEnum.additional_fields: self.additional_fields.columns,
-            ExperimentDataEnum.analysis_tables: self.analysis_tables.keys(),
-            ExperimentDataEnum.groups: self.groups.keys(),
-            ExperimentDataEnum.variables: self.variables.keys(),
-        }
-        classes = [
-            c.__name__ if isinstance(c, type) else c for c in Adapter.to_list(classes)
-        ]
-        searched_space = (
-            Adapter.to_list(searched_space) if searched_space else list(spaces.keys())
-        )
-
-        return {
-            class_: {
-                space.value: [
-                    str(id_) for id_ in spaces[space] if check_id(id_, class_)
-                ]
-                for space in searched_space
+        def executor_step(spaces):
+            executors = {s: list(self._index[s].keys()) for s in spaces}
+            if executor is None:
+                return executors
+            str_executor = executor if isinstance(executor, str) else executor.__name__
+            executors = {
+                s: [e for e in executors[s] if e == str_executor] for s in executors
             }
-            for class_ in classes
-        }
+            return {s: e for s, e in executors.items() if len(e) > 0}
 
-    def get_one_id(
-        self,
-        class_: Union[type, str],
-        space: ExperimentDataEnum,
-        key: Optional[str] = None,
-    ) -> str:
-        class_ = class_ if isinstance(class_, str) else class_.__name__
-        result = self.get_ids(class_, space, key)
-        if (class_ not in result) or (not len(result[class_][space.value])):
-            raise NotFoundInExperimentDataError(class_)
-        return result[class_][space.value][0]
+        def parameters_step(executors):
+            if not executors:
+                return None
+
+            params = {
+                s: {e: list(self._index[s][e].keys()) for e in executors[s]}
+                for s in executors
+            }
+            if parameters is None:
+                return params
+            param_str = (
+                parameters
+                if isinstance(parameters, str)
+                else ExecutorState.dict_to_str(parameters)
+            )
+
+            return {
+                s: {e: [p for p in params[s][e] if p == param_str] for e in params[s]}
+                for s in params
+            }
+
+        def key_step(params):
+            if not params:
+                return None
+
+            executors = []
+            for s in params:
+                for e in params[s]:
+                    for p in params[s][e]:
+                        if key is None:
+                            for k in self._index[s][e][p]:
+                                executors.append(self._index[s][e][p][k])
+                        elif key in self._index[s][e][p]:
+                            executors.append(self._index[s][e][p][key])
+            return executors
+
+        #-----------------------------------------------
+        result = key_step(parameters_step(executor_step(space_step())))
+        return result or []
 
     def copy(self, data: Optional[Dataset] = None) -> "ExperimentData":
         result = deepcopy(self)
@@ -127,49 +136,3 @@ class ExperimentData:
             result._data = data
         return result
 
-    def field_search(
-        self,
-        roles: Union[ABCRole, Iterable[ABCRole]],
-        tmp_role: bool = False,
-        search_types=None,
-    ) -> List[str]:
-        searched_field = []
-        roles = Adapter.to_list(roles)
-        field_in_additional = [
-            role for role in roles if isinstance(role, AdditionalRole)
-        ]
-        field_in_data = [role for role in roles if role not in field_in_additional]
-        if field_in_data:
-            searched_field += self.ds.search_columns(
-                field_in_data, tmp_role=tmp_role, search_types=search_types
-            )
-        if field_in_additional and isinstance(self, ExperimentData):
-            searched_field += self.additional_fields.search_columns(
-                field_in_additional, tmp_role=tmp_role, search_types=search_types
-            )
-        return searched_field
-
-    def field_data_search(
-        self,
-        roles: Union[ABCRole, Iterable[ABCRole]],
-        tmp_role: bool = False,
-        search_types=None,
-    ) -> Dataset:
-        searched_data: Dataset = (
-            Dataset.create_empty()
-        )  # TODO: backend check to be added
-        roles = Adapter.to_list(roles)
-        roles_columns_map = {
-            role: self.field_search(role, tmp_role, search_types) for role in roles
-        }
-        for role, columns in roles_columns_map.items():
-            for column in columns:
-                t_data = (
-                    self.additional_fields[column]
-                    if isinstance(role, AdditionalRole)
-                    else self.ds[column]
-                )
-                searched_data = searched_data.add_column(
-                    data=t_data, role={column: role}
-                )
-        return searched_data
