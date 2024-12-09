@@ -41,7 +41,9 @@ class StatTest(CompareExtension):
         if self.test_function is None:
             raise ValueError("test_function is needed for execution")
         one_result = self.test_function(
-            data.backend.data.values.flatten(), other.backend.data.values.flatten()
+            data.backend.data.values.flatten(),
+            other.backend.data.values.flatten(),
+            **kwargs,
         )
         one_result = DatasetAdapter.to_dataset(
             {
@@ -57,6 +59,13 @@ class StatTest(CompareExtension):
 class TTestExtensionExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ttest_ind, reliability=reliability)
+
+    def _calc_pandas(
+        self, data: Dataset, other: Union[Dataset, None] = None, **kwargs
+    ) -> Union[float, Dataset]:
+        return super()._calc_pandas(
+            data, other, equal_var=False, nan_policy="omit", **kwargs
+        )
 
 
 class KSTestExtensionExtension(StatTest):
