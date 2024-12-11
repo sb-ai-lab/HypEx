@@ -110,53 +110,46 @@ class AAScoreAnalyzer(Executor):
             raise ValueError(f"{splitter_id} is not a valid splitter id")
         return splitter_class.build_from_id(splitter_id)
 
-
-def _get_best_split(
-    self,
-    data: ExperimentData,
-    score_table: Dataset,
-    if_param_scores: Optional[Dataset] = None,
-) -> Dict[str, Any]:
-    # TODO: add split_scores in ExperimentData
-    if if_param_scores is None:
-        aa_split_scores = score_table.apply(
-            lambda x: (
-                (
+    def _get_best_split(
+        self,
+        data: ExperimentData,
+        score_table: Dataset,
+        if_param_scores: Optional[Dataset] = None,
+    ) -> Dict[str, Any]:
+        # TODO: add split_scores in ExperimentData
+        if if_param_scores is None:
+            aa_split_scores = score_table.apply(
+                lambda x: (
                     (
                         (
-                            sum(
-                                x[
-                                    key.replace(
-                                        f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}",
-                                        f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}",
-                                    )
-                                ]
-                                * value
-                                for key, value in self.__feature_weights.items()
-                                if isinstance(value, float) and value > 0
+                            (
+                                sum(
+                                    x[key.replace(f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}", f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}")] * value
+                                    for key, value in self.__feature_weights.items()
+                                    if isinstance(value, float) and value > 0
+                                )
+                                / len(self.__feature_weights)
                             )
-                            / len(self.__feature_weights)
+                            * 2
                         )
-                        * 2
+                        / 3
                     )
-                    / 3
-                )
-                + x["mean test score"] / 3
-            ),
-            axis=1,
-            role={"aa split score": StatisticRole()},
-        )
-        best_index = aa_split_scores.idxmax()
-        best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
-        score_dict = score_table.loc[best_index, :].transpose().to_records()[0]
-    else:
-        best_index = 0
-        best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
-        score_dict = if_param_scores.loc[best_index, :].transpose().to_records()[0]
-    best_score_stat = OneAADictReporter.convert_flat_dataset(score_dict)
-    self.key = "best split statistics"
-    result = self._set_value(data, best_score_stat)
-    return {"best_split_id": best_split_id, "data": result}
+                    + x["mean test score"] / 3
+                ),
+                axis=1,
+                role={"aa split score": StatisticRole()},
+            )
+            best_index = aa_split_scores.idxmax()
+            best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
+            score_dict = score_table.loc[best_index, :].transpose().to_records()[0]
+        else:
+            best_index = 0
+            best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
+            score_dict = if_param_scores.loc[best_index, :].transpose().to_records()[0]
+        best_score_stat = OneAADictReporter.convert_flat_dataset(score_dict)
+        self.key = "best split statistics"
+        result = self._set_value(data, best_score_stat)
+        return {"best_split_id": best_split_id, "data": result}
 
     def _set_best_split(
         self,
