@@ -60,7 +60,7 @@ class MDEBySize(TestPower):
         power: float = 0.8,
         **kwargs
     ) -> float:
-        m = norm.ppf(1 - significance / 2) + norm.ppf(power)
+        m = norm.ppf((1 + significance) / 2) + norm.ppf(power)
         if not test_data:
             raise ValueError("test_data is required")
 
