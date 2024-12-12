@@ -124,7 +124,13 @@ class AAScoreAnalyzer(Executor):
                         (
                             (
                                 sum(
-                                    x[key.replace(f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}", f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}")] * value
+                                    x[
+                                        key.replace(
+                                            f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}",
+                                            f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}",
+                                        )
+                                    ]
+                                    * value
                                     for key, value in self.__feature_weights.items()
                                     if isinstance(value, float) and value > 0
                                 )

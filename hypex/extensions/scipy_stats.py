@@ -63,9 +63,7 @@ class TTestExtensionExtension(StatTest):
     def _calc_pandas(
         self, data: Dataset, other: Union[Dataset, None] = None, **kwargs
     ) -> Union[float, Dataset]:
-        return super()._calc_pandas(
-            data, other, equal_var=False, nan_policy="omit", **kwargs
-        )
+        return super()._calc_pandas(data, other, nan_policy="omit", **kwargs)
 
 
 class KSTestExtensionExtension(StatTest):
