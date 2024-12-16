@@ -17,6 +17,7 @@ from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL
 class MatchingOutput(Output):
     resume: Dataset
     full_data: Dataset
+    quality_results: Dataset
 
     def __init__(self, searching_class: type = MatchingAnalyzer):
         super().__init__(resume_reporter=MatchingDictReporter(searching_class))

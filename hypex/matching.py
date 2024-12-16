@@ -4,7 +4,7 @@ from typing import List, Literal, Union
 from .experiments import GroupExperiment
 from .reporters.matching import MatchingDatasetReporter
 from .analyzers.matching import MatchingAnalyzer
-from .comparators import TTest
+from .comparators import TTest, PSI, KSTest
 from .comparators.distances import MahalanobisDistance
 from .dataset import TreatmentRole, TargetRole, AdditionalTargetRole
 from .executor import Executor
@@ -30,6 +30,10 @@ class Matching(ExperimentShell):
     ) -> Experiment:
         distance_mapping = {
             "mahalanobis": MahalanobisDistance(grouping_role=TreatmentRole())
+        }
+        test_mapping = {
+            "psi": PSI(grouping_role=TreatmentRole(), compare_by="groups"),
+            "ks-test": KSTest(grouping_role=TreatmentRole(), compare_by="groups")
         }
         two_sides = metric == "ate"
         test_pairs = metric == "atc"
@@ -59,7 +63,11 @@ class Matching(ExperimentShell):
             MatchingAnalyzer(),
         ]
         if quality_tests != "auto":
-            warnings.warn("Now quality tests aren't supported yet")
+            # warnings.warn("Now quality tests aren't supported yet")
+            for test in quality_tests:
+                executors += [
+                    test_mapping[test]
+                ]
         return (
             Experiment(
                 executors=(
