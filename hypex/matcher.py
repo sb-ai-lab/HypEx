@@ -281,7 +281,7 @@ class Matcher:
         self.silent = silent
         self.pbar = pbar
         self.max_categories = max_categories
-        self.algo = 'fast'
+        self.algo = algo
         self._preprocessing_data()
 
     def _convert_categorical_to_dummy(self):
