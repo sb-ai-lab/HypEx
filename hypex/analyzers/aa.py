@@ -190,7 +190,9 @@ class AAScoreAnalyzer(Executor):
             IfParamsExperiment,
             ExperimentDataEnum.analysis_tables,
         )
-        score_table = data.analysis_tables[param_experiment_id].dropna(axis=1, how="all")
+        score_table = data.analysis_tables[param_experiment_id].dropna(
+            axis=1, how="all"
+        )
         if_param_scores = (
             None
             if len(ifparam_experiment_id["IfParamsExperiment"]["analysis_tables"]) == 0
