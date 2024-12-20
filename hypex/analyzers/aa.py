@@ -1,5 +1,7 @@
 from typing import Dict, List, Any, Optional
 
+import numpy as np
+
 from ..comparators import KSTest, TTest, Chi2Test
 from ..dataset import Dataset, ExperimentData, StatisticRole
 from ..executor import Executor
@@ -34,6 +36,7 @@ class OneAAStatAnalyzer(Executor):
                     analysis_data[f"mean {class_} {field}"] = t_data[field].mean()
         analysis_data["mean test score"] = 0
         sum_weight = 0
+        analysis_data = {key: (0 if np.isnan(value) else value) for key, value in analysis_data.items()}
         if (
             "mean TTest p-value" in analysis_data
             and "mean KSTest p-value" in analysis_data
@@ -118,34 +121,41 @@ class AAScoreAnalyzer(Executor):
     ) -> Dict[str, Any]:
         # TODO: add split_scores in ExperimentData
         if if_param_scores is None:
-            aa_split_scores = score_table.apply(
-                lambda x: (
-                    (
+            if len(self.__feature_weights) < 1:
+                best_index = 0
+            else:
+                aa_split_scores = score_table.apply(
+                    lambda x: (
                         (
                             (
-                                sum(
-                                    x[
-                                        key.replace(
-                                            f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}",
-                                            f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}",
-                                        )
-                                    ]
-                                    * value
-                                    for key, value in self.__feature_weights.items()
-                                    if isinstance(value, float) and value > 0
+                                (
+                                    sum(
+                                        x[
+                                            key.replace(
+                                                f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}",
+                                                f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}",
+                                            )
+                                        ]
+                                        * value
+                                        for key, value in self.__feature_weights.items()
+                                        if (isinstance(value, float) and value > 0)
+                                        and (key.replace(
+                                                f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}",
+                                                f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}",
+                                            ) in x["splitter_id"])
+                                    )
+                                    / len(self.__feature_weights)
                                 )
-                                / len(self.__feature_weights)
+                                * 2
                             )
-                            * 2
+                            / 3
                         )
-                        / 3
-                    )
-                    + x["mean test score"] / 3
-                ),
-                axis=1,
-                role={"aa split score": StatisticRole()},
-            )
-            best_index = aa_split_scores.idxmax()
+                        + x["mean test score"] / 3
+                    ),
+                    axis=1,
+                    role={"aa split score": StatisticRole()},
+                )
+                best_index = aa_split_scores.idxmax()
             best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
             score_dict = score_table.loc[best_index, :].transpose().to_records()[0]
         else:
@@ -191,6 +201,7 @@ class AAScoreAnalyzer(Executor):
             ExperimentDataEnum.analysis_tables,
         )
         score_table = data.analysis_tables[param_experiment_id]
+        score_table = score_table.dropna(axis=1, how="all")
         if_param_scores = (
             None
             if len(ifparam_experiment_id["IfParamsExperiment"]["analysis_tables"]) == 0

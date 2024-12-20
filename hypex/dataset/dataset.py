@@ -557,9 +557,12 @@ class Dataset(DatasetBase):
         self,
         how: Literal["any", "all"] = "any",
         subset: Union[str, Iterable[str], None] = None,
+        axis: Union[Literal[0, 1], Literal["index", "rows", "columns"], None] = 0,
     ):
+        new_data = self._backend.dropna(how=how, subset=subset, axis=axis)
+        new_roles = self.roles if axis == 0 else {column: self.roles[column] for column in new_data.columns}
         return Dataset(
-            roles=self.roles, data=self._backend.dropna(how=how, subset=subset)
+            roles=new_roles, data=new_data,
         )
 
     def isna(self):
