@@ -1,6 +1,12 @@
-from typing import Dict, Any
+from typing import Dict, Any, Union
 
-from ..dataset.dataset import ExperimentData, Dataset
+from ..dataset import (
+    ExperimentData,
+    Dataset,
+    InfoRole,
+    TreatmentRole,
+)
+
 from ..ml import FaissNearestNeighbors
 from ..reporters.abstract import DictReporter, DatasetReporter
 from ..utils import (
@@ -8,9 +14,10 @@ from ..utils import (
     ID_SPLIT_SYMBOL,
     MATCHING_INDEXES_SPLITTER_SYMBOL,
 )
+
 from ..analyzers.matching import MatchingAnalyzer
 from .abstract import DatasetReporter, DictReporter
-
+from ..comparators import TTest, KSTest
 
 class MatchingDictReporter(DictReporter):
     def __init__(self, searching_class: type = MatchingAnalyzer):
@@ -53,6 +60,96 @@ class MatchingDictReporter(DictReporter):
         result.update(self._extract_from_analyser(experiment_data))
         if self.searching_class == MatchingAnalyzer:
             result.update(self._extract_from_additional_fields(experiment_data))
+        return result
+
+
+class MatchingQualityDictReporter(DictReporter):
+
+    @staticmethod
+    def _get_struct_dict(data: Dict):
+        # TODO: rewrite to recursion?
+        dict_result = {}
+        for key, value in data.items():
+            if ID_SPLIT_SYMBOL in key:
+                key_split = key.split(ID_SPLIT_SYMBOL)
+                if key_split[2] in ("pass", "p-value", "difference", "difference %"):
+                    if key_split[0] not in dict_result:
+                        dict_result[key_split[0]] = {
+                            key_split[3]: {key_split[1]: {key_split[2]: value}}
+                        }
+                    elif key_split[3] not in dict_result[key_split[0]]:
+                        dict_result[key_split[0]][key_split[3]] = {
+                            key_split[1]: {key_split[2]: value}
+                        }
+                    elif key_split[1] not in dict_result[key_split[0]][key_split[3]]:
+                        dict_result[key_split[0]][key_split[3]][key_split[1]] = {
+                            key_split[2]: value
+                        }
+                    else:
+                        dict_result[key_split[0]][key_split[3]][key_split[1]][
+                            key_split[2]
+                        ] = value
+        return dict_result
+    
+    @staticmethod
+    def _convert_struct_dict_to_dataset(data: Dict) -> Dataset:
+        result = []
+        for feature, groups in data.items():
+            for group, tests in groups.items():
+                t_values = {"feature": feature, "group": group}
+                for test, values in tests.items():
+                    if test == "GroupDifference":
+                        t_values["difference"] = values["difference"]
+                        t_values["difference %"] = values["difference %"]
+                    else:
+                        t_values[f"{test} pass"] = values["pass"]
+                        t_values[f"{test} p-value"] = values["p-value"]
+                result.append(t_values)
+        # result = [OneAADictReporter.rename_passed(d) for d in result]
+        return Dataset.from_dict(
+            result,
+            roles={"feature": InfoRole(), "group": TreatmentRole()},
+        )
+
+    def extract_tests(self, data: ExperimentData) -> Dict[str, Any]:
+        test_ids = data.get_ids(
+            [TTest, KSTest], searched_space=ExperimentDataEnum.analysis_tables
+        )
+        result = {}
+        for class_, ids in test_ids.items():
+            result.update(
+                self._extract_from_comparators(
+                    data, ids[ExperimentDataEnum.analysis_tables.value]
+                )
+            )
+        return {k: v for k, v in result.items() if "pass" in k or "p-value" in k}
+
+
+    def extract_data_from_analysis_tables(self, data: ExperimentData) -> Dict[str, Any]:
+        result = {}
+        result.update(self.extract_tests(data))
+        return result
+
+    def report(self, data: ExperimentData) -> Dict[str, Any]:
+        result = {}
+        result.update(self.extract_data_from_analysis_tables(data))
+        return result
+
+
+class MatchingQualityDatasetReporter(MatchingQualityDictReporter):
+
+    @staticmethod
+    def convert_flat_dataset(data: Dict) -> Dataset:
+        struct_dict = MatchingQualityDictReporter._get_struct_dict(data)
+        return MatchingQualityDictReporter._convert_struct_dict_to_dataset(struct_dict)
+
+
+    def report(self, data: ExperimentData):
+        front_buffer = self.front
+        self.front = False
+        dict_report = super().report(data)
+        self.front = front_buffer
+        result = self.convert_flat_dataset(dict_report)
         return result
 
 

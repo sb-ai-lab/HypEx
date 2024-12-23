@@ -10,7 +10,7 @@ from ..dataset import (
     GroupingRole,
     TargetRole,
 )
-from ..reporters.matching import MatchingDictReporter
+from ..reporters.matching import MatchingDictReporter, MatchingQualityDatasetReporter
 from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL
 
 
@@ -20,7 +20,9 @@ class MatchingOutput(Output):
     quality_results: Dataset
 
     def __init__(self, searching_class: type = MatchingAnalyzer):
-        super().__init__(resume_reporter=MatchingDictReporter(searching_class))
+        super().__init__(
+            resume_reporter=MatchingDictReporter(searching_class),
+            additional_reporters=MatchingQualityDatasetReporter())
 
     def _extract_full_data(self, experiment_data: ExperimentData, indexes: Dataset):
         indexes.index = experiment_data.ds.index
@@ -93,3 +95,7 @@ class MatchingOutput(Output):
             indexes,
         )
         self.resume = round(self.resume, 2)
+
+        #quality_results
+
+        self.quality_results = self.additional_reporters.report(experiment_data)
