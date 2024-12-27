@@ -96,6 +96,4 @@ class MatchingOutput(Output):
         )
         self.resume = round(self.resume, 2)
 
-        #quality_results
-
         self.quality_results = self.additional_reporters.report(experiment_data)

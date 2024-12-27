@@ -67,12 +67,11 @@ class MatchingQualityDictReporter(DictReporter):
 
     @staticmethod
     def _get_struct_dict(data: Dict):
-        # TODO: rewrite to recursion?
         dict_result = {}
         for key, value in data.items():
             if ID_SPLIT_SYMBOL in key:
                 key_split = key.split(ID_SPLIT_SYMBOL)
-                if key_split[2] in ("pass", "p-value", "difference", "difference %"):
+                if key_split[2] in ("pass", "p-value"):
                     if key_split[0] not in dict_result:
                         dict_result[key_split[0]] = {
                             key_split[3]: {key_split[1]: {key_split[2]: value}}
@@ -98,14 +97,9 @@ class MatchingQualityDictReporter(DictReporter):
             for group, tests in groups.items():
                 t_values = {"feature": feature, "group": group}
                 for test, values in tests.items():
-                    if test == "GroupDifference":
-                        t_values["difference"] = values["difference"]
-                        t_values["difference %"] = values["difference %"]
-                    else:
-                        t_values[f"{test} pass"] = values["pass"]
-                        t_values[f"{test} p-value"] = values["p-value"]
+                    t_values[f"{test} pass"] = values["pass"]
+                    t_values[f"{test} p-value"] = values["p-value"]
                 result.append(t_values)
-        # result = [OneAADictReporter.rename_passed(d) for d in result]
         return Dataset.from_dict(
             result,
             roles={"feature": InfoRole(), "group": TreatmentRole()},
