@@ -49,10 +49,7 @@ class DatasetBase(ABC):
         for column, role in roles.items():
             if role.data_type is None:
                 role.data_type = self._backend.get_column_type(column)
-            self._backend = self._backend.update_column_type(
-                column,
-                role.data_type
-            )
+            self._backend = self._backend.update_column_type(column, role.data_type)
 
     def __init__(
         self,
@@ -89,7 +86,7 @@ class DatasetBase(ABC):
 
     def __repr__(self):
         return self.data.__repr__()
-    
+
     def _repr_html_(self):
         return self.data._repr_html_()
 

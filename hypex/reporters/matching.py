@@ -19,6 +19,7 @@ from ..analyzers.matching import MatchingAnalyzer
 from .abstract import DatasetReporter, DictReporter
 from ..comparators import TTest, KSTest
 
+
 class MatchingDictReporter(DictReporter):
     def __init__(self, searching_class: type = MatchingAnalyzer):
         self.searching_class = searching_class
@@ -89,7 +90,7 @@ class MatchingQualityDictReporter(DictReporter):
                             key_split[2]
                         ] = value
         return dict_result
-    
+
     @staticmethod
     def _convert_struct_dict_to_dataset(data: Dict) -> Dataset:
         result = []
@@ -118,7 +119,6 @@ class MatchingQualityDictReporter(DictReporter):
             )
         return {k: v for k, v in result.items() if "pass" in k or "p-value" in k}
 
-
     def extract_data_from_analysis_tables(self, data: ExperimentData) -> Dict[str, Any]:
         result = {}
         result.update(self.extract_tests(data))
@@ -136,7 +136,6 @@ class MatchingQualityDatasetReporter(MatchingQualityDictReporter):
     def convert_flat_dataset(data: Dict) -> Dataset:
         struct_dict = MatchingQualityDictReporter._get_struct_dict(data)
         return MatchingQualityDictReporter._convert_struct_dict_to_dataset(struct_dict)
-
 
     def report(self, data: ExperimentData):
         front_buffer = self.front

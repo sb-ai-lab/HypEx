@@ -55,13 +55,18 @@ class Dataset(DatasetBase):
                 data=t_data,
                 roles={k: v for k, v in self.roles.items() if k in t_data.columns},
             )
-        
+
         def __setitem__(self, item, value):
             column_name = item[1]
             column_data_type = self.roles[column_name].data_type
-            if (column_data_type == None or 
-                (isinstance(value, Iterable) and all(isinstance(v, column_data_type) for v in value)) or
-                isinstance(value, column_data_type)):
+            if (
+                column_data_type == None
+                or (
+                    isinstance(value, Iterable)
+                    and all(isinstance(v, column_data_type) for v in value)
+                )
+                or isinstance(value, column_data_type)
+            ):
                 if column_name not in self.backend.data.columns:
                     raise KeyError("Column must be added by using add_column method.")
                 else:
@@ -80,14 +85,19 @@ class Dataset(DatasetBase):
                 data=t_data,
                 roles={k: v for k, v in self.roles.items() if k in t_data.columns},
             )
-        
+
         def __setitem__(self, item, value):
             column_index = item[1]
             column_name = self.backend.data.columns[column_index]
             column_data_type = self.roles[column_name].data_type
-            if (column_data_type == None or 
-                (isinstance(value, Iterable) and all(isinstance(v, column_data_type) for v in value)) or #check for backend specific list (?)
-                isinstance(value, column_data_type)):
+            if (
+                column_data_type == None
+                or (
+                    isinstance(value, Iterable)
+                    and all(isinstance(v, column_data_type) for v in value)
+                )  # check for backend specific list (?)
+                or isinstance(value, column_data_type)
+            ):
                 if column_index >= len(self.backend.data.columns):
                     raise IndexError("Column must be added by using add_column method.")
                 else:
@@ -141,9 +151,14 @@ class Dataset(DatasetBase):
             self.data[key] = value
         else:
             column_data_type = self.roles[key].data_type
-            if (column_data_type == None or 
-                (isinstance(value, Iterable) and all(isinstance(v, column_data_type) for v in value)) or #check for backend specific list (?)
-                isinstance(value, column_data_type)):
+            if (
+                column_data_type == None
+                or (
+                    isinstance(value, Iterable)
+                    and all(isinstance(v, column_data_type) for v in value)
+                )  # check for backend specific list (?)
+                or isinstance(value, column_data_type)
+            ):
                 self.data[key] = value
             else:
                 raise TypeError("Value type does not match the expected data type.")
@@ -326,23 +341,21 @@ class Dataset(DatasetBase):
             raise ConcatDataError(type(other))
         if type(other._backend) is not type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
-        
+
     def astype(
-        self,
-        dtype: Dict[str, type],
-        errors: Literal["raise", "ignore"] = "raise"
+        self, dtype: Dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> "Dataset":
         """
         Change the data type of one or more columns.
-        
+
         Parameters:
         - dtype: Dictionary where keys are column names and values are target types.
         - errors: If 'raise', raises an error on invalid types; if 'ignore', skips invalid types.
-        
+
         Returns:
         - A new Dataset object with the specified data types applied.
         """
-        
+
         for col, _ in dtype.items():
             if (errors == "raise") and (col not in self.columns):
                 raise KeyError(f"Column '{col}' does not exist in the Dataset.")
@@ -350,15 +363,15 @@ class Dataset(DatasetBase):
         new_backend = deepcopy(self._backend)
         new_backend.data = new_backend.astype(dtype, errors)
         new_roles = deepcopy(self.roles)
-        
+
         if errors == "ignore":
             for col, target_type in dtype.items():
                 if new_backend.get_column_type(col) == target_type:
                     new_roles[col].data_type = target_type
-        elif errors == 'raise':
+        elif errors == "raise":
             for col, target_type in dtype.items():
                 new_roles[col].data_type = target_type
-        
+
         return Dataset(roles=new_roles, data=new_backend.data)
 
     def append(self, other, reset_index=False, axis=0) -> "Dataset":

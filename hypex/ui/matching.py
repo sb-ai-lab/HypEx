@@ -22,7 +22,8 @@ class MatchingOutput(Output):
     def __init__(self, searching_class: type = MatchingAnalyzer):
         super().__init__(
             resume_reporter=MatchingDictReporter(searching_class),
-            additional_reporters=MatchingQualityDatasetReporter())
+            additional_reporters=MatchingQualityDatasetReporter(),
+        )
 
     def _extract_full_data(self, experiment_data: ExperimentData, indexes: Dataset):
         indexes.index = experiment_data.ds.index

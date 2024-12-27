@@ -24,8 +24,8 @@ class Matching(ExperimentShell):
         metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: Union[
-            Literal["smd", "psi", "ks-test", "repeats", "t-test","auto"],
-            List[Literal["smd", "psi", "ks-test", "repeats", "t-test","auto"]],
+            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"],
+            List[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]],
         ] = "auto",
     ) -> Experiment:
         distance_mapping = {
@@ -59,15 +59,12 @@ class Matching(ExperimentShell):
         ]
         if quality_tests != "auto":
             # warnings.warn("Now quality tests aren't supported yet")
-            tests_executors = []
-            for test in quality_tests:
-                tests_executors += [
-                    test_mapping[test]
-                ]
-            executors += [OnRoleExperiment(
-                    executors=tests_executors,
+            executors += [
+                OnRoleExperiment(
+                    executors=[test_mapping[test] for test in quality_tests],
                     role=TargetRole(),
-                )]
+                )
+            ]
         return (
             Experiment(
                 executors=(
@@ -94,8 +91,8 @@ class Matching(ExperimentShell):
         metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: Union[
-            Literal["smd", "psi", "ks-test", "repeats", "t-test","auto"],
-            List[Literal["smd", "psi", "ks-test", "repeats", "t-test","auto"]],
+            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"],
+            List[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]],
         ] = "auto",
     ):
         super().__init__(

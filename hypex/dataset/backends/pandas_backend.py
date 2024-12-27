@@ -197,17 +197,19 @@ class PandasNavigation(DatasetBackendNavigation):
             return int
         elif pd.api.types.is_float_dtype(dtype):
             return float
-        elif pd.api.types.is_string_dtype(dtype) or pd.api.types.is_object_dtype(dtype) or dtype.name == 'category':
+        elif (
+            pd.api.types.is_string_dtype(dtype)
+            or pd.api.types.is_object_dtype(dtype)
+            or dtype.name == "category"
+        ):
             return str
         elif pd.api.types.is_bool_dtype(dtype):
             return bool
         else:
             return None
-        
+
     def astype(
-        self,
-        dtype: Dict[str, type],
-        errors: Literal["raise", "ignore"] = "raise"
+        self, dtype: Dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> pd.DataFrame:
         return self.data.astype(dtype=dtype, errors=errors)
 
@@ -528,4 +530,3 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         self, labels: str = "", fill_value: Optional[str] = None
     ) -> pd.DataFrame:
         return self.data.reindex(labels, fill_value=fill_value)
-
