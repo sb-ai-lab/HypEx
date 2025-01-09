@@ -65,3 +65,31 @@ class DatasetReporter(OnDictReporter):
     @staticmethod
     def convert_to_dataset(data: Dict) -> Union[Dict[str, Dataset], Dataset]:
         return Dataset.from_dict(roles={k: ReportRole() for k in data}, data=[data])
+
+
+class TestsDictReporter(DictReporter):
+    @staticmethod
+    def _get_struct_dict(data: Dict):
+        # TODO: rewrite to recursion?
+        dict_result = {}
+        for key, value in data.items():
+            if ID_SPLIT_SYMBOL in key:
+                key_split = key.split(ID_SPLIT_SYMBOL)
+                if key_split[2] in ("pass", "p-value", "difference", "difference %"):
+                    if key_split[0] not in dict_result:
+                        dict_result[key_split[0]] = {
+                            key_split[3]: {key_split[1]: {key_split[2]: value}}
+                        }
+                    elif key_split[3] not in dict_result[key_split[0]]:
+                        dict_result[key_split[0]][key_split[3]] = {
+                            key_split[1]: {key_split[2]: value}
+                        }
+                    elif key_split[1] not in dict_result[key_split[0]][key_split[3]]:
+                        dict_result[key_split[0]][key_split[3]][key_split[1]] = {
+                            key_split[2]: value
+                        }
+                    else:
+                        dict_result[key_split[0]][key_split[3]][key_split[1]][
+                            key_split[2]
+                        ] = value
+        return dict_result

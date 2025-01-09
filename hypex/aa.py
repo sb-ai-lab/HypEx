@@ -101,6 +101,54 @@ class AATest(ExperimentShell):
         params.update(additional_params)
         return params
 
+    def create_experiment(self, **kwargs) -> Experiment:
+        return Experiment(
+            [
+                ParamsExperiment(
+                    executors=(
+                        [
+                            (
+                                ONE_AA_TEST_WITH_STRATIFICATION
+                                if kwargs.get("stratification")
+                                else ONE_AA_TEST
+                            )
+                        ]
+                    ),
+                    params=self._prepare_params(
+                        kwargs.get("n_iterations", 2000),
+                        kwargs.get("control_size", 0.5),
+                        kwargs.get("random_states", None),
+                        kwargs.get("sample_size", None),
+                        kwargs.get("additional_params", None),
+                    ),
+                    reporter=DatasetReporter(OneAADictReporter(front=False)),
+                ),
+                IfParamsExperiment(
+                    executors=(
+                        [
+                            (
+                                ONE_AA_TEST_WITH_STRATIFICATION
+                                if kwargs.get("stratification")
+                                else ONE_AA_TEST
+                            )
+                        ]
+                    ),
+                    params=self._prepare_params(
+                        kwargs.get("n_iterations", 2000),
+                        kwargs.get("control_size", 0.5),
+                        kwargs.get("random_states", None),
+                        kwargs.get("additional_params", None),
+                    ),
+                    reporter=DatasetReporter(OneAADictReporter(front=False)),
+                    stopping_criterion=IfAAExecutor(
+                        sample_size=kwargs.get("sample_size", None)
+                    ),
+                ),
+                AAScoreAnalyzer(),
+            ],
+            key="AATest",
+        )
+
     def __init__(
         self,
         n_iterations: int = 2000,
@@ -110,51 +158,14 @@ class AATest(ExperimentShell):
         additional_params: Optional[Dict[str, Any]] = None,
         random_states: Optional[Iterable[int]] = None,
     ):
-
         super().__init__(
-            experiment=Experiment(
-                [
-                    ParamsExperiment(
-                        executors=(
-                            [
-                                (
-                                    ONE_AA_TEST_WITH_STRATIFICATION
-                                    if stratification
-                                    else ONE_AA_TEST
-                                )
-                            ]
-                        ),
-                        params=self._prepare_params(
-                            n_iterations,
-                            control_size,
-                            random_states,
-                            sample_size,
-                            additional_params,
-                        ),
-                        reporter=DatasetReporter(OneAADictReporter(front=False)),
-                    ),
-                    IfParamsExperiment(
-                        executors=(
-                            [
-                                (
-                                    ONE_AA_TEST_WITH_STRATIFICATION
-                                    if stratification
-                                    else ONE_AA_TEST
-                                )
-                            ]
-                        ),
-                        params=self._prepare_params(
-                            n_iterations,
-                            control_size,
-                            random_states,
-                            additional_params,
-                        ),
-                        reporter=DatasetReporter(OneAADictReporter(front=False)),
-                        stopping_criterion=IfAAExecutor(sample_size=sample_size),
-                    ),
-                    AAScoreAnalyzer(),
-                ],
-                key="AATest",
-            ),
             output=AAOutput(),
+            create_experiment_kwargs={
+                "n_iterations": n_iterations,
+                "control_size": control_size,
+                "stratification": stratification,
+                "sample_size": sample_size,
+                "additional_params": additional_params,
+                "random_states": random_states,
+            },
         )

@@ -1,4 +1,5 @@
 from typing import Dict, Union, Any, Optional
+from abc import ABC, abstractmethod
 
 from ..dataset import ExperimentData, Dataset
 from ..experiments.base import Experiment
@@ -42,17 +43,23 @@ class Output:
         self._extract_by_reporters(experiment_data)
 
 
-class ExperimentShell:
+class ExperimentShell(ABC):
+    _experiment: Experiment
+
+    @abstractmethod
+    def create_experiment(self, **kwargs) -> Experiment:
+        pass
+
     def __init__(
         self,
-        experiment: Experiment,
         output: Output,
         experiment_params: Optional[Dict[str, Any]] = None,
+        create_experiment_kwargs: Optional[Dict[str, Any]] = None,
     ):
+        self._experiment = self.create_experiment(**create_experiment_kwargs)
         if experiment_params:
-            experiment.set_params(experiment_params)
+            self._experiment.set_params(experiment_params)
         self._out = output
-        self._experiment = experiment
 
     @property
     def experiment(self):
