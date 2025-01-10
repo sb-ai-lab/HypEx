@@ -64,7 +64,7 @@ cat = ["catboost"]
 lgbm = ["lightgbm"]
 all = ["catboost", "lightgbm"]
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 jupyter = "^1.0.0"
 pytest = "^7.4.3"
 
