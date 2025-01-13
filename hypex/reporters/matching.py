@@ -8,7 +8,7 @@ from ..dataset import (
 )
 
 from ..ml import FaissNearestNeighbors
-from ..reporters.abstract import DictReporter, DatasetReporter
+from ..reporters.abstract import DictReporter, DatasetReporter, TestDictReporter
 from ..utils import (
     ExperimentDataEnum,
     ID_SPLIT_SYMBOL,
@@ -64,70 +64,11 @@ class MatchingDictReporter(DictReporter):
         return result
 
 
-class MatchingQualityDictReporter(DictReporter):
-
-    @staticmethod
-    def _get_struct_dict(data: Dict):
-        dict_result = {}
-        for key, value in data.items():
-            if ID_SPLIT_SYMBOL in key:
-                key_split = key.split(ID_SPLIT_SYMBOL)
-                if key_split[2] in ("pass", "p-value"):
-                    if key_split[0] not in dict_result:
-                        dict_result[key_split[0]] = {
-                            key_split[3]: {key_split[1]: {key_split[2]: value}}
-                        }
-                    elif key_split[3] not in dict_result[key_split[0]]:
-                        dict_result[key_split[0]][key_split[3]] = {
-                            key_split[1]: {key_split[2]: value}
-                        }
-                    elif key_split[1] not in dict_result[key_split[0]][key_split[3]]:
-                        dict_result[key_split[0]][key_split[3]][key_split[1]] = {
-                            key_split[2]: value
-                        }
-                    else:
-                        dict_result[key_split[0]][key_split[3]][key_split[1]][
-                            key_split[2]
-                        ] = value
-        return dict_result
-
-    @staticmethod
-    def _convert_struct_dict_to_dataset(data: Dict) -> Dataset:
-        result = []
-        for feature, groups in data.items():
-            for group, tests in groups.items():
-                t_values = {"feature": feature, "group": group}
-                for test, values in tests.items():
-                    t_values[f"{test} pass"] = values["pass"]
-                    t_values[f"{test} p-value"] = values["p-value"]
-                result.append(t_values)
-        return Dataset.from_dict(
-            result,
-            roles={"feature": InfoRole(), "group": TreatmentRole()},
-        )
-
-    def extract_tests(self, data: ExperimentData) -> Dict[str, Any]:
-        test_ids = data.get_ids(
-            [TTest, KSTest], searched_space=ExperimentDataEnum.analysis_tables
-        )
-        result = {}
-        for class_, ids in test_ids.items():
-            result.update(
-                self._extract_from_comparators(
-                    data, ids[ExperimentDataEnum.analysis_tables.value]
-                )
-            )
-        return {k: v for k, v in result.items() if "pass" in k or "p-value" in k}
-
-    def extract_data_from_analysis_tables(self, data: ExperimentData) -> Dict[str, Any]:
-        result = {}
-        result.update(self.extract_tests(data))
-        return result
+class MatchingQualityDictReporter(TestDictReporter):
+    tests = [TTest, KSTest]
 
     def report(self, data: ExperimentData) -> Dict[str, Any]:
-        result = {}
-        result.update(self.extract_data_from_analysis_tables(data))
-        return result
+        return self.extract_tests(data)
 
 
 class MatchingQualityDatasetReporter(MatchingQualityDictReporter):
