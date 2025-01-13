@@ -88,7 +88,10 @@ class Comparator(Calculator, ABC):
     ) -> Dict:
         result = {}
         for i in range(len(compared_data)):
-            result[compared_data[i][0]] = DatasetAdapter.to_dataset(
+            res_name = f"{compared_data[i][0]}{NAME_BORDER_SYMBOL}{compared_data[i][1].columns[0]}" if len(
+                compared_data
+            ) > 1 else compared_data[i][0]
+            result[res_name] = DatasetAdapter.to_dataset(
                 cls._inner_function(
                     baseline_data[0 if len(baseline_data) == 1 else i][1],
                     compared_data[i][1],
@@ -162,7 +165,7 @@ class Comparator(Calculator, ABC):
         data: List[Tuple[str, Dataset]]
     ) -> List[Tuple[str, Dataset]]:
         result = [
-            (f"{bucket[0]}{NAME_BORDER_SYMBOL}{column}", bucket[1][column])
+            (bucket[0], bucket[1][column])
             for bucket in data
             for column in bucket[1].columns
         ]
