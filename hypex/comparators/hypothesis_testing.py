@@ -67,6 +67,6 @@ class Chi2Test(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dataset:
-        return Chi2TestExtension(
-            reliability=kwargs.get("reliability", 0.05)
-        ).calc(data, other=test_data, **kwargs)
+        return Chi2TestExtension(reliability=kwargs.get("reliability", 0.05)).calc(
+            data, other=test_data, **kwargs
+        )

@@ -63,7 +63,10 @@ class TTestExtension(StatTest):
     def _calc_pandas(
         self, data: Dataset, other: Union[Dataset, None] = None, **kwargs
     ) -> Union[float, Dataset]:
-        if list(data.nunique().values())[0] < 2 and list(other.nunique().values())[0] < 2:
+        if (
+            list(data.nunique().values())[0] < 2
+            and list(other.nunique().values())[0] < 2
+        ):
             return DatasetAdapter.to_dataset(
                 {
                     "p-value": [None],

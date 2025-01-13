@@ -175,7 +175,7 @@ class DatasetBackendNavigation(ABC):
     @abstractmethod
     def __repr__(self):
         raise AbstractMethodError
-    
+
     @abstractmethod
     def _repr_html_(self):
         raise AbstractMethodError
@@ -197,12 +197,10 @@ class DatasetBackendNavigation(ABC):
     @abstractmethod
     def get_column_type(self, column_name: str) -> Union[type, None]:
         raise AbstractMethodError
-    
+
     @abstractmethod
     def astype(
-        self,
-        dtype: Dict[str, type],
-        errors: Literal["raise", "ignore"] = "raise"
+        self, dtype: Dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> Any:
         raise AbstractMethodError
 
@@ -351,6 +349,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         self,
         how: Literal["any", "all"] = "any",
         subset: Union[str, Iterable[str], None] = None,
+        axis: Union[Literal["index", "rows", "columns"], int] = 0,
     ) -> Any:
         raise AbstractMethodError
 
@@ -419,4 +418,3 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         self, to_replace: Any = None, value: Any = None, regex: bool = False
     ) -> Any:
         raise AbstractMethodError
-

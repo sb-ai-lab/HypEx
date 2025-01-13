@@ -36,7 +36,10 @@ class OneAAStatAnalyzer(Executor):
                     analysis_data[f"mean {class_} {field}"] = t_data[field].mean()
         analysis_data["mean test score"] = 0
         sum_weight = 0
-        analysis_data = {key: (0 if np.isnan(value) else value) for key, value in analysis_data.items()}
+        analysis_data = {
+            key: (0 if np.isnan(value) else value)
+            for key, value in analysis_data.items()
+        }
         if (
             "mean TTest p-value" in analysis_data
             and "mean KSTest p-value" in analysis_data
@@ -139,10 +142,13 @@ class AAScoreAnalyzer(Executor):
                                         * value
                                         for key, value in self.__feature_weights.items()
                                         if (isinstance(value, float) and value > 0)
-                                        and (key.replace(
+                                        and (
+                                            key.replace(
                                                 f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}",
                                                 f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}",
-                                            ) in x["splitter_id"])
+                                            )
+                                            in x["splitter_id"]
+                                        )
                                     )
                                     / len(self.__feature_weights)
                                 )
