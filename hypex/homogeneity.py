@@ -24,8 +24,10 @@ HOMOGENEITY_TEST = Experiment(
 
 
 class HomogeneityTest(ExperimentShell):
+    def create_experiment(self, **kwargs) -> Experiment:
+        return HOMOGENEITY_TEST
+
     def __init__(self):
         super().__init__(
-            experiment=HOMOGENEITY_TEST,
             output=HomoOutput(),
         )

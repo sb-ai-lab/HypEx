@@ -18,21 +18,12 @@ from .ui.matching import MatchingOutput
 class Matching(ExperimentShell):
 
     @staticmethod
-    def _make_experiment(
-        group_match: bool = False,
-        distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-        metric: Literal["atc", "att", "ate"] = "ate",
-        bias_estimation: bool = True,
-        quality_tests: Union[
-            Literal["smd", "psi", "ks-test", "repeats", "auto"],
-            List[Literal["smd", "psi", "ks-test", "repeats", "auto"]],
-        ] = "auto",
-    ) -> Experiment:
+    def create_experiment(self, **kwargs) -> Experiment:
         distance_mapping = {
             "mahalanobis": MahalanobisDistance(grouping_role=TreatmentRole())
         }
-        two_sides = metric == "ate"
-        test_pairs = metric == "atc"
+        two_sides = kwargs.get("metric") == "ate"
+        test_pairs = kwargs.get("metric") == "atc"
         executors: List[Executor] = [
             FaissNearestNeighbors(
                 grouping_role=TreatmentRole(),
@@ -40,7 +31,7 @@ class Matching(ExperimentShell):
                 test_pairs=test_pairs,
             )
         ]
-        if bias_estimation:
+        if kwargs.get("bias_estimation"):
             executors += [
                 Bias(grouping_role=TreatmentRole(), target_roles=[TargetRole()]),
             ]
@@ -48,7 +39,7 @@ class Matching(ExperimentShell):
             MatchingMetrics(
                 grouping_role=TreatmentRole(),
                 target_roles=[TargetRole()],
-                metric=metric,
+                metric=kwargs.get("metric"),
             ),
             TTest(
                 compare_by="columns_in_groups",
@@ -58,24 +49,24 @@ class Matching(ExperimentShell):
             ),
             MatchingAnalyzer(),
         ]
-        if quality_tests != "auto":
+        if kwargs.get("quality_tests") != "auto":
             warnings.warn("Now quality tests aren't supported yet")
         return (
-            Experiment(
+            GroupExperiment(
                 executors=(
                     executors
-                    if distance == "l2"
-                    else [distance_mapping[distance]] + executors
-                )
-            )
-            if not group_match
-            else GroupExperiment(
-                executors=(
-                    executors
-                    if distance == "l2"
-                    else [distance_mapping[distance]] + executors
+                    if kwargs.get("distance") == "l2"
+                    else [distance_mapping[kwargs.get("distance")]] + executors
                 ),
                 reporter=MatchingDatasetReporter(),
+            )
+            if kwargs.get("group_match")
+            else Experiment(
+                executors=(
+                    executors
+                    if kwargs.get("distance") == "l2"
+                    else [distance_mapping[kwargs.get("distance")]] + executors
+                )
             )
         )
 
@@ -91,8 +82,12 @@ class Matching(ExperimentShell):
         ] = "auto",
     ):
         super().__init__(
-            experiment=self._make_experiment(
-                group_match, distance, metric, bias_estimation, quality_tests
-            ),
             output=MatchingOutput(GroupExperiment if group_match else MatchingAnalyzer),
+            create_experiment_kwargs={
+                "group_match": group_match,
+                "distance": distance,
+                "metric": metric,
+                "bias_estimation": bias_estimation,
+                "quality_tests": quality_tests,
+            },
         )

@@ -2,7 +2,6 @@ import datetime
 from typing import Any, Union, Dict, List, TypeVar, Callable, Sequence, Tuple
 
 StratificationRoleTypes = Union[float, str, datetime.datetime]
-DefaultRoleTypes = Union[float, bool, str, int]
 TargetRoleTypes = Union[float, int, bool]
 CategoricalTypes = Union[str]
 ScalarType = Union[float, int, str, bool]

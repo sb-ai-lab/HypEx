@@ -7,11 +7,11 @@ from hypex.dataset import ExperimentData
 from hypex.experiments import Experiment
 from hypex.ui.base import ExperimentShell
 from hypex.utils import ExperimentDataEnum
-from tutorial_data_creation import create_test_data
+from hypex.utils.tutorial_data_creation import create_test_data
 
 
 class BaseTest(ut.TestCase):
-    base_data_path: Optional[str] = None
+    base_data_path: Optional[str] = "C:\Projects\HypEx\data.csv"
 
     def createDataset(self):
         pass
@@ -32,15 +32,21 @@ class ExperimentTest(BaseTest):
         super().setUp()
         self.experiment_data = ExperimentData(self.data)
 
-    def executeExperiment(self):
+    def execute_experiment(self):
         self.experiment_data = self.experiment.execute(self.experiment_data)
 
     def check_experiment_key(self, key: str, space: ExperimentDataEnum):
-        self.assertIn(True, self.experiment_data.get_spaces_key_dict()[space])
+        self.assertIn(key, self.experiment_data.get_spaces_key_dict()[space])
 
 
 class ShellTest(ExperimentTest):
     shell: ExperimentShell
+
+    def create_experiment(self, **kwargs):
+        return self.shell.create_experiment(**kwargs)
+
+    def execute_shell(self):
+        return self.shell.execute(self.experiment_data)
 
     def test_experiment_structure(self):
         self.assertEqual(True, False)  # add assertion here

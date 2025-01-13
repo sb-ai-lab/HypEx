@@ -3,7 +3,6 @@ from typing import Optional, Dict
 
 from ..utils import (
     TargetRoleTypes,
-    DefaultRoleTypes,
     CategoricalTypes,
     RoleNameType,
 )
@@ -24,7 +23,7 @@ class ABCRole(ABC):
 
     _role_name: RoleNameType = "Abstract"
 
-    def __init__(self, data_type: Optional[DefaultRoleTypes] = None):
+    def __init__(self, data_type: Optional[type] = None):
         """Initializes a new instance of ABCRole with an optional data type.
         Attributes:
             data_type (Optional[DefaultRoleTypes], optional): Specifies the data type associated with the role.
@@ -76,7 +75,7 @@ class StratificationRole(ABCRole):
 
     _role_name: RoleNameType = "Stratification"
 
-    def __init__(self, data_type: Optional[CategoricalTypes] = None):
+    def __init__(self, data_type: Optional[type] = None):
         super().__init__(data_type)
 
 

@@ -28,7 +28,6 @@ from .errors import (
 from .typings import (
     FromDictTypes,
     TargetRoleTypes,
-    DefaultRoleTypes,
     StratificationRoleTypes,
     CategoricalTypes,
     MultiFieldKeyTypes,

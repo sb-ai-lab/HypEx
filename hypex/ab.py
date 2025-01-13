@@ -10,16 +10,14 @@ from .utils import ABNTestMethodsEnum
 
 
 class ABTest(ExperimentShell):
-
-    @staticmethod
-    def _make_experiment(additional_tests, multitest_method):
+    def create_experiment(self, **kwargs) -> Experiment:
         test_mapping = {
             "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
             "u-test": UTest(compare_by="groups", grouping_role=TreatmentRole()),
             "chi2-test": Chi2Test(compare_by="groups", grouping_role=TreatmentRole()),
         }
         on_role_executors = [GroupDifference(grouping_role=TreatmentRole())]
-        additional_tests = ["t-test"] if additional_tests is None else additional_tests
+        additional_tests = kwargs.get("additional_tests", ["t-test"])
         additional_tests = (
             additional_tests
             if isinstance(additional_tests, List)
@@ -36,13 +34,14 @@ class ABTest(ExperimentShell):
                 ),
                 ABAnalyzer(
                     multitest_method=(
-                        ABNTestMethodsEnum(multitest_method)
-                        if multitest_method
+                        ABNTestMethodsEnum(kwargs["multitest_method"])
+                        if kwargs.get("multitest_method")
                         else None
                     )
                 ),
             ]
         )
+
 
     def __init__(
         self,
@@ -67,7 +66,11 @@ class ABTest(ExperimentShell):
             ]
         ] = "holm",
     ):
+
         super().__init__(
-            experiment=self._make_experiment(additional_tests, multitest_method),
             output=ABOutput(),
+            create_experiment_kwargs={
+                "additional_tests": additional_tests,
+                "multitest_method": multitest_method
+            }
         )
