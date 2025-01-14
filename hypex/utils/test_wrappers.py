@@ -5,7 +5,7 @@ import pandas as pd
 
 from hypex.dataset import ExperimentData
 from hypex.experiments import Experiment
-from hypex.ui.base import ExperimentShell
+from hypex.ui.base import ExperimentShell, Output
 from hypex.utils import ExperimentDataEnum
 from hypex.utils.tutorial_data_creation import create_test_data
 
@@ -13,7 +13,7 @@ from hypex.utils.tutorial_data_creation import create_test_data
 class BaseTest(ut.TestCase):
     base_data_path: Optional[str] = "C:\Projects\HypEx\data.csv"
 
-    def createDataset(self):
+    def create_dataset(self):
         pass
 
     def setUp(self):
@@ -22,7 +22,7 @@ class BaseTest(ut.TestCase):
             if self.base_data_path
             else create_test_data()
         )
-        self.createDataset()
+        self.create_dataset()
 
 
 class ExperimentTest(BaseTest):
@@ -40,16 +40,28 @@ class ExperimentTest(BaseTest):
 
 
 class ShellTest(ExperimentTest):
+    shell_class: type
+    output: Output
     shell: ExperimentShell
 
     def create_experiment(self, **kwargs):
-        return self.shell.create_experiment(**kwargs)
+        return self.shell_class.create_experiment(**kwargs)
 
     def execute_shell(self):
-        return self.shell.execute(self.experiment_data)
+        return self.shell_class.execute(self.experiment_data)
 
     def test_experiment_structure(self):
         self.assertEqual(True, False)  # add assertion here
 
     def check_output_structure(self, output, attributes: List[str]):
-        return self.assertEqual(all(hasattr(output, a) for a in attributes), True)
+        return self.assertEqual(
+            all(
+                hasattr(output, a) and output.__getattribute__(a) is not None
+                for a in attributes
+            ),
+            True,
+        )
+
+    def test_shell_output_structure(self):
+        self.output = self.shell.execute(self.experiment_data)
+        self.check_output_structure(self.output, ["resume"])
