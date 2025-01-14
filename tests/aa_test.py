@@ -7,11 +7,13 @@ from hypex.dataset import (
     StratificationRole,
 )
 from hypex.splitters import AASplitter, AASplitterWithStratification
+from hypex.ui.aa import AAOutput
 from hypex.utils.test_wrappers import ShellTest
 
 
 class AAShellTest(ShellTest):
     shell_class = AATest
+    output: AAOutput
 
     def create_dataset(self):
         self.data = Dataset(
@@ -26,7 +28,6 @@ class AAShellTest(ShellTest):
         )
 
     # structure tests--------------------------------------------------------------
-
     def default_experiment_structure_test(self):
         shell = self.shell_class()
         self.assertEqual(
@@ -73,6 +74,17 @@ class AAShellTest(ShellTest):
     # --------------------------------------------------------------
     # running tests--------------------------------------------------------------
 
+    def check_resume_structure(self):
+        resume = self.output.resume
+        features = self.experiment_data.ds.search_columns(TargetRole())
+        self.assertTrue(all(f in resume["feature"] for f in features))
+
+    def check_experiments(self):
+        n_iterations = len(
+            self.shell.experiment.executors[0].params[AASplitter]["random_state"]
+        )
+        self.assertEqual(len(self.output.experiments), n_iterations)
+
     def test_shell_output_structure(self):
         self.shell = self.shell_class(n_iterations=10)
         super().test_shell_output_structure()
@@ -80,3 +92,5 @@ class AAShellTest(ShellTest):
             self.output,
             ["best_split", "experiments", "aa_score", "best_split_statistic"],
         )
+        self.check_resume_structure()
+        self.check_experiments()

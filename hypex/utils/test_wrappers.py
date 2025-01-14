@@ -51,15 +51,14 @@ class ShellTest(ExperimentTest):
         return self.shell_class.execute(self.experiment_data)
 
     def test_experiment_structure(self):
-        self.assertEqual(True, False)  # add assertion here
+        self.assertTrue(False)  # add assertion here
 
     def check_output_structure(self, output, attributes: List[str]):
-        return self.assertEqual(
+        return self.assertTrue(
             all(
                 hasattr(output, a) and output.__getattribute__(a) is not None
                 for a in attributes
-            ),
-            True,
+            )
         )
 
     def test_shell_output_structure(self):
