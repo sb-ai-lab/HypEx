@@ -73,10 +73,10 @@ class MatchingQualityDictReporter(TestDictReporter):
 
 class MatchingQualityDatasetReporter(MatchingQualityDictReporter):
 
-    @staticmethod
-    def convert_flat_dataset(data: Dict) -> Dataset:
-        struct_dict = MatchingQualityDictReporter._get_struct_dict(data)
-        return MatchingQualityDictReporter._convert_struct_dict_to_dataset(struct_dict)
+    @classmethod
+    def convert_flat_dataset(cls, data: Dict) -> Dataset:
+        struct_dict = cls._get_struct_dict(data)
+        return cls._convert_struct_dict_to_dataset(struct_dict)
 
     def report(self, data: ExperimentData):
         front_buffer = self.front
