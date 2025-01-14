@@ -66,6 +66,7 @@ class DatasetReporter(OnDictReporter):
     def convert_to_dataset(data: Dict) -> Union[Dict[str, Dataset], Dataset]:
         return Dataset.from_dict(roles={k: ReportRole() for k in data}, data=[data])
 
+
 class TestDictReporter(DictReporter):
 
     @staticmethod
@@ -91,17 +92,21 @@ class TestDictReporter(DictReporter):
                         dict_result[key_split[0]][key_split[3]][key_split[1]][
                             key_split[2]
                         ] = value
-        return dict_result\
-    
+        return dict_result
+
     @staticmethod
     def _convert_struct_dict_to_dataset(data: Dict) -> Dataset:
 
         def rename_passed(data: Dict[str, bool]):
             return {
-                c: ("NOT OK" if (v is True or v == "True") else "OK") if "pass" in c else v
+                c: (
+                    ("NOT OK" if (v is True or v == "True") else "OK")
+                    if "pass" in c
+                    else v
+                )
                 for c, v in data.items()
             }
-        
+
         result = []
         for feature, groups in data.items():
             for group, tests in groups.items():
@@ -119,7 +124,7 @@ class TestDictReporter(DictReporter):
             result,
             roles={"feature": InfoRole(), "group": TreatmentRole()},
         )
-    
+
     def extract_tests(self, data: ExperimentData) -> Dict[str, Any]:
         test_ids = data.get_ids(
             self.tests, searched_space=ExperimentDataEnum.analysis_tables
