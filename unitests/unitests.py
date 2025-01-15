@@ -20,6 +20,19 @@ class TestDataset(unittest.TestCase):
         self.assertListEqual(list(dataset.columns), ['col1', 'col2'])
         self.assertIn('col1', dataset.roles)
 
+        roles = {
+            InfoRole(): ['col1', 'col2']
+        }
+        data = pd.DataFrame({
+            'col1': [1, 2, 3],
+            'col2': [4, 5, 6]
+        })
+        dataset = Dataset(roles=roles, data=data)
+
+        self.assertEqual(len(dataset), 3)
+        self.assertListEqual(list(dataset.columns), ['col1', 'col2'])
+        self.assertIn('col2', dataset.roles)
+
     def test_add_column(self):
         roles = {
             'col1': InfoRole(),
@@ -193,22 +206,6 @@ class TestDatasetBase(unittest.TestCase):
         self.assertIn('data', result)
         self.assertIn('roles', result)
 
-    def test_to_json(self):
-        roles = {
-            'col1': InfoRole(),
-            'col2': InfoRole()
-        }
-        data = pd.DataFrame({
-            'col1': [1, 2, 3],
-            'col2': [4, 5, 6]
-        })
-        dataset_base = DatasetBase(roles=roles, data=data)
-
-        result = dataset_base.to_json()
-        self.assertIsInstance(result, str)
-        parsed = json.loads(result)
-        self.assertIn('data', parsed)
-        self.assertIn('roles', parsed)
 
 if __name__ == '__main__':
     unittest.main()

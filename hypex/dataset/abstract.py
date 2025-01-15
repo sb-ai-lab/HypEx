@@ -69,7 +69,7 @@ class DatasetBase(ABC):
         self.default_role = default_role
         roles = (
             parse_roles(roles)
-            if any(isinstance(role, type) for role in roles.keys())
+            if any(isinstance(role, ABCRole) for role in roles.keys())
             else roles
         )
         if data is not None and any(
