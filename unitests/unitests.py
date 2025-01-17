@@ -450,5 +450,49 @@ class TestDataset(unittest.TestCase):
         # Проверим, что check_hash возвращает False для несуществующего executor_id
         self.assertFalse(experiment_data.check_hash('nonexistent_executor', ExperimentDataEnum.analysis_tables))
 
+    def test_getitem_by_column_name(self):
+        subset = self.dataset['col1']
+        self.assertTrue(isinstance(subset, Dataset))
+        self.assertIn('col1', subset.columns)
+
+    def test_getitem_by_multiple_column_names(self):
+        subset = self.dataset[['col1', 'col2']]
+        self.assertTrue(isinstance(subset, Dataset))
+        self.assertEqual(set(subset.columns), {'col1', 'col2'})
+
+    def test_setitem_existing_column(self):
+        self.dataset['col1'] = [7, 8, 9]
+        self.assertEqual(self.dataset.data['col1'].tolist(), [7, 8, 9])
+
+    # def test_setitem_new_column(self):
+    #     new_data = [10, 11, 12]
+    #     self.dataset['col3'] = new_data
+    #     self.assertIn('col3', self.dataset.columns)
+    #     self.assertEqual(self.dataset.data['col3'].tolist(), new_data)
+
+    def test_setitem_invalid_type(self):
+        with self.assertRaises(TypeError):
+            self.dataset['col1'] = ['string', 'another', 'string']  # Incorrect type
+
+    def test_setitem_with_iloc(self):
+        new_data = [15, 16, 17]
+        self.dataset.iloc[1, 0] = new_data[0]
+        self.assertEqual(self.dataset.data.iloc[1, 0], new_data[0])
+
+    def test_getitem_column_not_found(self):
+        with self.assertRaises(KeyError):
+            self.dataset['nonexistent_column']
+        
+    def test_setitem_illegal_index(self):
+        with self.assertRaises(IndexError):
+            self.dataset.iloc[1, 3] = 10  # Index out of bounds
+
+    def test_getitem_empty_dataset(self):
+        empty_data = pd.DataFrame(columns=['col1', 'col2'])
+        empty_dataset = Dataset(roles=self.roles, data=empty_data)
+        subset = empty_dataset['col1']
+        self.assertTrue(isinstance(subset, Dataset))
+        self.assertEqual(len(subset), 0)
+
 if __name__ == '__main__':
     unittest.main()
