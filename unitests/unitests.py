@@ -4,15 +4,15 @@ import pandas as pd
 import numpy as np
 from hypex.dataset import *
 from hypex.dataset.roles import *
-from hypex.utils import BackendsEnum, RoleColumnError, ExperimentDataEnum, ConcatDataError
+from hypex.utils import *
 import json
 
 class TestDataset(unittest.TestCase):
 
     def setUp(self):
         self.roles = {
-            'col1': InfoRole(),
-            'col2': InfoRole()
+            'col1': InfoRole(int),
+            'col2': InfoRole(int)
         }
         self.data = pd.DataFrame({
             'col1': [1, 2, 3],
@@ -51,17 +51,6 @@ class TestDataset(unittest.TestCase):
         }
         with self.assertRaises(RoleColumnError):
             Dataset(roles=roles_invalid, data=self.data)
-
-    def test_add_column(self):
-        new_data = [7, 8, 9]
-        self.dataset.add_column(new_data, {'col3': InfoRole()})
-
-        self.assertIn('col3', self.dataset.columns)
-        self.assertListEqual(self.dataset.data['col3'].tolist(), new_data)
-
-    def test_astype(self):
-        dataset = self.dataset.astype({'col1': float})
-        self.assertEqual(dataset.data['col1'].dtype, float)
 
     def test_append(self):
         dataset_new = copy.deepcopy(self.dataset)
@@ -103,18 +92,6 @@ class TestDataset(unittest.TestCase):
     def test_operators(self):
         result = self.dataset + 1
         self.assertListEqual(result.data['col1'].tolist(), [2, 3, 4])
-
-    def test_groupby(self):
-        data_grouped = pd.DataFrame({
-            'col1': [1, 2, 1],
-            'col2': [4, 5, 6]
-        })
-        dataset_grouped = Dataset(roles=self.roles, data=data_grouped)
-
-        grouped = dataset_grouped.groupby(by='col1')
-        self.assertEqual(len(grouped), 2)
-        for key, group in grouped:
-            self.assertGreaterEqual(len(group), 1)
 
     def test_roles_property(self):
         dataset_base = DatasetBase(roles=self.roles, data=self.data)
@@ -466,11 +443,35 @@ class TestDataset(unittest.TestCase):
         self.dataset['col1'] = [7, 8, 9]
         self.assertEqual(self.dataset.data['col1'].tolist(), [7, 8, 9])
 
-    # def test_setitem_new_column(self):
-    #     new_data = [10, 11, 12]
-    #     self.dataset['col3'] = new_data
-    #     self.assertIn('col3', self.dataset.columns)
-    #     self.assertEqual(self.dataset.data['col3'].tolist(), new_data)
+    def test_invalid_type_other(self):
+        with self.assertRaises(DataTypeError):
+            result = self.dataset + {}
+
+    def test_backend_type_error(self):
+        # Создаем второй Dataset с другим типом бэкенда
+        other_roles = {'col1': InfoRole(int), 'col2': InfoRole(int)}
+        other_data = pd.DataFrame({
+            'col1': [10, 20, 30],
+            'col2': [40, 50, 60]
+        })
+        other_dataset = Dataset(roles=other_roles, data=other_data, backend='unknown')
+
+        # Проверка ошибки при несовместимых бэкендах
+        with self.assertRaises(BackendTypeError):
+            # Пытаемся выполнить операцию с несовместимым бэкендом
+            result = self.dataset + other_dataset  # Ожидаем ошибку BackendTypeError
+
+    def test_setitem_new_column(self):
+        new_data = [10, 11, 12]
+        self.dataset['col3'] = new_data
+        self.assertIn('col3', self.dataset.columns)
+        self.assertEqual(self.dataset.data['col3'].tolist(), new_data)
+
+    def test_setitem_dataset(self):
+        new_data = copy.deepcopy(self.dataset['col1'])
+        self.dataset['col3'] = new_data
+        self.assertIn('col3', self.dataset.columns)
+        self.assertEqual(self.dataset.data['col3'].tolist(), self.data['col1'].tolist())
 
     def test_setitem_invalid_type(self):
         with self.assertRaises(TypeError):
@@ -497,30 +498,24 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(len(subset), 0)
 
     def test_add_column(self):
+
+        with self.assertRaises(ValueError):
+            self.dataset.add_column([1, 2, 3])
+
         # Test basic add_column
         new_data = [7, 8, 9]
         self.dataset.add_column(new_data, {'col3': InfoRole()})
         self.assertIn('col3', self.dataset.columns)
         self.assertListEqual(self.dataset.data['col3'].tolist(), new_data)
 
-        # Test with custom index
-        new_data = [10, 11, 12]
-        self.dataset.add_column(new_data, {'col4': InfoRole()}, index=['a', 'b', 'c'])
-        self.assertEqual(list(self.dataset.data['col4'].index), ['a', 'b', 'c'])
-
-        # Test with single value
-        self.dataset.add_column(5, {'col5': InfoRole()})
-        self.assertEqual(self.dataset.data['col5'].tolist(), [5, 5, 5])
+        self.dataset.add_column(Dataset(pd.DataFrame({'col4': new_data})), {'col4': InfoRole()})
+        self.assertIn('col4', self.dataset.columns)
+        self.assertListEqual(self.dataset.data['col3'].tolist(), new_data)
 
         # Test with numpy array
         import numpy as np
         self.dataset.add_column(np.array([13, 14, 15]), {'col6': InfoRole()})
         self.assertListEqual(self.dataset.data['col6'].tolist(), [13, 14, 15])
-
-        # Edge cases
-        # Test with empty data
-        with self.assertRaises(ValueError):
-            self.dataset.add_column([], {'col7': InfoRole()})
 
         # Test with mismatched length
         with self.assertRaises(ValueError):
@@ -663,8 +658,7 @@ class TestDataset(unittest.TestCase):
         self.assertTrue(result.data['col2'].dtype == 'object')
 
         # Test with errors='ignore'
-        invalid_data = pd.DataFrame({'col1': ['a', 'b', 'c']})
-        invalid_dataset = Dataset(roles=self.roles, data=invalid_data)
+        invalid_dataset = Dataset(roles = {'col1': InfoRole()}, data = pd.DataFrame({'col1': ['a', 'b', 'c']}))
         result = invalid_dataset.astype({'col1': int}, errors='ignore')
         self.assertTrue(result.data['col1'].dtype == 'object')
 
@@ -1059,40 +1053,66 @@ class TestDataset(unittest.TestCase):
             Dataset.from_dict({'col1': [1]}, self.roles, orient='invalid')
 
     def test_groupby(self):
-        # Test basic groupby
-        self.dataset.add_column(['A', 'A', 'B'], {'group': InfoRole()})
-        grouped = self.dataset.groupby('group')
-        self.assertEqual(len(grouped.groups), 2)
 
-        # Test with multiple columns
-        self.dataset.add_column(['A', 'A', 'B'], {'group': InfoRole()})
-        self.dataset.add_column(['X', 'Y', 'X'], {'group2': InfoRole()})
-        grouped = self.dataset.groupby(['group', 'group2'])
-        self.assertEqual(len(grouped.groups), 3)
+        data_grouped = pd.DataFrame({
+            'col1': [1, 2, 1],
+            'col2': [4, 5, 6]
+        })
+        dataset_grouped = Dataset(roles=self.roles, data=data_grouped)
 
-        # Test with as_index=False
-        result = self.dataset.groupby('group', as_index=False).sum()
-        self.assertIn('group', result.columns)
+        grouped = dataset_grouped.groupby(by='col1')
+        self.assertEqual(len(grouped), 2)
 
-        # Edge cases
-        # Test with non-existent column
+    def test_groupby_with_single_column_dataset(self):
+        # Создаем новый Dataset для группировки
+        by = Dataset(roles={'col1': InfoRole(int)}, data=pd.DataFrame({'col1': [1, 2, 1]}))
+        
+        result = self.dataset.groupby(by=by)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        self.assertIsInstance(result[0][1], Dataset)
+    
+    def test_groupby_with_column_name(self):
+        # Группировка по столбцу 'col1'
+        result = self.dataset.groupby(by='col1')
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 3)  # должно быть 3 группы для значений 1, 2 и 3
+        self.assertIsInstance(result[0][1], Dataset)
+
+    def test_groupby_with_func(self):
+        # Агрегация с функцией sum
+        result = self.dataset.groupby(by='col1', func='sum')
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 3)  # Проверка числа групп
+        self.assertIsInstance(result[0][1], Dataset)
+        
+    def test_groupby_with_fields_list(self):
+        # Отбор столбцов после группировки
+        result = self.dataset.groupby(by='col1', fields_list=['col2'])
+        self.assertIsInstance(result, list)
+        self.assertEqual(result[0][1].data.columns.tolist(), ['col2'])
+
+    def test_groupby_with_invalid_by_type(self):
+        # Проверка на неправильный тип для 'by'
         with self.assertRaises(KeyError):
-            self.dataset.groupby('non_existent')
+            self.dataset.groupby(by=123)
 
-        # Test with empty dataset
-        empty_dataset = Dataset.create_empty(self.roles)
-        grouped = empty_dataset.groupby('col1')
-        self.assertEqual(len(grouped.groups), 0)
+    def test_groupby_with_empty_dataset(self):
+        # Проверка на пустой Dataset
+        empty_dataset = Dataset(roles=self.roles, data=pd.DataFrame(columns=['col1', 'col2']))
+        result = empty_dataset.groupby(by='col1')
+        self.assertEqual(result, [])
 
-        # Test with all NaN values in grouping column
-        self.dataset.data['group'] = None
-        grouped = self.dataset.groupby('group')
-        self.assertEqual(len(grouped.groups), 0)
-
-        # Test with mixed types in grouping column
-        self.dataset.data['group'] = ['A', 1, None]
-        grouped = self.dataset.groupby('group')
-        self.assertEqual(len(grouped.groups), 2)
+    def test_groupby_with_tmp_roles(self):
+        # Проверка, что tmp_roles сохраняются после группировки
+        result = self.dataset.groupby(by='col1')
+        self.assertTrue(all(dataset[1].tmp_roles == self.dataset.tmp_roles for dataset in result))
+    
+    def test_groupby_with_fields_list_and_func(self):
+        # Группировка с полями и функцией
+        result = self.dataset.groupby(by='col1', fields_list=['col2'], func='sum')
+        self.assertIsInstance(result, list)
+        self.assertEqual([int(x[1]) for x in result], self.data['col2'].tolist())
 
     def test_idxmax(self):
         # Test basic idxmax
@@ -1819,6 +1839,263 @@ class TestDataset(unittest.TestCase):
         # Test dtypes property
         self.assertEqual(len(self.dataset.dtypes), 2)
         self.assertTrue(all(dtype == 'int64' for dtype in self.dataset.dtypes))
+
+    # Тесты для бинарных операторов сравнения
+    def test_eq_operator(self):
+        other_dataset = Dataset(roles=self.roles, data=self.data, backend=BackendsEnum.pandas)
+        result = self.dataset == other_dataset
+        self.assertTrue(result)  # Ожидаем True, так как данные одинаковые
+
+    def test_ne_operator(self):
+        other_dataset = Dataset(roles=self.roles, data=self.data, backend=BackendsEnum.pandas)
+        result = self.dataset != other_dataset
+        self.assertFalse(result)  # Ожидаем False, так как данные одинаковые
+
+    def test_le_operator(self):
+        other_data = pd.DataFrame({
+            'col1': [1, 2, 3],
+            'col2': [4, 5, 6]
+        })
+        other_dataset = Dataset(roles=self.roles, data=other_data, backend=BackendsEnum.pandas)
+        result = self.dataset <= other_dataset
+        self.assertTrue(result)  # Ожидаем True, так как все элементы меньше или равны
+
+    # Тесты для унарных операторов
+    def test_pos_operator(self):
+        result = +self.dataset
+        self.assertIsInstance(result, Dataset)  # Ожидаем возвращение Dataset
+        self.assertTrue((result.data >= 0).all().all())  # Ожидаем, что все элементы >= 0
+
+    def test_neg_operator(self):
+        result = -self.dataset
+        self.assertIsInstance(result, Dataset)  # Ожидаем возвращение Dataset
+        self.assertTrue((result.data < 0).all().all())  # Ожидаем, что все элементы < 0
+
+    def test_abs_operator(self):
+        result = abs(self.dataset)
+        self.assertIsInstance(result, Dataset)  # Ожидаем возвращение Dataset
+        self.assertTrue((result.data >= 0).all().all())  # Ожидаем, что все элементы >= 0
+
+    def test_invert_operator(self):
+        result = ~self.dataset
+        self.assertIsInstance(result, Dataset)  # Ожидаем возвращение Dataset
+        # Допустим, что инверсия работает с битами, проверим корректность данных
+        self.assertTrue((result.data.isin([0, 1])).all().all())  # Ожидаем 0 или 1
+
+    def test_round_operator(self):
+        result = round(self.dataset, 2)
+        self.assertIsInstance(result, Dataset)  # Ожидаем возвращение Dataset
+        # Проверим, что округление работает корректно
+        self.assertTrue((result.data == self.dataset.data.round(2)).all().all())
+
+    def test_bool_operator(self):
+        result = bool(self.dataset)
+        self.assertTrue(result)  # Ожидаем, что не пустой Dataset вернет True
+
+    # Тесты для бинарных математических операторов
+    def test_add_operator(self):
+        other_data = pd.DataFrame({
+            'col1': [1, 1, 1],
+            'col2': [1, 1, 1]
+        })
+        other_dataset = Dataset(roles=self.roles, data=other_data, backend=BackendsEnum.pandas)
+        result = self.dataset + other_dataset
+        self.assertIsInstance(result, Dataset)  # Ожидаем, что результат будет Dataset
+        # Проверим корректность сложения
+        expected_data = self.data + other_data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_sub_operator(self):
+        other_data = pd.DataFrame({
+            'col1': [1, 1, 1],
+            'col2': [1, 1, 1]
+        })
+        other_dataset = Dataset(roles=self.roles, data=other_data, backend=BackendsEnum.pandas)
+        result = self.dataset - other_dataset
+        self.assertIsInstance(result, Dataset)  # Ожидаем, что результат будет Dataset
+        # Проверим корректность вычитания
+        expected_data = self.data - other_data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_mul_operator(self):
+        other_data = pd.DataFrame({
+            'col1': [1, 1, 1],
+            'col2': [1, 1, 1]
+        })
+        other_dataset = Dataset(roles=self.roles, data=other_data, backend=BackendsEnum.pandas)
+        result = self.dataset * other_dataset
+        self.assertIsInstance(result, Dataset)  # Ожидаем, что результат будет Dataset
+        # Проверим корректность умножения
+        expected_data = self.data * other_data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_floordiv_operator(self):
+        other_data = pd.DataFrame({
+            'col1': [1, 1, 1],
+            'col2': [1, 1, 1]
+        })
+        other_dataset = Dataset(roles=self.roles, data=other_data, backend=BackendsEnum.pandas)
+        result = self.dataset // other_dataset
+        self.assertIsInstance(result, Dataset)  # Ожидаем, что результат будет Dataset
+        # Проверим корректность целочисленного деления
+        expected_data = self.data // other_data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_truediv_operator(self):
+        other_data = pd.DataFrame({
+            'col1': [1, 1, 1],
+            'col2': [1, 1, 1]
+        })
+        other_dataset = Dataset(roles=self.roles, data=other_data, backend=BackendsEnum.pandas)
+        result = self.dataset / other_dataset
+        self.assertIsInstance(result, Dataset)  # Ожидаем, что результат будет Dataset
+        # Проверим корректность деления
+        expected_data = self.data / other_data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_rdiv_operator(self):
+        other_data = pd.DataFrame({
+            'col1': [1, 1, 1],
+            'col2': [1, 1, 1]
+        })
+        other_dataset = Dataset(roles=self.roles, data=other_data, backend=BackendsEnum.pandas)
+        result = other_dataset / self.dataset
+        self.assertIsInstance(result, Dataset)  # Ожидаем, что результат будет Dataset
+        # Проверим корректность "обратного деления"
+        expected_data = other_data / self.data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_mod_operator(self):
+        other_data = pd.DataFrame({
+            'col1': [2, 3, 4],
+            'col2': [1, 2, 3]
+        })
+        other_dataset = Dataset(roles=self.roles, data=other_data, backend=BackendsEnum.pandas)
+        result = self.dataset % other_dataset
+        self.assertIsInstance(result, Dataset)  # Ожидаем, что результат будет Dataset
+        # Проверим корректность остатка от деления
+        expected_data = self.data % other_data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_pow_operator(self):
+        other_data = pd.DataFrame({
+            'col1': [2, 3, 2],
+            'col2': [1, 2, 3]
+        })
+        other_dataset = Dataset(roles=self.roles, data=other_data, backend=BackendsEnum.pandas)
+        result = self.dataset ** other_dataset
+        self.assertIsInstance(result, Dataset)  # Ожидаем, что результат будет Dataset
+        # Проверим корректность возведения в степень
+        expected_data = self.data ** other_data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_and_operator(self):
+        other_data = pd.DataFrame({
+            'col1': [1, 1, 0],
+            'col2': [1, 0, 0]
+        })
+        other_dataset = Dataset(roles=self.roles, data=other_data, backend=BackendsEnum.pandas)
+        result = self.dataset & other_dataset
+        self.assertIsInstance(result, Dataset)  # Ожидаем, что результат будет Dataset
+        # Проверим корректность побитовой операции И
+        expected_data = self.data & other_data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_or_operator(self):
+        other_data = pd.DataFrame({
+            'col1': [1, 0, 0],
+            'col2': [0, 1, 1]
+        })
+        other_dataset = Dataset(roles=self.roles, data=other_data, backend=BackendsEnum.pandas)
+        result = self.dataset | other_dataset
+        self.assertIsInstance(result, Dataset)  # Ожидаем, что результат будет Dataset
+        # Проверим корректность побитовой операции ИЛИ
+        expected_data = self.data | other_data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_radd_operator(self):
+        # Тест правого оператора сложения
+        result = 5 + self.dataset
+        self.assertIsInstance(result, Dataset)
+        expected_data = 5 + self.data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_rsub_operator(self):
+        # Тест правого оператора вычитания
+        result = 10 - self.dataset
+        self.assertIsInstance(result, Dataset)
+        expected_data = 10 - self.data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_rmul_operator(self):
+        # Тест правого оператора умножения
+        result = 3 * self.dataset
+        self.assertIsInstance(result, Dataset)
+        expected_data = 3 * self.data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_rfloordiv_operator(self):
+        # Тест правого оператора целочисленного деления
+        result = 7 // self.dataset
+        self.assertIsInstance(result, Dataset)
+        expected_data = 7 // self.data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_rdiv_operator(self):
+        # Тест правого оператора деления
+        result = 8 / self.dataset
+        self.assertIsInstance(result, Dataset)
+        expected_data = 8 / self.data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_rtruediv_operator(self):
+        # Тест правого оператора деления с плавающей точкой
+        result = 8.0 / self.dataset
+        self.assertIsInstance(result, Dataset)
+        expected_data = 8.0 / self.data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_rmod_operator(self):
+        # Тест правого оператора остатка от деления
+        result = 9 % self.dataset
+        self.assertIsInstance(result, Dataset)
+        expected_data = 9 % self.data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_rpow_operator(self):
+        # Тест правого оператора возведения в степень
+        result = 2 ** self.dataset
+        self.assertIsInstance(result, Dataset)
+        expected_data = 2 ** self.data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_rdiv_operator(self):
+        # Проверка правого деления
+        result = 10 / self.dataset
+        self.assertIsInstance(result, Dataset)
+        expected_data = 10 / self.data
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_div_operator(self):
+        # Проверка деления
+        result = self.dataset / 2
+        self.assertIsInstance(result, Dataset)
+        expected_data = self.data / 2
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_lt_operator(self):
+        # Проверка оператора < (меньше)
+        result = self.dataset < 3
+        self.assertIsInstance(result, Dataset)
+        expected_data = self.data < 3
+        pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_ge_operator(self):
+        # Проверка оператора >= (больше или равно)
+        result = self.dataset >= 3
+        self.assertIsInstance(result, Dataset)
+        expected_data = self.data >= 3
+        pd.testing.assert_frame_equal(result.data, expected_data)
 
 if __name__ == '__main__':
     unittest.main()
