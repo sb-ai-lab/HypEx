@@ -11,10 +11,14 @@ from hypex.utils.tutorial_data_creation import create_test_data
 
 
 class BaseTest(ut.TestCase):
-    base_data_path: Optional[str] = "C:\Projects\HypEx\data.csv"
+    base_data_path: Optional[str]
 
     def create_dataset(self):
         pass
+
+    @staticmethod
+    def _default_data_generation(**kwargs):
+        return create_test_data(**kwargs)
 
     def setUp(self):
         self.data = (

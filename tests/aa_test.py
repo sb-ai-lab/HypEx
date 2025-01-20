@@ -28,7 +28,7 @@ class AAShellTest(ShellTest):
         )
 
     # structure tests--------------------------------------------------------------
-    def default_experiment_structure_test(self):
+    def check_default_experiment_structure(self):
         shell = self.shell_class()
         self.assertEqual(
             2000, len(shell.experiment.executors[0].params[AASplitter]["random_state"])
@@ -40,7 +40,7 @@ class AAShellTest(ShellTest):
             shell.experiment.executors[0].executors[0].executors[0], AASplitter
         )
 
-    def set_experiment_structure_test(self, n_iterations=100, control_size=0.3):
+    def check_set_experiment_structure(self, n_iterations=100, control_size=0.3):
         shell = self.shell_class(n_iterations=n_iterations, control_size=control_size)
         self.assertEqual(
             n_iterations,
@@ -51,14 +51,14 @@ class AAShellTest(ShellTest):
             shell._experiment.executors[0].params[AASplitter]["control_size"][0],
         )
 
-    def set_rs_experiment_structure_test(self, random_states=range(100)):
+    def check_set_rs_experiment_structure(self, random_states=range(100)):
         shell = self.shell_class(random_states=random_states)
         self.assertEqual(
             random_states,
             shell.experiment.executors[0].params[AASplitter]["random_state"],
         )
 
-    def set_stratification_experiment_structure_test(self):
+    def check_set_stratification_experiment_structure(self):
         shell = self.shell_class(stratification=True)
         self.assertIsInstance(
             shell.experiment.executors[0].executors[0].executors[0],
@@ -66,10 +66,10 @@ class AAShellTest(ShellTest):
         )
 
     def test_experiment_structure(self):
-        self.default_experiment_structure_test()
-        self.set_experiment_structure_test()
-        self.set_rs_experiment_structure_test()
-        self.set_stratification_experiment_structure_test()
+        self.check_default_experiment_structure()
+        self.check_set_experiment_structure()
+        self.check_set_rs_experiment_structure()
+        self.check_set_stratification_experiment_structure()
 
     # --------------------------------------------------------------
     # running tests--------------------------------------------------------------
