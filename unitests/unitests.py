@@ -662,6 +662,10 @@ class TestDataset(unittest.TestCase):
         result = invalid_dataset.astype({'col1': int}, errors='ignore')
         self.assertTrue(result.data['col1'].dtype == 'object')
 
+        invalid_dataset = Dataset(roles = {'col1': InfoRole()}, data = pd.DataFrame({'col1': ['a', 'b', 'c']}))
+        result = invalid_dataset.astype({'col1': str}, errors='ignore')
+        self.assertTrue(result.data['col1'].dtype == 'object')
+
         # Edge cases
         # Test with non-existent column
         with self.assertRaises(KeyError):
@@ -2096,6 +2100,152 @@ class TestDataset(unittest.TestCase):
         self.assertIsInstance(result, Dataset)
         expected_data = self.data >= 3
         pd.testing.assert_frame_equal(result.data, expected_data)
+
+    def test_locker_getitem(self):
+        # Используем .loc (например, для первой строки)
+        self.data.index = ['a', 'b', 'c']
+        self.dataset = Dataset(roles=self.roles, data=self.data)
+        t_data = self.dataset.loc['a']
+        self.assertTrue(isinstance(t_data, Dataset))
+        self.assertEqual(t_data.loc['col1'], 1)
+        self.assertEqual(t_data.loc['col2'], 4)
+        
+        # Тестирование ролей
+        self.assertIn('a', t_data.roles)
+
+    # Тестирование метода __setitem__ для Dataset.Locker
+    def test_locker_setitem_valid(self):
+        # Правильное обновление
+        self.data.index = ['a', 'b', 'c']
+        self.dataset = Dataset(roles=self.roles, data=self.data)
+        self.dataset.loc['a', 'col1'] = [10]
+        self.assertEqual(self.dataset.data.loc['a', 'col1'], 10)
+
+    def test_locker_setitem_invalid_type(self):
+        # Неправильный тип данных
+        self.data.index = ['a', 'b', 'c']
+        self.dataset = Dataset(roles=self.roles, data=self.data)
+        with self.assertRaises(TypeError):
+            self.dataset.loc['a', 'col1'] = ["string"]
+
+    def test_locker_setitem_type_mismatch(self):
+        # Попытка обновить столбец с несоответствующим типом данных
+        self.data.index = ['a', 'b', 'c']
+        self.dataset = Dataset(roles=self.roles, data=self.data)
+        with self.assertRaises(TypeError):
+            self.dataset.loc['a', 'col2'] = [1.1]
+    
+    # Тестирование метода __getitem__ для Dataset.ILocker
+    def test_ilocker_getitem(self):
+        t_data = self.dataset.iloc[0]
+        self.assertTrue(isinstance(t_data, Dataset))
+        self.assertEqual(t_data.data.to_dict(), {0: {'col1': 1, 'col2': 4}})
+
+        
+        # Тестирование ролей
+        self.assertIn(0, t_data.roles)
+
+    # Тестирование метода __setitem__ для Dataset.ILocker
+    def test_ilocker_setitem_valid(self):
+        # Правильное обновление через iloc
+        self.dataset.iloc[0, 0] = 10
+        self.assertEqual(self.dataset.data.iloc[0, 0], 10)
+
+    def test_ilocker_setitem_invalid_type(self):
+        # Неправильный тип данных через iloc
+        with self.assertRaises(TypeError):
+            self.dataset.iloc[0, 0] = "string"
+
+    def test_ilocker_setitem_column_not_found(self):
+        # Попытка обновить несуществующий столбец через iloc
+        with self.assertRaises(IndexError):
+            self.dataset.iloc[0, 5] = 10
+
+    def test_ilocker_setitem_type_mismatch(self):
+        # Попытка обновить столбец с несоответствующим типом данных через iloc
+        with self.assertRaises(TypeError):
+            self.dataset.iloc[0, 1] = [1.1]
+
+    def test_init(self):
+        # Проверка, что класс инициализируется правильно
+        self.experiment_data = ExperimentData(self.dataset)
+        self.assertEqual(self.experiment_data._data.data['col1'].tolist(), [1, 2, 3])
+        self.assertEqual(self.experiment_data._data.data['col2'].tolist(), [4, 5, 6])
+        self.assertIsInstance(self.experiment_data.additional_fields, Dataset)
+
+    # def test_get_id(self):
+
+    #     self.roles = {
+    #         'col1': InfoRole(str),
+    #         'col2': InfoRole(str)
+    #     }
+    #     self.data = pd.DataFrame({
+    #         'col1': ['1_exe_1', '2_exe_1', '3_exe_2'],
+    #         'col2': ['4_exe_1', '5_exe_2', '6_exe_3']
+    #     })
+    #     self.dataset = Dataset(data=self.data
+    #     , roles=self.roles)
+    #     self.experiment_data = ExperimentData(self.dataset)
+    #     self.experiment_data.additional_fields.data = {
+    #         '1_exe_1': 'A',
+    #         '2_exe_1': 'B',
+    #         '3_exe_2': 'C',
+    #     }
+    #     self.experiment_data.variables = {
+    #         '1_exe_1': {'var1': 10},
+    #         '2_exe_1': {'var2': 20},
+    #         '3_exe_2': {'var1': 30},
+    #     }
+    #     self.experiment_data.analysis_tables = {
+    #         '1_exe_1': Dataset(data={'table1': [1, 2]}),
+    #         '2_exe_1': Dataset(data={'table1': [3, 4]}),
+    #     }
+    #     self.experiment_data.groups = {
+    #         'group1': {'group_key': Dataset(data={'group_value': [1]})}
+    #     }
+    #     # Проверка, когда передается один класс
+    #     result = self.experiment_data.get_ids(classes='str', searched_space=[ExperimentDataEnum.additional_fields])
+    #     self.assertIn('str', result)
+    #     self.assertIn(ExperimentDataEnum.additional_fields, result['str'])
+    #     self.assertEqual(result['str'][ExperimentDataEnum.additional_fields], ['1_exe_1', '2_exe_1', '3_exe_2'])
+
+
+    #     # Проверка, когда передается несколько классов
+    #     result = self.experiment_data.get_ids(classes=['str', 'int'], searched_space=[ExperimentDataEnum.additional_fields])
+    #     self.assertIn('str', result)
+    #     self.assertIn('int', result)
+    #     self.assertIn(ExperimentDataEnum.additional_fields, result['str'])
+    #     self.assertIn(ExperimentDataEnum.additional_fields, result['int'])
+
+
+    #     # Проверка, когда передается ключ для фильтрации
+    #     result = self.experiment_data.get_ids(classes='str', searched_space=[ExperimentDataEnum.additional_fields], key='exe_1')
+    #     self.assertIn('str', result)
+    #     self.assertIn(ExperimentDataEnum.additional_fields, result['str'])
+    #     self.assertEqual(result['str'][ExperimentDataEnum.additional_fields], ['1_exe_1', '2_exe_1'])
+
+    #     # Проверка, когда searched_space не передан (по умолчанию ищутся все пространства)
+    #     result = self.experiment_data.get_ids(classes='str')
+    #     self.assertIn('str', result)
+    #     self.assertIn(ExperimentDataEnum.additional_fields, result['str'])
+    #     self.assertIn(ExperimentDataEnum.variables, result['str'])
+    #     self.assertIn(ExperimentDataEnum.analysis_tables, result['str'])
+    #     self.assertIn(ExperimentDataEnum.groups, result['str'])
+
+    #     # Проверка, когда нет совпадающих идентификаторов
+    #     result = self.experiment_data.get_ids(classes='str', searched_space=[ExperimentDataEnum.groups], key='not_found')
+    #     self.assertIn('str', result)
+    #     self.assertIn(ExperimentDataEnum.groups, result['str'])
+    #     self.assertEqual(result['str'][ExperimentDataEnum.groups], [])
+
+    #     # Проверка, когда передаются несколько пространств
+    #     result = self.experiment_data.get_ids(
+    #         classes='str',
+    #         searched_space=[ExperimentDataEnum.additional_fields, ExperimentDataEnum.variables]
+    #     )
+    #     self.assertIn('str', result)
+    #     self.assertIn(ExperimentDataEnum.additional_fields, result['str'])
+    #     self.assertIn(ExperimentDataEnum.variables, result['str'])
 
 if __name__ == '__main__':
     unittest.main()
