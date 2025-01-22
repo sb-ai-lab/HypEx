@@ -10,6 +10,7 @@ import json
 class TestDataset(unittest.TestCase):
 
     def setUp(self):
+        # Initialize test data and roles
         self.roles = {
             'col1': InfoRole(int),
             'col2': InfoRole(int)
@@ -22,22 +23,27 @@ class TestDataset(unittest.TestCase):
         
 
     def test_initialization(self):
+        # Test basic dataset initialization
         self.assertEqual(len(self.dataset), 3)
         self.assertListEqual(list(self.dataset.columns), ['col1', 'col2'])
         self.assertIn('col1', self.dataset.roles)
 
+        # Test initialization with role mapping
         roles_with_mapping = {
             InfoRole(): ['col1', 'col2']
         }
         dataset_with_mapping = Dataset(roles=roles_with_mapping, data=self.data)
         self.assertListEqual(list(dataset_with_mapping.columns), ['col1', 'col2'])
 
+        # Test initialization with backend
         dataset_with_backend = Dataset(roles=roles_with_mapping, data=self.data, backend=BackendsEnum.pandas)
         self.assertListEqual(list(dataset_with_backend.columns), ['col1', 'col2'])
 
+        # Test initialization with unknown backend
         dataset_unknown_backend = Dataset(roles=roles_with_mapping, data=self.data, backend='unknow')
         self.assertListEqual(list(dataset_unknown_backend.columns), ['col1', 'col2'])
 
+        # Test initialization with partial roles
         roles_partial = {
             InfoRole(): ['col1']
         }
@@ -46,6 +52,7 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(str(dataset_partial), str(dataset_partial.data))
         self.assertEqual(dataset_partial._repr_html_(), dataset_partial.data._repr_html_())
 
+        # Test initialization with invalid roles
         roles_invalid = {
             InfoRole(): ['col1', 'col3']
         }
@@ -53,11 +60,13 @@ class TestDataset(unittest.TestCase):
             Dataset(roles=roles_invalid, data=self.data)
 
     def test_append(self):
+        # Test appending datasets
         dataset_new = copy.deepcopy(self.dataset)
         self.dataset = self.dataset.append(dataset_new)
         self.assertEqual(len(self.dataset), 6)
 
     def test_merge(self):
+        # Test merging datasets
         data_new = pd.DataFrame({
             'col1': [1, 2, 3],
             'col3': [7, 8, 9]
@@ -69,6 +78,7 @@ class TestDataset(unittest.TestCase):
         self.assertIn('col3', merged.columns)
 
     def test_fillna(self):
+        # Test filling NA values
         data_with_na = pd.DataFrame({
             'col1': [1, None, 3],
             'col2': [4, 5, 6]
@@ -79,6 +89,7 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(filled_dataset.data.loc[1, 'col1'], 0)
 
     def test_dropna(self):
+        # Test dropping NA values
         data_with_na = pd.DataFrame({
             'col1': [1, None, 3],
             'col2': [4, 5, 6]
@@ -90,16 +101,19 @@ class TestDataset(unittest.TestCase):
 
 
     def test_operators(self):
+        # Test arithmetic operators
         result = self.dataset + 1
         self.assertListEqual(result.data['col1'].tolist(), [2, 3, 4])
 
     def test_roles_property(self):
+        # Test roles property access
         dataset_base = DatasetBase(roles=self.roles, data=self.data)
 
         self.assertIn('col1', dataset_base.roles)
         self.assertIsInstance(dataset_base.roles['col1'], InfoRole)
 
     def test_replace_roles(self):
+        # Test role replacement functionality
         dataset_base = DatasetBase(roles=self.roles, data=self.data)
 
         new_role = DefaultRole()
@@ -109,12 +123,14 @@ class TestDataset(unittest.TestCase):
         dataset_base.replace_roles({'col1': InfoRole()}, auto_roles_types=True)
 
     def test_search_columns(self):
+        # Test column search by role
         dataset_base = DatasetBase(roles=self.roles, data=self.data)
 
         columns = dataset_base.search_columns(InfoRole())
         self.assertListEqual(columns, ['col1', 'col2'])
 
     def test_to_dict(self):
+        # Test conversion to dictionary
         dataset_base = DatasetBase(roles=self.roles, data=self.data)
 
         result = dataset_base.to_dict()
@@ -123,19 +139,19 @@ class TestDataset(unittest.TestCase):
 
     
     def test_getitem_by_column(self):
-
-        # Получаем подмножество по столбцу 'col1'
+        # Test getting subset by single column
         subset = self.dataset['col1']
 
-        # Проверяем, что данные вернулись для 'col1'
+        # Check that data is returned for 'col1'
         self.assertIn('col1', subset.columns)
         self.assertNotIn('col2', subset.columns)
 
-        # Проверяем, что роли для 'col1' сохранены
+        # Check that roles for 'col1' are preserved
         self.assertIn('col1', subset.roles)
         self.assertIsInstance(subset.roles['col1'], InfoRole)
 
     def test_getitem_with_multiple_columns(self):
+        # Test getting subset with multiple columns
         roles = {
             'col1': InfoRole(),
             'col2': InfoRole(),
@@ -148,46 +164,44 @@ class TestDataset(unittest.TestCase):
         })
         dataset = Dataset(roles=roles, data=data)
 
-        # Получаем подмножество по столбцам 'col1' и 'col3'
+        # Get subset for columns 'col1' and 'col3'
         subset = dataset[['col1', 'col3']]
 
-        # Проверяем, что данные вернулись для 'col1' и 'col3'
+        # Check that data is returned for 'col1' and 'col3'
         self.assertIn('col1', subset.columns)
         self.assertIn('col3', subset.columns)
         self.assertNotIn('col2', subset.columns)
 
-        # Проверяем, что роли для 'col1' и 'col3' сохранены
+        # Check that roles for 'col1' and 'col3' are preserved
         self.assertIn('col1', subset.roles)
         self.assertIn('col3', subset.roles)
         self.assertIsInstance(subset.roles['col1'], InfoRole)
         self.assertIsInstance(subset.roles['col3'], InfoRole)
 
     def test_getitem_with_non_existing_column(self):
-
-        # Пытаемся получить несуществующий столбец
+        # Test getting non-existent column
         with self.assertRaises(KeyError):
             self.dataset['col3']
 
     def test_getitem_empty_result(self):
-
-        # Пытаемся получить пустое подмножество (например, с применением условия)
+        # Test getting empty subset with condition
         subset = self.dataset[self.dataset['col1'] > 3]
         self.assertTrue(len(subset)==0)
     
     def test_rename_single_column(self):
-
-        # Переименовываем только 'col1' в 'new_col1'
+        # Test renaming single column
         renamed_dataset = self.dataset.rename({'col1': 'new_col1'})
 
-        # Проверяем, что столбец 'col1' переименован в 'new_col1'
+        # Check that column 'col1' is renamed to 'new_col1'
         self.assertIn('new_col1', renamed_dataset.columns)
         self.assertNotIn('col1', renamed_dataset.columns)
 
-        # Проверяем, что роль для 'col1' переименована в 'new_col1'
+        # Check that role for 'col1' is renamed to 'new_col1'
         self.assertIn('new_col1', renamed_dataset.roles)
         self.assertIsInstance(renamed_dataset.roles['new_col1'], InfoRole)
 
     def test_rename_multiple_columns(self):
+        # Test renaming multiple columns
         roles = {
             'col1': InfoRole(),
             'col2': InfoRole(),
@@ -200,112 +214,112 @@ class TestDataset(unittest.TestCase):
         })
         dataset = Dataset(roles=roles, data=data)
 
-        # Переименовываем несколько столбцов
+        # Rename multiple columns
         renamed_dataset = dataset.rename({'col1': 'new_col1', 'col3': 'new_col3'})
 
-        # Проверяем, что столбцы 'col1' и 'col3' переименованы
+        # Check that columns 'col1' and 'col3' are renamed
         self.assertIn('new_col1', renamed_dataset.columns)
         self.assertIn('new_col3', renamed_dataset.columns)
         self.assertNotIn('col1', renamed_dataset.columns)
         self.assertNotIn('col3', renamed_dataset.columns)
 
-        # Проверяем, что роли для 'col1' и 'col3' переименованы
+        # Check that roles for 'col1' and 'col3' are renamed
         self.assertIn('new_col1', renamed_dataset.roles)
         self.assertIn('new_col3', renamed_dataset.roles)
         self.assertIsInstance(renamed_dataset.roles['new_col1'], InfoRole)
         self.assertIsInstance(renamed_dataset.roles['new_col3'], InfoRole)
 
     def test_rename_no_change(self):
-
-        # Переименовываем столбцы, но без изменений (передаем пустой словарь)
+        # Test renaming with no changes (empty dict)
         renamed_dataset = self.dataset.rename({})
 
-        # Проверяем, что данные остались без изменений
+        # Check that data remains unchanged
         self.assertEqual(list(self.dataset.columns), list(renamed_dataset.columns))
         self.assertEqual(list(self.dataset.roles.keys()), list(renamed_dataset.roles.keys()))
 
     def test_rename_with_non_existent_column(self):
-        # Переименовываем несуществующий столбец
+        # Test renaming non-existent column
         renamed_dataset = self.dataset.rename({'non_existent': 'new_col'})
 
-        # Проверяем, что столбцы без изменений
+        # Check that columns remain unchanged
         self.assertIn('col1', renamed_dataset.columns)
         self.assertIn('col2', renamed_dataset.columns)
         self.assertNotIn('new_col', renamed_dataset.columns)
 
     def test_rename_roles(self):
-        # Переименовываем столбцы и проверяем, что роли тоже обновляются
+        # Test renaming columns and check role updates
         renamed_dataset = self.dataset.rename({'col1': 'new_col1'})
 
-        # Проверяем, что роль для 'col1' переименована в 'new_col1'
+        # Check that role for 'col1' is renamed to 'new_col1'
         self.assertIn('new_col1', renamed_dataset.roles)
         self.assertIsInstance(renamed_dataset.roles['new_col1'], InfoRole)
         self.assertNotIn('col1', renamed_dataset.roles)
 
     def test_set_value_additional_fields_single_column(self):
-        # Настроим необходимые данные
+        # Test setting value for single column in additional_fields
         experiment_data = ExperimentData(self.dataset)
 
-        # Применяем set_value с одним столбцом в additional_fields
+        # Apply set_value with single column in additional_fields
         experiment_data.set_value(
             space=ExperimentDataEnum.additional_fields,
             executor_id='executor_1',
             value=self.dataset
         )
 
-        # Проверяем, что столбец был добавлен в additional_fields
+        # Check that column was added to additional_fields
         self.assertIn('executor_1', experiment_data.additional_fields.columns)
 
     def test_set_value_additional_fields_multiple_columns(self):
+        # Test setting value for multiple columns in additional_fields
         experiment_data = ExperimentData(self.dataset)
 
-        # Применяем set_value с несколькими столбцами в additional_fields
+        # Apply set_value with multiple columns in additional_fields
         experiment_data.set_value(
             space=ExperimentDataEnum.additional_fields,
             executor_id={'col1': 'executor_1', 'col2': 'executor_2'},
             value=self.dataset
         )
 
-        # Проверяем, что столбцы были переименованы и добавлены
+        # Check that columns were renamed and added
         self.assertIn('executor_1', experiment_data.additional_fields.columns)
         self.assertIn('executor_2', experiment_data.additional_fields.columns)
 
     def test_set_value_analysis_tables(self):
-        # Настроим необходимые данные
+        # Test setting value for analysis_tables
         experiment_data = ExperimentData(self.dataset)
 
-        # Применяем set_value для analysis_tables
+        # Apply set_value for analysis_tables
         experiment_data.set_value(
             space=ExperimentDataEnum.analysis_tables,
             executor_id='executor_1',
             value='analysis_data'
         )
 
-        # Проверяем, что данные были добавлены в analysis_tables
+        # Check that data was added to analysis_tables
         self.assertIn('executor_1', experiment_data.analysis_tables)
         self.assertEqual(experiment_data.analysis_tables['executor_1'], 'analysis_data')
 
     def test_set_value_variables_dict(self):
-        # Настроим необходимые данные
+        # Test setting value with Dict type
         experiment_data = ExperimentData(self.dataset)
 
-        # Применяем set_value с значением типа Dict
+        # Apply set_value with Dict value
         experiment_data.set_value(
             space=ExperimentDataEnum.variables,
             executor_id='executor_3',
             value={'key1': 'value1', 'key2': 'value2'}
         )
 
-        # Проверяем, что данные были добавлены в variables
+        # Check that data was added to variables
         self.assertIn('executor_3', experiment_data.variables)
         self.assertEqual(experiment_data.variables['executor_3'], {'key1': 'value1', 'key2': 'value2'})
 
     def test_set_value_variables_existing_executor(self):
-        # Настроим необходимые данные
+        # Test setting value for existing executor
         experiment_data = ExperimentData(self.dataset)
         experiment_data.variables = {'executor_1': {'key1': 'value1'}}
 
-        # Применяем set_value для существующего executor_id
+        # Apply set_value for existing executor_id
         experiment_data.set_value(
             space=ExperimentDataEnum.variables,
             executor_id='executor_1',
@@ -313,14 +327,14 @@ class TestDataset(unittest.TestCase):
             key='key2'
         )
 
-        # Проверяем, что значение в variables обновилось
+        # Check that value in variables was updated
         self.assertEqual(experiment_data.variables['executor_1']['key2'], 'new_value')
 
     def test_set_value_variables_new_executor(self):
-        # Настроим необходимые данные
+        # Test setting value for new executor
         experiment_data = ExperimentData(self.dataset)
 
-        # Применяем set_value для нового executor_id
+        # Apply set_value for new executor_id
         experiment_data.set_value(
             space=ExperimentDataEnum.variables,
             executor_id='executor_2',
@@ -328,15 +342,15 @@ class TestDataset(unittest.TestCase):
             key='key1'
         )
 
-        # Проверяем, что новый executor_id был добавлен в variables
+        # Check that new executor_id was added to variables
         self.assertIn('executor_2', experiment_data.variables)
         self.assertEqual(experiment_data.variables['executor_2']['key1'], 'new_value')
 
     def test_set_value_groups(self):
-        # Настроим необходимые данные
+        # Test setting value for groups
         experiment_data = ExperimentData(self.dataset)
 
-        # Применяем set_value для groups
+        # Apply set_value for groups
         experiment_data.set_value(
             space=ExperimentDataEnum.groups,
             executor_id='executor_1',
@@ -344,16 +358,16 @@ class TestDataset(unittest.TestCase):
             key='key1'
         )
 
-        # Проверяем, что данные были добавлены в groups
+        # Check that data was added to groups
         self.assertIn('executor_1', experiment_data.groups)
         self.assertEqual(experiment_data.groups['executor_1']['key1'], 'group_data')
 
     def test_set_value_groups_existing_executor(self):
-        # Настроим необходимые данные
+        # Test setting value for existing executor in groups
         experiment_data = ExperimentData(self.dataset)
         experiment_data.groups = {'executor_1': {'key1': 'old_value'}}
 
-        # Применяем set_value для существующего executor_id
+        # Apply set_value for existing executor_id
         experiment_data.set_value(
             space=ExperimentDataEnum.groups,
             executor_id='executor_1',
@@ -361,35 +375,35 @@ class TestDataset(unittest.TestCase):
             key='key2'
         )
 
-        # Проверяем, что данные в groups обновились
+        # Check that data in groups was updated
         self.assertEqual(experiment_data.groups['executor_1']['key2'], 'new_group_data')
     
     def test_initialization(self):
-        # Создаем пустой Dataset
+        # Test empty Dataset creation
         dataset = Dataset.create_empty()
         experiment_data = ExperimentData(dataset)
 
-        # Проверяем, что атрибуты инициализированы правильно
+        # Check that attributes are initialized correctly
         self.assertIsInstance(experiment_data.additional_fields, Dataset)
         self.assertEqual(len(experiment_data.variables), 0)
         self.assertEqual(len(experiment_data.groups), 0)
         self.assertEqual(len(experiment_data.analysis_tables), 0)
 
     def test_create_empty(self):
-        # Создаем пустой Dataset с использованием create_empty
+        # Test creating empty ExperimentData
         experiment_data = ExperimentData.create_empty()
 
-        # Проверяем, что объект ExperimentData был создан
+        # Check that ExperimentData object was created
         self.assertIsInstance(experiment_data, ExperimentData)
         self.assertIsInstance(experiment_data.ds, Dataset)
         self.assertIsInstance(experiment_data.additional_fields, Dataset)
 
     def test_check_hash_additional_fields(self):
-        # Настроим необходимые данные
+        # Test hash checking in additional_fields
         dataset = Dataset.create_empty()
         experiment_data = ExperimentData(dataset)
 
-        # Проверим, что check_hash возвращает True, если executor_id существует в additional_fields
+        # Check that check_hash returns True if executor_id exists in additional_fields
         executor_id = 'executor_1'
         experiment_data.additional_fields = experiment_data.additional_fields.add_column(
             Dataset(roles={executor_id: InfoRole()}, data=pd.DataFrame({executor_id: [1, 2, 3]}))
@@ -397,58 +411,62 @@ class TestDataset(unittest.TestCase):
 
         self.assertTrue(experiment_data.check_hash(executor_id, ExperimentDataEnum.additional_fields))
 
-        # Проверим, что check_hash возвращает False для несуществующего executor_id
+        # Check that check_hash returns False for non-existent executor_id
         self.assertFalse(experiment_data.check_hash('nonexistent_executor', ExperimentDataEnum.additional_fields))
 
     def test_check_hash_variables(self):
-        # Настроим необходимые данные
+        # Test hash checking in variables
         dataset = Dataset.create_empty()
         experiment_data = ExperimentData(dataset)
 
-        # Добавляем executor_id в переменные
+        # Add executor_id to variables
         experiment_data.variables['executor_1'] = {'key1': 1}
 
-        # Проверим, что check_hash возвращает True для существующего executor_id
+        # Check that check_hash returns True for existing executor_id
         self.assertTrue(experiment_data.check_hash('executor_1', ExperimentDataEnum.variables))
 
-        # Проверим, что check_hash возвращает False для несуществующего executor_id
+        # Check that check_hash returns False for non-existent executor_id
         self.assertFalse(experiment_data.check_hash('nonexistent_executor', ExperimentDataEnum.variables))
 
     def test_check_hash_analysis_tables(self):
-        # Настроим необходимые данные
+        # Test hash checking in analysis_tables
         dataset = Dataset.create_empty()
         experiment_data = ExperimentData(dataset)
 
-        # Добавляем executor_id в analysis_tables
+        # Add executor_id to analysis_tables
         experiment_data.analysis_tables['executor_1'] = dataset
 
-        # Проверим, что check_hash возвращает True для существующего executor_id
+        # Check that check_hash returns True for existing executor_id
         self.assertTrue(experiment_data.check_hash('executor_1', ExperimentDataEnum.analysis_tables))
         self.assertTrue(experiment_data.check_hash('executor_1', 'unknown'))
 
-        # Проверим, что check_hash возвращает False для несуществующего executor_id
+        # Check that check_hash returns False for non-existent executor_id
         self.assertFalse(experiment_data.check_hash('nonexistent_executor', ExperimentDataEnum.analysis_tables))
 
     def test_getitem_by_column_name(self):
+        # Test getting item by column name
         subset = self.dataset['col1']
         self.assertTrue(isinstance(subset, Dataset))
         self.assertIn('col1', subset.columns)
 
     def test_getitem_by_multiple_column_names(self):
+        # Test getting item by multiple column names
         subset = self.dataset[['col1', 'col2']]
         self.assertTrue(isinstance(subset, Dataset))
         self.assertEqual(set(subset.columns), {'col1', 'col2'})
 
     def test_setitem_existing_column(self):
+        # Test setting value for existing column
         self.dataset['col1'] = [7, 8, 9]
         self.assertEqual(self.dataset.data['col1'].tolist(), [7, 8, 9])
 
     def test_invalid_type_other(self):
+        # Test invalid type handling
         with self.assertRaises(DataTypeError):
             result = self.dataset + {}
 
     def test_backend_type_error(self):
-        # Создаем второй Dataset с другим типом бэкенда
+        # Test backend type error handling
         other_roles = {'col1': InfoRole(int), 'col2': InfoRole(int)}
         other_data = pd.DataFrame({
             'col1': [10, 20, 30],
@@ -456,41 +474,47 @@ class TestDataset(unittest.TestCase):
         })
         other_dataset = Dataset(roles=other_roles, data=other_data, backend='unknown')
 
-        # Проверка ошибки при несовместимых бэкендах
+        # Check error with incompatible backends
         with self.assertRaises(BackendTypeError):
-            # Пытаемся выполнить операцию с несовместимым бэкендом
-            result = self.dataset + other_dataset  # Ожидаем ошибку BackendTypeError
+            result = self.dataset + other_dataset
 
     def test_setitem_new_column(self):
+        # Test setting value for new column
         new_data = [10, 11, 12]
         self.dataset['col3'] = new_data
         self.assertIn('col3', self.dataset.columns)
         self.assertEqual(self.dataset.data['col3'].tolist(), new_data)
 
     def test_setitem_dataset(self):
+        # Test setting value with Dataset
         new_data = copy.deepcopy(self.dataset['col1'])
         self.dataset['col3'] = new_data
         self.assertIn('col3', self.dataset.columns)
         self.assertEqual(self.dataset.data['col3'].tolist(), self.data['col1'].tolist())
 
     def test_setitem_invalid_type(self):
+        # Test setting invalid type
         with self.assertRaises(TypeError):
-            self.dataset['col1'] = ['string', 'another', 'string']  # Incorrect type
+            self.dataset['col1'] = ['string', 'another', 'string']
 
     def test_setitem_with_iloc(self):
+        # Test setting value with iloc
         new_data = [15, 16, 17]
         self.dataset.iloc[1, 0] = new_data[0]
         self.assertEqual(self.dataset.data.iloc[1, 0], new_data[0])
 
     def test_getitem_column_not_found(self):
+        # Test getting non-existent column
         with self.assertRaises(KeyError):
             self.dataset['nonexistent_column']
         
     def test_setitem_illegal_index(self):
+        # Test setting value with illegal index
         with self.assertRaises(IndexError):
-            self.dataset.iloc[1, 3] = 10  # Index out of bounds
+            self.dataset.iloc[1, 3] = 10
 
     def test_getitem_empty_dataset(self):
+        # Test getting item from empty dataset
         empty_data = pd.DataFrame(columns=['col1', 'col2'])
         empty_dataset = Dataset(roles=self.roles, data=empty_data)
         subset = empty_dataset['col1']
@@ -498,7 +522,7 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(len(subset), 0)
 
     def test_add_column(self):
-
+        # Test adding column validation
         with self.assertRaises(ValueError):
             self.dataset.add_column([1, 2, 3])
 
@@ -508,58 +532,59 @@ class TestDataset(unittest.TestCase):
         self.assertIn('col3', self.dataset.columns)
         self.assertListEqual(self.dataset.data['col3'].tolist(), new_data)
 
+        # Test adding column with Dataset
         self.dataset.add_column(Dataset(pd.DataFrame({'col4': new_data})), {'col4': InfoRole()})
         self.assertIn('col4', self.dataset.columns)
         self.assertListEqual(self.dataset.data['col3'].tolist(), new_data)
 
-        # Test with numpy array
+        # Test adding column with numpy array
         import numpy as np
         self.dataset.add_column(np.array([13, 14, 15]), {'col6': InfoRole()})
         self.assertListEqual(self.dataset.data['col6'].tolist(), [13, 14, 15])
 
-        # Test with mismatched length
+        # Test adding column with mismatched length
         with self.assertRaises(ValueError):
             self.dataset.add_column([1, 2], {'col8': InfoRole()})
 
-        # Test with invalid role type
+        # Test adding column with invalid role type
         with self.assertRaises(TypeError):
             self.dataset.add_column([1, 2, 3], {'col9': 'not_a_role'})
 
-        # Test with duplicate column name
+        # Test adding column with duplicate name
         with self.assertRaises(ValueError):
             self.dataset.add_column([1, 2, 3], {'col1': InfoRole()})
 
     def test_agg(self):
-        # Test single function
+        # Test aggregation with single function
         result = self.dataset.agg('mean')
         self.assertIsInstance(result, Dataset)
 
-        # Test multiple functions
+        # Test aggregation with multiple functions
         result = self.dataset.agg(['mean', 'sum'])
         self.assertIn('mean', result.index)
         self.assertIn('sum', result.index)
 
-        # Test dict of functions
+        # Test aggregation with dict of functions
         result = self.dataset.agg({'col1': 'mean', 'col2': 'sum'})
         self.assertEqual(result.loc['mean', 'col1'], self.dataset.data['col1'].mean())
         self.assertEqual(result.loc['sum', 'col2'], self.dataset.data['col2'].sum())
 
         # Edge cases
-        # Test with empty dataset
+        # Test aggregation with empty dataset
         empty_dataset = Dataset.create_empty(self.roles)
         with self.assertRaises(ValueError):
             empty_dataset.agg('mean')
 
-        # Test with invalid function
+        # Test aggregation with invalid function
         with self.assertRaises(ValueError):
             self.dataset.agg('invalid_function')
 
-        # Test with NaN values
+        # Test aggregation with NaN values
         self.dataset.data.loc[0, 'col1'] = None
         result = self.dataset.agg('mean')
         self.assertTrue(pd.notna(result['col1']))
 
-        # Test with all NaN column
+        # Test aggregation with all NaN column
         self.dataset.data['col1'] = None
         result = self.dataset.agg('mean')
         self.assertTrue(pd.isna(result['col1']))
@@ -573,10 +598,6 @@ class TestDataset(unittest.TestCase):
         other_dataset = Dataset(roles=self.roles, data=other_data)
         result = self.dataset.append(other_dataset)
         self.assertEqual(len(result), 5)
-
-        # # Test append with ignore_index
-        # result = self.dataset.append(other_dataset, ignore_index=True)
-        # self.assertEqual(list(result.index), [0, 1, 2, 3, 4])
 
         # Test append with different columns
         other_data = pd.DataFrame({
@@ -648,11 +669,11 @@ class TestDataset(unittest.TestCase):
             self.dataset.apply(lambda x: x * 2, InfoRole())
 
     def test_astype(self):
-        # Test single column conversion
+        # Test single column type conversion
         result = self.dataset.astype({'col1': str})
         self.assertTrue(result.data['col1'].dtype == 'object')
 
-        # Test multiple column conversion
+        # Test multiple column type conversion
         result = self.dataset.astype({'col1': float, 'col2': str})
         self.assertTrue(result.data['col1'].dtype == 'float64')
         self.assertTrue(result.data['col2'].dtype == 'object')
