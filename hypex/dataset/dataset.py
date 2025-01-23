@@ -69,7 +69,7 @@ from ..utils.errors import InvalidArgumentError
 class Dataset(DatasetBase):
     """
     A class for working with tabular data that extends DatasetBase with additional functionality.
-    
+
     The Dataset class provides a rich interface for data manipulation, statistical operations,
     and role-based column management. It supports multiple backends (currently pandas)
     and provides consistent access patterns regardless of the underlying data storage.
@@ -79,9 +79,9 @@ class Dataset(DatasetBase):
         iloc (ILocker): Integer-based indexer for accessing data
         roles (Dict[str, ABCRole]): Mapping of column names to their roles
         data (pd.DataFrame): The underlying data storage
-        
+
     Args:
-        roles (Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]): 
+        roles (Union[Dict[ABCRole, Union[List[str], str]], Dict[str, ABCRole]]):
             Role definitions for columns
         data (Optional[Union[pd.DataFrame, str]]): Input data or path to data
         backend (Optional[BackendsEnum]): Backend storage type
@@ -91,10 +91,10 @@ class Dataset(DatasetBase):
     class Locker:
         """
         Label-based indexer for accessing data in the Dataset.
-        
+
         Provides a pandas-like .loc[] interface for label-based indexing.
         """
-        
+
         def __init__(self, backend, roles):
             self.backend = backend
             self.roles = roles
@@ -119,6 +119,7 @@ class Dataset(DatasetBase):
                     and all(isinstance(v, column_data_type) for v in value)
                 )
                 or isinstance(value, column_data_type)
+                or value is None
             ):
                 if column_name not in self.backend.data.columns:
                     raise KeyError("Column must be added by using add_column method.")
@@ -130,10 +131,10 @@ class Dataset(DatasetBase):
     class ILocker:
         """
         Integer-based indexer for accessing data in the Dataset.
-        
+
         Provides a pandas-like .iloc[] interface for integer-based indexing.
         """
-        
+
         def __init__(self, backend, roles):
             self.backend = backend
             self.roles = roles
@@ -179,7 +180,7 @@ class Dataset(DatasetBase):
     ):
         """
         Initialize a new Dataset instance.
-        
+
         Args:
             roles: Role definitions for columns
             data: Input data or path to data
@@ -193,10 +194,10 @@ class Dataset(DatasetBase):
     def __getitem__(self, item: Union[Iterable, str, int]) -> "Dataset":
         """
         Get a subset of the dataset by column selection.
-        
+
         Args:
             item: Column name(s) to select
-            
+
         Returns:
             Dataset containing only the selected columns
         """
@@ -222,11 +223,11 @@ class Dataset(DatasetBase):
     def __setitem__(self, key: str, value: Any):
         """
         Set values for a column in the dataset.
-        
+
         Args:
             key: Column name
             value: Values to set
-        
+
         Raises:
             TypeError: If value type doesn't match column's expected type
         """
@@ -256,14 +257,14 @@ class Dataset(DatasetBase):
     def __binary_magic_operator(self, other, func_name: str) -> Any:
         """
         Helper method for implementing binary operators.
-        
+
         Args:
             other: Right-hand operand
             func_name: Name of operator function to call
-            
+
         Returns:
             Result of binary operation
-            
+
         Raises:
             DataTypeError: If other has invalid type
             BackendTypeError: If backends don't match
@@ -437,15 +438,15 @@ class Dataset(DatasetBase):
         return self.backend.columns
 
     @staticmethod
-    def create_empty(backend=BackendsEnum.pandas, roles=None, index=None) -> "Dataset":
+    def create_empty(roles=None, index=None, backend=BackendsEnum.pandas) -> "Dataset":
         """
         Create an empty dataset.
-        
+
         Args:
-            backend: Backend storage type
             roles: Role definitions for columns
             index: Index for the empty dataset
-            
+            backend: Backend storage type
+
         Returns:
             Empty Dataset instance
         """
@@ -461,10 +462,10 @@ class Dataset(DatasetBase):
     def _convert_data_after_agg(self, result) -> Union["Dataset", float]:
         """
         Convert aggregation result to appropriate type.
-        
+
         Args:
             result: Result of aggregation operation
-            
+
         Returns:
             Dataset or float depending on result type
         """
@@ -481,21 +482,23 @@ class Dataset(DatasetBase):
     ):
         """
         Add a new column to the dataset.
-        
+
         Args:
             data: Column data to add
             role: Role definition for the new column
             index: Index for the new column
-            
+
         Returns:
             Self for method chaining
-            
+
         Raises:
             ValueError: If role is None and data is not a Dataset
         """
         if role is None:
             if not isinstance(data, Dataset):
-                raise ValueError("Козьёль")
+                raise ValueError("If role is None, data must be a Dataset")
+            if any([col in self.columns for col in data.columns]):
+                raise ValueError("Columns with the same name already exist")
             self.roles.update(data.roles)
             self._backend.add_column(
                 data.data,
@@ -503,6 +506,12 @@ class Dataset(DatasetBase):
                 index,
             )
         else:
+            if any([col in self.columns for col in role.keys()]):
+                raise ValueError("Columns with the same name already exist")
+            if isinstance(role, Dict) and any(
+                [not isinstance(r, ABCRole) for r in role.values()]
+            ):
+                raise TypeError("Role values must be of type ABCRole")
             if isinstance(data, Dataset):
                 data = data.data
             self.roles.update(role)
@@ -512,10 +521,10 @@ class Dataset(DatasetBase):
     def _check_other_dataset(self, other):
         """
         Check compatibility with another dataset.
-        
+
         Args:
             other: Dataset to check compatibility with
-            
+
         Raises:
             ConcatDataError: If other is not a Dataset
             ConcatBackendError: If backends don't match
@@ -560,12 +569,12 @@ class Dataset(DatasetBase):
     def append(self, other, reset_index=False, axis=0) -> "Dataset":
         """
         Append rows or columns from another dataset.
-        
+
         Args:
             other: Dataset to append
             reset_index: Whether to reset index after append
             axis: 0 for row append, 1 for column append
-            
+
         Returns:
             New Dataset with appended data
         """
@@ -593,13 +602,13 @@ class Dataset(DatasetBase):
     ) -> "Dataset":
         """
         Create a Dataset from a dictionary.
-        
+
         Args:
             data: Dictionary containing data
             roles: Role definitions for columns
             backend: Backend storage type
             index: Index for the dataset
-            
+
         Returns:
             New Dataset created from dictionary
         """
@@ -618,16 +627,18 @@ class Dataset(DatasetBase):
     ) -> "Dataset":
         """
         Apply a function to the dataset.
-        
+
         Args:
             func: Function to apply
             role: Role definition for result
             axis: Axis to apply function along
             **kwargs: Additional arguments for func
-            
+
         Returns:
             New Dataset with function applied
         """
+        if self.is_empty():
+            return deepcopy(self)
         return Dataset(
             data=self._backend.apply(
                 func=func, axis=axis, column_name=list(role.keys())[0], **kwargs
@@ -638,12 +649,12 @@ class Dataset(DatasetBase):
     def map(self, func, na_action=None, **kwargs) -> "Dataset":
         """
         Apply a mapping function to the dataset.
-        
+
         Args:
             func: Mapping function to apply
             na_action: How to handle NA values
             **kwargs: Additional arguments for func
-            
+
         Returns:
             New Dataset with mapping applied
         """
@@ -663,10 +674,10 @@ class Dataset(DatasetBase):
     def nunique(self, dropna: bool = False) -> Dict[str, int]:
         """
         Count unique values for each column.
-        
+
         Args:
             dropna: Whether to exclude NA values
-            
+
         Returns:
             Dictionary mapping column names to counts
         """
@@ -675,10 +686,10 @@ class Dataset(DatasetBase):
     def isin(self, values: Iterable) -> "Dataset":
         """
         Check whether values are contained in the dataset.
-        
+
         Args:
             values: Values to check for
-            
+
         Returns:
             Boolean mask as Dataset
         """
@@ -697,13 +708,13 @@ class Dataset(DatasetBase):
     ) -> List[Tuple[str, "Dataset"]]:
         """
         Group dataset by values.
-        
+
         Args:
             by: Column(s) to group by
             func: Aggregation function to apply
             fields_list: Columns to include in result
             **kwargs: Additional arguments for groupby
-            
+
         Returns:
             List of (group_key, group_data) tuples
         """
@@ -736,12 +747,12 @@ class Dataset(DatasetBase):
     ):
         """
         Sort dataset by values.
-        
+
         Args:
             by: Column(s) to sort by
             ascending: Sort order
             **kwargs: Additional arguments for sort
-            
+
         Returns:
             Sorted Dataset
         """
@@ -763,15 +774,15 @@ class Dataset(DatasetBase):
     ):
         """
         Fill NA values.
-        
+
         Args:
             values: Values to fill with
             method: Method for filling
             **kwargs: Additional arguments
-            
+
         Returns:
             Dataset with NA values filled
-            
+
         Raises:
             ValueError: If neither values nor method provided
         """
@@ -793,11 +804,11 @@ class Dataset(DatasetBase):
     def reindex(self, labels, fill_value: Optional[Any] = None) -> "Dataset":
         """
         Reindex the dataset.
-        
+
         Args:
             labels: New index labels
             fill_value: Value to use for missing values
-            
+
         Returns:
             Reindexed Dataset
         """
@@ -815,6 +826,8 @@ class Dataset(DatasetBase):
 
     def count(self):
         """Count non-NA values"""
+        if self.is_empty():
+            return Dataset.create_empty({role: InfoRole() for role in self.roles})
         return self._convert_data_after_agg(self._backend.count())
 
     def sum(self):
@@ -828,27 +841,26 @@ class Dataset(DatasetBase):
     def mode(self, numeric_only: bool = False, dropna: bool = True):
         """
         Calculate mode of columns.
-        
+
         Args:
             numeric_only: Whether to include only numeric columns
             dropna: Whether to exclude NA values
-            
+
         Returns:
             Mode values as Dataset
         """
-        return self._convert_data_after_agg(
-            self._backend.mode(numeric_only=numeric_only, dropna=dropna)
-        )
+        t_data = self._backend.mode(numeric_only=numeric_only, dropna=dropna)
+        return Dataset(data=t_data, roles={role: InfoRole() for role in t_data.columns})
 
     def var(self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False):
         """
         Calculate variance of columns.
-        
+
         Args:
             skipna: Whether to exclude NA values
             ddof: Delta degrees of freedom
             numeric_only: Whether to include only numeric columns
-            
+
         Returns:
             Variance values as Dataset
         """
@@ -859,10 +871,10 @@ class Dataset(DatasetBase):
     def agg(self, func: Union[str, List]):
         """
         Aggregate using one or more operations.
-        
+
         Args:
             func: Function or list of functions to apply
-            
+
         Returns:
             Aggregated results as Dataset
         """
@@ -872,6 +884,17 @@ class Dataset(DatasetBase):
         """Calculate standard deviation"""
         return self._convert_data_after_agg(self._backend.std())
 
+    def quantile(self, q: float = 0.5):
+        """Calculate quantiles for each column.
+
+        Args:
+            q: Quantile to compute, between 0 and 1
+
+        Returns:
+            Dataset: Quantile values for each column
+        """
+        return self._convert_data_after_agg(self._backend.quantile(q=q))
+
     def coefficient_of_variation(self):
         """Calculate coefficient of variation"""
         return self._convert_data_after_agg(self._backend.coefficient_of_variation())
@@ -879,11 +902,11 @@ class Dataset(DatasetBase):
     def corr(self, method="pearson", numeric_only=False):
         """
         Calculate correlation between columns.
-        
+
         Args:
             method: Correlation method
             numeric_only: Whether to include only numeric columns
-            
+
         Returns:
             Correlation matrix as Dataset
         """
@@ -901,20 +924,20 @@ class Dataset(DatasetBase):
     ):
         """
         Count unique values.
-        
+
         Args:
             normalize: Return proportions instead of counts
             sort: Sort by counts
             ascending: Sort order
             dropna: Whether to exclude NA values
-            
+
         Returns:
             Value counts as Dataset
         """
         t_data = self._backend.value_counts(
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
         )
-        t_roles = self.roles
+        t_roles = deepcopy(self.roles)
         column_name = "proportion" if normalize else "count"
         if column_name not in t_data:
             t_data = t_data.rename(columns={0: column_name})
@@ -968,17 +991,6 @@ class Dataset(DatasetBase):
             Dataset: A boolean dataset indicating missing values
         """
         return self._convert_data_after_agg(self._backend.isna())
-
-    def quantile(self, q: float = 0.5):
-        """Calculate quantiles for each column.
-
-        Args:
-            q: Quantile to compute, between 0 and 1
-
-        Returns:
-            Dataset: Quantile values for each column
-        """
-        return self._convert_data_after_agg(self._backend.quantile(q=q))
 
     def select_dtypes(self, include: Any = None, exclude: Any = None):
         """Select columns based on their dtype.
@@ -1051,7 +1063,7 @@ class Dataset(DatasetBase):
         )
 
         # Combine roles from both datasets
-        t_roles = copy(self.roles)
+        t_roles = deepcopy(self.roles)
         t_roles.update(right.roles)
 
         # Handle suffixed column roles
@@ -1084,7 +1096,9 @@ class Dataset(DatasetBase):
 
         # Update roles based on axis
         t_roles = (
-            self.roles if axis == 0 else {c: self.roles[c] for c in t_data.columns}
+            deepcopy(self.roles)
+            if axis == 0
+            else {c: self.roles[c] for c in t_data.columns}
         )
         return Dataset(roles=t_roles, data=t_data)
 
@@ -1107,7 +1121,8 @@ class Dataset(DatasetBase):
             Dataset: Filtered dataset
         """
         t_data = self._backend.filter(items=items, like=like, regex=regex, axis=axis)
-        return Dataset(roles=self.roles, data=t_data)
+        t_roles = {c: self.roles[c] for c in t_data.columns if c in self.roles.keys()}
+        return Dataset(roles=t_roles, data=t_data)
 
     def dot(self, other: "Dataset") -> "Dataset":
         """Compute matrix multiplication with another dataset.
@@ -1347,6 +1362,7 @@ class ExperimentData:
         Returns:
             Dict mapping classes to spaces and matching IDs
         """
+
         def check_id(id_: str, class_: str) -> bool:
             result = id_[: id_.find(ID_SPLIT_SYMBOL)] == class_
 

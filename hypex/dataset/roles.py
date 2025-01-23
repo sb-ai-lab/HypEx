@@ -1,5 +1,6 @@
 from abc import ABC
-from typing import Optional, Dict
+from typing import Optional, Dict, Union
+from copy import deepcopy
 
 from ..utils import (
     TargetRoleTypes,
