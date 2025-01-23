@@ -229,7 +229,7 @@ class PandasNavigation(DatasetBackendNavigation):
         if isinstance(data, pd.DataFrame):
             data = data.values
         if len(self.data) != len(data):
-            if len(data[0]) == 1:
+            if isinstance(data[0], Iterable) and len(data[0]) == 1:
                 data = data.squeeze()
             data = pd.Series(data)
         if index:
@@ -356,7 +356,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def mode(
         self, numeric_only: bool = False, dropna: bool = True
     ) -> Union[pd.DataFrame, float]:
-        return self.agg(["mode"])
+        return self.data.mode(numeric_only=numeric_only, dropna=dropna)
 
     def var(
         self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
@@ -369,6 +369,14 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def std(self) -> Union[pd.DataFrame, float]:
         return self.agg(["std"])
+
+    def cov(self):
+        return self.data.cov(ddof=0)
+
+    def quantile(self, q: float = 0.5) -> pd.DataFrame:
+        if isinstance(q, list) and len(q) > 1:
+            return self.data.quantile(q=q)
+        return self.agg(func="quantile", q=q)
 
     def coefficient_of_variation(self) -> Union[pd.DataFrame, float]:
         data = (self.data.std() / self.data.mean()).to_frame().T
@@ -446,12 +454,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         random_state: Optional[int] = None,
     ) -> pd.DataFrame:
         return self.data.sample(n=n, frac=frac, random_state=random_state)
-
-    def cov(self):
-        return self.data.cov(ddof=0)
-
-    def quantile(self, q: float = 0.5) -> pd.DataFrame:
-        return self.agg(func="quantile", q=q)
 
     def select_dtypes(
         self,
