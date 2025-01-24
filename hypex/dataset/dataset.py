@@ -472,7 +472,7 @@ class Dataset(DatasetBase):
         if isinstance(result, float):
             return result
         role: ABCRole = StatisticRole()
-        return Dataset(data=result, roles={column: role for column in self.roles})
+        return Dataset(data=result, roles={column: role for column in result.columns})
 
     def add_column(
         self,
@@ -639,11 +639,17 @@ class Dataset(DatasetBase):
         """
         if self.is_empty():
             return deepcopy(self)
+        tmp_data = self._backend.apply(
+            func=func, axis=axis, column_name=list(role.keys())[0], **kwargs
+        )
+        tmp_roles = (
+            {list(role.keys())[0]: list(role.values())[0]}
+            if ((not tmp_data.any().any()) and len(role) > 1)
+            else role
+        )
         return Dataset(
-            data=self._backend.apply(
-                func=func, axis=axis, column_name=list(role.keys())[0], **kwargs
-            ),
-            roles=role,
+            data=tmp_data,
+            roles=tmp_roles,
         )
 
     def map(self, func, na_action=None, **kwargs) -> "Dataset":
@@ -911,9 +917,8 @@ class Dataset(DatasetBase):
             Correlation matrix as Dataset
         """
         t_data = self._backend.corr(method=method, numeric_only=numeric_only)
-        return Dataset(
-            {column: DefaultRole() for column in t_data.columns}, data=t_data
-        )
+        t_roles = {column: self.roles[column] for column in t_data.columns}
+        return Dataset(roles=t_roles, data=t_data)
 
     def value_counts(
         self,

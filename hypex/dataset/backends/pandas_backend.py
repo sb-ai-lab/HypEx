@@ -182,6 +182,10 @@ class PandasNavigation(DatasetBackendNavigation):
     def columns(self):
         return self.data.columns
 
+    @property
+    def shape(self):
+        return self.data.shape
+
     def _get_column_index(
         self, column_name: Union[Sequence[str], str]
     ) -> Union[int, Sequence[int]]:
@@ -307,6 +311,21 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             result = self.data
         return result.values.tolist()
 
+    def iget_values(
+        self,
+        row: Optional[int] = None,
+        column: Optional[int] = None,
+    ) -> Any:
+        if (column is not None) and (row is not None):
+            return self.data.iloc[row, column]
+        elif column is not None:
+            result = self.data.iloc[:, column]
+        elif row is not None:
+            result = self.data.iloc[row, :]
+        else:
+            result = self.data
+        return result.values.tolist()
+
     def apply(self, func: Callable, **kwargs) -> pd.DataFrame:
         single_column_name = kwargs.pop("column_name")
         result = self.data.apply(func, **kwargs)
@@ -331,7 +350,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return list(groups)
 
     def agg(self, func: Union[str, List], **kwargs) -> Union[pd.DataFrame, float]:
-        func = func if isinstance(func, List) else [func]
+        func = func if isinstance(func, (List, Dict)) else [func]
         result = self.data.agg(func, **kwargs)
         return self._convert_agg_result(result)
 

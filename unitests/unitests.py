@@ -557,6 +557,9 @@ class TestDataset(unittest.TestCase):
         self.assertIn("sum", result.index)
 
         # Test aggregation with dict of functions
+        print(self.dataset)
+        print(self.dataset.data)
+        print(self.dataset.roles)
         result = self.dataset.agg({"col1": "mean", "col2": "sum"})
         self.assertEqual(result.loc["mean", "col1"], self.dataset.data["col1"].mean())
         self.assertEqual(result.loc["sum", "col2"], self.dataset.data["col2"].sum())
