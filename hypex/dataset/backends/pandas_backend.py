@@ -380,14 +380,14 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def var(
         self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
     ) -> Union[pd.DataFrame, float]:
-        return self.agg(["var"])
+        return self.agg(["var"], skipna=skipna, ddof=ddof, numeric_only=numeric_only)
 
     def log(self) -> pd.DataFrame:
         np_data = np.log(self.data.to_numpy())
         return pd.DataFrame(np_data, columns=self.data.columns)
 
-    def std(self) -> Union[pd.DataFrame, float]:
-        return self.agg(["std"])
+    def std(self, skipna: bool = True, ddof: int = 1) -> Union[pd.DataFrame, float]:
+        return self.agg(["std"], skipna=skipna, ddof=ddof)
 
     def cov(self):
         return self.data.cov(ddof=0)
