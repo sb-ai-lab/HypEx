@@ -171,6 +171,10 @@ class DatasetBase(ABC):
         return self._backend.columns
 
     @property
+    def shape(self):
+        return self._backend.shape
+
+    @property
     def tmp_roles(self):
         return self._tmp_roles
 
@@ -208,6 +212,13 @@ class DatasetBase(ABC):
         column: Optional[str] = None,
     ) -> Any:
         return self._backend.get_values(row=row, column=column)
+
+    def iget_values(
+        self,
+        row: Optional[int] = None,
+        column: Optional[int] = None,
+    ) -> Any:
+        return self._backend.iget_values(row=row, column=column)
 
     def _set_roles(
         self,
