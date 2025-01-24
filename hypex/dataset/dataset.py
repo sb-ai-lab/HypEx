@@ -886,9 +886,9 @@ class Dataset(DatasetBase):
         """
         return self._convert_data_after_agg(self._backend.agg(func))
 
-    def std(self):
+    def std(self, skipna: bool = True, ddof: int = 1):
         """Calculate standard deviation"""
-        return self._convert_data_after_agg(self._backend.std())
+        return self._convert_data_after_agg(self._backend.std(skipna=skipna, ddof=ddof))
 
     def quantile(self, q: float = 0.5):
         """Calculate quantiles for each column.
