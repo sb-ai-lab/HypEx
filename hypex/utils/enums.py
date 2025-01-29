@@ -7,6 +7,7 @@ class ExperimentDataEnum(enum.Enum):
     additional_fields = "additional_fields"
     analysis_tables = "analysis_tables"
     groups = "groups"
+    executors_states = "executors_states"
 
 
 @enum.unique

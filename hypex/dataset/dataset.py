@@ -60,7 +60,7 @@ class Dataset(DatasetBase):
             column_name = item[1]
             column_data_type = self.roles[column_name].data_type
             if (
-                column_data_type == None
+                column_data_type is None
                 or (
                     isinstance(value, Iterable)
                     and all(isinstance(v, column_data_type) for v in value)
@@ -713,6 +713,7 @@ class ExperimentData:
         self.variables: Dict[str, Dict[str, Union[int, float]]] = {}
         self.groups: Dict[str, Dict[str, Dataset]] = {}
         self.analysis_tables: Dict[str, Dataset] = {}
+        self.executor_states: Dict[str, Any] = {}
         self.id_name_mapping: Dict[str, str] = {}
 
     @property
@@ -733,13 +734,15 @@ class ExperimentData:
             return executor_id in self.variables.keys()
         elif space == ExperimentDataEnum.analysis_tables:
             return executor_id in self.analysis_tables
+        elif space == ExperimentDataEnum.executors_states:
+            return executor_id in self.executor_states
         else:
             return any(self.check_hash(executor_id, s) for s in ExperimentDataEnum)
 
     def set_value(
         self,
         space: ExperimentDataEnum,
-        executor_id: Union[str, Dict[str, str]],
+        executor_id: str,
         value: Any,
         key: Optional[str] = None,
         role=None,
@@ -773,6 +776,13 @@ class ExperimentData:
                 self.groups[executor_id] = {key: value}
             else:
                 self.groups[executor_id][key] = value
+        elif space == ExperimentDataEnum.executors_states:
+            if executor_id not in self.groups:
+                self.groups[executor_id] = {key: value}
+            else:
+                self.groups[executor_id][key] = value
+        else:
+            raise NotImplementedError(f"Space {space} is not implemented")
         return self
 
     def get_spaces_key_dict(self):
@@ -781,6 +791,7 @@ class ExperimentData:
             ExperimentDataEnum.analysis_tables: self.analysis_tables.keys(),
             ExperimentDataEnum.groups: self.groups.keys(),
             ExperimentDataEnum.variables: self.variables.keys(),
+            ExperimentDataEnum.executors_states: self.executor_states.keys(),
         }
 
     def get_ids(

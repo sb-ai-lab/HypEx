@@ -1,11 +1,21 @@
+from copy import deepcopy
 from itertools import product
-from typing import Optional, List, Dict, Sequence, Any
+from typing import Optional, List, Dict, Sequence, Any, Iterable, Literal
 
 from tqdm.auto import tqdm
 
-from ..dataset import ExperimentData, Dataset, GroupingRole, ABCRole
+from ..comparators import Comparator
+from ..dataset import (
+    ExperimentData,
+    Dataset,
+    GroupingRole,
+    ABCRole,
+    FeatureRole,
+    TargetRole,
+)
 from ..executor import Executor, IfExecutor
 from .base import Experiment
+from ..extensions.abstract import MLExtension
 from ..reporters import Reporter, DatasetReporter
 from ..utils.enums import ExperimentDataEnum
 
@@ -181,4 +191,73 @@ class IfParamsExperiment(ParamsExperiment):
             )
             if if_result.variables[if_executor_id]["response"]:
                 return self._set_result(data, [self.reporter.report(t_data)])
+        return data
+
+
+class MLExperiment(Executor):
+    def __init__(
+        self,
+        ml_pipeline: Sequence[MLExtension],
+        scores: Optional[Iterable[Comparator]] = None,
+        feature_role: Optional[ABCRole] = None,
+        target_role: Optional[ABCRole] = None,
+        grouping_role: Optional[ABCRole] = None,
+        key: Any = "",
+    ):
+        super().__init__(key)
+        self.feature_role = feature_role or FeatureRole()
+        self.target_role = target_role or TargetRole()
+        self.grouping_role = grouping_role or GroupingRole()
+        self.ml_pipeline = ml_pipeline
+        self.scores = scores
+
+    def _get_group_data(
+        self, data: ExperimentData, group_label: Literal["train", "test", "validation"]
+    ):
+        group = group_label if group_label in data.groups[self.id] else ""
+        if group not in data.groups[self.id]:
+            raise ValueError(
+                "Error in GroupingRole: ML group is one field contains values of 'train', 'test' or 'validation'"
+            )
+        return data.groups[self.id][group]
+
+    def fit(self, data: ExperimentData, features, target):
+        fit_data = self._get_group_data(data, "train")
+        for ml_extension in self.ml_pipeline:
+            ml_extension.fit(fit_data, features, target)
+            data.set_value(
+                ExperimentDataEnum.executors_states,
+                self.id,
+                ml_extension,
+                ml_extension.__class__.__name__,
+            )
+
+    def transform(self, data):
+        data.trans_ds = deepcopy(data.ds) if data.trans_ds is None else data.trans_ds
+        for ml_extension in self.ml_pipeline:
+            if isinstance(ml_extension, MLTransformer):
+                data.trans_ds = ml_extension.transform(data.trans_ds)
+
+    def predict(self, data):
+        t_data = data.ds if data.trans_ds is None else data.trans_ds
+        for ml_extension in self.ml_pipeline:
+            if isinstance(ml_extension, MLPredictor):
+                data.trans_ds = ml_extension.predict(data.trans_ds)
+
+    def score(self, data):
+        pass
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        features = data.ds.search_columns(self.feature_role)
+        target = data.ds.search_columns(self.target_role)
+        group = data.ds.search_columns(self.grouping_role)
+        if group > 0:
+            for key, group in data.ds.groupby(group):
+                data.set_value(ExperimentDataEnum.groups, self.id, group, key)
+        else:
+            data.set_value(ExperimentDataEnum.groups, self.id, deepcopy(data.ds), "")
+        self.fit(data, features, target)
+        self.transform(data)
+        self.predict(data)
+        self.score(data)
         return data
