@@ -546,6 +546,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             to_replace = to_replace.iloc[:, 0]
         elif isinstance(to_replace, pd.Series):
             to_replace = to_replace.to_list()
+        elif isinstance(to_replace, dict):
+            return self.data.replace(to_replace=to_replace, regex=regex)
         return self.data.replace(to_replace=to_replace, value=value, regex=regex)
 
     def reindex(
