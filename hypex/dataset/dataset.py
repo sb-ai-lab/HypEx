@@ -100,7 +100,9 @@ class Dataset(DatasetBase):
             self.roles = roles
 
         def __getitem__(self, item) -> "Dataset":
-            """Get data subset using label-based indexing"""
+            """
+            Get data subset using label-based indexing.
+            """
             t_data = self.backend.loc(item)
             return Dataset(
                 data=t_data,
@@ -108,7 +110,9 @@ class Dataset(DatasetBase):
             )
 
         def __setitem__(self, item, value):
-            """Set data values using label-based indexing"""
+            """
+            Set data values using label-based indexing.
+            """
             column_name = item[1]
             column_data_type = self.roles[column_name].data_type
             # Check if value matches expected data type
@@ -140,7 +144,9 @@ class Dataset(DatasetBase):
             self.roles = roles
 
         def __getitem__(self, item) -> "Dataset":
-            """Get data subset using integer-based indexing"""
+            """
+            Get data subset using integer-based indexing.
+            """
             t_data = self.backend.iloc(item)
             return Dataset(
                 data=t_data,
@@ -148,7 +154,9 @@ class Dataset(DatasetBase):
             )
 
         def __setitem__(self, item, value):
-            """Set data values using integer-based indexing"""
+            """
+            Set data values using integer-based indexing.
+            """
             column_index = item[1]
             column_name = self.backend.data.columns[column_index]
             column_data_type = self.roles[column_name].data_type
@@ -290,151 +298,221 @@ class Dataset(DatasetBase):
 
     # comparison operators:
     def __eq__(self, other):
-        """Implement equality comparison"""
+        """
+        Implement equality comparison.
+        """
         return self.__binary_magic_operator(other=other, func_name="__eq__")
 
     def __ne__(self, other):
-        """Implement inequality comparison"""
+        """
+        Implement inequality comparison.
+        """
         return self.__binary_magic_operator(other=other, func_name="__ne__")
 
     def __le__(self, other):
-        """Implement less than or equal comparison"""
+        """
+        Implement less than or equal comparison.
+        """
         return self.__binary_magic_operator(other=other, func_name="__le__")
 
     def __lt__(self, other):
-        """Implement less than comparison"""
+        """
+        Implement less than comparison.
+        """
         return self.__binary_magic_operator(other=other, func_name="__lt__")
 
     def __ge__(self, other):
-        """Implement greater than or equal comparison"""
+        """
+        Implement greater than or equal comparison.
+        """
         return self.__binary_magic_operator(other=other, func_name="__ge__")
 
     def __gt__(self, other):
-        """Implement greater than comparison"""
+        """
+        Implement greater than comparison.
+        """
         return self.__binary_magic_operator(other=other, func_name="__gt__")
 
     # unary operators:
     def __pos__(self):
-        """Implement unary positive"""
+        """
+        Implement unary positive.
+        """
         return Dataset(roles=self.roles, data=(+self._backend))
 
     def __neg__(self):
-        """Implement unary negation"""
+        """
+        Implement unary negation.
+        """
         return Dataset(roles=self.roles, data=(-self._backend))
 
     def __abs__(self):
-        """Implement absolute value"""
+        """
+        Implement absolute value.
+        """
         return Dataset(roles=self.roles, data=abs(self._backend))
 
     def __invert__(self):
-        """Implement bitwise inversion"""
+        """
+        Implement bitwise inversion.
+        """
         return Dataset(roles=self.roles, data=(~self._backend))
 
     def __round__(self, ndigits: int = 0):
-        """Implement rounding"""
+        """
+        Implement rounding.
+        """
         return Dataset(roles=self.roles, data=round(self._backend, ndigits))
 
     def __bool__(self):
-        """Implement truth value testing"""
+        """
+        Implement truth value testing.
+        """
         return not self._backend.is_empty()
 
     # Binary math operators:
     def __add__(self, other):
-        """Implement addition"""
+        """
+        Implement addition.
+        """
         return self.__binary_magic_operator(other=other, func_name="__add__")
 
     def __sub__(self, other):
-        """Implement subtraction"""
+        """
+        Implement subtraction.
+        """
         return self.__binary_magic_operator(other=other, func_name="__sub__")
 
     def __mul__(self, other):
-        """Implement multiplication"""
+        """
+        Implement multiplication.
+        """
         return self.__binary_magic_operator(other=other, func_name="__mul__")
 
     def __floordiv__(self, other):
-        """Implement floor division"""
+        """
+        Implement floor division.
+        """
         return self.__binary_magic_operator(other=other, func_name="__floordiv__")
 
     def __div__(self, other):
-        """Implement division"""
+        """
+        Implement division.
+        """
         return self.__binary_magic_operator(other=other, func_name="__div__")
 
     def __truediv__(self, other):
-        """Implement true division"""
+        """
+        Implement true division.
+        """
         return self.__binary_magic_operator(other=other, func_name="__truediv__")
 
     def __mod__(self, other):
-        """Implement modulo"""
+        """
+        Implement modulo.
+        """
         return self.__binary_magic_operator(other=other, func_name="__mod__")
 
     def __pow__(self, other):
-        """Implement exponentiation"""
+        """
+        Implement exponentiation.
+        """
         return self.__binary_magic_operator(other=other, func_name="__pow__")
 
     def __and__(self, other):
-        """Implement bitwise and"""
+        """
+        Implement bitwise and.
+        """
         return self.__binary_magic_operator(other=other, func_name="__and__")
 
     def __or__(self, other):
-        """Implement bitwise or"""
+        """
+        Implement bitwise or.
+        """
         return self.__binary_magic_operator(other=other, func_name="__or__")
 
     # Right math operators:
     def __radd__(self, other):
-        """Implement reverse addition"""
+        """
+        Implement reverse addition.
+        """
         return self.__binary_magic_operator(other=other, func_name="__radd__")
 
     def __rsub__(self, other):
-        """Implement reverse subtraction"""
+        """
+        Implement reverse subtraction.
+        """
         return self.__binary_magic_operator(other=other, func_name="__rsub__")
 
     def __rmul__(self, other):
-        """Implement reverse multiplication"""
+        """
+        Implement reverse multiplication.
+        """
         return self.__binary_magic_operator(other=other, func_name="__rmul__")
 
     def __rfloordiv__(self, other):
-        """Implement reverse floor division"""
+        """
+        Implement reverse floor division.
+        """
         return self.__binary_magic_operator(other=other, func_name="__rfloordiv__")
 
     def __rdiv__(self, other):
-        """Implement reverse division"""
+        """
+        Implement reverse division.
+        """
         return self.__binary_magic_operator(other=other, func_name="__rdiv__")
 
     def __rtruediv__(self, other):
-        """Implement reverse true division"""
+        """
+        Implement reverse true division.
+        """
         return self.__binary_magic_operator(other=other, func_name="__rtruediv__")
 
     def __rmod__(self, other):
-        """Implement reverse modulo"""
+        """
+        Implement reverse modulo.
+        """
         return self.__binary_magic_operator(other=other, func_name="__rmod__")
 
     def __rpow__(self, other) -> Any:
-        """Implement reverse exponentiation"""
+        """
+        Implement reverse exponentiation.
+        """
         return self.__binary_magic_operator(other=other, func_name="__rpow__")
 
     @property
     def index(self):
-        """Get the index of the dataset"""
+        """
+        Get the index of the dataset.
+        """
         return self.backend.index
 
     @index.setter
     def index(self, value):
-        """Set the index of the dataset"""
+        """
+        Set the index of the dataset.
+        """
         self.backend.data.index = value
 
     @property
     def data(self):
-        """Get the underlying data"""
+        """
+        Get the underlying data.
+        """
         return self._backend.data
 
     @data.setter
     def data(self, value):
-        """Set the underlying data"""
+        """
+        Set the underlying data.
+        """
         self.backend.data = value
 
     @property
     def columns(self):
-        """Get the column names"""
+        """
+        Get the column names.
+        """
         return self.backend.columns
 
     @staticmethod
@@ -670,11 +748,15 @@ class Dataset(DatasetBase):
         )
 
     def is_empty(self) -> bool:
-        """Check if dataset is empty"""
+        """
+        Check if dataset is empty.
+        """
         return self._backend.is_empty()
 
     def unique(self) -> Dict[str, List[Any]]:
-        """Get unique values for each column"""
+        """
+        Get unique values for each column.
+        """
         return self._backend.unique()
 
     def nunique(self, dropna: bool = False) -> Dict[str, int]:
@@ -800,11 +882,15 @@ class Dataset(DatasetBase):
         )
 
     def mean(self):
-        """Calculate mean of numeric columns"""
+        """
+        Calculate mean of numeric columns.
+        """
         return self._convert_data_after_agg(self._backend.mean())
 
     def max(self):
-        """Calculate maximum of columns"""
+        """
+        Calculate maximum of columns.
+        """
         return self._convert_data_after_agg(self._backend.max())
 
     def reindex(self, labels, fill_value: Optional[Any] = None) -> "Dataset":
@@ -823,25 +909,35 @@ class Dataset(DatasetBase):
         )
 
     def idxmax(self):
-        """Get index of maximum values"""
+        """
+        Get index of maximum values.
+        """
         return self._convert_data_after_agg(self._backend.idxmax())
 
     def min(self):
-        """Calculate minimum of columns"""
+        """
+        Calculate minimum of columns.
+        """
         return self._convert_data_after_agg(self._backend.min())
 
     def count(self):
-        """Count non-NA values"""
+        """
+        Count non-NA values.
+        """
         if self.is_empty():
             return Dataset.create_empty({role: InfoRole() for role in self.roles})
         return self._convert_data_after_agg(self._backend.count())
 
     def sum(self):
-        """Calculate sum of columns"""
+        """
+        Calculate sum of columns.
+        """
         return self._convert_data_after_agg(self._backend.sum())
 
     def log(self):
-        """Calculate natural logarithm"""
+        """
+        Calculate natural logarithm.
+        """
         return self._convert_data_after_agg(self._backend.log())
 
     def mode(self, numeric_only: bool = False, dropna: bool = True):
@@ -887,22 +983,27 @@ class Dataset(DatasetBase):
         return self._convert_data_after_agg(self._backend.agg(func))
 
     def std(self, skipna: bool = True, ddof: int = 1):
-        """Calculate standard deviation"""
+        """
+        Calculate standard deviation.
+        """
         return self._convert_data_after_agg(self._backend.std(skipna=skipna, ddof=ddof))
 
     def quantile(self, q: float = 0.5):
-        """Calculate quantiles for each column.
+        """
+        Calculate quantiles for each column.
 
         Args:
             q: Quantile to compute, between 0 and 1
 
         Returns:
-            Dataset: Quantile values for each column
+            Quantile values for each column
         """
         return self._convert_data_after_agg(self._backend.quantile(q=q))
 
     def coefficient_of_variation(self):
-        """Calculate coefficient of variation"""
+        """
+        Calculate coefficient of variation.
+        """
         return self._convert_data_after_agg(self._backend.coefficient_of_variation())
 
     def corr(self, method="pearson", numeric_only=False):
@@ -959,7 +1060,8 @@ class Dataset(DatasetBase):
         subset: Union[str, Iterable[str], None] = None,
         axis: Union[Literal["index", "rows", "columns"], int] = 0,
     ):
-        """Remove missing values from the dataset.
+        """
+        Remove missing values from the dataset.
 
         Args:
             how: How to drop rows/columns with missing values.
@@ -990,7 +1092,8 @@ class Dataset(DatasetBase):
         )
 
     def isna(self):
-        """Check for missing values in the dataset.
+        """
+        Check for missing values in the dataset.
 
         Returns:
             Dataset: A boolean dataset indicating missing values
@@ -998,7 +1101,8 @@ class Dataset(DatasetBase):
         return self._convert_data_after_agg(self._backend.isna())
 
     def select_dtypes(self, include: Any = None, exclude: Any = None):
-        """Select columns based on their dtype.
+        """
+        Select columns based on their dtype.
 
         Args:
             include: Dtypes to include
@@ -1025,7 +1129,8 @@ class Dataset(DatasetBase):
         suffixes: Tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "outer", "inner", "cross"] = "inner",
     ):
-        """Merge this dataset with another dataset.
+        """
+        Merge this dataset with another dataset.
 
         Args:
             right: Right dataset to merge with
@@ -1083,7 +1188,8 @@ class Dataset(DatasetBase):
         return Dataset(roles=new_roles, data=t_data)
 
     def drop(self, labels: Any = None, axis: int = 1):
-        """Drop specified labels from rows or columns.
+        """
+        Drop specified labels from rows or columns.
 
         Args:
             labels: Labels to drop
@@ -1114,7 +1220,8 @@ class Dataset(DatasetBase):
         regex: Optional[str] = None,
         axis: Optional[int] = None,
     ) -> "Dataset":
-        """Filter rows or columns using specified criteria.
+        """
+        Filter rows or columns using specified criteria.
 
         Args:
             items: List of items to include
@@ -1130,7 +1237,8 @@ class Dataset(DatasetBase):
         return Dataset(roles=t_roles, data=t_data)
 
     def dot(self, other: "Dataset") -> "Dataset":
-        """Compute matrix multiplication with another dataset.
+        """
+        Compute matrix multiplication with another dataset.
 
         Args:
             other: Dataset to multiply with
@@ -1144,7 +1252,8 @@ class Dataset(DatasetBase):
         self,
         roles: Optional[Union[Dict[str, ABCRole], List[str]]] = None,
     ) -> "Dataset":
-        """Transpose the dataset.
+        """
+        Transpose the dataset.
 
         Args:
             roles: New roles for transposed columns
@@ -1173,7 +1282,8 @@ class Dataset(DatasetBase):
         n: Optional[int] = None,
         random_state: Optional[int] = None,
     ) -> "Dataset":
-        """Return a random sample of the dataset.
+        """
+        Return a random sample of the dataset.
 
         Args:
             frac: Fraction of rows to sample
@@ -1189,7 +1299,8 @@ class Dataset(DatasetBase):
         )
 
     def cov(self):
-        """Calculate covariance matrix.
+        """
+        Calculate covariance matrix.
 
         Returns:
             Dataset: Covariance matrix
@@ -1200,7 +1311,8 @@ class Dataset(DatasetBase):
         )
 
     def rename(self, names: Dict[str, str]):
-        """Rename columns.
+        """
+        Rename columns.
 
         Args:
             names: Dictionary mapping old names to new names
@@ -1217,7 +1329,8 @@ class Dataset(DatasetBase):
         value: Any = None,
         regex: bool = False,
     ) -> "Dataset":
-        """Replace values in the dataset.
+        """
+        Replace values in the dataset.
 
         Args:
             to_replace: Values to replace
@@ -1234,10 +1347,13 @@ class Dataset(DatasetBase):
 
 
 class ExperimentData:
-    """Class for managing experimental data and analysis results."""
+    """
+    Class for managing experimental data and analysis results.
+    """
 
     def __init__(self, data: Dataset):
-        """Initialize ExperimentData.
+        """
+        Initialize ExperimentData.
 
         Args:
             data: Base dataset for the experiment
@@ -1251,14 +1367,17 @@ class ExperimentData:
 
     @property
     def ds(self):
-        """Get the base dataset."""
+        """
+        Get the base dataset.
+        """
         return self._data
 
     @staticmethod
     def create_empty(
         roles=None, backend=BackendsEnum.pandas, index=None
     ) -> "ExperimentData":
-        """Create empty ExperimentData instance.
+        """
+        Create empty ExperimentData instance.
 
         Args:
             roles: Roles for columns
@@ -1272,7 +1391,8 @@ class ExperimentData:
         return ExperimentData(ds)
 
     def check_hash(self, executor_id: int, space: ExperimentDataEnum) -> bool:
-        """Check if executor ID exists in specified space.
+        """
+        Check if executor ID exists in specified space.
 
         Args:
             executor_id: ID to check
@@ -1298,7 +1418,8 @@ class ExperimentData:
         key: Optional[str] = None,
         role=None,
     ) -> "ExperimentData":
-        """Set a value in the specified space.
+        """
+        Set a value in the specified space.
 
         Args:
             space: Space to set value in
@@ -1357,7 +1478,8 @@ class ExperimentData:
         ] = None,
         key: Optional[str] = None,
     ) -> Dict[str, Dict[str, List[str]]]:
-        """Get IDs matching specified criteria.
+        """
+        Get IDs matching specified criteria.
 
         Args:
             classes: Classes to search for
@@ -1410,7 +1532,8 @@ class ExperimentData:
         space: ExperimentDataEnum,
         key: Optional[str] = None,
     ) -> str:
-        """Get a single ID matching criteria.
+        """
+        Get a single ID matching criteria.
 
         Args:
             class_: Class to search for
@@ -1430,7 +1553,8 @@ class ExperimentData:
         return result[class_][space.value][0]
 
     def copy(self, data: Optional[Dataset] = None) -> "ExperimentData":
-        """Create a deep copy.
+        """
+        Create a deep copy.
 
         Args:
             data: Optional new base dataset
@@ -1449,7 +1573,8 @@ class ExperimentData:
         tmp_role: bool = False,
         search_types=None,
     ) -> List[str]:
-        """Search for fields with specified roles.
+        """
+        Search for fields with specified roles.
 
         Args:
             roles: Roles to search for
@@ -1488,7 +1613,8 @@ class ExperimentData:
         tmp_role: bool = False,
         search_types=None,
     ) -> Dataset:
-        """Search for data with specified roles.
+        """
+        Search for data with specified roles.
 
         Args:
             roles: Roles to search for
@@ -1521,14 +1647,17 @@ class ExperimentData:
 
 
 class DatasetAdapter(Adapter):
-    """Adapter class for converting various data types to Dataset objects."""
+    """
+    Adapter class for converting various data types to Dataset objects.
+    """
 
     @staticmethod
     def to_dataset(
         data: Union[Dict, Dataset, pd.DataFrame, List, str, int, float, bool],
         roles: Union[ABCRole, Dict[str, ABCRole]],
     ) -> Dataset:
-        """Convert various data types to a Dataset object.
+        """
+        Convert various data types to a Dataset object.
 
         Args:
             data: Input data to convert
@@ -1562,7 +1691,8 @@ class DatasetAdapter(Adapter):
     def value_to_dataset(
         data: ScalarType, roles: Union[ABCRole, Dict[str, ABCRole]]
     ) -> Dataset:
-        """Convert a scalar value to a Dataset.
+        """
+        Convert a scalar value to a Dataset.
 
         Args:
             data: Scalar value to convert
@@ -1579,7 +1709,8 @@ class DatasetAdapter(Adapter):
     def dict_to_dataset(
         data: Dict, roles: Union[ABCRole, Dict[str, ABCRole]]
     ) -> Dataset:
-        """Convert a dictionary to a Dataset.
+        """
+        Convert a dictionary to a Dataset.
 
         Args:
             data: Dictionary to convert
@@ -1605,7 +1736,8 @@ class DatasetAdapter(Adapter):
 
     @staticmethod
     def list_to_dataset(data: List, roles: Dict[str, ABCRole]) -> Dataset:
-        """Convert a list to a Dataset.
+        """
+        Convert a list to a Dataset.
 
         Args:
             data: List to convert
@@ -1621,7 +1753,8 @@ class DatasetAdapter(Adapter):
 
     @staticmethod
     def frame_to_dataset(data: pd.DataFrame, roles: Dict[str, ABCRole]) -> Dataset:
-        """Convert a pandas DataFrame to a Dataset.
+        """
+        Convert a pandas DataFrame to a Dataset.
 
         Args:
             data: DataFrame to convert
