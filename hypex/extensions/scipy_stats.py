@@ -56,27 +56,39 @@ class StatTest(CompareExtension):
         return one_result
 
 
-class TTestExtensionExtension(StatTest):
+class TTestExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ttest_ind, reliability=reliability)
 
     def _calc_pandas(
         self, data: Dataset, other: Union[Dataset, None] = None, **kwargs
     ) -> Union[float, Dataset]:
+        if (
+            list(data.nunique().values())[0] < 2
+            and list(other.nunique().values())[0] < 2
+        ):
+            return DatasetAdapter.to_dataset(
+                {
+                    "p-value": [None],
+                    "statistic": [None],
+                    "pass": [None],
+                },
+                StatisticRole(),
+            )
         return super()._calc_pandas(data, other, nan_policy="omit", **kwargs)
 
 
-class KSTestExtensionExtension(StatTest):
+class KSTestExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ks_2samp, reliability=reliability)
 
 
-class UTestExtensionExtension(StatTest):
+class UTestExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(mannwhitneyu, reliability=reliability)
 
 
-class Chi2TestExtensionExtension(StatTest):
+class Chi2TestExtension(StatTest):
     @staticmethod
     def mini_category_replace(counts: Dataset) -> Dataset:
         mini_counts = counts["count"][counts["count"] < 7]
@@ -117,9 +129,9 @@ class Chi2TestExtensionExtension(StatTest):
             warnings.warn(f"Matrix Chi2 is empty for {data.columns[0]}. Returning None")
             return DatasetAdapter.to_dataset(
                 {
-                    "p-value": None,
-                    "statistic": None,
-                    "pass": None,
+                    "p-value": [None],
+                    "statistic": [None],
+                    "pass": [None],
                 },
                 StatisticRole(),
             )
