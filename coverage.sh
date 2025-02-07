@@ -1,6 +1,7 @@
 #!/bin/bash
 
 export PYTHONPATH=$PYTHONPATH:.
+export PYTHONWARNINGS="ignore"
 
 coverage run --include="hypex/dataset/*" unitests/unitests.py
 

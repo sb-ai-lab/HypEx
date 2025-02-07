@@ -390,7 +390,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return self.agg(["std"], skipna=skipna, ddof=ddof)
 
     def cov(self):
-        return self.data.cov(ddof=0)
+        return self.data.cov(ddof=1)
 
     def quantile(self, q: float = 0.5) -> pd.DataFrame:
         if isinstance(q, list) and len(q) > 1:
