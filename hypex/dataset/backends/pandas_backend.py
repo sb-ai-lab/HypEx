@@ -182,6 +182,10 @@ class PandasNavigation(DatasetBackendNavigation):
     def columns(self):
         return self.data.columns
 
+    @property
+    def shape(self):
+        return self.data.shape
+
     def _get_column_index(
         self, column_name: Union[Sequence[str], str]
     ) -> Union[int, Sequence[int]]:
@@ -229,7 +233,7 @@ class PandasNavigation(DatasetBackendNavigation):
         if isinstance(data, pd.DataFrame):
             data = data.values
         if len(self.data) != len(data):
-            if len(data[0]) == 1:
+            if isinstance(data[0], Iterable) and len(data[0]) == 1:
                 data = data.squeeze()
             data = pd.Series(data)
         if index:
@@ -307,6 +311,21 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             result = self.data
         return result.values.tolist()
 
+    def iget_values(
+        self,
+        row: Optional[int] = None,
+        column: Optional[int] = None,
+    ) -> Any:
+        if (column is not None) and (row is not None):
+            return self.data.iloc[row, column]
+        elif column is not None:
+            result = self.data.iloc[:, column]
+        elif row is not None:
+            result = self.data.iloc[row, :]
+        else:
+            result = self.data
+        return result.values.tolist()
+
     def apply(self, func: Callable, **kwargs) -> pd.DataFrame:
         single_column_name = kwargs.pop("column_name")
         result = self.data.apply(func, **kwargs)
@@ -331,7 +350,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return list(groups)
 
     def agg(self, func: Union[str, List], **kwargs) -> Union[pd.DataFrame, float]:
-        func = func if isinstance(func, List) else [func]
+        func = func if isinstance(func, (List, Dict)) else [func]
         result = self.data.agg(func, **kwargs)
         return self._convert_agg_result(result)
 
@@ -356,19 +375,27 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def mode(
         self, numeric_only: bool = False, dropna: bool = True
     ) -> Union[pd.DataFrame, float]:
-        return self.agg(["mode"])
+        return self.data.mode(numeric_only=numeric_only, dropna=dropna)
 
     def var(
         self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
     ) -> Union[pd.DataFrame, float]:
-        return self.agg(["var"])
+        return self.agg(["var"], skipna=skipna, ddof=ddof, numeric_only=numeric_only)
 
     def log(self) -> pd.DataFrame:
         np_data = np.log(self.data.to_numpy())
         return pd.DataFrame(np_data, columns=self.data.columns)
 
-    def std(self) -> Union[pd.DataFrame, float]:
-        return self.agg(["std"])
+    def std(self, skipna: bool = True, ddof: int = 1) -> Union[pd.DataFrame, float]:
+        return self.agg(["std"], skipna=skipna, ddof=ddof)
+
+    def cov(self):
+        return self.data.cov(ddof=1)
+
+    def quantile(self, q: float = 0.5) -> pd.DataFrame:
+        if isinstance(q, list) and len(q) > 1:
+            return self.data.quantile(q=q)
+        return self.agg(func="quantile", q=q)
 
     def coefficient_of_variation(self) -> Union[pd.DataFrame, float]:
         data = (self.data.std() / self.data.mean()).to_frame().T
@@ -447,12 +474,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     ) -> pd.DataFrame:
         return self.data.sample(n=n, frac=frac, random_state=random_state)
 
-    def cov(self):
-        return self.data.cov(ddof=0)
-
-    def quantile(self, q: float = 0.5) -> pd.DataFrame:
-        return self.agg(func="quantile", q=q)
-
     def select_dtypes(
         self,
         include: Optional[str] = None,
@@ -525,6 +546,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             to_replace = to_replace.iloc[:, 0]
         elif isinstance(to_replace, pd.Series):
             to_replace = to_replace.to_list()
+        elif isinstance(to_replace, dict):
+            return self.data.replace(to_replace=to_replace, regex=regex)
         return self.data.replace(to_replace=to_replace, value=value, regex=regex)
 
     def reindex(
