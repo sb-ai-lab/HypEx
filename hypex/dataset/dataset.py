@@ -1392,7 +1392,7 @@ class ExperimentData:
 
     def check_hash(self, executor_id: int, space: ExperimentDataEnum) -> bool:
         """
-        Check if executor ID exists in specified space.
+        Check if experiments ID exists in specified space.
 
         Args:
             executor_id: ID to check

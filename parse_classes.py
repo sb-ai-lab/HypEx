@@ -9,7 +9,7 @@ unnecessary_dirs = (
     "experiment",
     "hypotheses",
     "utils",
-    "executor",
+    "experiments",
 )
 
 

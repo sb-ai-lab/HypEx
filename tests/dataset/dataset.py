@@ -30,7 +30,7 @@ class TestDataset(unittest.TestCase):
         roles_with_mapping = {InfoRole(): ["col1", "col2"]}
         dataset_with_mapping = Dataset(roles=roles_with_mapping, data=self.data)
         self.assertListEqual(list(dataset_with_mapping.columns), ["col1", "col2"])
-    
+
     def test_backend_initialization(self):
         # Test initialization with backend
         roles_with_mapping = {InfoRole(): ["col1", "col2"]}
@@ -39,7 +39,7 @@ class TestDataset(unittest.TestCase):
         )
         self.assertListEqual(list(dataset_with_backend.columns), ["col1", "col2"])
         self.assertEqual(dataset_with_backend.backend.name, "pandasdataset")
-    
+
     def test_partial_role_initialization(self):
         # Test initialization with partial roles
         roles_partial = {InfoRole(): ["col1"]}
@@ -63,9 +63,9 @@ class TestDataset(unittest.TestCase):
 
         merged = self.dataset.merge(dataset_new, on="col1")
         self.assertIn("col3", merged.columns)
-        self.assertTrue(isinstance(merged.roles['col1'], InfoRole))
-        self.assertTrue(isinstance(merged.roles['col2'], InfoRole))
-        self.assertTrue(isinstance(merged.roles['col3'], TargetRole))
+        self.assertTrue(isinstance(merged.roles["col1"], InfoRole))
+        self.assertTrue(isinstance(merged.roles["col2"], InfoRole))
+        self.assertTrue(isinstance(merged.roles["col3"], TargetRole))
 
     def test_operators(self):
         # Test arithmetic operators
@@ -268,7 +268,7 @@ class TestDataset(unittest.TestCase):
         )
 
     def test_set_value_variables_existing_executor(self):
-        # Test setting value for existing executor
+        # Test setting value for existing experiments
         experiment_data = ExperimentData(self.dataset)
         experiment_data.variables = {"executor_1": {"key1": "value1"}}
 
@@ -284,7 +284,7 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(experiment_data.variables["executor_1"]["key2"], "new_value")
 
     def test_set_value_variables_new_executor(self):
-        # Test setting value for new executor
+        # Test setting value for new experiments
         experiment_data = ExperimentData(self.dataset)
 
         # Apply set_value for new executor_id
@@ -316,7 +316,7 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(experiment_data.groups["executor_1"]["key1"], "group_data")
 
     def test_set_value_groups_existing_executor(self):
-        # Test setting value for existing executor in groups
+        # Test setting value for existing experiments in groups
         experiment_data = ExperimentData(self.dataset)
         experiment_data.groups = {"executor_1": {"key1": "old_value"}}
 
@@ -459,7 +459,7 @@ class TestDataset(unittest.TestCase):
         # Test setting invalid type
         with self.assertRaises(TypeError):
             self.dataset["col1"] = ["string", "another", "string"]
-        
+
     def test_setitem_invalid_len(self):
         # Test setting invalid type
         with self.assertRaises(ValueError):
@@ -657,12 +657,14 @@ class TestDataset(unittest.TestCase):
         # Test with correct positive values
         self.dataset.data["col1"] = [1, 2, 3]
         cv = self.dataset.coefficient_of_variation()
-        
+
         # Calculate the expected CV manually
         mean_col1 = np.mean([1, 2, 3])
-        std_col1 = np.std([1, 2, 3], ddof=0)  # Standard deviation with population correction
+        std_col1 = np.std(
+            [1, 2, 3], ddof=0
+        )  # Standard deviation with population correction
         expected_cv = std_col1 / mean_col1
-        
+
         # Check that the coefficient of variation is close to the expected value
         self.assertAlmostEqual(cv["col1"], expected_cv, places=3)
 
@@ -729,21 +731,25 @@ class TestDataset(unittest.TestCase):
 
         expected_cov = self.dataset.data.cov()
         pd.testing.assert_frame_equal(cov.data, expected_cov)
-        
+
         # Edge cases
         # Test with constant column
         self.dataset.data["col1"] = [1, 1, 1]
         cov = self.dataset.cov()
-        self.assertEqual(cov.loc["col1", "col1"], 0)  # Covariance with constant column should be 0
-        
+        self.assertEqual(
+            cov.loc["col1", "col1"], 0
+        )  # Covariance with constant column should be 0
+
         # Test with NaN values
         self.dataset.data["col1"] = [1, None, 3]
         cov = self.dataset.cov()
-        
+
         # The expected behavior for NaN values: pandas should handle them by excluding those rows in the covariance calculation
         expected_cov = self.dataset.data.cov()
-        pd.testing.assert_frame_equal(cov.data, expected_cov)  # Ensure covariance matrix is correct even with NaN
-        
+        pd.testing.assert_frame_equal(
+            cov.data, expected_cov
+        )  # Ensure covariance matrix is correct even with NaN
+
         # Ensure covariance involving NaN is correctly handled (NaN should not propagate if handled by pandas)
         self.assertTrue(pd.notna(cov.loc["col1", "col2"]))
 
@@ -806,7 +812,7 @@ class TestDataset(unittest.TestCase):
 
         # Test with non-numeric data
         self.dataset.data["col1"] = ["a", "b", "c"]
-        other_data = pd.DataFrame({'a': [1, 2]})
+        other_data = pd.DataFrame({"a": [1, 2]})
         other_roles = {"a": InfoRole()}
         other = Dataset(data=other_data, roles=other_roles)
         with self.assertRaises(ValueError):
@@ -861,8 +867,8 @@ class TestDataset(unittest.TestCase):
         data_with_na = pd.DataFrame({"col1": [1, None, 3], "col2": [4, 5, 6]})
         dataset_with_na = Dataset(roles=self.roles, data=data_with_na)
 
-        dropped_dataset = dataset_with_na.dropna(axis='columns')
-        self.assertEqual(dropped_dataset.columns, 'col2')
+        dropped_dataset = dataset_with_na.dropna(axis="columns")
+        self.assertEqual(dropped_dataset.columns, "col2")
 
     def test_dropna_all(self):
 
@@ -911,14 +917,13 @@ class TestDataset(unittest.TestCase):
 
     def test_fillna_with_str(self):
         # Test filling NA values with a string
-        data_with_na = pd.DataFrame({"col1": ['uwu', None, ':)'], "col2": [4, 5, 6]})
+        data_with_na = pd.DataFrame({"col1": ["uwu", None, ":)"], "col2": [4, 5, 6]})
         roles = {"col1": InfoRole(str), "col2": InfoRole()}
         dataset_with_na = Dataset(roles=roles, data=data_with_na)
 
         # Fill NaN values in 'col1' with the string 'missing'
         filled_dataset = dataset_with_na.fillna({"col1": "missing"})
         self.assertEqual(filled_dataset.data.loc[1, "col1"], "missing")
-
 
     def test_filter(self):
         # Test with items
@@ -972,7 +977,11 @@ class TestDataset(unittest.TestCase):
         dataset = Dataset.from_dict(data_dict, self.roles)
         self.assertEqual(dataset.shape, (3, 1))
 
-        data_list = [{"col1": 1, "col2": 4}, {"col1": 2, "col2": 5}, {"col1": 3, "col2": 6}]
+        data_list = [
+            {"col1": 1, "col2": 4},
+            {"col1": 2, "col2": 5},
+            {"col1": 3, "col2": 6},
+        ]
         dataset_from_list = Dataset.from_dict(data_list, self.roles)
         self.assertEqual(dataset_from_list.shape, (3, 2))
 
@@ -1279,7 +1288,9 @@ class TestDataset(unittest.TestCase):
     def test_reindex(self):
         # Test columns reindex
 
-        self.data = pd.DataFrame({"col1": [1, 2, 3], "col2": [4, 5, 6]}, index=['one', 'two', 'three'])
+        self.data = pd.DataFrame(
+            {"col1": [1, 2, 3], "col2": [4, 5, 6]}, index=["one", "two", "three"]
+        )
         self.dataset = Dataset(roles=self.roles, data=self.data)
 
         # Test index reindex
@@ -1339,11 +1350,11 @@ class TestDataset(unittest.TestCase):
         # Test replace with non-existent values
         result = self.dataset.replace({999: 1000})
         self.assertTrue(result.data.equals(self.dataset.data))
-    
+
     def test_replace_wrong_type(self):
         # Test replace single value
         with self.assertRaises(ValueError):
-            result = self.dataset.replace(1, 'uwu')
+            result = self.dataset.replace(1, "uwu")
 
     def test_sample(self):
         # Test with n parameter
@@ -1422,8 +1433,8 @@ class TestDataset(unittest.TestCase):
         # Test with ddof parameter
         self.assertEqual(
             self.dataset.std(ddof=0).iget_values(0),
-            self.dataset.data.std(ddof=0).to_list()
-            )
+            self.dataset.data.std(ddof=0).to_list(),
+        )
 
         # Test with skipna parameter
         self.dataset.data.loc[0, "col1"] = None
@@ -1486,7 +1497,7 @@ class TestDataset(unittest.TestCase):
         # Test with NaN values
         self.dataset.data.loc[0, "col1"] = None
         result = self.dataset.unique()
-        self.assertTrue(np.isnan(result['col1'][0]))
+        self.assertTrue(np.isnan(result["col1"][0]))
 
         # Edge cases
         # Test with empty dataset
@@ -1507,7 +1518,7 @@ class TestDataset(unittest.TestCase):
         # Test with normalize parameter
         self.assertEqual(
             self.dataset.value_counts(normalize=True).iget_values(0, 2),
-            self.dataset.data.value_counts(normalize=True).iloc[0]
+            self.dataset.data.value_counts(normalize=True).iloc[0],
         )
 
         # Test with dropna parameter
@@ -1535,11 +1546,16 @@ class TestDataset(unittest.TestCase):
 
     def test_var(self):
         # Test basic var
-        result = {k: v[0] for k, v in self.dataset.var().to_dict()['data']['data'].items()}
+        result = {
+            k: v[0] for k, v in self.dataset.var().to_dict()["data"]["data"].items()
+        }
         self.assertEqual(result, self.dataset.data.var().to_dict())
 
         # Test with ddof parameter
-        result = {k: v[0] for k, v in self.dataset.var(ddof=0).to_dict()['data']['data'].items()}
+        result = {
+            k: v[0]
+            for k, v in self.dataset.var(ddof=0).to_dict()["data"]["data"].items()
+        }
         self.assertEqual(result, self.dataset.data.var(ddof=0).to_dict())
 
         # Test with skipna parameter
@@ -1597,24 +1613,45 @@ class TestDataset(unittest.TestCase):
         result = bool(self.dataset)
         self.assertTrue(result)  # Ожидаем, что не пустой Dataset вернет True
 
+
 def test_operators(self):
     test_cases = [
         ("+", pd.DataFrame({"col1": [1, 1, 1], "col2": [1, 1, 1]}), lambda x, y: x + y),
         ("-", pd.DataFrame({"col1": [1, 1, 1], "col2": [1, 1, 1]}), lambda x, y: x - y),
         ("*", pd.DataFrame({"col1": [1, 1, 1], "col2": [1, 1, 1]}), lambda x, y: x * y),
-        ("//", pd.DataFrame({"col1": [1, 1, 1], "col2": [1, 1, 1]}), lambda x, y: x // y),
+        (
+            "//",
+            pd.DataFrame({"col1": [1, 1, 1], "col2": [1, 1, 1]}),
+            lambda x, y: x // y,
+        ),
         ("/", pd.DataFrame({"col1": [1, 1, 1], "col2": [1, 1, 1]}), lambda x, y: x / y),
         ("%", pd.DataFrame({"col1": [2, 3, 4], "col2": [1, 2, 3]}), lambda x, y: x % y),
-        ("**", pd.DataFrame({"col1": [2, 3, 2], "col2": [1, 2, 3]}), lambda x, y: x ** y),
+        ("**", pd.DataFrame({"col1": [2, 3, 2], "col2": [1, 2, 3]}), lambda x, y: x**y),
         ("&", pd.DataFrame({"col1": [1, 1, 0], "col2": [1, 0, 0]}), lambda x, y: x & y),
         ("|", pd.DataFrame({"col1": [1, 0, 1], "col2": [0, 1, 1]}), lambda x, y: x | y),
         ("^", pd.DataFrame({"col1": [1, 0, 1], "col2": [0, 1, 1]}), lambda x, y: x ^ y),
         ("<", pd.DataFrame({"col1": [1, 2, 3], "col2": [3, 2, 1]}), lambda x, y: x < y),
-        ("<=", pd.DataFrame({"col1": [1, 2, 3], "col2": [3, 2, 1]}), lambda x, y: x <= y),
+        (
+            "<=",
+            pd.DataFrame({"col1": [1, 2, 3], "col2": [3, 2, 1]}),
+            lambda x, y: x <= y,
+        ),
         (">", pd.DataFrame({"col1": [1, 2, 3], "col2": [3, 2, 1]}), lambda x, y: x > y),
-        (">=", pd.DataFrame({"col1": [1, 2, 3], "col2": [3, 2, 1]}), lambda x, y: x >= y),
-        ("==", pd.DataFrame({"col1": [1, 2, 3], "col2": [3, 2, 1]}), lambda x, y: x == y),
-        ("!=", pd.DataFrame({"col1": [1, 2, 3], "col2": [3, 2, 1]}), lambda x, y: x != y),
+        (
+            ">=",
+            pd.DataFrame({"col1": [1, 2, 3], "col2": [3, 2, 1]}),
+            lambda x, y: x >= y,
+        ),
+        (
+            "==",
+            pd.DataFrame({"col1": [1, 2, 3], "col2": [3, 2, 1]}),
+            lambda x, y: x == y,
+        ),
+        (
+            "!=",
+            pd.DataFrame({"col1": [1, 2, 3], "col2": [3, 2, 1]}),
+            lambda x, y: x != y,
+        ),
         # Right-hand operator cases
         ("radd", 5, lambda x, y: x + y),
         ("rsub", 10, lambda x, y: x - y),
@@ -1623,11 +1660,11 @@ def test_operators(self):
         ("rdiv", 8, lambda x, y: x / y),
         ("rtruediv", 8.0, lambda x, y: x / y),
         ("rmod", 9, lambda x, y: x % y),
-        ("rpow", 2, lambda x, y: x ** y),
+        ("rpow", 2, lambda x, y: x**y),
         ("rdiv2", 10, lambda x, y: x / y),
         ("div", 2, lambda x, y: x / y),
     ]
-    
+
     for operator, other_data, expected_operator in test_cases:
         with self.subTest(operator=operator):
             # Create the other dataset
@@ -1648,7 +1685,7 @@ def test_operators(self):
             elif operator == "%":
                 result = self.dataset % other_dataset
             elif operator == "**":
-                result = self.dataset ** other_dataset
+                result = self.dataset**other_dataset
             elif operator == "&":
                 result = self.dataset & other_dataset
             elif operator == "|":
@@ -1682,15 +1719,21 @@ def test_operators(self):
             elif operator == "rmod":
                 result = other_data % self.dataset
             elif operator == "rpow":
-                result = other_data ** self.dataset
+                result = other_data**self.dataset
             elif operator == "rdiv2":
                 result = other_data / self.dataset
-            
+
             # Check the result type
-            self.assertIsInstance(result, Dataset, f"Expected result to be Dataset for {operator}")
+            self.assertIsInstance(
+                result, Dataset, f"Expected result to be Dataset for {operator}"
+            )
 
             # Check the operation result
-            expected_data = expected_operator(other_data, self.data) if operator.isalpha() else expected_operator(self.data, other_data)
+            expected_data = (
+                expected_operator(other_data, self.data)
+                if operator.isalpha()
+                else expected_operator(self.data, other_data)
+            )
             pd.testing.assert_frame_equal(result.data, expected_data)
 
     def test_locker_getitem(self):
@@ -1787,6 +1830,7 @@ def test_operators(self):
         self.assertEqual(self.experiment_data._data.data["col1"].tolist(), [1, 2, 3])
         self.assertEqual(self.experiment_data._data.data["col2"].tolist(), [4, 5, 6])
         self.assertIsInstance(self.experiment_data.additional_fields, Dataset)
+
 
 if __name__ == "__main__":
     unittest.main()
