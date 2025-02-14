@@ -172,7 +172,7 @@ class AAPassedReporter(Reporter):
             names={c: c[: c.rfind("pass") - 1] for c in passed.columns}
         )
         passed = passed.replace("OK", 1).replace("NOT OK", 0)
-        passed = passed.astype({c: int for c in passed.columns})
+        # passed = passed.astype({c: int for c in passed.columns})
         return passed
 
     def _detect_pass(self, analyzer_tables: Dict[str, Dataset]):
