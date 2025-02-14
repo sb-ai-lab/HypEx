@@ -384,7 +384,7 @@ class Comparator(Calculator, ABC):
         if len(target_fields_data.columns) == 0:
             if (
                 data.ds.tmp_roles
-            ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
+            ):  # если колонка не подходит для теста, то таргет будет пустой, но если есть темп роли, то это нормальное поведение
                 return data
             else:
                 raise NoColumnsError(TargetRole().role_name)

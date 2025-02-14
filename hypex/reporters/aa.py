@@ -120,7 +120,7 @@ class OneAADictReporter(DictReporter):
     def extract_data_from_analysis_tables(self, data: ExperimentData) -> Dict[str, Any]:
         result = {}
         result.update(self.extract_group_difference(data))
-        result.update(self.extract_group_sizes(data))
+        # result.update(self.extract_group_sizes(data))
         result.update(self.extract_tests(data))
         result.update(self.extract_analyzer_data(data))
         if self.front:
@@ -172,7 +172,7 @@ class AAPassedReporter(Reporter):
             names={c: c[: c.rfind("pass") - 1] for c in passed.columns}
         )
         passed = passed.replace("OK", 1).replace("NOT OK", 0)
-        passed = passed.astype({c: int for c in passed.columns})
+        # passed = passed.astype({c: int for c in passed.columns})
         return passed
 
     def _detect_pass(self, analyzer_tables: Dict[str, Dataset]):
