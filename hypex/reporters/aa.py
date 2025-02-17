@@ -16,7 +16,6 @@ from ..utils import (
 )
 from .abstract import Reporter, TestDictReporter
 
-
 class OneAADictReporter(TestDictReporter):
     tests = [TTest, KSTest, Chi2Test]
 
@@ -148,9 +147,18 @@ class AAPassedReporter(Reporter):
                 ExperimentDataEnum.analysis_tables.value
             ]
         }
+        if not analyser_tables["aa score"]:
+            print("AA test cannot be performed as none of the analyzers passed")
+            return None
         result = self._detect_pass(analyser_tables)
+        stats_cols = ["feature", "group", "difference", "difference %"]
         differences = analyser_tables["best split statistics"].loc[
-            :, ["feature", "group", "difference", "difference %"]
+            :,
+            [
+                col
+                for col in stats_cols
+                if col in analyser_tables["best split statistics"].columns
+            ],
         ]
         result = result.merge(differences, on=["feature", "group"], how="left")
         result = result[

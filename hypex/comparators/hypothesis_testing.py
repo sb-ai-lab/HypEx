@@ -5,10 +5,10 @@ from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu  # type: ignore
 from .abstract import StatHypothesisTesting
 from ..dataset import Dataset
 from ..extensions.scipy_stats import (
-    TTestExtensionExtension,
-    KSTestExtensionExtension,
-    UTestExtensionExtension,
-    Chi2TestExtensionExtension,
+    TTestExtension,
+    KSTestExtension,
+    UTestExtension,
+    Chi2TestExtension,
 )
 from ..utils.constants import NUMBER_TYPES_LIST
 
@@ -22,7 +22,7 @@ class TTest(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dataset:
-        return TTestExtensionExtension(kwargs.get("reliability", 0.05)).calc(
+        return TTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
@@ -37,7 +37,7 @@ class KSTest(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dataset:
-        return KSTestExtensionExtension(kwargs.get("reliability", 0.05)).calc(
+        return KSTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
@@ -52,7 +52,7 @@ class UTest(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dataset:
-        return UTestExtensionExtension(kwargs.get("reliability", 0.05)).calc(
+        return UTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
@@ -67,6 +67,6 @@ class Chi2Test(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dataset:
-        return Chi2TestExtensionExtension(
-            reliability=kwargs.get("reliability", 0.05)
-        ).calc(data, other=test_data, **kwargs)
+        return Chi2TestExtension(reliability=kwargs.get("reliability", 0.05)).calc(
+            data, other=test_data, **kwargs
+        )

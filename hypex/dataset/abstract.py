@@ -11,7 +11,7 @@ from .roles import (
     default_roles,
     DefaultRole,
 )
-from ..utils import BackendsEnum, RoleColumnError
+from ..utils import BackendsEnum, RoleColumnError, BackendTypeError
 
 
 def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
@@ -36,7 +36,9 @@ class DatasetBase(ABC):
     def _select_backend_from_str(data, backend):
         if backend == BackendsEnum.pandas:
             return PandasDataset(data)
-        return PandasDataset(data)
+        if backend is None:
+            return PandasDataset(data)
+        raise TypeError("Backend must be an instance of BackendsEnum")
 
     def _set_all_roles(self, roles):
         keys = list(roles.keys())
@@ -69,9 +71,11 @@ class DatasetBase(ABC):
         self.default_role = default_role
         roles = (
             parse_roles(roles)
-            if any(isinstance(role, type) for role in roles.keys())
+            if any(isinstance(role, ABCRole) for role in roles.keys())
             else roles
         )
+        if any(not isinstance(role, ABCRole) for role in roles.values()):
+            raise TypeError("Roles must be instances of ABCRole type")
         if data is not None and any(
             i not in self._backend.columns for i in list(roles.keys())
         ):
@@ -167,6 +171,10 @@ class DatasetBase(ABC):
         return self._backend.columns
 
     @property
+    def shape(self):
+        return self._backend.shape
+
+    @property
     def tmp_roles(self):
         return self._tmp_roles
 
@@ -204,6 +212,13 @@ class DatasetBase(ABC):
         column: Optional[str] = None,
     ) -> Any:
         return self._backend.get_values(row=row, column=column)
+
+    def iget_values(
+        self,
+        row: Optional[int] = None,
+        column: Optional[int] = None,
+    ) -> Any:
+        return self._backend.iget_values(row=row, column=column)
 
     def _set_roles(
         self,

@@ -349,6 +349,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         self,
         how: Literal["any", "all"] = "any",
         subset: Union[str, Iterable[str], None] = None,
+        axis: Union[Literal["index", "rows", "columns"], int] = 0,
     ) -> Any:
         raise AbstractMethodError
 
