@@ -228,7 +228,9 @@ class DatasetBase(ABC):
         temp_role: bool = False,
     ):
         if not new_roles_map:
-            return self.roles
+            if temp_role:
+                self._tmp_roles = {}
+            return self
 
         keys, values = list(new_roles_map.keys()), list(new_roles_map.values())
         roles, columns_sets = (

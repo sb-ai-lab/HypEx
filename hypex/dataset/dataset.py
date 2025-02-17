@@ -115,7 +115,6 @@ class Dataset(DatasetBase):
             """
             column_name = item[1]
             column_data_type = self.roles[column_name].data_type
-            # Check if value matches expected data type
             if (
                 column_data_type == None
                 or (
@@ -123,7 +122,6 @@ class Dataset(DatasetBase):
                     and all(isinstance(v, column_data_type) for v in value)
                 )
                 or isinstance(value, column_data_type)
-                or value is None
             ):
                 if column_name not in self.backend.data.columns:
                     raise KeyError("Column must be added by using add_column method.")
@@ -160,7 +158,6 @@ class Dataset(DatasetBase):
             column_index = item[1]
             column_name = self.backend.data.columns[column_index]
             column_data_type = self.roles[column_name].data_type
-            # Check if value matches expected data type
             if (
                 column_data_type == None
                 or (
