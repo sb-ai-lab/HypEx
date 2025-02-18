@@ -103,7 +103,7 @@ class AATest(ExperimentShell):
 
     def __init__(
         self,
-        t1_error_handling: bool = False,
+        precision_mode: bool = False,
         control_size: float = 0.5,
         stratification: bool = False,
         n_iterations: Optional[int] = None,
@@ -112,7 +112,7 @@ class AATest(ExperimentShell):
         random_states: Optional[Iterable[int]] = None,
     ):
         if n_iterations is None:
-            if t1_error_handling:
+            if precision_mode:
                 n_iterations = 2000
             else:
                 n_iterations = 10
