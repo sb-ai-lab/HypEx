@@ -440,6 +440,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         **kwargs,
     ) -> pd.DataFrame:
         return self.data.fillna(value=values, method=method, **kwargs)
+    
+    def bfill(self) -> pd.DataFrame:
+        return self.data.bfill()
 
     def na_counts(self) -> Union[pd.DataFrame, int]:
         data = self.data.isna().sum().to_frame().T

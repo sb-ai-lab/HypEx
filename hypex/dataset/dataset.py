@@ -878,6 +878,15 @@ class Dataset(DatasetBase):
             data=self.backend.fillna(values=values, method=method, **kwargs),
         )
 
+    def bfill(
+        self,
+    ):
+        return Dataset(
+            roles=self.roles,
+            data=self.backend.bfill()
+        )
+
+
     def mean(self):
         """
         Calculate mean of numeric columns.
