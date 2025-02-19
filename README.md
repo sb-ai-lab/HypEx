@@ -6,6 +6,31 @@
 ![Python versions](https://img.shields.io/badge/python-3.8_|_3.9_|_3.10_|_3.11_|_3.12-blue)
 ![Pypi downloads\month](https://img.shields.io/badge/downloads\month->1K-1E782B)
 
+# Moving to a New Architecture! ⚠️
+
+## ❗ ВАЖНОЕ ОБНОВЛЕНИЕ: HypEx переходит на новую архитектуру! ❗
+
+## 🔥 What's changing? / Что изменится?
+
+New interface! Import paths, class methods, and overall API structure will be different.
+
+Old version (0.1.10) will no longer be supported.
+
+New tutorials are available to help you migrate: Check them out [here](https://github.com/sb-ai-lab/HypEx/tree/dev/architecture_v11/examples/tutorials).
+
+Try the new version now by installing the beta release:
+
+```
+pip install --upgrade --pre hypex
+```
+Prefer the old version? You can still use it, but it won't receive updates:
+
+```
+pip install hypex==0.1.10
+```
+
+🔗 Learn more: [Telegram Chat](t.me/hypexchat)
+
 ## Introduction
 
 HypEx (Hypotheses and Experiments) is a comprehensive library crafted to streamline the causal inference and AB testing
