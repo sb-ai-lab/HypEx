@@ -16,13 +16,15 @@ New interface! Import paths, class methods, and overall API structure will be di
 
 Old version (0.1.10) will no longer be supported.
 
-New tutorials are available to help you migrate: Check them out [here](https://github.com/sb-ai-lab/HypEx/tree/dev/architecture_v11/examples/tutorials).
+New tutorials are available to help you migrate: Check them
+out [here](https://github.com/sb-ai-lab/HypEx/tree/dev/architecture_v11/examples/tutorials).
 
 Try the new version now by installing the beta release:
 
 ```
 pip install --upgrade --pre hypex
 ```
+
 Prefer the old version? You can still use it, but it won't receive updates:
 
 ```
@@ -121,16 +123,17 @@ data = Dataset(
     default_role=FeatureRole(),  # All remaining columns will be of type FeatureRole (searching for similar ones)
 )
 
-test = Matching() # Classic Matching (maha distance + full metrics)
-test = Matching(metric="att") # Calc only ATT
-test = Matching(distance="l2") # Choose distance here
+test = Matching()  # Classic Matching (maha distance + full metrics)
+test = Matching(metric="att")  # Calc only ATT
+test = Matching(distance="l2")  # Choose distance here
 
 result = test.execute(data)
-result.resume # Resume of results 
-result.full_data # old df_matched. Wide df with pairs
-result.indexes # Only indexed pairs (good for join)
+result.resume  # Resume of results 
+result.full_data  # old df_matched. Wide df with pairs
+result.indexes  # Only indexed pairs (good for join)
 
 ```  
+More about Matching [here](tps://github.com/sb-ai-lab/HypEx/tree/dev/architecture_v11/examples/tutorials/Matching)
 
 ### AA-test example
 
@@ -140,21 +143,22 @@ from hypex import AATest
 
 data = Dataset(
     roles={
-        "user_id": InfoRole(int), # InfoRole for ID.
-        "pre_spends": TargetRole(), # TargetRole for check homogenity
-        "post_spends": TargetRole(), # TargetRole for check homogenity
-        "gender": StratificationRole(str) # StratificationRole for strat
+        "user_id": InfoRole(int),  # InfoRole for ID.
+        "pre_spends": TargetRole(),  # TargetRole for check homogenity
+        "post_spends": TargetRole(),  # TargetRole for check homogenity
+        "gender": StratificationRole(str)  # StratificationRole for strat
     }, data="data.csv",
 )
 
-aa = AATest(n_iterations=10) 
-res = aa.execute(data) 
+aa = AATest(n_iterations=10)
+res = aa.execute(data)
 
-res.resume # Resume for all test
-res.aa_score # AA score 
-res.best_split # The best homogeneity split
-res.best_split_statistic # Statistics for best split 
+res.resume  # Resume for all test
+res.aa_score  # AA score 
+res.best_split  # The best homogeneity split
+res.best_split_statistic  # Statistics for best split 
 ```
+More about AA test [here](tps://github.com/sb-ai-lab/HypEx/tree/dev/architecture_v11/examples/tutorials/AA_test)
 
 ### AB-test example
 
@@ -164,21 +168,21 @@ from hypex import ABTest
 
 data = Dataset(
     roles={
-        "user_id": InfoRole(int), # InfoRole use for ID
-        "treat": TreatmentRole(), # TreatmentRole is for identify user group (control or target)
-        "pre_spends": TargetRole(), # Target for A/B(n) Tests
-        "post_spends": TargetRole(), # Target for A/B(n) Tests
+        "user_id": InfoRole(int),  # InfoRole use for ID
+        "treat": TreatmentRole(),  # TreatmentRole is for identify user group (control or target)
+        "pre_spends": TargetRole(),  # Target for A/B(n) Tests
+        "post_spends": TargetRole(),  # Target for A/B(n) Tests
     }, data="data.csv",
 )
 
-
-test = ABTest() # Classic A/B test
-test = ABTest(multitest_method="bonferroni") # A/Bn test with Bonferroni corrections
-test = ABTest(additional_tests=['t-test', 'u-test', 'chi2-test']) # Use can choose tests
+test = ABTest()  # Classic A/B test
+test = ABTest(multitest_method="bonferroni")  # A/Bn test with Bonferroni corrections
+test = ABTest(additional_tests=['t-test', 'u-test', 'chi2-test'])  # Use can choose tests
 
 result = test.execute(data)
-result.resume # Resume of results
+result.resume  # Resume of results
 ```
+More about A/B test [here](tps://github.com/sb-ai-lab/HypEx/tree/dev/architecture_v11/examples/tutorials/AB test)
 
 ## Documentation
 
@@ -231,4 +235,4 @@ HypEx stands as an indispensable resource for data analysts and researchers delv
 testing. With its automated capabilities, sophisticated matching techniques, and thorough validation procedures, HypEx
 is poised to unravel causal relationships in complex datasets with unprecedented speed and precision.
 
-##                                                                               
+##                                                                                
