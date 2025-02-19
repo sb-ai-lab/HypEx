@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "HypEx"
-version = "0.1.9"
+version = "0.1.10"
 description = "Fast and customizable framework for Causal Inference"
 authors = [
     "Dmitry Tikhomirov <dimasta00@gmail.com>",
