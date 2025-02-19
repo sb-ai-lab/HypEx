@@ -148,20 +148,25 @@ res.best_split_statistic # Statistics for best split
 ### AB-test example
 
 ```python
+from hypex.dataset import Dataset, InfoRole, TreatmentRole, TargetRole
 from hypex import ABTest
-from hypex.utils.tutorial_data_creation import create_test_data
 
-data = create_test_data(rs=52, na_step=10, nan_cols=['age', 'gender'])
-
-model = ABTest()
-results = model.execute(
-    data=data,
-    target_field='post_spends',
-    target_field_before='pre_spends',
-    group_field='group'
+data = Dataset(
+    roles={
+        "user_id": InfoRole(int), # InfoRole use for ID
+        "treat": TreatmentRole(), # TreatmentRole is used for identify user group (control or target)
+        "pre_spends": TargetRole(), # Target for A/B(n) Tests
+        "post_spends": TargetRole(), # Target for A/B(n) Tests
+    }, data="data.csv",
 )
 
-model.show_beautiful_result()
+
+test = ABTest() # Classic A/B test
+test = ABTest(multitest_method="bonferroni") # A/Bn test with Bonferroni corrections
+test = ABTest(additional_tests=['t-test', 'u-test', 'chi2-test']) # Use can choose tests
+
+result = test.execute(data)
+result.resume # Resume of results
 ```
 
 ## Documentation
