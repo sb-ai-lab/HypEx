@@ -108,18 +108,29 @@ Explore usage examples and tutorials [here](https://github.com/sb-ai-lab/Hypex/b
 ### Matching example
 
 ```python
-from hypex import Matcher
-from hypex.utils.tutorial_data_creation import create_test_data
+from hypex.dataset import Dataset, InfoRole, TreatmentRole, TargetRole, DefaultRole, FeatureRole
+from hypex import Matching
 
-# Define your data and parameters
-df = create_test_data(rs=42, na_step=45, nan_cols=['age', 'gender'])
+data = Dataset(
+    roles={
+        "user_id": InfoRole(int),  # InfoRole for ID
+        "treat": TreatmentRole(int),  # TreatmentRole is for identify user group (control or target)
+        "post_spends": TargetRole(float)  # TargetRole for Target :)
+    },
+    data="data.csv",
+    default_role=FeatureRole(),  # All remaining columns will be of type FeatureRole (searching for similar ones)
+)
 
-info_col = ['user_id']
-outcome = 'post_spends'
-treatment = 'treat'
-model = Matcher(input_data=df, outcome=outcome, treatment=treatment, info_col=info_col)
-results, quality_results, df_matched = model.estimate()
-```
+test = Matching() # Classic Matching (maha distance + full metrics)
+test = Matching(metric="att") # Calc only ATT
+test = Matching(distance="l2") # Choose distance here
+
+result = test.execute(data)
+result.resume # Resume of results 
+result.full_data # old df_matched. Wide df with pairs
+result.indexes # Only indexed pairs (good for join)
+
+```  
 
 ### AA-test example
 
@@ -154,7 +165,7 @@ from hypex import ABTest
 data = Dataset(
     roles={
         "user_id": InfoRole(int), # InfoRole use for ID
-        "treat": TreatmentRole(), # TreatmentRole is used for identify user group (control or target)
+        "treat": TreatmentRole(), # TreatmentRole is for identify user group (control or target)
         "pre_spends": TargetRole(), # Target for A/B(n) Tests
         "post_spends": TargetRole(), # Target for A/B(n) Tests
     }, data="data.csv",
