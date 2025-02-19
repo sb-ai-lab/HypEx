@@ -10,6 +10,7 @@ from ..utils import ExperimentDataEnum, ID_SPLIT_SYMBOL
 
 class ABOutput(Output):
     multitest: Union[Dataset, str]
+    sizes: Dataset
 
     def __init__(self):
         self._groups = []
