@@ -1230,7 +1230,7 @@ class AATest:
         test_size: float = 0.5,
         pbar: bool = True,
         group_field: str = "group",
-        write_mode: Optional[Literal["any", "all", "full"]] = "all",
+        write_mode: Optional[Literal["any", "all", "full"]] = "full",
         **kwargs,
     ):
         """Main function for AATest estimation.
