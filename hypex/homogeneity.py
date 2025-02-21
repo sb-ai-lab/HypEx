@@ -24,10 +24,10 @@ HOMOGENEITY_TEST = Experiment(
 
 
 class HomogeneityTest(ExperimentShell):
-    """A class for conducting homogeneity tests between treatment groups.
+    """A class for conducting homogeneity tests between the groups.
 
-    This class provides functionality to test whether treatment groups are homogeneous
-    across target variables using multiple statistical tests including t-test,
+    This class provides functionality to test whether treatment and control groups are
+    homogeneous across target variables using multiple statistical tests including t-test,
     Kolmogorov-Smirnov test, and chi-square test.
 
     The class runs the following analyses:

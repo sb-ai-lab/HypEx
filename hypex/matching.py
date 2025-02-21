@@ -18,7 +18,7 @@ from .ui.matching import MatchingOutput
 class Matching(ExperimentShell):
     """A class for performing matching analysis with configurable distance metrics and quality tests.
 
-    This class provides functionality to perform matching analysis between treatment and control groups
+    This class provides functionality to identify groups that are similar to each other
     using various distance metrics and quality assessment methods.
 
     Args:

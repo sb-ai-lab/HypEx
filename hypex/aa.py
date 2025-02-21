@@ -79,11 +79,11 @@ class AATest(ExperimentShell):
     """A class for conducting A/A tests with configurable parameters.
 
     This class provides functionality to run A/A tests with options for stratification,
-    precision control, and sample size specification. It sets up the experiment pipeline
-    with appropriate parameters.
+    precision control (fast or with type 1 error controll), and sample size specification.
+    It sets up the experiment pipeline with appropriate parameters.
 
     Args:
-        precision_mode (bool, optional): If True, runs more iterations (2000) for higher precision.
+        precision_mode (bool, optional): If True, runs more iterations (2000) in order to tuckle type 1 error.
             If False, runs fewer iterations (10) for quicker results. Defaults to False.
         control_size (float, optional): The proportion of data to allocate to control group.
             Must be between 0 and 1. Defaults to 0.5.
