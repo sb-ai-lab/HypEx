@@ -10,9 +10,51 @@ from .utils import ABNTestMethodsEnum
 
 
 class ABTest(ExperimentShell):
+    """A class for conducting A/B tests with configurable statistical tests and multiple testing correction.
+
+    This class provides functionality to run A/B tests with options for different statistical tests
+    (t-test, u-test, chi-square test) and multiple testing correction methods.
+
+    Args:
+        additional_tests (Union[str, List[str], None], optional): Statistical test(s) to run in addition to 
+            the default group difference calculation. Valid options are "t-test", "u-test", and "chi2-test".
+            Can be a single test name or list of test names. Defaults to ["t-test"].
+        multitest_method (str, optional): Method to use for multiple testing correction. Valid options are:
+            "bonferroni", "sidak", "holm-sidak", "holm", "simes-hochberg", "hommel", "fdr_bh", "fdr_by",
+            "fdr_tsbh", "fdr_tsbhy", "quantile". Defaults to "holm".
+
+    Examples:
+        Basic A/B test with default t-test:
+        >>> ab_test = ABTest()
+        >>> results = ab_test.execute(data)
+
+        A/B test with multiple statistical tests:
+        >>> ab_test = ABTest(
+        ...     additional_tests=["t-test", "chi2-test"],
+        ...     multitest_method="bonferroni"
+        ... )
+        >>> results = ab_test.execute(data)
+
+        A/B test with single non-default test:
+        >>> ab_test = ABTest(
+        ...     additional_tests="u-test",
+        ...     multitest_method="fdr_bh"
+        ... )
+        >>> results = ab_test.execute(data)
+    """
 
     @staticmethod
     def _make_experiment(additional_tests, multitest_method):
+        """Creates an experiment configuration with specified statistical tests.
+
+        Args:
+            additional_tests (Union[str, List[str], None]): Statistical test(s) to include.
+                Valid options are "t-test", "u-test", and "chi2-test".
+            multitest_method (str): Method for multiple testing correction.
+
+        Returns:
+            Experiment: Configured experiment object with specified tests and correction method.
+        """
         test_mapping = {
             "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
             "u-test": UTest(compare_by="groups", grouping_role=TreatmentRole()),
