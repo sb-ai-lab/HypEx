@@ -6,8 +6,6 @@ import pandas.testing as pdt
 from hypex.dataset import Dataset, InfoRole, TreatmentRole, TargetRole, StratificationRole, FeatureRole
 from hypex import AATest, ABTest, Matching
 
-file_path = 'data_output.xlsx'
-
 @pytest.fixture
 def aa_data():
     return Dataset(
@@ -59,21 +57,38 @@ def test_aatest(aa_data):
         'aa-sample': AATest(n_iterations=10, sample_size=0.3)
     }
 
-    required_attrs = ['resume', 'aa_score', 'best_split', 'best_split_statistic', 'experiments']
+    mapping_resume = {
+        'aa-casual': pd.DataFrame({
+                        'TTest aa test': {0: 'OK', 1: 'OK'},
+                        'KSTest aa test': {0: 'NOT OK', 1: 'OK'},
+                        'TTest best split': {0: 'OK', 1: 'OK'},
+                        'KSTest best split': {0: 'OK', 1: 'OK'},
+                        'result': {0: 'OK', 1: 'OK'}}),
+        'aa-rs': pd.DataFrame({
+                        'TTest aa test': {0: 'OK', 1: 'OK'},
+                        'KSTest aa test': {0: 'NOT OK', 1: 'OK'},
+                        'TTest best split': {0: 'OK', 1: 'OK'},
+                        'KSTest best split': {0: 'OK', 1: 'OK'},
+                        'result': {0: 'OK', 1: 'OK'}}),
+        'aa-strat': pd.DataFrame({
+                        'TTest aa test': {0: 'OK', 1: 'NOT OK'},
+                        'KSTest aa test': {0: 'OK', 1: 'NOT OK'},
+                        'TTest best split': {0: 'OK', 1: 'OK'},
+                        'KSTest best split': {0: 'OK', 1: 'OK'},
+                        'result': {0: 'OK', 1: 'NOT OK'}}),
+        'aa-sample': pd.DataFrame({
+                        'TTest aa test': {0: 'OK', 1: 'OK'},
+                        'KSTest aa test': {0: 'OK', 1: 'OK'},
+                        'TTest best split': {0: 'NOT OK', 1: 'NOT OK'},
+                        'KSTest best split': {0: 'OK', 1: 'OK'},
+                        'result': {0: 'OK', 1: 'OK'}})
+    }
     
     for test_name in mapping.keys():
         res = mapping[test_name].execute(aa_data)
-        for attr in required_attrs:
-            assert hasattr(res, attr), f"Результат должен содержать атрибут '{attr}'"
-
-        for attr in required_attrs:
-            expected_data = pd.read_excel(file_path, sheet_name=f'{test_name}.res.{attr}.data', index_col=0)
-            actual_data = getattr(res, attr).data
-
-            expected_data = expected_data.fillna(0).apply(pd.to_numeric, errors='ignore')
-            actual_data = actual_data.fillna(0).apply(pd.to_numeric, errors='ignore')
-
-            pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)
+        actual_data = res.resume.data.iloc[:, 2:-2]
+        expected_data = mapping_resume[test_name]
+        pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)
 
 def test_abtest(ab_data):
     mapping = {
@@ -82,21 +97,37 @@ def test_abtest(ab_data):
         'ab-n': ABTest(multitest_method="bonferroni")
     }
 
-    required_attrs = ['resume', 'sizes', 'multitest']
+    mapping_resume = {
+        'ab-casual': pd.DataFrame({'TTest pass': {0: 'NOT OK', 1: 'NOT OK', 2: 'NOT OK', 3: 'NOT OK'}}),
+        'ab-additional': pd.DataFrame({'TTest pass': {
+                            0: 'NOT OK',
+                            1: 'NOT OK',
+                            2: 'NOT OK',
+                            3: 'NOT OK',
+                            4: 0,
+                            5: 0},
+                        'UTest pass': {0: 'NOT OK',
+                            1: 'NOT OK',
+                            2: 'NOT OK',
+                            3: 'NOT OK',
+                            4: 0,
+                            5: 0},
+                        'Chi2Test pass': {0: 0,
+                            1: 0,
+                            2: 0,
+                            3: 0,
+                            4: 'NOT OK',
+                            5: 'NOT OK'}}
+  ),
+        'ab-n': pd.DataFrame({
+                    'TTest pass': {0: 'NOT OK', 1: 'NOT OK', 2: 'NOT OK', 3: 'NOT OK'}}),
+    }
     
     for test_name in mapping.keys():
         res = mapping[test_name].execute(ab_data)
-        for attr in required_attrs:
-            assert hasattr(res, attr), f"Результат должен содержать атрибут '{attr}'"
-
-        for attr in required_attrs:
-            expected_data = pd.read_excel(file_path, sheet_name=f'{test_name}.result.{attr}.data', index_col=0)
-            actual_data = getattr(res, attr).data
-
-            expected_data = expected_data.fillna(0).apply(pd.to_numeric, errors='ignore')
-            actual_data = actual_data.fillna(0).apply(pd.to_numeric, errors='ignore')
-
-            pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)
+        actual_data = res.resume.data.fillna(0).apply(pd.to_numeric, errors='ignore').iloc[:, 4::2]
+        expected_data = mapping_resume[test_name]
+        pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)
 
 def test_matchingtest(matching_data):
     mapping = {
@@ -106,18 +137,9 @@ def test_matchingtest(matching_data):
         'matching-l2': Matching(distance="l2", metric='att')
     }
 
-    required_attrs = ['resume', 'indexes']
-    
     for test_name in mapping.keys():
         res = mapping[test_name].execute(matching_data)
-        for attr in required_attrs:
-            assert hasattr(res, attr), f"Результат должен содержать атрибут '{attr}'"
+        actual_data = res.resume.data
+        assert actual_data.index.isin(['ATT', 'ATC', 'ATE']).all()
+        assert all(actual_data.iloc[:, :-1].dtypes.apply(lambda x: pd.api.types.is_numeric_dtype(x))), "Есть нечисловые колонки!"
 
-        for attr in required_attrs:
-            expected_data = pd.read_excel(file_path, sheet_name=f'{test_name}.result.{attr}.data', index_col=0)
-            actual_data = getattr(res, attr).data
-
-            expected_data = expected_data.fillna(0).apply(pd.to_numeric, errors='ignore')
-            actual_data = actual_data.fillna(0).apply(pd.to_numeric, errors='ignore')
-
-            pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)
