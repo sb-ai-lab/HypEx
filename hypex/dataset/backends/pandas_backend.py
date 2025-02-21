@@ -439,10 +439,15 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         method: Optional[Literal["bfill", "ffill"]] = None,
         **kwargs,
     ) -> pd.DataFrame:
-        return self.data.fillna(value=values, method=method, **kwargs)
-    
-    def bfill(self) -> pd.DataFrame:
-        return self.data.bfill()
+        if method is not None:
+            if method == "bfill":
+                return self.data.bfill(**kwargs)  # Используем bfill() отдельно
+            elif method == "ffill":
+                return self.data.ffill(**kwargs)  # Используем ffill() отдельно
+            else:
+                raise ValueError(f"Недопустимое значение method: {method}")
+
+        return self.data.fillna(value=values, **kwargs)  # Обычный fillna без method
 
     def na_counts(self) -> Union[pd.DataFrame, int]:
         data = self.data.isna().sum().to_frame().T

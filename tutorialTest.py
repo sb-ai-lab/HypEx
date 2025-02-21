@@ -46,7 +46,7 @@ def matching_data():
         data="data.csv",
         default_role=FeatureRole()
     )
-    data = data.bfill()
+    data = data.fillna(method="bfill")
     return data
 
 def test_aatest(aa_data):
