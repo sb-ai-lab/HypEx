@@ -238,7 +238,7 @@ class MatchingMetrics(GroupOperator):
         )
         if (
             not target_fields and data.ds.tmp_roles
-        ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
+        ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
             return data
 
         compare_result = self.calc(
@@ -372,7 +372,7 @@ class Bias(GroupOperator):
         )
         if (
             not target_fields and data.ds.tmp_roles
-        ):  # если колонка не подходит для теста, то тагет будет пустой, но если есть темп роли, то это нормальное поведение
+        ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
             return data
 
         compare_result = self.calc(
