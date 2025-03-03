@@ -51,7 +51,7 @@ class OneAADictReporter(TestDictReporter):
     def extract_data_from_analysis_tables(self, data: ExperimentData) -> Dict[str, Any]:
         result = {}
         result.update(self.extract_group_difference(data))
-        result.update(self.extract_group_sizes(data))
+        # result.update(self.extract_group_sizes(data))
         result.update(self.extract_tests(data))
         result.update(self.extract_analyzer_data(data))
         if self.front:
