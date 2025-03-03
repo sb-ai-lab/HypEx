@@ -1,15 +1,23 @@
-from typing import Dict, Any
+from typing import Dict, Any, Union
 
-from ..dataset.dataset import ExperimentData, Dataset
+from ..dataset import (
+    ExperimentData,
+    Dataset,
+    InfoRole,
+    TreatmentRole,
+)
+
 from ..ml import FaissNearestNeighbors
-from ..reporters.abstract import DictReporter, DatasetReporter
+from ..reporters.abstract import DictReporter, DatasetReporter, TestDictReporter
 from ..utils import (
     ExperimentDataEnum,
     ID_SPLIT_SYMBOL,
     MATCHING_INDEXES_SPLITTER_SYMBOL,
 )
+
 from ..analyzers.matching import MatchingAnalyzer
 from .abstract import DatasetReporter, DictReporter
+from ..comparators import TTest, KSTest
 
 
 class MatchingDictReporter(DictReporter):
@@ -53,6 +61,29 @@ class MatchingDictReporter(DictReporter):
         result.update(self._extract_from_analyser(experiment_data))
         if self.searching_class == MatchingAnalyzer:
             result.update(self._extract_from_additional_fields(experiment_data))
+        return result
+
+
+class MatchingQualityDictReporter(TestDictReporter):
+    tests = [TTest, KSTest]
+
+    def report(self, data: ExperimentData) -> Dict[str, Any]:
+        return self.extract_tests(data)
+
+
+class MatchingQualityDatasetReporter(MatchingQualityDictReporter):
+
+    @classmethod
+    def convert_flat_dataset(cls, data: Dict) -> Dataset:
+        struct_dict = cls._get_struct_dict(data)
+        return cls._convert_struct_dict_to_dataset(struct_dict)
+
+    def report(self, data: ExperimentData):
+        front_buffer = self.front
+        self.front = False
+        dict_report = super().report(data)
+        self.front = front_buffer
+        result = self.convert_flat_dataset(dict_report)
         return result
 
 

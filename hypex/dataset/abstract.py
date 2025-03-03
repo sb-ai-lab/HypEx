@@ -234,6 +234,7 @@ class DatasetBase(ABC):
                 self._tmp_roles = {}
                 return self
 
+
         keys, values = list(new_roles_map.keys()), list(new_roles_map.values())
         roles, columns_sets = (
             (keys, values) if isinstance(keys[0], ABCRole) else (values, keys)
