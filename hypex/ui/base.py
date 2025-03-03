@@ -86,7 +86,7 @@ class Output:
             experiment_data (ExperimentData): The experiment data to generate reports from.
 
         Examples:
-            >>> output = Output(resume_reporter=MyReporter())
+            >>> output = Output(resume_reporter=TestDictReporter())
             >>> output.extract(experiment_data)
             >>> print(output.resume)  # Access the main report
         """
@@ -105,25 +105,6 @@ class ExperimentShell:
         output (Output): Output handler that defines how results are formatted.
         experiment_params (Optional[Dict[str, Any]], optional): Additional parameters
             to configure the experiment. Defaults to None.
-
-    Examples:
-        Basic usage with default parameters:
-        >>> experiment = Experiment([...])  # Configure experiment
-        >>> output = Output(resume_reporter=MyReporter())
-        >>> shell = ExperimentShell(experiment, output)
-        >>> results = shell.execute(data)
-
-        With custom experiment parameters:
-        >>> params = {
-        ...     "random_state": 42,
-        ...     "test_size": 0.3
-        ... }
-        >>> shell = ExperimentShell(
-        ...     experiment=experiment,
-        ...     output=output,
-        ...     experiment_params=params
-        ... )
-        >>> results = shell.execute(data)
     """
 
     def __init__(
