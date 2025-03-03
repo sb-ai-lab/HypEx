@@ -67,33 +67,9 @@ class Output:
         self._experiment_data = experiment_data
 
     @staticmethod
-    def replace_splitters(
+    def _replace_splitters(
         data: Dataset, mode: RenameEnum = RenameEnum.columns
     ) -> Dataset:
-        """Replaces ID split symbols in column names and/or index with spaces.
-
-        Args:
-            data (Dataset): The dataset to process.
-            mode (RenameEnum, optional): Specifies where to replace symbols:
-                - RenameEnum.columns: Only in column names
-                - RenameEnum.index: Only in index
-                - RenameEnum.all: Both columns and index
-                Defaults to RenameEnum.columns.
-
-        Returns:
-            Dataset: The dataset with replaced symbols.
-
-        Examples:
-            Replace symbols in column names only:
-            >>> output = Output(resume_reporter=MyReporter())
-            >>> cleaned_data = output.replace_splitters(data)
-
-            Replace symbols in both columns and index:
-            >>> cleaned_data = output.replace_splitters(
-            ...     data, 
-            ...     mode=RenameEnum.all
-            ... )
-        """
         result = data
         if mode in (RenameEnum.all, RenameEnum.columns):
             result = result.rename(

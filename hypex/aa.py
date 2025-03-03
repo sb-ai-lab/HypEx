@@ -80,7 +80,8 @@ class AATest(ExperimentShell):
 
     This class provides functionality to run A/A tests with options for stratification,
     precision control (fast or with type 1 error controll), and sample size specification.
-    It sets up the experiment pipeline with appropriate parameters.
+    It sets up the experiment pipeline with appropriate parameters, performs homogenity
+    tests for each split in order to evaluate their quality and to identify the best one.
 
     Args:
         precision_mode (bool, optional): If True, runs more iterations (2000) in order to tuckle type 1 error.
@@ -115,7 +116,6 @@ class AATest(ExperimentShell):
         >>> aa_test = AATest(
         ...     sample_size=0.8,
         ...     n_iterations=100,
-        ...     random_states=range(100)
         ... )
         >>> results = aa_test.execute(data)
     """
@@ -131,14 +131,19 @@ class AATest(ExperimentShell):
         """Prepares parameters for the A/A test experiment.
 
         Args:
-            n_iterations (int): Number of test iterations to run.
-            control_size (float): Proportion of data to allocate to control group.
-            random_states (Optional[Iterable[int]], optional): Random seeds for each iteration.
-                If None, uses range(n_iterations). Defaults to None.
-            sample_size (Optional[float], optional): Fraction of data to sample.
-                If None, uses full dataset. Defaults to None.
-            additional_params (Optional[Dict[str, Any]], optional): Additional parameters
-                to update the default configuration. Defaults to None.
+            If False, runs fewer iterations (10) for quicker results. Defaults to False.
+        control_size (float, optional): The proportion of data to allocate to control group.
+            Must be between 0 and 1. Defaults to 0.5.
+        stratification (bool, optional): Whether to use stratified sampling when splitting data.
+            Defaults to False.
+        n_iterations (int, optional): Number of test iterations to run. If None, determined by
+            precision_mode. Defaults to None.
+        sample_size (float, optional): Fraction of data to sample for each test.
+            Must be between 0 and 1. If None, uses full dataset. Defaults to None.
+        additional_params (Dict[str, Any], optional): Additional parameters to pass to the
+            experiment pipeline. Defaults to None.
+        random_states (Iterable[int], optional): Random seeds to use for each iteration.
+            If None, uses range(n_iterations). Defaults to None.
 
         Returns:
             Dict[type, Dict[str, Any]]: Dictionary mapping executor classes to their

@@ -71,10 +71,17 @@ class Matching(ExperimentShell):
 
         Args:
             group_match (bool, optional): Whether to perform group matching. Defaults to False.
-            distance (Literal["mahalanobis", "l2"], optional): Distance metric to use. Defaults to "mahalanobis".
-            metric (Literal["atc", "att", "ate"], optional): Treatment effect type to estimate. Defaults to "ate".
-            bias_estimation (bool, optional): Whether to estimate bias. Defaults to True.
-            quality_tests (Union[str, List[str]], optional): Quality tests to perform. Defaults to "auto".
+        distance (Literal["mahalanobis", "l2"], optional): Distance metric to use for matching.
+            Options are "mahalanobis" or "l2". Defaults to "mahalanobis".
+        metric (Literal["atc", "att", "ate"], optional): Type of treatment effect to estimate.
+            "atc" = average treatment effect on controls
+            "att" = average treatment effect on treated
+            "ate" = average treatment effect
+            Defaults to "ate".
+        bias_estimation (bool, optional): Whether to estimate bias. Defaults to True.
+        quality_tests (Union[str, List[str]], optional): Quality tests to perform.
+            Options are "ks-test", "t-test", or "auto".
+            Can be a single test or list of tests. Defaults to "auto", which performs all tests.
 
         Returns:
             Experiment: Configured experiment object with specified matching parameters.
@@ -153,15 +160,6 @@ class Matching(ExperimentShell):
             List[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]],
         ] = "auto",
     ):
-        """Initialize Matching with specified parameters.
-
-        Args:
-            group_match (bool, optional): Whether to perform group matching. Defaults to False.
-            distance (Literal["mahalanobis", "l2"], optional): Distance metric to use. Defaults to "mahalanobis".
-            metric (Literal["atc", "att", "ate"], optional): Treatment effect type to estimate. Defaults to "ate".
-            bias_estimation (bool, optional): Whether to estimate bias. Defaults to True.
-            quality_tests (Union[str, List[str]], optional): Quality tests to perform. Defaults to "auto".
-        """
         super().__init__(
             experiment=self._make_experiment(
                 group_match, distance, metric, bias_estimation, quality_tests

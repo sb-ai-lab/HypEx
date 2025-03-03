@@ -46,8 +46,7 @@ class HomogeneityTest(ExperimentShell):
         Accessing specific test results:
         >>> homo_test = HomogeneityTest()
         >>> results = homo_test.execute(data)
-        >>> ttest_results = results.get_test_results('t-test')
-        >>> ks_results = results.get_test_results('ks-test')
+        >>> output = results.resume
 
         Running test on dataset with roles:
         >>> from hypex.dataset import Dataset, TargetRole, TreatmentRole

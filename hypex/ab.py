@@ -22,6 +22,8 @@ class ABTest(ExperimentShell):
         multitest_method (str, optional): Method to use for multiple testing correction. Valid options are:
             "bonferroni", "sidak", "holm-sidak", "holm", "simes-hochberg", "hommel", "fdr_bh", "fdr_by",
             "fdr_tsbh", "fdr_tsbhy", "quantile". Defaults to "holm".
+         For more information refer to the statsmodels documentation:
+         <https://www.statsmodels.org/dev/generated/statsmodels.stats.multitest.multipletests.html>
 
     Examples:
         Basic A/B test with default t-test:
@@ -48,9 +50,15 @@ class ABTest(ExperimentShell):
         """Creates an experiment configuration with specified statistical tests.
 
         Args:
-            additional_tests (Union[str, List[str], None]): Statistical test(s) to include.
-                Valid options are "t-test", "u-test", and "chi2-test".
-            multitest_method (str): Method for multiple testing correction.
+            Args:
+        additional_tests (Union[str, List[str], None], optional): Statistical test(s) to run in addition to
+            the default group difference calculation. Valid options are "t-test", "u-test", and "chi2-test".
+            Can be a single test name or list of test names. Defaults to ["t-test"].
+        multitest_method (str, optional): Method to use for multiple testing correction. Valid options are:
+            "bonferroni", "sidak", "holm-sidak", "holm", "simes-hochberg", "hommel", "fdr_bh", "fdr_by",
+            "fdr_tsbh", "fdr_tsbhy", "quantile". Defaults to "holm".
+         For more information refer to the statsmodels documentation:
+         <https://www.statsmodels.org/dev/generated/statsmodels.stats.multitest.multipletests.html>
 
         Returns:
             Experiment: Configured experiment object with specified tests and correction method.
