@@ -445,7 +445,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             elif method == "ffill":
                 return self.data.ffill(**kwargs)
             else:
-                raise ValueError(f"Недопустимое значение method: {method}")
+                raise ValueError(f"Wrong fill method: {method}")
 
         return self.data.fillna(value=values, **kwargs)
 
