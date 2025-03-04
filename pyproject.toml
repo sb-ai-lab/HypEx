@@ -66,6 +66,7 @@ lgbm = ["lightgbm"]
 all = ["catboost", "lightgbm"]
 
 [tool.poetry.group.dev.dependencies]
+docutils = ">=0.17,<0.21"
 jupyter = "^1.0.0"
 pytest = "^7.4.3"
 sphinx = { version = "^7.2.6", python = ">=3.9, <3.11" }
