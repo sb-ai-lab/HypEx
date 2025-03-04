@@ -1,4 +1,6 @@
-from typing import List, Literal, Optional, Union
+from __future__ import annotations
+
+from typing import Literal
 
 from .analyzers.ab import ABAnalyzer
 from .comparators import Chi2Test, GroupDifference, GroupSizes, TTest, UTest
@@ -72,7 +74,7 @@ class ABTest(ExperimentShell):
         additional_tests = ["t-test"] if additional_tests is None else additional_tests
         additional_tests = (
             additional_tests
-            if isinstance(additional_tests, List)
+            if isinstance(additional_tests, list)
             else [additional_tests]
         )
         for i in additional_tests:
@@ -95,13 +97,12 @@ class ABTest(ExperimentShell):
         )
 
     def __init__(
-        self,
-        additional_tests: Union[
-            Literal["t-test", "u-test", "chi2-test"],
-            List[Literal["t-test", "u-test", "chi2-test"]],
-            None,
-        ] = None,
-        multitest_method: Optional[
+            self,
+            additional_tests:
+            Literal["t-test", "u-test", "chi2-test"] |
+            list[Literal["t-test", "u-test", "chi2-test"]] |
+            None = None,
+            multitest_method:
             Literal[
                 "bonferroni",
                 "sidak",
@@ -114,8 +115,8 @@ class ABTest(ExperimentShell):
                 "fdr_tsbh",
                 "fdr_tsbhy",
                 "quantile",
-            ]
-        ] = "holm",
+            ] | None
+            = "holm",
     ):
         super().__init__(
             experiment=self._make_experiment(additional_tests, multitest_method),

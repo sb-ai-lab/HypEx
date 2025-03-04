@@ -1,4 +1,6 @@
-from typing import Any, Dict, Iterable, Optional
+from __future__ import annotations
+
+from typing import Any, Iterable
 
 from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
 from .comparators import GroupDifference, GroupSizes
@@ -123,10 +125,10 @@ class AATest(ExperimentShell):
     def _prepare_params(
         n_iterations: int,
         control_size: float,
-        random_states: Optional[Iterable[int]] = None,
-        sample_size: Optional[float] = None,
-        additional_params: Optional[Dict[str, Any]] = None,
-    ) -> Dict[type, Dict[str, Any]]:
+        random_states: Iterable[int] | None = None,
+        sample_size: float | None = None,
+        additional_params: dict[str, Any] | None = None,
+    ) -> dict[type, dict[str, Any]]:
         """Prepares parameters for the A/A test experiment.
 
         Args:
@@ -179,10 +181,10 @@ class AATest(ExperimentShell):
         precision_mode: bool = False,
         control_size: float = 0.5,
         stratification: bool = False,
-        n_iterations: Optional[int] = None,
-        sample_size: Optional[float] = None,
-        additional_params: Optional[Dict[str, Any]] = None,
-        random_states: Optional[Iterable[int]] = None,
+        n_iterations: int | None = None,
+        sample_size: float | None = None,
+        additional_params: dict[str, Any] | None = None,
+        random_states: Iterable[int] | None = None,
     ):
         if n_iterations is None:
             if precision_mode:

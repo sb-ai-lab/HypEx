@@ -1,4 +1,6 @@
-from typing import List, Literal, Union
+from __future__ import annotations
+
+from typing import Literal
 
 from .analyzers.matching import MatchingAnalyzer
 from .comparators import KSTest, TTest
@@ -57,14 +59,13 @@ class Matching(ExperimentShell):
 
     @staticmethod
     def _make_experiment(
-        group_match: bool = False,
-        distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-        metric: Literal["atc", "att", "ate"] = "ate",
-        bias_estimation: bool = True,
-        quality_tests: Union[
-            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"],
-            List[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]],
-        ] = "auto",
+            group_match: bool = False,
+            distance: Literal["mahalanobis", "l2"] = "mahalanobis",
+            metric: Literal["atc", "att", "ate"] = "ate",
+            bias_estimation: bool = True,
+            quality_tests:
+            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"] | list[
+                Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]] = "auto",
     ) -> Experiment:
         """Creates an experiment configuration with specified matching parameters.
 
@@ -102,7 +103,7 @@ class Matching(ExperimentShell):
         }
         two_sides = metric == "ate"
         test_pairs = metric == "atc"
-        executors: List[Executor] = [
+        executors: list[Executor] = [
             FaissNearestNeighbors(
                 grouping_role=TreatmentRole(),
                 two_sides=two_sides,
@@ -149,15 +150,14 @@ class Matching(ExperimentShell):
         )
 
     def __init__(
-        self,
-        group_match: bool = False,
-        distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-        metric: Literal["atc", "att", "ate"] = "ate",
-        bias_estimation: bool = True,
-        quality_tests: Union[
-            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"],
-            List[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]],
-        ] = "auto",
+            self,
+            group_match: bool = False,
+            distance: Literal["mahalanobis", "l2"] = "mahalanobis",
+            metric: Literal["atc", "att", "ate"] = "ate",
+            bias_estimation: bool = True,
+            quality_tests:
+            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"] |
+            list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]] = "auto",
     ):
         super().__init__(
             experiment=self._make_experiment(

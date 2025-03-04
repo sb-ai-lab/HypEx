@@ -452,7 +452,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             return int(data.loc[data.index[0], data.columns[0]])
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
-    def dot(self, other: "PandasDataset") -> pd.DataFrame:
+    def dot(self, other: PandasDataset) -> pd.DataFrame:
         result = self.data.dot(other.data)
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
@@ -490,7 +490,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def merge(
         self,
-        right: "PandasDataset",
+        right: PandasDataset,
         on: str | None = None,
         left_on: str | None = None,
         right_on: str | None = None,
