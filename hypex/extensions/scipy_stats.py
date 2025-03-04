@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import warnings
-from typing import Callable, Optional, Union
+from typing import Callable
 
 from scipy.stats import (  # type: ignore
     chi2_contingency,
@@ -15,14 +17,14 @@ from .abstract import CompareExtension
 
 class StatTest(CompareExtension):
     def __init__(
-        self, test_function: Optional[Callable] = None, reliability: float = 0.05
+        self, test_function: Callable | None = None, reliability: float = 0.05
     ):
         super().__init__()
         self.test_function = test_function
         self.reliability = reliability
 
     @staticmethod  # TODO: remove
-    def check_other(other: Union[Dataset, None]) -> Dataset:
+    def check_other(other: Dataset | None) -> Dataset:
         if other is None:
             raise ValueError("No other dataset provided")
         return other
@@ -32,7 +34,7 @@ class StatTest(CompareExtension):
         if len(data.columns) != 1:
             raise ValueError("Data must be one-dimensional")
 
-    def check_data(self, data: Dataset, other: Union[Dataset, None]) -> Dataset:
+    def check_data(self, data: Dataset, other: Dataset | None) -> Dataset:
         other = self.check_other(other)
 
         self.check_dataset(data)
@@ -41,8 +43,8 @@ class StatTest(CompareExtension):
         return other
 
     def _calc_pandas(
-        self, data: Dataset, other: Union[Dataset, None] = None, **kwargs
-    ) -> Union[float, Dataset]:
+        self, data: Dataset, other: Dataset | None = None, **kwargs
+    ) -> Dataset | float:
         other = self.check_data(data, other)
         if self.test_function is None:
             raise ValueError("test_function is needed for execution")
@@ -67,8 +69,8 @@ class TTestExtension(StatTest):
         super().__init__(ttest_ind, reliability=reliability)
 
     def _calc_pandas(
-        self, data: Dataset, other: Union[Dataset, None] = None, **kwargs
-    ) -> Union[float, Dataset]:
+        self, data: Dataset, other: Dataset | None = None, **kwargs
+    ) -> Dataset | float:
         if (
             next(iter(data.nunique().values()))
             and next(iter(other.nunique().values())) < 2
@@ -108,7 +110,7 @@ class Chi2TestExtension(StatTest):
             counts = counts[counts["count"] >= 7]
         return counts
 
-    def matrix_preparation(self, data: Dataset, other: Dataset) -> Optional[Dataset]:
+    def matrix_preparation(self, data: Dataset, other: Dataset) -> Dataset | None:
         proportion = len(data) / (len(data) + len(other))
         counted_data = data.value_counts()
         counted_data = self.mini_category_replace(counted_data)
@@ -127,8 +129,8 @@ class Chi2TestExtension(StatTest):
         ].fillna(0)
 
     def _calc_pandas(
-        self, data: Dataset, other: Optional[Dataset] = None, **kwargs
-    ) -> Union[float, Dataset]:
+        self, data: Dataset, other: Dataset | None = None, **kwargs
+    ) -> Dataset | float:
         other = self.check_data(data, other)
         matrix = self.matrix_preparation(data, other)
         if matrix is None:
@@ -167,8 +169,8 @@ class Chi2TestExtension(StatTest):
 
 class NormCDF(StatTest):
     def _calc_pandas(
-        self, data: Dataset, other: Optional[Dataset] = None, **kwargs
-    ) -> Union[float, Dataset]:
+        self, data: Dataset, other: Dataset | None = None, **kwargs
+    ) -> Dataset | float:
         result = norm.cdf(abs(data.get_values()[0][0]))
         return DatasetAdapter.to_dataset(
             {"p-value": 2 * (1 - result)},

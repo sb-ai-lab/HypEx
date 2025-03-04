@@ -91,7 +91,7 @@ class FaissNearestNeighbors(MLExecutor):
             data=data, test_data=test_data
         )
 
-    def fit(self, X: Dataset, Y: Dataset | None = None) -> "MLExecutor":
+    def fit(self, X: Dataset, Y: Dataset | None = None) -> MLExecutor:
         return FaissExtension(self.n_neighbors).fit(X=X, Y=Y)
 
     def predict(self, X: Dataset) -> Dataset:

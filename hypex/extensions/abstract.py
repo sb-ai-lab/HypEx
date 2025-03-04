@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Literal
 
 from ..dataset import ABCRole, Dataset
 from ..dataset.backends import PandasDataset
@@ -22,13 +24,13 @@ class Extension(ABC):
 
     @staticmethod
     def result_to_dataset(
-        result: Any, roles: Union[ABCRole, Dict[str, ABCRole]]
+        result: Any, roles: ABCRole | dict[str, ABCRole]
     ) -> Dataset:
         return DatasetAdapter.to_dataset(result, roles=roles)
 
 
 class CompareExtension(Extension, ABC):
-    def calc(self, data: Dataset, other: Optional[Dataset] = None, **kwargs):
+    def calc(self, data: Dataset, other: Dataset | None = None, **kwargs):
         return super().calc(data=data, other=other, **kwargs)
 
 
@@ -37,8 +39,8 @@ class MLExtension(Extension):
     def _calc_pandas(
         self,
         data: Dataset,
-        test_data: Optional[Dataset] = None,
-        mode: Optional[Literal["auto", "fit", "predict"]] = None,
+        test_data: Dataset | None = None,
+        mode: Literal["auto", "fit", "predict"] | None = None,
         **kwargs
     ):
         if mode in ["auto", "fit"]:
@@ -56,8 +58,8 @@ class MLExtension(Extension):
     def calc(
         self,
         data: Dataset,
-        target_data: Union[Dataset, None] = None,
-        test_data: Optional[Dataset] = None,
+        target_data: Dataset | None = None,
+        test_data: Dataset | None = None,
         **kwargs
     ):
         return super().calc(
