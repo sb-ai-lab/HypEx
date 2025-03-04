@@ -4,9 +4,15 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from hypex.dataset import *
-from hypex.dataset.roles import *
-from hypex.utils import *
+from hypex.dataset import Dataset, ExperimentData
+from hypex.dataset.roles import DefaultRole, InfoRole, TargetRole
+from hypex.utils import (
+    BackendsEnum,
+    ConcatDataError,
+    DataTypeError,
+    ExperimentDataEnum,
+    RoleColumnError,
+)
 
 
 class TestDataset(unittest.TestCase):

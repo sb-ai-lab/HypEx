@@ -6,11 +6,11 @@ from .shuffle import Shuffle
 
 __all__ = [
     "CVFilter",
+    "CVFilter",
     "CategoryAggregator",
     "ConstFilter",
     "CorrFilter",
     "DummyEncoder",
-    "NaFilter",
     "NanFilter",
     "OutliersFilter",
     "Shuffle",

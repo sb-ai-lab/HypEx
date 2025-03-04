@@ -4,4 +4,4 @@ from .base import (
 )
 from .base_complex import CycledExperiment, GroupExperiment
 
-__all__ = ["CycledExperiment", "GroupExperiment"]
+__all__ = ["CycledExperiment", "Experiment", "GroupExperiment", "OnRoleExperiment"]
