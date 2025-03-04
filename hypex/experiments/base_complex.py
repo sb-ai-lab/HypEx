@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from itertools import product
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Sequence
 
 from tqdm.auto import tqdm
 
@@ -15,7 +17,7 @@ class ExperimentWithReporter(Experiment):
         self,
         executors: Sequence[Executor],
         reporter: Reporter,
-        transformer: Optional[bool] = None,
+        transformer: bool | None = None,
         key: str = "",
     ):
         super().__init__(executors, transformer, key)
@@ -33,7 +35,7 @@ class ExperimentWithReporter(Experiment):
         return result
 
     def _set_result(
-        self, data: ExperimentData, result: List[Dataset], reset_index: bool = True
+        self, data: ExperimentData, result: list[Dataset], reset_index: bool = True
     ):
         result = (
             result[0].append(result[1:], reset_index=reset_index)
@@ -46,10 +48,10 @@ class ExperimentWithReporter(Experiment):
 class CycledExperiment(ExperimentWithReporter):
     def __init__(
         self,
-        executors: List[Executor],
+        executors: list[Executor],
         reporter: DatasetReporter,
         n_iterations: int,
-        transformer: Optional[bool] = None,
+        transformer: bool | None = None,
         key: str = "",
     ):
         super().__init__(executors, reporter, transformer, key)
@@ -59,7 +61,7 @@ class CycledExperiment(ExperimentWithReporter):
         return f"{self.reporter.__class__.__name__} x {self.n_iterations}"
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        result: List[Dataset] = [
+        result: list[Dataset] = [
             self.one_iteration(data, str(i)) for i in tqdm(range(self.n_iterations))
         ]
         return self._set_result(data, result)
@@ -71,7 +73,7 @@ class GroupExperiment(ExperimentWithReporter):
         executors: Sequence[Executor],
         reporter: Reporter,
         searching_role: ABCRole = GroupingRole(),
-        transformer: Optional[bool] = None,
+        transformer: bool | None = None,
         key: str = "",
     ):
         self.searching_role = searching_role
@@ -82,7 +84,7 @@ class GroupExperiment(ExperimentWithReporter):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field = data.ds.search_columns(self.searching_role)
-        result: List[Dataset] = [
+        result: list[Dataset] = [
             self.one_iteration(
                 ExperimentData(group_data), str(group[0]), set_key_as_index=True
             )
@@ -96,13 +98,13 @@ class ParamsExperiment(ExperimentWithReporter):
         self,
         executors: Sequence[Executor],
         reporter: DatasetReporter,
-        params: Dict[type, Dict[str, Sequence[Any]]],
-        transformer: Optional[bool] = None,
+        params: dict[type, dict[str, Sequence[Any]]],
+        transformer: bool | None = None,
         key: str = "",
     ):
         super().__init__(executors, reporter, transformer, key)
         self._params = params
-        self._flat_params: List[Dict[type, Dict[str, Any]]] = []
+        self._flat_params: list[dict[type, dict[str, Any]]] = []
 
     def generate_params_hash(self) -> str:
         return f"ParamsExperiment: {self.reporter.__class__.__name__}"
@@ -130,15 +132,15 @@ class ParamsExperiment(ExperimentWithReporter):
         self._flat_params = new_flat_params
 
     @property
-    def flat_params(self) -> List[Dict[type, Dict[str, Any]]]:
+    def flat_params(self) -> list[dict[type, dict[str, Any]]]:
         return self._flat_params
 
     @property
-    def params(self) -> Dict[type, Dict[str, Sequence[Any]]]:
+    def params(self) -> dict[type, dict[str, Sequence[Any]]]:
         return self._params
 
     @params.setter
-    def params(self, params: Dict[type, Dict[str, Sequence[Any]]]):
+    def params(self, params: dict[type, dict[str, Sequence[Any]]]):
         self._params = params
         self._update_flat_params()
 
@@ -160,9 +162,9 @@ class IfParamsExperiment(ParamsExperiment):
         self,
         executors: Sequence[Executor],
         reporter: DatasetReporter,
-        params: Dict[type, Dict[str, Sequence[Any]]],
+        params: dict[type, dict[str, Sequence[Any]]],
         stopping_criterion: IfExecutor,
-        transformer: Optional[bool] = None,
+        transformer: bool | None = None,
         key: str = "",
     ):
         self.stopping_criterion = stopping_criterion
