@@ -1,0 +1,377 @@
+{
+  "type": "object",
+  "default": {},
+  "title": "Root Schema",
+  "required": [
+    "dataset"
+  ],
+  "properties": {
+    "dataset": {
+      "type": "object",
+      "default": {},
+      "title": "The dataset Schema",
+      "oneOf": [
+        {
+          "required": [
+            "path",
+            "backend"
+          ]
+        },
+        {
+          "required": [
+            "data",
+            "backend"
+          ]
+        }
+      ],
+      "properties": {
+        "data": {
+          "type": "object",
+          "title": "The data Schema",
+          "required": [
+            "data"
+          ],
+          "properties": {
+            "index": {
+              "type": "array",
+              "items": {}
+            },
+            "data": {
+              "type": "object",
+              "minItems": 1,
+              "example": {
+                "column": [
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "column2": [
+                  5,
+                  6,
+                  7,
+                  8
+                ]
+              }
+            }
+          },
+          "index": {
+            "type": "array",
+            "default": []
+          }
+        },
+        "path": {
+          "type": "string",
+          "default": "",
+          "title": "The path Schema",
+          "examples": [
+            "path/to/file"
+          ]
+        },
+        "backend": {
+          "enum": [
+            "pandas",
+            "pyspark"
+          ],
+          "default": "pandas"
+        },
+        "roles": {
+          "type": "object",
+          "title": "The roles Schema",
+          "required": [
+            "role_names",
+            "columns"
+          ],
+          "properties": {
+            "role_names": {
+              "type": "array",
+              "minItems": 1,
+              "title": "The role_names Schema",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Info",
+                  "Target",
+                  "Feature",
+                  "Treatment"
+                ]
+              }
+            },
+            "columns": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "default": [],
+              "title": "The columns Schema",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "args": {
+          "type": "object",
+          "default": {},
+          "title": "The args Schema",
+          "properties": {},
+          "examples": [
+            {
+              "delimiter": ",",
+              "encoding": "utf-8"
+            }
+          ]
+        }
+      },
+      "examples": [
+        {
+          "data": "future",
+          "path": "path/to/file",
+          "backend": "pandas",
+          "roles": {
+            "columnname": "role"
+          },
+          "args": {
+            "delimiter": ",",
+            "encoding": "utf-8"
+          }
+        }
+      ]
+    }
+  },
+  "experiment": {
+    "type": "object",
+    "default": {},
+    "title": "The experiment Schema",
+    "properties": {
+      "AADictReporter": {
+        "required": [],
+        "properties": {}
+      },
+      "AASplitter": {
+        "required": [
+          "control_size",
+          "random_state",
+          "inner_executors"
+        ],
+        "properties": {
+          "control_size": {
+            "type": "",
+            "default": 0.5,
+            "title": "The control_size Schema"
+          },
+          "random_state": {
+            "type": "",
+            "default": "None",
+            "title": "The random_state Schema"
+          }
+        }
+      },
+      "AASplitterWithGrouping": {
+        "required": [],
+        "properties": {}
+      },
+      "AASplitterWithStratification": {
+        "required": [
+          "control_size",
+          "random_state"
+        ],
+        "properties": {
+          "control_size": {
+            "type": "",
+            "default": 0.5,
+            "title": "The control_size Schema"
+          },
+          "random_state": {
+            "type": "",
+            "default": "None",
+            "title": "The random_state Schema"
+          }
+        }
+      },
+      "ABAnalyzer": {
+        "required": [],
+        "properties": {}
+      },
+      "ATE": {
+        "required": [],
+        "properties": {}
+      },
+      "CycledExperiment": {
+        "required": [
+          "inner_executor",
+          "n_iterations",
+          "analyzer"
+        ],
+        "properties": {
+          "inner_executor": {
+            "type": "",
+            "default": {},
+            "title": "The inner_executor Schema"
+          },
+          "n_iterations": {
+            "type": "",
+            "default": {},
+            "title": "The n_iterations Schema"
+          },
+          "analyzer": {
+            "type": "",
+            "default": {},
+            "title": "The analyzer Schema"
+          }
+        }
+      },
+      "Experiment": {
+        "required": [
+          "executors"
+        ],
+        "properties": {
+          "executors": {
+            "type": "",
+            "default": {},
+            "title": "The executors Schema"
+          }
+        }
+      },
+      "GroupDifference": {
+        "required": [],
+        "properties": {}
+      },
+      "GroupExperiment": {
+        "required": [
+          "inner_executor"
+        ],
+        "properties": {
+          "inner_executor": {
+            "type": "",
+            "default": {},
+            "title": "The inner_executor Schema"
+          }
+        }
+      },
+      "GroupSizes": {
+        "required": [],
+        "properties": {}
+      },
+      "KSTest": {
+        "required": [],
+        "properties": {}
+      },
+      "OnRoleExperiment": {
+        "required": [
+          "executors",
+          "role"
+        ],
+        "properties": {
+          "executors": {
+            "type": "",
+            "default": {},
+            "title": "The executors Schema"
+          },
+          "role": {
+            "type": "",
+            "default": {},
+            "title": "The role Schema"
+          }
+        }
+      },
+      "OneAAStatAnalyzer": {
+        "required": [],
+        "properties": {}
+      },
+      "Shuffle": {
+        "required": [
+          "random_state"
+        ],
+        "properties": {
+          "random_state": {
+            "type": "",
+            "default": "None",
+            "title": "The random_state Schema"
+          }
+        }
+      },
+      "StatMdeBySize": {
+        "required": [],
+        "properties": {}
+      },
+      "StatPowerByTTestInd": {
+        "required": [],
+        "properties": {}
+      },
+      "StatSampleSizeByMde": {
+        "required": [
+          "mde",
+          "target_field",
+          "significance",
+          "power"
+        ],
+        "properties": {
+          "mde": {
+            "type": "",
+            "default": {},
+            "title": "The mde Schema"
+          },
+          "target_field": {
+            "type": "",
+            "default": {},
+            "title": "The target_field Schema"
+          },
+          "significance": {
+            "type": "",
+            "default": {},
+            "title": "The significance Schema"
+          },
+          "power": {
+            "type": "",
+            "default": {},
+            "title": "The power Schema"
+          }
+        }
+      },
+      "TestPower": {
+        "required": [
+          "target_field",
+          "significance",
+          "power"
+        ],
+        "properties": {
+          "target_field": {
+            "type": "",
+            "default": {},
+            "title": "The target_field Schema"
+          },
+          "significance": {
+            "type": "",
+            "default": {},
+            "title": "The significance Schema"
+          },
+          "power": {
+            "type": "",
+            "default": {},
+            "title": "The power Schema"
+          }
+        }
+      },
+      "UTest": {
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "examples": [
+    {
+      "dataset": {
+        "data": "future",
+        "path": "path/to/file",
+        "backend": "pandas",
+        "roles": {
+          "columnname": "role"
+        },
+        "args": {
+          "delimiter": ",",
+          "encoding": "utf-8"
+        }
+      }
+    }
+  ]
+}

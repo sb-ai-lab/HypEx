@@ -5,14 +5,14 @@ from typing import Iterable, Union
 import numpy as np
 import pandas as pd
 
-ROOT = Path('').absolute().parents[0]
+ROOT = Path("").absolute().parents[0]
 sys.path.append(str(ROOT))
 
 
 def set_nans(
-        data: pd.DataFrame,
-        na_step: Union[Iterable[int], int] = None,
-        nan_cols: Union[Iterable[str], str] = None
+    data: pd.DataFrame,
+    na_step: Union[Iterable[int], int] = None,
+    nan_cols: Union[Iterable[str], str] = None,
 ):
     """Fill some values with NaN/
 
@@ -34,55 +34,59 @@ def set_nans(
         #  number of nans
         if na_step is None:
             na_step = [10]
-            print(f'No na_step specified: set to {na_step}')
+            print(f"No na_step specified: set to {na_step}")
         elif not isinstance(na_step, Iterable):
             na_step = [na_step]
 
         #  columns
         if nan_cols is None:
             nan_cols = list(data.columns)
-            print('No nan_cols specified. Setting NaNs applied to all columns')
+            print("No nan_cols specified. Setting NaNs applied to all columns")
         elif not isinstance(nan_cols, Iterable):
             nan_cols = [nan_cols]
 
         # correct length of two lists
         if len(na_step) > len(nan_cols):
-            na_step = na_step[:len(nan_cols)]
+            na_step = na_step[: len(nan_cols)]
             # print('Length of na_step is bigger than length of columns. Used only first values') TODO: set to logging
         elif len(na_step) < len(nan_cols):
             na_step = na_step + [na_step[-1]] * (len(nan_cols) - len(na_step))
             # print('Length of na_step is less than length of columns. Used last value several times')
 
         # create list of indexes to fill with na
-        nans_indexes = [list(range(i, len(data), period)) for i, period in enumerate(na_step)]
+        nans_indexes = [
+            list(range(i, len(data), period)) for i, period in enumerate(na_step)
+        ]
 
         for i in range(len(nan_cols)):
             try:
                 data.loc[nans_indexes[i], nan_cols[i]] = np.nan
             except KeyError:
-                print(f'There is no column {nan_cols[i]} in data. No nans in this column will be added.')
+                print(
+                    f"There is no column {nan_cols[i]} in data. No nans in this column will be added."
+                )
     else:
-        print('No NaN added')
+        print("No NaN added")
 
     return data
 
 
 def create_test_data(
-        num_users: int = 10000,
-        na_step: Union[Iterable[int], int] = None,
-        nan_cols: Union[Iterable[str], str] = None,
-        file_name: str = None,
-        exact_ATT: int = 100,
-        rs=None,
+    num_users: int = 10000,
+    na_step: Union[Iterable[int], int] = None,
+    nan_cols: Union[Iterable[str], str] = None,
+    file_name: str = None,
+    exact_ATT: int = 100,
+    rs=None,
 ):
     """Creates data for tutorial.
 
     Args:
         num_users: num of strings
-        na_step: 
+        na_step:
             num or list of nums of period to make NaN (step of range)
             If list - iterates accordingly order of columns
-        nan_cols: 
+        nan_cols:
             name of one or several columns to fill with NaN
             If list - iterates accordingly order of na_step
         file_name: name of file to save; doesn't save file if None
@@ -100,13 +104,19 @@ def create_test_data(
     num_months = 12
 
     # signup_months == 0 means customer did not sign up
-    signup_months = np.random.choice(np.arange(1, num_months), num_users) * np.random.randint(0, 2, size=num_users)
+    signup_months = np.random.choice(
+        np.arange(1, num_months), num_users
+    ) * np.random.randint(0, 2, size=num_users)
 
     data = pd.DataFrame(
         {
             "user_id": np.repeat(np.arange(num_users), num_months),
-            "signup_month": np.repeat(signup_months, num_months),  # signup month == 0 means customer did not sign up
-            "month": np.tile(np.arange(1, num_months + 1), num_users),  # months are from 1 to 12
+            "signup_month": np.repeat(
+                signup_months, num_months
+            ),  # signup month == 0 means customer did not sign up
+            "month": np.tile(
+                np.arange(1, num_months + 1), num_users
+            ),  # months are from 1 to 12
             "spend": np.random.poisson(500, num_users * num_months),
         }
     )
@@ -124,11 +134,13 @@ def create_test_data(
     # Setting the signup month (for ease of analysis)
     i = 3
     data = (
-        data
-        .groupby(["user_id", "signup_month", "treat"])
+        data.groupby(["user_id", "signup_month", "treat"])
         .apply(
             lambda x: pd.Series(
-                {"pre_spends": x.loc[x.month < i, "spend"].mean(), "post_spends": x.loc[x.month > i, "spend"].mean(), }
+                {
+                    "pre_spends": x.loc[x.month < i, "spend"].mean(),
+                    "post_spends": x.loc[x.month > i, "spend"].mean(),
+                }
             )
         )
         .reset_index()
@@ -157,3 +169,198 @@ def create_test_data(
         data.to_csv(ROOT / f"{file_name}.csv", index=False)
 
     return data
+
+
+def sigmoid(x: np.ndarray) -> np.ndarray:
+    """Logistic sigmoid ufunc for ndarrays.
+
+    The sigmoid function, also known as the logistic sigmoid function,
+    is defined as sigmoid(x) = $\fraq{1}{(1+\exp{-x})}$.
+    It is the inverse of the logit function.
+
+    Args:
+        x:
+            Input array.
+
+    Returns:
+        Sigmoid function of x.
+    """
+    return 1 / (1 + np.exp(-x))
+
+
+def sigmoid_division(x, dependent_division=True) -> np.ndarray:
+    """
+    Division method via sigmoid function.
+
+    Args:
+        x:
+            Input array
+        dependent_division:
+            If True - returns the binary vector dependent on the X.
+            If False - returns the binary vector independent on the X.
+
+    Returns:
+        Binary array coordinated with variable x.
+    """
+    if dependent_division:
+        division = np.random.binomial(1, sigmoid((x - x.mean()) / x.std()))
+    else:
+        division = np.random.binomial(1, 0.5, size=len(x))
+    return division
+
+
+def gen_special_medicine_df(
+    data_size=100, *, dependent_division=True, random_state=None
+) -> pd.DataFrame:
+    """Synthetic dataframe generator.
+
+    Realises dependent/independent group splitting.
+
+    Args:
+        data_size:
+            Length of output Dataframe
+        dependent_division:
+            If True - the returned Dataframe contains a division into
+            groups dependent on the features.
+            If False - the returned Dataframe contains a division into
+            groups independent on the features.
+        random_state:
+            If specified - defines numpy random seed. Defaults to None.
+
+    Returns:
+        Synthetic dataframe also containing fictional information about patient treatment.
+    """
+    if random_state is not None:
+        np.random.seed(random_state)
+
+    disease_degree = np.random.choice(
+        [1, 2, 3, 4, 5], p=[0.3, 0.3, 0.2, 0.1, 0.1], size=data_size
+    ).astype(int)
+
+    age = np.random.normal(40, scale=8, size=data_size).astype(int)
+
+    age_effect = (age ^ 2 - 400) / 1000
+
+    experimental_treatment = sigmoid_division(disease_degree, dependent_division)
+
+    residual_lifetime = np.random.exponential(
+        17 - 2.5 * disease_degree + 1 * experimental_treatment - age_effect
+    )
+
+    df = pd.DataFrame(
+        dict(
+            age=age,
+            disease_degree=disease_degree,
+            experimental_treatment=experimental_treatment,
+            residual_lifetime=residual_lifetime,
+        )
+    )
+    return df
+
+
+def gen_oracle_df(
+    data_size=8, *, dependent_division=True, factual_only=False, random_state=None
+) -> pd.DataFrame:
+    """Synthetic dataframe generator.
+
+    Realises factual and counterfactual outcomes.
+
+    Args:
+        data_size:
+            Length of output Dataframe
+        dependent_division:
+            If True - the returned Dataframe contains a division into
+            groups dependent on the features.
+            If False - the returned Dataframe contains a division into
+            groups independent on the features.
+        factual_only:
+            Defines the display of counterfactual states.
+        random_state:
+            If specified - defines numpy random seed. Defaults to None.
+
+    Returns:
+        Synthetic dataframe also containing fictional information about
+        factual and counterfactual states of the target.
+    """
+    if random_state is not None:
+        np.random.seed(random_state)
+
+    treatment = np.random.binomial(1, 0.5, size=data_size)
+
+    if dependent_division:
+        target_feature = np.random.binomial(1, 0.3 + 0.4 * treatment)
+    else:
+        target_feature = np.random.binomial(1, 0.5, size=data_size)
+
+    target_untreated = (
+        np.random.uniform(low=300, high=800, size=data_size).round(-2).astype(int)
+    )
+
+    target_treated = target_untreated + 50 + target_feature * 100
+
+    if factual_only:
+        target_untreated = np.where(1 - treatment, target_untreated, np.nan)
+        target_treated = np.where(treatment, target_treated, np.nan)
+
+    y_factual = np.where(treatment, target_treated, target_untreated).astype("int")
+
+    treatment_effect = target_treated - target_untreated
+
+    df = pd.DataFrame(
+        dict(
+            X=target_feature,
+            Target_untreated=target_untreated,
+            Target_treated=target_treated,
+            Treatment=treatment,
+            Target=y_factual,
+            TE=treatment_effect,
+        )
+    )
+    return df
+
+
+def gen_control_variates_df(
+    data_size=1000, *, dependent_division=True, random_state=None
+) -> pd.DataFrame:
+    """Synthetic dataframe generator.
+
+    Realises 0-variation outcome mixed with linear x dependency.
+
+    Args:
+        data_size:
+            Length of output Dataframe
+        dependent_division:
+            If True - the returned Dataframe contains a division into
+            groups dependent on the features.
+            If False - the returned Dataframe contains a division into
+            groups independent on the features.
+        random_state:
+            If specified - defines numpy random seed. Defaults to None.
+
+    Returns:
+        Synthetic dataframe also containing fictional information about
+        features and lagged features.
+    """
+    if random_state is not None:
+        np.random.seed(random_state)
+
+    mean_x_feature = np.random.uniform(0, 5, size=data_size)
+
+    x_feature_lag_1 = np.random.normal(mean_x_feature, 2)
+    x_feature = np.random.normal(mean_x_feature, 2)
+
+    treatment = sigmoid_division(x_feature_lag_1, dependent_division)
+
+    target_lag_1 = 200 + x_feature_lag_1 * 100
+    target_factual = 200 + x_feature * 100 + treatment * 10
+
+    df = pd.DataFrame(
+        dict(
+            X_lag_1=x_feature_lag_1,
+            Target_lag_1=target_lag_1,
+            X=x_feature,
+            Treatment=treatment,
+            Target=target_factual,
+        )
+    )
+    return df

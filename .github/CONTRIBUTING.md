@@ -16,7 +16,7 @@
     - [Adding new submodules](#adding-new-submodules)
     - [Adding Tutorials](#adding-tutorials)
 
-## Beginning 
+## Beginning
 
 We're thrilled you're considering contributing to HypEx! Your contributions help keep HypEx robust and valuable. Here's
 how you can get involved:
@@ -271,7 +271,7 @@ poetry run pre-commit install
    If you experience any issues with pre-commit, please ask for support on the
    usual help channels.
 
-### Testing 
+### Testing
 (in progress)
 
 ## Documentation

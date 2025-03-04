@@ -32,4 +32,3 @@
 - [ ] I have verified that the changes are accurate and necessary.
 - [ ] The updated documentation has been tested for clarity and comprehensibility.
 - [ ] All modified sections are properly formatted and adhere to project documentation standards.
-
