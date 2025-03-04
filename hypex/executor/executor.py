@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Sequence
 
 from ..dataset import (
     ABCRole,
@@ -32,7 +34,7 @@ class Executor(ABC):
         self.key: Any = key
         self._generate_id()
 
-    def check_and_setattr(self, params: Dict[str, Any]):
+    def check_and_setattr(self, params: dict[str, Any]):
         for key, value in params.items():
             if key in self.__dir__():
                 setattr(self, key, value)
@@ -128,7 +130,7 @@ class Calculator(Executor, ABC):
 
     @staticmethod
     def _check_test_data(
-        test_data: Optional[Dataset] = None,
+        test_data: Dataset | None = None,
     ) -> Dataset:  # TODO to move away from Calculator. Where to?
         if test_data is None:
             raise ValueError("test_data is needed for comparison")
@@ -138,8 +140,8 @@ class Calculator(Executor, ABC):
 class MLExecutor(Calculator, ABC):
     def __init__(
         self,
-        grouping_role: Optional[ABCRole] = None,
-        target_role: Optional[ABCRole] = None,
+        grouping_role: ABCRole | None = None,
+        target_role: ABCRole | None = None,
         key: Any = "",
     ):
         self.target_role = target_role or TargetRole()
@@ -154,7 +156,7 @@ class MLExecutor(Calculator, ABC):
         return group_field, target_field
 
     @abstractmethod
-    def fit(self, X: Dataset, Y: Optional[Dataset] = None) -> "MLExecutor":
+    def fit(self, X: Dataset, Y: Dataset | None = None) -> MLExecutor:
         raise NotImplementedError
 
     @abstractmethod
@@ -173,8 +175,8 @@ class MLExecutor(Calculator, ABC):
     def _inner_function(
         cls,
         data: Dataset,
-        test_data: Optional[Dataset] = None,
-        target_data: Optional[Dataset] = None,
+        test_data: Dataset | None = None,
+        target_data: Dataset | None = None,
         **kwargs,
     ) -> Any:
         raise AbstractMethodError
@@ -183,7 +185,7 @@ class MLExecutor(Calculator, ABC):
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_field: Optional[str] = None,
+        target_field: str | None = None,
         **kwargs,
     ) -> Any:
         if target_field:
@@ -214,10 +216,10 @@ class MLExecutor(Calculator, ABC):
     def calc(
         cls,
         data: Dataset,
-        group_field: Union[Sequence[str], str, None] = None,
-        grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
-        target_field: Union[str, List[str], None] = None,
-        features_fields: Union[str, List[str], None] = None,
+        group_field: Sequence[str] | str | None = None,
+        grouping_data: list[tuple[str, Dataset]] | None = None,
+        target_field: str | list[str] | None = None,
+        features_fields: str | list[str] | None = None,
         **kwargs,
     ) -> Dataset:
         group_field = Adapter.to_list(group_field)
@@ -265,8 +267,8 @@ class MLExecutor(Calculator, ABC):
 class IfExecutor(Executor, ABC):
     def __init__(
         self,
-        if_executor: Optional[Executor] = None,
-        else_executor: Optional[Executor] = None,
+        if_executor: Executor | None = None,
+        else_executor: Executor | None = None,
         key: Any = "",
     ):
         self.if_executor = if_executor
