@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from copy import deepcopy
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal
 
 import numpy as np
 
@@ -25,7 +27,7 @@ class SMD(GroupOperator):
 
     @classmethod
     def _inner_function(
-        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Any:
         test_data = cls._check_test_data(test_data=test_data)
         return (data.mean() + test_data.mean()) / data.std()
@@ -34,9 +36,9 @@ class SMD(GroupOperator):
 class MatchingMetrics(GroupOperator):
     def __init__(
         self,
-        grouping_role: Optional[ABCRole] = None,
-        target_roles: Union[ABCRole, List[ABCRole], None] = None,
-        metric: Optional[Literal["auto", "atc", "att", "ate"]] = None,
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | list[ABCRole] | None = None,
+        metric: Literal["auto", "atc", "att", "ate"] | None = None,
         key: Any = "",
     ):
         self.metric = metric or "auto"
@@ -45,7 +47,7 @@ class MatchingMetrics(GroupOperator):
         super().__init__(
             grouping_role=grouping_role,
             target_roles=(
-                target_roles if isinstance(target_roles, List) else [target_roles]
+                target_roles if isinstance(target_roles, list) else [target_roles]
             ),
             key=key,
         )
@@ -80,8 +82,8 @@ class MatchingMetrics(GroupOperator):
     def _inner_function(
         cls,
         data: Dataset,
-        test_data: Optional[Dataset] = None,
-        target_fields: Optional[List[str]] = None,
+        test_data: Dataset | None = None,
+        target_fields: list[str] | None = None,
         **kwargs,
     ) -> Any:
         if target_fields is None or test_data is None:
@@ -166,8 +168,8 @@ class MatchingMetrics(GroupOperator):
 
     @classmethod
     def _execute_inner_function(
-        cls, grouping_data, target_fields: Optional[List[str]] = None, **kwargs
-    ) -> Dict:
+        cls, grouping_data, target_fields: list[str] | None = None, **kwargs
+    ) -> dict:
         metric = kwargs.get("metric", "ate")
         if target_fields is None or len(target_fields) != 2:
             raise ValueError(
@@ -253,8 +255,8 @@ class MatchingMetrics(GroupOperator):
 class Bias(GroupOperator):
     def __init__(
         self,
-        grouping_role: Optional[ABCRole] = None,
-        target_roles: Optional[List[ABCRole]] = None,
+        grouping_role: ABCRole | None = None,
+        target_roles: list[ABCRole] | None = None,
         key: Any = "",
     ):
         super().__init__(
@@ -262,15 +264,15 @@ class Bias(GroupOperator):
         )
 
     @staticmethod
-    def calc_coefficients(X: Dataset, Y: Dataset) -> List[float]:
+    def calc_coefficients(X: Dataset, Y: Dataset) -> list[float]:
         X_l = Dataset.create_empty(roles={"temp": InfoRole()}, index=X.index).fillna(1)
         X = X_l.append(X, axis=1).data.values
         return np.linalg.lstsq(X, Y.data.values, rcond=-1)[0][1:]
 
     @staticmethod
     def calc_bias(
-        X: Dataset, X_matched: Dataset, coefficients: List[float]
-    ) -> List[float]:
+        X: Dataset, X_matched: Dataset, coefficients: list[float]
+    ) -> list[float]:
         return [
             (j - i).dot(coefficients)[0]
             for i, j in zip(X.data.values, X_matched.data.values)
@@ -280,11 +282,11 @@ class Bias(GroupOperator):
     def _inner_function(
         cls,
         data: Dataset,
-        test_data: Optional[Dataset] = None,
-        target_fields: Optional[List[str]] = None,
-        features_fields: Optional[List[str]] = None,
+        test_data: Dataset | None = None,
+        target_fields: list[str] | None = None,
+        features_fields: list[str] | None = None,
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
         if target_fields is None or features_fields is None or test_data is None:
             raise NoneArgumentError(
                 ["target_fields", "features_fields", "test_data"], "bias_estimation"
@@ -334,10 +336,10 @@ class Bias(GroupOperator):
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_fields: Optional[List[str]] = None,
-        features_fields: Optional[List[str]] = None,
+        target_fields: list[str] | None = None,
+        features_fields: list[str] | None = None,
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
         return cls._inner_function(
             grouping_data[0][1],
             test_data=grouping_data[1][1],
