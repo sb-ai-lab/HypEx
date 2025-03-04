@@ -1,4 +1,6 @@
-from typing import Any, ClassVar, Dict
+from __future__ import annotations
+
+from typing import Any, ClassVar
 
 from ..analyzers.matching import MatchingAnalyzer
 from ..comparators import KSTest, TTest
@@ -21,7 +23,7 @@ class MatchingDictReporter(DictReporter):
         super().__init__()
 
     @staticmethod
-    def _convert_dataset_to_dict(data: Dataset) -> Dict[str, Any]:
+    def _convert_dataset_to_dict(data: Dataset) -> dict[str, Any]:
         dict_data = data.to_dict()["data"]
         indexes = dict_data["index"]
         df = dict_data["data"]
@@ -62,14 +64,14 @@ class MatchingDictReporter(DictReporter):
 class MatchingQualityDictReporter(TestDictReporter):
     tests: ClassVar[list] = [TTest, KSTest]
 
-    def report(self, data: ExperimentData) -> Dict[str, Any]:
+    def report(self, data: ExperimentData) -> dict[str, Any]:
         return self.extract_tests(data)
 
 
 class MatchingQualityDatasetReporter(MatchingQualityDictReporter):
 
     @classmethod
-    def convert_flat_dataset(cls, data: Dict) -> Dataset:
+    def convert_flat_dataset(cls, data: dict) -> Dataset:
         struct_dict = cls._get_struct_dict(data)
         return cls._convert_struct_dict_to_dataset(struct_dict)
 

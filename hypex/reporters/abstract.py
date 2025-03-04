@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Union
+from typing import Any
 
 from ..dataset import Dataset, ExperimentData
 from ..dataset.roles import InfoRole, ReportRole, TreatmentRole
@@ -18,7 +20,7 @@ class DictReporter(Reporter, ABC):
         self.front = front
 
     @staticmethod
-    def extract_from_one_row_dataset(data: Dataset) -> Dict[str, Any]:
+    def extract_from_one_row_dataset(data: Dataset) -> dict[str, Any]:
         return {k: v[0] for k, v in data.to_dict()["data"]["data"].items()}
 
     def _extract_from_comparator(self, data: ExperimentData, comparator_id: str):
@@ -38,15 +40,15 @@ class DictReporter(Reporter, ABC):
         return result
 
     def _extract_from_comparators(
-        self, data: ExperimentData, comparator_ids: List[str]
-    ) -> Dict[str, Any]:
+        self, data: ExperimentData, comparator_ids: list[str]
+    ) -> dict[str, Any]:
         result = {}
         for comparator_id in comparator_ids:
             result.update(self._extract_from_comparator(data, comparator_id))
         return result
 
     @abstractmethod
-    def report(self, data: ExperimentData) -> Dict:
+    def report(self, data: ExperimentData) -> dict:
         raise AbstractMethodError
 
 
@@ -56,21 +58,21 @@ class OnDictReporter(Reporter, ABC):
 
 
 class DatasetReporter(OnDictReporter):
-    def report(self, data: ExperimentData) -> Union[Dict[str, Dataset], Dataset]:
+    def report(self, data: ExperimentData) -> dict[str, Dataset] | Dataset:
         dict_result = self.dict_reporter.report(data)
         return self.convert_to_dataset(
             dict_result
         )  #   TODO: change to DatasetAdapter.to_dataset()
 
     @staticmethod
-    def convert_to_dataset(data: Dict) -> Union[Dict[str, Dataset], Dataset]:
+    def convert_to_dataset(data: dict) -> dict[str, Dataset] | Dataset:
         return Dataset.from_dict(roles={k: ReportRole() for k in data}, data=[data])
 
 
 class TestDictReporter(DictReporter):
 
     @staticmethod
-    def _get_struct_dict(data: Dict):
+    def _get_struct_dict(data: dict):
         dict_result = {}
         for key, value in data.items():
             if ID_SPLIT_SYMBOL in key:
@@ -95,9 +97,9 @@ class TestDictReporter(DictReporter):
         return dict_result
 
     @staticmethod
-    def _convert_struct_dict_to_dataset(data: Dict) -> Dataset:
+    def _convert_struct_dict_to_dataset(data: dict) -> Dataset:
 
-        def rename_passed(data: Dict[str, bool]):
+        def rename_passed(data: dict[str, bool]):
             return {
                 c: (
                     ("NOT OK" if (v is True or v == "True") else "OK")
@@ -125,7 +127,7 @@ class TestDictReporter(DictReporter):
             roles={"feature": InfoRole(), "group": TreatmentRole()},
         )
 
-    def extract_tests(self, data: ExperimentData) -> Dict[str, Any]:
+    def extract_tests(self, data: ExperimentData) -> dict[str, Any]:
         test_ids = data.get_ids(
             self.tests, searched_space=ExperimentDataEnum.analysis_tables
         )

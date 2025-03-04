@@ -1,4 +1,6 @@
-from typing import Any, ClassVar, Dict
+from __future__ import annotations
+
+from typing import Any, ClassVar
 
 from ..comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from ..dataset import (
@@ -20,7 +22,7 @@ class OneAADictReporter(TestDictReporter):
     tests: ClassVar[list] = [TTest, KSTest, Chi2Test]
 
     @staticmethod
-    def convert_flat_dataset(data: Dict) -> Dataset:
+    def convert_flat_dataset(data: dict) -> Dataset:
         struct_dict = OneAADictReporter._get_struct_dict(data)
         return OneAADictReporter._convert_struct_dict_to_dataset(struct_dict)
 
@@ -32,23 +34,23 @@ class OneAADictReporter(TestDictReporter):
             except NotFoundInExperimentDataError:
                 pass  # The splitting was done by another class
 
-    def extract_group_difference(self, data: ExperimentData) -> Dict[str, Any]:
+    def extract_group_difference(self, data: ExperimentData) -> dict[str, Any]:
         group_difference_ids = data.get_ids(GroupDifference)[GroupDifference.__name__][
             ExperimentDataEnum.analysis_tables.value
         ]
         return self._extract_from_comparators(data, group_difference_ids)
 
-    def extract_group_sizes(self, data: ExperimentData) -> Dict[str, Any]:
+    def extract_group_sizes(self, data: ExperimentData) -> dict[str, Any]:
         group_sizes_id = data.get_one_id(GroupSizes, ExperimentDataEnum.analysis_tables)
         return self._extract_from_comparators(data, [group_sizes_id])
 
-    def extract_analyzer_data(self, data: ExperimentData) -> Dict[str, Any]:
+    def extract_analyzer_data(self, data: ExperimentData) -> dict[str, Any]:
         analyzer_id = data.get_one_id(
             "OneAAStatAnalyzer", ExperimentDataEnum.analysis_tables
         )
         return self.extract_from_one_row_dataset(data.analysis_tables[analyzer_id])
 
-    def extract_data_from_analysis_tables(self, data: ExperimentData) -> Dict[str, Any]:
+    def extract_data_from_analysis_tables(self, data: ExperimentData) -> dict[str, Any]:
         result = {}
         result.update(self.extract_group_difference(data))
         # result.update(self.extract_group_sizes(data))
@@ -58,7 +60,7 @@ class OneAADictReporter(TestDictReporter):
             result = self.rename_passed(result)
         return result
 
-    def report(self, data: ExperimentData) -> Dict[str, Any]:
+    def report(self, data: ExperimentData) -> dict[str, Any]:
         result = {
             "splitter_id": self.get_splitter_id(data),
         }
@@ -106,7 +108,7 @@ class AAPassedReporter(Reporter):
         passed = passed.astype({c: int for c in passed.columns})
         return passed
 
-    def _detect_pass(self, analyzer_tables: Dict[str, Dataset]):
+    def _detect_pass(self, analyzer_tables: dict[str, Dataset]):
         score_table = self._reformat_aa_score_table(analyzer_tables["aa score"])
         best_split_table = self._reformat_best_split_table(
             analyzer_tables["best split statistics"]
