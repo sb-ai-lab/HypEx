@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from copy import deepcopy
-from typing import Any, List, Optional, Union
+from typing import Any
 
 from ..comparators import TTest, UTest
 from ..dataset import (
@@ -23,12 +25,12 @@ from ..utils import (
 class ABAnalyzer(Executor):
     def __init__(
         self,
-        multitest_method: Optional[ABNTestMethodsEnum] = None,
+        multitest_method: ABNTestMethodsEnum | None = None,
         alpha: float = 0.05,
         equal_variance: bool = True,
-        quantiles: Optional[Union[float, List[float]]] = None,
+        quantiles: float | list[float] | None = None,
         iteration_size: int = 20000,
-        random_state: Optional[int] = None,
+        random_state: int | None = None,
         key: Any = "",
     ):
         self.multitest_method = multitest_method

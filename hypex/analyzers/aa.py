@@ -1,4 +1,6 @@
-from typing import Any, ClassVar, Dict, List, Optional
+from __future__ import annotations
+
+from typing import Any, ClassVar
 
 import numpy as np
 
@@ -16,12 +18,12 @@ class OneAAStatAnalyzer(Executor):
         return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        analysis_tests: List[type] = [TTest, KSTest, Chi2Test]
+        analysis_tests: list[type] = [TTest, KSTest, Chi2Test]
         executor_ids = data.get_ids(
             analysis_tests, searched_space=ExperimentDataEnum.analysis_tables
         )
 
-        analysis_data: Dict[str, float] = {}
+        analysis_data: dict[str, float] = {}
         for class_, spaces in executor_ids.items():
             analysis_ids = spaces.get("analysis_tables", [])
             if len(analysis_ids) > 0:
@@ -120,8 +122,8 @@ class AAScoreAnalyzer(Executor):
         self,
         data: ExperimentData,
         score_table: Dataset,
-        if_param_scores: Optional[Dataset] = None,
-    ) -> Dict[str, Any]:
+        if_param_scores: Dataset | None = None,
+    ) -> dict[str, Any]:
         # TODO: add split_scores in ExperimentData
         if if_param_scores is None:
             if len(self.__feature_weights) < 1:
@@ -193,7 +195,7 @@ class AAScoreAnalyzer(Executor):
         self,
         data: ExperimentData,
         score_table: Dataset,
-        if_param_scores: Optional[Dataset] = None,
+        if_param_scores: Dataset | None = None,
     ) -> ExperimentData:
         best_split = self._get_best_split(data, score_table, if_param_scores)
         return self._set_best_split(best_split["data"], best_split["best_split_id"])
