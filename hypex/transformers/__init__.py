@@ -11,6 +11,7 @@ __all__ = [
     "ConstFilter",
     "CorrFilter",
     "DummyEncoder",
+    "NaFiller",
     "NanFilter",
     "OutliersFilter",
     "Shuffle",

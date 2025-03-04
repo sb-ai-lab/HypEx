@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List, Optional
 
 import numpy as np
 
@@ -67,7 +67,7 @@ class OneAAStatAnalyzer(Executor):
 
 
 class AAScoreAnalyzer(Executor):
-    AA_SPLITER_CLASS_MAPPING = {
+    AA_SPLITER_CLASS_MAPPING : ClassVar[dict] = {
         class_.__name__: class_ for class_ in [AASplitter, AASplitterWithStratification]
     }
 

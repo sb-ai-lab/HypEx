@@ -51,9 +51,9 @@ class Executor(ABC):
         )
 
     def set_params(self, params: SetParamsDictTypes) -> None:
-        if isinstance(list(params)[0], str):
+        if isinstance(next(iter(params)), str):
             self.check_and_setattr(params)
-        elif isinstance(list(params)[0], type):
+        elif isinstance(next(iter(params)), type):
             for executor_class, class_params in params.items():
                 if isinstance(self, executor_class):
                     self.check_and_setattr(class_params)

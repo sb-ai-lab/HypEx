@@ -134,7 +134,7 @@ class Matching(ExperimentShell):
                 executors=(
                     executors
                     if distance == "l2"
-                    else [distance_mapping[distance]] + executors
+                    else [distance_mapping[distance], *executors]
                 )
             )
             if not group_match
@@ -142,7 +142,7 @@ class Matching(ExperimentShell):
                 executors=(
                     executors
                     if distance == "l2"
-                    else [distance_mapping[distance]] + executors
+                    else [distance_mapping[distance], *executors]
                 ),
                 reporter=MatchingDatasetReporter(),
             )

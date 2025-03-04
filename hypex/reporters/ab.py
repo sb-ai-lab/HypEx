@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, ClassVar
 
 from ..analyzers.ab import ABAnalyzer
 from ..comparators import Chi2Test, TTest, UTest
@@ -8,7 +8,7 @@ from .aa import OneAADictReporter
 
 
 class ABDictReporter(OneAADictReporter):
-    tests = [TTest, UTest, Chi2Test]
+    tests: ClassVar[list] = [TTest, UTest, Chi2Test]
 
     def extract_analyzer_data(self, data: ExperimentData) -> Dict[str, Any]:
         analyzer_id = data.get_one_id(ABAnalyzer, ExperimentDataEnum.analysis_tables)

@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import Iterable, Union
+from typing import Iterable, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -11,8 +11,8 @@ sys.path.append(str(ROOT))
 
 def set_nans(
     data: pd.DataFrame,
-    na_step: Union[Iterable[int], int] = None,
-    nan_cols: Union[Iterable[str], str] = None,
+    na_step: Optional[Union[Iterable[int], int]] = None,
+    nan_cols: Optional[Union[Iterable[str], str]] = None,
 ):
     """Fill some values with NaN/
 
@@ -73,9 +73,9 @@ def set_nans(
 
 def create_test_data(
     num_users: int = 10000,
-    na_step: Union[Iterable[int], int] = None,
-    nan_cols: Union[Iterable[str], str] = None,
-    file_name: str = None,
+    na_step: Optional[Union[Iterable[int], int]] = None,
+    nan_cols: Optional[Union[Iterable[str], str]] = None,
+    file_name: Optional[str] = None,
     exact_ATT: int = 100,
     rs=None,
 ):

@@ -416,7 +416,7 @@ class Dataset(DatasetBase):
             func=func, axis=axis, column_name=list(role.keys())[0], **kwargs
         )
         tmp_roles = (
-            {list(role.keys())[0]: list(role.values())[0]}
+            {next(iter(role.keys())): next(iter(role.values()))}
             if ((not tmp_data.any().any()) and len(role) > 1)
             else role
         )
@@ -975,7 +975,7 @@ class DatasetAdapter(Adapter):
     ) -> Dataset:
         if isinstance(roles, ABCRole):
             roles = {"value": roles}
-        return Dataset(roles=roles, data=pd.DataFrame({list(roles.keys())[0]: [data]}))
+        return Dataset(roles=roles, data=pd.DataFrame({next(iter(roles.keys())): [data]}))
 
     @staticmethod
     def dict_to_dataset(
@@ -1000,7 +1000,7 @@ class DatasetAdapter(Adapter):
     def list_to_dataset(data: List, roles: Dict[str, ABCRole]) -> Dataset:
         return Dataset(
             roles=roles,
-            data=pd.DataFrame(data=data, columns=[list(roles.keys())[0]]),
+            data=pd.DataFrame(data=data, columns=[next(iter(roles.keys()))]),
         )
 
     @staticmethod

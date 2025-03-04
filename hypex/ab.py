@@ -16,7 +16,7 @@ class ABTest(ExperimentShell):
     (t-test, u-test, chi-square test) and multiple testing correction methods.
 
     Args:
-        additional_tests (Union[str, List[str], None], optional): Statistical test(s) to run in addition to 
+        additional_tests (Union[str, List[str], None], optional): Statistical test(s) to run in addition to
             the default group difference calculation. Valid options are "t-test", "u-test", and "chi2-test".
             Can be a single test name or list of test names. Defaults to ["t-test"].
         multitest_method (str, optional): Method to use for multiple testing correction. Valid options are:

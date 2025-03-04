@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, ClassVar
 
 from ..analyzers.matching import MatchingAnalyzer
 from ..comparators import KSTest, TTest
@@ -13,7 +13,6 @@ from ..utils import (
     MATCHING_INDEXES_SPLITTER_SYMBOL,
     ExperimentDataEnum,
 )
-from .abstract import DatasetReporter, DictReporter
 
 
 class MatchingDictReporter(DictReporter):
@@ -61,7 +60,7 @@ class MatchingDictReporter(DictReporter):
 
 
 class MatchingQualityDictReporter(TestDictReporter):
-    tests = [TTest, KSTest]
+    tests: ClassVar[list] = [TTest, KSTest]
 
     def report(self, data: ExperimentData) -> Dict[str, Any]:
         return self.extract_tests(data)

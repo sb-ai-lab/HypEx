@@ -1,18 +1,22 @@
 from typing import Dict, List, Literal, Optional, Union
 
+import numpy as np
+
 from ..dataset import ABCRole, Dataset
 from ..utils.constants import NUMBER_TYPES_LIST
 from .abstract import Comparator
 
+NUM_OF_BUCKETS = 10
+
 
 class GroupDifference(Comparator):
     def __init__(
-        self,
-        compare_by: Literal[
-            "groups", "columns", "columns_in_groups", "cross"
-        ] = "groups",
-        grouping_role: Optional[ABCRole] = None,
-        target_roles: Union[ABCRole, List[ABCRole], None] = None,
+            self,
+            compare_by: Literal[
+                "groups", "columns", "columns_in_groups", "cross"
+            ] = "groups",
+            grouping_role: Optional[ABCRole] = None,
+            target_roles: Union[ABCRole, List[ABCRole], None] = None,
     ):
         super().__init__(
             compare_by=compare_by,
@@ -26,10 +30,10 @@ class GroupDifference(Comparator):
 
     @classmethod
     def _inner_function(
-        cls,
-        data: Dataset,
-        test_data: Optional[Dataset] = None,
-        **kwargs,
+            cls,
+            data: Dataset,
+            test_data: Optional[Dataset] = None,
+            **kwargs,
     ) -> Dict:
         test_data = cls._check_test_data(test_data)
         control_mean = data.mean()
@@ -47,11 +51,11 @@ class GroupDifference(Comparator):
 
 class GroupSizes(Comparator):
     def __init__(
-        self,
-        compare_by: Literal[
-            "groups", "columns", "columns_in_groups", "cross"
-        ] = "groups",
-        grouping_role: Optional[ABCRole] = None,
+            self,
+            compare_by: Literal[
+                "groups", "columns", "columns_in_groups", "cross"
+            ] = "groups",
+            grouping_role: Optional[ABCRole] = None,
     ):
         super().__init__(
             compare_by=compare_by,
@@ -61,7 +65,7 @@ class GroupSizes(Comparator):
 
     @classmethod
     def _inner_function(
-        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+            cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dict:
         size_a = len(data)
         size_b = len(test_data) if isinstance(test_data, Dataset) else 0
@@ -78,7 +82,7 @@ class PSI(Comparator):
 
     @classmethod
     def _inner_function(
-        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+            cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
     ) -> Dict[str, float]:
         test_data = cls._check_test_data(test_data=test_data)
         data.sort(ascending=False)

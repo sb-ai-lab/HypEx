@@ -70,8 +70,8 @@ class TTestExtension(StatTest):
         self, data: Dataset, other: Union[Dataset, None] = None, **kwargs
     ) -> Union[float, Dataset]:
         if (
-            list(data.nunique().values())[0] < 2
-            and list(other.nunique().values())[0] < 2
+            next(iter(data.nunique().values()))
+            and next(iter(other.nunique().values())) < 2
         ):
             return DatasetAdapter.to_dataset(
                 {

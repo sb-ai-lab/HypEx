@@ -60,7 +60,7 @@ class MatchingOutput(Output):
                     },
                     index=experiment_data.ds[
                         experiment_data.ds[group_indexes_id] == group
-                    ].index,
+                        ].index,
                     roles={"indexes": StatisticRole()},
                 )
                 for group, values in reformatted_resume.pop("indexes").items()
@@ -82,7 +82,7 @@ class MatchingOutput(Output):
         outcome = experiment_data.field_search(TargetRole())[0]
         reformatted_resume["outcome"] = {
             key: outcome
-            for key in reformatted_resume[list(reformatted_resume.keys())[0]].keys()
+            for key in reformatted_resume[next(iter(reformatted_resume.keys()))].keys()
         }
 
         self.resume = Dataset.from_dict(

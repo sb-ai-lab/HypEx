@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, ClassVar
 
 from ..comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from ..dataset import (
@@ -17,7 +17,7 @@ from .abstract import Reporter, TestDictReporter
 
 
 class OneAADictReporter(TestDictReporter):
-    tests = [TTest, KSTest, Chi2Test]
+    tests: ClassVar[list] = [TTest, KSTest, Chi2Test]
 
     @staticmethod
     def convert_flat_dataset(data: Dict) -> Dataset:

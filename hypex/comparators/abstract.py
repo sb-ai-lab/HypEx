@@ -123,7 +123,7 @@ class Comparator(Calculator, ABC):
     def _extract_dataset(
         compare_result: FromDictTypes, roles: Dict[Any, ABCRole]
     ) -> Dataset:
-        if isinstance(list(compare_result.values())[0], Dataset):
+        if isinstance(next(iter(compare_result.values())), Dataset):
             cr_list_v: List[Dataset] = list(compare_result.values())
             result = cr_list_v[0]
             if len(cr_list_v) > 1:

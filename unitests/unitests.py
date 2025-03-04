@@ -437,14 +437,14 @@ class TestDataset(unittest.TestCase):
     def test_invalid_type_other(self):
         # Test invalid type handling
         with self.assertRaises(DataTypeError):
-            result = self.dataset + {}
+            self.dataset + {}
 
     def test_backend_type_error(self):
         # Test backend type error handling
         other_roles = {"col1": InfoRole(int), "col2": InfoRole(int)}
         other_data = pd.DataFrame({"col1": [10, 20, 30], "col2": [40, 50, 60]})
         with self.assertRaises(TypeError):
-            other_dataset = Dataset(
+            Dataset(
                 roles=other_roles, data=other_data, backend="unknown"
             )
 
@@ -754,7 +754,7 @@ class TestDataset(unittest.TestCase):
         # Ensure covariance involving NaN is correctly handled (NaN should not propagate if handled by pandas)
         self.assertTrue(pd.notna(cov.loc["col1", "col2"]))
 
-    def test_create_empty(self):
+    def test_create_empty_2(self):
         # Test basic empty creation
         empty = Dataset.create_empty(roles=self.roles)
         self.assertTrue(empty.is_empty())
@@ -1350,7 +1350,7 @@ class TestDataset(unittest.TestCase):
     def test_replace_wrong_type(self):
         # Test replace single value
         with self.assertRaises(ValueError):
-            result = self.dataset.replace(1, 'uwu')
+            self.dataset.replace(1, 'uwu')
 
     def test_sample(self):
         # Test with n parameter
@@ -1710,10 +1710,10 @@ def test_operators(self):
         self.assertEqual(t_data.loc["col2"], 4)
 
         with self.assertRaises(KeyError):
-            result = self.dataset["q"]
+            self.dataset["q"]
 
         with self.assertRaises(RoleColumnError):
-            result = self.dataset[1]
+            self.dataset[1]
 
         # Тестирование ролей
         self.assertIn("a", t_data.roles)
@@ -1753,10 +1753,10 @@ def test_operators(self):
         self.assertEqual(t_data.data.to_dict(), {0: {"col1": 1, "col2": 4}})
 
         with self.assertRaises(IndexError):
-            result = self.dataset.iloc[7]
+            self.dataset.iloc[7]
 
         with self.assertRaises(TypeError):
-            result = self.dataset.iloc["a"]
+            self.dataset.iloc["a"]
 
         # Тестирование ролей
         self.assertIn(0, t_data.roles)

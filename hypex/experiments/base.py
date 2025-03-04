@@ -49,9 +49,9 @@ class Experiment(Executor):
     def set_params(
         self, params: Union[Dict[str, Any], Dict[type, Dict[str, Any]]]
     ) -> None:
-        if isinstance(list(params)[0], str):
+        if isinstance(next(iter(params)), str):
             super().set_params(params)
-        elif isinstance(list(params)[0], type):
+        elif isinstance(next(iter(params)), type):
             for executor in self.executors:
                 executor.set_params(params)
         else:

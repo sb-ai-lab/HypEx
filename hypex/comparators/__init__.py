@@ -5,6 +5,7 @@ from .hypothesis_testing import Chi2Test, KSTest, TTest, UTest
 from .test_power import MDEBySize, TestPower
 
 __all__ = [
+    "PSI",
     "Chi2Test",
     "Comparator",
     "GroupDifference",

@@ -46,17 +46,14 @@ from .typings import (
 )
 
 __all__ = [
-    # constants
     "ID_SPLIT_SYMBOL",
     "MATCHING_INDEXES_SPLITTER_SYMBOL",
     "NAME_BORDER_SYMBOL",
     "NUMBER_TYPES_LIST",
-    # enums
     "ABNTestMethodsEnum",
     "BackendsEnum",
     "ExperimentDataEnum",
     "SpaceEnum",
-    # errors
     "AbstractMethodError",
     "BackendTypeError",
     "ConcatBackendError",
@@ -69,12 +66,10 @@ __all__ = [
     "NotSuitableFieldError",
     "RoleColumnError",
     "SpaceError",
-    # tutorial_data_creation
     "create_test_data",
     "gen_control_variates_df",
     "gen_oracle_df",
     "gen_special_medicine_df",
-    # typings
     "CategoricalTypes",
     "DecoratedType",
     "DefaultRoleTypes",
