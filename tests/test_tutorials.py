@@ -17,7 +17,7 @@ def aa_data():
             "post_spends": TargetRole(),
             "gender": StratificationRole(str),
         },
-        data="data.csv"
+        data="examples/tutorials/data.csv"
     )
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def ab_data():
             "post_spends": TargetRole(),
             "gender": TargetRole()
         },
-        data="data.csv",
+        data="examples/tutorials/data.csv"
     )
     data["treat"] = [random.choice([0, 1, 2]) for _ in range(len(data))]
     return data
@@ -44,7 +44,7 @@ def matching_data():
             "treat": TreatmentRole(int), 
             "post_spends": TargetRole(float)
         },
-        data="data.csv",
+        data="examples/tutorials/data.csv",
         default_role=FeatureRole()
     )
     data = data.fillna(method="bfill")
