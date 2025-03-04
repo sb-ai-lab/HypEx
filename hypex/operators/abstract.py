@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Sequence
 
 from ..dataset import (
     ABCRole,
@@ -24,8 +26,8 @@ class GroupOperator(
 
     def __init__(
         self,
-        grouping_role: Optional[ABCRole] = None,
-        target_roles: Union[ABCRole, List[ABCRole], None] = None,
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | list[ABCRole] | None = None,
         key: Any = "",
     ):
         super().__init__(key=key)
@@ -39,7 +41,7 @@ class GroupOperator(
     @classmethod
     @abstractmethod
     def _inner_function(
-        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Any:
         raise AbstractMethodError
 
@@ -58,9 +60,9 @@ class GroupOperator(
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_fields: Optional[List[str]] = None,
+        target_fields: list[str] | None = None,
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
         if target_fields is None or len(target_fields) != 2:
             raise ValueError(
                 f"This operator works with 2 targets, but got {len(target_fields) if target_fields else None}"
@@ -78,11 +80,11 @@ class GroupOperator(
     def calc(
         cls,
         data: Dataset,
-        group_field: Union[Sequence[str], str, None] = None,
-        grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
-        target_fields: Union[str, List[str], None] = None,
+        group_field: Sequence[str] | str | None = None,
+        grouping_data: list[tuple[str, Dataset]] | None = None,
+        target_fields: str | list[str] | None = None,
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
         group_field = Adapter.to_list(group_field)
 
         if grouping_data is None:
@@ -96,7 +98,7 @@ class GroupOperator(
         )
 
     def _set_value(
-        self, data: ExperimentData, value: Optional[Dict] = None, key: Any = None
+        self, data: ExperimentData, value: dict | None = None, key: Any = None
     ) -> ExperimentData:
         data.set_value(
             ExperimentDataEnum.variables,

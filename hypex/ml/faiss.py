@@ -1,4 +1,6 @@
-from typing import Any, Dict, Optional
+from __future__ import annotations
+
+from typing import Any
 
 from ..comparators.distances import MahalanobisDistance
 from ..dataset import (
@@ -20,7 +22,7 @@ class FaissNearestNeighbors(MLExecutor):
         n_neighbors: int = 1,
         two_sides: bool = False,
         test_pairs: bool = False,
-        grouping_role: Optional[ABCRole] = None,
+        grouping_role: ABCRole | None = None,
         key: Any = "",
     ):
         self.n_neighbors = n_neighbors
@@ -34,12 +36,12 @@ class FaissNearestNeighbors(MLExecutor):
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_field: Optional[str] = None,
-        n_neighbors: Optional[int] = None,
-        two_sides: Optional[bool] = None,
-        test_pairs: Optional[bool] = None,
+        target_field: str | None = None,
+        n_neighbors: int | None = None,
+        two_sides: bool | None = None,
+        test_pairs: bool | None = None,
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
         if test_pairs is not True:
             data = cls._inner_function(
                 data=grouping_data[0][1],
@@ -80,16 +82,16 @@ class FaissNearestNeighbors(MLExecutor):
     def _inner_function(
         cls,
         data: Dataset,
-        test_data: Optional[Dataset] = None,
-        target_data: Optional[Dataset] = None,
-        n_neighbors: Optional[int] = None,
+        test_data: Dataset | None = None,
+        target_data: Dataset | None = None,
+        n_neighbors: int | None = None,
         **kwargs,
     ) -> Any:
         return FaissExtension(n_neighbors=n_neighbors or 1).calc(
             data=data, test_data=test_data
         )
 
-    def fit(self, X: Dataset, Y: Optional[Dataset] = None) -> "MLExecutor":
+    def fit(self, X: Dataset, Y: Dataset | None = None) -> "MLExecutor":
         return FaissExtension(self.n_neighbors).fit(X=X, Y=Y)
 
     def predict(self, X: Dataset) -> Dataset:
