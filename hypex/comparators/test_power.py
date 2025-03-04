@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
+import numpy as np
+from scipy.stats import norm
+
 from ..dataset import ABCRole, Dataset, ExperimentData
 from ..utils import ExperimentDataEnum
 from .comparators import Comparator
@@ -88,13 +91,7 @@ class MDEBySize(TestPower):
 #             ratio=ratio,
 #             alpha=significance,
 #
-from typing import Any, Optional
 
-import numpy as np
-from scipy.stats import norm
-
-from ..comparators.abstract import Comparator
-from ..dataset import ABCRole, Dataset, ExperimentData
 
 
 # class MDEBySize(GroupComparator):

@@ -1,4 +1,4 @@
-from typing import Any, Dict, ClassVar
+from typing import Any, ClassVar, Dict
 
 from ..analyzers.ab import ABAnalyzer
 from ..comparators import Chi2Test, TTest, UTest

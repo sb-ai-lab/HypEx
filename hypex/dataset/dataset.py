@@ -6,7 +6,6 @@ from typing import (
     Callable,
     Dict,
     Hashable,
-    Iterable,
     List,
     Literal,
     Optional,
@@ -62,7 +61,7 @@ class Dataset(DatasetBase):
             column_name = item[1]
             column_data_type = self.roles[column_name].data_type
             if (
-                column_data_type == None
+                column_data_type is None
                 or (
                     isinstance(value, Iterable)
                     and all(isinstance(v, column_data_type) for v in value)
@@ -93,7 +92,7 @@ class Dataset(DatasetBase):
             column_name = self.backend.data.columns[column_index]
             column_data_type = self.roles[column_name].data_type
             if (
-                column_data_type == None
+                column_data_type is None
                 or (
                     isinstance(value, Iterable)
                     and all(isinstance(v, column_data_type) for v in value)
@@ -154,7 +153,7 @@ class Dataset(DatasetBase):
         else:
             column_data_type = self.roles[key].data_type
             if (
-                column_data_type == None
+                column_data_type is None
                 or (
                     isinstance(value, Iterable)
                     and all(isinstance(v, column_data_type) for v in value)
@@ -413,7 +412,7 @@ class Dataset(DatasetBase):
         if self.is_empty():
             return deepcopy(self)
         tmp_data = self._backend.apply(
-            func=func, axis=axis, column_name=list(role.keys())[0], **kwargs
+            func=func, axis=axis, column_name=next(iter(role.keys())), **kwargs
         )
         tmp_roles = (
             {next(iter(role.keys())): next(iter(role.values()))}

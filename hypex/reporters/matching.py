@@ -1,4 +1,4 @@
-from typing import Any, Dict, ClassVar
+from typing import Any, ClassVar, Dict
 
 from ..analyzers.matching import MatchingAnalyzer
 from ..comparators import KSTest, TTest

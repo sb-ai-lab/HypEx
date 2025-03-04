@@ -1,4 +1,4 @@
-from typing import Any, Dict, ClassVar
+from typing import Any, ClassVar, Dict
 
 from ..comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from ..dataset import (
