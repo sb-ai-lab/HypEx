@@ -1,4 +1,6 @@
-from typing import Any, Dict
+from __future__ import annotations
+
+from typing import Any
 
 from ..analyzers.matching import MatchingAnalyzer
 from ..dataset import (
@@ -41,7 +43,7 @@ class MatchingOutput(Output):
 
     def extract(self, experiment_data: ExperimentData):
         resume = self.resume_reporter.report(experiment_data)
-        reformatted_resume: Dict[str, Any] = {}
+        reformatted_resume: dict[str, Any] = {}
         for key, value in resume.items():
             if ID_SPLIT_SYMBOL in key:
                 keys = key.split(ID_SPLIT_SYMBOL)

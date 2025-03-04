@@ -1,4 +1,6 @@
-from typing import Any, Optional, Sequence, Union
+from __future__ import annotations
+
+from typing import Any, Sequence
 
 from ..dataset.dataset import Dataset, ExperimentData
 from ..dataset.roles import (
@@ -12,9 +14,9 @@ from .abstract import Transformer
 class CategoryAggregator(Transformer):
     def __init__(
         self,
-        target_roles: Optional[Union[str, Sequence[str]]] = None,
-        threshold: Optional[int] = 15,
-        new_group_name: Optional[str] = None,
+        target_roles: str | Sequence[str] | None = None,
+        threshold: int | None = 15,
+        new_group_name: str | None = None,
         key: Any = "",
     ):
         super().__init__(key=key)
@@ -29,9 +31,9 @@ class CategoryAggregator(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: Optional[str] = None,
-        threshold: Optional[int] = 15,
-        new_group_name: Optional[str] = None,
+        target_cols: str | None = None,
+        threshold: int | None = 15,
+        new_group_name: str | None = None,
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
         for column in target_cols:

@@ -1,4 +1,6 @@
-from typing import Any, Dict, Literal, Optional, Sequence, Union
+from __future__ import annotations
+
+from typing import Any, Literal, Sequence
 
 from ..dataset.dataset import Dataset, ExperimentData
 from ..dataset.roles import (
@@ -12,9 +14,9 @@ from .abstract import Transformer
 class NaFiller(Transformer):
     def __init__(
         self,
-        target_roles: Optional[Union[str, Sequence[str]]] = None,
-        values: Union[ScalarType, Dict[str, ScalarType], None] = None,
-        method: Optional[Literal["bfill", "ffill"]] = None,
+        target_roles: str | Sequence[str] | None = None,
+        values: ScalarType | dict[str, ScalarType] | None = None,
+        method: Literal["bfill", "ffill"] | None = None,
         key: Any = "",
     ):
         """
@@ -38,9 +40,9 @@ class NaFiller(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: Optional[str] = None,
-        values: Union[ScalarType, Dict[str, ScalarType], None] = None,
-        method: Optional[Literal["bfill", "ffill"]] = None,
+        target_cols: str | None = None,
+        values: ScalarType | dict[str, ScalarType] | None = None,
+        method: Literal["bfill", "ffill"] | None = None,
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
