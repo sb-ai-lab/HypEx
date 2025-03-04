@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -11,75 +11,59 @@ ROOT = Path("").absolute().parents[0]
 sys.path.append(str(ROOT))
 
 
+
 def set_nans(
     data: pd.DataFrame,
-    na_step: Iterable[int] |  int | None = None,
-    nan_cols: Iterable[str] |  str | None = None,
-):
-    """Fill some values with NaN/
+    na_step: Sequence[int] | int | None = None,
+    nan_cols: Sequence[str] | str | None = None,
+) -> pd.DataFrame:
+    """Fills specific columns in a DataFrame with NaN values at given intervals.
 
     Args:
-        data: input dataframe
-        na_step:
-            num or list of nums of period to make NaN (step of range)
-            If list - iterates accordingly order of columns
-        nan_cols:
-            name of one or several columns to fill with NaN
-            If list - iterates accordingly order of na_step
+        data: The input DataFrame.
+        na_step: Step interval(s) for inserting NaNs.
+        nan_cols: Column(s) to insert NaNs.
 
     Returns:
-        data: dataframe with some NaNs
+        pd.DataFrame: Modified DataFrame with NaNs.
     """
-    if (nan_cols is not None) or (na_step is not None):
-        # correct type of columns to iterate
-
-        #  number of nans
-        if na_step is None:
-            na_step = [10]
-            print(f"No na_step specified: set to {na_step}")
-        elif not isinstance(na_step, Iterable):
-            na_step = [na_step]
-
-        #  columns
-        if nan_cols is None:
-            nan_cols = list(data.columns)
-            print("No nan_cols specified. Setting NaNs applied to all columns")
-        elif not isinstance(nan_cols, Iterable):
-            nan_cols = [nan_cols]
-
-        # correct length of two lists
-        if len(na_step) > len(nan_cols):
-            na_step = na_step[: len(nan_cols)]
-            # print('Length of na_step is bigger than length of columns. Used only first values') TODO: set to logging
-        elif len(na_step) < len(nan_cols):
-            na_step = na_step + [na_step[-1]] * (len(nan_cols) - len(na_step))
-            # print('Length of na_step is less than length of columns. Used last value several times')
-
-        # create list of indexes to fill with na
-        nans_indexes = [
-            list(range(i, len(data), period)) for i, period in enumerate(na_step)
-        ]
-
-        for i in range(len(nan_cols)):
-            try:
-                data.loc[nans_indexes[i], nan_cols[i]] = np.nan
-            except KeyError:
-                print(
-                    f"There is no column {nan_cols[i]} in data. No nans in this column will be added."
-                )
+    # Convert na_step and nan_cols to lists
+    if na_step is None:
+        na_step_list: list[int] = [10]
+    elif isinstance(na_step, int):
+        na_step_list = [na_step]
     else:
-        print("No NaN added")
+        na_step_list = list(na_step)
+
+    if nan_cols is None:
+        nan_cols_list: list[str] = list(data.columns)
+    elif isinstance(nan_cols, str):
+        nan_cols_list = [nan_cols]
+    else:
+        nan_cols_list = list(nan_cols)
+
+    if not na_step_list or not nan_cols_list:
+        raise ValueError("na_step and nan_cols must not be empty.")
+
+    if len(na_step_list) < len(nan_cols_list):
+        na_step_list += [na_step_list[-1]] * (len(nan_cols_list) - len(na_step_list))
+    elif len(na_step_list) > len(nan_cols_list):
+        na_step_list = na_step_list[:len(nan_cols_list)]
+
+    for col, step in zip(nan_cols_list, na_step_list):
+        if col in data.columns:
+            data.loc[::step, col] = None
 
     return data
 
 
 def create_test_data(
-    num_users: int = 10000,
-    na_step: Iterable[int] |  int | None = None,
-    nan_cols: Iterable[str] |  str | None = None,
-    file_name: str | None = None,
-    exact_ATT: int = 100,
-    rs=None,
+        num_users: int = 10000,
+        na_step: Sequence[int] | int | None = None,
+        nan_cols: Sequence[str] | str | None = None,
+        file_name: str | None = None,
+        exact_ATT: int = 100,
+        rs=None,
 ):
     """Creates data for tutorial.
 
@@ -212,7 +196,7 @@ def sigmoid_division(x, dependent_division=True) -> np.ndarray:
 
 
 def gen_special_medicine_df(
-    data_size=100, *, dependent_division=True, random_state=None
+        data_size=100, *, dependent_division=True, random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
 
@@ -261,7 +245,7 @@ def gen_special_medicine_df(
 
 
 def gen_oracle_df(
-    data_size=8, *, dependent_division=True, factual_only=False, random_state=None
+        data_size=8, *, dependent_division=True, factual_only=False, random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
 
@@ -322,7 +306,7 @@ def gen_oracle_df(
 
 
 def gen_control_variates_df(
-    data_size=1000, *, dependent_division=True, random_state=None
+        data_size=1000, *, dependent_division=True, random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
 
