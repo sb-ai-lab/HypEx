@@ -79,8 +79,8 @@ class AATest(ExperimentShell):
     """A class for conducting A/A tests with configurable parameters.
 
     This class provides functionality to run A/A tests with options for stratification,
-    precision control (fast or with type 1 error controll), and sample size specification.
-    It sets up the experiment pipeline with appropriate parameters, performs homogenity
+    precision control (fast or with type 1 error control), and sample size specification.
+    It sets up the experiment pipeline with appropriate parameters, performs homogeneity
     tests for each split in order to evaluate their quality and to identify the best one.
 
     Args:
