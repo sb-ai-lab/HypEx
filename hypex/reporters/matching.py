@@ -1,23 +1,19 @@
-from typing import Dict, Any, Union
-
-from ..dataset import (
-    ExperimentData,
-    Dataset,
-    InfoRole,
-    TreatmentRole,
-)
-
-from ..ml import FaissNearestNeighbors
-from ..reporters.abstract import DictReporter, DatasetReporter, TestDictReporter
-from ..utils import (
-    ExperimentDataEnum,
-    ID_SPLIT_SYMBOL,
-    MATCHING_INDEXES_SPLITTER_SYMBOL,
-)
+from typing import Any, Dict
 
 from ..analyzers.matching import MatchingAnalyzer
+from ..comparators import KSTest, TTest
+from ..dataset import (
+    Dataset,
+    ExperimentData,
+)
+from ..ml import FaissNearestNeighbors
+from ..reporters.abstract import DatasetReporter, DictReporter, TestDictReporter
+from ..utils import (
+    ID_SPLIT_SYMBOL,
+    MATCHING_INDEXES_SPLITTER_SYMBOL,
+    ExperimentDataEnum,
+)
 from .abstract import DatasetReporter, DictReporter
-from ..comparators import TTest, KSTest
 
 
 class MatchingDictReporter(DictReporter):

@@ -1,16 +1,16 @@
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
 from typing import (
-    Iterable,
     Any,
-    Union,
     Callable,
-    Sized,
-    Optional,
     Dict,
-    Sequence,
+    Iterable,
     List,
     Literal,
+    Optional,
+    Sequence,
+    Sized,
     Tuple,
+    Union,
 )
 
 from ...utils import AbstractMethodError, FromDictTypes

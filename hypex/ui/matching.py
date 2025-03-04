@@ -1,17 +1,17 @@
-from typing import Dict, Any
+from typing import Any, Dict
 
-from .base import Output
 from ..analyzers.matching import MatchingAnalyzer
 from ..dataset import (
+    AdditionalMatchingRole,
     Dataset,
     ExperimentData,
-    AdditionalMatchingRole,
-    StatisticRole,
     GroupingRole,
+    StatisticRole,
     TargetRole,
 )
 from ..reporters.matching import MatchingDictReporter, MatchingQualityDatasetReporter
 from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL
+from .base import Output
 
 
 class MatchingOutput(Output):

@@ -1,14 +1,13 @@
-from typing import Optional, Dict, Any, Iterable
+from typing import Any, Dict, Iterable, Optional
 
-from .forks.aa import IfAAExecutor
-from .analyzers.aa import OneAAStatAnalyzer, AAScoreAnalyzer
+from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
 from .comparators import GroupDifference, GroupSizes
 from .comparators.abstract import Comparator
-from .comparators.hypothesis_testing import TTest, KSTest, Chi2Test
-from .dataset import AdditionalTreatmentRole
-from .dataset import TargetRole
+from .comparators.hypothesis_testing import Chi2Test, KSTest, TTest
+from .dataset import AdditionalTreatmentRole, TargetRole
 from .experiments.base import Experiment, OnRoleExperiment
-from .experiments.base_complex import ParamsExperiment, IfParamsExperiment
+from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
+from .forks.aa import IfAAExecutor
 from .reporters import DatasetReporter
 from .reporters.aa import OneAADictReporter
 from .splitters import AASplitter, AASplitterWithStratification

@@ -1,7 +1,6 @@
 from functools import wraps
-from typing import Union, Any, Callable, cast
+from typing import Any, Callable, Union, cast
 
-from docs.mock_docs import MyClass
 from hypex.utils import DecoratedType, DocstringInheritDecorator
 
 

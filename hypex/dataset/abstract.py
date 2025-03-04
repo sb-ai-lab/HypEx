@@ -1,17 +1,17 @@
 import copy
 import json  # type: ignore
 from abc import ABC
-from typing import Iterable, Dict, Union, List, Optional, Any
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 import pandas as pd  # type: ignore
 
+from ..utils import BackendsEnum, RoleColumnError
 from .backends import PandasDataset
 from .roles import (
     ABCRole,
-    default_roles,
     DefaultRole,
+    default_roles,
 )
-from ..utils import BackendsEnum, RoleColumnError, BackendTypeError
 
 
 def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:

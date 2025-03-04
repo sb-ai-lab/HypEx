@@ -1,11 +1,12 @@
-import unittest
 import copy
-import pandas as pd
+import unittest
+
 import numpy as np
+import pandas as pd
+
 from hypex.dataset import *
 from hypex.dataset.roles import *
 from hypex.utils import *
-import json
 
 
 class TestDataset(unittest.TestCase):
@@ -30,7 +31,7 @@ class TestDataset(unittest.TestCase):
         roles_with_mapping = {InfoRole(): ["col1", "col2"]}
         dataset_with_mapping = Dataset(roles=roles_with_mapping, data=self.data)
         self.assertListEqual(list(dataset_with_mapping.columns), ["col1", "col2"])
-    
+
     def test_backend_initialization(self):
         # Test initialization with backend
         roles_with_mapping = {InfoRole(): ["col1", "col2"]}
@@ -39,7 +40,7 @@ class TestDataset(unittest.TestCase):
         )
         self.assertListEqual(list(dataset_with_backend.columns), ["col1", "col2"])
         self.assertEqual(dataset_with_backend.backend.name, "pandasdataset")
-    
+
     def test_partial_role_initialization(self):
         # Test initialization with partial roles
         roles_partial = {InfoRole(): ["col1"]}
@@ -459,7 +460,7 @@ class TestDataset(unittest.TestCase):
         # Test setting invalid type
         with self.assertRaises(TypeError):
             self.dataset["col1"] = ["string", "another", "string"]
-        
+
     def test_setitem_invalid_len(self):
         # Test setting invalid type
         with self.assertRaises(ValueError):
@@ -657,12 +658,12 @@ class TestDataset(unittest.TestCase):
         # Test with correct positive values
         self.dataset.data["col1"] = [1, 2, 3]
         cv = self.dataset.coefficient_of_variation()
-        
+
         # Calculate the expected CV manually
         mean_col1 = np.mean([1, 2, 3])
         std_col1 = np.std([1, 2, 3], ddof=0)  # Standard deviation with population correction
         expected_cv = std_col1 / mean_col1
-        
+
         # Check that the coefficient of variation is close to the expected value
         self.assertAlmostEqual(cv["col1"], expected_cv, places=3)
 
@@ -729,21 +730,21 @@ class TestDataset(unittest.TestCase):
 
         expected_cov = self.dataset.data.cov()
         pd.testing.assert_frame_equal(cov.data, expected_cov)
-        
+
         # Edge cases
         # Test with constant column
         self.dataset.data["col1"] = [1, 1, 1]
         cov = self.dataset.cov()
         self.assertEqual(cov.loc["col1", "col1"], 0)  # Covariance with constant column should be 0
-        
+
         # Test with NaN values
         self.dataset.data["col1"] = [1, None, 3]
         cov = self.dataset.cov()
-        
+
         # The expected behavior for NaN values: pandas should handle them by excluding those rows in the covariance calculation
         expected_cov = self.dataset.data.cov()
         pd.testing.assert_frame_equal(cov.data, expected_cov)  # Ensure covariance matrix is correct even with NaN
-        
+
         # Ensure covariance involving NaN is correctly handled (NaN should not propagate if handled by pandas)
         self.assertTrue(pd.notna(cov.loc["col1", "col2"]))
 
@@ -1339,7 +1340,7 @@ class TestDataset(unittest.TestCase):
         # Test replace with non-existent values
         result = self.dataset.replace({999: 1000})
         self.assertTrue(result.data.equals(self.dataset.data))
-    
+
     def test_replace_wrong_type(self):
         # Test replace single value
         with self.assertRaises(ValueError):
@@ -1627,7 +1628,7 @@ def test_operators(self):
         ("rdiv2", 10, lambda x, y: x / y),
         ("div", 2, lambda x, y: x / y),
     ]
-    
+
     for operator, other_data, expected_operator in test_cases:
         with self.subTest(operator=operator):
             # Create the other dataset
@@ -1685,7 +1686,7 @@ def test_operators(self):
                 result = other_data ** self.dataset
             elif operator == "rdiv2":
                 result = other_data / self.dataset
-            
+
             # Check the result type
             self.assertIsInstance(result, Dataset, f"Expected result to be Dataset for {operator}")
 

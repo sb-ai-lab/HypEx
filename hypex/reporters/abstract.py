@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Union, List
+from typing import Any, Dict, List, Union
 
-from ..dataset import ExperimentData, Dataset
-from ..dataset.roles import ReportRole, TreatmentRole, InfoRole
+from ..dataset import Dataset, ExperimentData
+from ..dataset.roles import InfoRole, ReportRole, TreatmentRole
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
 from ..utils.errors import AbstractMethodError
 

@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Union, Dict, List, TypeVar, Callable, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Sequence, Tuple, TypeVar, Union
 
 StratificationRoleTypes = Union[float, str, datetime.datetime]
 DefaultRoleTypes = Union[float, bool, str, int]

@@ -1,11 +1,11 @@
-from typing import Any, Optional, List, Union, Sequence
+from typing import Any, List, Optional, Sequence, Union
 
 from ..dataset import Dataset, ExperimentData, FeatureRole
 from ..executor import Calculator
 from ..utils import (
+    NAME_BORDER_SYMBOL,
     AbstractMethodError,
     CategoricalTypes,
-    NAME_BORDER_SYMBOL,
     ExperimentDataEnum,
 )
 

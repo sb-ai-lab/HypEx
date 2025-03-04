@@ -1,9 +1,15 @@
 import warnings
-from typing import Callable, Union, Optional
+from typing import Callable, Optional, Union
 
-from scipy.stats import chi2_contingency, ks_2samp, mannwhitneyu, ttest_ind, norm  # type: ignore
+from scipy.stats import (  # type: ignore
+    chi2_contingency,
+    ks_2samp,
+    mannwhitneyu,
+    norm,
+    ttest_ind,
+)
 
-from ..dataset import Dataset, StatisticRole, DatasetAdapter
+from ..dataset import Dataset, DatasetAdapter, StatisticRole
 from .abstract import CompareExtension
 
 

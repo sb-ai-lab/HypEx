@@ -1,17 +1,16 @@
 from pathlib import Path
-
 from typing import (
     Any,
     Callable,
     Dict,
     Iterable,
     List,
+    Literal,
     Optional,
     Sequence,
     Sized,
     Tuple,
     Union,
-    Literal,
 )
 
 import numpy as np

@@ -1,17 +1,17 @@
-from .shuffle import Shuffle
-from .filters import CVFilter, ConstFilter, NanFilter, CorrFilter, OutliersFilter
-from .category_agg import CategoryAggregator
-from .na_filler import NaFiller
 from ..encoders.encoders import DummyEncoder
+from .category_agg import CategoryAggregator
+from .filters import ConstFilter, CorrFilter, CVFilter, NanFilter, OutliersFilter
+from .na_filler import NaFiller
+from .shuffle import Shuffle
 
 __all__ = [
-    "Shuffle",
     "CVFilter",
-    "ConstFilter",
-    "NanFilter",
-    "CorrFilter",
-    "OutliersFilter",
     "CategoryAggregator",
+    "ConstFilter",
+    "CorrFilter",
     "DummyEncoder",
     "NaFilter",
+    "NanFilter",
+    "OutliersFilter",
+    "Shuffle",
 ]

@@ -1,14 +1,14 @@
 from .encoders.encoders import DummyEncoder
 from .experiments.base import Experiment
 from .transformers.category_agg import CategoryAggregator
-from .transformers.na_filler import NaFiller
 from .transformers.filters import (
-    NanFilter,
-    CorrFilter,
     ConstFilter,
+    CorrFilter,
     CVFilter,
+    NanFilter,
     OutliersFilter,
 )
+from .transformers.na_filler import NaFiller
 
 PREPROCESSING_DATA = Experiment(
     executors=[

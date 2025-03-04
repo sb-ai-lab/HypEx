@@ -1,16 +1,16 @@
-from typing import Optional, Any, Dict
+from typing import Any, Dict, Optional
 
 from ..comparators.distances import MahalanobisDistance
 from ..dataset import (
-    Dataset,
     ABCRole,
-    FeatureRole,
-    ExperimentData,
     AdditionalMatchingRole,
+    Dataset,
+    ExperimentData,
+    FeatureRole,
 )
 from ..executor import MLExecutor
 from ..extensions.faiss import FaissExtension
-from ..utils import SpaceEnum, ExperimentDataEnum
+from ..utils import ExperimentDataEnum
 from ..utils.errors import PairsNotFoundError
 
 

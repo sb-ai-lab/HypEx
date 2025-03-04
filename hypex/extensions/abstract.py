@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Union, Any, Dict, Optional, Literal
+from typing import Any, Dict, Literal, Optional, Union
 
-from ..dataset import Dataset, ABCRole
+from ..dataset import ABCRole, Dataset
 from ..dataset.backends import PandasDataset
 from ..dataset.dataset import DatasetAdapter
 from ..utils.errors import AbstractMethodError

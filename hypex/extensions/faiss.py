@@ -1,10 +1,10 @@
-from typing import Optional, Literal
+from typing import Literal, Optional
 
 import faiss  # type: ignore
 import numpy as np
 import pandas as pd  # type: ignore
 
-from ..dataset import Dataset, AdditionalMatchingRole
+from ..dataset import AdditionalMatchingRole, Dataset
 from .abstract import MLExtension
 
 

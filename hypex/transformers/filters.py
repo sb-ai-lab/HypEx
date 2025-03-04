@@ -1,15 +1,14 @@
-from typing import Any, Optional, Union, Sequence
+from typing import Any, Optional, Sequence, Union
 
-from ..dataset.dataset import Dataset
-from ..dataset.dataset import ExperimentData
+from ..dataset.dataset import Dataset, ExperimentData
 from ..dataset.roles import (
-    InfoRole,
     FeatureRole,
+    InfoRole,
     PreTargetRole,
     TargetRole,
 )
-from .abstract import Transformer
 from ..utils.adapter import Adapter
+from .abstract import Transformer
 
 
 class CVFilter(Transformer):

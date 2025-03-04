@@ -1,11 +1,20 @@
 #starts with HYPEX-dir: PYTHONPATH=$(pwd) pytest
 import random
+
 import pandas as pd
-import numpy as np
-import pytest
 import pandas.testing as pdt
-from hypex.dataset import Dataset, InfoRole, TreatmentRole, TargetRole, StratificationRole, FeatureRole
+import pytest
+
 from hypex import AATest, ABTest, Matching
+from hypex.dataset import (
+    Dataset,
+    FeatureRole,
+    InfoRole,
+    StratificationRole,
+    TargetRole,
+    TreatmentRole,
+)
+
 
 @pytest.fixture
 def aa_data():
@@ -41,7 +50,7 @@ def matching_data():
     data = Dataset(
         roles={
             "user_id": InfoRole(int),
-            "treat": TreatmentRole(int), 
+            "treat": TreatmentRole(int),
             "post_spends": TargetRole(float)
         },
         data="examples/tutorials/data.csv",
@@ -84,7 +93,7 @@ def test_aatest(aa_data):
                         'KSTest best split': {0: 'OK', 1: 'OK'},
                         'result': {0: 'OK', 1: 'OK'}})
     }
-    
+
     for test_name in mapping.keys():
         res = mapping[test_name].execute(aa_data)
         actual_data = res.resume.data.iloc[:, 2:-2]
@@ -123,7 +132,7 @@ def test_abtest(ab_data):
         'ab-n': pd.DataFrame({
                     'TTest pass': {0: 'NOT OK', 1: 'NOT OK', 2: 'NOT OK', 3: 'NOT OK'}}),
     }
-    
+
     for test_name in mapping.keys():
         res = mapping[test_name].execute(ab_data)
         actual_data = res.resume.data.fillna(0).apply(pd.to_numeric, errors='ignore').iloc[:, 4::2]

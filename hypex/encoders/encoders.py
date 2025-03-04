@@ -1,8 +1,8 @@
 from typing import Optional
 
 from ..dataset import Dataset
-from .abstract import Encoder
 from ..extensions.encoders import DummyEncoderExtension
+from .abstract import Encoder
 
 
 class DummyEncoder(Encoder):

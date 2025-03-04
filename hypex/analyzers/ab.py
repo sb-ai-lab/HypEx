@@ -1,22 +1,22 @@
 from copy import deepcopy
-from typing import Optional, Any, Union, List
+from typing import Any, List, Optional, Union
 
 from ..comparators import TTest, UTest
 from ..dataset import (
     Dataset,
     ExperimentData,
     StatisticRole,
-    TreatmentRole,
     TargetRole,
+    TreatmentRole,
 )
 from ..experiments.base import Executor
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
 from ..utils import (
     ID_SPLIT_SYMBOL,
     NAME_BORDER_SYMBOL,
+    ABNTestMethodsEnum,
     BackendsEnum,
     ExperimentDataEnum,
-    ABNTestMethodsEnum,
 )
 
 

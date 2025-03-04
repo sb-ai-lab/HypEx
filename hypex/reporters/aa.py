@@ -1,20 +1,20 @@
-from typing import Dict, Any
+from typing import Any, Dict
 
-from ..comparators import GroupDifference, GroupSizes, TTest, KSTest, Chi2Test
+from ..comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from ..dataset import (
-    ExperimentData,
     Dataset,
+    ExperimentData,
     InfoRole,
-    TreatmentRole,
     StatisticRole,
 )
 from ..splitters import AASplitter, AASplitterWithStratification
 from ..utils import (
-    ExperimentDataEnum,
     ID_SPLIT_SYMBOL,
+    ExperimentDataEnum,
     NotFoundInExperimentDataError,
 )
 from .abstract import Reporter, TestDictReporter
+
 
 class OneAADictReporter(TestDictReporter):
     tests = [TTest, KSTest, Chi2Test]

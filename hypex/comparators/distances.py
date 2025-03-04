@@ -1,12 +1,12 @@
 from copy import deepcopy
-from typing import Optional, List, Dict, Any, Union, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from ..dataset import (
+    ABCRole,
     Dataset,
     ExperimentData,
     FeatureRole,
     GroupingRole,
-    ABCRole,
     TargetRole,
 )
 from ..executor import Calculator

@@ -1,6 +1,6 @@
-from typing import Dict, Union, Any, Optional
+from typing import Any, Dict, Optional, Union
 
-from ..dataset import ExperimentData, Dataset
+from ..dataset import Dataset, ExperimentData
 from ..experiments.base import Experiment
 from ..reporters import Reporter
 from ..utils import ID_SPLIT_SYMBOL

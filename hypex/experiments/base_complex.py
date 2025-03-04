@@ -1,13 +1,13 @@
 from itertools import product
-from typing import Optional, List, Dict, Sequence, Any
+from typing import Any, Dict, List, Optional, Sequence
 
 from tqdm.auto import tqdm
 
-from ..dataset import ExperimentData, Dataset, GroupingRole, ABCRole
+from ..dataset import ABCRole, Dataset, ExperimentData, GroupingRole
 from ..executor import Executor, IfExecutor
-from .base import Experiment
-from ..reporters import Reporter, DatasetReporter
+from ..reporters import DatasetReporter, Reporter
 from ..utils.enums import ExperimentDataEnum
+from .base import Experiment
 
 
 class ExperimentWithReporter(Experiment):

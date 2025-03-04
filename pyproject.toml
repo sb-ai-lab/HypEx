@@ -82,6 +82,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 88
-target-version = ["py38", "py39", "py310", "py311", "py312"]
+target-version = "py38"
 select = ["E", "F", "W", "C90", "UP", "RUF", "I"]
 ignore = ["E501"]

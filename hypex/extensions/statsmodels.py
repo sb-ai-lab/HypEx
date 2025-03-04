@@ -1,11 +1,11 @@
-from typing import Optional, Union, List
+from typing import List, Optional, Union
 
 import numpy as np
 from scipy.stats import norm  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
 
-from ..dataset import Dataset, StatisticRole, DatasetAdapter
-from ..utils import ABNTestMethodsEnum, ID_SPLIT_SYMBOL
+from ..dataset import Dataset, DatasetAdapter, StatisticRole
+from ..utils import ID_SPLIT_SYMBOL, ABNTestMethodsEnum
 from .abstract import Extension
 
 

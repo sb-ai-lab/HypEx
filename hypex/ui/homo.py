@@ -1,7 +1,6 @@
-from ..reporters.homo import HomoDatasetReporter
-
-from .base import Output
 from ..dataset import Dataset, ExperimentData
+from ..reporters.homo import HomoDatasetReporter
+from .base import Output
 
 
 class HomoOutput(Output):

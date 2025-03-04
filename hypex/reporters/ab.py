@@ -1,10 +1,10 @@
-from typing import Dict, Any
+from typing import Any, Dict
 
 from ..analyzers.ab import ABAnalyzer
-from ..dataset import ExperimentData, Dataset
+from ..comparators import Chi2Test, TTest, UTest
+from ..dataset import Dataset, ExperimentData
 from ..utils import ExperimentDataEnum
 from .aa import OneAADictReporter
-from ..comparators import TTest, UTest, Chi2Test
 
 
 class ABDictReporter(OneAADictReporter):

@@ -1,18 +1,18 @@
 import warnings
-from copy import copy, deepcopy
 from collections.abc import Iterable
+from copy import deepcopy
 from typing import (
-    Union,
-    List,
-    Iterable,
     Any,
-    Dict,
     Callable,
+    Dict,
     Hashable,
-    Optional,
-    Tuple,
+    Iterable,
+    List,
     Literal,
+    Optional,
     Sequence,
+    Tuple,
+    Union,
 )
 
 import pandas as pd  # type: ignore
@@ -20,27 +20,27 @@ import pandas as pd  # type: ignore
 from ..utils import (
     ID_SPLIT_SYMBOL,
     BackendsEnum,
+    BackendTypeError,
     ConcatBackendError,
     ConcatDataError,
+    DataTypeError,
     ExperimentDataEnum,
     FromDictTypes,
     MultiFieldKeyTypes,
     NotFoundInExperimentDataError,
-    DataTypeError,
-    BackendTypeError,
     ScalarType,
-)
-from .abstract import DatasetBase
-from .roles import (
-    StatisticRole,
-    InfoRole,
-    ABCRole,
-    FilterRole,
-    DefaultRole,
-    AdditionalRole,
 )
 from ..utils.adapter import Adapter
 from ..utils.errors import InvalidArgumentError
+from .abstract import DatasetBase
+from .roles import (
+    ABCRole,
+    AdditionalRole,
+    DefaultRole,
+    FilterRole,
+    InfoRole,
+    StatisticRole,
+)
 
 
 class Dataset(DatasetBase):

@@ -1,33 +1,32 @@
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Union, Tuple, Sequence, Literal
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from ..dataset import (
     ABCRole,
     Dataset,
-    ExperimentData,
-    StatisticRole,
-    TempTargetRole,
-    InfoRole,
     DatasetAdapter,
+    ExperimentData,
     GroupingRole,
-    TargetRole,
+    InfoRole,
     PreTargetRole,
+    StatisticRole,
+    TargetRole,
+    TempTargetRole,
 )
 from ..executor import Calculator
 from ..utils import (
+    NAME_BORDER_SYMBOL,
     BackendsEnum,
     ExperimentDataEnum,
     FromDictTypes,
-    NAME_BORDER_SYMBOL,
     GroupingDataType,
 )
-from ..utils.adapter import Adapter
 from ..utils.errors import (
     AbstractMethodError,
-    NotSuitableFieldError,
-    NoRequiredArgumentError,
     NoColumnsError,
+    NoRequiredArgumentError,
+    NotSuitableFieldError,
 )
 
 

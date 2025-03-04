@@ -1,9 +1,9 @@
 from copy import deepcopy
-from typing import Iterable, Dict, Union, Any, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
 from ..dataset import (
-    ExperimentData,
     ABCRole,
+    ExperimentData,
     TempTargetRole,
 )
 from ..executor import Executor

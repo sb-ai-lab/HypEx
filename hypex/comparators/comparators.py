@@ -1,8 +1,8 @@
-from typing import Dict, Optional, List, Literal, Union
+from typing import Dict, List, Literal, Optional, Union
 
-from .abstract import Comparator
-from ..dataset import Dataset, ABCRole
+from ..dataset import ABCRole, Dataset
 from ..utils.constants import NUMBER_TYPES_LIST
+from .abstract import Comparator
 
 
 class GroupDifference(Comparator):

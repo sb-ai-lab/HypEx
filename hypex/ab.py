@@ -1,7 +1,7 @@
-from typing import Optional, Literal, Union, List
+from typing import List, Literal, Optional, Union
 
 from .analyzers.ab import ABAnalyzer
-from .comparators import GroupDifference, GroupSizes, TTest, UTest, Chi2Test
+from .comparators import Chi2Test, GroupDifference, GroupSizes, TTest, UTest
 from .dataset import TargetRole, TreatmentRole
 from .experiments.base import Experiment, OnRoleExperiment
 from .ui.ab import ABOutput

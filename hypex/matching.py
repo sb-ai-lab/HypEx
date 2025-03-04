@@ -1,16 +1,15 @@
-import warnings
 from typing import List, Literal, Union
 
-from .experiments import GroupExperiment
-from .reporters.matching import MatchingDatasetReporter
 from .analyzers.matching import MatchingAnalyzer
-from .comparators import TTest, PSI, KSTest
+from .comparators import KSTest, TTest
 from .comparators.distances import MahalanobisDistance
-from .dataset import TreatmentRole, TargetRole, AdditionalTargetRole
+from .dataset import TargetRole, TreatmentRole
 from .executor import Executor
+from .experiments import GroupExperiment
 from .experiments.base import Experiment, OnRoleExperiment
 from .ml.faiss import FaissNearestNeighbors
-from .operators.operators import MatchingMetrics, Bias
+from .operators.operators import Bias, MatchingMetrics
+from .reporters.matching import MatchingDatasetReporter
 from .ui.base import ExperimentShell
 from .ui.matching import MatchingOutput
 

@@ -1,22 +1,22 @@
 from copy import deepcopy
-from typing import Optional, Any, List, Literal, Union, Dict, Tuple
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import numpy as np
 
 from ..dataset import (
-    Dataset,
     ABCRole,
-    ExperimentData,
-    TargetRole,
-    InfoRole,
-    FeatureRole,
     AdditionalMatchingRole,
     AdditionalTargetRole,
+    Dataset,
+    ExperimentData,
+    FeatureRole,
+    InfoRole,
+    TargetRole,
 )
 from ..extensions.scipy_stats import NormCDF
-from .abstract import GroupOperator
 from ..utils.enums import ExperimentDataEnum
 from ..utils.errors import NoneArgumentError
+from .abstract import GroupOperator
 
 
 class SMD(GroupOperator):
@@ -171,9 +171,7 @@ class MatchingMetrics(GroupOperator):
         metric = kwargs.get("metric", "ate")
         if target_fields is None or len(target_fields) != 2:
             raise ValueError(
-                "This operator works with 2 targets, but got {}".format(
-                    len(target_fields) if target_fields else None
-                )
+                f"This operator works with 2 targets, but got {len(target_fields) if target_fields else None}"
             )
         return cls._inner_function(
             data=grouping_data[0][1],
@@ -189,7 +187,7 @@ class MatchingMetrics(GroupOperator):
     ) -> Dataset:
         indexes = data.field_search(AdditionalMatchingRole())
         if len(indexes) == 0:
-            raise ValueError(f"No indexes were found")
+            raise ValueError("No indexes were found")
         new_target = data.ds.search_columns(TargetRole())[0]
         indexes = data.additional_fields[indexes[0]]
         indexes.index = t_data.index

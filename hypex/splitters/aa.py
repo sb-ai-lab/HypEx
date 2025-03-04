@@ -1,11 +1,11 @@
 from typing import Any, List, Optional, Union
 
 from ..dataset import (
+    AdditionalTreatmentRole,
     Dataset,
     ExperimentData,
-    TreatmentRole,
     StratificationRole,
-    AdditionalTreatmentRole,
+    TreatmentRole,
 )
 from ..dataset.roles import ConstGroupRole
 from ..executor import Calculator

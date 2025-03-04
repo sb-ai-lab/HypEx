@@ -1,16 +1,14 @@
-from typing import Optional, List
+from typing import List, Optional
 
-from scipy.stats import ttest_ind, ks_2samp, mannwhitneyu  # type: ignore
-
-from .abstract import StatHypothesisTesting
 from ..dataset import Dataset
 from ..extensions.scipy_stats import (
-    TTestExtension,
-    KSTestExtension,
-    UTestExtension,
     Chi2TestExtension,
+    KSTestExtension,
+    TTestExtension,
+    UTestExtension,
 )
 from ..utils.constants import NUMBER_TYPES_LIST
+from .abstract import StatHypothesisTesting
 
 
 class TTest(StatHypothesisTesting):

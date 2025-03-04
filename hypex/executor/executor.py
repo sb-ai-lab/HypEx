@@ -1,23 +1,22 @@
-from abc import abstractmethod, ABC
-from typing import Any, Dict, List, Optional, Sequence, Union, Tuple, Iterable
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from ..dataset import (
     ABCRole,
-    Dataset,
-    ExperimentData,
-    GroupingRole,
-    FeatureRole,
     AdditionalMatchingRole,
-    TargetRole,
+    Dataset,
     DatasetAdapter,
+    ExperimentData,
+    FeatureRole,
+    GroupingRole,
+    TargetRole,
 )
-from ..dataset.roles import AdditionalRole
 from ..utils import (
-    AbstractMethodError,
     ID_SPLIT_SYMBOL,
-    SetParamsDictTypes,
+    AbstractMethodError,
     ExperimentDataEnum,
     NotSuitableFieldError,
+    SetParamsDictTypes,
 )
 from ..utils.adapter import Adapter
 

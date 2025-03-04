@@ -1,14 +1,14 @@
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from ..comparators import KSTest, TTest, Chi2Test
+from ..comparators import Chi2Test, KSTest, TTest
 from ..dataset import Dataset, ExperimentData, StatisticRole
 from ..executor import Executor
-from ..experiments.base_complex import ParamsExperiment, IfParamsExperiment
+from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from ..reporters.aa import OneAADictReporter
 from ..splitters import AASplitter, AASplitterWithStratification
-from ..utils import BackendsEnum, ExperimentDataEnum, ID_SPLIT_SYMBOL
+from ..utils import ID_SPLIT_SYMBOL, BackendsEnum, ExperimentDataEnum
 
 
 class OneAAStatAnalyzer(Executor):

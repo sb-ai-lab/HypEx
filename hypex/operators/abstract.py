@@ -1,18 +1,18 @@
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional, Union, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from ..dataset import (
-    Dataset,
-    ExperimentData,
-    TargetRole,
-    GroupingRole,
     ABCRole,
     AdditionalTargetRole,
+    Dataset,
+    ExperimentData,
+    GroupingRole,
+    TargetRole,
 )
 from ..executor import Calculator
 from ..utils import (
-    ExperimentDataEnum,
     AbstractMethodError,
+    ExperimentDataEnum,
     NotSuitableFieldError,
 )
 from ..utils.adapter import Adapter
@@ -63,9 +63,7 @@ class GroupOperator(
     ) -> Dict:
         if target_fields is None or len(target_fields) != 2:
             raise ValueError(
-                "This operator works with 2 targets, but got {}".format(
-                    len(target_fields) if target_fields else None
-                )
+                f"This operator works with 2 targets, but got {len(target_fields) if target_fields else None}"
             )
         result = {}
         for group, group_data in grouping_data:
