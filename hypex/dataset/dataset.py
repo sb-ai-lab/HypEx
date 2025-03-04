@@ -8,9 +8,7 @@ from typing import (
     Callable,
     Hashable,
     Literal,
-    Optional,
     Sequence,
-    Union,
 )
 
 import pandas as pd  # type: ignore
@@ -107,19 +105,17 @@ class Dataset(DatasetBase):
 
     def __init__(
         self,
-        roles: Union[
-            dict[ABCRole, Union[list[str], str]],
-            dict[str, ABCRole],
-        ],
-        data: Optional[Union[pd.DataFrame, str]] = None,
-        backend: Optional[BackendsEnum] = None,
-        default_role: Optional[ABCRole] = None,
+        roles:
+            dict[ABCRole, list[str] | str] | dict[str, ABCRole],
+        data: pd.DataFrame | str | None = None,
+        backend: BackendsEnum | None = None,
+        default_role: ABCRole | None = None,
     ):
         super().__init__(roles, data, backend, default_role)
         self.loc = self.Locker(self._backend, self.roles)
         self.iloc = self.ILocker(self._backend, self.roles)
 
-    def __getitem__(self, item: Union[Iterable, str, int]) -> Dataset:
+    def __getitem__(self, item: Iterable | str | int) -> Dataset:
         if isinstance(item, Dataset):
             item = item.data
         items = (
@@ -308,7 +304,7 @@ class Dataset(DatasetBase):
         ds.data = ds.backend.data
         return ds
 
-    def _convert_data_after_agg(self, result) -> Union[Dataset, float]:
+    def _convert_data_after_agg(self, result) -> Dataset | float:
         if isinstance(result, float):
             return result
         role: ABCRole = StatisticRole()
@@ -317,8 +313,8 @@ class Dataset(DatasetBase):
     def add_column(
         self,
         data,
-        role: Optional[dict[str, ABCRole]] = None,
-        index: Optional[Iterable[Hashable]] = None,
+        role: dict[str, ABCRole] | None = None,
+        index: Iterable[Hashable] | None = None,
     ):
         if role is None:
             if not isinstance(data, Dataset):
@@ -387,11 +383,8 @@ class Dataset(DatasetBase):
     # TODO: set backend by backend object
     @staticmethod
     def from_dict(
-        data: FromdictTypes,
-        roles: Union[
-            dict[ABCRole, Union[list[str], str]],
-            dict[str, ABCRole],
-        ],
+        data: FromDictTypes,
+        roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
         backend: BackendsEnum = BackendsEnum.pandas,
         index=None,
     ) -> Dataset:
@@ -448,8 +441,8 @@ class Dataset(DatasetBase):
     def groupby(
         self,
         by: Any,
-        func: Optional[Union[str, list]] = None,
-        fields_list: Optional[Union[str, list]] = None,
+        func: str | list | None = None,
+        fields_list: str | list | None = None,
         **kwargs,
     ) -> list[tuple[str, Dataset]]:
         if isinstance(by, Dataset) and len(by.columns) == 1:
@@ -475,7 +468,7 @@ class Dataset(DatasetBase):
 
     def sort(
         self,
-        by: Optional[MultiFieldKeyTypes] = None,
+        by: MultiFieldKeyTypes | None = None,
         ascending: bool = True,
         **kwargs,
     ):
@@ -491,8 +484,8 @@ class Dataset(DatasetBase):
 
     def fillna(
         self,
-        values: Union[ScalarType, dict[str, ScalarType], None] = None,
-        method: Optional[Literal["bfill", "ffill"]] = None,
+        values: ScalarType | dict[str, ScalarType] | None = None,
+        method: Literal["bfill", "ffill"] | None = None,
         **kwargs,
     ):
         if values is None and method is None:
@@ -508,7 +501,7 @@ class Dataset(DatasetBase):
     def max(self):
         return self._convert_data_after_agg(self._backend.max())
 
-    def reindex(self, labels, fill_value: Optional[Any] = None) -> Dataset:
+    def reindex(self, labels, fill_value: Any | None = None) -> Dataset:
         return Dataset(
             self.roles, data=self.backend.reindex(labels, fill_value=fill_value)
         )
@@ -539,7 +532,7 @@ class Dataset(DatasetBase):
             self._backend.var(skipna=skipna, ddof=ddof, numeric_only=numeric_only)
         )
 
-    def agg(self, func: Union[str, list]):
+    def agg(self, func: str | list):
         return self._convert_data_after_agg(self._backend.agg(func))
 
     def std(self, skipna: bool = True, ddof: int = 1):
@@ -580,8 +573,8 @@ class Dataset(DatasetBase):
     def dropna(
         self,
         how: Literal["any", "all"] = "any",
-        subset: Union[str, Iterable[str], None] = None,
-        axis: Union[Literal["index", "rows", "columns"], int] = 0,
+        subset: str | Iterable[str] | None = None,
+        axis: Literal["index", "rows", "columns"] |int = 0,
     ):
         # Drop NA values using backend implementation
         new_data = self._backend.dropna(how=how, subset=subset, axis=axis)
@@ -613,9 +606,9 @@ class Dataset(DatasetBase):
     def merge(
         self,
         right,
-        on: Optional[str] = None,
-        left_on: Optional[str] = None,
-        right_on: Optional[str] = None,
+        on: str | None = None,
+        left_on: str | None = None,
+        right_on: str | None = None,
         left_index: bool = False,
         right_index: bool = False,
         suffixes: tuple[str, str] = ("_x", "_y"),
@@ -677,10 +670,10 @@ class Dataset(DatasetBase):
 
     def filter(
         self,
-        items: Optional[list] = None,
-        like: Optional[str] = None,
-        regex: Optional[str] = None,
-        axis: Optional[int] = None,
+        items: list | None = None,
+        like: str | None = None,
+        regex: str | None = None,
+        axis: int | None = None,
     ) -> Dataset:
         t_data = self._backend.filter(items=items, like=like, regex=regex, axis=axis)
         t_roles = {c: self.roles[c] for c in t_data.columns if c in self.roles.keys()}
@@ -691,10 +684,10 @@ class Dataset(DatasetBase):
 
     def transpose(
         self,
-        roles: Optional[Union[dict[str, ABCRole], list[str]]] = None,
+        roles: dict[str, ABCRole] | list[str] | None = None,
     ) -> Dataset:
         # Get role names if provided
-        roles_names: list[Union[str, None]] = (
+        roles_names: list[str | None] = (
             list(roles.keys()) or [] if isinstance(roles, dict) else roles
         )
 
@@ -710,9 +703,9 @@ class Dataset(DatasetBase):
 
     def sample(
         self,
-        frac: Optional[float] = None,
-        n: Optional[int] = None,
-        random_state: Optional[int] = None,
+        frac: float | None = None,
+        n: int | None = None,
+        random_state: int | None = None,
     ) -> Dataset:
         return Dataset(
             self.roles,
@@ -746,7 +739,7 @@ class ExperimentData:
     def __init__(self, data: Dataset):
         self._data = data
         self.additional_fields = Dataset.create_empty(index=data.index)
-        self.variables: dict[str, dict[str, Union[int, float]]] = {}
+        self.variables: dict[str, dict[str, int | float]] = {}
         self.groups: dict[str, dict[str, Dataset]] = {}
         self.analysis_tables: dict[str, Dataset] = {}
         self.id_name_mapping: dict[str, str] = {}
@@ -778,9 +771,9 @@ class ExperimentData:
     def set_value(
         self,
         space: ExperimentDataEnum,
-        executor_id: Union[str, dict[str, str]],
+        executor_id: str | dict[str, str],
         value: Any,
-        key: Optional[str] = None,
+        key: str | None = None,
         role=None,
     ) -> ExperimentData:
         # Handle additional fields
@@ -824,11 +817,9 @@ class ExperimentData:
 
     def get_ids(
         self,
-        classes: Union[type, Iterable[type], str, Iterable[str]],
-        searched_space: Union[
-            ExperimentDataEnum, Iterable[ExperimentDataEnum], None
-        ] = None,
-        key: Optional[str] = None,
+        classes: type | Iterable[type] | str | Iterable[str],
+        searched_space: ExperimentDataEnum |Iterable[ExperimentDataEnum] | None = None,
+        key: str | None = None,
     ) -> dict[str, dict[str, list[str]]]:
 
         def check_id(id_: str, class_: str) -> bool:
@@ -869,9 +860,9 @@ class ExperimentData:
 
     def get_one_id(
         self,
-        class_: Union[type, str],
+        class_: type | str,
         space: ExperimentDataEnum,
-        key: Optional[str] = None,
+        key: str | None = None,
     ) -> str:
         class_ = class_ if isinstance(class_, str) else class_.__name__
         result = self.get_ids(class_, space, key)
@@ -879,7 +870,7 @@ class ExperimentData:
             raise NotFoundInExperimentDataError(class_)
         return result[class_][space.value][0]
 
-    def copy(self, data: Optional[Dataset] = None) -> ExperimentData:
+    def copy(self, data: Dataset | None = None) -> ExperimentData:
         result = deepcopy(self)
         if data is not None:
             result._data = data
@@ -887,7 +878,7 @@ class ExperimentData:
 
     def field_search(
         self,
-        roles: Union[ABCRole, Iterable[ABCRole]],
+        roles: ABCRole | Iterable[ABCRole],
         tmp_role: bool = False,
         search_types=None,
     ) -> list[str]:
@@ -916,7 +907,7 @@ class ExperimentData:
 
     def field_data_search(
         self,
-        roles: Union[ABCRole, Iterable[ABCRole]],
+        roles: ABCRole | Iterable[ABCRole],
         tmp_role: bool = False,
         search_types=None,
     ) -> Dataset:
@@ -946,8 +937,8 @@ class DatasetAdapter(Adapter):
 
     @staticmethod
     def to_dataset(
-        data: Union[dict, Dataset, pd.DataFrame, list, str, int, float, bool],
-        roles: Union[ABCRole, dict[str, ABCRole]],
+        data: dict | Dataset |pd.DataFrame | list | str | int | float | bool,
+        roles: ABCRole | dict[str, ABCRole],
     ) -> Dataset:
         # Convert data based on its type
         if isinstance(data, dict):
@@ -969,7 +960,7 @@ class DatasetAdapter(Adapter):
 
     @staticmethod
     def value_to_dataset(
-        data: ScalarType, roles: Union[ABCRole, dict[str, ABCRole]]
+        data: ScalarType, roles: ABCRole | dict[str, ABCRole]
     ) -> Dataset:
         if isinstance(roles, ABCRole):
             roles = {"value": roles}
@@ -977,7 +968,7 @@ class DatasetAdapter(Adapter):
 
     @staticmethod
     def dict_to_dataset(
-        data: dict, roles: Union[ABCRole, dict[str, ABCRole]]
+        data: dict, roles: ABCRole | dict[str, ABCRole]
     ) -> Dataset:
         roles_names = list(data.keys())
         if any(
