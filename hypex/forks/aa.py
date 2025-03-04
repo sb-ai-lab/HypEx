@@ -1,4 +1,4 @@
-from typing import Optional
+from __future__ import annotations
 
 from ..analyzers.aa import OneAAStatAnalyzer
 from ..executor.executor import Executor, IfExecutor
@@ -8,9 +8,9 @@ from ..utils.enums import ExperimentDataEnum
 class IfAAExecutor(IfExecutor):
     def __init__(
         self,
-        if_executor: Optional[Executor] = None,
-        else_executor: Optional[Executor] = None,
-        sample_size: Optional[float] = None,
+        if_executor: Executor | None = None,
+        else_executor: Executor | None = None,
+        sample_size: float | None = None,
         key: str = "",
     ):
         self.sample_size = sample_size

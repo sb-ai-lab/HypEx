@@ -1,6 +1,8 @@
-from typing import Dict, Union, Any, Optional
+from __future__ import annotations
 
-from ..dataset import ExperimentData, Dataset
+from typing import Any
+
+from ..dataset import Dataset, ExperimentData
 from ..experiments.base import Experiment
 from ..reporters import Reporter
 from ..utils import ID_SPLIT_SYMBOL
@@ -50,7 +52,7 @@ class Output:
     def __init__(
         self,
         resume_reporter: Reporter,
-        additional_reporters: Optional[Dict[str, Reporter]] = None,
+        additional_reporters: dict[str, Reporter] | None = None,
     ):
         self.resume_reporter = resume_reporter
         self.additional_reporters = additional_reporters or {}
@@ -130,7 +132,7 @@ class ExperimentShell:
         self,
         experiment: Experiment,
         output: Output,
-        experiment_params: Optional[Dict[str, Any]] = None,
+        experiment_params: dict[str, Any] | None = None,
     ):
         if experiment_params:
             experiment.set_params(experiment_params)
@@ -146,7 +148,7 @@ class ExperimentShell:
         """
         return self._experiment
 
-    def execute(self, data: Union[Dataset, ExperimentData]) -> Output:
+    def execute(self, data: Dataset | ExperimentData) -> Output:
         """Executes the experiment on the provided data.
 
         Runs the configured experiment on the input data and formats the results

@@ -1,33 +1,34 @@
+from __future__ import annotations
+
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Union, Tuple, Sequence, Literal
+from typing import Any, Literal
 
 from ..dataset import (
     ABCRole,
     Dataset,
-    ExperimentData,
-    StatisticRole,
-    TempTargetRole,
-    InfoRole,
     DatasetAdapter,
+    ExperimentData,
     GroupingRole,
-    TargetRole,
+    InfoRole,
     PreTargetRole,
+    StatisticRole,
+    TargetRole,
+    TempTargetRole,
 )
 from ..executor import Calculator
 from ..utils import (
+    NAME_BORDER_SYMBOL,
     BackendsEnum,
     ExperimentDataEnum,
     FromDictTypes,
-    NAME_BORDER_SYMBOL,
     GroupingDataType,
 )
-from ..utils.adapter import Adapter
 from ..utils.errors import (
     AbstractMethodError,
-    NotSuitableFieldError,
-    NoRequiredArgumentError,
     NoColumnsError,
+    NoRequiredArgumentError,
+    NotSuitableFieldError,
 )
 
 
@@ -35,9 +36,9 @@ class Comparator(Calculator, ABC):
     def __init__(
         self,
         compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
-        grouping_role: Optional[ABCRole] = None,
-        target_roles: Union[ABCRole, List[ABCRole], None] = None,
-        baseline_role: Optional[ABCRole] = None,
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | list[ABCRole] | None = None,
+        baseline_role: ABCRole | None = None,
         key: Any = "",
     ):
         super().__init__(key=key)
@@ -47,22 +48,22 @@ class Comparator(Calculator, ABC):
         self.baseline_role = baseline_role or PreTargetRole()
 
     @property
-    def search_types(self) -> Optional[List[type]]:
+    def search_types(self) ->list[type] | None:
         return None
 
     def _local_extract_dataset(
-        self, compare_result: Dict[Any, Any], roles: Dict[Any, ABCRole]
+        self, compare_result: dict[Any, Any], roles: dict[Any, ABCRole]
     ) -> Dataset:
         return self._extract_dataset(compare_result, roles)
 
     @classmethod
     @abstractmethod
     def _inner_function(
-        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Any:
         raise AbstractMethodError
 
-    def _get_fields_data(self, data: ExperimentData) -> Dict[str, Dataset]:
+    def _get_fields_data(self, data: ExperimentData) -> dict[str, Dataset]:
         tmp_role = True if data.ds.tmp_roles else False
         group_field_data = data.field_data_search(roles=self.grouping_role)
         target_fields_data = data.field_data_search(
@@ -82,11 +83,11 @@ class Comparator(Calculator, ABC):
     @classmethod
     def _execute_inner_function(
         cls,
-        baseline_data: List[Tuple[str, Dataset]],
-        compared_data: List[Tuple[str, Dataset]],
+        baseline_data: list[tuple[str, Dataset]],
+        compared_data: list[tuple[str, Dataset]],
         compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
         result = {}
         for i in range(len(compared_data)):
             res_name = (
@@ -105,13 +106,13 @@ class Comparator(Calculator, ABC):
         return result
 
     @staticmethod
-    def _check_test_data(test_data: Optional[Dataset] = None) -> Dataset:
+    def _check_test_data(test_data: Dataset | None = None) -> Dataset:
         if test_data is None:
             raise ValueError("test_data is needed for evaluation")
         return test_data
 
     def _set_value(
-        self, data: ExperimentData, value: Optional[Dataset] = None, key: Any = None
+        self, data: ExperimentData, value: Dataset | None = None, key: Any = None
     ) -> ExperimentData:
         data.set_value(
             ExperimentDataEnum.analysis_tables,
@@ -122,10 +123,10 @@ class Comparator(Calculator, ABC):
 
     @staticmethod
     def _extract_dataset(
-        compare_result: FromDictTypes, roles: Dict[Any, ABCRole]
+        compare_result: FromDictTypes, roles: dict[Any, ABCRole]
     ) -> Dataset:
-        if isinstance(list(compare_result.values())[0], Dataset):
-            cr_list_v: List[Dataset] = list(compare_result.values())
+        if isinstance(next(iter(compare_result.values())), Dataset):
+            cr_list_v: list[Dataset] = list(compare_result.values())
             result = cr_list_v[0]
             if len(cr_list_v) > 1:
                 result = result.append(cr_list_v[1:])
@@ -137,12 +138,12 @@ class Comparator(Calculator, ABC):
 
     @staticmethod
     def _grouping_data_split(
-        grouping_data: Dict[str, Dataset],
+        grouping_data: dict[str, Dataset],
         compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
-        target_fields: List[str],
-        baseline_field: Optional[str],
+        target_fields: list[str],
+        baseline_field: str | None = None,
     ) -> GroupingDataType:
-        if isinstance(grouping_data, Dict):
+        if isinstance(grouping_data, dict):
             compared_data = [(name, data) for name, data in grouping_data.items()]
             baseline_data = [compared_data.pop(0)]
         else:
@@ -165,8 +166,8 @@ class Comparator(Calculator, ABC):
 
     @staticmethod
     def _split_ds_into_columns(
-        data: List[Tuple[str, Dataset]]
-    ) -> List[Tuple[str, Dataset]]:
+        data: list[tuple[str, Dataset]]
+    ) -> list[tuple[str, Dataset]]:
         result = [
             (bucket[0], bucket[1][column])
             for bucket in data
@@ -342,17 +343,14 @@ class Comparator(Calculator, ABC):
     @classmethod
     def calc(
         cls,
-        compare_by: Optional[
-            Literal["groups", "columns", "columns_in_groups", "cross"]
-        ] = None,
-        target_fields_data: Optional[Dataset] = None,
-        baseline_field_data: Optional[Dataset] = None,
-        group_field_data: Optional[Dataset] = None,
-        grouping_data: Optional[
-            Tuple[List[Tuple[str, Dataset]], List[Tuple[str, Dataset]]]
-        ] = None,
+        compare_by: Literal["groups", "columns", "columns_in_groups", "cross"] | None = None,
+        target_fields_data: Dataset | None = None,
+        baseline_field_data: Dataset | None = None,
+        group_field_data: Dataset | None = None,
+        grouping_data:
+            tuple[list[tuple[str, Dataset]]] | list[tuple[str, Dataset]] | None =  None,
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
 
         if compare_by is None and target_fields_data is None:
             raise ValueError(
@@ -447,9 +445,9 @@ class StatHypothesisTesting(Comparator, ABC):
     def __init__(
         self,
         compare_by: Literal["groups", "columns", "columns_in_groups", "cross"],
-        grouping_role: Union[ABCRole, None] = None,
-        target_role: Union[ABCRole, None] = None,
-        baseline_role: Union[ABCRole, None] = None,
+        grouping_role: ABCRole | None = None,
+        target_role: ABCRole | None = None,
+        baseline_role: ABCRole | None = None,
         reliability: float = 0.05,
         key: Any = "",
     ):

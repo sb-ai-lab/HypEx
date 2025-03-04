@@ -1,18 +1,24 @@
-from typing import Dict, Optional, List, Literal, Union
+from __future__ import annotations
 
-from .abstract import Comparator
-from ..dataset import Dataset, ABCRole
+from typing import Literal
+
+import numpy as np
+
+from ..dataset import ABCRole, Dataset
 from ..utils.constants import NUMBER_TYPES_LIST
+from .abstract import Comparator
+
+NUM_OF_BUCKETS = 10
 
 
 class GroupDifference(Comparator):
     def __init__(
-        self,
-        compare_by: Literal[
-            "groups", "columns", "columns_in_groups", "cross"
-        ] = "groups",
-        grouping_role: Optional[ABCRole] = None,
-        target_roles: Union[ABCRole, List[ABCRole], None] = None,
+            self,
+            compare_by: Literal[
+                "groups", "columns", "columns_in_groups", "cross"
+            ] = "groups",
+            grouping_role: ABCRole | None = None,
+            target_roles: ABCRole | list[ABCRole] | None = None,
     ):
         super().__init__(
             compare_by=compare_by,
@@ -21,16 +27,16 @@ class GroupDifference(Comparator):
         )
 
     @property
-    def search_types(self) -> Optional[List[type]]:
+    def search_types(self) -> list[type] | None:
         return NUMBER_TYPES_LIST
 
     @classmethod
     def _inner_function(
-        cls,
-        data: Dataset,
-        test_data: Optional[Dataset] = None,
-        **kwargs,
-    ) -> Dict:
+            cls,
+            data: Dataset,
+            test_data: Dataset | None = None,
+            **kwargs,
+    ) -> dict:
         test_data = cls._check_test_data(test_data)
         control_mean = data.mean()
         test_mean = test_data.mean()
@@ -47,11 +53,11 @@ class GroupDifference(Comparator):
 
 class GroupSizes(Comparator):
     def __init__(
-        self,
-        compare_by: Literal[
-            "groups", "columns", "columns_in_groups", "cross"
-        ] = "groups",
-        grouping_role: Optional[ABCRole] = None,
+            self,
+            compare_by: Literal[
+                "groups", "columns", "columns_in_groups", "cross"
+            ] = "groups",
+            grouping_role: ABCRole | None = None,
     ):
         super().__init__(
             compare_by=compare_by,
@@ -61,8 +67,8 @@ class GroupSizes(Comparator):
 
     @classmethod
     def _inner_function(
-        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
-    ) -> Dict:
+            cls, data: Dataset, test_data: Dataset | None = None, **kwargs
+    ) -> dict:
         size_a = len(data)
         size_b = len(test_data) if isinstance(test_data, Dataset) else 0
 
@@ -78,8 +84,8 @@ class PSI(Comparator):
 
     @classmethod
     def _inner_function(
-        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
-    ) -> Dict[str, float]:
+            cls, data: Dataset, test_data: Dataset | None = None, **kwargs
+    ) -> dict[str, float]:
         test_data = cls._check_test_data(test_data=test_data)
         data.sort(ascending=False)
         test_data.sort(ascending=False)

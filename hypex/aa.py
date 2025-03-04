@@ -1,14 +1,15 @@
-from typing import Optional, Dict, Any, Iterable
+from __future__ import annotations
 
-from .forks.aa import IfAAExecutor
-from .analyzers.aa import OneAAStatAnalyzer, AAScoreAnalyzer
+from typing import Any, Iterable
+
+from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
 from .comparators import GroupDifference, GroupSizes
 from .comparators.abstract import Comparator
-from .comparators.hypothesis_testing import TTest, KSTest, Chi2Test
-from .dataset import AdditionalTreatmentRole
-from .dataset import TargetRole
+from .comparators.hypothesis_testing import Chi2Test, KSTest, TTest
+from .dataset import AdditionalTreatmentRole, TargetRole
 from .experiments.base import Experiment, OnRoleExperiment
-from .experiments.base_complex import ParamsExperiment, IfParamsExperiment
+from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
+from .forks.aa import IfAAExecutor
 from .reporters import DatasetReporter
 from .reporters.aa import OneAADictReporter
 from .splitters import AASplitter, AASplitterWithStratification
@@ -79,8 +80,8 @@ class AATest(ExperimentShell):
     """A class for conducting A/A tests with configurable parameters.
 
     This class provides functionality to run A/A tests with options for stratification,
-    precision control (fast or with type 1 error controll), and sample size specification.
-    It sets up the experiment pipeline with appropriate parameters, performs homogenity
+    precision control (fast or with type 1 error control), and sample size specification.
+    It sets up the experiment pipeline with appropriate parameters, performs homogeneity
     tests for each split in order to evaluate their quality and to identify the best one.
 
     Args:
@@ -124,10 +125,10 @@ class AATest(ExperimentShell):
     def _prepare_params(
         n_iterations: int,
         control_size: float,
-        random_states: Optional[Iterable[int]] = None,
-        sample_size: Optional[float] = None,
-        additional_params: Optional[Dict[str, Any]] = None,
-    ) -> Dict[type, Dict[str, Any]]:
+        random_states: Iterable[int] | None = None,
+        sample_size: float | None = None,
+        additional_params: dict[str, Any] | None = None,
+    ) -> dict[type, dict[str, Any]]:
         """Prepares parameters for the A/A test experiment.
 
         Args:
@@ -180,10 +181,10 @@ class AATest(ExperimentShell):
         precision_mode: bool = False,
         control_size: float = 0.5,
         stratification: bool = False,
-        n_iterations: Optional[int] = None,
-        sample_size: Optional[float] = None,
-        additional_params: Optional[Dict[str, Any]] = None,
-        random_states: Optional[Iterable[int]] = None,
+        n_iterations: int | None = None,
+        sample_size: float | None = None,
+        additional_params: dict[str, Any] | None = None,
+        random_states: Iterable[int] | None = None,
     ):
         if n_iterations is None:
             if precision_mode:

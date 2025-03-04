@@ -1,15 +1,20 @@
-from abc import ABC, abstractmethod
-from typing import Any, Optional
+from __future__ import annotations
 
+from abc import ABC, abstractmethod
+from typing import Any
+
+import numpy as np
+from scipy.stats import norm
+
+from ..dataset import ABCRole, Dataset, ExperimentData
+from ..utils import ExperimentDataEnum
 from .comparators import Comparator
-from ..dataset import ExperimentData, ABCRole, Dataset
-from ..utils import SpaceEnum, ExperimentDataEnum
 
 
 class TestPower(Comparator, ABC):
     def __init__(
         self,
-        grouping_role: Optional[ABCRole] = None,
+        grouping_role: ABCRole | None = None,
         # space: SpaceEnum = SpaceEnum.auto,
         significance: float = 0.95,
         power: float = 0.8,
@@ -29,7 +34,7 @@ class TestPower(Comparator, ABC):
     def _inner_function(
         cls,
         data: Dataset,
-        test_data: Optional[Dataset] = None,
+        test_data: Dataset | None = None,
         significance: float = 0.95,
         power: float = 0.8,
         **kwargs
@@ -42,7 +47,7 @@ class TestPower(Comparator, ABC):
 
 class MDEBySize(TestPower):
     def _set_value(
-        self, data: ExperimentData, value: Optional[Dataset] = None, key: Any = None
+        self, data: ExperimentData, value: Dataset | None = None, key: Any = None
     ) -> ExperimentData:
         data.set_value(
             ExperimentDataEnum.variables,
@@ -55,7 +60,7 @@ class MDEBySize(TestPower):
     def _inner_function(
         cls,
         data: Dataset,
-        test_data: Optional[Dataset] = None,
+        test_data: Dataset | None = None,
         significance: float = 0.95,
         power: float = 0.8,
         **kwargs
@@ -88,14 +93,7 @@ class MDEBySize(TestPower):
 #             ratio=ratio,
 #             alpha=significance,
 #
-from typing import Optional, Any, Dict, Union, Sequence
 
-import numpy as np
-from scipy.stats import norm
-
-from ..comparators.abstract import Comparator
-from ..dataset import ABCRole, Dataset, ExperimentData, TargetRole
-from ..utils import SpaceEnum
 
 
 # class MDEBySize(GroupComparator):

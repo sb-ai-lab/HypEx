@@ -94,7 +94,7 @@ digraph Architecture{
         report_out_data[label="Report artifact"]
     }
 
-    subgraph atributes{
+    subgraph attributes{
         node[shape=record, fillcolor=lightpink]
         experiment_executor_list_attribute[label="List[Executor]"]
         report_backend[label="Backend"]

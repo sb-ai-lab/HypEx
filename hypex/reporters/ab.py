@@ -1,20 +1,22 @@
-from typing import Dict, Any
+from __future__ import annotations
+
+from typing import Any, ClassVar
 
 from ..analyzers.ab import ABAnalyzer
-from ..dataset import ExperimentData, Dataset
+from ..comparators import Chi2Test, TTest, UTest
+from ..dataset import Dataset, ExperimentData
 from ..utils import ExperimentDataEnum
 from .aa import OneAADictReporter
-from ..comparators import TTest, UTest, Chi2Test
 
 
 class ABDictReporter(OneAADictReporter):
-    tests = [TTest, UTest, Chi2Test]
+    tests: ClassVar[list] = [TTest, UTest, Chi2Test]
 
-    def extract_analyzer_data(self, data: ExperimentData) -> Dict[str, Any]:
+    def extract_analyzer_data(self, data: ExperimentData) -> dict[str, Any]:
         analyzer_id = data.get_one_id(ABAnalyzer, ExperimentDataEnum.analysis_tables)
         return self.extract_from_one_row_dataset(data.analysis_tables[analyzer_id])
 
-    def extract_data_from_analysis_tables(self, data: ExperimentData) -> Dict[str, Any]:
+    def extract_data_from_analysis_tables(self, data: ExperimentData) -> dict[str, Any]:
         result = {}
         result.update(self.extract_group_sizes(data))
         result.update(self.extract_group_difference(data))
@@ -22,7 +24,7 @@ class ABDictReporter(OneAADictReporter):
         result.update(self.extract_analyzer_data(data))
         return result
 
-    def report(self, data: ExperimentData) -> Dict[str, Any]:
+    def report(self, data: ExperimentData) -> dict[str, Any]:
         return self.extract_data_from_analysis_tables(data)
 
 

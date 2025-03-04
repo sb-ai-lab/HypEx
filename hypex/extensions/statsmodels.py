@@ -1,11 +1,11 @@
-from typing import Optional, Union, List
+from __future__ import annotations
 
 import numpy as np
 from scipy.stats import norm  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
 
-from ..dataset import Dataset, StatisticRole, DatasetAdapter
-from ..utils import ABNTestMethodsEnum, ID_SPLIT_SYMBOL
+from ..dataset import Dataset, DatasetAdapter, StatisticRole
+from ..utils import ID_SPLIT_SYMBOL, ABNTestMethodsEnum
 from .abstract import Extension
 
 
@@ -41,7 +41,7 @@ class MultitestQuantile(Extension):
         alpha: float = 0.05,
         iteration_size: int = 20000,
         equal_variance: bool = True,
-        random_state: Optional[int] = None,
+        random_state: int | None = None,
     ):
         self.alpha = alpha
         self.iteration_size = iteration_size
@@ -94,8 +94,8 @@ class MultitestQuantile(Extension):
         self,
         num_samples: int,
         quantile_level: float,
-        variances: Optional[List[float]] = None,
-    ) -> List[float]:
+        variances: list[float] | None = None,
+    ) -> list[float]:
         if variances is None:
             self.equal_variance = True
         num_samples_hyp = 1 if self.equal_variance else num_samples
@@ -130,10 +130,10 @@ class MultitestQuantile(Extension):
         self,
         num_samples: int,
         mde: float,
-        variances: Union[List[float], float],
+        variances: list[float] | float,
         power: float = 0.2,
-        quantile_1: Optional[Union[float, List[float]]] = None,
-        quantile_2: Optional[Union[float, List[float]]] = None,
+        quantile_1: float | list[float] | None = None,
+        quantile_2: float | list[float] | None = None,
         initial_estimate: int = 0,
         iteration_size: int = 3000,
     ):
@@ -145,7 +145,7 @@ class MultitestQuantile(Extension):
         quantile_1 = quantile_1 or self.quantile_of_marginal_distribution(
             num_samples=num_samples,
             quantile_level=1 - self.alpha / num_samples,
-            variances=variances if isinstance(variances, List) else [variances],
+            variances=variances if isinstance(variances, list) else [variances],
         )
         quantile_2 = quantile_2 or self.quantile_of_marginal_distribution(
             num_samples=num_samples, quantile_level=power

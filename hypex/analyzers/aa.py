@@ -1,14 +1,16 @@
-from typing import Dict, List, Any, Optional
+from __future__ import annotations
+
+from typing import Any, ClassVar
 
 import numpy as np
 
-from ..comparators import KSTest, TTest, Chi2Test
+from ..comparators import Chi2Test, KSTest, TTest
 from ..dataset import Dataset, ExperimentData, StatisticRole
 from ..executor import Executor
-from ..experiments.base_complex import ParamsExperiment, IfParamsExperiment
+from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from ..reporters.aa import OneAADictReporter
 from ..splitters import AASplitter, AASplitterWithStratification
-from ..utils import BackendsEnum, ExperimentDataEnum, ID_SPLIT_SYMBOL
+from ..utils import ID_SPLIT_SYMBOL, BackendsEnum, ExperimentDataEnum
 
 
 class OneAAStatAnalyzer(Executor):
@@ -16,12 +18,12 @@ class OneAAStatAnalyzer(Executor):
         return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        analysis_tests: List[type] = [TTest, KSTest, Chi2Test]
+        analysis_tests: list[type] = [TTest, KSTest, Chi2Test]
         executor_ids = data.get_ids(
             analysis_tests, searched_space=ExperimentDataEnum.analysis_tables
         )
 
-        analysis_data: Dict[str, float] = {}
+        analysis_data: dict[str, float] = {}
         for class_, spaces in executor_ids.items():
             analysis_ids = spaces.get("analysis_tables", [])
             if len(analysis_ids) > 0:
@@ -67,7 +69,7 @@ class OneAAStatAnalyzer(Executor):
 
 
 class AAScoreAnalyzer(Executor):
-    AA_SPLITER_CLASS_MAPPING = {
+    AA_SPLITER_CLASS_MAPPING : ClassVar[dict] = {
         class_.__name__: class_ for class_ in [AASplitter, AASplitterWithStratification]
     }
 
@@ -120,8 +122,8 @@ class AAScoreAnalyzer(Executor):
         self,
         data: ExperimentData,
         score_table: Dataset,
-        if_param_scores: Optional[Dataset] = None,
-    ) -> Dict[str, Any]:
+        if_param_scores: Dataset | None = None,
+    ) -> dict[str, Any]:
         # TODO: add split_scores in ExperimentData
         if if_param_scores is None:
             if len(self.__feature_weights) < 1:
@@ -193,7 +195,7 @@ class AAScoreAnalyzer(Executor):
         self,
         data: ExperimentData,
         score_table: Dataset,
-        if_param_scores: Optional[Dataset] = None,
+        if_param_scores: Dataset | None = None,
     ) -> ExperimentData:
         best_split = self._get_best_split(data, score_table, if_param_scores)
         return self._set_best_split(best_split["data"], best_split["best_split_id"])

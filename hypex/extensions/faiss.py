@@ -1,10 +1,12 @@
-from typing import Optional, Literal
+from __future__ import annotations
+
+from typing import Literal
 
 import faiss  # type: ignore
 import numpy as np
 import pandas as pd  # type: ignore
 
-from ..dataset import Dataset, AdditionalMatchingRole
+from ..dataset import AdditionalMatchingRole, Dataset
 from .abstract import MLExtension
 
 
@@ -42,8 +44,8 @@ class FaissExtension(MLExtension):
     def _calc_pandas(
         self,
         data: Dataset,
-        test_data: Optional[Dataset] = None,
-        mode: Optional[Literal["auto", "fit", "predict"]] = None,
+        test_data: Dataset | None = None,
+        mode: Literal["auto", "fit", "predict"] | None = None,
         **kwargs,
     ):
         mode = mode or "auto"
@@ -61,7 +63,7 @@ class FaissExtension(MLExtension):
             return self._predict(data, test_data, X)
         return self
 
-    def fit(self, X: Dataset, Y: Optional[Dataset] = None, **kwargs):
+    def fit(self, X: Dataset, Y: Dataset | None = None, **kwargs):
         return super().calc(X, target_data=Y, mode="fit", **kwargs)
 
     def predict(self, X: Dataset, **kwargs) -> Dataset:

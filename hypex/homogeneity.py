@@ -1,6 +1,5 @@
 from .analyzers.aa import OneAAStatAnalyzer
-from .comparators import GroupDifference, GroupSizes
-from .comparators import TTest, KSTest, Chi2Test
+from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from .dataset import TargetRole, TreatmentRole
 from .experiments.base import Experiment, OnRoleExperiment
 from .ui.base import ExperimentShell

@@ -1,17 +1,13 @@
-from pathlib import Path
+from __future__ import annotations
 
+from pathlib import Path
 from typing import (
     Any,
     Callable,
-    Dict,
     Iterable,
-    List,
-    Optional,
+    Literal,
     Sequence,
     Sized,
-    Tuple,
-    Union,
-    Literal,
 )
 
 import numpy as np
@@ -23,7 +19,7 @@ from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 class PandasNavigation(DatasetBackendNavigation):
     @staticmethod
-    def _read_file(filename: Union[str, Path]) -> pd.DataFrame:
+    def _read_file(filename: str | Path) -> pd.DataFrame:
         file_extension = Path(filename).suffix
         if file_extension == ".csv":
             return pd.read_csv(filename)
@@ -32,12 +28,12 @@ class PandasNavigation(DatasetBackendNavigation):
         else:
             raise ValueError(f"Unsupported file extension {file_extension}")
 
-    def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series] = None):
+    def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
         if isinstance(data, pd.DataFrame):
             self.data = data
         elif isinstance(data, pd.Series):
             self.data = pd.DataFrame(data)
-        elif isinstance(data, Dict):
+        elif isinstance(data, dict):
             if "index" in data.keys():
                 self.data = pd.DataFrame(data=data["data"], index=data["index"])
             else:
@@ -168,8 +164,8 @@ class PandasNavigation(DatasetBackendNavigation):
 
     def create_empty(
         self,
-        index: Optional[Iterable] = None,
-        columns: Optional[Iterable[str]] = None,
+        index: Iterable | None = None,
+        columns: Iterable[str] | None = None,
     ):
         self.data = pd.DataFrame(index=index, columns=columns)
         return self
@@ -187,15 +183,15 @@ class PandasNavigation(DatasetBackendNavigation):
         return self.data.shape
 
     def _get_column_index(
-        self, column_name: Union[Sequence[str], str]
-    ) -> Union[int, Sequence[int]]:
+        self, column_name: Sequence[str] | str
+    ) -> int | Sequence[int]:
         return (
             self.data.columns.get_loc(column_name)
             if isinstance(column_name, str)
             else self.data.columns.get_indexer(column_name)
         )[0]
 
-    def get_column_type(self, column_name: str) -> Union[type, None]:
+    def get_column_type(self, column_name: str) -> type | None:
         dtype = self.data.dtypes[column_name]
         if pd.api.types.is_integer_dtype(dtype):
             return int
@@ -213,7 +209,7 @@ class PandasNavigation(DatasetBackendNavigation):
             return None
 
     def astype(
-        self, dtype: Dict[str, type], errors: Literal["raise", "ignore"] = "raise"
+        self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> pd.DataFrame:
         return self.data.astype(dtype=dtype, errors=errors)
 
@@ -224,11 +220,11 @@ class PandasNavigation(DatasetBackendNavigation):
 
     def add_column(
         self,
-        data: Union[Sequence],
-        name: Union[str, List[str]],
-        index: Optional[Sequence] = None,
+        data: Sequence,
+        name: str | list[str],
+        index: Sequence | None = None,
     ):
-        if isinstance(name, List) and len(name) == 1:
+        if isinstance(name, list) and len(name) == 1:
             name = name[0]
         if isinstance(data, pd.DataFrame):
             data = data.values
@@ -250,9 +246,9 @@ class PandasNavigation(DatasetBackendNavigation):
         return new_data
 
     def from_dict(
-        self, data: FromDictTypes, index: Union[Iterable, Sized, None] = None
+        self, data: FromDictTypes, index: Iterable | Sized | None = None
     ):
-        if isinstance(data, Dict):
+        if isinstance(data, dict):
             self.data = pd.DataFrame().from_records(data, columns=list(data.keys()))
         else:
             self.data = pd.DataFrame().from_records(data)
@@ -260,7 +256,7 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data.index = index
         return self
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "data": {
                 column: self.data[column].to_list() for column in self.data.columns
@@ -268,7 +264,7 @@ class PandasNavigation(DatasetBackendNavigation):
             "index": list(self.index),
         }
 
-    def to_records(self) -> List[Dict]:
+    def to_records(self) -> list[dict]:
         return self.data.to_dict(orient="records")
 
     def loc(self, items: Iterable) -> Iterable:
@@ -293,13 +289,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             return float(result.loc[result.index[0], result.columns[0]])
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
-    def __init__(self, data: Union[pd.DataFrame, Dict, str, pd.Series] = None):
+    def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
         super().__init__(data)
 
     def get_values(
         self,
-        row: Optional[str] = None,
-        column: Optional[str] = None,
+        row: str | None = None,
+        column: str | None = None,
     ) -> Any:
         if (column is not None) and (row is not None):
             return self.data.loc[row, column]
@@ -313,8 +309,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def iget_values(
         self,
-        row: Optional[int] = None,
-        column: Optional[int] = None,
+        row: int | None = None,
+        column: int | None = None,
     ) -> Any:
         if (column is not None) and (row is not None):
             return self.data.iloc[row, column]
@@ -345,48 +341,48 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def nunique(self, dropna: bool = True):
         return {column: self.data[column].nunique() for column in self.data.columns}
 
-    def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> List[Tuple]:
+    def groupby(self, by: str | Iterable[str], **kwargs) -> list[tuple]:
         groups = self.data.groupby(by=by, observed=False, **kwargs)
         return list(groups)
 
-    def agg(self, func: Union[str, List], **kwargs) -> Union[pd.DataFrame, float]:
-        func = func if isinstance(func, (List, Dict)) else [func]
+    def agg(self, func:str | list, **kwargs) -> pd.DataFrame | float:
+        func = func if isinstance(func, (list, dict)) else [func]
         result = self.data.agg(func, **kwargs)
         return self._convert_agg_result(result)
 
-    def max(self) -> Union[pd.DataFrame, float]:
+    def max(self) -> pd.DataFrame | float:
         return self.agg(["max"])
 
-    def idxmax(self) -> Union[pd.DataFrame, float]:
+    def idxmax(self) ->  pd.DataFrame | float:
         return self.agg(["idxmax"])
 
-    def min(self) -> Union[pd.DataFrame, float]:
+    def min(self) ->  pd.DataFrame | float:
         return self.agg(["min"])
 
-    def count(self) -> Union[pd.DataFrame, float]:
+    def count(self) ->  pd.DataFrame | float:
         return self.agg(["count"])
 
-    def sum(self) -> Union[pd.DataFrame, float]:
+    def sum(self) ->  pd.DataFrame | float:
         return self.agg(["sum"])
 
-    def mean(self) -> Union[pd.DataFrame, float]:
+    def mean(self) ->  pd.DataFrame | float:
         return self.agg(["mean"])
 
     def mode(
         self, numeric_only: bool = False, dropna: bool = True
-    ) -> Union[pd.DataFrame, float]:
+    ) ->  pd.DataFrame | float:
         return self.data.mode(numeric_only=numeric_only, dropna=dropna)
 
     def var(
         self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
-    ) -> Union[pd.DataFrame, float]:
+    ) ->  pd.DataFrame | float:
         return self.agg(["var"], skipna=skipna, ddof=ddof, numeric_only=numeric_only)
 
     def log(self) -> pd.DataFrame:
         np_data = np.log(self.data.to_numpy())
         return pd.DataFrame(np_data, columns=self.data.columns)
 
-    def std(self, skipna: bool = True, ddof: int = 1) -> Union[pd.DataFrame, float]:
+    def std(self, skipna: bool = True, ddof: int = 1) ->  pd.DataFrame | float:
         return self.agg(["std"], skipna=skipna, ddof=ddof)
 
     def cov(self):
@@ -397,7 +393,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             return self.data.quantile(q=q)
         return self.agg(func="quantile", q=q)
 
-    def coefficient_of_variation(self) -> Union[pd.DataFrame, float]:
+    def coefficient_of_variation(self) ->  pd.DataFrame | float:
         data = (self.data.std() / self.data.mean()).to_frame().T
         data.index = ["cv"]
         if data.shape[0] == 1 and data.shape[1] == 1:
@@ -411,14 +407,14 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         self,
         method: Literal["pearson", "kendall", "spearman"] = "pearson",
         numeric_only: bool = False,
-    ) -> Union[pd.DataFrame, float]:
+    ) ->  pd.DataFrame | float:
         return self.data.corr(method=method, numeric_only=numeric_only)
 
     def isna(self) -> pd.DataFrame:
         return self.data.isna()
 
     def sort_values(
-        self, by: Union[str, List[str]], ascending: bool = True, **kwargs
+        self, by: str | list[str], ascending: bool = True, **kwargs
     ) -> pd.DataFrame:
         return self.data.sort_values(by=by, ascending=ascending, **kwargs)
 
@@ -435,8 +431,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def fillna(
         self,
-        values: Union[ScalarType, Dict[str, ScalarType], None] = None,
-        method: Optional[Literal["bfill", "ffill"]] = None,
+        values: ScalarType | dict[str, ScalarType] | None = None,
+        method: Literal["bfill", "ffill"] | None = None,
         **kwargs,
     ) -> pd.DataFrame:
         if method is not None:
@@ -449,26 +445,26 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
         return self.data.fillna(value=values, **kwargs)
 
-    def na_counts(self) -> Union[pd.DataFrame, int]:
+    def na_counts(self) ->  pd.DataFrame | int:
         data = self.data.isna().sum().to_frame().T
         data.index = ["na_counts"]
         if data.shape[0] == 1 and data.shape[1] == 1:
             return int(data.loc[data.index[0], data.columns[0]])
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
-    def dot(self, other: "PandasDataset") -> pd.DataFrame:
+    def dot(self, other: PandasDataset) -> pd.DataFrame:
         result = self.data.dot(other.data)
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
     def dropna(
         self,
         how: Literal["any", "all"] = "any",
-        subset: Union[str, Iterable[str], None] = None,
-        axis: Union[Literal["index", "rows", "columns"], int] = 0,
+        subset: str | Iterable[str] | None = None,
+        axis: Literal["index", "rows", "columns"] | int = 0,
     ) -> pd.DataFrame:
         return self.data.dropna(how=how, subset=subset, axis=axis)
 
-    def transpose(self, names: Optional[Sequence[str]] = None) -> pd.DataFrame:
+    def transpose(self, names: Sequence[str] | None = None) -> pd.DataFrame:
         result = self.data.transpose()
         if names is not None:
             result.columns = names
@@ -476,16 +472,16 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def sample(
         self,
-        frac: Optional[float] = None,
-        n: Optional[int] = None,
-        random_state: Optional[int] = None,
+        frac: float | None = None,
+        n: int | None = None,
+        random_state: int | None = None,
     ) -> pd.DataFrame:
         return self.data.sample(n=n, frac=frac, random_state=random_state)
 
     def select_dtypes(
         self,
-        include: Optional[str] = None,
-        exclude: Optional[str] = None,
+        include: str | None = None,
+        exclude: str | None = None,
     ) -> pd.DataFrame:
         return self.data.select_dtypes(include=include, exclude=exclude)
 
@@ -494,13 +490,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def merge(
         self,
-        right: "PandasDataset",
-        on: Optional[str] = None,
-        left_on: Optional[str] = None,
-        right_on: Optional[str] = None,
-        left_index: Optional[bool] = None,
-        right_index: Optional[bool] = None,
-        suffixes: Tuple[str, str] = ("_x", "_y"),
+        right: PandasDataset,
+        on: str | None = None,
+        left_on: str | None = None,
+        right_on: str | None = None,
+        left_index: bool | None = None,
+        right_index: bool | None = None,
+        suffixes: tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> pd.DataFrame:
         for on_ in [on, left_on, right_on]:
@@ -537,14 +533,14 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def filter(
         self,
-        items: Optional[List] = None,
-        like: Optional[str] = None,
-        regex: Optional[str] = None,
+        items: list | None = None,
+        like: str | None = None,
+        regex: str | None = None,
         axis: int = 0,
     ) -> pd.DataFrame:
         return self.data.filter(items=items, like=like, regex=regex, axis=axis)
 
-    def rename(self, columns: Dict[str, str]) -> pd.DataFrame:
+    def rename(self, columns: dict[str, str]) -> pd.DataFrame:
         return self.data.rename(columns=columns)
 
     def replace(
@@ -559,6 +555,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return self.data.replace(to_replace=to_replace, value=value, regex=regex)
 
     def reindex(
-        self, labels: str = "", fill_value: Optional[str] = None
+        self, labels: str = "", fill_value: str | None = None
     ) -> pd.DataFrame:
         return self.data.reindex(labels, fill_value=fill_value)

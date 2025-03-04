@@ -1,14 +1,14 @@
-from typing import Optional
+from __future__ import annotations
 
 from ..dataset import Dataset
-from .abstract import Encoder
 from ..extensions.encoders import DummyEncoderExtension
+from .abstract import Encoder
 
 
 class DummyEncoder(Encoder):
     @staticmethod
     def _inner_function(
-        data: Dataset, target_cols: Optional[str] = None, **kwargs
+        data: Dataset, target_cols: str | None = None, **kwargs
     ) -> Dataset:
         if not target_cols:
             return data

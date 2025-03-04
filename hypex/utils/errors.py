@@ -17,7 +17,7 @@ class ConcatDataError(Exception):
 class ConcatBackendError(Exception):
     def __init__(self, other_backend, backend):
         super().__init__(
-            f"Can only append datas with the same backends. Got {other_backend} expected {backend}"
+            f"Can only append data with the same backends. Got {other_backend} expected {backend}"
         )
 
 
@@ -87,5 +87,5 @@ class InvalidArgumentError(Exception):
 class PairsNotFoundError(Exception):
     def __init__(self):
         super().__init__(
-            "Pairs are not found. Check your input data and try execute preprocessing pipline before matching estimation."
+            "Pairs are not found. Check your input data and try execute preprocessing pipeline before matching estimation."
         )

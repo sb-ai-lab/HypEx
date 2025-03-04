@@ -1,11 +1,18 @@
-import unittest
 import copy
-import pandas as pd
+import unittest
+
 import numpy as np
-from hypex.dataset import *
-from hypex.dataset.roles import *
-from hypex.utils import *
-import json
+import pandas as pd
+
+from hypex.dataset import Dataset, ExperimentData
+from hypex.dataset.roles import DefaultRole, InfoRole, TargetRole
+from hypex.utils import (
+    BackendsEnum,
+    ConcatDataError,
+    DataTypeError,
+    ExperimentDataEnum,
+    RoleColumnError,
+)
 
 
 class TestDataset(unittest.TestCase):
@@ -30,7 +37,7 @@ class TestDataset(unittest.TestCase):
         roles_with_mapping = {InfoRole(): ["col1", "col2"]}
         dataset_with_mapping = Dataset(roles=roles_with_mapping, data=self.data)
         self.assertListEqual(list(dataset_with_mapping.columns), ["col1", "col2"])
-    
+
     def test_backend_initialization(self):
         # Test initialization with backend
         roles_with_mapping = {InfoRole(): ["col1", "col2"]}
@@ -39,7 +46,7 @@ class TestDataset(unittest.TestCase):
         )
         self.assertListEqual(list(dataset_with_backend.columns), ["col1", "col2"])
         self.assertEqual(dataset_with_backend.backend.name, "pandasdataset")
-    
+
     def test_partial_role_initialization(self):
         # Test initialization with partial roles
         roles_partial = {InfoRole(): ["col1"]}
@@ -430,14 +437,14 @@ class TestDataset(unittest.TestCase):
     def test_invalid_type_other(self):
         # Test invalid type handling
         with self.assertRaises(DataTypeError):
-            result = self.dataset + {}
+            self.dataset + {}
 
     def test_backend_type_error(self):
         # Test backend type error handling
         other_roles = {"col1": InfoRole(int), "col2": InfoRole(int)}
         other_data = pd.DataFrame({"col1": [10, 20, 30], "col2": [40, 50, 60]})
         with self.assertRaises(TypeError):
-            other_dataset = Dataset(
+            Dataset(
                 roles=other_roles, data=other_data, backend="unknown"
             )
 
@@ -459,7 +466,7 @@ class TestDataset(unittest.TestCase):
         # Test setting invalid type
         with self.assertRaises(TypeError):
             self.dataset["col1"] = ["string", "another", "string"]
-        
+
     def test_setitem_invalid_len(self):
         # Test setting invalid type
         with self.assertRaises(ValueError):
@@ -657,12 +664,12 @@ class TestDataset(unittest.TestCase):
         # Test with correct positive values
         self.dataset.data["col1"] = [1, 2, 3]
         cv = self.dataset.coefficient_of_variation()
-        
+
         # Calculate the expected CV manually
         mean_col1 = np.mean([1, 2, 3])
         std_col1 = np.std([1, 2, 3], ddof=0)  # Standard deviation with population correction
         expected_cv = std_col1 / mean_col1
-        
+
         # Check that the coefficient of variation is close to the expected value
         self.assertAlmostEqual(cv["col1"], expected_cv, places=3)
 
@@ -729,25 +736,25 @@ class TestDataset(unittest.TestCase):
 
         expected_cov = self.dataset.data.cov()
         pd.testing.assert_frame_equal(cov.data, expected_cov)
-        
+
         # Edge cases
         # Test with constant column
         self.dataset.data["col1"] = [1, 1, 1]
         cov = self.dataset.cov()
         self.assertEqual(cov.loc["col1", "col1"], 0)  # Covariance with constant column should be 0
-        
+
         # Test with NaN values
         self.dataset.data["col1"] = [1, None, 3]
         cov = self.dataset.cov()
-        
+
         # The expected behavior for NaN values: pandas should handle them by excluding those rows in the covariance calculation
         expected_cov = self.dataset.data.cov()
         pd.testing.assert_frame_equal(cov.data, expected_cov)  # Ensure covariance matrix is correct even with NaN
-        
+
         # Ensure covariance involving NaN is correctly handled (NaN should not propagate if handled by pandas)
         self.assertTrue(pd.notna(cov.loc["col1", "col2"]))
 
-    def test_create_empty(self):
+    def test_create_empty_2(self):
         # Test basic empty creation
         empty = Dataset.create_empty(roles=self.roles)
         self.assertTrue(empty.is_empty())
@@ -1339,11 +1346,11 @@ class TestDataset(unittest.TestCase):
         # Test replace with non-existent values
         result = self.dataset.replace({999: 1000})
         self.assertTrue(result.data.equals(self.dataset.data))
-    
+
     def test_replace_wrong_type(self):
         # Test replace single value
         with self.assertRaises(ValueError):
-            result = self.dataset.replace(1, 'uwu')
+            self.dataset.replace(1, 'uwu')
 
     def test_sample(self):
         # Test with n parameter
@@ -1627,7 +1634,7 @@ def test_operators(self):
         ("rdiv2", 10, lambda x, y: x / y),
         ("div", 2, lambda x, y: x / y),
     ]
-    
+
     for operator, other_data, expected_operator in test_cases:
         with self.subTest(operator=operator):
             # Create the other dataset
@@ -1685,7 +1692,7 @@ def test_operators(self):
                 result = other_data ** self.dataset
             elif operator == "rdiv2":
                 result = other_data / self.dataset
-            
+
             # Check the result type
             self.assertIsInstance(result, Dataset, f"Expected result to be Dataset for {operator}")
 
@@ -1703,10 +1710,10 @@ def test_operators(self):
         self.assertEqual(t_data.loc["col2"], 4)
 
         with self.assertRaises(KeyError):
-            result = self.dataset["q"]
+            self.dataset["q"]
 
         with self.assertRaises(RoleColumnError):
-            result = self.dataset[1]
+            self.dataset[1]
 
         # Тестирование ролей
         self.assertIn("a", t_data.roles)
@@ -1746,10 +1753,10 @@ def test_operators(self):
         self.assertEqual(t_data.data.to_dict(), {0: {"col1": 1, "col2": 4}})
 
         with self.assertRaises(IndexError):
-            result = self.dataset.iloc[7]
+            self.dataset.iloc[7]
 
         with self.assertRaises(TypeError):
-            result = self.dataset.iloc["a"]
+            self.dataset.iloc["a"]
 
         # Тестирование ролей
         self.assertIn(0, t_data.roles)
