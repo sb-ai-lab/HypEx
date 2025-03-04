@@ -1,16 +1,13 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import (
     Any,
     Callable,
-    Dict,
     Iterable,
-    List,
     Literal,
-    Optional,
     Sequence,
     Sized,
-    Tuple,
-    Union,
 )
 
 from ...utils import AbstractMethodError, FromDictTypes
@@ -33,15 +30,15 @@ class DatasetBackendNavigation(ABC):
 
     @abstractmethod
     def from_dict(
-        self, data: FromDictTypes, index: Optional[Union[Iterable, Sized]] = None
+        self, data: FromDictTypes, index: Iterable | Sized | None = None
     ):
         raise AbstractMethodError
 
     @abstractmethod
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         raise AbstractMethodError
 
-    def to_records(self) -> List[Dict]:
+    def to_records(self) -> list[dict]:
         raise AbstractMethodError
 
     @abstractmethod
@@ -183,24 +180,24 @@ class DatasetBackendNavigation(ABC):
     @abstractmethod
     def create_empty(
         self,
-        index: Optional[Iterable] = None,
-        columns: Optional[Iterable[str]] = None,
+        index: Iterable | None = None,
+        columns: Iterable[str] | None = None,
     ):
         raise AbstractMethodError
 
     @abstractmethod
     def _get_column_index(
-        self, column_name: Union[Sequence[str], str]
-    ) -> Union[int, Sequence[int]]:
+        self, column_name: Sequence[str] | str
+    ) -> int | Sequence[int]:
         raise AbstractMethodError
 
     @abstractmethod
-    def get_column_type(self, column_name: str) -> Union[type, None]:
+    def get_column_type(self, column_name: str) -> type | None:
         raise AbstractMethodError
 
     @abstractmethod
     def astype(
-        self, dtype: Dict[str, type], errors: Literal["raise", "ignore"] = "raise"
+        self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> Any:
         raise AbstractMethodError
 
@@ -211,9 +208,9 @@ class DatasetBackendNavigation(ABC):
     @abstractmethod
     def add_column(
         self,
-        data: Union[Sequence],
+        data: Sequence,
         name: str,
-        index: Optional[Sequence] = None,
+        index: Sequence | None = None,
     ):
         raise AbstractMethodError
 
@@ -276,8 +273,8 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     @abstractmethod
     def get_values(
         self,
-        row: Optional[str] = None,
-        column: Optional[str] = None,
+        row: str | None = None,
+        column: str | None = None,
     ) -> Any:
         raise AbstractMethodError
 
@@ -306,7 +303,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> Any:
+    def groupby(self, by: str | Iterable[str], **kwargs) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
@@ -315,7 +312,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
 
     @abstractmethod
     def sort_values(
-        self, by: Union[str, List[str]], ascending: bool = True, **kwargs
+        self, by: str | list[str], ascending: bool = True, **kwargs
     ) -> Any:
         raise AbstractMethodError
 
@@ -348,8 +345,8 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     def dropna(
         self,
         how: Literal["any", "all"] = "any",
-        subset: Union[str, Iterable[str], None] = None,
-        axis: Union[Literal["index", "rows", "columns"], int] = 0,
+        subset: str | Iterable[str] | None = None,
+        axis: Literal["index", "rows", "columns"] | int = 0,
     ) -> Any:
         raise AbstractMethodError
 
@@ -363,7 +360,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
 
     @abstractmethod
     def select_dtypes(
-        self, include: Optional[Any] = None, exclude: Optional[Any] = None
+        self, include: Any | None = None, exclude: Any | None = None
     ) -> Any:
         raise AbstractMethodError
 
@@ -371,12 +368,12 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     def merge(
         self,
         right: Any,
-        on: Optional[str] = None,
-        left_on: Optional[str] = None,
-        right_on: Optional[str] = None,
+        on: str | None = None,
+        left_on: str | None = None,
+        right_on: str | None = None,
         left_index: bool = False,
         right_index: bool = False,
-        suffixes: Tuple[str, str] = ("_x", "_y"),
+        suffixes: tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> Any:
         raise AbstractMethodError
@@ -384,16 +381,16 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     @abstractmethod
     def drop(
         self,
-        labels: Union[str, Sequence[str], None] = None,
+        labels: str | Sequence[str] | None = None,
         axis: int = 1,
     ) -> Any:
         raise AbstractMethodError
 
     def filter(
         self,
-        items: Optional[List] = None,
-        like: Optional[str] = None,
-        regex: Optional[str] = None,
+        items: list | None = None,
+        like: str | None = None,
+        regex: str | None = None,
         axis: int = 0,
     ) -> Any:
         return AbstractMethodError
@@ -410,7 +407,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def rename(self, columns: Dict[str, str]) -> Any:
+    def rename(self, columns: dict[str, str]) -> Any:
         return AbstractMethodError
 
     @abstractmethod
