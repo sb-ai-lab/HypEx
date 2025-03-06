@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 from copy import deepcopy
-from typing import Optional, List, Dict, Any, Union, Sequence, Tuple
+from typing import Any, Sequence
 
 from ..dataset import (
+    ABCRole,
     Dataset,
     ExperimentData,
     FeatureRole,
     GroupingRole,
-    ABCRole,
     TargetRole,
 )
 from ..executor import Calculator
@@ -19,7 +21,7 @@ class MahalanobisDistance(Calculator):
 
     def __init__(
         self,
-        grouping_role: Optional[ABCRole] = None,
+        grouping_role: ABCRole | None = None,
         key: Any = "",
     ):
         super().__init__(key=key)
@@ -29,9 +31,9 @@ class MahalanobisDistance(Calculator):
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_fields: Optional[List[str]] = None,
+        target_fields: list[str] | None = None,
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
         result = {}
         for i in range(1, len(grouping_data)):
             result.update(
@@ -52,7 +54,7 @@ class MahalanobisDistance(Calculator):
         return result
 
     def _set_value(
-        self, data: ExperimentData, value: Optional[Dict] = None, key: Any = None
+        self, data: ExperimentData, value: dict | None = None, key: Any = None
     ) -> ExperimentData:
         for key, value_ in value.items():
             data = data.set_value(
@@ -69,12 +71,12 @@ class MahalanobisDistance(Calculator):
         return group_field, target_fields
 
     @property
-    def search_types(self) -> Optional[List[type]]:
+    def search_types(self) -> list[type] | None:
         return [int, float]
 
     @classmethod
     def _inner_function(
-        cls, data: Dataset, test_data: Optional[Dataset] = None, **kwargs
+        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ):
         test_data = cls._check_test_data(test_data)
         cov = (data.cov() + test_data.cov()) / 2 if test_data else data.cov()
@@ -90,11 +92,11 @@ class MahalanobisDistance(Calculator):
     def calc(
         cls,
         data: Dataset,
-        group_field: Union[Sequence[str], str, None] = None,
-        grouping_data: Optional[List[Tuple[str, Dataset]]] = None,
-        target_fields: Union[str, List[str], None] = None,
+        group_field: Sequence[str] | str | None = None,
+        grouping_data: list[tuple[str, Dataset]] | None = None,
+        target_fields: str | list[str] | None = None,
         **kwargs,
-    ) -> Dict:
+    ) -> dict:
         group_field = Adapter.to_list(group_field)
 
         if grouping_data is None:

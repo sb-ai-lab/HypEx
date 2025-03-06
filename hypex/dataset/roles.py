@@ -1,12 +1,12 @@
+from __future__ import annotations
+
 from abc import ABC
-from typing import Optional, Dict, Union
-from copy import deepcopy
 
 from ..utils import (
-    TargetRoleTypes,
-    DefaultRoleTypes,
     CategoricalTypes,
+    DefaultRoleTypes,
     RoleNameType,
+    TargetRoleTypes,
 )
 
 
@@ -14,7 +14,7 @@ class ABCRole(ABC):
 
     _role_name: RoleNameType = "Abstract"
 
-    def __init__(self, data_type: Optional[DefaultRoleTypes] = None):
+    def __init__(self, data_type: DefaultRoleTypes | None = None):
         self.data_type = data_type
 
     @property
@@ -34,7 +34,7 @@ class StratificationRole(ABCRole):
 
     _role_name: RoleNameType = "Stratification"
 
-    def __init__(self, data_type: Optional[CategoricalTypes] = None):
+    def __init__(self, data_type: CategoricalTypes | None = None):
         super().__init__(data_type)
 
 
@@ -42,7 +42,7 @@ class GroupingRole(ABCRole):
 
     _role_name: RoleNameType = "Grouping"
 
-    def __init__(self, data_type: Optional[CategoricalTypes] = None):
+    def __init__(self, data_type: CategoricalTypes | None = None):
         super().__init__(data_type)
 
 
@@ -55,7 +55,7 @@ class TargetRole(ABCRole):
 
     _role_name: RoleNameType = "Target"
 
-    def __init__(self, data_type: Optional[TargetRoleTypes] = None):
+    def __init__(self, data_type: TargetRoleTypes | None = None):
         super().__init__(data_type)
 
 
@@ -68,7 +68,7 @@ class PreTargetRole(ABCRole):
 
     _role_name: RoleNameType = "PreTarget"
 
-    def __init__(self, data_type: Optional[TargetRoleTypes] = None):
+    def __init__(self, data_type: TargetRoleTypes | None = None):
         super().__init__(data_type)
 
 
@@ -150,7 +150,7 @@ class AdditionalMatchingRole(AdditionalRole):
     _role_name: RoleNameType = "AdditionalMatching"
 
 
-default_roles: Dict[RoleNameType, ABCRole] = {
+default_roles: dict[RoleNameType, ABCRole] = {
     "info": InfoRole(),
     "default": DefaultRole(),
     "feature": FeatureRole(),

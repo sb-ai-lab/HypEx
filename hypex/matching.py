@@ -1,16 +1,17 @@
-import warnings
-from typing import List, Literal, Union
+from __future__ import annotations
 
-from .experiments import GroupExperiment
-from .reporters.matching import MatchingDatasetReporter
+from typing import Literal
+
 from .analyzers.matching import MatchingAnalyzer
-from .comparators import TTest, PSI, KSTest
+from .comparators import KSTest, TTest
 from .comparators.distances import MahalanobisDistance
-from .dataset import TreatmentRole, TargetRole, AdditionalTargetRole
+from .dataset import TargetRole, TreatmentRole
 from .executor import Executor
+from .experiments import GroupExperiment
 from .experiments.base import Experiment, OnRoleExperiment
 from .ml.faiss import FaissNearestNeighbors
-from .operators.operators import MatchingMetrics, Bias
+from .operators.operators import Bias, MatchingMetrics
+from .reporters.matching import MatchingDatasetReporter
 from .ui.base import ExperimentShell
 from .ui.matching import MatchingOutput
 
@@ -58,14 +59,13 @@ class Matching(ExperimentShell):
 
     @staticmethod
     def _make_experiment(
-        group_match: bool = False,
-        distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-        metric: Literal["atc", "att", "ate"] = "ate",
-        bias_estimation: bool = True,
-        quality_tests: Union[
-            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"],
-            List[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]],
-        ] = "auto",
+            group_match: bool = False,
+            distance: Literal["mahalanobis", "l2"] = "mahalanobis",
+            metric: Literal["atc", "att", "ate"] = "ate",
+            bias_estimation: bool = True,
+            quality_tests:
+            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"] | list[
+                Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]] = "auto",
     ) -> Experiment:
         """Creates an experiment configuration with specified matching parameters.
 
@@ -103,7 +103,7 @@ class Matching(ExperimentShell):
         }
         two_sides = metric == "ate"
         test_pairs = metric == "atc"
-        executors: List[Executor] = [
+        executors: list[Executor] = [
             FaissNearestNeighbors(
                 grouping_role=TreatmentRole(),
                 two_sides=two_sides,
@@ -135,7 +135,7 @@ class Matching(ExperimentShell):
                 executors=(
                     executors
                     if distance == "l2"
-                    else [distance_mapping[distance]] + executors
+                    else [distance_mapping[distance], *executors]
                 )
             )
             if not group_match
@@ -143,22 +143,21 @@ class Matching(ExperimentShell):
                 executors=(
                     executors
                     if distance == "l2"
-                    else [distance_mapping[distance]] + executors
+                    else [distance_mapping[distance], *executors]
                 ),
                 reporter=MatchingDatasetReporter(),
             )
         )
 
     def __init__(
-        self,
-        group_match: bool = False,
-        distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-        metric: Literal["atc", "att", "ate"] = "ate",
-        bias_estimation: bool = True,
-        quality_tests: Union[
-            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"],
-            List[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]],
-        ] = "auto",
+            self,
+            group_match: bool = False,
+            distance: Literal["mahalanobis", "l2"] = "mahalanobis",
+            metric: Literal["atc", "att", "ate"] = "ate",
+            bias_estimation: bool = True,
+            quality_tests:
+            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"] |
+            list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]] = "auto",
     ):
         super().__init__(
             experiment=self._make_experiment(

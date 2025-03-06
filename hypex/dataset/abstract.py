@@ -1,20 +1,22 @@
+from __future__ import annotations
+
 import copy
 import json  # type: ignore
 from abc import ABC
-from typing import Iterable, Dict, Union, List, Optional, Any
+from typing import Any, Iterable
 
 import pandas as pd  # type: ignore
 
+from ..utils import BackendsEnum, RoleColumnError
 from .backends import PandasDataset
 from .roles import (
     ABCRole,
-    default_roles,
     DefaultRole,
+    default_roles,
 )
-from ..utils import BackendsEnum, RoleColumnError, BackendTypeError
 
 
-def parse_roles(roles: Dict) -> Dict[Union[str, int], ABCRole]:
+def parse_roles(roles: dict) -> dict[str | int] | ABCRole:
     new_roles = {}
     roles = roles or {}
     for role in roles:
@@ -54,14 +56,11 @@ class DatasetBase(ABC):
             self._backend = self._backend.update_column_type(column, role.data_type)
 
     def __init__(
-        self,
-        roles: Union[
-            Dict[ABCRole, Union[List[str], str]],
-            Dict[str, ABCRole],
-        ],
-        data: Optional[Union[pd.DataFrame, str]] = None,
-        backend: Optional[BackendsEnum] = None,
-        default_role: Optional[ABCRole] = None,
+            self,
+            roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
+            data: pd.DataFrame | str | None = None,
+            backend: BackendsEnum | None = None,
+            default_role: ABCRole | None = None,
     ):
         self._backend = (
             self._select_backend_from_str(data, backend)
@@ -77,16 +76,14 @@ class DatasetBase(ABC):
         if any(not isinstance(role, ABCRole) for role in roles.values()):
             raise TypeError("Roles must be instances of ABCRole type")
         if data is not None and any(
-            i not in self._backend.columns for i in list(roles.keys())
+                i not in self._backend.columns for i in list(roles.keys())
         ):
             raise RoleColumnError(list(roles.keys()), self._backend.columns)
         if data is not None:
             roles = self._set_all_roles(roles)
             self._set_empty_types(roles)
-        self._roles: Dict[str, ABCRole] = roles
-        self._tmp_roles: Union[
-            Dict[ABCRole, Union[List[str], str]], Dict[Union[List[str], str], ABCRole]
-        ] = {}
+        self._roles: dict[str, ABCRole] = roles
+        self._tmp_roles: dict[ABCRole, list[str] | str] | dict[list[str] | str] | ABCRole = {}
 
     def __repr__(self):
         return self.data.__repr__()
@@ -98,11 +95,11 @@ class DatasetBase(ABC):
         return self._backend.__len__()
 
     def search_columns(
-        self,
-        roles: Union[ABCRole, Iterable[ABCRole]],
-        tmp_role=False,
-        search_types: Optional[List] = None,
-    ) -> List[str]:
+            self,
+            roles:ABCRole | Iterable[ABCRole],
+            tmp_role=False,
+            search_types: list | None = None,
+    ) -> list[str]:
         roles = roles if isinstance(roles, Iterable) else [roles]
         roles_for_search = self._tmp_roles if tmp_role else self.roles
         return [
@@ -116,10 +113,10 @@ class DatasetBase(ABC):
         ]
 
     def replace_roles(
-        self,
-        new_roles_map: Dict[Union[ABCRole, str], ABCRole],
-        tmp_role: bool = False,
-        auto_roles_types: bool = False,
+            self,
+            new_roles_map: dict[ABCRole | str] | ABCRole,
+            tmp_role: bool = False,
+            auto_roles_types: bool = False,
     ):
         new_roles_map = parse_roles(
             {
@@ -196,7 +193,7 @@ class DatasetBase(ABC):
     def to_records(self):
         return self._backend.to_records()
 
-    def to_json(self, filename: Optional[str] = None):
+    def to_json(self, filename: str | None = None):
         if not filename:
             return json.dumps(self.to_dict())
         with open(filename, "w") as file:
@@ -207,25 +204,23 @@ class DatasetBase(ABC):
         return self._backend
 
     def get_values(
-        self,
-        row: Optional[str] = None,
-        column: Optional[str] = None,
+            self,
+            row: str | None = None,
+            column: str | None = None,
     ) -> Any:
         return self._backend.get_values(row=row, column=column)
 
     def iget_values(
-        self,
-        row: Optional[int] = None,
-        column: Optional[int] = None,
+            self,
+            row: int | None = None,
+            column: int | None = None,
     ) -> Any:
         return self._backend.iget_values(row=row, column=column)
 
     def _set_roles(
-        self,
-        new_roles_map: Union[
-            Dict[ABCRole, Union[List[str], str]], Dict[Union[List[str], str], ABCRole]
-        ],
-        temp_role: bool = False,
+            self,
+            new_roles_map: dict[ABCRole,list[str] | str] | dict[list[str] |str] | ABCRole,
+            temp_role: bool = False,
     ):
         if not new_roles_map:
             if not temp_role:
@@ -233,7 +228,6 @@ class DatasetBase(ABC):
             else:
                 self._tmp_roles = {}
                 return self
-
 
         keys, values = list(new_roles_map.keys()), list(new_roles_map.values())
         roles, columns_sets = (

@@ -1,11 +1,9 @@
-import itertools
-
-from .base import Output
 from ..analyzers.aa import AAScoreAnalyzer
 from ..dataset import Dataset, ExperimentData
-from ..reporters.aa import AAPassedReporter, AABestSplitReporter
-from ..utils import ExperimentDataEnum, ID_SPLIT_SYMBOL
+from ..reporters.aa import AABestSplitReporter, AAPassedReporter
+from ..utils import ExperimentDataEnum
 from ..utils.enums import RenameEnum
+from .base import Output
 
 
 class AAOutput(Output):

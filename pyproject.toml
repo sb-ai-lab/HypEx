@@ -66,6 +66,7 @@ lgbm = ["lightgbm"]
 all = ["catboost", "lightgbm"]
 
 [tool.poetry.group.dev.dependencies]
+docutils = ">=0.17,<0.21"
 jupyter = "^1.0.0"
 pytest = "^7.4.3"
 sphinx = { version = "^7.2.6", python = ">=3.9, <3.11" }
@@ -81,6 +82,8 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 88
-target-version = ["py38", "py39", "py310", "py311", "py312"]
+target-version = "py38"
+
+[tool.ruff.lint]
 select = ["E", "F", "W", "C90", "UP", "RUF", "I"]
 ignore = ["E501"]

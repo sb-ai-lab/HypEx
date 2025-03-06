@@ -1,11 +1,11 @@
 from typing import Union
 
-from .base import Output
 from ..analyzers.ab import ABAnalyzer
-from ..comparators import GroupSizes, GroupDifference
-from ..dataset import ExperimentData, Dataset, TreatmentRole, StatisticRole
+from ..comparators import GroupDifference, GroupSizes
+from ..dataset import Dataset, ExperimentData, StatisticRole, TreatmentRole
 from ..reporters.ab import ABDatasetReporter
-from ..utils import ExperimentDataEnum, ID_SPLIT_SYMBOL
+from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
+from .base import Output
 
 
 class ABOutput(Output):

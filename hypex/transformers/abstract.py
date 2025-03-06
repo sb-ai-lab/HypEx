@@ -1,7 +1,6 @@
 from abc import abstractmethod
-from typing import Any
 
-from ..dataset import Dataset, ExperimentData, ABCRole
+from ..dataset import Dataset, ExperimentData
 from ..executor import Calculator
 from ..utils import AbstractMethodError
 

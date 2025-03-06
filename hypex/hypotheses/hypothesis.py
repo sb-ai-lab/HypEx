@@ -30,7 +30,7 @@
 #             and "path" not in self.dataset.keys()
 #             and not self.dataset["data"]["data"]
 #         ):
-#             raise ValueError("Data ot path to data must be added")
+#             raise ValueError("Data or path to data must be added")
 #         # if len(self.dataset["roles"]["role_names"]) != len(
 #         #     self.dataset["roles"]["columns"]
 #         # ):

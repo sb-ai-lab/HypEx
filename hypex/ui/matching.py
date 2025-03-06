@@ -1,17 +1,19 @@
-from typing import Dict, Any
+from __future__ import annotations
 
-from .base import Output
+from typing import Any
+
 from ..analyzers.matching import MatchingAnalyzer
 from ..dataset import (
+    AdditionalMatchingRole,
     Dataset,
     ExperimentData,
-    AdditionalMatchingRole,
-    StatisticRole,
     GroupingRole,
+    StatisticRole,
     TargetRole,
 )
 from ..reporters.matching import MatchingDictReporter, MatchingQualityDatasetReporter
 from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL
+from .base import Output
 
 
 class MatchingOutput(Output):
@@ -41,7 +43,7 @@ class MatchingOutput(Output):
 
     def extract(self, experiment_data: ExperimentData):
         resume = self.resume_reporter.report(experiment_data)
-        reformatted_resume: Dict[str, Any] = {}
+        reformatted_resume: dict[str, Any] = {}
         for key, value in resume.items():
             if ID_SPLIT_SYMBOL in key:
                 keys = key.split(ID_SPLIT_SYMBOL)
@@ -60,7 +62,7 @@ class MatchingOutput(Output):
                     },
                     index=experiment_data.ds[
                         experiment_data.ds[group_indexes_id] == group
-                    ].index,
+                        ].index,
                     roles={"indexes": StatisticRole()},
                 )
                 for group, values in reformatted_resume.pop("indexes").items()
@@ -82,7 +84,7 @@ class MatchingOutput(Output):
         outcome = experiment_data.field_search(TargetRole())[0]
         reformatted_resume["outcome"] = {
             key: outcome
-            for key in reformatted_resume[list(reformatted_resume.keys())[0]].keys()
+            for key in reformatted_resume[next(iter(reformatted_resume.keys()))].keys()
         }
 
         self.resume = Dataset.from_dict(

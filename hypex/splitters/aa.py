@@ -1,11 +1,13 @@
-from typing import Any, List, Optional, Union
+from __future__ import annotations
+
+from typing import Any
 
 from ..dataset import (
+    AdditionalTreatmentRole,
     Dataset,
     ExperimentData,
-    TreatmentRole,
     StratificationRole,
-    AdditionalTreatmentRole,
+    TreatmentRole,
 )
 from ..dataset.roles import ConstGroupRole
 from ..executor import Calculator
@@ -16,8 +18,8 @@ class AASplitter(Calculator):
     def __init__(
         self,
         control_size: float = 0.5,
-        random_state: Optional[int] = None,
-        sample_size: Optional[float] = None,
+        random_state: int | None = None,
+        sample_size: float | None = None,
         constant_key: bool = True,
         save_groups: bool = True,
         key: Any = "",
@@ -31,7 +33,7 @@ class AASplitter(Calculator):
         super().__init__(key)
 
     def _generate_params_hash(self):
-        hash_parts: List[str] = []
+        hash_parts: list[str] = []
         if self.control_size != 0.5:
             hash_parts.append(f"cs {self.control_size}")
         if self.random_state is not None:
@@ -39,7 +41,7 @@ class AASplitter(Calculator):
         self._params_hash = "|".join(hash_parts)
 
     def init_from_hash(self, params_hash: str):
-        hash_parts: List[str] = params_hash.split("|")
+        hash_parts: list[str] = params_hash.split("|")
         for hash_part in hash_parts:
             if hash_part.startswith("cs"):
                 self.control_size = float(hash_part[hash_part.rfind(" ") + 1 :])
@@ -75,12 +77,12 @@ class AASplitter(Calculator):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        random_state: Optional[int] = None,
+        random_state: int | None = None,
         control_size: float = 0.5,
-        sample_size: Optional[float] = None,
-        const_group_field: Optional[str] = None,
+        sample_size: float | None = None,
+        const_group_field: str | None = None,
         **kwargs,
-    ) -> List[str]:
+    ) -> list[str]:
         sample_size = 1.0 if sample_size is None else sample_size
         control_indexes = []
         if const_group_field:
@@ -126,11 +128,11 @@ class AASplitterWithStratification(AASplitter):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        random_state: Optional[int] = None,
+        random_state: int | None = None,
         control_size: float = 0.5,
         grouping_fields=None,
         **kwargs,
-    ) -> Union[List[str], Dataset]:
+    ) -> list[str] | Dataset:
         if not grouping_fields:
             return AASplitter._inner_function(
                 data, random_state, control_size, **kwargs

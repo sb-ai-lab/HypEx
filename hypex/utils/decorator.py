@@ -1,12 +1,13 @@
-from functools import wraps
-from typing import Union, Any, Callable, cast
+from __future__ import annotations
 
-from docs.mock_docs import MyClass
+from functools import wraps
+from typing import Any, Callable, cast
+
 from hypex.utils import DecoratedType, DocstringInheritDecorator
 
 
 def inherit_docstring_from(
-    source: Union[Callable[..., Any], property]
+    source: Callable[..., Any] | property
 ) -> DocstringInheritDecorator:
     """
     A decorator to inherit the docstring from another function or property.

@@ -1,11 +1,13 @@
-from typing import Any, Optional, List, Union, Sequence
+from __future__ import annotations
+
+from typing import Any, Sequence
 
 from ..dataset import Dataset, ExperimentData, FeatureRole
 from ..executor import Calculator
 from ..utils import (
+    NAME_BORDER_SYMBOL,
     AbstractMethodError,
     CategoricalTypes,
-    NAME_BORDER_SYMBOL,
     ExperimentDataEnum,
 )
 
@@ -13,7 +15,7 @@ from ..utils import (
 class Encoder(Calculator):
     def __init__(
         self,
-        target_roles: Optional[Union[str, Sequence[str]]] = None,
+        target_roles: str |  Sequence[str] | None = None,
         key: Any = "",
     ):
         self.target_roles = target_roles or FeatureRole()
@@ -32,7 +34,7 @@ class Encoder(Calculator):
         self.key = f"{NAME_BORDER_SYMBOL}{col_name}{NAME_BORDER_SYMBOL}"
         return self.id
 
-    def _ids_to_names(self, col_names: List[str]):
+    def _ids_to_names(self, col_names: list[str]):
         return {col_name: self._get_ids(col_name) for col_name in col_names}
 
     @staticmethod
