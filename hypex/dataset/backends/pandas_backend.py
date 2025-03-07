@@ -227,7 +227,10 @@ class PandasNavigation(DatasetBackendNavigation):
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
         if isinstance(data, pd.DataFrame):
-            data = data.values
+            if len(data.columns) == 1:
+                data = pd.Series(data.iloc[:, 0])
+            else:
+                data = data.values
         if len(self.data) != len(data):
             if isinstance(data[0], Iterable) and len(data[0]) == 1:
                 data = data.squeeze()
