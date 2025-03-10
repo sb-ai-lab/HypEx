@@ -48,9 +48,7 @@ class Experiment(Executor):
         )
         super().__init__(key)
 
-    def set_params(
-        self, params: dict[str, Any] | dict[type, dict[str, Any]]
-    ) -> None:
+    def set_params(self, params: dict[str, Any] | dict[type, dict[str, Any]]) -> None:
         if isinstance(next(iter(params)), str):
             super().set_params(params)
         elif isinstance(next(iter(params)), type):
