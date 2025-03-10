@@ -105,8 +105,7 @@ class Dataset(DatasetBase):
 
     def __init__(
         self,
-        roles:
-            dict[ABCRole, list[str] | str] | dict[str, ABCRole],
+        roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
         data: pd.DataFrame | str | None = None,
         backend: BackendsEnum | None = None,
         default_role: ABCRole | None = None,
@@ -574,7 +573,7 @@ class Dataset(DatasetBase):
         self,
         how: Literal["any", "all"] = "any",
         subset: str | Iterable[str] | None = None,
-        axis: Literal["index", "rows", "columns"] |int = 0,
+        axis: Literal["index", "rows", "columns"] | int = 0,
     ):
         # Drop NA values using backend implementation
         new_data = self._backend.dropna(how=how, subset=subset, axis=axis)
@@ -818,7 +817,7 @@ class ExperimentData:
     def get_ids(
         self,
         classes: type | Iterable[type] | str | Iterable[str],
-        searched_space: ExperimentDataEnum |Iterable[ExperimentDataEnum] | None = None,
+        searched_space: ExperimentDataEnum | Iterable[ExperimentDataEnum] | None = None,
         key: str | None = None,
     ) -> dict[str, dict[str, list[str]]]:
 
@@ -937,7 +936,7 @@ class DatasetAdapter(Adapter):
 
     @staticmethod
     def to_dataset(
-        data: dict | Dataset |pd.DataFrame | list | str | int | float | bool,
+        data: dict | Dataset | pd.DataFrame | list | str | int | float | bool,
         roles: ABCRole | dict[str, ABCRole],
     ) -> Dataset:
         # Convert data based on its type
@@ -964,12 +963,12 @@ class DatasetAdapter(Adapter):
     ) -> Dataset:
         if isinstance(roles, ABCRole):
             roles = {"value": roles}
-        return Dataset(roles=roles, data=pd.DataFrame({next(iter(roles.keys())): [data]}))
+        return Dataset(
+            roles=roles, data=pd.DataFrame({next(iter(roles.keys())): [data]})
+        )
 
     @staticmethod
-    def dict_to_dataset(
-        data: dict, roles: ABCRole | dict[str, ABCRole]
-    ) -> Dataset:
+    def dict_to_dataset(data: dict, roles: ABCRole | dict[str, ABCRole]) -> Dataset:
         roles_names = list(data.keys())
         if any(
             [

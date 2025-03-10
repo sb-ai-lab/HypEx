@@ -23,9 +23,7 @@ class Extension(ABC):
         return self.BACKEND_MAPPING[type(data.backend)](data=data, **kwargs)
 
     @staticmethod
-    def result_to_dataset(
-        result: Any, roles: ABCRole | dict[str, ABCRole]
-    ) -> Dataset:
+    def result_to_dataset(result: Any, roles: ABCRole | dict[str, ABCRole]) -> Dataset:
         return DatasetAdapter.to_dataset(result, roles=roles)
 
 
@@ -41,7 +39,7 @@ class MLExtension(Extension):
         data: Dataset,
         test_data: Dataset | None = None,
         mode: Literal["auto", "fit", "predict"] | None = None,
-        **kwargs
+        **kwargs,
     ):
         if mode in ["auto", "fit"]:
             return self.fit(data, test_data, **kwargs)
@@ -60,7 +58,7 @@ class MLExtension(Extension):
         data: Dataset,
         target_data: Dataset | None = None,
         test_data: Dataset | None = None,
-        **kwargs
+        **kwargs,
     ):
         return super().calc(
             data=data, target_data=target_data, test_data=test_data, **kwargs
