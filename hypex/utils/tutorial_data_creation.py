@@ -11,7 +11,6 @@ ROOT = Path("").absolute().parents[0]
 sys.path.append(str(ROOT))
 
 
-
 def set_nans(
     data: pd.DataFrame,
     na_step: Sequence[int] | int | None = None,
@@ -48,7 +47,7 @@ def set_nans(
     if len(na_step_list) < len(nan_cols_list):
         na_step_list += [na_step_list[-1]] * (len(nan_cols_list) - len(na_step_list))
     elif len(na_step_list) > len(nan_cols_list):
-        na_step_list = na_step_list[:len(nan_cols_list)]
+        na_step_list = na_step_list[: len(nan_cols_list)]
 
     for col, step in zip(nan_cols_list, na_step_list):
         if col in data.columns:
@@ -58,12 +57,12 @@ def set_nans(
 
 
 def create_test_data(
-        num_users: int = 10000,
-        na_step: Sequence[int] | int | None = None,
-        nan_cols: Sequence[str] | str | None = None,
-        file_name: str | None = None,
-        exact_ATT: int = 100,
-        rs=None,
+    num_users: int = 10000,
+    na_step: Sequence[int] | int | None = None,
+    nan_cols: Sequence[str] | str | None = None,
+    file_name: str | None = None,
+    exact_ATT: int = 100,
+    rs=None,
 ):
     """Creates data for tutorial.
 
@@ -196,7 +195,7 @@ def sigmoid_division(x, dependent_division=True) -> np.ndarray:
 
 
 def gen_special_medicine_df(
-        data_size=100, *, dependent_division=True, random_state=None
+    data_size=100, *, dependent_division=True, random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
 
@@ -245,7 +244,7 @@ def gen_special_medicine_df(
 
 
 def gen_oracle_df(
-        data_size=8, *, dependent_division=True, factual_only=False, random_state=None
+    data_size=8, *, dependent_division=True, factual_only=False, random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
 
@@ -306,7 +305,7 @@ def gen_oracle_df(
 
 
 def gen_control_variates_df(
-        data_size=1000, *, dependent_division=True, random_state=None
+    data_size=1000, *, dependent_division=True, random_state=None
 ) -> pd.DataFrame:
     """Synthetic dataframe generator.
 

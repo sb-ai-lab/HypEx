@@ -13,12 +13,12 @@ NUM_OF_BUCKETS = 10
 
 class GroupDifference(Comparator):
     def __init__(
-            self,
-            compare_by: Literal[
-                "groups", "columns", "columns_in_groups", "cross"
-            ] = "groups",
-            grouping_role: ABCRole | None = None,
-            target_roles: ABCRole | list[ABCRole] | None = None,
+        self,
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross"
+        ] = "groups",
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | list[ABCRole] | None = None,
     ):
         super().__init__(
             compare_by=compare_by,
@@ -32,10 +32,10 @@ class GroupDifference(Comparator):
 
     @classmethod
     def _inner_function(
-            cls,
-            data: Dataset,
-            test_data: Dataset | None = None,
-            **kwargs,
+        cls,
+        data: Dataset,
+        test_data: Dataset | None = None,
+        **kwargs,
     ) -> dict:
         test_data = cls._check_test_data(test_data)
         control_mean = data.mean()
@@ -53,11 +53,11 @@ class GroupDifference(Comparator):
 
 class GroupSizes(Comparator):
     def __init__(
-            self,
-            compare_by: Literal[
-                "groups", "columns", "columns_in_groups", "cross"
-            ] = "groups",
-            grouping_role: ABCRole | None = None,
+        self,
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross"
+        ] = "groups",
+        grouping_role: ABCRole | None = None,
     ):
         super().__init__(
             compare_by=compare_by,
@@ -67,7 +67,7 @@ class GroupSizes(Comparator):
 
     @classmethod
     def _inner_function(
-            cls, data: Dataset, test_data: Dataset | None = None, **kwargs
+        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> dict:
         size_a = len(data)
         size_b = len(test_data) if isinstance(test_data, Dataset) else 0
@@ -84,7 +84,7 @@ class PSI(Comparator):
 
     @classmethod
     def _inner_function(
-            cls, data: Dataset, test_data: Dataset | None = None, **kwargs
+        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> dict[str, float]:
         test_data = cls._check_test_data(test_data=test_data)
         data.sort(ascending=False)

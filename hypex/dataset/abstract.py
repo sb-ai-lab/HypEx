@@ -56,11 +56,11 @@ class DatasetBase(ABC):
             self._backend = self._backend.update_column_type(column, role.data_type)
 
     def __init__(
-            self,
-            roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
-            data: pd.DataFrame | str | None = None,
-            backend: BackendsEnum | None = None,
-            default_role: ABCRole | None = None,
+        self,
+        roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
+        data: pd.DataFrame | str | None = None,
+        backend: BackendsEnum | None = None,
+        default_role: ABCRole | None = None,
     ):
         self._backend = (
             self._select_backend_from_str(data, backend)
@@ -76,14 +76,16 @@ class DatasetBase(ABC):
         if any(not isinstance(role, ABCRole) for role in roles.values()):
             raise TypeError("Roles must be instances of ABCRole type")
         if data is not None and any(
-                i not in self._backend.columns for i in list(roles.keys())
+            i not in self._backend.columns for i in list(roles.keys())
         ):
             raise RoleColumnError(list(roles.keys()), self._backend.columns)
         if data is not None:
             roles = self._set_all_roles(roles)
             self._set_empty_types(roles)
         self._roles: dict[str, ABCRole] = roles
-        self._tmp_roles: dict[ABCRole, list[str] | str] | dict[list[str] | str] | ABCRole = {}
+        self._tmp_roles: (
+            dict[ABCRole, list[str] | str] | dict[list[str] | str] | ABCRole
+        ) = {}
 
     def __repr__(self):
         return self.data.__repr__()
@@ -95,10 +97,10 @@ class DatasetBase(ABC):
         return self._backend.__len__()
 
     def search_columns(
-            self,
-            roles:ABCRole | Iterable[ABCRole],
-            tmp_role=False,
-            search_types: list | None = None,
+        self,
+        roles: ABCRole | Iterable[ABCRole],
+        tmp_role=False,
+        search_types: list | None = None,
     ) -> list[str]:
         roles = roles if isinstance(roles, Iterable) else [roles]
         roles_for_search = self._tmp_roles if tmp_role else self.roles
@@ -113,10 +115,10 @@ class DatasetBase(ABC):
         ]
 
     def replace_roles(
-            self,
-            new_roles_map: dict[ABCRole | str] | ABCRole,
-            tmp_role: bool = False,
-            auto_roles_types: bool = False,
+        self,
+        new_roles_map: dict[ABCRole | str] | ABCRole,
+        tmp_role: bool = False,
+        auto_roles_types: bool = False,
     ):
         new_roles_map = parse_roles(
             {
@@ -204,23 +206,23 @@ class DatasetBase(ABC):
         return self._backend
 
     def get_values(
-            self,
-            row: str | None = None,
-            column: str | None = None,
+        self,
+        row: str | None = None,
+        column: str | None = None,
     ) -> Any:
         return self._backend.get_values(row=row, column=column)
 
     def iget_values(
-            self,
-            row: int | None = None,
-            column: int | None = None,
+        self,
+        row: int | None = None,
+        column: int | None = None,
     ) -> Any:
         return self._backend.iget_values(row=row, column=column)
 
     def _set_roles(
-            self,
-            new_roles_map: dict[ABCRole,list[str] | str] | dict[list[str] |str] | ABCRole,
-            temp_role: bool = False,
+        self,
+        new_roles_map: dict[ABCRole, list[str] | str] | dict[list[str] | str] | ABCRole,
+        temp_role: bool = False,
     ):
         if not new_roles_map:
             if not temp_role:

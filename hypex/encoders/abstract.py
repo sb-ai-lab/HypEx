@@ -15,7 +15,7 @@ from ..utils import (
 class Encoder(Calculator):
     def __init__(
         self,
-        target_roles: str |  Sequence[str] | None = None,
+        target_roles: str | Sequence[str] | None = None,
         key: Any = "",
     ):
         self.target_roles = target_roles or FeatureRole()

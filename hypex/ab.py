@@ -97,12 +97,13 @@ class ABTest(ExperimentShell):
         )
 
     def __init__(
-            self,
-            additional_tests:
-            Literal["t-test", "u-test", "chi2-test"] |
-            list[Literal["t-test", "u-test", "chi2-test"]] |
-            None = None,
-            multitest_method:
+        self,
+        additional_tests: (
+            Literal["t-test", "u-test", "chi2-test"]
+            | list[Literal["t-test", "u-test", "chi2-test"]]
+            | None
+        ) = None,
+        multitest_method: (
             Literal[
                 "bonferroni",
                 "sidak",
@@ -115,8 +116,9 @@ class ABTest(ExperimentShell):
                 "fdr_tsbh",
                 "fdr_tsbhy",
                 "quantile",
-            ] | None
-            = "holm",
+            ]
+            | None
+        ) = "holm",
     ):
         super().__init__(
             experiment=self._make_experiment(additional_tests, multitest_method),

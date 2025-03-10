@@ -161,6 +161,7 @@ default_roles: dict[RoleNameType, ABCRole] = {
     "stratification": StratificationRole(),
     "statistic": StatisticRole(),
     "filter": FilterRole(),
+    "constgroup": ConstGroupRole(),
     "additionaltreatment": AdditionalTreatmentRole(),
     "additionalgrouping": AdditionalGroupingRole(),
     "additionaltarget": AdditionalTargetRole(),

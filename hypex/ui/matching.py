@@ -62,7 +62,7 @@ class MatchingOutput(Output):
                     },
                     index=experiment_data.ds[
                         experiment_data.ds[group_indexes_id] == group
-                        ].index,
+                    ].index,
                     roles={"indexes": StatisticRole()},
                 )
                 for group, values in reformatted_resume.pop("indexes").items()
