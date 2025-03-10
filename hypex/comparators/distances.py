@@ -75,9 +75,7 @@ class MahalanobisDistance(Calculator):
         return [int, float]
 
     @classmethod
-    def _inner_function(
-        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ):
+    def _inner_function(cls, data: Dataset, test_data: Dataset | None = None, **kwargs):
         test_data = cls._check_test_data(test_data)
         cov = (data.cov() + test_data.cov()) / 2 if test_data else data.cov()
         cholesky = CholeskyExtension().calc(cov)

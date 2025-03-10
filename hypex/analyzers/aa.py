@@ -69,7 +69,7 @@ class OneAAStatAnalyzer(Executor):
 
 
 class AAScoreAnalyzer(Executor):
-    AA_SPLITER_CLASS_MAPPING : ClassVar[dict] = {
+    AA_SPLITER_CLASS_MAPPING: ClassVar[dict] = {
         class_.__name__: class_ for class_ in [AASplitter, AASplitterWithStratification]
     }
 

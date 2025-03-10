@@ -248,9 +248,7 @@ class PandasNavigation(DatasetBackendNavigation):
             new_data = new_data.reset_index(drop=True)
         return new_data
 
-    def from_dict(
-        self, data: FromDictTypes, index: Iterable | Sized | None = None
-    ):
+    def from_dict(self, data: FromDictTypes, index: Iterable | Sized | None = None):
         if isinstance(data, dict):
             self.data = pd.DataFrame().from_records(data, columns=list(data.keys()))
         else:
@@ -348,7 +346,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         groups = self.data.groupby(by=by, observed=False, **kwargs)
         return list(groups)
 
-    def agg(self, func:str | list, **kwargs) -> pd.DataFrame | float:
+    def agg(self, func: str | list, **kwargs) -> pd.DataFrame | float:
         func = func if isinstance(func, (list, dict)) else [func]
         result = self.data.agg(func, **kwargs)
         return self._convert_agg_result(result)
@@ -356,36 +354,36 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def max(self) -> pd.DataFrame | float:
         return self.agg(["max"])
 
-    def idxmax(self) ->  pd.DataFrame | float:
+    def idxmax(self) -> pd.DataFrame | float:
         return self.agg(["idxmax"])
 
-    def min(self) ->  pd.DataFrame | float:
+    def min(self) -> pd.DataFrame | float:
         return self.agg(["min"])
 
-    def count(self) ->  pd.DataFrame | float:
+    def count(self) -> pd.DataFrame | float:
         return self.agg(["count"])
 
-    def sum(self) ->  pd.DataFrame | float:
+    def sum(self) -> pd.DataFrame | float:
         return self.agg(["sum"])
 
-    def mean(self) ->  pd.DataFrame | float:
+    def mean(self) -> pd.DataFrame | float:
         return self.agg(["mean"])
 
     def mode(
         self, numeric_only: bool = False, dropna: bool = True
-    ) ->  pd.DataFrame | float:
+    ) -> pd.DataFrame | float:
         return self.data.mode(numeric_only=numeric_only, dropna=dropna)
 
     def var(
         self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
-    ) ->  pd.DataFrame | float:
+    ) -> pd.DataFrame | float:
         return self.agg(["var"], skipna=skipna, ddof=ddof, numeric_only=numeric_only)
 
     def log(self) -> pd.DataFrame:
         np_data = np.log(self.data.to_numpy())
         return pd.DataFrame(np_data, columns=self.data.columns)
 
-    def std(self, skipna: bool = True, ddof: int = 1) ->  pd.DataFrame | float:
+    def std(self, skipna: bool = True, ddof: int = 1) -> pd.DataFrame | float:
         return self.agg(["std"], skipna=skipna, ddof=ddof)
 
     def cov(self):
@@ -396,7 +394,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             return self.data.quantile(q=q)
         return self.agg(func="quantile", q=q)
 
-    def coefficient_of_variation(self) ->  pd.DataFrame | float:
+    def coefficient_of_variation(self) -> pd.DataFrame | float:
         data = (self.data.std() / self.data.mean()).to_frame().T
         data.index = ["cv"]
         if data.shape[0] == 1 and data.shape[1] == 1:
@@ -410,7 +408,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         self,
         method: Literal["pearson", "kendall", "spearman"] = "pearson",
         numeric_only: bool = False,
-    ) ->  pd.DataFrame | float:
+    ) -> pd.DataFrame | float:
         return self.data.corr(method=method, numeric_only=numeric_only)
 
     def isna(self) -> pd.DataFrame:
@@ -448,7 +446,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
         return self.data.fillna(value=values, **kwargs)
 
-    def na_counts(self) ->  pd.DataFrame | int:
+    def na_counts(self) -> pd.DataFrame | int:
         data = self.data.isna().sum().to_frame().T
         data.index = ["na_counts"]
         if data.shape[0] == 1 and data.shape[1] == 1:
@@ -557,7 +555,5 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             return self.data.replace(to_replace=to_replace, regex=regex)
         return self.data.replace(to_replace=to_replace, value=value, regex=regex)
 
-    def reindex(
-        self, labels: str = "", fill_value: str | None = None
-    ) -> pd.DataFrame:
+    def reindex(self, labels: str = "", fill_value: str | None = None) -> pd.DataFrame:
         return self.data.reindex(labels, fill_value=fill_value)

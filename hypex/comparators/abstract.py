@@ -48,7 +48,7 @@ class Comparator(Calculator, ABC):
         self.baseline_role = baseline_role or PreTargetRole()
 
     @property
-    def search_types(self) ->list[type] | None:
+    def search_types(self) -> list[type] | None:
         return None
 
     def _local_extract_dataset(
@@ -343,12 +343,15 @@ class Comparator(Calculator, ABC):
     @classmethod
     def calc(
         cls,
-        compare_by: Literal["groups", "columns", "columns_in_groups", "cross"] | None = None,
+        compare_by: (
+            Literal["groups", "columns", "columns_in_groups", "cross"] | None
+        ) = None,
         target_fields_data: Dataset | None = None,
         baseline_field_data: Dataset | None = None,
         group_field_data: Dataset | None = None,
-        grouping_data:
-            tuple[list[tuple[str, Dataset]]] | list[tuple[str, Dataset]] | None =  None,
+        grouping_data: (
+            tuple[list[tuple[str, Dataset]]] | list[tuple[str, Dataset]] | None
+        ) = None,
         **kwargs,
     ) -> dict:
 

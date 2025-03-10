@@ -59,13 +59,14 @@ class Matching(ExperimentShell):
 
     @staticmethod
     def _make_experiment(
-            group_match: bool = False,
-            distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-            metric: Literal["atc", "att", "ate"] = "ate",
-            bias_estimation: bool = True,
-            quality_tests:
-            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"] | list[
-                Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]] = "auto",
+        group_match: bool = False,
+        distance: Literal["mahalanobis", "l2"] = "mahalanobis",
+        metric: Literal["atc", "att", "ate"] = "ate",
+        bias_estimation: bool = True,
+        quality_tests: (
+            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]
+            | list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]]
+        ) = "auto",
     ) -> Experiment:
         """Creates an experiment configuration with specified matching parameters.
 
@@ -150,14 +151,15 @@ class Matching(ExperimentShell):
         )
 
     def __init__(
-            self,
-            group_match: bool = False,
-            distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-            metric: Literal["atc", "att", "ate"] = "ate",
-            bias_estimation: bool = True,
-            quality_tests:
-            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"] |
-            list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]] = "auto",
+        self,
+        group_match: bool = False,
+        distance: Literal["mahalanobis", "l2"] = "mahalanobis",
+        metric: Literal["atc", "att", "ate"] = "ate",
+        bias_estimation: bool = True,
+        quality_tests: (
+            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]
+            | list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]]
+        ) = "auto",
     ):
         super().__init__(
             experiment=self._make_experiment(
