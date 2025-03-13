@@ -144,9 +144,9 @@ from hypex import AATest
 data = Dataset(
     roles={
         "user_id": InfoRole(int),  # InfoRole for ID.
-        "pre_spends": TargetRole(),  # TargetRole for check homogenity
-        "post_spends": TargetRole(),  # TargetRole for check homogenity
-        "gender": StratificationRole(str)  # StratificationRole for strat
+        "pre_spends": TargetRole(),  # TargetRole for check homogeneity
+        "post_spends": TargetRole(),  # TargetRole for check homogeneity
+        "gender": StratificationRole(str)  # StratificationRole for strata
     }, data="data.csv",
 )
 
