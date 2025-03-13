@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from ..comparators.distances import MahalanobisDistance
 from ..dataset import (
@@ -24,10 +24,12 @@ class FaissNearestNeighbors(MLExecutor):
         test_pairs: bool = False,
         grouping_role: ABCRole | None = None,
         key: Any = "",
+        faiss_mode: Literal["base", "fast", "auto"] = "auto",
     ):
         self.n_neighbors = n_neighbors
         self.two_sides = two_sides
         self.test_pairs = test_pairs
+        self.faiss_mode = faiss_mode
         super().__init__(
             grouping_role=grouping_role, target_role=FeatureRole(), key=key
         )
@@ -40,6 +42,7 @@ class FaissNearestNeighbors(MLExecutor):
         n_neighbors: int | None = None,
         two_sides: bool | None = None,
         test_pairs: bool | None = None,
+        faiss_mode: Literal["base", "fast", "auto"] = "auto",
         **kwargs,
     ) -> dict:
         if test_pairs is not True:
@@ -47,6 +50,7 @@ class FaissNearestNeighbors(MLExecutor):
                 data=grouping_data[0][1],
                 test_data=grouping_data[1][1],
                 n_neighbors=n_neighbors or 1,
+                faiss_mode=faiss_mode,
                 **kwargs,
             )
             if two_sides is not True:
@@ -57,6 +61,7 @@ class FaissNearestNeighbors(MLExecutor):
                     data=grouping_data[1][1],
                     test_data=grouping_data[0][1],
                     n_neighbors=n_neighbors or 1,
+                    faiss_mode=faiss_mode,
                     **kwargs,
                 ),
             }
@@ -64,6 +69,7 @@ class FaissNearestNeighbors(MLExecutor):
             data=grouping_data[1][1],
             test_data=grouping_data[0][1],
             n_neighbors=n_neighbors or 1,
+            faiss_mode=faiss_mode,
             **kwargs,
         )
         if two_sides is not True:
@@ -74,6 +80,7 @@ class FaissNearestNeighbors(MLExecutor):
                 data=grouping_data[1][1],
                 test_data=grouping_data[0][1],
                 n_neighbors=n_neighbors or 1,
+                faiss_mode=faiss_mode,
                 **kwargs,
             ),
         }
@@ -85,14 +92,15 @@ class FaissNearestNeighbors(MLExecutor):
         test_data: Dataset | None = None,
         target_data: Dataset | None = None,
         n_neighbors: int | None = None,
+        faiss_mode: Literal["base", "fast", "auto"] = "auto",
         **kwargs,
     ) -> Any:
-        return FaissExtension(n_neighbors=n_neighbors or 1).calc(
+        return FaissExtension(n_neighbors=n_neighbors or 1, faiss_mode=faiss_mode).calc(
             data=data, test_data=test_data
         )
 
     def fit(self, X: Dataset, Y: Dataset | None = None) -> MLExecutor:
-        return FaissExtension(self.n_neighbors).fit(X=X, Y=Y)
+        return FaissExtension(self.n_neighbors, self.faiss_mode).fit(X=X, Y=Y)
 
     def predict(self, X: Dataset) -> Dataset:
         return FaissExtension().predict(X)
@@ -114,6 +122,7 @@ class FaissNearestNeighbors(MLExecutor):
             grouping_data=grouping_data,
             features_fields=features_fields,
             n_neighbors=self.n_neighbors,
+            faiss_mode=self.faiss_mode,
             two_sides=self.two_sides,
             test_pairs=self.test_pairs,
         )

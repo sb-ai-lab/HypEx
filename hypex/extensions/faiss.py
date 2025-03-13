@@ -11,8 +11,9 @@ from .abstract import MLExtension
 
 
 class FaissExtension(MLExtension):
-    def __init__(self, n_neighbors: int = 1):
+    def __init__(self, n_neighbors: int = 1, faiss_mode: Literal["base", "fast", "auto"] = "auto"):
         self.n_neighbors = n_neighbors
+        self.faiss_mode = faiss_mode
         super().__init__()
 
     @staticmethod
@@ -52,7 +53,7 @@ class FaissExtension(MLExtension):
         X = data.data.values
         if mode in ["auto", "fit"]:
             self.index = faiss.IndexFlatL2(X.shape[1])
-            if len(X) > 1_000_000:
+            if (len(X) > 1_000_000 and self.faiss_mode == "auto") or self.faiss_mode == "fast":
                 self.index = faiss.IndexIVFFlat(self.index, 1, 1000)
                 self.index.train(X)
             self.index.add(X)
