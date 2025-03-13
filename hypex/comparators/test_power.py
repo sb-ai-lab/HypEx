@@ -37,7 +37,7 @@ class TestPower(Comparator, ABC):
         test_data: Dataset | None = None,
         significance: float = 0.95,
         power: float = 0.8,
-        **kwargs
+        **kwargs,
     ) -> float:
         pass
 
@@ -63,7 +63,7 @@ class MDEBySize(TestPower):
         test_data: Dataset | None = None,
         significance: float = 0.95,
         power: float = 0.8,
-        **kwargs
+        **kwargs,
     ) -> float:
         m = norm.ppf((1 + significance) / 2) + norm.ppf(power)
         if not test_data:
@@ -93,7 +93,6 @@ class MDEBySize(TestPower):
 #             ratio=ratio,
 #             alpha=significance,
 #
-
 
 
 # class MDEBySize(GroupComparator):

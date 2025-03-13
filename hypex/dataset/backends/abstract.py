@@ -29,9 +29,7 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def from_dict(
-        self, data: FromDictTypes, index: Iterable | Sized | None = None
-    ):
+    def from_dict(self, data: FromDictTypes, index: Iterable | Sized | None = None):
         raise AbstractMethodError
 
     @abstractmethod
@@ -311,9 +309,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def sort_values(
-        self, by: str | list[str], ascending: bool = True, **kwargs
-    ) -> Any:
+    def sort_values(self, by: str | list[str], ascending: bool = True, **kwargs) -> Any:
         raise AbstractMethodError
 
     def std(self) -> Any:
