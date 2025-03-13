@@ -95,7 +95,7 @@ class MatchingMetrics(GroupOperator):
         itt = test_data[target_fields[0]] - test_data[target_fields[1]]
         itc = data[target_fields[1]] - data[target_fields[0]]
         bias = kwargs.get("bias", {})
-        if len(bias) > 0:
+        if bias and len(bias) > 0:
             if metric in ["atc", "ate"]:
                 itc -= Dataset.from_dict(
                     {"test": bias["control"]}, roles={}, index=itc.index
