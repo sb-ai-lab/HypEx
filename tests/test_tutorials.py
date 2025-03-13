@@ -170,6 +170,8 @@ def test_matchingtest(matching_data):
         "matching-atc": Matching(metric="atc"),
         "matching-att": Matching(metric="att"),
         "matching-l2": Matching(distance="l2", metric="att"),
+        "matching-faiss-auto": Matching(distance="l2", faiss_mode="auto"),
+        "matching-faiss_base": Matching(distance="mahalanobis", faiss_mode="base"),
     }
 
     for test_name in mapping.keys():

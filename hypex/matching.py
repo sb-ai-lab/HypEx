@@ -59,14 +59,15 @@ class Matching(ExperimentShell):
 
     @staticmethod
     def _make_experiment(
-        group_match: bool = False,
-        distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-        metric: Literal["atc", "att", "ate"] = "ate",
-        bias_estimation: bool = True,
-        quality_tests: (
-            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]
-            | list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]]
-        ) = "auto",
+            group_match: bool = False,
+            distance: Literal["mahalanobis", "l2"] = "mahalanobis",
+            metric: Literal["atc", "att", "ate"] = "ate",
+            bias_estimation: bool = True,
+            quality_tests: (
+                    Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]
+                    | list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]]
+            ) = "auto",
+            faiss_mode: Literal["base", "fast", "auto"] = "auto",
     ) -> Experiment:
         """Creates an experiment configuration with specified matching parameters.
 
@@ -109,6 +110,7 @@ class Matching(ExperimentShell):
                 grouping_role=TreatmentRole(),
                 two_sides=two_sides,
                 test_pairs=test_pairs,
+                faiss_mode=faiss_mode,
             )
         ]
         if bias_estimation:
@@ -160,10 +162,12 @@ class Matching(ExperimentShell):
             Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]
             | list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]]
         ) = "auto",
+        faiss_mode: Literal["base", "fast", "auto"] = "auto",
+
     ):
         super().__init__(
             experiment=self._make_experiment(
-                group_match, distance, metric, bias_estimation, quality_tests
+                group_match, distance, metric, bias_estimation, quality_tests, faiss_mode
             ),
             output=MatchingOutput(GroupExperiment if group_match else MatchingAnalyzer),
         )
