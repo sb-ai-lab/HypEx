@@ -153,16 +153,16 @@ class Matching(ExperimentShell):
         )
 
     def __init__(
-            self,
-            group_match: bool = False,
-            distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-            metric: Literal["atc", "att", "ate"] = "ate",
-            bias_estimation: bool = True,
-            quality_tests: (
-                    Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]
-                    | list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]]
-            ) = "auto",
-            faiss_mode: Literal["base", "fast", "auto"] = "auto",
+        self,
+        group_match: bool = False,
+        distance: Literal["mahalanobis", "l2"] = "mahalanobis",
+        metric: Literal["atc", "att", "ate"] = "ate",
+        bias_estimation: bool = True,
+        quality_tests: (
+            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]
+            | list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]]
+        ) = "auto",
+        faiss_mode: Literal["base", "fast", "auto"] = "auto",
 
     ):
         super().__init__(
