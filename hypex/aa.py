@@ -191,49 +191,53 @@ class AATest(ExperimentShell):
                 n_iterations = 2000
             else:
                 n_iterations = 10
+        experiment_params = [
+            ParamsExperiment(
+                executors=(
+                    [
+                        (
+                            ONE_AA_TEST_WITH_STRATIFICATION
+                            if stratification
+                            else ONE_AA_TEST
+                        )
+                    ]
+                ),
+                params=self._prepare_params(
+                    n_iterations,
+                    control_size,
+                    random_states,
+                    sample_size,
+                    additional_params,
+                ),
+                reporter=DatasetReporter(OneAADictReporter(front=False)),
+            )        
+        ]
+        if sample_size:
+            experiment_params.append(
+                IfParamsExperiment(
+                    executors=(
+                        [
+                            (
+                                ONE_AA_TEST_WITH_STRATIFICATION
+                                if stratification
+                                else ONE_AA_TEST
+                            )
+                        ]
+                    ),
+                    params=self._prepare_params(
+                        n_iterations,
+                        control_size,
+                        random_states,
+                        additional_params,
+                    ),
+                    reporter=DatasetReporter(OneAADictReporter(front=False)),
+                    stopping_criterion=IfAAExecutor(sample_size=sample_size),
+                )
+            )
+        experiment_params.append(AAScoreAnalyzer())
         super().__init__(
             experiment=Experiment(
-                [
-                    ParamsExperiment(
-                        executors=(
-                            [
-                                (
-                                    ONE_AA_TEST_WITH_STRATIFICATION
-                                    if stratification
-                                    else ONE_AA_TEST
-                                )
-                            ]
-                        ),
-                        params=self._prepare_params(
-                            n_iterations,
-                            control_size,
-                            random_states,
-                            sample_size,
-                            additional_params,
-                        ),
-                        reporter=DatasetReporter(OneAADictReporter(front=False)),
-                    ),
-                    IfParamsExperiment(
-                        executors=(
-                            [
-                                (
-                                    ONE_AA_TEST_WITH_STRATIFICATION
-                                    if stratification
-                                    else ONE_AA_TEST
-                                )
-                            ]
-                        ),
-                        params=self._prepare_params(
-                            n_iterations,
-                            control_size,
-                            random_states,
-                            additional_params,
-                        ),
-                        reporter=DatasetReporter(OneAADictReporter(front=False)),
-                        stopping_criterion=IfAAExecutor(sample_size=sample_size),
-                    ),
-                    AAScoreAnalyzer(),
-                ],
+                experiment_params,
                 key="AATest",
             ),
             output=AAOutput(),
