@@ -1,6 +1,7 @@
 # starts with HYPEX-dir: PYTHONPATH=$(pwd) pytest
 import random
 
+import numpy as np
 import pandas as pd
 import pandas.testing as pdt
 import pytest
@@ -18,7 +19,8 @@ from hypex.dataset import (
 
 @pytest.fixture
 def aa_data():
-    return Dataset(
+    return [
+        Dataset(
         roles={
             "user_id": InfoRole(int),
             "treat": TreatmentRole(int),
@@ -27,7 +29,18 @@ def aa_data():
             "gender": StratificationRole(str),
         },
         data="examples/tutorials/data.csv",
-    )
+        ),
+        Dataset(
+        roles={
+            "user_id": InfoRole(int),
+            "treat": TreatmentRole(int),
+            "pre_spends": TargetRole(),
+            "post_spends": TargetRole(),
+            "gender": TargetRole(str),
+        },
+        data="examples/tutorials/data.csv",
+        ),
+    ]
 
 
 @pytest.fixture
@@ -68,6 +81,7 @@ def test_aatest(aa_data):
         "aa-rs": AATest(random_states=[56, 72, 2, 43]),
         "aa-strat": AATest(random_states=[56, 72, 2, 43], stratification=True),
         "aa-sample": AATest(n_iterations=10, sample_size=0.3),
+        "aa-cat_target": AATest(n_iterations=10),
     }
 
     mapping_resume = {
@@ -107,13 +121,27 @@ def test_aatest(aa_data):
                 "result": {0: "OK", 1: "OK"},
             }
         ),
+        "aa-cat_target": pd.DataFrame(
+            {
+                "TTest aa test": ["OK", "OK", np.nan],
+                "KSTest aa test": ["NOT OK", "OK", np.nan],
+                "Chi2Test aa test": [np.nan, np.nan, "OK"],
+                "TTest best split": ["OK", "OK", np.nan],
+                "KSTest best split": ["OK", "OK", np.nan],
+                "Chi2Test best split": [np.nan, np.nan, "OK"],
+                "result": ["OK", "OK", "OK"],
+            }
+        ),
     }
 
     for test_name in mapping.keys():
-        res = mapping[test_name].execute(aa_data)
+        if test_name == "aa-cat_target":
+            res = mapping[test_name].execute(aa_data[1])
+        else:
+            res = mapping[test_name].execute(aa_data[0])
         actual_data = res.resume.data.iloc[:, 2:-2]
         expected_data = mapping_resume[test_name]
-        pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)
+        pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)    
 
 
 def test_abtest(ab_data):
