@@ -106,6 +106,44 @@ class AASplitter(Calculator):
 
         return ["control" if i in control_indexes else "test" for i in data.index]
 
+    # @staticmethod
+    # def _inner_function(
+    #     data: Dataset,
+    #     random_state: int | None = None,
+    #     control_size: float = 0.5,
+    #     sample_size: float | None = None,
+    #     const_group_field: str | None = None,
+    #     **kwargs,
+    # ) -> list[str]:
+    #     sample_size = 1.0 if sample_size is None else sample_size
+    #     control_indexes = []
+    #     if const_group_field:
+    #         const_data = dict(data.groupby(const_group_field))
+    #         control_data = const_data.get("control")
+    #         if control_data is not None:
+    #             control_indexes = list(control_data.index)
+    #         const_size = sum(len(cd) for cd in const_data.values())
+    #         control_size = (len(data) * control_size - const_size) / (
+    #             len(data) - const_size
+    #         )
+    #     experiment_data = (
+    #         data[data[const_group_field].isna()] if const_group_field else data
+    #     )
+    #     experiment_data_index = experiment_data.sample(
+    #         frac=sample_size, random_state=random_state
+    #     ).index
+    #     addition_indexes = list(experiment_data_index)
+    #     edge = int(len(addition_indexes) * control_size)
+    #     control_indexes += addition_indexes[:edge]
+    #
+    #     import numpy as np
+    #     import pandas as pd
+    #     split_series = pd.Series(np.ones(data.data.shape[0], dtype='int'))
+    #     split_series[control_indexes] -= 1
+    #     split_series = split_series.map({0: 'control', 1: 'test'})
+    #
+    #     return split_series.to_list()
+
     def execute(self, data: ExperimentData) -> ExperimentData:
         const_group_fields = data.ds.search_columns(ConstGroupRole())
         const_group_fields = (
