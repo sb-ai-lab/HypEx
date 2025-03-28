@@ -5,7 +5,7 @@
     "n_iterations": [10, 20]
   },
   "montecarlo_params": {
-    "num_points" : 2,
+    "num_points" : 10,
     "bounds": {
       "n_rows" : {
           "max" : 10000,
@@ -24,6 +24,6 @@
   "fixed_params" : {    
     "n_columns": 10,
     "n_rows": 1000,
-    "n_iterations": 10
+    "n_iterations": 5
   }
 }

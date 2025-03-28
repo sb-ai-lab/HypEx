@@ -6,6 +6,7 @@ warnings.filterwarnings("ignore")
 
 import csv
 import json
+import jsonschema
 import multiprocessing as mp
 import psutil
 import tracemalloc
@@ -262,9 +263,13 @@ def perfomance_test_plot(params: Dict, output_path: str, title="Результа
             result["P"].append(value)
     df["Var"] = result["Var"]
     df["P"] = result["P"]
-
     plot_size = df["Var"].nunique()
-    fig, axs = plt.subplots(plot_size, 3, figsize=(plot_size * 11, 15))
+    if plot_size == 1:
+        fig, axs = plt.subplots(1, 3, figsize=(33, 5))
+        axs = axs.reshape(1, -1)  # Делаем 2D массив
+    else:
+        fig, axs = plt.subplots(plot_size, 3, figsize=(plot_size * 11, 15))
+
     for counter, (var, table) in enumerate(df.groupby("Var")):
         table = table.sort_values(by="P")
         axs[counter, 0].plot(table["P"], table["time"])
@@ -282,6 +287,7 @@ def perfomance_test_plot(params: Dict, output_path: str, title="Результа
     fig.suptitle(title)
     plt.subplots_adjust(hspace=0.5)
     plt.savefig(f"{output_path[:output_path.rfind('.')]}.png")
+    
 
 
 def tester(config: Dict, output_path: str): 
@@ -320,8 +326,7 @@ def tester(config: Dict, output_path: str):
         mcparams = config["montecarlo_params"]  
         df = {}
         for key in list(mcparams['bounds'].keys()):
-            df[key] = np.sort(np.round(np.random.uniform(mcparams['bounds'][key]['min'], mcparams['bounds'][key]['max'], mcparams['num_points'])).astype(int))
-        
+            df[key] = np.round(np.random.uniform(mcparams['bounds'][key]['min'], mcparams['bounds'][key]['max'], mcparams['num_points'])).astype(int)
         keys = list(df.keys())
         df = [{key: value.item() for key, value in zip(keys, values)} for values in zip(*df.values())]
         test.iterable_params = df
@@ -329,8 +334,13 @@ def tester(config: Dict, output_path: str):
         
 
 if __name__ == "__main__":
-    with open('config.json', 'r') as file:
-        config = json.load(file)
-
-    output_path = "AAPerfomanceTestResult"
+    with open('config.schema.json', 'r') as file1, open('config.json', 'r') as file2:
+        schema = json.load(file1)
+        config = json.load(file2)
+    try:
+        jsonschema.validate(instance=config, schema=schema)
+    except jsonschema.exceptions.ValidationError as err:
+        raise(f"Ошибка валидации: {err}")
+    
+    output_path = "aa_perfomance_test_result"
     tester(config = config, output_path = output_path)
