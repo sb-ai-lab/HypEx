@@ -287,7 +287,7 @@ def performance_test_plot(params: Dict, output_path: str, title="Результ�
     
 
 
-def tester(config: Dict, output_path: str): 
+def executor(config: Dict, output_path: str): 
     output_path = f"{output_path}.csv"
 
     if "fixed_params" not in config:
@@ -340,4 +340,4 @@ if __name__ == "__main__":
         raise(f"Ошибка валидации: {err}")
     
     output_path = "aa_performance_test_result"
-    tester(config = config, output_path = output_path)
+    executor(config = config, output_path = output_path)
