@@ -21,9 +21,6 @@ import pandas as pd
 from tqdm import tqdm
 from alive_progress import alive_bar
 
-import sys
-sys.path.append('..')
-
 from hypex import (
     AATest,
     ABTest,
@@ -334,7 +331,7 @@ def tester(config: Dict, output_path: str):
         
 
 if __name__ == "__main__":
-    with open('config.schema.json', 'r') as file1, open('config.json', 'r') as file2:
+    with open('utils/config.schema.json', 'r') as file1, open('utils/config.json', 'r') as file2:
         schema = json.load(file1)
         config = json.load(file2)
     try:
