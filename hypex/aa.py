@@ -210,7 +210,7 @@ class AATest(ExperimentShell):
                     additional_params,
                 ),
                 reporter=DatasetReporter(OneAADictReporter(front=False)),
-            )        
+            )
         ]
         if sample_size:
             experiment_params.append(
