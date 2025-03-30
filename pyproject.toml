@@ -59,6 +59,8 @@ matplotlib = [
 faiss-cpu = ">=1.6.0, <=1.8.0"
 seaborn = "<=0.13.2"
 statsmodels = "<=0.14.2"
+jsonschema = "^4.23.0"
+alive-progress = "^3.1.0"
 
 [tool.poetry.extras]
 cat = ["catboost"]

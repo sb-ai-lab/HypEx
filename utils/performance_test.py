@@ -249,7 +249,7 @@ class PerformanceTester:
             memory_usage / 10**6 if self.use_memory else None
         ]
 
-def perfomance_test_plot(params: Dict, output_path: str, title="Результаты однофакторного тестирования производительности АА Теста"):
+def performance_test_plot(params: Dict, output_path: str, title="Результаты однофакторного тестирования производительности АА Теста"):
     df = pd.read_csv(output_path)
     df = df[df.analysis == "onefactor"]
     df = df[['time', 'M1', 'M2']]
@@ -320,7 +320,7 @@ def tester(config: Dict, output_path: str):
         test.iterable_params = iterable_params
         test.execute(output_path, analysis="onefactor")
         test.rewrite = False
-        perfomance_test_plot(config["onefactor_params"], output_path)
+        performance_test_plot(config["onefactor_params"], output_path)
         
     if "montecarlo_params" in config:
         mcparams = config["montecarlo_params"]  
@@ -342,5 +342,5 @@ if __name__ == "__main__":
     except jsonschema.exceptions.ValidationError as err:
         raise(f"Ошибка валидации: {err}")
     
-    output_path = "aa_perfomance_test_result"
+    output_path = "aa_performance_test_result"
     tester(config = config, output_path = output_path)
