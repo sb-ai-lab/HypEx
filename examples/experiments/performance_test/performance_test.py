@@ -1,4 +1,3 @@
-# starts with HYPEX-dir/examples: PYTHONPATH=$(pwd)
 import os
 import time
 import warnings
@@ -331,7 +330,13 @@ def executor(config: Dict, output_path: str):
         
 
 if __name__ == "__main__":
-    with open('utils/config.schema.json', 'r') as file1, open('utils/config.json', 'r') as file2:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    file_path_schema = os.path.join(script_dir, "config.schema.json")
+    
+    file_path_config = os.path.join(script_dir, "config.json")
+
+    with open(file_path_schema, 'r') as file1, open(file_path_config, 'r') as file2:
         schema = json.load(file1)
         config = json.load(file2)
     try:
