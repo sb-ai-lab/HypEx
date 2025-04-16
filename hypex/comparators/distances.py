@@ -107,7 +107,6 @@ class MahalanobisDistance(Calculator):
             grouping_data, target_fields=target_fields, old_data=data, **kwargs
         )
 
-    # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields = self._get_fields(data=data)
         self.key = str(

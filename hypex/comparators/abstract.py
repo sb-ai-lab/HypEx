@@ -134,8 +134,6 @@ class Comparator(Calculator, ABC):
             return result
         return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
-    # TODO выделить в отдельную функцию с кваргами (нужно для альфы)
-
     @staticmethod
     def _grouping_data_split(
         grouping_data: dict[str, Dataset],
@@ -143,14 +141,13 @@ class Comparator(Calculator, ABC):
         target_fields: list[str],
         baseline_field: str | None = None,
     ) -> GroupingDataType:
-        if isinstance(grouping_data, dict):
-            compared_data = [(name, data) for name, data in grouping_data.items()]
-            baseline_data = [compared_data.pop(0)]
-        else:
+        if not isinstance(grouping_data, dict):
             raise TypeError(
                 f"Grouping data must be dict of strings and datasets, but got {type(grouping_data)}"
             )
 
+        compared_data = list(grouping_data.items())
+        baseline_data = [compared_data.pop(0)]
         baseline_data = [
             (
                 bucket[0],
