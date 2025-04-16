@@ -1,0 +1,116 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Parameters Configuration",
+    "description": "Schema for onefactor, montecarlo and fixed parameters",
+    "type": "object",
+    "properties": {
+      "onefactor_params": {
+        "type": "object",
+        "properties": {
+          "n_rows": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "n_columns": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "n_iterations": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "montecarlo_params": {
+        "type": "object",
+        "properties": {
+          "num_points": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "bounds": {
+            "type": "object",
+            "properties": {
+              "n_rows": {
+                "type": "object",
+                "properties": {
+                  "max": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "min": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": ["max", "min"],
+                "additionalProperties": false
+              },
+              "n_iterations": {
+                "type": "object",
+                "properties": {
+                  "max": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "min": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": ["max", "min"],
+                "additionalProperties": false
+              },
+              "n_columns": {
+                "type": "object",
+                "properties": {
+                  "max": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "min": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": ["max", "min"],
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "required": ["num_points", "bounds"],
+        "additionalProperties": true
+      },
+      "fixed_params": {
+        "type": "object",
+        "properties": {
+          "n_columns": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "n_rows": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "n_iterations": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": true
+  }
