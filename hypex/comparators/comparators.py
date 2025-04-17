@@ -81,7 +81,6 @@ class GroupSizes(Comparator):
 
 
 class PSI(Comparator):
-
     @classmethod
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs

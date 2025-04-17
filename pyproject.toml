@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "HypEx"
-version = "1.0.1"
+version = "1.0.2"
 description = "Fast and customizable framework for Causal Inference"
 authors = [
     "Dmitry Tikhomirov <dimasta00@gmail.com>",
@@ -38,7 +38,7 @@ scikit-learn = "*"
 
 pandas = [
     { version = ">=1.3.5, <=2.0.3", python = "<3.9" },
-    { version = ">=1.3.5, <=2.2.2", python = ">=3.9" }
+    { version = ">=1.3.5, <=2.2.3", python = ">=3.9" }
 ]
 
 numpy = [
@@ -75,9 +75,10 @@ nbsphinx_link = "*"
 sphinx_autodoc-typehints = "*"
 sphinx_rtd_theme = "^1.2.2"
 ruff = "*"
-jsonschema = "^4.23.0"
 alive-progress = "^3.1.0"
 psutil = "^7.0.0"
+jsonschema = "^4.23.0"
+
 
 [build-system]
 requires = ["poetry-core"]
@@ -89,4 +90,4 @@ target-version = "py38"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "C90", "UP", "RUF", "I"]
-ignore = ["E501"]
+ignore = ["E501", "RUF003", "C901"]

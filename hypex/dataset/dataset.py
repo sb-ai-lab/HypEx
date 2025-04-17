@@ -40,9 +40,7 @@ from .roles import (
 
 
 class Dataset(DatasetBase):
-
     class Locker:
-
         def __init__(self, backend, roles):
             self.backend = backend
             self.roles = roles
@@ -348,7 +346,6 @@ class Dataset(DatasetBase):
     def astype(
         self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> Dataset:
-
         for col, _ in dtype.items():
             if (errors == "raise") and (col not in self.columns):
                 raise KeyError(f"Column '{col}' does not exist in the Dataset.")
@@ -734,7 +731,6 @@ class Dataset(DatasetBase):
 
 
 class ExperimentData:
-
     def __init__(self, data: Dataset):
         self._data = data
         self.additional_fields = Dataset.create_empty(index=data.index)
@@ -820,7 +816,6 @@ class ExperimentData:
         searched_space: ExperimentDataEnum | Iterable[ExperimentDataEnum] | None = None,
         key: str | None = None,
     ) -> dict[str, dict[str, list[str]]]:
-
         def check_id(id_: str, class_: str) -> bool:
             result = id_[: id_.find(ID_SPLIT_SYMBOL)] == class_
 
@@ -933,7 +928,6 @@ class ExperimentData:
 
 
 class DatasetAdapter(Adapter):
-
     @staticmethod
     def to_dataset(
         data: dict | Dataset | pd.DataFrame | list | str | int | float | bool,

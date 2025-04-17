@@ -11,7 +11,6 @@ from .abstract import Extension
 class DummyEncoderExtension(
     Extension
 ):  # TODO: role types are being rewritten, needs to be fixed
-
     @staticmethod
     def _calc_pandas(data: Dataset, target_cols: str | None = None, **kwargs):
         dummies_df = pd.get_dummies(data=data[target_cols].data, drop_first=True)

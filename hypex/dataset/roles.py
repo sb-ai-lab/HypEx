@@ -11,7 +11,6 @@ from ..utils import (
 
 
 class ABCRole(ABC):
-
     _role_name: RoleNameType = "Abstract"
 
     def __init__(self, data_type: DefaultRoleTypes | None = None):
@@ -26,12 +25,10 @@ class ABCRole(ABC):
 
 
 class InfoRole(ABCRole):
-
     _role_name: RoleNameType = "Info"
 
 
 class StratificationRole(ABCRole):
-
     _role_name: RoleNameType = "Stratification"
 
     def __init__(self, data_type: CategoricalTypes | None = None):
@@ -39,7 +36,6 @@ class StratificationRole(ABCRole):
 
 
 class GroupingRole(ABCRole):
-
     _role_name: RoleNameType = "Grouping"
 
     def __init__(self, data_type: CategoricalTypes | None = None):
@@ -47,12 +43,10 @@ class GroupingRole(ABCRole):
 
 
 class TreatmentRole(ABCRole):
-
     _role_name: RoleNameType = "Treatment"
 
 
 class TargetRole(ABCRole):
-
     _role_name: RoleNameType = "Target"
 
     def __init__(self, data_type: TargetRoleTypes | None = None):
@@ -60,12 +54,10 @@ class TargetRole(ABCRole):
 
 
 class FeatureRole(ABCRole):
-
     _role_name: RoleNameType = "Feature"
 
 
 class PreTargetRole(ABCRole):
-
     _role_name: RoleNameType = "PreTarget"
 
     def __init__(self, data_type: TargetRoleTypes | None = None):
@@ -73,7 +65,6 @@ class PreTargetRole(ABCRole):
 
 
 class StatisticRole(ABCRole):
-
     _role_name: RoleNameType = "Statistic"
 
 
@@ -95,58 +86,47 @@ class TempRole(ABCRole):
 
 
 class TempTreatmentRole(TempRole, TreatmentRole):
-
     _role_name: RoleNameType = "TempTreatment"
 
 
 class TempTargetRole(TempRole, TargetRole):
-
     _role_name: RoleNameType = "TempTarget"
 
 
 class TempGroupingRole(TempRole, GroupingRole):
-
     _role_name: RoleNameType = "TempGrouping"
 
 
 class DefaultRole(ABCRole):
-
     _role_name: RoleNameType = "Default"
 
 
 class ReportRole(ABCRole):
-
     _role_name: RoleNameType = "Report"
 
 
 # ___________________________________________________________________________________________
 class AdditionalRole(ABCRole):
-
     _role_name: RoleNameType = "Additional"
 
 
 class AdditionalTreatmentRole(AdditionalRole):
-
     _role_name: RoleNameType = "AdditionalTreatment"
 
 
 class AdditionalGroupingRole(AdditionalRole):
-
     _role_name: RoleNameType = "AdditionalGrouping"
 
 
 class AdditionalTargetRole(AdditionalRole):
-
     _role_name: RoleNameType = "AdditionalTarget"
 
 
 class AdditionalPreTargetRole(AdditionalRole):
-
     _role_name: RoleNameType = "AdditionalPreTarget"
 
 
 class AdditionalMatchingRole(AdditionalRole):
-
     _role_name: RoleNameType = "AdditionalMatching"
 
 

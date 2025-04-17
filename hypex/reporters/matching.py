@@ -69,7 +69,6 @@ class MatchingQualityDictReporter(TestDictReporter):
 
 
 class MatchingQualityDatasetReporter(MatchingQualityDictReporter):
-
     @classmethod
     def convert_flat_dataset(cls, data: dict) -> Dataset:
         struct_dict = cls._get_struct_dict(data)
