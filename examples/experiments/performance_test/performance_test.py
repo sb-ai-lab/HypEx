@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-import os
-import time
-import warnings
-
-warnings.filterwarnings("ignore")
-
 import csv
 import json
 import multiprocessing as mp
+import os
+import sys
+import time
 import tracemalloc
+import warnings
 from collections import defaultdict
+from typing import ClassVar
 
 import jsonschema
 import matplotlib.pyplot as plt
@@ -20,16 +19,16 @@ import psutil
 from alive_progress import alive_bar
 from tqdm import tqdm
 
-import sys
-
-sys.path.append("../../..")
-
 from hypex import AATest
 from hypex.dataset import Dataset, TargetRole
 
+warnings.filterwarnings("ignore")
+
+sys.path.append("../../..")
+
 
 class DataProfiler:
-    default_data_params = {
+    default_data_params: ClassVar[dict] = {
         "n_columns": 10,
         "n_rows": 10000,
         "n2c_ratio": 0.7,
@@ -50,12 +49,12 @@ class DataProfiler:
 
     @staticmethod
     def _generate_synthetic_data(
-        n_columns: int,
-        n_rows: int,
-        n2c_ratio: float,
-        rs: int | None,
-        num_range: tuple,
-        n_categories: int,
+            n_columns: int,
+            n_rows: int,
+            n2c_ratio: float,
+            rs: int | None,
+            num_range: tuple,
+            n_categories: int,
     ) -> pd.DataFrame:
         if rs is not None:
             np.random.seed(rs)
@@ -67,17 +66,17 @@ class DataProfiler:
             num_range[0], num_range[1], size=(n_rows, n_numerical)
         )
 
-        categories = [f"Category_{i+1}" for i in range(n_categories)]
+        categories = [f"Category_{i + 1}" for i in range(n_categories)]
         categorical_data = np.random.choice(categories, size=(n_rows, n_categorical))
 
         return pd.DataFrame(
             np.hstack((numerical_data, categorical_data)),
             columns=[f"num_col_{i}" for i in range(n_numerical)]
-            + [f"cat_col_{i}" for i in range(n_categorical)],
+                    + [f"cat_col_{i}" for i in range(n_categorical)],
         )
 
     def create_dataset(
-        self, params: dict
+            self, params: dict
     ) -> tuple[Dataset, dict[str, int | tuple[int, int] | float]]:
         all_params = self.fixed_data_params.copy()
         all_params.update(params)
@@ -90,12 +89,12 @@ class DataProfiler:
 
 
 class ExperimentProfiler:
-    default_experiment_params = {"n_iterations": 10}
+    default_experiment_params: ClassVar[dict] = {"n_iterations": 10}
 
     def __init__(
-        self,
-        fixed_experiment_params: dict | None = None,
-        experiment: type = AATest,
+            self,
+            fixed_experiment_params: dict | None = None,
+            experiment: type = AATest,
     ):
         fixed_experiment_params = fixed_experiment_params or {}
         self.fixed_experiment_params = self.default_experiment_params.copy()
@@ -114,15 +113,15 @@ class ExperimentProfiler:
 
 
 class PerformanceTester:
-    resume = defaultdict(dict)
+    resume: ClassVar[defaultdict] = defaultdict(dict)
 
     def __init__(
-        self,
-        dataProfiler: DataProfiler,
-        experimentProfiler: ExperimentProfiler,
-        iterable_params: list | None = None,
-        use_memory: bool = True,
-        rewrite: bool = True,
+            self,
+            dataProfiler: DataProfiler,
+            experimentProfiler: ExperimentProfiler,
+            iterable_params: list | None = None,
+            use_memory: bool = True,
+            rewrite: bool = True,
     ):
         self.dataProfiler = dataProfiler
         self.experimentProfiler = experimentProfiler
@@ -150,17 +149,18 @@ class PerformanceTester:
         if self.rewrite:
             with open(file_name, "w", newline="") as file:
                 writer = csv.writer(file)
-                writer.writerow(
-                    ["analysis"]
-                    + list(self.experimentProfiler.fixed_experiment_params.keys())
-                    + list(self.dataProfiler.fixed_data_params.keys())
-                    + ["time", "M1", "M2"]
-                )
+                row_items = [
+                    "analysis",
+                    *list(self.experimentProfiler.fixed_experiment_params.keys()),
+                    *list(self.dataProfiler.fixed_data_params.keys()),
+                    "time", "M1", "M2"
+                ]
+                writer.writerow(row_items)
         with alive_bar(
-            self.get_number_params(),
-            bar="squares",
-            spinner="dots_waves2",
-            title=f"Analysis : {analysis}",
+                self.get_number_params(),
+                bar="squares",
+                spinner="dots_waves2",
+                title=f"Analysis : {analysis}",
         ) as bar:
             for params, data, experiment in tqdm(self.get_params()):
                 combined_params = {**data[1], **experiment[1]}
@@ -184,17 +184,18 @@ class PerformanceTester:
                 process.join()
                 monitor.join()
 
-                max_memory_mb = return_dict2["max_memory"] / 1024**2
+                max_memory_mb = return_dict2["max_memory"] / 1024 ** 2
 
                 with open(file_name, "a", newline="") as file:
                     writer = csv.writer(file)
                     combined_params = {**experiment[1], **data[1]}
-                    writer.writerow(
-                        [analysis]
-                        + list(combined_params.values())
-                        + return_dict1["results"]
-                        + [max_memory_mb]
-                    )
+                    row_items = [
+                        analysis,
+                        *list(combined_params.values()),
+                        *return_dict1["results"],
+                        max_memory_mb,
+                    ]
+                    writer.writerow(row_items)
                 bar()
 
     @staticmethod
@@ -233,14 +234,14 @@ class PerformanceTester:
 
         return_dict["results"] = [
             exec_time,
-            memory_usage / 10**6 if self.use_memory else None,
+            memory_usage / 10 ** 6 if self.use_memory else None,
         ]
 
 
 def performance_test_plot(
-    params: dict,
-    output_path: str,
-    title="The results of the one-factor performance test of the AA Test",
+        params: dict,
+        output_path: str,
+        title="The results of the one-factor performance test of the AA Test",
 ):
     df = pd.read_csv(output_path)
     df = df[df.analysis == "onefactor"]
