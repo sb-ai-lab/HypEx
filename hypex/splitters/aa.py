@@ -107,7 +107,7 @@ class AASplitter(Calculator):
         edge = int(len(addition_indexes) * control_size)
         control_indexes += addition_indexes[:edge]
 
-        split_series = pd.Series(np.ones(data.data.shape[0], dtype="int"))
+        split_series = pd.Series(np.ones(data.data.shape[0], dtype="int"), index=data.data.index)
         split_series[control_indexes] -= 1
         split_series = split_series.map({0: "control", 1: "test"})
 
