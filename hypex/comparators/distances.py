@@ -18,7 +18,6 @@ from ..utils.adapter import Adapter
 
 
 class MahalanobisDistance(Calculator):
-
     def __init__(
         self,
         grouping_role: ABCRole | None = None,

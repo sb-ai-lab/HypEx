@@ -163,7 +163,7 @@ class Comparator(Calculator, ABC):
 
     @staticmethod
     def _split_ds_into_columns(
-        data: list[tuple[str, Dataset]]
+        data: list[tuple[str, Dataset]],
     ) -> list[tuple[str, Dataset]]:
         result = [
             (bucket[0], bucket[1][column])
@@ -351,7 +351,6 @@ class Comparator(Calculator, ABC):
         ) = None,
         **kwargs,
     ) -> dict:
-
         if compare_by is None and target_fields_data is None:
             raise ValueError(
                 "You should pass either compare_by or target_fields argument."
@@ -387,9 +386,7 @@ class Comparator(Calculator, ABC):
         )
 
         if len(target_fields_data.columns) == 0:
-            if (
-                data.ds.tmp_roles
-            ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
+            if data.ds.tmp_roles:  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
                 return data
             else:
                 raise NoColumnsError(TargetRole().role_name)
