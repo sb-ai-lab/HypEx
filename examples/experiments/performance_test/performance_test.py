@@ -1,66 +1,55 @@
 import os
 import time
 import warnings
+
 warnings.filterwarnings("ignore")
 
 import csv
 import json
-import jsonschema
 import multiprocessing as mp
-import psutil
 import tracemalloc
-
 from collections import defaultdict
-from typing import Dict, Union, Any, Optional, TypedDict, List, Tuple
+from typing import Dict, List
 
+import jsonschema
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
-from tqdm import tqdm
+import psutil
 from alive_progress import alive_bar
+from tqdm import tqdm
+
+import sys
+
+sys.path.append("../../..")
 
 from hypex import (
     AATest,
-    ABTest,
-    Matching,
-    HomogeneityTest,
 )
-
 from hypex.dataset import (
     Dataset,
-    InfoRole,
-    ExperimentData,
-    TreatmentRole,
     TargetRole,
-    StratificationRole,
 )
 
 
-class DataProfiler():
-    
+class DataProfiler:
+
     default_data_params = {
-        'n_columns': 10,
-        'n_rows': 10000,
-        'n2c_ratio': 0.7,
-        'rs': 42,
-        'num_range': (-100, 100),
-        'n_categories': 10
+        "n_columns": 10,
+        "n_rows": 10000,
+        "n2c_ratio": 0.7,
+        "rs": 42,
+        "num_range": (-100, 100),
+        "n_categories": 10,
     }
 
+    def __init__(self, fixed_data_params: Dict = None):
 
-    def __init__(
-        self,
-        fixed_data_params: Dict = None
-    ):
-        
         self.fixed_data_params = self.default_data_params | fixed_data_params
 
         for key in list(self.fixed_data_params.keys()):
             if key not in list(self.default_data_params.keys()):
                 del self.fixed_data_params[key]
-
-        
 
     @staticmethod
     def _generate_synthetic_data(
@@ -69,7 +58,7 @@ class DataProfiler():
         n2c_ratio: float,
         rs: int,
         num_range: tuple,
-        n_categories: int
+        n_categories: int,
     ) -> pd.DataFrame:
         if rs is not None:
             np.random.seed(rs)
@@ -84,48 +73,46 @@ class DataProfiler():
         categories = [f"Category_{i+1}" for i in range(n_categories)]
         categorical_data = np.random.choice(categories, size=(n_rows, n_categorical))
 
-        data = pd.DataFrame(
+        return pd.DataFrame(
             np.hstack((numerical_data, categorical_data)),
             columns=[f"num_col_{i}" for i in range(n_numerical)]
             + [f"cat_col_{i}" for i in range(n_categorical)],
         )
-        
-        return data
-    
-    def create_dataset(self, params: Dict) -> Dataset:
-        
+
+    def create_dataset(
+        self, params: Dict
+    ) -> tuple[Dataset, dict[str, int | tuple[int, int] | float]]:
+
         all_params = self.fixed_data_params.copy()
         for param_name, param in params.items():
             all_params[param_name] = param
 
         data = self._generate_synthetic_data(**all_params)
-        return Dataset(
-            roles={column: TargetRole() for column in data.columns},
-            data=data
-        ), all_params
-   
+        return (
+            Dataset(roles={column: TargetRole() for column in data.columns}, data=data),
+            all_params,
+        )
+
 
 class ExperimentProfiler:
-    
-    default_experiment_params = {
-        "n_iterations" : 10
-    }
+
+    default_experiment_params = {"n_iterations": 10}
 
     def __init__(
         self,
         fixed_experiment_params: Dict = None,
-        experiment: Union[AATest, ABTest, Matching, HomogeneityTest] = AATest
-        
+        experiment: type = AATest,
     ):
-        
-        self.fixed_experiment_params = self.default_experiment_params | fixed_experiment_params
+
+        self.fixed_experiment_params = (
+            self.default_experiment_params | fixed_experiment_params
+        )
         self.experiment = experiment
 
-        
         for key in list(self.fixed_experiment_params.keys()):
             if key not in list(self.default_experiment_params.keys()):
                 del self.fixed_experiment_params[key]
-        
+
     def get_experiment(self, experiment_params):
         all_params = self.fixed_experiment_params.copy()
         for param_name, param in experiment_params.items():
@@ -136,20 +123,18 @@ class ExperimentProfiler:
 class PerformanceTester:
 
     resume = defaultdict(dict)
-    
+
     def __init__(
         self,
         dataProfiler: DataProfiler,
         experimentProfiler: ExperimentProfiler,
         iterable_params: List = None,
-        use_time: bool = True,
         use_memory: bool = True,
-        rewrite: bool = True
+        rewrite: bool = True,
     ):
         self.dataProfiler = dataProfiler
         self.experimentProfiler = experimentProfiler
         self.iterable_params = iterable_params
-        self.use_time = use_time
         self.use_memory = use_memory
         self.rewrite = rewrite
 
@@ -157,54 +142,74 @@ class PerformanceTester:
         for params in self.iterable_params:
             all_params = params.copy()
             if "n_iterations" in list(params.keys()):
-                experiment_params = {'n_iterations': params['n_iterations']}
-                params.pop('n_iterations', None)
+                experiment_params = {"n_iterations": params["n_iterations"]}
+                params.pop("n_iterations", None)
             else:
                 experiment_params = {}
             data_params = params
-            yield all_params, self.dataProfiler.create_dataset(data_params), self.experimentProfiler.get_experiment(experiment_params) 
+            yield all_params, self.dataProfiler.create_dataset(
+                data_params
+            ), self.experimentProfiler.get_experiment(experiment_params)
 
     def get_number_params(self):
-        
+
         return len(self.iterable_params)
-    
+
     def execute(self, file_name, analysis="onefactor"):
         if self.rewrite:
             with open(file_name, "w", newline="") as file:
                 writer = csv.writer(file)
-                writer.writerow(['analysis'] + list(self.experimentProfiler.fixed_experiment_params.keys()) + list(self.dataProfiler.fixed_data_params.keys()) + ['time', 'M1', 'M2'])
-        with alive_bar(self.get_number_params(), bar="squares", spinner="dots_waves2", title=f"Analysis : {analysis}") as bar:
+                writer.writerow(
+                    ["analysis"]
+                    + list(self.experimentProfiler.fixed_experiment_params.keys())
+                    + list(self.dataProfiler.fixed_data_params.keys())
+                    + ["time", "M1", "M2"]
+                )
+        with alive_bar(
+            self.get_number_params(),
+            bar="squares",
+            spinner="dots_waves2",
+            title=f"Analysis : {analysis}",
+        ) as bar:
             for params, data, experiment in tqdm(self.get_params()):
 
-                print(f'{data[1] | experiment[1]}')               
-                
+                print(f"{data[1] | experiment[1]}")
+
                 manager = mp.Manager()
                 return_dict1 = manager.dict()
-                return_dict2 = manager.dict() 
+                return_dict2 = manager.dict()
 
-                process = mp.Process(target=self.test_function_performance, 
-                                     args=(experiment[0].execute, {'data': data[0]}, return_dict1))
+                process = mp.Process(
+                    target=self.function_performance,
+                    args=(experiment[0].execute, {"data": data[0]}, return_dict1),
+                )
                 process.start()
 
-                monitor = mp.Process(target=self._memory_monitor, 
-                                     args=(process.pid, return_dict2))
+                monitor = mp.Process(
+                    target=self._memory_monitor, args=(process.pid, return_dict2)
+                )
                 monitor.start()
 
                 process.join()
-                monitor.join()  
+                monitor.join()
 
                 max_memory_mb = return_dict2["max_memory"] / 1024**2
 
                 with open(file_name, "a", newline="") as file:
                     writer = csv.writer(file)
-                    writer.writerow([analysis] + list((experiment[1] | data[1]).values()) + return_dict1['results'] + [max_memory_mb])
+                    writer.writerow(
+                        [analysis]
+                        + list((experiment[1] | data[1]).values())
+                        + return_dict1["results"]
+                        + [max_memory_mb]
+                    )
                 bar()
-                
+
     @staticmethod
     def _memory_monitor(pid, return_dict, interval=0.1):
-        
+
         process = psutil.Process(pid)
-        max_memory = 0  
+        max_memory = 0
 
         while process.is_running():
             try:
@@ -215,44 +220,42 @@ class PerformanceTester:
                 break  # If the process has finished
 
         return_dict["max_memory"] = max_memory  # Save the result
-        
-            
-    def test_function_performance(self, func, param_dict, return_dict):
-        
+
+    def function_performance(self, func, param_dict, return_dict):
+
         param_dict = param_dict or {}
         exec_time = None
         memory_usage = None
 
-        if self.use_time:
-            start_time = time.time()
+        start_time = time.time()
 
         if self.use_memory:
             tracemalloc.start()
-        
-        result = func(**param_dict) 
-        
+
+        func(**param_dict)
+
         if self.use_memory:
             _, memory_usage = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
-        if self.use_time:
-            end_time = time.time()
-            exec_time = end_time - start_time
+        end_time = time.time()
+        exec_time = end_time - start_time
 
-        
-        return_dict['results'] = [
-            exec_time if self.use_time else None,
-            memory_usage / 10**6 if self.use_memory else None
+        return_dict["results"] = [
+            exec_time,
+            memory_usage / 10**6 if self.use_memory else None,
         ]
 
-def performance_test_plot(params: Dict, output_path: str, title="Результаты однофакторного тестирования производительности АА Теста"):
+
+def performance_test_plot(
+    params: Dict,
+    output_path: str,
+    title="The results of the one-factor performance test of the AA Test",
+):
     df = pd.read_csv(output_path)
     df = df[df.analysis == "onefactor"]
-    df = df[['time', 'M1', 'M2']]
-    result = {
-        "Var": [],
-        "P": []
-    }
+    df = df[["time", "M1", "M2"]]
+    result = {"Var": [], "P": []}
     for key, values in params.items():
         for value in values:
             result["Var"].append(key)
@@ -283,66 +286,71 @@ def performance_test_plot(params: Dict, output_path: str, title="Результ�
     fig.suptitle(title)
     plt.subplots_adjust(hspace=0.5)
     plt.savefig(f"{output_path[:output_path.rfind('.')]}.png")
-    
 
 
-def executor(config: Dict, output_path: str): 
+def executor(config: Dict, output_path: str):
     output_path = f"{output_path}.csv"
 
     if "fixed_params" not in config:
-        config['fixed_params'] = {}
+        config["fixed_params"] = {}
 
-    experimentProfiler=ExperimentProfiler(
-        fixed_experiment_params=config['fixed_params'],
-        experiment=AATest
+    experimentProfiler = ExperimentProfiler(
+        fixed_experiment_params=config["fixed_params"], experiment=AATest
     )
-    dataProfiler=DataProfiler(
-        fixed_data_params=config['fixed_params']
-    )
+    dataProfiler = DataProfiler(fixed_data_params=config["fixed_params"])
     test = PerformanceTester(
-        experimentProfiler=experimentProfiler,
-        dataProfiler=dataProfiler
+        experimentProfiler=experimentProfiler, dataProfiler=dataProfiler
     )
-    
+
     if "onefactor_params" in config:
         iterable_params = []
+
         def _format(param):
             return param if isinstance(param, list) else [param]
 
         for param_name, params in config["onefactor_params"].items():
             params = _format(params)
             for param in params:
-                iterable_params.append({param_name : param})
+                iterable_params.append({param_name: param})
         test.iterable_params = iterable_params
         test.execute(output_path, analysis="onefactor")
         test.rewrite = False
         performance_test_plot(config["onefactor_params"], output_path)
-        
+
     if "montecarlo_params" in config:
-        mcparams = config["montecarlo_params"]  
+        mcparams = config["montecarlo_params"]
         df = {}
-        for key in list(mcparams['bounds'].keys()):
-            df[key] = np.round(np.random.uniform(mcparams['bounds'][key]['min'], mcparams['bounds'][key]['max'], mcparams['num_points'])).astype(int)
+        for key in list(mcparams["bounds"].keys()):
+            df[key] = np.round(
+                np.random.uniform(
+                    mcparams["bounds"][key]["min"],
+                    mcparams["bounds"][key]["max"],
+                    mcparams["num_points"],
+                )
+            ).astype(int)
         keys = list(df.keys())
-        df = [{key: value.item() for key, value in zip(keys, values)} for values in zip(*df.values())]
+        df = [
+            {key: value.item() for key, value in zip(keys, values)}
+            for values in zip(*df.values())
+        ]
         test.iterable_params = df
         test.execute(output_path, analysis="montecarlo")
-        
+
 
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     file_path_schema = os.path.join(script_dir, "config.schema.json")
-    
+
     file_path_config = os.path.join(script_dir, "config.json")
 
-    with open(file_path_schema, 'r') as file1, open(file_path_config, 'r') as file2:
+    with open(file_path_schema) as file1, open(file_path_config) as file2:
         schema = json.load(file1)
         config = json.load(file2)
     try:
         jsonschema.validate(instance=config, schema=schema)
     except jsonschema.exceptions.ValidationError as err:
-        raise(f"Ошибка валидации: {err}")
-    
+        raise f"JSON validation error: {err}" from err
+
     output_path = "aa_performance_test_result"
-    executor(config = config, output_path = output_path)
+    executor(config=config, output_path=output_path)
