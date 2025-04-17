@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import time
 import warnings
@@ -9,7 +11,6 @@ import json
 import multiprocessing as mp
 import tracemalloc
 from collections import defaultdict
-from typing import Dict, List
 
 import jsonschema
 import matplotlib.pyplot as plt
@@ -23,17 +24,11 @@ import sys
 
 sys.path.append("../../..")
 
-from hypex import (
-    AATest,
-)
-from hypex.dataset import (
-    Dataset,
-    TargetRole,
-)
+from hypex import AATest
+from hypex.dataset import Dataset, TargetRole
 
 
 class DataProfiler:
-
     default_data_params = {
         "n_columns": 10,
         "n_rows": 10000,
@@ -43,10 +38,12 @@ class DataProfiler:
         "n_categories": 10,
     }
 
-    def __init__(self, fixed_data_params: Dict = None):
+    def __init__(self, fixed_data_params: dict | None = None):
+        fixed_data_params = fixed_data_params or {}
+        self.fixed_data_params = self.default_data_params.copy()
+        self.fixed_data_params.update(fixed_data_params)
 
-        self.fixed_data_params = self.default_data_params | fixed_data_params
-
+        # Remove any keys that aren't in default params
         for key in list(self.fixed_data_params.keys()):
             if key not in list(self.default_data_params.keys()):
                 del self.fixed_data_params[key]
@@ -56,7 +53,7 @@ class DataProfiler:
         n_columns: int,
         n_rows: int,
         n2c_ratio: float,
-        rs: int,
+        rs: int | None,
         num_range: tuple,
         n_categories: int,
     ) -> pd.DataFrame:
@@ -80,12 +77,10 @@ class DataProfiler:
         )
 
     def create_dataset(
-        self, params: Dict
+        self, params: dict
     ) -> tuple[Dataset, dict[str, int | tuple[int, int] | float]]:
-
         all_params = self.fixed_data_params.copy()
-        for param_name, param in params.items():
-            all_params[param_name] = param
+        all_params.update(params)
 
         data = self._generate_synthetic_data(**all_params)
         return (
@@ -95,46 +90,43 @@ class DataProfiler:
 
 
 class ExperimentProfiler:
-
     default_experiment_params = {"n_iterations": 10}
 
     def __init__(
         self,
-        fixed_experiment_params: Dict = None,
+        fixed_experiment_params: dict | None = None,
         experiment: type = AATest,
     ):
-
-        self.fixed_experiment_params = (
-            self.default_experiment_params | fixed_experiment_params
-        )
+        fixed_experiment_params = fixed_experiment_params or {}
+        self.fixed_experiment_params = self.default_experiment_params.copy()
+        self.fixed_experiment_params.update(fixed_experiment_params)
         self.experiment = experiment
 
+        # Remove any keys that aren't in default params
         for key in list(self.fixed_experiment_params.keys()):
             if key not in list(self.default_experiment_params.keys()):
                 del self.fixed_experiment_params[key]
 
     def get_experiment(self, experiment_params):
         all_params = self.fixed_experiment_params.copy()
-        for param_name, param in experiment_params.items():
-            all_params[param_name] = param
+        all_params.update(experiment_params)
         return self.experiment(**all_params), all_params
 
 
 class PerformanceTester:
-
     resume = defaultdict(dict)
 
     def __init__(
         self,
         dataProfiler: DataProfiler,
         experimentProfiler: ExperimentProfiler,
-        iterable_params: List = None,
+        iterable_params: list | None = None,
         use_memory: bool = True,
         rewrite: bool = True,
     ):
         self.dataProfiler = dataProfiler
         self.experimentProfiler = experimentProfiler
-        self.iterable_params = iterable_params
+        self.iterable_params = iterable_params or []
         self.use_memory = use_memory
         self.rewrite = rewrite
 
@@ -152,7 +144,6 @@ class PerformanceTester:
             ), self.experimentProfiler.get_experiment(experiment_params)
 
     def get_number_params(self):
-
         return len(self.iterable_params)
 
     def execute(self, file_name, analysis="onefactor"):
@@ -172,8 +163,8 @@ class PerformanceTester:
             title=f"Analysis : {analysis}",
         ) as bar:
             for params, data, experiment in tqdm(self.get_params()):
-
-                print(f"{data[1] | experiment[1]}")
+                combined_params = {**data[1], **experiment[1]}
+                print(f"{combined_params}")
 
                 manager = mp.Manager()
                 return_dict1 = manager.dict()
@@ -197,9 +188,10 @@ class PerformanceTester:
 
                 with open(file_name, "a", newline="") as file:
                     writer = csv.writer(file)
+                    combined_params = {**experiment[1], **data[1]}
                     writer.writerow(
                         [analysis]
-                        + list((experiment[1] | data[1]).values())
+                        + list(combined_params.values())
                         + return_dict1["results"]
                         + [max_memory_mb]
                     )
@@ -207,7 +199,6 @@ class PerformanceTester:
 
     @staticmethod
     def _memory_monitor(pid, return_dict, interval=0.1):
-
         process = psutil.Process(pid)
         max_memory = 0
 
@@ -222,7 +213,6 @@ class PerformanceTester:
         return_dict["max_memory"] = max_memory  # Save the result
 
     def function_performance(self, func, param_dict, return_dict):
-
         param_dict = param_dict or {}
         exec_time = None
         memory_usage = None
@@ -248,7 +238,7 @@ class PerformanceTester:
 
 
 def performance_test_plot(
-    params: Dict,
+    params: dict,
     output_path: str,
     title="The results of the one-factor performance test of the AA Test",
 ):
@@ -288,7 +278,7 @@ def performance_test_plot(
     plt.savefig(f"{output_path[:output_path.rfind('.')]}.png")
 
 
-def executor(config: Dict, output_path: str):
+def executor(config: dict, output_path: str):
     output_path = f"{output_path}.csv"
 
     if "fixed_params" not in config:
@@ -341,7 +331,6 @@ if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     file_path_schema = os.path.join(script_dir, "config.schema.json")
-
     file_path_config = os.path.join(script_dir, "config.json")
 
     with open(file_path_schema) as file1, open(file_path_config) as file2:
@@ -350,7 +339,7 @@ if __name__ == "__main__":
     try:
         jsonschema.validate(instance=config, schema=schema)
     except jsonschema.exceptions.ValidationError as err:
-        raise f"JSON validation error: {err}" from err
+        raise ValueError(f"JSON validation error: {err}") from err
 
     output_path = "aa_performance_test_result"
     executor(config=config, output_path=output_path)
