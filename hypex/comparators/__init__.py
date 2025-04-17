@@ -2,7 +2,7 @@ from .abstract import Comparator, StatHypothesisTesting
 from .comparators import PSI, GroupDifference, GroupSizes
 from .distances import MahalanobisDistance
 from .hypothesis_testing import Chi2Test, KSTest, TTest, UTest
-from .test_power import MDEBySize, TestPower
+from .power_testing import MDEBySize, PowerTesting
 
 __all__ = [
     "PSI",
@@ -15,6 +15,6 @@ __all__ = [
     "MahalanobisDistance",
     "StatHypothesisTesting",
     "TTest",
-    "TestPower",
+    "PowerTesting",
     "UTest",
 ]

@@ -23,7 +23,6 @@ from ..utils.adapter import Adapter
 class GroupOperator(
     Calculator
 ):  # TODO: change the derive from Calculator to COmparator
-
     def __init__(
         self,
         grouping_role: ABCRole | None = None,
