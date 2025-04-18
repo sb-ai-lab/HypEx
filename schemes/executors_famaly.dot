@@ -1,0 +1,152 @@
+digraph Architecture{
+    rankdir=LR
+    node[style="filled"]
+    compound=true
+
+    subgraph atributes{
+        node[shape=note, fillcolor=darkseagreen1]
+        id
+        role
+        n_iterations
+        searching_role
+        params
+    }
+
+    subgraph functions{
+        node[shape=box, fillcolor=skyblue2]
+        execute
+        calc
+        check_rule
+        set_params
+    }
+
+    subgraph objects{
+        node[shape=box3d, fillcolor=fuchsia]
+        if_executor
+        else_executor
+        reporter
+        stopping_criterion
+    }
+
+    subgraph collections{
+        node[shape=folder, fillcolor=lightgoldenrod1]
+        executors
+    }
+
+    subgraph cluster_abstract_executors{
+        graph[label="Abstract Executors", style="dashed"]
+
+         subgraph cluster_executor{
+        graph[label="Executor", style="solid"]
+        id
+        execute
+        }
+
+        subgraph cluster_calculator{
+            graph[label="Calculator", style="solid"]
+            calc
+        }
+        calc -> execute [        
+            arrowhead=curve
+            ltail=cluster_calculator
+            lhead=cluster_executor
+        ]
+
+        subgraph cluster_if_executor{
+            graph[label="IfExecutor", style="solid"]
+            check_rule
+            if_executor
+            else_executor
+        }
+        check_rule -> execute [        
+            arrowhead=curve
+            ltail=cluster_if_executor
+            lhead=cluster_executor
+        ]
+        execute -> {if_executor, else_executor} [
+            style=dashed
+            arrowhead=box
+            ltail=cluster_executor
+        ]
+    }
+
+    subgraph cluster_experiments{
+        graph[label="Experiment Types", style="dashed"]
+
+        subgraph cluster_experiment{
+            graph[label="Experiment", style="solid"]
+            executors
+            set_params
+        }
+        executors -> execute [        
+            arrowhead=curve
+            ltail=cluster_experiment
+            lhead=cluster_executor
+        ]
+
+        subgraph cluster_on_role_experiment{
+            graph[label="OnRoleExperiment", style="solid"]
+            role
+        }
+        role -> executors [        
+            arrowhead=curve
+            ltail=cluster_on_role_experiment
+            lhead=cluster_experiment
+        ]
+
+        subgraph cluster_experiment_with_reporter{
+            graph[label="ExperimentWithReporter", style="solid"]
+            reporter
+        }
+        reporter -> executors [        
+            arrowhead=curve
+            ltail=cluster_experiment_with_reporter
+            lhead=cluster_experiment
+        ]
+
+        subgraph cluster_cycled_experiment{
+            graph[label="CycledExperiment", style="solid"]
+            n_iterations
+        }
+        n_iterations -> reporter [        
+            arrowhead=curve
+            ltail=cluster_cycled_experiment
+            lhead=cluster_experiment_with_reporter
+        ]
+
+        subgraph cluster_group_experiment{
+            graph[label="GroupExperiment", style="solid"]
+            searching_role
+        }
+        searching_role -> reporter [        
+            arrowhead=curve
+            ltail=cluster_group_experiment
+            lhead=cluster_experiment_with_reporter
+        ]
+
+        subgraph cluster_params_experiment{
+            graph[label="ParamsExperiment", style="solid"]
+            params
+        }
+        params -> reporter [        
+            arrowhead=curve
+            ltail=cluster_params_experiment
+            lhead=cluster_experiment_with_reporter
+        ]
+
+        subgraph cluster_if_params_experiment{
+            graph[label="IfParamsExperiment", style="solid"]
+            stopping_criterion
+        }
+        stopping_criterion -> params [        
+            arrowhead=curve
+            ltail=cluster_if_params_experiment
+            lhead=cluster_params_experiment
+        ]
+        check_rule -> stopping_criterion [
+            style=dashed
+            arrowhead=box
+            ltail=cluster_if_executor
+        ]
+    }
+}
