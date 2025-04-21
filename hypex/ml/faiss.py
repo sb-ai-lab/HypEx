@@ -116,7 +116,7 @@ class FaissNearestNeighbors(MLExecutor):
             grouping_data = list(
                 data.groups[distances_keys["MahalanobisDistance"]["groups"][0]].items()
             )
-        compare_result = self._inner_function(
+        compare_result = self.calc(
             data=data.ds,
             group_field=group_field,
             grouping_data=grouping_data,

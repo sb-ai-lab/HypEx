@@ -175,7 +175,7 @@ class MatchingMetrics(GroupOperator):
             raise ValueError(
                 f"This operator works with 2 targets, but got {len(target_fields) if target_fields else None}"
             )
-        return cls.calc(
+        return cls._inner_function(
             data=grouping_data[0][1],
             test_data=grouping_data[1][1],
             target_fields=target_fields,
@@ -341,7 +341,7 @@ class Bias(GroupOperator):
         features_fields: list[str] | None = None,
         **kwargs,
     ) -> dict:
-        return cls.calc(
+        return cls._inner_function(
             grouping_data[0][1],
             test_data=grouping_data[1][1],
             target_fields=target_fields,
