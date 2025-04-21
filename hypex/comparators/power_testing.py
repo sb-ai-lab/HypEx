@@ -31,13 +31,8 @@ class PowerTesting(Comparator, ABC):
 
     @classmethod
     @abstractmethod
-    def _inner_function(
-        cls,
-        data: Dataset,
-        test_data: Dataset | None = None,
-        significance: float = 0.95,
-        power: float = 0.8,
-        **kwargs,
+    def calc(
+        cls, data: Dataset, test_data: Dataset | None = None, **kwargs: float
     ) -> float:
         pass
 
@@ -57,13 +52,8 @@ class MDEBySize(PowerTesting):
         return data
 
     @classmethod
-    def _inner_function(
-        cls,
-        data: Dataset,
-        test_data: Dataset | None = None,
-        significance: float = 0.95,
-        power: float = 0.8,
-        **kwargs,
+    def calc(
+        cls, data: Dataset, test_data: Dataset | None = None, **kwargs: float
     ) -> float:
         m = norm.ppf((1 + significance) / 2) + norm.ppf(power)
         if not test_data:

@@ -58,13 +58,11 @@ class Comparator(Calculator, ABC):
 
     @classmethod
     @abstractmethod
-    def _inner_function(
-        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ) -> Any:
+    def calc(cls, data: Dataset, test_data: Dataset | None = None, **kwargs) -> Any:
         raise AbstractMethodError
 
     def _get_fields_data(self, data: ExperimentData) -> dict[str, Dataset]:
-        tmp_role = True if data.ds.tmp_roles else False
+        tmp_role = bool(data.ds.tmp_roles)
         group_field_data = data.field_data_search(roles=self.grouping_role)
         target_fields_data = data.field_data_search(
             roles=TempTargetRole() if tmp_role else self.target_roles,
@@ -96,7 +94,7 @@ class Comparator(Calculator, ABC):
                 else f"{compared_data[i][0]}{NAME_BORDER_SYMBOL}{compared_data[i][1].columns[0]}"
             )
             result[res_name] = DatasetAdapter.to_dataset(
-                cls._inner_function(
+                cls.calc(
                     baseline_data[0 if len(baseline_data) == 1 else i][1],
                     compared_data[i][1],
                     **kwargs,
@@ -333,12 +331,13 @@ class Comparator(Calculator, ABC):
             )
         else:
             raise ValueError(
-                f"Wrong compare_by argument passed {compare_by}. It can be only one of the following modes: 'groups', 'columns', 'columns_in_groups', 'cross'."
+                f"Wrong compare_by argument passed {compare_by}. It can be only one of the following modes: 'groups', "
+                f"'columns', 'columns_in_groups', 'cross'."
             )
         return baseline_data, compared_data
 
     @classmethod
-    def calc(
+    def _precalc(
         cls,
         compare_by: (
             Literal["groups", "columns", "columns_in_groups", "cross"] | None
@@ -386,7 +385,10 @@ class Comparator(Calculator, ABC):
         )
 
         if len(target_fields_data.columns) == 0:
-            if data.ds.tmp_roles:  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
+            if (
+                data.ds.tmp_roles
+            ):  # if the column is not suitable for the test, then the target will be empty,
+                # but if there is a role tempo, then this is normal behavior
                 return data
             else:
                 raise NoColumnsError(TargetRole().role_name)
@@ -425,7 +427,7 @@ class Comparator(Calculator, ABC):
         if len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1:
             raise NotSuitableFieldError(group_field_data, "Grouping")
 
-        compare_result = self.calc(
+        compare_result = self._precalc(
             compare_by=self.compare_by,
             target_fields_data=target_fields_data,
             baseline_field_data=baseline_field_data,
