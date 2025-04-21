@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+import pandas as pd
+
 from ..dataset import (
     AdditionalTreatmentRole,
     Dataset,
@@ -97,14 +100,18 @@ class AASplitter(Calculator):
         experiment_data = (
             data[data[const_group_field].isna()] if const_group_field else data
         )
-        experiment_data = experiment_data.sample(
+        experiment_data_index = experiment_data.sample(
             frac=sample_size, random_state=random_state
-        )
-        addition_indexes = list(experiment_data.index)
+        ).index
+        addition_indexes = list(experiment_data_index)
         edge = int(len(addition_indexes) * control_size)
         control_indexes += addition_indexes[:edge]
 
-        return ["control" if i in control_indexes else "test" for i in data.index]
+        split_series = pd.Series(np.ones(data.data.shape[0], dtype="int"), index=data.data.index)
+        split_series[control_indexes] -= 1
+        split_series = split_series.map({0: "control", 1: "test"})
+
+        return split_series.to_list()
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         const_group_fields = data.ds.search_columns(ConstGroupRole())

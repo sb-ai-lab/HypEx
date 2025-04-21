@@ -26,7 +26,6 @@ class TTest(StatHypothesisTesting):
 
 
 class KSTest(StatHypothesisTesting):
-
     @property
     def search_types(self) -> list[type] | None:
         return NUMBER_TYPES_LIST
@@ -41,7 +40,6 @@ class KSTest(StatHypothesisTesting):
 
 
 class UTest(StatHypothesisTesting):
-
     @property
     def search_types(self) -> list[type] | None:
         return NUMBER_TYPES_LIST
@@ -56,7 +54,6 @@ class UTest(StatHypothesisTesting):
 
 
 class Chi2Test(StatHypothesisTesting):
-
     @property
     def search_types(self) -> list[type] | None:
         return [str]

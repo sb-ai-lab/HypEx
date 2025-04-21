@@ -3,7 +3,7 @@ from __future__ import annotations
 from itertools import product
 from typing import Any, Sequence
 
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from ..dataset import ABCRole, Dataset, ExperimentData, GroupingRole
 from ..executor import Executor, IfExecutor
@@ -147,7 +147,7 @@ class ParamsExperiment(ExperimentWithReporter):
     def execute(self, data: ExperimentData) -> ExperimentData:
         results = []
         self._update_flat_params()
-        for flat_param in self._flat_params:
+        for flat_param in tqdm(self._flat_params):
             t_data = ExperimentData(data.ds)
             for executor in self.executors:
                 executor.set_params(flat_param)
@@ -172,7 +172,7 @@ class IfParamsExperiment(ParamsExperiment):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         self._update_flat_params()
-        for flat_param in self._flat_params:
+        for flat_param in tqdm(self._flat_params):
             t_data = ExperimentData(data.ds)
             for executor in self.executors:
                 executor.set_params(flat_param)

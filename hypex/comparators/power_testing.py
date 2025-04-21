@@ -11,7 +11,7 @@ from ..utils import ExperimentDataEnum
 from .comparators import Comparator
 
 
-class TestPower(Comparator, ABC):
+class PowerTesting(Comparator, ABC):
     def __init__(
         self,
         grouping_role: ABCRole | None = None,
@@ -45,7 +45,7 @@ class TestPower(Comparator, ABC):
         return super().execute(data)
 
 
-class MDEBySize(TestPower):
+class MDEBySize(PowerTesting):
     def _set_value(
         self, data: ExperimentData, value: Dataset | None = None, key: Any = None
     ) -> ExperimentData:

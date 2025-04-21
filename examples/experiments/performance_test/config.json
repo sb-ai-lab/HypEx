@@ -1,0 +1,29 @@
+{ 
+  "onefactor_params" : {
+    "n_rows": [10, 100],
+    "n_columns": [10, 15],
+    "n_iterations": [10, 20]
+  },
+  "montecarlo_params": {
+    "num_points" : 10,
+    "bounds": {
+      "n_rows" : {
+          "max" : 10000,
+          "min" : 100
+      },
+      "n_iterations" : {
+          "max" : 100,
+          "min" : 5
+      },
+      "n_columns" : {
+          "max" : 30,
+          "min" : 10
+      }
+    }
+  },
+  "fixed_params" : {    
+    "n_columns": 10,
+    "n_rows": 1000,
+    "n_iterations": 5
+  }
+}

@@ -999,7 +999,6 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(len(grouped), 2)
 
     def test_groupby_with_single_column_dataset(self):
-        # Создаем новый Dataset для группировки
         by = Dataset(
             roles={"col1": InfoRole(int)}, data=pd.DataFrame({"col1": [1, 2, 1]})
         )
@@ -1010,32 +1009,31 @@ class TestDataset(unittest.TestCase):
         self.assertIsInstance(result[0][1], Dataset)
 
     def test_groupby_with_column_name(self):
-        # Группировка по столбцу 'col1'
         result = self.dataset.groupby(by="col1")
         self.assertIsInstance(result, list)
-        self.assertEqual(len(result), 3)  # должно быть 3 группы для значений 1, 2 и 3
+        self.assertEqual(len(result), 3)  # There should be 3 groups for values 1, 2, and 3.
         self.assertIsInstance(result[0][1], Dataset)
 
     def test_groupby_with_func(self):
-        # Агрегация с функцией sum
+        # Aggregation with sum function
         result = self.dataset.groupby(by="col1", func="sum")
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 3)  # Проверка числа групп
         self.assertIsInstance(result[0][1], Dataset)
 
     def test_groupby_with_fields_list(self):
-        # Отбор столбцов после группировки
+        # Column selection after grouping
         result = self.dataset.groupby(by="col1", fields_list=["col2"])
         self.assertIsInstance(result, list)
         self.assertEqual(result[0][1].data.columns.tolist(), ["col2"])
 
     def test_groupby_with_invalid_by_type(self):
-        # Проверка на неправильный тип для 'by'
+        # Check for incorrect type for 'by'
         with self.assertRaises(KeyError):
             self.dataset.groupby(by=123)
 
     def test_groupby_with_empty_dataset(self):
-        # Проверка на пустой Dataset
+        # Check for empty Dataset
         empty_dataset = Dataset(
             roles=self.roles, data=pd.DataFrame(columns=["col1", "col2"])
         )
@@ -1043,14 +1041,14 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(result, [])
 
     def test_groupby_with_tmp_roles(self):
-        # Проверка, что tmp_roles сохраняются после группировки
+        # Check that tmp_roles are saved after grouping
         result = self.dataset.groupby(by="col1")
         self.assertTrue(
             all(dataset[1].tmp_roles == self.dataset.tmp_roles for dataset in result)
         )
 
     def test_groupby_with_fields_list_and_func(self):
-        # Группировка с полями и функцией
+        # Grouping with fields and function
         result = self.dataset.groupby(by="col1", fields_list=["col2"], func="sum")
         self.assertIsInstance(result, list)
         self.assertEqual([int(x[1]) for x in result], self.data["col2"].tolist())
@@ -1121,11 +1119,7 @@ class TestDataset(unittest.TestCase):
         self.assertTrue(result.data.loc[2, "col1"])
 
     def test_isin(self):
-        # Test with list
-        result = self.dataset.isin([1, 4])
-        self.assertTrue(result.data.loc[0, "col1"])
-        self.assertTrue(result.data.loc[0, "col2"])
-
+        result = self._extracted_from_test_isin_3(4, 0, "col2")
         # Test with dict
         result = self.dataset.isin({"col1": [1, 2], "col2": [4]})
         self.assertTrue(result.data.loc[0, "col1"])
@@ -1142,9 +1136,16 @@ class TestDataset(unittest.TestCase):
 
         # Test with mixed types
         self.dataset.data["col1"] = [1, "two", 3]
-        result = self.dataset.isin([1, "two"])
+        result = self._extracted_from_test_isin_3("two", 1, "col1")
+
+    # TODO Rename this here and in `test_isin`
+    def _extracted_from_test_isin_3(self, arg0, arg1, arg2):
+        # Test with list
+        result = self.dataset.isin([1, arg0])
         self.assertTrue(result.data.loc[0, "col1"])
-        self.assertTrue(result.data.loc[1, "col1"])
+        self.assertTrue(result.data.loc[arg1, arg2])
+
+        return result
 
     def test_log(self):
         # Test basic log
@@ -1594,29 +1595,29 @@ class TestDataset(unittest.TestCase):
         # Test shape property
         self.assertEqual(self.dataset.shape, (3, 2))
 
-    # Тесты для унарных операторов
+    # Tests for unary operators
     def test_pos_operator(self):
         result = +self.dataset
-        self.assertIsInstance(result, Dataset)  # Ожидаем возвращение Dataset
+        self.assertIsInstance(result, Dataset)  # Expecting a Dataset return
         self.assertTrue(
             (result.data >= 0).all().all()
-        )  # Ожидаем, что все элементы >= 0
+        )  # Expecting all elements >= 0
 
     def test_neg_operator(self):
         result = -self.dataset
-        self.assertIsInstance(result, Dataset)  # Ожидаем возвращение Dataset
-        self.assertTrue((result.data < 0).all().all())  # Ожидаем, что все элементы < 0
+        self.assertIsInstance(result, Dataset)  # Expecting a Dataset return
+        self.assertTrue((result.data < 0).all().all())  # Expecting all elements < 0
 
     def test_abs_operator(self):
         result = abs(self.dataset)
-        self.assertIsInstance(result, Dataset)  # Ожидаем возвращение Dataset
+        self.assertIsInstance(result, Dataset)  # Expecting a Dataset return
         self.assertTrue(
             (result.data >= 0).all().all()
-        )  # Ожидаем, что все элементы >= 0
+        )  # Expecting all elements >= 0
 
     def test_bool_operator(self):
         result = bool(self.dataset)
-        self.assertTrue(result)  # Ожидаем, что не пустой Dataset вернет True
+        self.assertTrue(result)  # Expecting non-empty Dataset to return True
 
 
 def test_operators(self):
@@ -1677,56 +1678,36 @@ def test_operators(self):
                 roles=self.roles, data=other_data, backend=BackendsEnum.pandas
             )
             # Perform the operation using the operator directly
-            if operator == "+":
-                result = self.dataset + other_dataset
-            elif operator == "-":
-                result = self.dataset - other_dataset
-            elif operator == "*":
-                result = self.dataset * other_dataset
-            elif operator == "//":
-                result = self.dataset // other_dataset
-            elif operator == "/":
-                result = self.dataset / other_dataset
-            elif operator == "%":
-                result = self.dataset % other_dataset
-            elif operator == "**":
-                result = self.dataset**other_dataset
-            elif operator == "&":
-                result = self.dataset & other_dataset
-            elif operator == "|":
-                result = self.dataset | other_dataset
-            elif operator == "^":
-                result = self.dataset ^ other_dataset
-            elif operator == "<":
-                result = self.dataset < other_dataset
-            elif operator == "<=":
-                result = self.dataset <= other_dataset
-            elif operator == ">":
-                result = self.dataset > other_dataset
-            elif operator == ">=":
-                result = self.dataset >= other_dataset
-            elif operator == "==":
-                result = self.dataset == other_dataset
-            elif operator == "!=":
-                result = self.dataset != other_dataset
-            elif operator == "radd":
-                result = other_data + self.dataset
-            elif operator == "rsub":
-                result = other_data - self.dataset
-            elif operator == "rmul":
-                result = other_data * self.dataset
-            elif operator == "rfloordiv":
-                result = other_data // self.dataset
-            elif operator == "rdiv":
-                result = other_data / self.dataset
-            elif operator == "rtruediv":
-                result = other_data / self.dataset
-            elif operator == "rmod":
-                result = other_data % self.dataset
-            elif operator == "rpow":
-                result = other_data**self.dataset
-            elif operator == "rdiv2":
-                result = other_data / self.dataset
+            operator_functions = {
+                "+": lambda self, other: self.dataset + other,
+                "-": lambda self, other: self.dataset - other,
+                "*": lambda self, other: self.dataset * other,
+                "//": lambda self, other: self.dataset // other,
+                "/": lambda self, other: self.dataset / other,
+                "%": lambda self, other: self.dataset % other,
+                "**": lambda self, other: self.dataset ** other,
+                "&": lambda self, other: self.dataset & other,
+                "|": lambda self, other: self.dataset | other,
+                "^": lambda self, other: self.dataset ^ other,
+                "<": lambda self, other: self.dataset < other,
+                "<=": lambda self, other: self.dataset <= other,
+                ">": lambda self, other: self.dataset > other,
+                ">=": lambda self, other: self.dataset >= other,
+                "==": lambda self, other: self.dataset == other,
+                "!=": lambda self, other: self.dataset != other,
+                "radd": lambda self, other: other + self.dataset,
+                "rsub": lambda self, other: other - self.dataset,
+                "rmul": lambda self, other: other * self.dataset,
+                "rfloordiv": lambda self, other: other // self.dataset,
+                "rdiv": lambda self, other: other / self.dataset,
+                "rtruediv": lambda self, other: other / self.dataset,
+                "rmod": lambda self, other: other % self.dataset,
+                "rpow": lambda self, other: other ** self.dataset,
+                "rdiv2": lambda self, other: other / self.dataset
+            }
+
+            operator = operator  # Assuming operator is defined somewhere in the code
+            result = operator_functions.get(operator, lambda self, other: other)(self, other_dataset)
 
             # Check the result type
             self.assertIsInstance(
@@ -1742,7 +1723,7 @@ def test_operators(self):
             pd.testing.assert_frame_equal(result.data, expected_data)
 
     def test_locker_getitem(self):
-        # Используем .loc (например, для первой строки)
+        # Using .loc (e.g., for the first row)
         self.data.index = ["a", "b", "c"]
         self.dataset = Dataset(roles=self.roles, data=self.data)
         t_data = self.dataset.loc["a"]
@@ -1756,12 +1737,11 @@ def test_operators(self):
         with self.assertRaises(RoleColumnError):
             self.dataset[1]
 
-        # Тестирование ролей
+        # Testing roles
         self.assertIn("a", t_data.roles)
 
-    # Тестирование метода __setitem__ для Dataset.Locker
     def test_locker_setitem_valid(self):
-        # Правильное обновление
+        # Correct update
         self.data.index = ["a", "b", "c"]
         self.dataset = Dataset(roles=self.roles, data=self.data)
         self.dataset.loc["a", "col1"] = [10]
@@ -1774,20 +1754,19 @@ def test_operators(self):
         self.assertEqual(self.dataset.data.loc[1, "col1"], 10)
 
     def test_locker_setitem_invalid_type(self):
-        # Неправильный тип данных
+        # Wrong data type
         self.data.index = ["a", "b", "c"]
         self.dataset = Dataset(roles=self.roles, data=self.data)
         with self.assertRaises(TypeError):
             self.dataset.loc["a", "col1"] = ["string"]
 
     def test_locker_setitem_type_mismatch(self):
-        # Попытка обновить столбец с несоответствующим типом данных
+        # Attempting to update a column with mismatched data type
         self.data.index = ["a", "b", "c"]
         self.dataset = Dataset(roles=self.roles, data=self.data)
         with self.assertRaises(TypeError):
             self.dataset.loc["a", "col2"] = [1.1]
 
-    # Тестирование метода __getitem__ для Dataset.ILocker
     def test_ilocker_getitem(self):
         t_data = self.dataset.iloc[0]
         self.assertTrue(isinstance(t_data, Dataset))
@@ -1799,12 +1778,11 @@ def test_operators(self):
         with self.assertRaises(TypeError):
             self.dataset.iloc["a"]
 
-        # Тестирование ролей
+        # Testing roles
         self.assertIn(0, t_data.roles)
 
-    # Тестирование метода __setitem__ для Dataset.ILocker
     def test_ilocker_setitem_valid(self):
-        # Правильное обновление через iloc
+        # Correct update via iloc
         self.dataset.iloc[0, 0] = 10
         self.assertEqual(self.dataset.data.iloc[0, 0], 10)
 
@@ -1815,22 +1793,22 @@ def test_operators(self):
             self.dataset.iloc[7, "col1"] = [10]
 
     def test_ilocker_setitem_invalid_type(self):
-        # Неправильный тип данных через iloc
+        # Wrong data type via iloc
         with self.assertRaises(TypeError):
             self.dataset.iloc[0, 0] = "string"
 
     def test_ilocker_setitem_column_not_found(self):
-        # Попытка обновить несуществующий столбец через iloc
+        # Attempting to update a non-existent column via iloc
         with self.assertRaises(IndexError):
             self.dataset.iloc[0, 5] = 10
 
     def test_ilocker_setitem_type_mismatch(self):
-        # Попытка обновить столбец с несоответствующим типом данных через iloc
+        # Attempting to update a column with mismatched data type via iloc
         with self.assertRaises(TypeError):
             self.dataset.iloc[0, 1] = [1.1]
 
     def test_init(self):
-        # Проверка, что класс инициализируется правильно
+        # Checking that the class initializes correctly
         self.experiment_data = ExperimentData(self.dataset)
         self.assertEqual(self.experiment_data._data.data["col1"].tolist(), [1, 2, 3])
         self.assertEqual(self.experiment_data._data.data["col2"].tolist(), [4, 5, 6])

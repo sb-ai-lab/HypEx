@@ -117,7 +117,7 @@ class ABAnalyzer(Executor):
                 for i in range(0, len(analysis_ids), len(analysis_ids) // num_groups):
                     value = t_data.iloc[i : i + len(analysis_ids) // num_groups][f]
                     multitest_pvalues = self._add_pvalues(multitest_pvalues, value, f)
-                    analysis_data[f"{c} {f} {groups[i//num_groups + 1][0]}"] = (
+                    analysis_data[f"{c} {f} {groups[i // num_groups + 1][0]}"] = (
                         value.mean()
                     )
             if c not in ["UTest", "TTest"]:
@@ -126,7 +126,7 @@ class ABAnalyzer(Executor):
                 for idx, value in zip(indexes, values):
                     name = idx.split(ID_SPLIT_SYMBOL)[-1]
                     analysis_data[
-                        f"{c} {name[name.find(NAME_BORDER_SYMBOL) + 1: name.rfind(NAME_BORDER_SYMBOL)]}"
+                        f"{c} {name[name.find(NAME_BORDER_SYMBOL) + 1 : name.rfind(NAME_BORDER_SYMBOL)]}"
                     ] = value[0]
 
         analysis_dataset = Dataset.from_dict(

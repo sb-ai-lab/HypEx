@@ -141,7 +141,7 @@ def test_aatest(aa_data):
             res = mapping[test_name].execute(aa_data[0])
         actual_data = res.resume.data.iloc[:, 2:-2]
         expected_data = mapping_resume[test_name]
-        pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)    
+        pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)
 
 
 def test_abtest(ab_data):

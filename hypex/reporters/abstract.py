@@ -70,7 +70,6 @@ class DatasetReporter(OnDictReporter):
 
 
 class TestDictReporter(DictReporter):
-
     @staticmethod
     def _get_struct_dict(data: dict):
         dict_result = {}
@@ -98,7 +97,6 @@ class TestDictReporter(DictReporter):
 
     @staticmethod
     def _convert_struct_dict_to_dataset(data: dict) -> Dataset:
-
         def rename_passed(data: dict[str, bool]):
             return {
                 c: (
