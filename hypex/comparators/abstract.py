@@ -461,23 +461,14 @@ class StatHypothesisTesting(Comparator, ABC):
 class PowerTesting(Comparator, ABC):
     def __init__(
         self,
-        compare_by: Literal[
-            "groups", "columns", "columns_in_groups", "cross"
-        ] = "groups",
         grouping_role: ABCRole | None = None,
-        target_roles: ABCRole | list[ABCRole] | None = None,
-        baseline_role: ABCRole | None = None,
         significance: float = 0.95,
         power: float = 0.8,
         key: Any = "",
     ):
-        if compare_by != "groups":
-            warnings.warn("PowerTesting can be used only with compare_by='groups'")
         super().__init__(
             compare_by="groups",
             grouping_role=grouping_role,
-            target_roles=target_roles,
-            baseline_role=baseline_role,
             key=key,
         )
         self.significance = significance
