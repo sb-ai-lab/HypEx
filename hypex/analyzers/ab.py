@@ -11,18 +11,17 @@ from ..dataset import (
     TargetRole,
     TreatmentRole,
 )
-from ..experiments.base import Executor
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
 from ..utils import (
     ID_SPLIT_SYMBOL,
     NAME_BORDER_SYMBOL,
     ABNTestMethodsEnum,
     BackendsEnum,
-    ExperimentDataEnum,
 )
+from .abstract import Analyzer
 
 
-class ABAnalyzer(Executor):
+class ABAnalyzer(Analyzer):
     def __init__(
         self,
         multitest_method: ABNTestMethodsEnum | None = None,
@@ -40,13 +39,6 @@ class ABAnalyzer(Executor):
         self.iteration_size = iteration_size
         self.random_state = random_state
         super().__init__(key)
-
-    def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
-        return data.set_value(
-            ExperimentDataEnum.analysis_tables,
-            self.id + key if key else self.id,
-            value,
-        )
 
     def execute_multitest(self, data: ExperimentData, p_values: Dataset, **kwargs):
         group_field = data.ds.search_columns(TreatmentRole())[0]

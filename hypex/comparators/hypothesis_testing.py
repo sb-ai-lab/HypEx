@@ -17,9 +17,7 @@ class TTest(StatHypothesisTesting):
         return NUMBER_TYPES_LIST
 
     @classmethod
-    def _inner_function(
-        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ) -> Dataset:
+    def calc(cls, data: Dataset, test_data: Dataset | None = None, **kwargs) -> Dataset:
         return TTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
@@ -31,9 +29,7 @@ class KSTest(StatHypothesisTesting):
         return NUMBER_TYPES_LIST
 
     @classmethod
-    def _inner_function(
-        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ) -> Dataset:
+    def calc(cls, data: Dataset, test_data: Dataset | None = None, **kwargs) -> Dataset:
         return KSTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
@@ -45,9 +41,7 @@ class UTest(StatHypothesisTesting):
         return NUMBER_TYPES_LIST
 
     @classmethod
-    def _inner_function(
-        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ) -> Dataset:
+    def calc(cls, data: Dataset, test_data: Dataset | None = None, **kwargs) -> Dataset:
         return UTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
@@ -59,9 +53,7 @@ class Chi2Test(StatHypothesisTesting):
         return [str]
 
     @classmethod
-    def _inner_function(
-        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ) -> Dataset:
+    def calc(cls, data: Dataset, test_data: Dataset | None = None, **kwargs) -> Dataset:
         return Chi2TestExtension(reliability=kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )

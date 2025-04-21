@@ -28,12 +28,14 @@ class CategoryAggregator(Transformer):
     def search_types(self):
         return [CategoricalTypes]
 
-    @staticmethod
-    def _inner_function(
+    @classmethod
+    def calc(
+        cls,
         data: Dataset,
         target_cols: str | None = None,
         threshold: int | None = 15,
         new_group_name: str | None = None,
+        **kwargs,
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
@@ -51,7 +53,7 @@ class CategoryAggregator(Transformer):
         target_cols = data.ds.search_columns(
             roles=self.target_roles, search_types=self.search_types
         )
-        result = data.copy(
+        return data.copy(
             data=self.calc(
                 data=data.ds,
                 target_cols=target_cols,
@@ -59,4 +61,3 @@ class CategoryAggregator(Transformer):
                 new_group_name=self.new_group_name,
             )
         )
-        return result

@@ -31,12 +31,7 @@ class GroupDifference(Comparator):
         return NUMBER_TYPES_LIST
 
     @classmethod
-    def _inner_function(
-        cls,
-        data: Dataset,
-        test_data: Dataset | None = None,
-        **kwargs,
-    ) -> dict:
+    def calc(cls, data: Dataset, test_data: Dataset | None = None, **kwargs) -> dict:
         test_data = cls._check_test_data(test_data)
         control_mean = data.mean()
         test_mean = test_data.mean()
@@ -66,9 +61,7 @@ class GroupSizes(Comparator):
         )
 
     @classmethod
-    def _inner_function(
-        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ) -> dict:
+    def calc(cls, data: Dataset, test_data: Dataset | None = None, **kwargs) -> dict:
         size_a = len(data)
         size_b = len(test_data) if isinstance(test_data, Dataset) else 0
 
@@ -82,7 +75,7 @@ class GroupSizes(Comparator):
 
 class PSI(Comparator):
     @classmethod
-    def _inner_function(
+    def calc(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> dict[str, float]:
         test_data = cls._check_test_data(test_data=test_data)

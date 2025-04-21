@@ -66,14 +66,14 @@ class GroupOperator(
             raise ValueError(
                 f"This operator works with 2 targets, but got {len(target_fields) if target_fields else None}"
             )
-        result = {}
-        for group, group_data in grouping_data:
-            result[group[0]] = cls._inner_function(
+        return {
+            group[0]: cls._inner_function(
                 data=group_data[target_fields[0]],
                 test_data=group_data[target_fields[1]],
                 **kwargs,
             )
-        return result
+            for group, group_data in grouping_data
+        }
 
     @classmethod
     def calc(

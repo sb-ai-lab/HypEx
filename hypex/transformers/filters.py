@@ -39,12 +39,14 @@ class CVFilter(Transformer):
     def search_types(self):
         return [float, int, bool]
 
-    @staticmethod
-    def _inner_function(
+    @classmethod
+    def calc(
+        cls,
         data: Dataset,
         target_cols: str | None = None,
         lower_bound: float | None = None,
         upper_bound: float | None = None,
+        **kwargs,
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
@@ -63,7 +65,7 @@ class CVFilter(Transformer):
             )
         else:
             target_cols = data.ds.search_columns(roles=FeatureRole())
-        result = data.copy(
+        return data.copy(
             data=self.calc(
                 data=data.ds,
                 target_cols=target_cols,
@@ -71,7 +73,6 @@ class CVFilter(Transformer):
                 upper_bound=self.upper_bound,
             )
         )
-        return result
 
 
 class ConstFilter(Transformer):
@@ -93,11 +94,13 @@ class ConstFilter(Transformer):
         self.target_roles = target_roles or FeatureRole()
         self.threshold = threshold
 
-    @staticmethod
-    def _inner_function(
+    @classmethod
+    def calc(
+        cls,
         data: Dataset,
         target_cols: str | None = None,
         threshold: float = 0.95,
+        **kwargs,
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
@@ -108,12 +111,11 @@ class ConstFilter(Transformer):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         target_cols = data.ds.search_columns(roles=self.target_roles)
-        result = data.copy(
+        return data.copy(
             data=self.calc(
                 data=data.ds, target_cols=target_cols, threshold=self.threshold
             )
         )
-        return result
 
 
 class NanFilter(Transformer):
@@ -135,11 +137,13 @@ class NanFilter(Transformer):
         self.target_roles = target_roles or FeatureRole()
         self.threshold = threshold
 
-    @staticmethod
-    def _inner_function(
+    @classmethod
+    def calc(
+        cls,
         data: Dataset,
         target_cols: str | None = None,
         threshold: float = 0.8,
+        **kwargs,
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
@@ -150,12 +154,11 @@ class NanFilter(Transformer):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         target_cols = data.ds.search_columns(roles=self.target_roles)
-        result = data.copy(
+        return data.copy(
             data=self.calc(
                 data=data.ds, target_cols=target_cols, threshold=self.threshold
             )
         )
-        return result
 
 
 class CorrFilter(Transformer):
@@ -175,8 +178,9 @@ class CorrFilter(Transformer):
         self.method = method
         self.numeric_only = numeric_only
 
-    @staticmethod
-    def _inner_function(
+    @classmethod
+    def calc(
+        cls,
         data: Dataset,
         target_cols: str | None = None,
         corr_space_cols: str | None = None,
@@ -184,6 +188,7 @@ class CorrFilter(Transformer):
         method: str = "pearson",
         numeric_only: bool = True,
         drop_policy: str = "cv",
+        **kwargs,
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
         corr_space_cols = Adapter.to_list(corr_space_cols)
@@ -212,12 +217,14 @@ class CorrFilter(Transformer):
                     drop = target
                     if data.roles[column] in corr_target_cols:
                         if drop_policy == "corr":
-                            if abs(
-                                corr_matrix.get_values(target, pre_target_column)
-                            ) > abs(corr_matrix.get_values(column, pre_target_column)):
-                                drop = target
-                            else:
-                                drop = column
+                            drop = (
+                                target
+                                if abs(
+                                    corr_matrix.get_values(target, pre_target_column)
+                                )
+                                > abs(corr_matrix.get_values(column, pre_target_column))
+                                else column
+                            )
                         elif drop_policy == "cv":
                             drop = (
                                 target
@@ -231,7 +238,7 @@ class CorrFilter(Transformer):
     def execute(self, data: ExperimentData) -> ExperimentData:
         target_cols = data.ds.search_columns(roles=self.target_roles)
         corr_space_cols = data.ds.search_columns(roles=self.corr_space_roles)
-        result = data.copy(
+        return data.copy(
             data=self.calc(
                 data=data.ds,
                 target_cols=target_cols,
@@ -241,7 +248,6 @@ class CorrFilter(Transformer):
                 numeric_only=self.numeric_only,
             )
         )
-        return result
 
 
 class OutliersFilter(Transformer):
@@ -269,12 +275,14 @@ class OutliersFilter(Transformer):
     def search_types(self):
         return [float, int, bool]
 
-    @staticmethod
-    def _inner_function(
+    @classmethod
+    def calc(
+        cls,
         data: Dataset,
         target_cols: str | None = None,
         lower_percentile: float = 0,
         upper_percentile: float = 1,
+        **kwargs,
     ) -> Dataset:
         mask = data[target_cols].apply(
             func=lambda x: (x < x.quantile(lower_percentile))

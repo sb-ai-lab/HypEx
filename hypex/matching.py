@@ -134,22 +134,20 @@ class Matching(ExperimentShell):
                 )
             ]
         return (
-            Experiment(
-                executors=(
-                    executors
-                    if distance == "l2"
-                    else [distance_mapping[distance], *executors]
-                )
-            )
-            if not group_match
-            else GroupExperiment(
-                executors=(
-                    executors
-                    if distance == "l2"
-                    else [distance_mapping[distance], *executors]
-                ),
-                reporter=MatchingDatasetReporter(),
-            )
+            GroupExperiment(
+                            executors=(
+               executors
+               if distance == "l2"
+               else [distance_mapping[distance], *executors]
+                            ),
+                            reporter=MatchingDatasetReporter(),
+                        ) if group_match else Experiment(
+                            executors=(
+                                executors
+                                if distance == "l2"
+                                else [distance_mapping[distance], *executors]
+                            )
+                        )
         )
 
     def __init__(

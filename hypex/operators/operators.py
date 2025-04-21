@@ -204,7 +204,7 @@ class MatchingMetrics(GroupOperator):
         matched_data = data.ds.loc[
             list(map(lambda x: x[0], filtered_field.get_values()))
         ][new_target].rename(
-            {new_target: new_target + "_matched" for _ in data.ds.columns}
+            {new_target: f"{new_target}_matched" for _ in data.ds.columns}
         )
         matched_data.index = filtered_field.index
         return matched_data
@@ -238,7 +238,8 @@ class MatchingMetrics(GroupOperator):
         )
         if (
             not target_fields and data.ds.tmp_roles
-        ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
+        ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role
+            # tempo, then this is normal behavior
             return data
 
         compare_result = self.calc(
@@ -356,7 +357,7 @@ class Bias(GroupOperator):
         )
         matched_data = data.ds.loc[
             list(map(lambda x: x[0], filtered_field.get_values()))
-        ].rename({i: i + "_matched" for i in data.ds.columns})
+        ].rename({i: f"{i}_matched" for i in data.ds.columns})
         matched_data.index = filtered_field.index
         return matched_data
 
@@ -372,7 +373,8 @@ class Bias(GroupOperator):
         )
         if (
             not target_fields and data.ds.tmp_roles
-        ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
+        ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role
+            # tempo, then this is normal behavior
             return data
 
         compare_result = self.calc(

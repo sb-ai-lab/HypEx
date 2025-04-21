@@ -113,7 +113,8 @@ class MahalanobisDistance(Calculator):
         )
         if (
             not target_fields and data.ds.tmp_roles
-        ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
+        ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role
+            # tempo, then this is normal behavior
             return data
         if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
             grouping_data = list(data.groups[group_field[0]].items())

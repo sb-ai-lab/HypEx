@@ -155,6 +155,6 @@ class FaissNearestNeighbors(MLExecutor):
             ).sort()
         if len(matched_indexes) < len(data.ds) and not self.two_sides:
             matched_indexes = matched_indexes.reindex(data.ds.index, fill_value=-1)
-        elif len(matched_indexes) < len(data.ds) and self.two_sides:
+        elif len(matched_indexes) < len(data.ds):
             raise PairsNotFoundError
         return self._set_value(data, matched_indexes, key="matched")

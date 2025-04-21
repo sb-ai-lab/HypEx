@@ -6,17 +6,14 @@ import numpy as np
 
 from ..comparators import Chi2Test, KSTest, TTest
 from ..dataset import Dataset, ExperimentData, StatisticRole
-from ..executor import Executor
 from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from ..reporters.aa import OneAADictReporter
 from ..splitters import AASplitter, AASplitterWithStratification
 from ..utils import ID_SPLIT_SYMBOL, BackendsEnum, ExperimentDataEnum
+from .abstract import Analyzer
 
 
-class OneAAStatAnalyzer(Executor):
-    def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
-        return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
-
+class OneAAStatAnalyzer(Analyzer):
     def execute(self, data: ExperimentData) -> ExperimentData:
         analysis_tests: list[type] = [TTest, KSTest, Chi2Test]
         executor_ids = data.get_ids(
@@ -68,7 +65,7 @@ class OneAAStatAnalyzer(Executor):
         return self._set_value(data, analysis_dataset)
 
 
-class AAScoreAnalyzer(Executor):
+class AAScoreAnalyzer(Analyzer):
     AA_SPLITER_CLASS_MAPPING: ClassVar[dict] = {
         class_.__name__: class_ for class_ in [AASplitter, AASplitterWithStratification]
     }
@@ -79,16 +76,6 @@ class AAScoreAnalyzer(Executor):
         self.alpha = alpha
         self.__feature_weights = {}
         self.threshold = 1 - (self.alpha * 1.2)
-
-    def _set_value(
-        self, data: ExperimentData, value: Any, key: Any = None
-    ) -> ExperimentData:
-        return data.set_value(
-            ExperimentDataEnum.analysis_tables,
-            executor_id=self.id,
-            key=self.key,
-            value=value,
-        )
 
     def _analyze_aa_score(
         self, data: ExperimentData, score_table: Dataset
