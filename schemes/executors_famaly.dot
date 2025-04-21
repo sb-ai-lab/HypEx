@@ -10,6 +10,11 @@ digraph Architecture{
         n_iterations
         searching_role
         params
+        compare_by
+        groping_reole,
+        target_roles,
+        baseline_role
+        reliability
     }
 
     subgraph functions{
@@ -18,6 +23,7 @@ digraph Architecture{
         calc
         check_rule
         set_params
+        _split_data_to_buckets
     }
 
     subgraph objects{
@@ -27,11 +33,11 @@ digraph Architecture{
         reporter
         stopping_criterion
         // Analyzers----------------
-        analyzer[label="Analyzer"]
-        one_aa_analyzer[label="OneAAAnalyzer"]
-        aa_score_analyzer[label="AAScoreAnalyzer"]
-        ab_analyzer[label="ABAnalyzer"]
-        matching_analyzer[label="MatchingAnalyzer"]
+        analyzer[label="Analyzer", fillcolor=mintcream]
+        one_aa_analyzer[label="OneAAAnalyzer", fillcolor=mintcream]
+        aa_score_analyzer[label="AAScoreAnalyzer", fillcolor=mintcream]
+        ab_analyzer[label="ABAnalyzer", fillcolor=mintcream]
+        matching_analyzer[label="MatchingAnalyzer", fillcolor=mintcream]
     }
 
     subgraph collections{
@@ -157,7 +163,7 @@ digraph Architecture{
     }
 
     subgraph cluster_analyzers{
-        graph[label="Analyzers Ierarchy", style="dashed"]
+        graph[label="Analyzers", style="dashed"]
         analyzer
         subgraph cluster_aa_analyzers{
             graph[label="AA", style="dashed"]
@@ -183,5 +189,37 @@ digraph Architecture{
             ab_analyzer,
             matching_analyzer
         } -> analyzer [arrowhead=curve]
+    }
+
+    subgraph cluster_comparators{
+        graph[label="Comparators", style="dashed"]
+
+        subgraph cluster_abstract_comporators{
+            graph[label="Abstract", style="dotted"]
+
+            subgraph cluster_comporator{
+                graph[label="Comparator", style="solid"]
+                _split_data_to_buckets
+                compare_by
+                groping_reole
+                target_roles
+                baseline_role
+            }
+            _split_data_to_buckets -> calc [        
+                arrowhead=curve
+                ltail=cluster_comporator
+                lhead=cluster_calculator
+            ]
+
+            subgraph cluster_stat_hyp_testing{
+                graph[label="StatHypothesisTesting", style="solid"]
+                reliability
+            }
+            reliability -> compare_by [        
+                arrowhead=curve
+                ltail=cluster_stat_hyp_testing
+                lhead=cluster_comporator
+            ]
+        }
     }
 }
