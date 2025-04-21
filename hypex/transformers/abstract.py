@@ -1,8 +1,6 @@
-from abc import abstractmethod
 
 from ..dataset import Dataset, ExperimentData
 from ..executor import Calculator
-from ..utils import AbstractMethodError
 
 
 class Transformer(Calculator):

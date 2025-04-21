@@ -163,13 +163,11 @@ class Comparator(Calculator, ABC):
     def _split_ds_into_columns(
         data: list[tuple[str, Dataset]],
     ) -> list[tuple[str, Dataset]]:
-        result = [
+        return [
             (bucket[0], bucket[1][column])
             for bucket in data
             for column in bucket[1].columns
         ]
-
-        return result
 
     @staticmethod
     def _field_validity_check(
@@ -458,3 +456,39 @@ class StatHypothesisTesting(Comparator, ABC):
             key=key,
         )
         self.reliability = reliability
+
+
+class PowerTesting(Comparator, ABC):
+    def __init__(
+        self,
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross"
+        ] = "groups",
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | list[ABCRole] | None = None,
+        baseline_role: ABCRole | None = None,
+        significance: float = 0.95,
+        power: float = 0.8,
+        key: Any = "",
+    ):
+        if compare_by != "groups":
+            warnings.warn("PowerTesting can be used only with compare_by='groups'")
+        super().__init__(
+            compare_by="groups",
+            grouping_role=grouping_role,
+            target_roles=target_roles,
+            baseline_role=baseline_role,
+            key=key,
+        )
+        self.significance = significance
+        self.power = power
+
+    @classmethod
+    @abstractmethod
+    def calc(
+        cls, data: Dataset, test_data: Dataset | None = None, **kwargs: float
+    ) -> float:
+        pass
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        return super().execute(data)
