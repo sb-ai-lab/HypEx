@@ -40,6 +40,16 @@ digraph Architecture{
         aa_score_analyzer[label="AAScoreAnalyzer", fillcolor=mintcream]
         ab_analyzer[label="ABAnalyzer", fillcolor=mintcream]
         matching_analyzer[label="MatchingAnalyzer", fillcolor=mintcream]
+        // Comporators-------------
+        group_diff[label="GroupDifference", fillcolor=mintcream]
+        group_sizes[label="GroupSizes", fillcolor=mintcream]
+        psi[label="PSI", fillcolor=mintcream]
+        maha_dist[label="MahalanobisDistance", fillcolor=mintcream]
+        ttest[label="TTest", fillcolor=mintcream]
+        kstest[label="KSTest", fillcolor=mintcream]
+        utest[label="UTest", fillcolor=mintcream]
+        chi2test[label="Chi2Test", fillcolor=mintcream]
+        mdebysize[label="MDEBySize", fillcolor=mintcream]
     }
 
     subgraph collections{
@@ -234,5 +244,33 @@ digraph Architecture{
                 lhead=cluster_comporator
             ]
         }
+
+        {
+            group_diff, 
+            group_sizes
+            psi
+            maha_dist
+        } -> compare_by [        
+            arrowhead=curve
+            lhead=cluster_comporator
+        ]
+
+        subgraph cluster_hyp_testing{
+            graph[label="Hypothesis testing", style=dotted]
+            {
+                ttest
+                kstest
+                utest
+                chi2test
+            } -> reliability [        
+                arrowhead=curve
+                lhead=cluster_stat_hyp_testing
+            ]
+        }
+
+        mdebysize -> power [        
+            arrowhead=curve
+            lhead=cluster_power_testing
+        ]
     }
 }
