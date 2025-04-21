@@ -2,7 +2,7 @@ from ..dataset.dataset import DatasetAdapter, ExperimentData
 from ..dataset.roles import StatisticRole
 from ..operators.operators import MatchingMetrics
 from ..utils.enums import ExperimentDataEnum
-from .base import Analyzer
+from .abstract import Analyzer
 
 
 class MatchingAnalyzer(Analyzer):

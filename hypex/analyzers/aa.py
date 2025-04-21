@@ -10,7 +10,7 @@ from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from ..reporters.aa import OneAADictReporter
 from ..splitters import AASplitter, AASplitterWithStratification
 from ..utils import ID_SPLIT_SYMBOL, BackendsEnum, ExperimentDataEnum
-from .base import Analyzer
+from .abstract import Analyzer
 
 
 class OneAAStatAnalyzer(Analyzer):

@@ -18,7 +18,7 @@ from ..utils import (
     ABNTestMethodsEnum,
     BackendsEnum,
 )
-from .base import Analyzer
+from .abstract import Analyzer
 
 
 class ABAnalyzer(Analyzer):
