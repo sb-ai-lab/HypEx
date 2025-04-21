@@ -26,6 +26,12 @@ digraph Architecture{
         else_executor
         reporter
         stopping_criterion
+        // Analyzers----------------
+        analyzer[label="Analyzer"]
+        one_aa_analyzer[label="OneAAAnalyzer"]
+        aa_score_analyzer[label="AAScoreAnalyzer"]
+        ab_analyzer[label="ABAnalyzer"]
+        matching_analyzer[label="MatchingAnalyzer"]
     }
 
     subgraph collections{
@@ -148,5 +154,34 @@ digraph Architecture{
             arrowhead=box
             ltail=cluster_if_executor
         ]
+    }
+
+    subgraph cluster_analyzers{
+        graph[label="Analyzers Ierarchy", style="dashed"]
+        analyzer
+        subgraph cluster_aa_analyzers{
+            graph[label="AA", style="dashed"]
+            one_aa_analyzer
+            aa_score_analyzer
+        }
+        subgraph cluster_ab_analyzers{
+            graph[label="AB", style="dashed"]
+            ab_analyzer
+        }
+        subgraph cluster_matching_analyzers{
+            graph[label="Matching", style="dashed"]
+            matching_analyzer
+        }
+        analyzer -> execute [        
+            arrowhead=curve
+            lhead=cluster_executor
+        ]
+
+        {
+            one_aa_analyzer,
+            aa_score_analyzer,
+            ab_analyzer,
+            matching_analyzer
+        } -> analyzer [arrowhead=curve]
     }
 }
