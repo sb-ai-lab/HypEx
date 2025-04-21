@@ -115,13 +115,9 @@ class Executor(ABC):
 
 
 class Calculator(Executor, ABC):
-    @classmethod
-    def calc(cls, data: Dataset, **kwargs):
-        return cls._inner_function(data, **kwargs)
 
-    @staticmethod
-    @abstractmethod
-    def _inner_function(data: Dataset, **kwargs) -> Any:
+    @classmethod
+    def calc(cls, data: Dataset, **kwargs) -> Any:
         raise AbstractMethodError
 
     @property
@@ -172,13 +168,7 @@ class MLExecutor(Calculator, ABC):
 
     @classmethod
     @abstractmethod
-    def _inner_function(
-        cls,
-        data: Dataset,
-        test_data: Dataset | None = None,
-        target_data: Dataset | None = None,
-        **kwargs,
-    ) -> Any:
+    def _inner_function(cls, data, **kwargs: Dataset) -> Any:
         raise AbstractMethodError
 
     @classmethod
@@ -196,9 +186,7 @@ class MLExecutor(Calculator, ABC):
                 **kwargs,
             )
         return cls._inner_function(
-            data=grouping_data[0][1],
-            test_data=grouping_data[1][1],
-            **kwargs,
+            data=grouping_data[0][1], test_data=grouping_data[1][1], **kwargs
         )
 
     def _set_value(
@@ -248,7 +236,8 @@ class MLExecutor(Calculator, ABC):
         )
         if (
             not target_fields and data.ds.tmp_roles
-        ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
+        ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role
+            # tempo, then this is normal behavior
             return data
         if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
             grouping_data = list(data.groups[group_field[0]].items())

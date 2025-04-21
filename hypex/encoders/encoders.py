@@ -6,10 +6,9 @@ from .abstract import Encoder
 
 
 class DummyEncoder(Encoder):
-    @staticmethod
-    def _inner_function(
-        data: Dataset, target_cols: str | None = None, **kwargs
-    ) -> Dataset:
+    @classmethod
+    def calc(cls, data: Dataset, **kwargs: str | None) -> Dataset:
+        target_cols = kwargs.get("target_cols")
         if not target_cols:
             return data
         return DummyEncoderExtension().calc(

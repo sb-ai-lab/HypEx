@@ -116,7 +116,7 @@ class FaissNearestNeighbors(MLExecutor):
             grouping_data = list(
                 data.groups[distances_keys["MahalanobisDistance"]["groups"][0]].items()
             )
-        compare_result = self.calc(
+        compare_result = self._inner_function(
             data=data.ds,
             group_field=group_field,
             grouping_data=grouping_data,
@@ -155,6 +155,6 @@ class FaissNearestNeighbors(MLExecutor):
             ).sort()
         if len(matched_indexes) < len(data.ds) and not self.two_sides:
             matched_indexes = matched_indexes.reindex(data.ds.index, fill_value=-1)
-        elif len(matched_indexes) < len(data.ds) and self.two_sides:
+        elif len(matched_indexes) < len(data.ds):
             raise PairsNotFoundError
         return self._set_value(data, matched_indexes, key="matched")

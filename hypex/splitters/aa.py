@@ -77,16 +77,11 @@ class AASplitter(Calculator):
             }
         return data
 
-    @staticmethod
-    def _inner_function(
-        data: Dataset,
-        random_state: int | None = None,
-        control_size: float = 0.5,
-        sample_size: float | None = None,
-        const_group_field: str | None = None,
-        **kwargs,
-    ) -> list[str]:
-        sample_size = 1.0 if sample_size is None else sample_size
+    @classmethod
+    def calc(cls, data: Dataset, **kwargs: int | None) -> list[str]:
+        control_size = kwargs.get("control_size") or 0.5
+        sample_size = kwargs.get("sample_size") or 1
+        const_group_field = kwargs.get("const_group_field")
         control_indexes = []
         if const_group_field:
             const_data = dict(data.groupby(const_group_field))
@@ -101,13 +96,15 @@ class AASplitter(Calculator):
             data[data[const_group_field].isna()] if const_group_field else data
         )
         experiment_data_index = experiment_data.sample(
-            frac=sample_size, random_state=random_state
+            frac=sample_size, random_state=kwargs.get("random_state")
         ).index
         addition_indexes = list(experiment_data_index)
         edge = int(len(addition_indexes) * control_size)
         control_indexes += addition_indexes[:edge]
 
-        split_series = pd.Series(np.ones(data.data.shape[0], dtype="int"), index=data.data.index)
+        split_series = pd.Series(
+            np.ones(data.data.shape[0], dtype="int"), index=data.data.index
+        )
         split_series[control_indexes] -= 1
         split_series = split_series.map({0: "control", 1: "test"})
 
@@ -132,24 +129,15 @@ class AASplitter(Calculator):
 
 
 class AASplitterWithStratification(AASplitter):
-    @staticmethod
-    def _inner_function(
-        data: Dataset,
-        random_state: int | None = None,
-        control_size: float = 0.5,
-        grouping_fields=None,
-        **kwargs,
-    ) -> list[str] | Dataset:
+    @classmethod
+    def calc(cls, data: Dataset, **kwargs: int | None) -> list[str] | Dataset:
+        grouping_fields = kwargs.get("grouping_fields")
         if not grouping_fields:
-            return AASplitter._inner_function(
-                data, random_state, control_size, **kwargs
-            )
+            return AASplitter.calc(data, **kwargs)
         result = {"split": []}
         index = []
         for group, group_data in data.groupby(grouping_fields):
-            result["split"].extend(
-                AASplitter._inner_function(group_data, random_state, control_size)
-            )
+            result["split"].extend(AASplitter.calc(group_data))
             index.extend(list(group_data.index))
         return Dataset.from_dict(result, index=index, roles={"split": TreatmentRole()})
 

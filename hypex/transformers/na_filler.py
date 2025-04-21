@@ -37,12 +37,14 @@ class NaFiller(Transformer):
         self.values = values
         self.method = method
 
-    @staticmethod
-    def _inner_function(
+    @classmethod
+    def calc(
+        cls,
         data: Dataset,
         target_cols: str | None = None,
         values: ScalarType | dict[str, ScalarType] | None = None,
         method: Literal["bfill", "ffill"] | None = None,
+        **kwargs,
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
@@ -52,7 +54,7 @@ class NaFiller(Transformer):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         target_cols = data.ds.search_columns(roles=self.target_roles)
-        result = data.copy(
+        return data.copy(
             data=self.calc(
                 data=data.ds,
                 target_cols=target_cols,
@@ -60,4 +62,3 @@ class NaFiller(Transformer):
                 method=self.method,
             )
         )
-        return result

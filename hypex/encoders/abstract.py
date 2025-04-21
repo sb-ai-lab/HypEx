@@ -37,8 +37,8 @@ class Encoder(Calculator):
     def _ids_to_names(self, col_names: list[str]):
         return {col_name: self._get_ids(col_name) for col_name in col_names}
 
-    @staticmethod
-    def _inner_function(data: Dataset, **kwargs) -> Dataset:
+    @classmethod
+    def calc(cls, data: Dataset, **kwargs) -> Dataset:
         raise AbstractMethodError
 
     def _set_value(
