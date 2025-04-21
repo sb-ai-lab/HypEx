@@ -1,16 +1,11 @@
 from ..dataset.dataset import DatasetAdapter, ExperimentData
 from ..dataset.roles import StatisticRole
-from ..executor.executor import Executor
 from ..operators.operators import MatchingMetrics
 from ..utils.enums import ExperimentDataEnum
+from .base import Analyzer
 
 
-class MatchingAnalyzer(Executor):
-    def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
-        return data.set_value(
-            ExperimentDataEnum.analysis_tables, self.id, value, key=key
-        )
-
+class MatchingAnalyzer(Analyzer):
     def execute(self, data: ExperimentData):
         variables = data.variables[
             data.get_one_id(MatchingMetrics, space=ExperimentDataEnum.variables)
