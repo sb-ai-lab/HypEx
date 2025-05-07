@@ -24,6 +24,7 @@ digraph Architecture{
         iteration_size
         equal_variance
         random_state_q[label="random_state"]
+        sample_size
     }
 
     subgraph functions{
@@ -482,5 +483,19 @@ digraph Architecture{
             lhead=cluster_extension
         ]
     }
+
+    subgraph cluster_forks{
+        graph[label="Forks", style=dashed]
+
+        subgraph cluster_if_aa_executor{
+            graph[label="IfAAExecutor", style=solid]
+            sample_size
+        }
+    }
+    sample_size -> if_executor [
+        arrowhead=curve
+        ltail=cluster_if_aa_executor
+        lhead=cluster_if_executor
+    ]
 
 }
