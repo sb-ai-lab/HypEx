@@ -5,7 +5,7 @@ from typing import Literal
 from .analyzers.matching import MatchingAnalyzer
 from .comparators import KSTest, TTest
 from .comparators.distances import MahalanobisDistance
-from .dataset import TargetRole, TreatmentRole
+from .dataset import TargetRole, TreatmentRole, FeatureRole
 from .executor import Executor
 from .experiments import GroupExperiment
 from .experiments.base import Experiment, OnRoleExperiment
@@ -130,7 +130,7 @@ class Matching(ExperimentShell):
             executors += [
                 OnRoleExperiment(
                     executors=[test_mapping[test] for test in quality_tests],
-                    role=TargetRole(),
+                    role=FeatureRole(),
                 )
             ]
         return (
