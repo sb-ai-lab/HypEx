@@ -242,3 +242,6 @@ class AATest(ExperimentShell):
             ),
             output=AAOutput(),
         )
+
+    def set_equal_var(self, is_equal: bool):
+        self.experiment.set_params({TTest: {"calc_kwargs": {"equal_var": is_equal}}})
