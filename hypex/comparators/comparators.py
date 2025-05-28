@@ -15,7 +15,7 @@ class GroupDifference(Comparator):
     def __init__(
         self,
         compare_by: Literal[
-            "groups", "columns", "columns_in_groups", "cross"
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
         ] = "groups",
         grouping_role: ABCRole | None = None,
         target_roles: ABCRole | list[ABCRole] | None = None,
@@ -55,7 +55,7 @@ class GroupSizes(Comparator):
     def __init__(
         self,
         compare_by: Literal[
-            "groups", "columns", "columns_in_groups", "cross"
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
         ] = "groups",
         grouping_role: ABCRole | None = None,
     ):
