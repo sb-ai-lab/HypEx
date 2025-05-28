@@ -40,7 +40,7 @@ class Comparator(Calculator, ABC):
         target_roles: ABCRole | list[ABCRole] | None = None,
         baseline_role: ABCRole | None = None,
         key: Any = "",
-        **calc_kwargs,
+        calc_kwargs: dict[str, Any] = {},
     ):
         super().__init__(key=key)
         self.grouping_role = grouping_role or GroupingRole()
@@ -453,7 +453,7 @@ class StatHypothesisTesting(Comparator, ABC):
         baseline_role: ABCRole | None = None,
         reliability: float = 0.05,
         key: Any = "",
-        **calc_kwargs,
+        calc_kwargs: dict[str, Any] = {},
     ):
         super().__init__(
             compare_by=compare_by,
