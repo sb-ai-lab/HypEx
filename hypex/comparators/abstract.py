@@ -71,7 +71,7 @@ class Comparator(Calculator, ABC):
             tmp_role=tmp_role,
             search_types=self.search_types,
         )
-        if isinstance(self.baseline_role, PreTargetRole):
+        if self.compare_by != "matched_pairs":
             baseline_field_data = data.field_data_search(
                 roles=self.baseline_role, tmp_role=tmp_role
             )
@@ -306,25 +306,21 @@ class Comparator(Calculator, ABC):
         baseline_field_data = cls._field_validity_check(baseline_field_data, "baseline_field_data", "matched_pairs")
         target_fields_data = cls._field_validity_check(target_fields_data, "target_fields_data", "matched_pairs")
 
-        unique_groups = sorted(set(group_field_data.data.values.flatten()))
-    
-        baseline_group = unique_groups[0]
-        compared_group = unique_groups[1]
+        compared_data = [
+        sorted(
+            target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+        ).pop(1)
+        ]
 
-        compared_mask = group_field_data.data.values.flatten() == compared_group
-        compared_indices = compared_mask.nonzero()[0]
-
-        compared_values = target_fields_data.iloc[compared_indices]
-        compared_values.data = compared_values.data.reset_index(drop=True)
+        baseline_data = target_fields_data.iloc[baseline_field_data.iloc[compared_data[0][1].index].data.iloc[:, 0].to_list()]
+        baseline_value = [
+        sorted(
+            target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+        ).pop(0)
+        ][0][0]
         
-        baseline_indices = baseline_field_data.iloc[compared_indices].data.values.flatten()
-        
-        baseline_values = target_fields_data.iloc[baseline_indices]
-        baseline_values.data = baseline_values.data.reset_index(drop=True)
-
-        baseline_data = cls._split_ds_into_columns([(baseline_group, baseline_values)])
-        compared_data = cls._split_ds_into_columns([(compared_group, compared_values)])
-
+        baseline_data = cls._split_ds_into_columns(data=[(baseline_value, baseline_data)])
+        compared_data = cls._split_ds_into_columns(data=compared_data)
         return baseline_data, compared_data
 
     @classmethod
