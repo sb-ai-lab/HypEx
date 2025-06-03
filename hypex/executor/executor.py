@@ -27,12 +27,14 @@ class Executor(ABC):
     def __init__(
         self,
         key: Any = "",
+        **calc_kwargs,
     ):
         self._id: str = ""
         self._params_hash = ""
 
         self.key: Any = key
         self._generate_id()
+        self.calc_kwargs = calc_kwargs
 
     def check_and_setattr(self, params: dict[str, Any]):
         for key, value in params.items():

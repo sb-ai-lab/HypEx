@@ -194,13 +194,7 @@ class AATest(ExperimentShell):
         experiment_params = [
             ParamsExperiment(
                 executors=(
-                    [
-                        (
-                            ONE_AA_TEST_WITH_STRATIFICATION
-                            if stratification
-                            else ONE_AA_TEST
-                        )
-                    ]
+                    [ONE_AA_TEST_WITH_STRATIFICATION if stratification else ONE_AA_TEST]
                 ),
                 params=self._prepare_params(
                     n_iterations,
@@ -242,3 +236,6 @@ class AATest(ExperimentShell):
             ),
             output=AAOutput(),
         )
+
+    def set_equal_var(self, is_equal: bool):
+        self.experiment.set_params({TTest: {"calc_kwargs": {"equal_var": is_equal}}})

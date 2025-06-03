@@ -40,12 +40,14 @@ class Comparator(Calculator, ABC):
         target_roles: ABCRole | list[ABCRole] | None = None,
         baseline_role: ABCRole | None = None,
         key: Any = "",
+        calc_kwargs: dict[str, Any] = {},
     ):
         super().__init__(key=key)
         self.grouping_role = grouping_role or GroupingRole()
         self.compare_by = compare_by
         self.target_roles = target_roles or TargetRole()
         self.baseline_role = baseline_role or PreTargetRole()
+        self.calc_kwargs = calc_kwargs
 
     @property
     def search_types(self) -> list[type] | None:
@@ -416,7 +418,9 @@ class Comparator(Calculator, ABC):
         )
 
         if len(target_fields_data.columns) == 0:
-            if data.ds.tmp_roles:  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
+            if (
+                data.ds.tmp_roles
+            ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
                 return data
             else:
                 raise NoColumnsError(TargetRole().role_name)
@@ -455,11 +459,13 @@ class Comparator(Calculator, ABC):
             raise NotSuitableFieldError(group_field_data, "Grouping")
 
         compare_result = self.calc(
+            **self.calc_kwargs,
             compare_by=self.compare_by,
             target_fields_data=target_fields_data,
             baseline_field_data=baseline_field_data,
             group_field_data=group_field_data,
             grouping_data=grouping_data,
+            # kwargs=,
         )
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key in compare_result}
@@ -476,6 +482,7 @@ class StatHypothesisTesting(Comparator, ABC):
         baseline_role: ABCRole | None = None,
         reliability: float = 0.05,
         key: Any = "",
+        calc_kwargs: dict[str, Any] = {},
     ):
         super().__init__(
             compare_by=compare_by,
@@ -483,5 +490,6 @@ class StatHypothesisTesting(Comparator, ABC):
             target_roles=target_role,
             baseline_role=baseline_role,
             key=key,
+            calc_kwargs=calc_kwargs,
         )
         self.reliability = reliability
