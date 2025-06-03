@@ -51,7 +51,7 @@ def set_nans(
 
     for col, step in zip(nan_cols_list, na_step_list):
         if col in data.columns:
-            data.loc[::step, col] = None
+            data.loc[step::step, col] = None
 
     return data
 
