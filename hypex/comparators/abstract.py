@@ -71,15 +71,9 @@ class Comparator(Calculator, ABC):
             tmp_role=tmp_role,
             search_types=self.search_types,
         )
-        if self.compare_by != "matched_pairs":
-            baseline_field_data = data.field_data_search(
-                roles=self.baseline_role, tmp_role=tmp_role
-            )
-        else:
-            baseline_field_data = data.field_data_search(
-                roles=self.baseline_role
-            )
-
+        baseline_field_data = data.field_data_search(
+            roles=self.baseline_role
+        )
         return {
             "group_field": group_field_data,
             "target_fields": target_fields_data,
@@ -311,16 +305,17 @@ class Comparator(Calculator, ABC):
             target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
         ).pop(1)
         ]
-
-        baseline_data = target_fields_data.iloc[baseline_field_data.iloc[compared_data[0][1].index].data.iloc[:, 0].to_list()]
+        baseline_indexes = baseline_field_data.iloc[compared_data[0][1].index].data.iloc[:, 0].to_list()
+        baseline_data = target_fields_data.iloc[baseline_indexes]
         baseline_value = [
         sorted(
             target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
         ).pop(0)
         ][0][0]
-        
+
         baseline_data = cls._split_ds_into_columns(data=[(baseline_value, baseline_data)])
         compared_data = cls._split_ds_into_columns(data=compared_data)
+
         return baseline_data, compared_data
 
     @classmethod
