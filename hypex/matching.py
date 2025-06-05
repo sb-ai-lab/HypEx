@@ -5,7 +5,7 @@ from typing import Literal
 from .analyzers.matching import MatchingAnalyzer
 from .comparators import KSTest, TTest
 from .comparators.distances import MahalanobisDistance
-from .dataset import TargetRole, TreatmentRole
+from .dataset import TargetRole, TreatmentRole, FeatureRole, AdditionalMatchingRole
 from .executor import Executor
 from .experiments import GroupExperiment
 from .experiments.base import Experiment, OnRoleExperiment
@@ -99,9 +99,9 @@ class Matching(ExperimentShell):
             "mahalanobis": MahalanobisDistance(grouping_role=TreatmentRole())
         }
         test_mapping = {
-            "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
+            "t-test": TTest(compare_by="matched_pairs", grouping_role=TreatmentRole(), baseline_role=AdditionalMatchingRole()),
             # "psi": PSI(grouping_role=TreatmentRole(), compare_by="groups"),
-            "ks-test": KSTest(grouping_role=TreatmentRole(), compare_by="groups"),
+            "ks-test": KSTest(grouping_role=TreatmentRole(), compare_by="matched_pairs", baseline_role=AdditionalMatchingRole()),
         }
         two_sides = metric == "ate"
         test_pairs = metric == "atc"
@@ -130,7 +130,7 @@ class Matching(ExperimentShell):
             executors += [
                 OnRoleExperiment(
                     executors=[test_mapping[test] for test in quality_tests],
-                    role=TargetRole(),
+                    role=FeatureRole(),
                 )
             ]
         return (
