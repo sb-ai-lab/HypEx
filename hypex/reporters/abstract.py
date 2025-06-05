@@ -113,11 +113,11 @@ class TestDictReporter(DictReporter):
                 t_values = {"feature": feature, "group": group}
                 for test, values in tests.items():
                     if test == "GroupDifference":
-                        t_values["difference"] = values["difference"]
-                        t_values["difference %"] = values["difference %"]
+                        t_values["difference"] = values.get("difference")
+                        t_values["difference %"] = values.get("difference %")
                     else:
-                        t_values[f"{test} pass"] = values["pass"]
-                        t_values[f"{test} p-value"] = values["p-value"]
+                        t_values[f"{test} pass"] = values.get("pass")
+                        t_values[f"{test} p-value"] = values.get("p-value")
                 result.append(t_values)
         result = [rename_passed(d) for d in result]
         return Dataset.from_dict(
