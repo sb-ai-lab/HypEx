@@ -5,7 +5,7 @@ from typing import Literal
 from .analyzers.matching import MatchingAnalyzer
 from .comparators import KSTest, TTest
 from .comparators.distances import MahalanobisDistance
-from .dataset import TargetRole, TreatmentRole, FeatureRole, AdditionalMatchingRole
+from .dataset import AdditionalMatchingRole, FeatureRole, TargetRole, TreatmentRole
 from .executor import Executor
 from .experiments import GroupExperiment
 from .experiments.base import Experiment, OnRoleExperiment
