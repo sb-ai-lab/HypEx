@@ -139,7 +139,7 @@ def test_aatest(aa_data):
             res = mapping[test_name].execute(aa_data[1])
         else:
             res = mapping[test_name].execute(aa_data[0])
-        actual_data = res.resume.data.iloc[:, 2:-2]
+        actual_data = res.resume.data.iloc[:, 2:-4]
         expected_data = mapping_resume[test_name]
         pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)
 
@@ -186,7 +186,7 @@ def test_abtest(ab_data):
         actual_data = (
             res.resume.data.fillna(0)
             .apply(pd.to_numeric, errors="ignore")
-            .iloc[:, 4::2]
+            .iloc[:, 6::2]
         )
         expected_data = mapping_resume[test_name]
         pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)
