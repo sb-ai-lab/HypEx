@@ -4,13 +4,7 @@ from copy import deepcopy
 from typing import Any
 
 from ..comparators import TTest, UTest
-from ..dataset import (
-    Dataset,
-    ExperimentData,
-    StatisticRole,
-    TargetRole,
-    TreatmentRole,
-)
+from ..dataset import Dataset, ExperimentData, StatisticRole, TargetRole, TreatmentRole
 from ..experiments.base import Executor
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
 from ..utils import (

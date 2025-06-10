@@ -3,13 +3,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Iterable
 from copy import deepcopy
-from typing import (
-    Any,
-    Callable,
-    Hashable,
-    Literal,
-    Sequence,
-)
+from typing import Any, Callable, Hashable, Literal, Sequence
 
 import pandas as pd  # type: ignore
 

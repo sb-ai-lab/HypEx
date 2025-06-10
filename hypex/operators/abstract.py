@@ -12,11 +12,7 @@ from ..dataset import (
     TargetRole,
 )
 from ..executor import Calculator
-from ..utils import (
-    AbstractMethodError,
-    ExperimentDataEnum,
-    NotSuitableFieldError,
-)
+from ..utils import AbstractMethodError, ExperimentDataEnum, NotSuitableFieldError
 from ..utils.adapter import Adapter
 
 

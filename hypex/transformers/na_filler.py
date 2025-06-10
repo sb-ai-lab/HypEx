@@ -3,9 +3,7 @@ from __future__ import annotations
 from typing import Any, Literal, Sequence
 
 from ..dataset.dataset import Dataset, ExperimentData
-from ..dataset.roles import (
-    FeatureRole,
-)
+from ..dataset.roles import FeatureRole
 from ..utils import ScalarType
 from ..utils.adapter import Adapter
 from .abstract import Transformer
