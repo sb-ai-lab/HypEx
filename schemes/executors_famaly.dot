@@ -25,6 +25,12 @@ digraph Architecture{
         equal_variance
         random_state_q[label="random_state"]
         sample_size
+        n_neighbors
+        two_sides
+        test_pairs
+        faiss_mode
+        matching_metric[label="metric"]
+        one_aa_dict_reporter_tests[label="tests"]
     }
 
     subgraph functions{
@@ -44,6 +50,17 @@ digraph Architecture{
         test_function
         reliability_ext[label="reliability"]
         matrix_preparation
+        report
+        extract_from_one_row_dataset
+        convert_to_dataset
+        extract_tests
+        convert_flat_dataset
+        get_splitter_id
+        extract_group_difference
+        extract_group_sizes
+        extract_analyzer_data_aa[label="extract_analyzer_data"]
+        extract_data_from_analysis_tables_aa[label="extract_data_from_analysis_tables"]
+
     }
 
     subgraph objects{
@@ -69,6 +86,9 @@ digraph Architecture{
         utest[label="UTest", fillcolor=mintcream]
         chi2test[label="Chi2Test", fillcolor=mintcream]
         mdebysize[label="MDEBySize", fillcolor=mintcream]
+        group_operator[label="GroupOperator", fillcolor=mintcream]
+        smd[label="SMD", fillcolor=mintcream]
+        bias[label="Bias", fillcolor=mintcream]
         // Dataset-----------------
         backend
         data_pandas[label="data: pd.DataFrame"]
@@ -83,6 +103,19 @@ digraph Architecture{
         kstest_ext[label="KSTestExtension", fillcolor=mintcream]
         utest_ext[label="UtestExtension", fillcolor=mintcream]
         norm_cdf_ext[label="NormCDFExtension", fillcolor=mintcream]
+        // Reporters--------------
+        on_dict_reporter[label="OnDictReporter", fillcolor=mintcream]
+        aa_dataset_reporter[label="AADatasetReporter", fillcolor=mintcream]
+        aa_passed_reporter[label="AAPassedReporter", fillcolor=mintcream]
+        aa_best_split_reporter[label="AABestSplitReporter", fillcolor=mintcream]
+        ab_dict_rporter[label="ABDictReporter", fillcolor=mintcream]
+        ab_dataset_reporter[label="ABDatasetReporter", fillcolor=mintcream]
+        homo_dict_reporter[label="HomoDictReporter", fillcolor=mintcream]
+        homo_dataset_reporter[label="HomoDatasetReporter", fillcolor=mintcream]
+        matching_dict_reporter[label="MatchingDictReporter", fillcolor=mintcream]
+        matching_quality_dict_reporter[label="MatchingQualityDictReporter", fillcolor=mintcream]
+        matching_quality_dataset_reporter[label="MatchingQualityDatasetReporter", fillcolor=mintcream]
+        matching_dataset_reporter[label="MatchingDatasetReporter", fillcolor=mintcream]
     }
 
     subgraph collections{
@@ -497,5 +530,172 @@ digraph Architecture{
         ltail=cluster_if_aa_executor
         lhead=cluster_if_executor
     ]
+
+    subgraph cluster_ml{
+        graph[label="ML", style=dashed]
+
+        subgraph cluster_faiss{
+            graph[label="Faiss", style=solid]
+            n_neighbors
+            two_sides
+            test_pairs
+            faiss_mode
+        }
+    }
+    faiss_ext -> faiss_mode[
+        arrowhead=box
+        lhead=cluster_faiss
+    ]
+    faiss_mode -> fit[
+        arrowhead=curve,
+        ltail=cluster_faiss
+        lhead=cluster_ml_executor
+    ]
+
+    subgraph cluster_operators{
+        graph[label="Operators", style=dashed]
+
+        subgraph cluster_matching_metrics{
+            graph[label="MatchingMetrics", style=solid]
+            matching_metric
+        }
+
+        {smd, bias} -> group_operator [arrowhead=curve]
+        matching_metric -> group_operator [
+            arrowhead=curve, 
+            ltail=cluster_matching_metrics
+        ]
+
+        group_operator -> calc [
+            arrowhead=curve, 
+            lhead=cluster_calculator
+        ]
+    }
+
+    subgraph cluster_reporters{
+        graph[label="Reporters", style=dashed]
+
+        subgraph cluster_reporter{
+            graph[label="Reporter", style=solid]
+            report
+        }
+
+        subgraph cluster_dict_reporter{
+            graph[label="DictReporter", style=solid]
+            extract_from_one_row_dataset
+        }
+        on_dict_reporter
+
+        subgraph cluster_dataset_reporter{
+            graph[label="DatasetReporter", style=solid]
+            convert_to_dataset
+        }
+
+        subgraph cluster_test_dict_reporter{
+            graph[label="TestDictReporter", style=solid]
+            extract_tests
+        }
+
+        subgraph cluster_one_aa_dict_reporter{
+            graph[label="OneAADictReporter", style=solid]
+            one_aa_dict_reporter_tests
+            convert_flat_dataset
+            get_splitter_id
+            extract_group_difference
+            extract_group_sizes
+            extract_analyzer_data_aa
+            extract_data_from_analysis_tables_aa
+        }
+
+        aa_dataset_reporter
+        aa_passed_reporter
+        aa_best_split_reporter
+        ab_dataset_reporter
+
+        matching_dict_reporter
+        matching_quality_dict_reporter
+        matching_quality_dataset_reporter
+        matching_dataset_reporter
+
+        extract_from_one_row_dataset -> report [
+            arrowhead=curve,
+            ltail=cluster_dict_reporter,
+            lhead=cluster_reporter
+        ]
+
+        
+        on_dict_reporter -> report [
+            arrowhead=curve,
+            lhead=cluster_reporter
+        ]
+
+        convert_to_dataset -> on_dict_reporter [
+            arrowhead=curve,
+            ltail=cluster_dataset_reporter,
+        ]
+
+        extract_tests -> extract_from_one_row_dataset [
+            arrowhead=curve,
+            ltail=cluster_test_dict_reporter,
+            lhead=cluster_dict_reporter
+        ]
+
+        one_aa_dict_reporter_tests -> extract_tests [
+            arrowhead=curve,
+            ltail=cluster_one_aa_dict_reporter,
+            lhead=cluster_test_dict_reporter
+        ]
+
+        aa_dataset_reporter -> one_aa_dict_reporter_tests [
+            arrowhead=curve,
+            lhead=cluster_one_aa_dict_reporter
+        ]
+
+        aa_passed_reporter -> report [
+            arrowhead=curve,
+            lhead=cluster_reporter
+        ]
+
+        aa_best_split_reporter -> report [
+            arrowhead=curve,
+            lhead=cluster_reporter
+        ]
+
+        ab_dict_rporter -> one_aa_dict_reporter_tests [
+            arrowhead=curve,
+            ltail=cluster_ab_dict_reporter
+            lhead=cluster_one_aa_dict_reporter
+        ]
+
+        ab_dataset_reporter -> ab_dict_rporter [arrowhead=curve]
+
+        homo_dict_reporter -> one_aa_dict_reporter_tests [
+            arrowhead=curve,
+            lhead=cluster_one_aa_dict_reporter
+        ]
+
+        homo_dataset_reporter -> convert_to_dataset [
+            arrowhead=curve,
+            lhead=cluster_dataset_reporter
+        ]
+        homo_dict_reporter -> homo_dataset_reporter [arrowhead=box]
+
+        matching_dict_reporter -> extract_from_one_row_dataset [
+            arrowhead=curve,
+            lhead=cluster_dict_reporter
+        ]
+
+        matching_quality_dict_reporter -> extract_tests [
+            arrowhead=curve,
+            lhead=cluster_test_dict_reporter
+        ]
+
+        matching_quality_dataset_reporter -> matching_quality_dict_reporter [arrowhead=curve]
+
+        matching_dataset_reporter -> convert_to_dataset [
+            arrowhead=curve,
+            lhead=cluster_dataset_reporter
+        ]
+    }
 
 }
