@@ -4,10 +4,7 @@ from typing import Any, ClassVar
 
 from ..analyzers.matching import MatchingAnalyzer
 from ..comparators import KSTest, TTest
-from ..dataset import (
-    Dataset,
-    ExperimentData,
-)
+from ..dataset import Dataset, ExperimentData
 from ..ml import FaissNearestNeighbors
 from ..reporters.abstract import DatasetReporter, DictReporter, TestDictReporter
 from ..utils import (

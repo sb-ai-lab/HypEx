@@ -288,7 +288,7 @@ class Comparator(Calculator, ABC):
         compared_data = cls._split_ds_into_columns(data=compared_data)
 
         return baseline_data, compared_data
-    
+
     @classmethod
     def _split_for_matched_pairs_mode(
         cls,
@@ -408,7 +408,7 @@ class Comparator(Calculator, ABC):
         group_field_data = fields["group_field"]
         target_fields_data = fields["target_fields"]
         baseline_field_data = fields["baseline_field"]
-        
+
         self.key = str(
             target_fields_data.columns[0]
             if len(target_fields_data.columns) == 1
