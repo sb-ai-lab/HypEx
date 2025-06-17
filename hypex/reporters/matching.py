@@ -76,8 +76,7 @@ class MatchingQualityDatasetReporter(MatchingQualityDictReporter):
         self.front = False
         dict_report = super().report(data)
         self.front = front_buffer
-        result = self.convert_flat_dataset(dict_report)
-        return result
+        return self.convert_flat_dataset(dict_report)
 
 
 class MatchingDatasetReporter(DatasetReporter):

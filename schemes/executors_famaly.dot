@@ -1,0 +1,701 @@
+digraph Architecture{
+    rankdir=LR
+    node[style="filled"]
+    compound=true
+
+    subgraph atributes{
+        node[shape=note, fillcolor=darkseagreen1]
+        id
+        role
+        n_iterations
+        searching_role
+        params
+        compare_by
+        groping_reole
+        target_roles_comporator[label="target_roles"]
+        baseline_role
+        reliability
+        significance
+        power
+        target_roles_encoder[label="target_roles"]
+        method
+        alpha
+        alpha_q[label="alpha"]
+        iteration_size
+        equal_variance
+        random_state_q[label="random_state"]
+        sample_size
+        n_neighbors
+        two_sides
+        test_pairs
+        faiss_mode
+        matching_metric[label="metric"]
+        one_aa_dict_reporter_tests[label="tests"]
+    }
+
+    subgraph functions{
+        node[shape=box, fillcolor=skyblue2]
+        execute
+        calc
+        check_rule
+        set_params
+        _split_data_to_buckets
+        fit
+        predict
+        score
+        calc_ext[label="calc"]
+        _calc_pandas
+        fit_ext[label="fit"]
+        predict_ext[label="predict"]
+        test_function
+        reliability_ext[label="reliability"]
+        matrix_preparation
+        report
+        extract_from_one_row_dataset
+        convert_to_dataset
+        extract_tests
+        convert_flat_dataset
+        get_splitter_id
+        extract_group_difference
+        extract_group_sizes
+        extract_analyzer_data_aa[label="extract_analyzer_data"]
+        extract_data_from_analysis_tables_aa[label="extract_data_from_analysis_tables"]
+
+    }
+
+    subgraph objects{
+        node[shape=box3d, fillcolor=orchid2]
+        if_executor
+        else_executor
+        reporter
+        stopping_criterion
+        dummy_encoder[label="DummyEncoder", fillcolor=mintcream]
+        // Analyzers----------------
+        analyzer[label="Analyzer", fillcolor=mintcream]
+        one_aa_analyzer[label="OneAAAnalyzer", fillcolor=mintcream]
+        aa_score_analyzer[label="AAScoreAnalyzer", fillcolor=mintcream]
+        ab_analyzer[label="ABAnalyzer", fillcolor=mintcream]
+        matching_analyzer[label="MatchingAnalyzer", fillcolor=mintcream]
+        // Comporators-------------
+        group_diff[label="GroupDifference", fillcolor=mintcream]
+        group_sizes[label="GroupSizes", fillcolor=mintcream]
+        psi[label="PSI", fillcolor=mintcream]
+        maha_dist[label="MahalanobisDistance", fillcolor=mintcream]
+        ttest[label="TTest", fillcolor=mintcream]
+        kstest[label="KSTest", fillcolor=mintcream]
+        utest[label="UTest", fillcolor=mintcream]
+        chi2test[label="Chi2Test", fillcolor=mintcream]
+        mdebysize[label="MDEBySize", fillcolor=mintcream]
+        group_operator[label="GroupOperator", fillcolor=mintcream]
+        smd[label="SMD", fillcolor=mintcream]
+        bias[label="Bias", fillcolor=mintcream]
+        // Dataset-----------------
+        backend
+        data_pandas[label="data: pd.DataFrame"]
+        abc_role[label="ABCRole", fillcolor=mintcream]
+        // Extensions--------------
+        compare_extension[label="CompareExtension", fillcolor=mintcream]
+        dummy_encoder_ext[label="DummyEncoderExtension", fillcolor=mintcream]
+        faiss_ext[label="FaissExtension", fillcolor=mintcream]
+        cholesky_ext[label="CholeskyExtension", fillcolor=mintcream]
+        inverse_ext[label="InverseExtension", fillcolor=mintcream]
+        ttest_ext[label="TTestExtension", fillcolor=mintcream]
+        kstest_ext[label="KSTestExtension", fillcolor=mintcream]
+        utest_ext[label="UtestExtension", fillcolor=mintcream]
+        norm_cdf_ext[label="NormCDFExtension", fillcolor=mintcream]
+        // Reporters--------------
+        on_dict_reporter[label="OnDictReporter", fillcolor=mintcream]
+        aa_dataset_reporter[label="AADatasetReporter", fillcolor=mintcream]
+        aa_passed_reporter[label="AAPassedReporter", fillcolor=mintcream]
+        aa_best_split_reporter[label="AABestSplitReporter", fillcolor=mintcream]
+        ab_dict_rporter[label="ABDictReporter", fillcolor=mintcream]
+        ab_dataset_reporter[label="ABDatasetReporter", fillcolor=mintcream]
+        homo_dict_reporter[label="HomoDictReporter", fillcolor=mintcream]
+        homo_dataset_reporter[label="HomoDatasetReporter", fillcolor=mintcream]
+        matching_dict_reporter[label="MatchingDictReporter", fillcolor=mintcream]
+        matching_quality_dict_reporter[label="MatchingQualityDictReporter", fillcolor=mintcream]
+        matching_quality_dataset_reporter[label="MatchingQualityDatasetReporter", fillcolor=mintcream]
+        matching_dataset_reporter[label="MatchingDatasetReporter", fillcolor=mintcream]
+    }
+
+    subgraph collections{
+        node[shape=folder, fillcolor=lightgoldenrod1]
+        executors
+        roles
+        data_manipulations_functios[label="Data Manipulation Functions", fillcolor=lightcoral]
+        calculation_functions[label="Calculation Functions", fillcolor=lightcoral]
+        pandas_dataset_backend_functions[label="Pandas Dataset Backend Functions", fillcolor=lightcoral]
+        navigation_backend_calling_functions[label="Navigation Backend Calling Functions", fillcolor=lightcoral]
+        calculation_functions_via_backend[label="Calculation Functions via Backend", fillcolor=lightcoral]
+    }
+
+    subgraph cluster_abstract_executors{
+        graph[label="Abstract Executors", style="dashed"]
+
+        subgraph cluster_executor{
+            graph[label="Executor", style="solid"]
+            id
+            execute
+        }
+        subgraph cluster_calculator{
+            graph[label="Calculator", style="solid"]
+            calc
+        }
+        calc -> execute [        
+            arrowhead=curve
+            ltail=cluster_calculator
+            lhead=cluster_executor
+        ]
+        subgraph cluster_if_executor{
+            graph[label="IfExecutor", style="solid"]
+            check_rule
+            if_executor
+            else_executor
+        }
+        subgraph cluster_ml_executor{
+            graph[label="MLExecutor", style="solid"]
+            fit
+            predict
+            score
+        }
+
+        check_rule -> execute [        
+            arrowhead=curve
+            ltail=cluster_if_executor
+            lhead=cluster_executor
+        ]
+        execute -> {if_executor, else_executor} [
+            style=dashed
+            arrowhead=box
+            ltail=cluster_executor
+        ]
+        fit -> calc [
+            arrowhead=curve
+            ltail=cluster_ml_executor
+            lhead=cluster_calculator
+        ]
+    }
+
+    subgraph cluster_experiments{
+        graph[label="Experiment Types", style="dashed"]
+
+        subgraph cluster_experiment{
+            graph[label="Experiment", style="solid"]
+            executors
+            set_params
+        }
+        executors -> execute [        
+            arrowhead=curve
+            ltail=cluster_experiment
+            lhead=cluster_executor
+        ]
+        executors -> execute [        
+            arrowhead=box
+            lhead=cluster_executor
+        ]
+
+        subgraph cluster_on_role_experiment{
+            graph[label="OnRoleExperiment", style="solid"]
+            role
+        }
+        role -> executors [        
+            arrowhead=curve
+            ltail=cluster_on_role_experiment
+            lhead=cluster_experiment
+        ]
+
+        subgraph cluster_experiment_with_reporter{
+            graph[label="ExperimentWithReporter", style="solid"]
+            reporter
+        }
+        reporter -> executors [        
+            arrowhead=curve
+            ltail=cluster_experiment_with_reporter
+            lhead=cluster_experiment
+        ]
+
+        subgraph cluster_cycled_experiment{
+            graph[label="CycledExperiment", style="solid"]
+            n_iterations
+        }
+        n_iterations -> reporter [        
+            arrowhead=curve
+            ltail=cluster_cycled_experiment
+            lhead=cluster_experiment_with_reporter
+        ]
+
+        subgraph cluster_group_experiment{
+            graph[label="GroupExperiment", style="solid"]
+            searching_role
+        }
+        searching_role -> reporter [        
+            arrowhead=curve
+            ltail=cluster_group_experiment
+            lhead=cluster_experiment_with_reporter
+        ]
+
+        subgraph cluster_params_experiment{
+            graph[label="ParamsExperiment", style="solid"]
+            params
+        }
+        params -> reporter [        
+            arrowhead=curve
+            ltail=cluster_params_experiment
+            lhead=cluster_experiment_with_reporter
+        ]
+
+        subgraph cluster_if_params_experiment{
+            graph[label="IfParamsExperiment", style="solid"]
+            stopping_criterion
+        }
+        stopping_criterion -> params [        
+            arrowhead=curve
+            ltail=cluster_if_params_experiment
+            lhead=cluster_params_experiment
+        ]
+        stopping_criterion -> check_rule [
+            style=dashed
+            arrowhead=box
+            lhead=cluster_if_executor
+        ]
+    }
+
+    subgraph cluster_analyzers{
+        graph[label="Analyzers", style="dashed"]
+        analyzer
+        subgraph cluster_aa_analyzers{
+            graph[label="AA", style="dashed"]
+            one_aa_analyzer
+            aa_score_analyzer
+        }
+        subgraph cluster_ab_analyzers{
+            graph[label="AB", style="dashed"]
+            ab_analyzer
+        }
+        subgraph cluster_matching_analyzers{
+            graph[label="Matching", style="dashed"]
+            matching_analyzer
+        }
+        analyzer -> execute [        
+            arrowhead=curve
+            lhead=cluster_executor
+        ]
+
+        {
+            one_aa_analyzer,
+            aa_score_analyzer,
+            ab_analyzer,
+            matching_analyzer
+        } -> analyzer [arrowhead=curve]
+    }
+
+    subgraph cluster_comparators{
+        graph[label="Comparators", style="dashed"]
+
+        subgraph cluster_abstract_comporators{
+            graph[label="Abstract", style="dotted"]
+
+            subgraph cluster_comporator{
+                graph[label="Comparator", style="solid"]
+                _split_data_to_buckets
+                compare_by
+                groping_reole
+                target_roles_comporator
+                baseline_role
+            }
+            _split_data_to_buckets -> calc [        
+                arrowhead=curve
+                ltail=cluster_comporator
+                lhead=cluster_calculator
+            ]
+
+            subgraph cluster_stat_hyp_testing{
+                graph[label="StatHypothesisTesting", style="solid"]
+                reliability
+            }
+            reliability -> compare_by [        
+                arrowhead=curve
+                ltail=cluster_stat_hyp_testing
+                lhead=cluster_comporator
+            ]
+
+            subgraph cluster_power_testing{
+                graph[label="PowerTesting", style="solid"]
+                significance
+                power
+            }
+            power -> compare_by [        
+                arrowhead=curve
+                ltail=cluster_power_testing
+                lhead=cluster_comporator
+            ]
+        }
+
+        {
+            group_diff, 
+            group_sizes
+            psi
+            maha_dist
+        } -> compare_by [        
+            arrowhead=curve
+            lhead=cluster_comporator
+        ]
+
+        subgraph cluster_hyp_testing{
+            graph[label="Hypothesis testing", style=dotted]
+            {
+                ttest
+                kstest
+                utest
+                chi2test
+            } -> reliability [        
+                arrowhead=curve
+                lhead=cluster_stat_hyp_testing
+            ]
+        }
+
+        mdebysize -> power [        
+            arrowhead=curve
+            lhead=cluster_power_testing
+        ]
+    }
+
+    subgraph cluster_data{
+        graph[label="Data", style=dashed]
+        subgraph cluster_dataset_backend_navigation{
+            graph[label="DatasetBackendNavigation", style=solid]
+            data_manipulations_functios
+        }
+        subgraph cluster_dataset_backend_calc{
+            graph[label="DatasetBackendCalc", style=solid]
+            calculation_functions
+        }
+        subgraph cluster_pandas_backend{
+            graph[label="PandasBackend", style=solid]
+            pandas_dataset_backend_functions
+            data_pandas
+        }
+        subgraph cluster_dataset_base{
+            graph[label="DatasetBase", style=solid]
+            backend
+            roles
+            navigation_backend_calling_functions
+        }
+        subgraph cluster_dataset{
+            graph[label="Dataset", style=solid]
+            calculation_functions_via_backend
+        }
+
+        calculation_functions -> data_manipulations_functios [
+            arrowhead=curve,
+            ltail=cluster_dataset_backend_calc
+            lhead=cluster_dataset_backend_navigation
+        ]
+        pandas_dataset_backend_functions -> calculation_functions [
+            arrowhead=curve,
+            ltail=cluster_pandas_backend
+            lhead=cluster_dataset_backend_calc
+        ]
+        backend -> calculation_functions [
+            arrowhead=box,
+            lhead=cluster_dataset_backend_calc
+        ]
+        calculation_functions_via_backend -> navigation_backend_calling_functions [
+            arrowhead=curve,
+            ltail=cluster_dataset
+            lhead=cluster_dataset_base
+        ]
+        roles -> abc_role[arrowhead=box]
+    }
+
+    subgraph cluster_encoders{
+        graph[label="Encoders", style=dashed]
+        subgraph cluster_encoder{
+            graph[label="Encoder", style=solid]
+            target_roles_encoder
+        }
+        target_roles_encoder -> calc [
+            arrowhead=curve,
+            ltail=cluster_encoder,
+            lhead=cluster_calculator
+        ]
+        dummy_encoder -> target_roles_encoder [
+            arrowhead=curve,
+            lhead=cluster_encoder
+        ]
+    }
+
+    subgraph cluster_extensions{
+        graph[label="Extensions", style=dashed]
+        subgraph cluster_abstract_extensions{
+            graph[label="Abstract", style=dotted]
+
+            subgraph cluster_extension{
+                graph[label="Extension", style=solid]
+                calc_ext
+                _calc_pandas
+            }
+            subgraph cluster_ml_extension{
+                graph[label="MLExtension", style=solid]
+                fit_ext
+                predict_ext
+            }
+
+            compare_extension -> calc_ext [
+                arrowhead=curve
+                lhead=cluster_extension
+            ]
+            fit_ext -> calc_ext [
+                arrowhead=curve
+                lhead=cluster_extension
+                ltail=cluster_ml_extension
+            ]
+        }
+
+        subgraph cluster_stat_test{
+            graph[label="StatTest", style=solid]
+            test_function
+            reliability_ext
+        }
+        subgraph cluster_chi2test_ext{
+            graph[label="Chi2Test", style=solid]
+            matrix_preparation
+        }
+        subgraph cluster_multitest{
+            graph[label="MultiTest", style=solid]
+            compare_extension
+            method
+            alpha
+        }
+        subgraph cluster_multitest_q{
+            graph[label="MultiTestQuantile", style=solid]
+            alpha_q
+            iteration_size
+            equal_variance
+            random_state_q
+        }
+
+        {
+            dummy_encoder_ext
+            inverse_ext
+            cholesky_ext
+        } -> calc_ext [
+            arrowhead=curve
+            lhead=cluster_extension
+        ]
+        faiss_ext -> fit_ext [
+            arrowhead=curve
+            lhead=cluster_ml_extension
+        ]
+        test_function -> compare_extension [
+            arrowhead=curve
+            ltail=cluster_stat_test
+        ]
+        {
+            ttest_ext
+            kstest_ext
+            utest_ext
+            norm_cdf_ext
+        } -> test_function [
+            arrowhead=curve
+            lhead=cluster_stat_test
+        ]
+        matrix_preparation -> test_function [
+            arrowhead=curve
+            ltail=cluster_chi2test_ext
+            lhead=cluster_stat_test
+        ]
+        method -> calc_ext [
+            arrowhead=curve
+            ltail=cluster_multitest
+            lhead=cluster_extension
+        ]
+        iteration_size -> calc_ext [
+            arrowhead=curve
+            ltail=cluster_multitest_q
+            lhead=cluster_extension
+        ]
+    }
+
+    subgraph cluster_forks{
+        graph[label="Forks", style=dashed]
+
+        subgraph cluster_if_aa_executor{
+            graph[label="IfAAExecutor", style=solid]
+            sample_size
+        }
+    }
+    sample_size -> if_executor [
+        arrowhead=curve
+        ltail=cluster_if_aa_executor
+        lhead=cluster_if_executor
+    ]
+
+    subgraph cluster_ml{
+        graph[label="ML", style=dashed]
+
+        subgraph cluster_faiss{
+            graph[label="Faiss", style=solid]
+            n_neighbors
+            two_sides
+            test_pairs
+            faiss_mode
+        }
+    }
+    faiss_ext -> faiss_mode[
+        arrowhead=box
+        lhead=cluster_faiss
+    ]
+    faiss_mode -> fit[
+        arrowhead=curve,
+        ltail=cluster_faiss
+        lhead=cluster_ml_executor
+    ]
+
+    subgraph cluster_operators{
+        graph[label="Operators", style=dashed]
+
+        subgraph cluster_matching_metrics{
+            graph[label="MatchingMetrics", style=solid]
+            matching_metric
+        }
+
+        {smd, bias} -> group_operator [arrowhead=curve]
+        matching_metric -> group_operator [
+            arrowhead=curve, 
+            ltail=cluster_matching_metrics
+        ]
+
+        group_operator -> calc [
+            arrowhead=curve, 
+            lhead=cluster_calculator
+        ]
+    }
+
+    subgraph cluster_reporters{
+        graph[label="Reporters", style=dashed]
+
+        subgraph cluster_reporter{
+            graph[label="Reporter", style=solid]
+            report
+        }
+
+        subgraph cluster_dict_reporter{
+            graph[label="DictReporter", style=solid]
+            extract_from_one_row_dataset
+        }
+        on_dict_reporter
+
+        subgraph cluster_dataset_reporter{
+            graph[label="DatasetReporter", style=solid]
+            convert_to_dataset
+        }
+
+        subgraph cluster_test_dict_reporter{
+            graph[label="TestDictReporter", style=solid]
+            extract_tests
+        }
+
+        subgraph cluster_one_aa_dict_reporter{
+            graph[label="OneAADictReporter", style=solid]
+            one_aa_dict_reporter_tests
+            convert_flat_dataset
+            get_splitter_id
+            extract_group_difference
+            extract_group_sizes
+            extract_analyzer_data_aa
+            extract_data_from_analysis_tables_aa
+        }
+
+        aa_dataset_reporter
+        aa_passed_reporter
+        aa_best_split_reporter
+        ab_dataset_reporter
+
+        matching_dict_reporter
+        matching_quality_dict_reporter
+        matching_quality_dataset_reporter
+        matching_dataset_reporter
+
+        extract_from_one_row_dataset -> report [
+            arrowhead=curve,
+            ltail=cluster_dict_reporter,
+            lhead=cluster_reporter
+        ]
+
+        
+        on_dict_reporter -> report [
+            arrowhead=curve,
+            lhead=cluster_reporter
+        ]
+
+        convert_to_dataset -> on_dict_reporter [
+            arrowhead=curve,
+            ltail=cluster_dataset_reporter,
+        ]
+
+        extract_tests -> extract_from_one_row_dataset [
+            arrowhead=curve,
+            ltail=cluster_test_dict_reporter,
+            lhead=cluster_dict_reporter
+        ]
+
+        one_aa_dict_reporter_tests -> extract_tests [
+            arrowhead=curve,
+            ltail=cluster_one_aa_dict_reporter,
+            lhead=cluster_test_dict_reporter
+        ]
+
+        aa_dataset_reporter -> one_aa_dict_reporter_tests [
+            arrowhead=curve,
+            lhead=cluster_one_aa_dict_reporter
+        ]
+
+        aa_passed_reporter -> report [
+            arrowhead=curve,
+            lhead=cluster_reporter
+        ]
+
+        aa_best_split_reporter -> report [
+            arrowhead=curve,
+            lhead=cluster_reporter
+        ]
+
+        ab_dict_rporter -> one_aa_dict_reporter_tests [
+            arrowhead=curve,
+            ltail=cluster_ab_dict_reporter
+            lhead=cluster_one_aa_dict_reporter
+        ]
+
+        ab_dataset_reporter -> ab_dict_rporter [arrowhead=curve]
+
+        homo_dict_reporter -> one_aa_dict_reporter_tests [
+            arrowhead=curve,
+            lhead=cluster_one_aa_dict_reporter
+        ]
+
+        homo_dataset_reporter -> convert_to_dataset [
+            arrowhead=curve,
+            lhead=cluster_dataset_reporter
+        ]
+        homo_dict_reporter -> homo_dataset_reporter [arrowhead=box]
+
+        matching_dict_reporter -> extract_from_one_row_dataset [
+            arrowhead=curve,
+            lhead=cluster_dict_reporter
+        ]
+
+        matching_quality_dict_reporter -> extract_tests [
+            arrowhead=curve,
+            lhead=cluster_test_dict_reporter
+        ]
+
+        matching_quality_dataset_reporter -> matching_quality_dict_reporter [arrowhead=curve]
+
+        matching_dataset_reporter -> convert_to_dataset [
+            arrowhead=curve,
+            lhead=cluster_dataset_reporter
+        ]
+    }
+
+}
