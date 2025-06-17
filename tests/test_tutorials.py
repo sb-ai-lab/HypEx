@@ -82,6 +82,7 @@ def test_aatest(aa_data):
         "aa-strat": AATest(random_states=[56, 72, 2, 43], stratification=True),
         "aa-sample": AATest(n_iterations=10, sample_size=0.3),
         "aa-cat_target": AATest(n_iterations=10),
+        "aa-equal_var": AATest(n_iterations=10, t_test_equal_var=False),
     }
 
     mapping_resume = {
@@ -132,9 +133,19 @@ def test_aatest(aa_data):
                 "result": ["OK", "OK", "OK"],
             }
         ),
+        "aa-equal_var": pd.DataFrame(
+            {
+                "TTest aa test": {0: "OK", 1: "OK"},
+                "KSTest aa test": {0: "NOT OK", 1: "OK"},
+                "TTest best split": {0: "OK", 1: "OK"},
+                "KSTest best split": {0: "OK", 1: "OK"},
+                "result": {0: "OK", 1: "OK"},
+            }
+        ),
     }
 
     for test_name in mapping.keys():
+        print(test_name)
         if test_name == "aa-cat_target":
             res = mapping[test_name].execute(aa_data[1])
         else:
