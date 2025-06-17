@@ -27,6 +27,7 @@ class ABTest(ExperimentShell):
          For more information refer to the statsmodels documentation:
          <https://www.statsmodels.org/dev/generated/statsmodels.stats.multitest.multipletests.html>
 
+
     Examples:
         Basic A/B test with default t-test:
         >>> ab_test = ABTest()
@@ -119,8 +120,11 @@ class ABTest(ExperimentShell):
             ]
             | None
         ) = "holm",
+        t_test_equal_var: bool = None,
     ):
         super().__init__(
             experiment=self._make_experiment(additional_tests, multitest_method),
             output=ABOutput(),
         )
+        if t_test_equal_var is not None:
+            self.experiment.set_params({TTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}})
