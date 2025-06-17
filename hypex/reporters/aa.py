@@ -3,18 +3,9 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from ..comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
-from ..dataset import (
-    Dataset,
-    ExperimentData,
-    InfoRole,
-    StatisticRole,
-)
+from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..splitters import AASplitter, AASplitterWithStratification
-from ..utils import (
-    ID_SPLIT_SYMBOL,
-    ExperimentDataEnum,
-    NotFoundInExperimentDataError,
-)
+from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, NotFoundInExperimentDataError
 from .abstract import Reporter, TestDictReporter
 
 
@@ -153,7 +144,7 @@ class AAPassedReporter(Reporter):
             print("AA test cannot be performed as none of the analyzers passed")
             return None
         result = self._detect_pass(analyser_tables)
-        stats_cols = ["feature", "group", "difference", "difference %"]
+        stats_cols = ["feature", "group", "control mean", "test mean", "difference", "difference %"]
         differences = analyser_tables["best split statistics"].loc[
             :,
             [
@@ -167,6 +158,9 @@ class AAPassedReporter(Reporter):
             ["feature", "group"]
             + [c for c in result.columns if c not in ["feature", "group"]]
         ]
+        numeric_cols = ["control mean", "test mean", "difference", "difference %"]
+        for col in numeric_cols:
+            result.data[col] = result.data[col].astype(float).round(6)
         return result
 
 

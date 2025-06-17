@@ -3,12 +3,7 @@ from __future__ import annotations
 from typing import Any, Sequence
 
 from ..dataset.dataset import Dataset, ExperimentData
-from ..dataset.roles import (
-    FeatureRole,
-    InfoRole,
-    PreTargetRole,
-    TargetRole,
-)
+from ..dataset.roles import FeatureRole, InfoRole, PreTargetRole, TargetRole
 from ..utils.adapter import Adapter
 from .abstract import Transformer
 

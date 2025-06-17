@@ -21,24 +21,24 @@ from hypex.dataset import (
 def aa_data():
     return [
         Dataset(
-        roles={
-            "user_id": InfoRole(int),
-            "treat": TreatmentRole(int),
-            "pre_spends": TargetRole(),
-            "post_spends": TargetRole(),
-            "gender": StratificationRole(str),
-        },
-        data="examples/tutorials/data.csv",
+            roles={
+                "user_id": InfoRole(int),
+                "treat": TreatmentRole(int),
+                "pre_spends": TargetRole(),
+                "post_spends": TargetRole(),
+                "gender": StratificationRole(str),
+            },
+            data="examples/tutorials/data.csv",
         ),
         Dataset(
-        roles={
-            "user_id": InfoRole(int),
-            "treat": TreatmentRole(int),
-            "pre_spends": TargetRole(),
-            "post_spends": TargetRole(),
-            "gender": TargetRole(str),
-        },
-        data="examples/tutorials/data.csv",
+            roles={
+                "user_id": InfoRole(int),
+                "treat": TreatmentRole(int),
+                "pre_spends": TargetRole(),
+                "post_spends": TargetRole(),
+                "gender": TargetRole(str),
+            },
+            data="examples/tutorials/data.csv",
         ),
     ]
 
@@ -139,7 +139,7 @@ def test_aatest(aa_data):
             res = mapping[test_name].execute(aa_data[1])
         else:
             res = mapping[test_name].execute(aa_data[0])
-        actual_data = res.resume.data.iloc[:, 2:-2]
+        actual_data = res.resume.data.iloc[:, 2:-4]
         expected_data = mapping_resume[test_name]
         pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)
 
@@ -186,7 +186,7 @@ def test_abtest(ab_data):
         actual_data = (
             res.resume.data.fillna(0)
             .apply(pd.to_numeric, errors="ignore")
-            .iloc[:, 4::2]
+            .iloc[:, 6::2]
         )
         expected_data = mapping_resume[test_name]
         pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)
@@ -200,6 +200,7 @@ def test_matchingtest(matching_data):
         "matching-l2": Matching(distance="l2", metric="att"),
         "matching-faiss-auto": Matching(distance="l2", faiss_mode="auto"),
         "matching-faiss_base": Matching(distance="mahalanobis", faiss_mode="base"),
+        "matching-n-neighbors": Matching(n_neighbors=2),
     }
 
     for test_name in mapping.keys():

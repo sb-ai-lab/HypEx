@@ -71,18 +71,18 @@ class TTestExtension(StatTest):
     def _calc_pandas(
         self, data: Dataset, other: Dataset | None = None, **kwargs
     ) -> Dataset | float:
-        if (
-            next(iter(data.nunique().values()))
-            and next(iter(other.nunique().values())) < 2
-        ):
-            return DatasetAdapter.to_dataset(
-                {
-                    "p-value": [None],
-                    "statistic": [None],
-                    "pass": [None],
-                },
-                StatisticRole(),
-            )
+        # if (
+        #     next(iter(data.nunique().values()))
+        #     and next(iter(other.nunique().values())) < 2
+        # ):
+        #     return DatasetAdapter.to_dataset(
+        #         {
+        #             "p-value": [None],
+        #             "statistic": [None],
+        #             "pass": [None],
+        #         },
+        #         StatisticRole(),
+        #     )
         return super()._calc_pandas(data, other, nan_policy="omit", **kwargs)
 
 

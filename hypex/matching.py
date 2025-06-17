@@ -5,7 +5,7 @@ from typing import Literal
 from .analyzers.matching import MatchingAnalyzer
 from .comparators import KSTest, TTest
 from .comparators.distances import MahalanobisDistance
-from .dataset import TargetRole, TreatmentRole, FeatureRole
+from .dataset import AdditionalMatchingRole, FeatureRole, TargetRole, TreatmentRole
 from .executor import Executor
 from .experiments import GroupExperiment
 from .experiments.base import Experiment, OnRoleExperiment
@@ -35,6 +35,9 @@ class Matching(ExperimentShell):
         quality_tests (Union[str, List[str]], optional): Quality tests to perform.
             Options are "smd", "psi", "ks-test", "repeats", "t-test", or "auto".
             Can be a single test or list of tests. Defaults to "auto".
+        faiss_mode (Literal["base", "fast", "auto"], optional): Faiss mode to use for matching.
+            Options are "base", "fast", or "auto". Defaults to "auto".
+        n_neighbors (int, optional): Number of neighbors to use for matching. Defaults to 1.
 
     Examples:
         Basic matching with default settings:
@@ -68,6 +71,7 @@ class Matching(ExperimentShell):
             | list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]]
         ) = "auto",
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
+        n_neighbors: int = 1,
     ) -> Experiment:
         """Creates an experiment configuration with specified matching parameters.
 
@@ -84,6 +88,9 @@ class Matching(ExperimentShell):
         quality_tests (Union[str, List[str]], optional): Quality tests to perform.
             Options are "ks-test", "t-test", or "auto".
             Can be a single test or list of tests. Defaults to "auto", which performs all tests.
+        faiss_mode (Literal["base", "fast", "auto"], optional): Faiss mode to use for matching.
+            Options are "base", "fast", or "auto". Defaults to "auto".
+        n_neighbors (int, optional): Number of neighbors to use for matching. Defaults to 1.
 
         Returns:
             Experiment: Configured experiment object with specified matching parameters.
@@ -99,9 +106,17 @@ class Matching(ExperimentShell):
             "mahalanobis": MahalanobisDistance(grouping_role=TreatmentRole())
         }
         test_mapping = {
-            "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
+            "t-test": TTest(
+                compare_by="matched_pairs",
+                grouping_role=TreatmentRole(),
+                baseline_role=AdditionalMatchingRole(),
+            ),
             # "psi": PSI(grouping_role=TreatmentRole(), compare_by="groups"),
-            "ks-test": KSTest(grouping_role=TreatmentRole(), compare_by="groups"),
+            "ks-test": KSTest(
+                grouping_role=TreatmentRole(),
+                compare_by="matched_pairs",
+                baseline_role=AdditionalMatchingRole(),
+            ),
         }
         two_sides = metric == "ate"
         test_pairs = metric == "atc"
@@ -111,6 +126,7 @@ class Matching(ExperimentShell):
                 two_sides=two_sides,
                 test_pairs=test_pairs,
                 faiss_mode=faiss_mode,
+                n_neighbors=n_neighbors,
             )
         ]
         if bias_estimation:
@@ -163,6 +179,7 @@ class Matching(ExperimentShell):
             | list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]]
         ) = "auto",
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
+        n_neighbors: int = 1,
     ):
         super().__init__(
             experiment=self._make_experiment(
