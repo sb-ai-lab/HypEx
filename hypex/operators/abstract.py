@@ -3,20 +3,11 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import Any, Sequence
 
-from ..dataset import (
-    ABCRole,
-    AdditionalTargetRole,
-    Dataset,
-    ExperimentData,
-    GroupingRole,
-    TargetRole,
-)
+from ..dataset import (ABCRole, AdditionalTargetRole, Dataset, ExperimentData,
+                       GroupingRole, TargetRole)
 from ..executor import Calculator
-from ..utils import (
-    AbstractMethodError,
-    ExperimentDataEnum,
-    NotSuitableFieldError,
-)
+from ..utils import (AbstractMethodError, ExperimentDataEnum,
+                     NotSuitableFieldError)
 from ..utils.adapter import Adapter
 
 

@@ -3,13 +3,8 @@ from __future__ import annotations
 import warnings
 from typing import Callable
 
-from scipy.stats import (  # type: ignore
-    chi2_contingency,
-    ks_2samp,
-    mannwhitneyu,
-    norm,
-    ttest_ind,
-)
+from scipy.stats import (chi2_contingency, ks_2samp,  # type: ignore
+                         mannwhitneyu, norm, ttest_ind)
 
 from ..dataset import Dataset, DatasetAdapter, StatisticRole
 from .abstract import CompareExtension

@@ -4,20 +4,11 @@ from copy import deepcopy
 from typing import Any
 
 from ..comparators import TTest, UTest
-from ..dataset import (
-    Dataset,
-    ExperimentData,
-    StatisticRole,
-    TargetRole,
-    TreatmentRole,
-)
+from ..dataset import (Dataset, ExperimentData, StatisticRole, TargetRole,
+                       TreatmentRole)
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
-from ..utils import (
-    ID_SPLIT_SYMBOL,
-    NAME_BORDER_SYMBOL,
-    ABNTestMethodsEnum,
-    BackendsEnum,
-)
+from ..utils import (ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL, ABNTestMethodsEnum,
+                     BackendsEnum)
 from .abstract import Analyzer
 
 

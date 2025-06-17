@@ -4,30 +4,13 @@ This module defines data structures and roles used across the library for managi
 
 from .abstract import DatasetBase
 from .dataset import Dataset, DatasetAdapter, ExperimentData
-from .roles import (
-    ABCRole,
-    AdditionalGroupingRole,
-    AdditionalMatchingRole,
-    AdditionalPreTargetRole,
-    AdditionalTargetRole,
-    AdditionalTreatmentRole,
-    ConstGroupRole,
-    DefaultRole,
-    FeatureRole,
-    FilterRole,
-    GroupingRole,
-    InfoRole,
-    PreTargetRole,
-    StatisticRole,
-    StratificationRole,
-    TargetRole,
-    TempGroupingRole,
-    TempRole,
-    TempTargetRole,
-    TempTreatmentRole,
-    TreatmentRole,
-    default_roles,
-)
+from .roles import (ABCRole, AdditionalGroupingRole, AdditionalMatchingRole,
+                    AdditionalPreTargetRole, AdditionalTargetRole,
+                    AdditionalTreatmentRole, ConstGroupRole, DefaultRole,
+                    FeatureRole, FilterRole, GroupingRole, InfoRole,
+                    PreTargetRole, StatisticRole, StratificationRole,
+                    TargetRole, TempGroupingRole, TempRole, TempTargetRole,
+                    TempTreatmentRole, TreatmentRole, default_roles)
 
 __all__ = [
     "ABCRole",

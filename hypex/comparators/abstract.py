@@ -4,32 +4,14 @@ import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Literal
 
-from ..dataset import (
-    ABCRole,
-    Dataset,
-    DatasetAdapter,
-    ExperimentData,
-    GroupingRole,
-    InfoRole,
-    PreTargetRole,
-    StatisticRole,
-    TargetRole,
-    TempTargetRole,
-)
+from ..dataset import (ABCRole, Dataset, DatasetAdapter, ExperimentData,
+                       GroupingRole, InfoRole, PreTargetRole, StatisticRole,
+                       TargetRole, TempTargetRole)
 from ..executor import Calculator
-from ..utils import (
-    NAME_BORDER_SYMBOL,
-    BackendsEnum,
-    ExperimentDataEnum,
-    FromDictTypes,
-    GroupingDataType,
-)
-from ..utils.errors import (
-    AbstractMethodError,
-    NoColumnsError,
-    NoRequiredArgumentError,
-    NotSuitableFieldError,
-)
+from ..utils import (NAME_BORDER_SYMBOL, BackendsEnum, ExperimentDataEnum,
+                     FromDictTypes, GroupingDataType)
+from ..utils.errors import (AbstractMethodError, NoColumnsError,
+                            NoRequiredArgumentError, NotSuitableFieldError)
 
 
 class Comparator(Calculator, ABC):
@@ -456,30 +438,3 @@ class StatHypothesisTesting(Comparator, ABC):
             key=key,
         )
         self.reliability = reliability
-
-
-class PowerTesting(Comparator, ABC):
-    def __init__(
-        self,
-        grouping_role: ABCRole | None = None,
-        significance: float = 0.95,
-        power: float = 0.8,
-        key: Any = "",
-    ):
-        super().__init__(
-            compare_by="groups",
-            grouping_role=grouping_role,
-            key=key,
-        )
-        self.significance = significance
-        self.power = power
-
-    @classmethod
-    @abstractmethod
-    def calc(
-        cls, data: Dataset, test_data: Dataset | None = None, **kwargs: float
-    ) -> float:
-        pass
-
-    def execute(self, data: ExperimentData) -> ExperimentData:
-        return super().execute(data)

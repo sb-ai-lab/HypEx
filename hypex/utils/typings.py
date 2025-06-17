@@ -1,15 +1,6 @@
 import datetime
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    List,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import (TYPE_CHECKING, Any, Callable, Dict, List, Sequence, Tuple,
+                    TypeVar, Union)
 
 if TYPE_CHECKING:
     from hypex.dataset import Dataset

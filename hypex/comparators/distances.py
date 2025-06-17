@@ -3,14 +3,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Sequence
 
-from ..dataset import (
-    ABCRole,
-    Dataset,
-    ExperimentData,
-    FeatureRole,
-    GroupingRole,
-    TargetRole,
-)
+from ..dataset import (ABCRole, Dataset, ExperimentData, FeatureRole,
+                       GroupingRole, TargetRole)
 from ..executor import Calculator
 from ..extensions.scipy_linalg import CholeskyExtension, InverseExtension
 from ..utils import ExperimentDataEnum, NotSuitableFieldError

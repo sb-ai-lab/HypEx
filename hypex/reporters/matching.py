@@ -4,17 +4,12 @@ from typing import Any, ClassVar
 
 from ..analyzers.matching import MatchingAnalyzer
 from ..comparators import KSTest, TTest
-from ..dataset import (
-    Dataset,
-    ExperimentData,
-)
+from ..dataset import Dataset, ExperimentData
 from ..ml import FaissNearestNeighbors
-from ..reporters.abstract import DatasetReporter, DictReporter, TestDictReporter
-from ..utils import (
-    ID_SPLIT_SYMBOL,
-    MATCHING_INDEXES_SPLITTER_SYMBOL,
-    ExperimentDataEnum,
-)
+from ..reporters.abstract import (DatasetReporter, DictReporter,
+                                  TestDictReporter)
+from ..utils import (ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL,
+                     ExperimentDataEnum)
 
 
 class MatchingDictReporter(DictReporter):

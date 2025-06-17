@@ -4,12 +4,8 @@ from typing import Any, Sequence
 
 from ..dataset import Dataset, ExperimentData, FeatureRole
 from ..executor import Calculator
-from ..utils import (
-    NAME_BORDER_SYMBOL,
-    AbstractMethodError,
-    CategoricalTypes,
-    ExperimentDataEnum,
-)
+from ..utils import (NAME_BORDER_SYMBOL, AbstractMethodError, CategoricalTypes,
+                     ExperimentDataEnum)
 
 
 class Encoder(Calculator):

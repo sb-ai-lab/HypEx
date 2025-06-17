@@ -3,13 +3,8 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from ..comparators.distances import MahalanobisDistance
-from ..dataset import (
-    ABCRole,
-    AdditionalMatchingRole,
-    Dataset,
-    ExperimentData,
-    FeatureRole,
-)
+from ..dataset import (ABCRole, AdditionalMatchingRole, Dataset,
+                       ExperimentData, FeatureRole)
 from ..executor import MLExecutor
 from ..extensions.faiss import FaissExtension
 from ..utils import ExperimentDataEnum

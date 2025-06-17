@@ -3,18 +3,10 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from ..comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
-from ..dataset import (
-    Dataset,
-    ExperimentData,
-    InfoRole,
-    StatisticRole,
-)
+from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..splitters import AASplitter, AASplitterWithStratification
-from ..utils import (
-    ID_SPLIT_SYMBOL,
-    ExperimentDataEnum,
-    NotFoundInExperimentDataError,
-)
+from ..utils import (ID_SPLIT_SYMBOL, ExperimentDataEnum,
+                     NotFoundInExperimentDataError)
 from .abstract import Reporter, TestDictReporter
 
 

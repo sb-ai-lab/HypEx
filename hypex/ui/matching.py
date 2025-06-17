@@ -3,15 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from ..analyzers.matching import MatchingAnalyzer
-from ..dataset import (
-    AdditionalMatchingRole,
-    Dataset,
-    ExperimentData,
-    GroupingRole,
-    StatisticRole,
-    TargetRole,
-)
-from ..reporters.matching import MatchingDictReporter, MatchingQualityDatasetReporter
+from ..dataset import (AdditionalMatchingRole, Dataset, ExperimentData,
+                       GroupingRole, StatisticRole, TargetRole)
+from ..reporters.matching import (MatchingDictReporter,
+                                  MatchingQualityDatasetReporter)
 from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL
 from .base import Output
 

@@ -5,13 +5,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from ..dataset import (
-    AdditionalTreatmentRole,
-    Dataset,
-    ExperimentData,
-    StratificationRole,
-    TreatmentRole,
-)
+from ..dataset import (AdditionalTreatmentRole, Dataset, ExperimentData,
+                       StratificationRole, TreatmentRole)
 from ..dataset.roles import ConstGroupRole
 from ..executor import Calculator
 from ..utils import ExperimentDataEnum

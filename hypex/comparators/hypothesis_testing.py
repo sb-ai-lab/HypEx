@@ -1,12 +1,8 @@
 from __future__ import annotations
 
 from ..dataset import Dataset
-from ..extensions.scipy_stats import (
-    Chi2TestExtension,
-    KSTestExtension,
-    TTestExtension,
-    UTestExtension,
-)
+from ..extensions.scipy_stats import (Chi2TestExtension, KSTestExtension,
+                                      TTestExtension, UTestExtension)
 from ..utils.constants import NUMBER_TYPES_LIST
 from .abstract import StatHypothesisTesting
 

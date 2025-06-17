@@ -3,23 +3,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Sequence
 
-from ..dataset import (
-    ABCRole,
-    AdditionalMatchingRole,
-    Dataset,
-    DatasetAdapter,
-    ExperimentData,
-    FeatureRole,
-    GroupingRole,
-    TargetRole,
-)
-from ..utils import (
-    ID_SPLIT_SYMBOL,
-    AbstractMethodError,
-    ExperimentDataEnum,
-    NotSuitableFieldError,
-    SetParamsDictTypes,
-)
+from ..dataset import (ABCRole, AdditionalMatchingRole, Dataset,
+                       DatasetAdapter, ExperimentData, FeatureRole,
+                       GroupingRole, TargetRole)
+from ..utils import (ID_SPLIT_SYMBOL, AbstractMethodError, ExperimentDataEnum,
+                     NotSuitableFieldError, SetParamsDictTypes)
 from ..utils.adapter import Adapter
 
 

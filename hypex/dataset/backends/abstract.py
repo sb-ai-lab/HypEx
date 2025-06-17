@@ -1,14 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import (
-    Any,
-    Callable,
-    Iterable,
-    Literal,
-    Sequence,
-    Sized,
-)
+from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
 from ...utils import AbstractMethodError, FromDictTypes
 

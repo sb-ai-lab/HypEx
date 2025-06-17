@@ -2,12 +2,8 @@ from __future__ import annotations
 
 from abc import ABC
 
-from ..utils import (
-    CategoricalTypes,
-    DefaultRoleTypes,
-    RoleNameType,
-    TargetRoleTypes,
-)
+from ..utils import (CategoricalTypes, DefaultRoleTypes, RoleNameType,
+                     TargetRoleTypes)
 
 
 class ABCRole(ABC):

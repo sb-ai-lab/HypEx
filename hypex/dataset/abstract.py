@@ -9,11 +9,7 @@ import pandas as pd  # type: ignore
 
 from ..utils import BackendsEnum, RoleColumnError
 from .backends import PandasDataset
-from .roles import (
-    ABCRole,
-    DefaultRole,
-    default_roles,
-)
+from .roles import ABCRole, DefaultRole, default_roles
 
 
 def parse_roles(roles: dict) -> dict[str | int] | ABCRole:

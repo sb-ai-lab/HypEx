@@ -3,40 +3,19 @@ from __future__ import annotations
 import warnings
 from collections.abc import Iterable
 from copy import deepcopy
-from typing import (
-    Any,
-    Callable,
-    Hashable,
-    Literal,
-    Sequence,
-)
+from typing import Any, Callable, Hashable, Literal, Sequence
 
 import pandas as pd  # type: ignore
 
-from ..utils import (
-    ID_SPLIT_SYMBOL,
-    BackendsEnum,
-    BackendTypeError,
-    ConcatBackendError,
-    ConcatDataError,
-    DataTypeError,
-    ExperimentDataEnum,
-    FromDictTypes,
-    MultiFieldKeyTypes,
-    NotFoundInExperimentDataError,
-    ScalarType,
-)
+from ..utils import (ID_SPLIT_SYMBOL, BackendsEnum, BackendTypeError,
+                     ConcatBackendError, ConcatDataError, DataTypeError,
+                     ExperimentDataEnum, FromDictTypes, MultiFieldKeyTypes,
+                     NotFoundInExperimentDataError, ScalarType)
 from ..utils.adapter import Adapter
 from ..utils.errors import InvalidArgumentError
 from .abstract import DatasetBase
-from .roles import (
-    ABCRole,
-    AdditionalRole,
-    DefaultRole,
-    FilterRole,
-    InfoRole,
-    StatisticRole,
-)
+from .roles import (ABCRole, AdditionalRole, DefaultRole, FilterRole, InfoRole,
+                    StatisticRole)
 
 
 class Dataset(DatasetBase):
