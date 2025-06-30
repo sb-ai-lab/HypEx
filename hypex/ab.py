@@ -115,7 +115,7 @@ class ABTest(ExperimentShell):
             ]
             | None
         ) = "holm",
-        t_test_equal_var: bool = None,
+        t_test_equal_var: bool | None = None,
     ):
         super().__init__(
             experiment=self._make_experiment(additional_tests, multitest_method),
