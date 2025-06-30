@@ -1,5 +1,5 @@
 .. role:: hidden
-    :class: hidden-section
+   :class: hidden-section
 
 {{ name | underline }}
 
@@ -7,49 +7,47 @@
 
 {% block classes %}
 {% if classes %}
+
 .. rubric:: {{ _('Classes') }}
 
 .. autosummary::
-    :toctree: generated
-    :nosignatures:
-    :template: classtemplate.rst
+   :toctree: generated
+   :nosignatures:
+   :template: classtemplate.rst
 
-{% for item in classes %}
-    {{ item }}
-{% endfor %}
-
+   {% for item in classes %}
+   {{ item }}
+   {% endfor %}
 {% endif %}
 {% endblock %}
-{% set _ = namespace() %}
 
 {% block functions %}
 {% if functions %}
+
 .. rubric:: {{ _('Functions') }}
 
 .. autosummary::
-    :toctree: generated
-    :nosignatures:
-    :template: functiontemplate.rst
+   :toctree: generated
+   :nosignatures:
+   :template: functiontemplate.rst
 
-{% for item in functions %}
-    {{ item }}
-{% endfor %}
-
+   {% for item in functions %}
+   {{ item }}
+   {% endfor %}
 {% endif %}
 {% endblock %}
-{% set _ = namespace() %}
 
 {% block modules %}
 {% if modules %}
+
 .. rubric:: {{ _('Modules') }}
 
 .. autosummary::
-    :toctree:
-    :recursive:
+   :toctree:
+   :recursive:
 
-{% for item in modules %}
-    {{ item }}
-{% endfor %}
-
+   {% for item in modules %}
+   {{ item }}
+   {% endfor %}
 {% endif %}
 {% endblock %}
