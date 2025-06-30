@@ -5,43 +5,51 @@
 
 .. automodule:: {{ fullname }}
 
-    {% block classes %}
-    {% if classes %}
-    .. rubric:: {{ _('Classes') }}
+{% block classes %}
+{% if classes %}
+.. rubric:: {{ _('Classes') }}
 
-    .. autosummary::
-        :toctree: generated
-        :nosignatures:
-        :template: classtemplate.rst
-    {% for item in classes %}
-        {{ item }}
-    {%- endfor %}
-    {% endif %}
-    {% endblock %}
+.. autosummary::
+    :toctree: generated
+    :nosignatures:
+    :template: classtemplate.rst
 
-    {% block functions %}
-    {% if functions %}
-    .. rubric:: {{ _('Functions') }}
+{% for item in classes %}
+    {{ item }}
+{% endfor %}
 
-    .. autosummary::
-        :toctree: generated
-        :nosignatures:
-        :template: functiontemplate.rst
-    {% for item in functions %}
-        {{ item }}
-    {%- endfor %}
-    {% endif %}
-    {% endblock %}
+{% endif %}
+{% endblock %}
+{% set _ = namespace() %}
 
-    {% block modules %}
-    {% if modules %}
-    .. rubric:: {{ _('Modules') }}
+{% block functions %}
+{% if functions %}
+.. rubric:: {{ _('Functions') }}
 
-    .. autosummary::
-        :toctree:
-        :recursive:
-    {% for item in modules %}
-        {{ item }}
-    {%- endfor %}
-    {% endif %}
-    {% endblock %}
+.. autosummary::
+    :toctree: generated
+    :nosignatures:
+    :template: functiontemplate.rst
+
+{% for item in functions %}
+    {{ item }}
+{% endfor %}
+
+{% endif %}
+{% endblock %}
+{% set _ = namespace() %}
+
+{% block modules %}
+{% if modules %}
+.. rubric:: {{ _('Modules') }}
+
+.. autosummary::
+    :toctree:
+    :recursive:
+
+{% for item in modules %}
+    {{ item }}
+{% endfor %}
+
+{% endif %}
+{% endblock %}
