@@ -12,7 +12,6 @@ HypEx is a fast and customizable framework for Causal Inference.
    installation
    quickstart
    api_reference
-   examples
 
 Installation
 ------------

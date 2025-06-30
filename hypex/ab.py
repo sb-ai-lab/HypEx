@@ -24,28 +24,23 @@ class ABTest(ExperimentShell):
         multitest_method (str, optional): Method to use for multiple testing correction. Valid options are:
             "bonferroni", "sidak", "holm-sidak", "holm", "simes-hochberg", "hommel", "fdr_bh", "fdr_by",
             "fdr_tsbh", "fdr_tsbhy", "quantile". Defaults to "holm".
-         For more information refer to the statsmodels documentation:
-         <https://www.statsmodels.org/dev/generated/statsmodels.stats.multitest.multipletests.html>
 
+            For more information refer to the statsmodels documentation:
+            https://www.statsmodels.org/dev/generated/statsmodels.stats.multitest.multipletests.html
 
     Examples:
-        Basic A/B test with default t-test:
-        >>> ab_test = ABTest()
-        >>> results = ab_test.execute(data)
+        Basic A/B test with default t-test::
 
-        A/B test with multiple statistical tests:
-        >>> ab_test = ABTest(
-        ...     additional_tests=["t-test", "chi2-test"],
-        ...     multitest_method="bonferroni"
-        ... )
-        >>> results = ab_test.execute(data)
+            >>> ab_test = ABTest()
+            >>> results = ab_test.execute(data)
 
-        A/B test with single non-default test:
-        >>> ab_test = ABTest(
-        ...     additional_tests="u-test",
-        ...     multitest_method="fdr_bh"
-        ... )
-        >>> results = ab_test.execute(data)
+        A/B test with multiple statistical tests::
+
+            >>> ab_test = ABTest(
+            ...     additional_tests=["t-test", "chi2-test"],
+            ...     multitest_method="bonferroni"
+            ... )
+            >>> results = ab_test.execute(data)
     """
 
     @staticmethod

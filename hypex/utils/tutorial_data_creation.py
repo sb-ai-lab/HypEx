@@ -160,12 +160,11 @@ def sigmoid(x: np.ndarray) -> np.ndarray:
     """Logistic sigmoid ufunc for ndarrays.
 
     The sigmoid function, also known as the logistic sigmoid function,
-    is defined as sigmoid(x) = $\fraq{1}{(1+\\exp{-x})}$.
+    is defined as sigmoid(x) = 1/(1+exp(-x)).
     It is the inverse of the logit function.
 
     Args:
-        x:
-            Input array.
+        x: Input array.
 
     Returns:
         Sigmoid function of x.
