@@ -1,0 +1,143 @@
+/* Улучшенные цвета и стили */
+.wy-nav-content {
+    max-width: 1200px;
+}
+
+/* Красивые заголовки */
+h1 {
+    color: #2980B9;
+    border-bottom: 2px solid #2980B9;
+    padding-bottom: 10px;
+}
+
+h2 {
+    color: #34495e;
+    margin-top: 30px;
+}
+
+/* Стилизация блоков кода */
+.highlight {
+    background: #f8f8f8 !important;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    margin: 1em 0;
+}
+
+/* Красивые примечания */
+.admonition {
+    border-radius: 6px;
+    padding: 12px;
+    border-left: 4px solid;
+}
+
+.admonition.note {
+    background-color: #e3f2fd;
+    border-left-color: #2196f3;
+}
+
+.admonition.warning {
+    background-color: #fff3cd;
+    border-left-color: #ffc107;
+}
+
+.admonition.tip {
+    background-color: #e8f5e9;
+    border-left-color: #4caf50;
+}
+
+/* Улучшенные таблицы */
+.wy-table-responsive table td, .wy-table-responsive table th {
+    white-space: normal;
+}
+
+table.docutils {
+    border: 1px solid #e1e4e8;
+    border-collapse: collapse;
+    border-spacing: 0;
+    width: 100%;
+}
+
+table.docutils tr:nth-child(2n) {
+    background-color: #f6f8fa;
+}
+
+/* Красивые кнопки */
+.btn {
+    display: inline-block;
+    padding: 6px 12px;
+    margin-bottom: 0;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.42857143;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background-color: #2980B9;
+    color: white;
+    text-decoration: none;
+}
+
+.btn:hover {
+    background-color: #21618C;
+    color: white;
+}
+
+/* API Reference styling */
+.class dt {
+    font-size: 1.1em;
+    font-weight: bold;
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #f0f0f0;
+    border-left: 3px solid #2980B9;
+}
+
+/* Parameters styling */
+.field-list {
+    margin: 20px 0;
+}
+
+.field-name {
+    font-weight: bold;
+    min-width: 100px;
+    padding-right: 20px;
+}
+
+/* Навигация */
+.wy-menu-vertical li.current > a {
+    background: #fcfcfc;
+    border-right: solid 3px #2980B9;
+}
+
+.wy-menu-vertical li.current a {
+    color: #404040;
+}
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 3px 7px;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1;
+    color: #fff;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 10px;
+}
+
+.badge-primary {
+    background-color: #2980B9;
+}
+
+.badge-success {
+    background-color: #27ae60;
+}
+
+.badge-warning {
+    background-color: #f39c12;
+}
