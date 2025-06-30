@@ -23,3 +23,4 @@ clean:
 	sphinx-build -M clean "$(SOURCEDIR)" "$(BUILDDIR)"
 	sphinx-build -M clean "$(SOURCEDIR)" "imgs"
 	sphinx-build -M clean "$(SOURCEDIR)" "pages/modules/generated/"
+	rm -rf "$(SOURCEDIR)/_autosummary"
