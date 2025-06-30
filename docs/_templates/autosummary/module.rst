@@ -33,16 +33,15 @@
     {% endif %}
     {% endblock %}
 
+    {% block modules %}
+    {% if modules %}
+    .. rubric:: {{ _('Modules') }}
 
-{% block modules %}
-{% if modules %}
-.. rubric:: {{ _('Modules') }}
-
-.. autosummary::
-    :toctree:
-    :recursive:
-{% for item in modules %}
-    {{ item }}
-{%- endfor %}
-{% endif %}
-{% endblock %}
+    .. autosummary::
+        :toctree:
+        :recursive:
+    {% for item in modules %}
+        {{ item }}
+    {%- endfor %}
+    {% endif %}
+    {% endblock %}
