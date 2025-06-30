@@ -74,10 +74,40 @@ templates_path = ["_templates"]
 # a list of builtin themes.
 html_theme = "sphinx_rtd_theme"
 
+html_theme_options = {
+    'logo_only': False,
+    'prev_next_buttons_location': 'bottom',
+    'style_external_links': True,
+    'vcs_pageview_mode': 'blob',
+    'style_nav_header_background': '#2980B9',
+    # Toc options
+    'collapse_navigation': True,
+    'sticky_navigation': True,
+    'navigation_depth': 4,
+    'includehidden': True,
+    'titles_only': False,
+    'globaltoc_collapse': True,
+    'globaltoc_maxdepth': 3,
+}
+
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+
+html_css_files = [
+    'custom.css',
+]
+
+html_show_sourcelink = False
+html_sidebars = {
+    '**': [
+        'globaltoc.html',
+        'relations.html',
+        'sourcelink.html',
+        'searchbox.html',
+    ]
+}
 
 # code style
 pygments_style = "default"
@@ -99,6 +129,7 @@ autodoc_default_options = {
     "ignore-module-all": True,
     "show-inheritance": True,
     "exclude-members": EXCLUDED_MEMBERS,
+    'inherited-members': False,
 }
 
 # order of members in docs, usefully for methods in class

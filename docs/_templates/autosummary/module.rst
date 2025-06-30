@@ -1,48 +1,53 @@
 .. role:: hidden
-    :class: hidden-section
+   :class: hidden-section
 
 {{ name | underline }}
 
 .. automodule:: {{ fullname }}
 
-    {% block classes %}
-    {% if classes %}
-    .. rubric:: {{ _('Classes') }}
+{% block classes %}
+{% if classes %}
 
-    .. autosummary::
-        :toctree: generated
-        :nosignatures:
-        :template: classtemplate.rst
-    {% for item in classes %}
-        {{ item }}
-    {%- endfor %}
-    {% endif %}
-    {% endblock %}
+.. rubric:: {{ _('Classes') }}
 
-    {% block functions %}
-    {% if functions %}
-    .. rubric:: {{ _('Functions') }}
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+   :template: classtemplate.rst
 
-    .. autosummary::
-        :toctree: generated
-        :nosignatures:
-        :template: functiontemplate.rst
-    {% for item in functions %}
-        {{ item }}
-    {%- endfor %}
-    {% endif %}
-    {% endblock %}
+   {% for item in classes %}
+   {{ item }}
+   {% endfor %}
+{% endif %}
+{% endblock %}
 
+{% block functions %}
+{% if functions %}
+
+.. rubric:: {{ _('Functions') }}
+
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+   :template: functiontemplate.rst
+
+   {% for item in functions %}
+   {{ item }}
+   {% endfor %}
+{% endif %}
+{% endblock %}
 
 {% block modules %}
 {% if modules %}
+
 .. rubric:: {{ _('Modules') }}
 
 .. autosummary::
-    :toctree:
-    :recursive:
-{% for item in modules %}
-    {{ item }}
-{%- endfor %}
+   :toctree:
+   :recursive:
+
+   {% for item in modules %}
+   {{ item }}
+   {% endfor %}
 {% endif %}
 {% endblock %}

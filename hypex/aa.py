@@ -100,7 +100,7 @@ class AATest(ExperimentShell):
         random_states (Iterable[int], optional): Random seeds to use for each iteration.
             If None, uses range(n_iterations). Defaults to None.
         t_test_equal_var (bool, optional): If True (default), perform a standard independent 2 sample
-            test that assumes equal population variances. If False, perform Welch’s t-test,
+            test that assumes equal population variances. If False, perform Welch's t-test,
             which does not assume equal population variance.
 
     Examples:
@@ -188,7 +188,7 @@ class AATest(ExperimentShell):
         sample_size: float | None = None,
         additional_params: dict[str, Any] | None = None,
         random_states: Iterable[int] | None = None,
-        t_test_equal_var: bool = None,
+        t_test_equal_var: bool | None = None,
     ):
         if n_iterations is None:
             if precision_mode:
