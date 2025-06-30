@@ -1,10 +1,10 @@
 # HypEx: Advanced Causal Inference and AB Testing Toolkit
 
-![Last release](https://img.shields.io/badge/pypi-v0.1.10-darkgreen)
+![Last release](https://img.shields.io/badge/pypi-v1.0.2-darkgreen)
 [![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/hypexchat)
 ![Pypi downloads](https://img.shields.io/badge/downloads-70K-1E782B)
 ![Python versions](https://img.shields.io/badge/python-3.8_|_3.9_|_3.10_|_3.11_|_3.12-blue)
-![Pypi downloads\month](https://img.shields.io/badge/downloads\month->10K-1E782B)
+![Pypi downloads\month](https://img.shields.io/badge/downloads\month->20K-1E782B)
 
 # Moving to a New Architecture! ⚠️
 
@@ -22,7 +22,7 @@ out [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials).
 Try the new version now by installing the beta release:
 
 ```
-pip install --upgrade --pre hypex
+pip install --upgrade hypex
 ```
 
 Prefer the old version? You can still use it, but it won't receive updates:
@@ -68,34 +68,6 @@ design. Below, we will discuss features that are implemented in HypEx but do not
 
 **Note:** For Matching, it's recommended not to use more than 7 features as it might result in the curse of
 dimensionality, making the results unrepresentative.
-
-### Feature Selection
-
-**Feature selection** models the significance of features for the accuracy of target approximation. However, it does not
-rule out the possibility of overlooked features, the complex impact of features on target description, or the
-significance of features from a business logic perspective. The algorithm will not function correctly if there are data
-leaks.
-
-Points to consider when selecting features:
-
-* Data leaks - these should not be present.
-* Influence on treatment distribution - features should not affect the treatment distribution.
-* The target should be describable by features.
-* All features significantly affecting the target should be included.
-* The business rationale of features.
-* The feature selection function can be useful for addressing these tasks, but it does not solve them nor does it
-  absolve the user of the responsibility for their selection, nor does it justify it.
-
-[Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/selectors.html#selector-classes)
-
-### Random Treatment
-
-**Random Treatment** algorithm randomly shuffles the actual treatment. It is expected that the treatment's effect on the
-target will be close to 0.
-
-These method is not sufficiently accurate marker of a successful experiment.
-
-[Link to ReadTheDocs](https://hypex.readthedocs.io/en/latest/pages/modules/utils.html#validators)
 
 ## Installation
 
