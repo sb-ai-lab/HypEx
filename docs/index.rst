@@ -30,16 +30,6 @@ Quick Start
 
    # Your code here
 
-API Reference
--------------
-
-.. autosummary::
-   :toctree: _autosummary
-   :recursive:
-   :template: autosummary/module.rst
-
-   hypex
-
 Indices and tables
 ==================
 

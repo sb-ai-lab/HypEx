@@ -99,6 +99,7 @@ autodoc_default_options = {
     "ignore-module-all": True,
     "show-inheritance": True,
     "exclude-members": EXCLUDED_MEMBERS,
+    'inherited-members': False,
 }
 
 # order of members in docs, usefully for methods in class

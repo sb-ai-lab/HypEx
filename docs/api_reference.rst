@@ -14,7 +14,7 @@ Main Classes
    AATest
    ABTest
    HomogeneityTest
-   Matching
+   matching.Matching
 
 Dataset Module
 --------------
