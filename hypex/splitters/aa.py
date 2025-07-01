@@ -82,6 +82,7 @@ class AASplitter(Calculator):
         data: Dataset,
         random_state: int | None = None,
         control_size: float = 0.5,
+        groups_sizes: list[float] | None = None,
         sample_size: float | None = None,
         const_group_field: str | None = None,
         **kwargs,
@@ -95,7 +96,7 @@ class AASplitter(Calculator):
                 control_indexes = list(control_data.index)
             const_size = sum(len(cd) for cd in const_data.values())
             control_size = (len(data) * control_size - const_size) / (
-                len(data) - const_size
+                    len(data) - const_size
             )
         experiment_data = (
             data[data[const_group_field].isna()] if const_group_field else data
@@ -104,12 +105,28 @@ class AASplitter(Calculator):
             frac=sample_size, random_state=random_state
         ).index
         addition_indexes = list(experiment_data_index)
-        edge = int(len(addition_indexes) * control_size)
-        control_indexes += addition_indexes[:edge]
+        edges = []
+        if groups_sizes:
+            if sum(groups_sizes) != 1:
+                raise ValueError("Groups sizes must sum to 1")
+            for group_size in groups_sizes:
+                size = int(len(addition_indexes) * group_size) + (0 if not edges else edges[-1])
+                size = min(size, len(addition_indexes))
+                if not size in edges:
+                    edges += [size]
+        else:
+            edges = [int(len(addition_indexes) * control_size), len(addition_indexes)]
+        control_indexes += addition_indexes[:edges[0]]
+        test_indexes = [addition_indexes[edges[i - 1]:edges[i]] for i in range(1, len(edges))]
 
         split_series = pd.Series(np.ones(data.data.shape[0], dtype="int"), index=data.data.index)
         split_series[control_indexes] -= 1
-        split_series = split_series.map({0: "control", 1: "test"})
+        for i, test_index in enumerate(test_indexes):
+            split_series[test_index] += i
+
+        label_map = {0: "control"}
+        label_map.update({i: f"test_{i}" for i in range(1, len(edges))})
+        split_series = split_series.map(label_map)
 
         return split_series.to_list()
 
@@ -144,6 +161,7 @@ class AASplitterWithStratification(AASplitter):
             return AASplitter._inner_function(
                 data, random_state, control_size, **kwargs
             )
+
         result = {"split": []}
         index = []
         for group, group_data in data.groupby(grouping_fields):
