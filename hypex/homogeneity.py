@@ -37,27 +37,30 @@ class HomogeneityTest(ExperimentShell):
         - Chi-square test for categorical variables
         - AA statistics analysis
 
-    Examples:
-        Basic homogeneity test:
-        >>> homo_test = HomogeneityTest()
-        >>> results = homo_test.execute(data)
+    Examples
+    --------
+    .. code-block:: python
 
-        Accessing specific test results:
-        >>> homo_test = HomogeneityTest()
-        >>> results = homo_test.execute(data)
-        >>> output = results.resume
+        # Basic homogeneity test
+        homo_test = HomogeneityTest()
+        results = homo_test.execute(data)
 
-        Running test on dataset with roles:
-        >>> from hypex.dataset import Dataset, TargetRole, TreatmentRole
-        >>> ds = Dataset(
-        ...     roles={
-        ...         'treatment': TreatmentRole(),
-        ...         'outcome': TargetRole()
-        ...     },
-        ...     data=df
-        ... )
-        >>> homo_test = HomogeneityTest()
-        >>> results = homo_test.execute(ds)
+        # Accessing specific test results
+        homo_test = HomogeneityTest()
+        results = homo_test.execute(data)
+        output = results.resume
+
+        # Running test on dataset with roles
+        from hypex.dataset import Dataset, TargetRole, TreatmentRole
+        ds = Dataset(
+            roles={
+                'treatment': TreatmentRole(),
+                'outcome': TargetRole()
+            },
+            data=df
+        )
+        homo_test = HomogeneityTest()
+        results = homo_test.execute(ds)
     """
 
     def __init__(self):

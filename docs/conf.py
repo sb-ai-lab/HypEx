@@ -73,6 +73,7 @@ templates_path = ["_templates"]
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 html_theme = "sphinx_rtd_theme"
+highlight_language = "python"
 
 html_theme_options = {
     'logo_only': False,
@@ -110,7 +111,7 @@ html_sidebars = {
 }
 
 # code style
-pygments_style = "default"
+pygments_style = "sphinx"
 
 nbsphinx_execute = "never"
 
