@@ -98,12 +98,15 @@ class Matching(ExperimentShell):
         Returns:
             Experiment: Configured experiment object with specified matching parameters.
 
-        Examples:
-            >>> exp = Matching._make_experiment(
-            ...     distance="l2",
-            ...     metric="att",
-            ...     quality_tests=["t-test"]
-            ... )
+        Examples
+        --------
+        .. code-block:: python
+
+            exp = Matching._make_experiment(
+                distance="l2",
+                metric="att",
+                quality_tests=["t-test"]
+            )
         """
         distance_mapping = {
             "mahalanobis": MahalanobisDistance(grouping_role=TreatmentRole())

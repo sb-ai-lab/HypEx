@@ -24,26 +24,29 @@ class Output:
         additional_reporters (Optional[Dict[str, Reporter]]): Dictionary mapping attribute
             names to additional reporters for custom reporting. Defaults to None.
 
-    Examples:
-        Basic usage with just a resume reporter:
-        >>> from my_reporters import MyResumeReporter
-        >>> output = Output(resume_reporter=MyResumeReporter())
-        >>> output.extract(experiment_data)
-        >>> print(output.resume)
+    Examples
+    --------
+    .. code-block:: python
 
-        Using additional custom reporters:
-        >>> from my_reporters import StatsReporter, PlotReporter
-        >>> additional = {
-        ...     'statistics': StatsReporter(),
-        ...     'plots': PlotReporter()
-        ... }
-        >>> output = Output(
-        ...     resume_reporter=MyResumeReporter(),
-        ...     additional_reporters=additional
-        ... )
-        >>> output.extract(experiment_data)
-        >>> print(output.statistics)  # Access additional report
-        >>> print(output.plots)  # Access additional report
+        # Basic usage with just a resume reporter
+        from my_reporters import MyResumeReporter
+        output = Output(resume_reporter=MyResumeReporter())
+        output.extract(experiment_data)
+        print(output.resume)
+
+        # Using additional custom reporters
+        from my_reporters import StatsReporter, PlotReporter
+        additional = {
+            'statistics': StatsReporter(),
+            'plots': PlotReporter()
+        }
+        output = Output(
+            resume_reporter=MyResumeReporter(),
+            additional_reporters=additional
+        )
+        output.extract(experiment_data)
+        print(output.statistics)  # Access additional report
+        print(output.plots)  # Access additional report
     """
 
     resume: Dataset
@@ -87,10 +90,13 @@ class Output:
         Args:
             experiment_data (ExperimentData): The experiment data to generate reports from.
 
-        Examples:
-            >>> output = Output(resume_reporter=MyReporter())
-            >>> output.extract(experiment_data)
-            >>> print(output.resume)  # Access the main report
+        Examples
+        --------
+        .. code-block:: python
+
+            output = Output(resume_reporter=MyReporter())
+            output.extract(experiment_data)
+            print(output.resume)  # Access the main report
         """
         self._extract_by_reporters(experiment_data)
 
@@ -108,24 +114,27 @@ class ExperimentShell:
         experiment_params (Optional[Dict[str, Any]], optional): Additional parameters
             to configure the experiment. Defaults to None.
 
-    Examples:
-        Basic usage with default parameters:
-        >>> experiment = Experiment([...])  # Configure experiment
-        >>> output = Output(resume_reporter=MyReporter())
-        >>> shell = ExperimentShell(experiment, output)
-        >>> results = shell.execute(data)
+    Examples
+    --------
+    .. code-block:: python
 
-        With custom experiment parameters:
-        >>> params = {
-        ...     "random_state": 42,
-        ...     "test_size": 0.3
-        ... }
-        >>> shell = ExperimentShell(
-        ...     experiment=experiment,
-        ...     output=output,
-        ...     experiment_params=params
-        ... )
-        >>> results = shell.execute(data)
+        # Basic usage with default parameters
+        experiment = Experiment([...])  # Configure experiment
+        output = Output(resume_reporter=MyReporter())
+        shell = ExperimentShell(experiment, output)
+        results = shell.execute(data)
+
+        # With custom experiment parameters
+        params = {
+            "random_state": 42,
+            "test_size": 0.3
+        }
+        shell = ExperimentShell(
+            experiment=experiment,
+            output=output,
+            experiment_params=params
+        )
+        results = shell.execute(data)
     """
 
     def __init__(
@@ -161,11 +170,14 @@ class ExperimentShell:
         Returns:
             Output: Formatted experiment results through the configured output handler.
 
-        Examples:
-            >>> shell = ExperimentShell(experiment, output)
-            >>> dataset = Dataset(...)  # Your input data
-            >>> results = shell.execute(dataset)
-            >>> print(results.resume)  # Access formatted results
+        Examples
+        --------
+        .. code-block:: python
+
+            shell = ExperimentShell(experiment, output)
+            dataset = Dataset(...)  # Your input data
+            results = shell.execute(dataset)
+            print(results.resume)  # Access formatted results
         """
         if isinstance(data, Dataset):
             data = ExperimentData(data)
