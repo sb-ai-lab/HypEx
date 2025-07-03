@@ -39,25 +39,28 @@ class Matching(ExperimentShell):
             Options are "base", "fast", or "auto". Defaults to "auto".
         n_neighbors (int, optional): Number of neighbors to use for matching. Defaults to 1.
 
-    Examples:
-        Basic matching with default settings:
-        >>> matching = Matching()
-        >>> results = matching.execute(data)
+    Examples
+    --------
+    .. code-block:: python
 
-        Matching with L2 distance and specific quality tests:
-        >>> matching = Matching(
-        ...     distance="l2",
-        ...     quality_tests=["t-test", "ks-test"]
-        ... )
-        >>> results = matching.execute(data)
+        # Basic matching with default settings
+        matching = Matching()
+        results = matching.execute(data)
 
-        Group matching with ATT estimation:
-        >>> matching = Matching(
-        ...     group_match=True,
-        ...     metric="att",
-        ...     bias_estimation=True
-        ... )
-        >>> results = matching.execute(data)
+        # Matching with L2 distance and specific quality tests
+        matching = Matching(
+            distance="l2",
+            quality_tests=["t-test", "ks-test"]
+        )
+        results = matching.execute(data)
+
+        # Group matching with ATT estimation
+        matching = Matching(
+            group_match=True,
+            metric="att",
+            bias_estimation=True
+        )
+        results = matching.execute(data)
     """
 
     @staticmethod

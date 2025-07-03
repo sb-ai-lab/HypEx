@@ -103,25 +103,29 @@ class AATest(ExperimentShell):
             test that assumes equal population variances. If False, perform Welch's t-test,
             which does not assume equal population variance.
 
-    Examples:
-        Basic A/A test with default parameters:
-        >>> aa_test = AATest()
-        >>> results = aa_test.execute(data)
 
-        High precision A/A test with stratification:
-        >>> aa_test = AATest(
-        ...     precision_mode=True,
-        ...     stratification=True,
-        ...     control_size=0.5
-        ... )
-        >>> results = aa_test.execute(data)
+    Examples
+    --------
+    .. code-block:: python
 
-        A/A test with custom sample size and iterations:
-        >>> aa_test = AATest(
-        ...     sample_size=0.8,
-        ...     n_iterations=100,
-        ... )
-        >>> results = aa_test.execute(data)
+        # Basic A/A test with default parameters
+        aa_test = AATest()
+        results = aa_test.execute(data)
+
+        # High precision A/A test with stratification
+        aa_test = AATest(
+            precision_mode=True,
+            stratification=True,
+            control_size=0.5
+        )
+        results = aa_test.execute(data)
+
+        # A/A test with custom sample size and iterations
+        aa_test = AATest(
+            sample_size=0.8,
+            n_iterations=100
+        )
+        results = aa_test.execute(data)
     """
 
     @staticmethod
@@ -153,14 +157,17 @@ class AATest(ExperimentShell):
             Dict[type, Dict[str, Any]]: Dictionary mapping executor classes to their
                 parameter configurations.
 
-        Examples:
-            >>> params = AATest._prepare_params(
-            ...     n_iterations=10,
-            ...     control_size=0.5,
-            ...     sample_size=0.8
-            ... )
-            >>> print(params[AASplitter]["control_size"])
-            [0.5]
+        Examples
+        --------
+        .. code-block:: python
+
+            params = AATest._prepare_params(
+                n_iterations=10,
+                control_size=0.5,
+                sample_size=0.8
+            )
+            print(params[AASplitter]["control_size"])
+            # [0.5]
         """
         random_states = random_states or range(n_iterations)
         additional_params = additional_params or {}

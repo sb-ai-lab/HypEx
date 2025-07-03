@@ -28,19 +28,20 @@ class ABTest(ExperimentShell):
             For more information refer to the statsmodels documentation:
             https://www.statsmodels.org/dev/generated/statsmodels.stats.multitest.multipletests.html
 
-    Examples:
-        Basic A/B test with default t-test::
+    Examples
+    --------
+    .. code-block:: python
 
-            >>> ab_test = ABTest()
-            >>> results = ab_test.execute(data)
+        # Basic A/B test with default t-test
+        ab_test = ABTest()
+        results = ab_test.execute(data)
 
-        A/B test with multiple statistical tests::
-
-            >>> ab_test = ABTest(
-            ...     additional_tests=["t-test", "chi2-test"],
-            ...     multitest_method="bonferroni"
-            ... )
-            >>> results = ab_test.execute(data)
+        # A/B test with multiple statistical tests
+        ab_test = ABTest(
+            additional_tests=["t-test", "chi2-test"],
+            multitest_method="bonferroni"
+        )
+        results = ab_test.execute(data)
     """
 
     @staticmethod
