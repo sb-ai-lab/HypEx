@@ -25,6 +25,7 @@ class AASplitter(Calculator):
         sample_size: float | None = None,
         constant_key: bool = True,
         save_groups: bool = True,
+        groups_sizes: list[float] | None = None,
         key: Any = "",
     ):
         self.control_size = control_size
@@ -33,6 +34,7 @@ class AASplitter(Calculator):
         self.constant_key = constant_key
         self.save_groups = save_groups
         self.sample_size = sample_size
+        self.groups_sizes = groups_sizes
         super().__init__(key)
 
     def _generate_params_hash(self):
@@ -41,6 +43,8 @@ class AASplitter(Calculator):
             hash_parts.append(f"cs {self.control_size}")
         if self.random_state is not None:
             hash_parts.append(f"rs {self.random_state}")
+        if self.groups_sizes is not None:
+            hash_parts.append(f"gs {self.groups_sizes}")
         self._params_hash = "|".join(hash_parts)
 
     def init_from_hash(self, params_hash: str):
@@ -50,6 +54,10 @@ class AASplitter(Calculator):
                 self.control_size = float(hash_part[hash_part.rfind(" ") + 1 :])
             elif hash_part.startswith("rs"):
                 self.random_state = int(hash_part[hash_part.rfind(" ") + 1 :])
+            elif hash_part.startswith("gs"):
+                self.groups_sizes = []
+                groups_sizes = hash_part[hash_part.find(" ") + 1 :].strip("[]").split(",")
+                self.groups_sizes = [float(gs) for gs in groups_sizes]
         self._generate_id()
 
     @property
@@ -141,6 +149,7 @@ class AASplitter(Calculator):
             control_size=self.control_size,
             sample_size=self.sample_size,
             const_group_field=const_group_fields,
+            groups_sizes=self.groups_sizes,
         )
         return self._set_value(
             data,
@@ -178,6 +187,7 @@ class AASplitterWithStratification(AASplitter):
             random_state=self.random_state,
             control_size=self.control_size,
             grouping_fields=grouping_fields,
+            groups_sizes=self.groups_sizes
         )
         if isinstance(result, Dataset):
             result = result.replace_roles({"split": AdditionalTreatmentRole()})

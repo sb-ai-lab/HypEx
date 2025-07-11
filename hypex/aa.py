@@ -109,18 +109,11 @@ class AATest(ExperimentShell):
         >>> results = aa_test.execute(data)
 
         High precision A/A test with stratification:
-        >>> aa_test = AATest(
-        ...     precision_mode=True,
-        ...     stratification=True,
-        ...     control_size=0.5
-        ... )
+        >>> aa_test = AATest(precision_mode=True,control_size=0.5,stratification=True)
         >>> results = aa_test.execute(data)
 
         A/A test with custom sample size and iterations:
-        >>> aa_test = AATest(
-        ...     sample_size=0.8,
-        ...     n_iterations=100,
-        ... )
+        >>> aa_test = AATest(n_iterations=100,sample_size=0.8)
         >>> results = aa_test.execute(data)
     """
 
@@ -131,6 +124,7 @@ class AATest(ExperimentShell):
         random_states: Iterable[int] | None = None,
         sample_size: float | None = None,
         additional_params: dict[str, Any] | None = None,
+        groups_sizes: list[float] | None = None,
     ) -> dict[type, dict[str, Any]]:
         """Prepares parameters for the A/A test experiment.
 
@@ -154,11 +148,7 @@ class AATest(ExperimentShell):
                 parameter configurations.
 
         Examples:
-            >>> params = AATest._prepare_params(
-            ...     n_iterations=10,
-            ...     control_size=0.5,
-            ...     sample_size=0.8
-            ... )
+            >>> params = AATest._prepare_params(n_iterations=10,control_size=0.5,sample_size=0.8)
             >>> print(params[AASplitter]["control_size"])
             [0.5]
         """
@@ -169,6 +159,7 @@ class AATest(ExperimentShell):
                 "random_state": random_states,
                 "control_size": [control_size],
                 "sample_size": [sample_size],
+                "groups_sizes": [groups_sizes],
             },
             Comparator: {
                 "grouping_role": [AdditionalTreatmentRole()],
@@ -189,6 +180,7 @@ class AATest(ExperimentShell):
         additional_params: dict[str, Any] | None = None,
         random_states: Iterable[int] | None = None,
         t_test_equal_var: bool | None = None,
+        groups_sizes: list[float] | None = None,
     ):
         if n_iterations is None:
             if precision_mode:
@@ -200,13 +192,7 @@ class AATest(ExperimentShell):
                 executors=(
                     [ONE_AA_TEST_WITH_STRATIFICATION if stratification else ONE_AA_TEST]
                 ),
-                params=self._prepare_params(
-                    n_iterations,
-                    control_size,
-                    random_states,
-                    sample_size,
-                    additional_params,
-                ),
+                params=self._prepare_params(n_iterations, control_size, random_states, sample_size, additional_params, groups_sizes),
                 reporter=DatasetReporter(OneAADictReporter(front=False)),
             )
         ]
@@ -222,12 +208,8 @@ class AATest(ExperimentShell):
                             )
                         ]
                     ),
-                    params=self._prepare_params(
-                        n_iterations,
-                        control_size,
-                        random_states,
-                        additional_params,
-                    ),
+                    params=self._prepare_params(n_iterations, control_size, random_states, additional_params,
+                                                groups_sizes),
                     reporter=DatasetReporter(OneAADictReporter(front=False)),
                     stopping_criterion=IfAAExecutor(sample_size=sample_size),
                 )

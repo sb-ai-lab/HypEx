@@ -79,7 +79,7 @@ def test_aatest(aa_data):
     mapping = {
         "aa-casual": AATest(n_iterations=10),
         "aa-rs": AATest(random_states=[56, 72, 2, 43]),
-        "aa-strat": AATest(random_states=[56, 72, 2, 43], stratification=True),
+        "aa-strat": AATest(stratification=True, random_states=[56, 72, 2, 43]),
         "aa-sample": AATest(n_iterations=10, sample_size=0.3),
         "aa-cat_target": AATest(n_iterations=10),
         "aa-equal_var": AATest(n_iterations=10, t_test_equal_var=False),

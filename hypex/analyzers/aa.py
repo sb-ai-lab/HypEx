@@ -22,6 +22,10 @@ class OneAAStatAnalyzer(Executor):
         executor_ids = data.get_ids(
             analysis_tests, searched_space=ExperimentDataEnum.analysis_tables
         )
+        # num_groups = len(data.groups[data.ds.search_columns(TreatmentRole())[0]]) - 1
+        # groups = list(data.groups[data.ds.search_columns(TreatmentRole())[0]].items())
+        # multitest_pvalues = Dataset.create_empty()
+        # analysis_data = {}
 
         analysis_data: dict[str, float] = {}
         for class_, spaces in executor_ids.items():
