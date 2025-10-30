@@ -287,6 +287,20 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
         super().__init__(data)
 
+    def get(
+        self,
+        key,
+        default=None,
+    ) -> Any:
+        return self.data.get(key, default)
+
+    def take(
+        self,
+        indices: int | list[int],
+        axis: Literal["index", "columns", "rows"] | int = 0,
+    ) -> Any:
+        return self.data.take(indices=indices, axis=axis)
+
     def get_values(
         self,
         row: str | None = None,

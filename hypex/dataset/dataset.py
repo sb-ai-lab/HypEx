@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from copy import deepcopy
 from typing import Any, Callable, Hashable, Literal, Sequence
 
+import numpy as np
 import pandas as pd  # type: ignore
 from numpy import ndarray
 
@@ -302,6 +303,27 @@ class Dataset(DatasetBase):
         role: ABCRole = StatisticRole()
         return Dataset(data=result, roles={column: role for column in result.columns})
 
+    def get(
+        self,
+        key,
+        default=None,
+    ) -> Dataset:
+        res = self._backend.get(key, default)
+        return Dataset(data=self._backend.get(key, default), roles=deepcopy(self.roles))
+
+    def take(
+        self,
+        indices: int | list[int],
+        axis: Literal["index", "columns", "rows"] | int = 0,
+    ) -> Dataset:
+        new_data = self._backend.take(indices=indices, axis=axis)
+        new_roles = (
+            {k: deepcopy(v) for k, v in self.roles.items() if k in new_data.columns}
+            if axis == 1
+            else deepcopy(self.roles)
+        )
+        return Dataset(data=new_data, roles=new_roles)
+
     def add_column(
         self,
         data,
@@ -380,6 +402,9 @@ class Dataset(DatasetBase):
         index=None,
     ) -> Dataset:
         ds = Dataset(roles=roles, backend=backend)
+        # if all([isinstance(v, Dataset) for v in data.values()]):
+        #     ds._backend = ds._backend.from_dict({k: v.data for k, v in data.items()}, data, index)
+        # else:
         ds._backend = ds._backend.from_dict(data, index)
         ds.data = ds._backend.data
         return ds
@@ -434,10 +459,12 @@ class Dataset(DatasetBase):
         by: Any,
         func: str | list | None = None,
         fields_list: str | list | None = None,
+        reset_index: bool = True,
         **kwargs,
     ) -> list[tuple[str, Dataset]]:
         if isinstance(by, Dataset) and len(by.columns) == 1:
-            self.data = self.data.reset_index(drop=True)
+            # if reset_index:
+            #     self.data = self.data.reset_index(drop=True)
             datasets = [
                 (group, Dataset(roles=self.roles, data=self.data.loc[group_data.index]))
                 for group, group_data in by._backend.groupby(by=by.columns[0], **kwargs)
@@ -790,8 +817,14 @@ class ExperimentData:
             elif len(value.columns) == 1:
                 role = role[0] if isinstance(role, list) else role
                 role = list(role.values())[0] if isinstance(role, dict) else role
-                executor_id = executor_id[0] if isinstance(executor_id, list) else executor_id
-                executor_id = list(executor_id.keys())[0] if isinstance(executor_id, dict) else executor_id
+                executor_id = (
+                    executor_id[0] if isinstance(executor_id, list) else executor_id
+                )
+                executor_id = (
+                    list(executor_id.keys())[0]
+                    if isinstance(executor_id, dict)
+                    else executor_id
+                )
                 self.additional_fields = self.additional_fields.add_column(
                     data=value, role={executor_id: role}
                 )
@@ -942,6 +975,8 @@ class ExperimentData:
                 searched_data = searched_data.add_column(
                     data=t_data, role={column: role}
                 )
+        if not searched_data.is_empty():
+            searched_data.index = self.ds.index
         return searched_data
 
 
@@ -962,6 +997,8 @@ class DatasetAdapter(Adapter):
             if isinstance(roles, ABCRole):
                 raise InvalidArgumentError("roles", "dict[str, ABCRole]")
             return DatasetAdapter.list_to_dataset(data, roles)
+        elif isinstance(data, np.ndarray):
+            return DatasetAdapter.ndarray_to_dataset(data, roles)
         elif any(isinstance(data, t) for t in [str, int, float, bool]):
             return DatasetAdapter.value_to_dataset(data, roles)
         elif isinstance(data, Dataset):
@@ -999,12 +1036,21 @@ class DatasetAdapter(Adapter):
     @staticmethod
     def list_to_dataset(data: list, roles: dict[str, ABCRole]) -> Dataset:
         return Dataset(
-            roles=roles,
-            data=pd.DataFrame(data=data, columns=[next(iter(roles.keys()))]),
+            roles= roles if len(roles) > 0 else {0: DefaultRole()},
+            data=pd.DataFrame(data=data, columns=[next(iter(roles.keys()))] if len(roles) > 0 else [0]),
         )
 
     @staticmethod
     def frame_to_dataset(data: pd.DataFrame, roles: dict[str, ABCRole]) -> Dataset:
+        return Dataset(
+            roles=roles,
+            data=data,
+        )
+    
+    @staticmethod
+    def ndarray_to_dataset(data: np.ndarray, roles: dict[str, ABCRole]) -> Dataset:
+        columns = range(data.shape[1]) if len(roles) == 0 else list(roles.keys())
+        data = pd.DataFrame(data=data, columns=columns)
         return Dataset(
             roles=roles,
             data=data,

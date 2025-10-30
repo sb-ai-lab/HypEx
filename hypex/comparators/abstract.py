@@ -316,11 +316,15 @@ class Comparator(Calculator, ABC):
 
         compared_data = target_fields_data.groupby(by=group_field_data)
         baseline_indexes = baseline_field_data.groupby(by=group_field_data)
-        t = baseline_indexes[0][1].iget_values(column=0)
-        baseline_data = [
-            (group[0], target_fields_data.iloc[(group[1].iget_values(column=0)), :])
-            for group in baseline_indexes
-        ]
+        baseline_data = []
+
+        # mapping the data of the baseline data to its mathes data. If there are no matches, matching index will be -1
+        for group in baseline_indexes:
+            name = group[0]
+            indexes = group[1].iget_values(column=0)
+            dummy_index = target_fields_data.index[-1]
+            indexes = list(map(lambda x: dummy_index if x < 0 else x, indexes))
+            baseline_data.append((name, target_fields_data.loc[indexes, :]))
 
         return baseline_data, compared_data
 
@@ -413,6 +417,18 @@ class Comparator(Calculator, ABC):
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """
+        Execute the comparator on the given data.
+
+        The comparator will split the data into a baseline and a comparison
+        dataset based on the compare_by argument. Then it will calculate
+        statistics comparing the baseline and comparison datasets.
+
+        :param data: The ExperimentData to execute the comparator on
+        :type data: ExperimentData
+        :return: The ExperimentData with the comparison results
+        :rtype: ExperimentData
+        """
         fields = self._get_fields_data(data)
         group_field_data = fields["group_field"]
         target_fields_data = fields["target_fields"]
@@ -425,9 +441,8 @@ class Comparator(Calculator, ABC):
         )
 
         if len(target_fields_data.columns) == 0:
-            if (
-                data.ds.tmp_roles
-            ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
+            # If the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
+            if data.ds.tmp_roles:
                 return data
             else:
                 raise NoColumnsError(TargetRole().role_name)
@@ -454,7 +469,8 @@ class Comparator(Calculator, ABC):
             )
         else:
             data.groups[group_field_data.columns[0]] = {
-                f"{group}": ds for group, ds in data.ds.groupby(group_field_data)
+                f"{group}": ds
+                for group, ds in data.ds.groupby(by=group_field_data, reset_index=False)
             }
             grouping_data = self._split_data_to_buckets(
                 compare_by=self.compare_by,

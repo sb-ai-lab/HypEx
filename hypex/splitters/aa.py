@@ -56,7 +56,9 @@ class AASplitter(Calculator):
                 self.random_state = int(hash_part[hash_part.rfind(" ") + 1 :])
             elif hash_part.startswith("gs"):
                 self.groups_sizes = []
-                groups_sizes = hash_part[hash_part.find(" ") + 1 :].strip("[]").split(",")
+                groups_sizes = (
+                    hash_part[hash_part.find(" ") + 1 :].strip("[]").split(",")
+                )
                 self.groups_sizes = [float(gs) for gs in groups_sizes]
         self._generate_id()
 
@@ -103,9 +105,10 @@ class AASplitter(Calculator):
             if control_data is not None:
                 control_indexes = list(control_data.index)
             const_size = sum(len(cd) for cd in const_data.values())
-            control_size = (len(data) * control_size - const_size) / (
-                    len(data) - const_size
+            control_size = 0 if len(data) <= const_size else (len(data) * control_size - len(const_data["control"])) / (
+                len(data) - const_size
             )
+            # control_size = len(data) * control_size
         experiment_data = (
             data[data[const_group_field].isna()] if const_group_field else data
         )
@@ -118,16 +121,22 @@ class AASplitter(Calculator):
             if sum(groups_sizes) != 1:
                 raise ValueError("Groups sizes must sum to 1")
             for group_size in groups_sizes:
-                size = int(len(addition_indexes) * group_size) + (0 if not edges else edges[-1])
+                size = int(len(addition_indexes) * group_size) + (
+                    0 if not edges else edges[-1]
+                )
                 size = min(size, len(addition_indexes))
                 if not size in edges:
                     edges += [size]
         else:
             edges = [int(len(addition_indexes) * control_size), len(addition_indexes)]
-        control_indexes += addition_indexes[:edges[0]]
-        test_indexes = [addition_indexes[edges[i - 1]:edges[i]] for i in range(1, len(edges))]
+        control_indexes += addition_indexes[: edges[0]]
+        test_indexes = [
+            addition_indexes[edges[i - 1] : edges[i]] for i in range(1, len(edges))
+        ]
 
-        split_series = pd.Series(np.ones(data.data.shape[0], dtype="int"), index=data.data.index)
+        split_series = pd.Series(
+            np.ones(data.data.shape[0], dtype="int"), index=data.data.index
+        )
         split_series[control_indexes] -= 1
         for i, test_index in enumerate(test_indexes):
             split_series[test_index] += i
@@ -187,7 +196,7 @@ class AASplitterWithStratification(AASplitter):
             random_state=self.random_state,
             control_size=self.control_size,
             grouping_fields=grouping_fields,
-            groups_sizes=self.groups_sizes
+            groups_sizes=self.groups_sizes,
         )
         if isinstance(result, Dataset):
             result = result.replace_roles({"split": AdditionalTreatmentRole()})

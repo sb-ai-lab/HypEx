@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from .analyzers.ab import ABAnalyzer
-from .comparators import Chi2Test, GroupDifference, GroupSizes, TTest, UTest
+from .comparators import Chi2Test, GroupDifference, GroupSizes, TTest, UTest, KSTest
 from .dataset import TargetRole, TreatmentRole
 from .executor.executor import Executor
 from .experiments.base import Experiment, OnRoleExperiment
@@ -51,18 +51,20 @@ class ABTest(ExperimentShell):
         additional_tests: (
             str | ABTestTypesEnum | list[str | ABTestTypesEnum] | None
         ),
-        multitest_method: ABNTestMethodsEnum | None,
+        multitest_method: ABNTestMethodsEnum | str | None,
         cuped_features: dict[str, str] | None,
         cupac_features: dict[str, list[str]] | None,
         cupac_model: str | list[str] | None,
     ) -> Experiment:
         test_mapping: dict[str, Executor] = {
             "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
+            "ks-test": KSTest(compare_by="groups", grouping_role=TreatmentRole()),
             "u-test": UTest(compare_by="groups", grouping_role=TreatmentRole()),
             "chi2-test": Chi2Test(compare_by="groups", grouping_role=TreatmentRole()),
         }
         on_role_executors: list[Executor] = [GroupDifference(grouping_role=TreatmentRole())]
         additional_tests = [ABTestTypesEnum.t_test] if additional_tests is None else additional_tests
+        multitest_method = ABNTestMethodsEnum(multitest_method) if (multitest_method is not None and multitest_method in ABNTestMethodsEnum.__members__.values()) else ABNTestMethodsEnum.holm
         if additional_tests:
             if isinstance(additional_tests, list):
                 additional_tests = [ABTestTypesEnum(test) if isinstance(test, str) else test for test in additional_tests]
