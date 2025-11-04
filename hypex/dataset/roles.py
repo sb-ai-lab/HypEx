@@ -19,7 +19,7 @@ class ABCRole(ABC):
         return f"{self._role_name}({self.data_type})"
 
 
-class TemporalRole(ABCRole):
+class LagRole(ABCRole):
     """Base class for roles that support temporal metadata (parent, lag)."""
     
     def __init__(
@@ -65,21 +65,19 @@ class TreatmentRole(ABCRole):
     _role_name: RoleNameType = "Treatment"
 
 
-class TargetRole(TemporalRole):
+class TargetRole(ABCRole):
     _role_name: RoleNameType = "Target"
 
     def __init__(
         self,
         data_type: TargetRoleTypes | None = None,
-        parent: str | None = None,
-        lag: int | None = None,
         cofounders: list[str] | None = None,
     ):
-        super().__init__(data_type=data_type, parent=parent, lag=lag)
+        super().__init__(data_type=data_type)
         self.cofounders = cofounders if cofounders is not None else []
 
 
-class FeatureRole(TemporalRole):
+class FeatureRole(LagRole):
     _role_name: RoleNameType = "Feature"
 
     def __init__(
@@ -91,7 +89,7 @@ class FeatureRole(TemporalRole):
         super().__init__(data_type=data_type, parent=parent, lag=lag)
 
 
-class PreTargetRole(TargetRole):
+class PreTargetRole(LagRole):
     _role_name: RoleNameType = "PreTarget"
 
     def __init__(self,
@@ -100,7 +98,8 @@ class PreTargetRole(TargetRole):
         lag: int | None = None,
         cofounders: list[str] | None = None,
         ):
-        super().__init__(data_type=data_type, parent=parent, lag=lag, cofounders=cofounders)
+        super().__init__(data_type=data_type, parent=parent, lag=lag)
+        self.cofounders = cofounders if cofounders is not None else []
 
 
 class StatisticRole(ABCRole):

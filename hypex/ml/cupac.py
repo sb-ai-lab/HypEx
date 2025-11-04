@@ -22,7 +22,6 @@ class CUPACExecutor(MLExecutor):
     ):
         super().__init__(target_role=TargetRole(), key=key)
         self.cupac_models = cupac_models
-        self.fitted_models = {}
         self.extension = CupacExtension(n_folds, random_state)
 
     def _validate_models(self) -> None:
@@ -33,11 +32,8 @@ class CUPACExecutor(MLExecutor):
         
         if isinstance(self.cupac_models, str):
             self.cupac_models = [self.cupac_models]
-        
-        self.cupac_models = [model.lower() for model in self.cupac_models]
-        
         for model in self.cupac_models:
-            if model not in CUPAC_MODELS:
+            if model.lower() not in CUPAC_MODELS:
                 wrong_models.append(model)
             elif CUPAC_MODELS[model] is None:
                 raise ValueError(f"Model '{model}' is not available for the current backend")
@@ -45,16 +41,14 @@ class CUPACExecutor(MLExecutor):
         if wrong_models:
             raise ValueError(f"Wrong cupac models: {wrong_models}. Available models: {list(CUPAC_MODELS.keys())}")
 
-    def _prepare_data(self, data: ExperimentData):
+    @staticmethod
+    def _prepare_data(data: ExperimentData):
 
         def agg_temporal_fields(role, data):
             fields = {}
-            if isinstance(role, TargetRole):
-                searched_fields = data.field_search([TargetRole(), PreTargetRole()], search_types=[int, float])
-            else:
-                searched_fields = data.field_search(role, search_types=[int, float])
-            
-            searched_lags = [(field, data.ds.roles[field].lag if data.ds.roles[field].lag is not None else 0) for field in searched_fields]
+            searched_fields = data.field_search([TargetRole(), PreTargetRole()] if isinstance(role, TargetRole) else role, search_types=[int, float])
+
+            searched_lags = [(field, data.ds.roles[field].lag if not isinstance(data.ds.roles[field], TargetRole) else 0) for field in searched_fields]
             sorted_fields_by_lag = sorted(searched_lags, key=lambda x: x[1])
             for field, lag in sorted_fields_by_lag:
                 if lag in [None , 0]:
@@ -68,15 +62,13 @@ class CUPACExecutor(MLExecutor):
             return fields
 
         def agg_train_predict_x(mode, lag):
-            for i in range(len(cofounders[target])):
-                feature = cofounders[target][i]
+            for i, cofounder in enumerate(cofounders[target]):
                 if lag in [1, max_lags[target]]:
-                    cupac_data[target][mode].append([features[feature][lag]])
+                    cupac_data[target][mode].append([features[cofounder][lag]])
                 else:
-                    cupac_data[target][mode][i].append(feature)
+                    cupac_data[target][mode][i].append(cofounder)
 
             cupac_data[target][mode].append([targets[target][lag]])
-
 
         cupac_data = {}
         targets = agg_temporal_fields(TargetRole(), data)
@@ -111,17 +103,14 @@ class CUPACExecutor(MLExecutor):
             if target in data.ds.columns:
                 cupac_data[target]['X_predict'] = []
 
-            for lag in range(max_lags[target], 0, -1):
-                if lag == 1:
-                    if 'X_predict' in cupac_data[target].keys():
-                        agg_train_predict_x('X_predict', lag)
-                else:
-                    agg_train_predict_x('X_train', lag)
-                    cupac_data[target]['Y_train'].append(targets[target][lag - 1])
+            for lag in range(max_lags[target], 1, -1):
+                agg_train_predict_x('X_train', lag)
+                cupac_data[target]['Y_train'].append(targets[target][lag - 1])
+
+            if 'X_predict' in cupac_data[target].keys():
+                agg_train_predict_x('X_predict', 1)
 
         return cupac_data
-
-
 
     @classmethod
     def _execute_inner_function():
@@ -131,23 +120,44 @@ class CUPACExecutor(MLExecutor):
     def _inner_function():
         pass
 
-    def fit(self, model, X, Y):
-        var_red, fitted_model = self.extension.fit(
+    def calc(
+        self,
+        mode,
+        model,
+        X,
+        Y=None
+    ):
+        if mode == 'kfold_fit':
+            return self.kfold_fit(model, X, Y)
+        elif mode == 'fit':
+            return self.fit(model, X, Y)
+        elif mode == 'predict':
+            return self.predict(model, X)
+
+    def kfold_fit(self, model, X, Y):
+        var_red = self.extension.calc(
+            data=X,
+            mode='kfold_fit',
             model=model,
-            X=X,
             Y=Y,
         )
 
-        self.fitted_models[model] = fitted_model
         return var_red
-
-    def predict(self, model, X):
-        return self.extension.predict(
+    
+    def fit(self, model, X, Y):
+        return self.extension.calc(
+            data=X,
+            mode='fit',
             model=model,
-            X=X,
+            Y=Y,
         )
 
-    def get_variance_reductions(self): pass 
+    def predict(self, model, X):
+        return self.extension.calc(
+            data=X,
+            mode='predict',
+            model=model,
+        )
 
     @staticmethod
     def _agg_data_from_cupac_data(data, cupac_data_slice):
@@ -181,22 +191,24 @@ class CUPACExecutor(MLExecutor):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         self._validate_models()
-        cupac_data = self._prepare_data(data)
+        cupac_data = CUPACExecutor._prepare_data(data)
         for target in cupac_data.keys():
+            X_train = CUPACExecutor._agg_data_from_cupac_data(
+                data,
+                cupac_data[target]['X_train']
+            )
+            Y_train = CUPACExecutor._agg_data_from_cupac_data(
+                data,
+                [cupac_data[target]['Y_train']]
+            )
             best_model, best_var_red = None, None
+
             for model in self.cupac_models:
-                X_train = CUPACExecutor._agg_data_from_cupac_data(
-                    data,
-                    cupac_data[target]['X_train']
-                )
-                Y_train = CUPACExecutor._agg_data_from_cupac_data(
-                    data,
-                    [cupac_data[target]['Y_train']]
-                )
-                var_red = self.fit(
-                    model,
-                    X_train,
-                    Y_train
+                var_red = self.calc(
+                    mode='kfold_fit',
+                    model=model,
+                    X=X_train,
+                    Y=Y_train
                     )
                 if best_var_red is None or var_red > best_var_red:
                     best_model, best_var_red = model, var_red
@@ -211,15 +223,27 @@ class CUPACExecutor(MLExecutor):
                     data,
                     cupac_data[target]['X_predict']
                 )
-                prediction = self.predict(self.fitted_models[best_model], X_predict)
+
+                fitted_model = self.calc(
+                    mode='fit',
+                    model=best_model,
+                    X=X_train,
+                    Y=Y_train
+                )
+
+                prediction = self.calc(
+                    mode='predict',
+                    model=fitted_model,
+                    X=X_predict
+                )
 
                 explained_variation = prediction - prediction.mean()
                 target_cupac = data.ds[target] - explained_variation
 
                 target_cupac = target_cupac.rename({target: f"{target}_cupac"})
-                data._data = data.ds.add_column(
+                data.additional_fields = data.additional_fields.add_column(
                     data=target_cupac,
-                    role={f"{target}_cupac": TargetRole()}
+                    role={f"{target}_cupac": AdditionalTargetRole()}
                 )
                 cupac_variance_reduction_real = self.extension._calculate_variance_reduction(data.ds[target], target_cupac)
 

@@ -15,6 +15,7 @@ from ..dataset import (
     StatisticRole,
     TargetRole,
     TempTargetRole,
+    AdditionalTargetRole,
 )
 from ..executor import Calculator
 from ..utils import (
@@ -66,10 +67,10 @@ class Comparator(Calculator, ABC):
         raise AbstractMethodError
 
     def _get_fields_data(self, data: ExperimentData) -> dict[str, Dataset]:
-        tmp_role = True if data.ds.tmp_roles else False
+        tmp_role = True if data.ds.tmp_roles or data.additional_fields.tmp_roles else False
         group_field_data = data.field_data_search(roles=self.grouping_role)
         target_fields_data = data.field_data_search(
-            roles=TempTargetRole() if tmp_role else self.target_roles,
+            roles=(TempTargetRole() if data.ds.tmp_roles else AdditionalTargetRole()) if tmp_role else self.target_roles,
             tmp_role=tmp_role,
             search_types=self.search_types,
         )
@@ -446,8 +447,13 @@ class Comparator(Calculator, ABC):
                 ),
             )
         else:
+            combined_data = data.ds
+            for column in data.additional_fields.columns:
+                if isinstance(data.additional_fields.roles[column], AdditionalTargetRole):
+                    combined_data = combined_data.merge(data.additional_fields[column], left_index=True, right_index=True, how='outer')
+            
             data.groups[group_field_data.columns[0]] = {
-                f"{group}": ds for group, ds in data.ds.groupby(group_field_data)
+                f"{group}": ds for group, ds in combined_data.groupby(group_field_data)
             }
             grouping_data = self._split_data_to_buckets(
                 compare_by=self.compare_by,

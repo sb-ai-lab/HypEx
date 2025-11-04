@@ -85,7 +85,7 @@ class ABTest(ExperimentShell):
             GroupSizes(grouping_role=TreatmentRole()),
             OnRoleExperiment(
                 executors=on_role_executors,
-                role=TargetRole(),
+                role=[TargetRole(), AdditionalTargetRole()] if enable_cupac else TargetRole(),
             ),
             ABAnalyzer(
                 multitest_method=(
@@ -102,7 +102,7 @@ class ABTest(ExperimentShell):
             from .ml import CUPACExecutor
             executors.insert(0, CUPACExecutor(cupac_models=cupac_models))
 
-        return Experiment(executors=executors, transformer= True if enable_cupac else False)
+        return Experiment(executors=executors)
 
     def __init__(
         self,

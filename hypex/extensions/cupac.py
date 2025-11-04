@@ -21,22 +21,27 @@ class CupacExtension(MLExtension):
         self.n_folds = n_folds
         self.random_state = random_state
 
+    def _calc_pandas(
+        self,
+        data,
+        mode,
+        model,
+        Y=None,
+        **kwargs):
+        if mode == 'kfold_fit':
+            return self._kfold_fit_pandas(model, data, Y)
+        if mode == 'fit':
+            return self._fit_pandas(model, data, Y)
+        elif mode == 'predict':
+            return self._predict_pandas(model, data)
+
     def fit(self, model, X: Dataset, Y: Dataset):
-        if type(X.backend) != type(Y.backend):
-            raise ValueError("X and Y must have the same backend")
-        elif isinstance(X.backend, PandasDataset):
-            return self._fit_pandas(model, X, Y)
-        else:
-            raise NotImplementedError(f"Backend {type(X.backend)} is not supported")
+        pass
 
     def predict(self, model, X: Dataset):
-        if isinstance(X.backend, PandasDataset):
-            return self._predict_pandas(model, X)
-        else:
-            raise NotImplementedError(f"Backend {type(X.backend)} is not supported")
+        pass
 
-    def _fit_pandas(self, model, X, Y):
-        """Fit models using pandas backend."""
+    def _kfold_fit_pandas(self, model, X, Y):
         
         model_proto = CUPAC_MODELS[model]["pandasdataset"]
         
@@ -63,11 +68,17 @@ class CupacExtension(MLExtension):
             var_reduction = self._calculate_variance_reduction(y_original, y_adjusted)
             fold_var_reductions.append(var_reduction)
         
-        final_model = clone(model_proto)
-        final_model.fit(X_df, y_values)
-        
         mean_var_reduction = float(np.nanmean(fold_var_reductions))
-        return mean_var_reduction, final_model
+        return mean_var_reduction
+    
+    def _fit_pandas(self, model, X, Y):
+        model_proto = CUPAC_MODELS[model]["pandasdataset"]
+        final_model = clone(model_proto)
+        X_df = X.data
+        Y_df = Y.data
+        y_values = Y_df.iloc[:, 0] if len(Y_df.columns) > 0 else Y_df
+        final_model.fit(X_df, y_values)
+        return final_model
 
     def _predict_pandas(self, model, X: Dataset):
         """Make predictions using pandas backend."""

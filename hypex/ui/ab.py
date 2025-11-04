@@ -67,46 +67,48 @@ class ABOutput(Output):
             if key.endswith('_cupac_report')
         ]
         
-        if cupac_report_keys:
-            # Aggregate all CUPAC reports into a single dataset
-            variance_data = []
-            for key in cupac_report_keys:
-                report = experiment_data.analysis_tables[key]
-                target_name = key.replace('_cupac_report', '')
-                
-                control_mean_bias = None
-                test_mean_bias = None
-                
-                resume_data = self.resume.data
-                if 'feature' in resume_data.columns and target_name in resume_data['feature'].values:
-                    original_row = resume_data[resume_data['feature'] == target_name]
-                    cupac_row = resume_data[resume_data['feature'] == f"{target_name}_cupac"]
-
-                    control_mean_bias = original_row['control mean'].iloc[0] - cupac_row['control mean'].iloc[0]
-                    test_mean_bias = original_row['test mean'].iloc[0] - cupac_row['test mean'].iloc[0]
-
-                variance_data.append({
-                    'target': target_name,
-                    'best_model': report.get('cupac_best_model'),
-                    'variance_reduction_cv': report.get('cupac_variance_reduction_cv'),
-                    'variance_reduction_real': report.get('cupac_variance_reduction_real'),
-                    'control_mean_bias': control_mean_bias,
-                    'test_mean_bias': test_mean_bias
-                })
-            
-            self.variance_reductions = Dataset.from_dict(
-                data=variance_data,
-                roles={
-                    'target': InfoRole(str),
-                    'best_model': InfoRole(str),
-                    'variance_reduction_cv': StatisticRole(),
-                    'variance_reduction_real': StatisticRole(),
-                    'control_mean_bias': StatisticRole(),
-                    'test_mean_bias': StatisticRole()
-                }
-            )
-        else:
+        if not cupac_report_keys:
             self.variance_reductions = None
+            return
+        
+        # Aggregate all CUPAC reports into a single dataset
+        variance_data = []
+        for key in cupac_report_keys:
+            report = experiment_data.analysis_tables[key]
+            target_name = key.replace('_cupac_report', '')
+            
+            control_mean_bias = None
+            test_mean_bias = None
+            
+            resume_data = self.resume.data
+            if 'feature' in resume_data.columns and target_name in resume_data['feature'].values:
+                original_row = resume_data[resume_data['feature'] == target_name]
+                cupac_row = resume_data[resume_data['feature'] == f"{target_name}_cupac"]
+
+                control_mean_bias = original_row['control mean'].iloc[0] - cupac_row['control mean'].iloc[0]
+                test_mean_bias = original_row['test mean'].iloc[0] - cupac_row['test mean'].iloc[0]
+
+            variance_data.append({
+                'target': target_name,
+                'best_model': report.get('cupac_best_model'),
+                'variance_reduction_cv': report.get('cupac_variance_reduction_cv'),
+                'variance_reduction_real': report.get('cupac_variance_reduction_real'),
+                'control_mean_bias': control_mean_bias,
+                'test_mean_bias': test_mean_bias
+            })
+        
+        self.variance_reductions = Dataset.from_dict(
+            data=variance_data,
+            roles={
+                'target': InfoRole(str),
+                'best_model': InfoRole(str),
+                'variance_reduction_cv': StatisticRole(),
+                'variance_reduction_real': StatisticRole(),
+                'control_mean_bias': StatisticRole(),
+                'test_mean_bias': StatisticRole()
+            }
+        )
+            
 
     @property
     def variance_reduction_report(self) -> Dataset | str:
