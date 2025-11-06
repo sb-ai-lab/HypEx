@@ -173,7 +173,7 @@ class SparkNavigation(DatasetBackendNavigation):
         raise KeyError("Unsupported index type for SparkDataset")
 
     def __len__(self):
-        pass
+        return 0 if self.data is None else self.data.count()
 
     @staticmethod
     def __magic_determine_other(other) -> Any:
@@ -276,16 +276,62 @@ class SparkNavigation(DatasetBackendNavigation):
     def _repr_html_(self):
         pass
 
+    def get_values(
+        self,
+        row: Optional[str] = None,
+        column: Optional[str] = None,
+    ) -> Any:
+        if (column is not None) and (row is not None):
+            return self[row].data.select(column)
+        if column is not None:
+            return self[column].data.toPandas.values.tolist()
+        if row is not None:
+            return self[row].data.toPandas.values.tolist()
+        return self
+
+    def iget_values(
+        self,
+        row: Optional[int] = None,
+        column: Optional[int] = None,
+    ) -> Any:
+        if (column is not None) and (row is not None):
+            column = self.columns[column]
+            return self[row].data.select(column)
+        if column is not None:
+            column = self.columns[column]
+            return self[column].data.toPandas.values.tolist()
+        if row is not None:
+            return self[row].data.toPandas.values.tolist()
+        return self
+
     def create_empty(
         self,
         index: Optional[Iterable] = None,
         columns: Optional[Iterable[str]] = None,
     ):
-        pass
+        columns = list(columns or [])
+        schema = T.StructType(
+            [T.StructField(column, T.StringType(), True) for column in columns]
+        )
+        empty_rdd = self.session.sparkContext.emptyRDD()
+        self.data = self.session.createDataFrame(empty_rdd, schema)
+        if index is not None:
+            index_rows = [(value,) for value in index]
+            index_df = self.session.createDataFrame(index_rows, ["index"])
+            self.data = index_df.join(self.data, how="cross") if columns else index_df
+        return self
 
     @property
     def index(self):
-        pass
+        if self.data is None:
+            return []
+        if "index" in self.data.columns:
+            return self.get_values(column="index")
+        if "__index__" in self.data.columns:
+            return pd.Index(self.data.select("__index__").toPandas()["__index__"])
+        return pd.Index(
+            [row["__row_id"] for row in self._with_row_index(self.data).select("__row_id").collect()]
+        )
 
     @property
     def columns(self):
@@ -401,20 +447,6 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     @staticmethod
     def _convert_agg_result(result):
-        pass
-
-    def get_values(
-        self,
-        row: Optional[str] = None,
-        column: Optional[str] = None,
-    ) -> Any:
-        pass
-
-    def iget_values(
-        self,
-        row: Optional[int] = None,
-        column: Optional[int] = None,
-    ) -> Any:
         pass
 
     def apply(self, func: Callable, **kwargs) -> spark.DataFrame:

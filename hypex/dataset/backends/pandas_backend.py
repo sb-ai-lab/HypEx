@@ -155,6 +155,36 @@ class PandasNavigation(DatasetBackendNavigation):
     def _repr_html_(self):
         return self.data._repr_html_()
 
+    def get_values(
+        self,
+        row: str | None = None,
+        column: str | None = None,
+    ) -> Any:
+        if (column is not None) and (row is not None):
+            return self.data.loc[row, column]
+        elif column is not None:
+            result = self.data.loc[:, column]
+        elif row is not None:
+            result = self.data.loc[row, :]
+        else:
+            result = self.data
+        return result.values.tolist()
+
+    def iget_values(
+        self,
+        row: int | None = None,
+        column: int | None = None,
+    ) -> Any:
+        if (column is not None) and (row is not None):
+            return self.data.iloc[row, column]
+        elif column is not None:
+            result = self.data.iloc[:, column]
+        elif row is not None:
+            result = self.data.iloc[row, :]
+        else:
+            result = self.data
+        return result.values.tolist()
+
     def create_empty(
         self,
         index: Iterable | None = None,
@@ -294,36 +324,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
         super().__init__(data)
-
-    def get_values(
-        self,
-        row: str | None = None,
-        column: str | None = None,
-    ) -> Any:
-        if (column is not None) and (row is not None):
-            return self.data.loc[row, column]
-        elif column is not None:
-            result = self.data.loc[:, column]
-        elif row is not None:
-            result = self.data.loc[row, :]
-        else:
-            result = self.data
-        return result.values.tolist()
-
-    def iget_values(
-        self,
-        row: int | None = None,
-        column: int | None = None,
-    ) -> Any:
-        if (column is not None) and (row is not None):
-            return self.data.iloc[row, column]
-        elif column is not None:
-            result = self.data.iloc[:, column]
-        elif row is not None:
-            result = self.data.iloc[row, :]
-        else:
-            result = self.data
-        return result.values.tolist()
 
     def apply(self, func: Callable, **kwargs) -> pd.DataFrame:
         single_column_name = kwargs.pop("column_name")
