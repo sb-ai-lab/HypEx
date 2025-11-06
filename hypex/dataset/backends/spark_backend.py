@@ -18,11 +18,12 @@ from typing import (
 import numpy as np
 import pandas as pd
 import pyspark.sql as spark
+from patsy.util import iterable
 from pyspark import SparkContext, SparkConf, StorageLevel
 from pyspark.sql import SparkSession, functions as F, types as T
 from pyspark.sql.functions import lit, monotonically_increasing_id
 
-from ...utils import FromDictTypes, MergeOnError, ScalarType
+from ...utils import FromDictTypes, MergeOnError, ScalarType, Adapter
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -123,7 +124,53 @@ class SparkNavigation(DatasetBackendNavigation):
             self.data = SparkSession.emptyDataFrame
 
     def __getitem__(self, item):
-        pass
+
+        def get_slice(self, item: slice):
+            if isinstance(item, slice):
+                start = item.start or 0
+                stop = item.stop
+                if stop is None:
+                    raise ValueError("Slice stop must be defined for Spark navigation")
+                step = item.step or 1
+                if step <= 0:
+                    raise ValueError("Slice step must be positive for Spark navigation")
+
+                indexed = self._with_row_index(self.data)
+                condition = (F.col("__row_id") >= start) & (F.col("__row_id") < stop)
+                filtered = indexed.filter(condition & ((F.col("__row_id") - start) % step == 0))
+                return filtered.drop("__row_id")
+
+        def get_cols(self, item: Union[str, List[str]]):
+            columns = Adapter.to_list(item)
+            return self.data.select(*columns)
+
+        def get_rows(self, item: Union[int, List[int], slice]):
+            if isinstance(item, slice):
+                return get_slice(self, item)
+
+            idx = Adapter.to_list(item)
+            if any(idx < 0):
+                length = self.__len__()
+                idx = [length + id if id < 0 else id for id in idx]
+
+            if len(idx) == 1:
+                row = self._with_row_index(self.data).filter(F.col("__row_id") == idx).drop("__row_id")
+                collected = row.limit(1).collect()
+                if not collected:
+                    raise IndexError("Spark dataset index out of range")
+                return collected[0]
+            else:
+                df_with_ids = self.withColumn("row_id", monotonically_increasing_id())
+                return df_with_ids.filter(df_with_ids.row_id.isin(idx)).drop("row_id")
+
+        sample = item[0] if isinstance(item, List) else item
+
+        if isinstance(sample, str):
+            return get_cols(self, item)
+        elif isinstance(sample, Union[int, slice]):
+            return get_rows(self, item)
+
+        raise KeyError("Unsupported index type for SparkDataset")
 
     def __len__(self):
         pass
