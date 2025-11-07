@@ -22,6 +22,10 @@ from pyspark import SparkContext, SparkConf, StorageLevel
 from pyspark.sql import SparkSession, functions as F, types as T
 from pyspark.sql.functions import lit, monotonically_increasing_id
 
+from pyspark.sql import DataFrame as SparkDF
+from pyspark.sql.column import Column
+
+
 from ...utils import FromDictTypes, MergeOnError, ScalarType
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
@@ -130,104 +134,126 @@ class SparkNavigation(DatasetBackendNavigation):
 
     @staticmethod
     def __magic_determine_other(other) -> Any:
-        pass
-
+        if isinstance(other, (int, float, str, bool)):
+            return F.lit(other)
+        elif isinstance(other, F.Column):
+            return other
+        else:
+            raise TypeError(
+                f"Unsupported operand type: '{type(other).__name__}'. "
+                )
+        
     # comparison operators:
-    def __eq__(self, other) -> Any:
-        pass
+    def __eq__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.col(c) == other).alias(c) for c in self.data.columns)
 
-    def __ne__(self, other) -> Any:
-        pass
+    def __ne__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.col(c) != other).alias(c) for c in self.data.columns)
 
-    def __le__(self, other) -> Any:
-        pass
+    def __lt__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.col(c) < other).alias(c) for c in self.data.columns)
 
-    def __lt__(self, other) -> Any:
-        pass
+    def __le__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.col(c) <= other).alias(c) for c in self.data.columns)
 
-    def __ge__(self, other) -> Any:
-        pass
-
-    def __gt__(self, other) -> Any:
-        pass
+    def __ge__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.col(c) >= other).alias(c) for c in self.data.columns)
+    
+    def __gt__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.col(c) > other).alias(c) for c in self.data.columns)
 
     # Unary operations:
-    def __pos__(self) -> Any:
-        pass
+    def __pos__(self) -> spark.DataFrame:
+        return self.data.select("*")
 
-    def __neg__(self) -> Any:
-        pass
+    def __neg__(self) -> spark.DataFrame:
+        return self.data.select((-F.col(c)).alias(c) for c in self.data.columns)
 
-    def __abs__(self) -> Any:
-        pass
+    def __abs__(self) -> spark.DataFrame:
+        return self.data.select(F.abs(F.col(c)).alias(c) for c in self.data.columns)
 
-    def __invert__(self) -> Any:
-        pass
+    def __invert__(self) -> spark.DataFrame:
+        return self.data.select((~F.col(c)).alias(c) for c in self.data.columns)
 
-    def __round__(self, ndigits: int = 0) -> Any:
-        pass
+    def __round__(self, ndigits: int = 0) -> spark.DataFrame:
+        return self.data.select(F.round(F.col(c), ndigits).alias(c) for c in self.data.columns)
 
     # Binary operations:
-    def __add__(self, other) -> Any:
-        pass
+    def __add__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.col(c) + other).alias(c) for c in self.data.columns)
 
-    def __sub__(self, other) -> Any:
-        pass
+    def __sub__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.col(c) - other).alias(c) for c in self.data.columns)
 
-    def __mul__(self, other) -> Any:
-        pass
+    def __mul__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.col(c) * other).alias(c) for c in self.data.columns)
 
-    def __floordiv__(self, other) -> Any:
-        pass
+    def __floordiv__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.floor(F.col(c) / other)).alias(c) for c in self.data.columns)
 
-    def __div__(self, other) -> Any:
-        pass
+    def __mod__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.col(c) % other).alias(c) for c in self.data.columns)
 
-    def __truediv__(self, other) -> Any:
-        pass
+    def __pow__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select(F.pow(F.col(c), other).alias(c) for c in self.data.columns)
 
-    def __mod__(self, other) -> Any:
-        pass
+    def __and__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.col(c) & other).alias(c) for c in self.data.columns)
 
-    def __pow__(self, other) -> Any:
-        pass
-
-    def __and__(self, other) -> Any:
-        pass
-
-    def __or__(self, other) -> Any:
-        pass
+    def __or__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.col(c) | other).alias(c) for c in self.data.columns)
 
     # Right arithmetic operators:
-    def __radd__(self, other) -> Any:
-        pass
+    def __radd__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((other + F.col(c)).alias(c) for c in self.data.columns)
 
-    def __rsub__(self, other) -> Any:
-        pass
+    def __rsub__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((other - F.col(c)).alias(c) for c in self.data.columns)
 
-    def __rmul__(self, other) -> Any:
-        pass
+    def __rmul__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((other * F.col(c)).alias(c) for c in self.data.columns)
 
-    def __rfloordiv__(self, other) -> Any:
-        pass
+    def __rfloordiv__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((F.floor(other / F.col(c))).alias(c) for c in self.data.columns)
 
-    def __rdiv__(self, other) -> Any:
-        pass
+    def __rdiv__(self, other) -> spark.DataFrame:
+        return self.__rtruediv__(other)
 
-    def __rtruediv__(self, other) -> Any:
-        pass
+    def __rtruediv__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((other / F.col(c)).alias(c) for c in self.data.columns)
 
-    def __rmod__(self, other) -> Any:
-        pass
+    def __rmod__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select((other % F.col(c)).alias(c) for c in self.data.columns)
 
-    def __rpow__(self, other) -> Any:
-        pass
+    def __rpow__(self, other) -> spark.DataFrame:
+        other = self.__magic_determine_other(other)
+        return self.data.select(F.pow(other, F.col(c)).alias(c) for c in self.data.columns)
 
     def __repr__(self):
-        pass
+        return self.data.__repr__()
 
     def _repr_html_(self):
-        pass
+        return self.data._repr_html_()
 
     def create_empty(
         self,
