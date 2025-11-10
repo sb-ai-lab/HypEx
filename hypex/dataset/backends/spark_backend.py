@@ -355,10 +355,6 @@ class SparkNavigation(DatasetBackendNavigation):
                 dtypes[k] = int
             elif pd.api.types.is_float_dtype(v):
                 dtypes[k] = float
-            # elif pd.api.types.is_object_dtype(v) and pd.api.types.is_list_like(
-            #     self.data[column_name].iloc[0]
-            # ):
-            #     dtypes[k] = object
             elif (
                 pd.api.types.is_string_dtype(v)
                 or pd.api.types.is_object_dtype(v)
@@ -402,7 +398,7 @@ class SparkNavigation(DatasetBackendNavigation):
                 raise ValueError(f"Data length {len(data_list)} doesn't match DataFrame row count {df.count()}")
 
             original_rdd = df.rdd
-            zipped_rdd = original_rdd.zip(spark.sparkContext.parallelize(data_list))
+            zipped_rdd = original_rdd.zip(SparkContext.parallelize(data_list))
             new_df = zipped_rdd.map(lambda x: x[0] + (x[1],)).toDF(df.columns + [column_names])
 
             return new_df
