@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Sequence, Optional, Dict, Union
+from typing import Any, Sequence, Optional, Dict, Union, Literal
 import numpy as np
 import pandas as pd
 from sklearn.base import clone
@@ -23,11 +23,11 @@ class CupacExtension(MLExtension):
 
     def _calc_pandas(
         self,
-        data,
-        mode,
-        model,
-        Y=None,
-        **kwargs):
+        data: Dataset,
+        mode: Literal["kfold_fit", "fit", "predict"],
+        model: str | Any,
+        Y: Dataset | None = None,
+        **kwargs) -> Any:
         if mode == 'kfold_fit':
             return self._kfold_fit_pandas(model, data, Y)
         if mode == 'fit':
@@ -35,13 +35,13 @@ class CupacExtension(MLExtension):
         elif mode == 'predict':
             return self._predict_pandas(model, data)
 
-    def fit(self, model, X: Dataset, Y: Dataset):
+    def fit(self, model: str, X: Dataset, Y: Dataset) -> Any:
         pass
 
-    def predict(self, model, X: Dataset):
+    def predict(self, model: Any, X: Dataset) -> Dataset:
         pass
 
-    def _kfold_fit_pandas(self, model, X, Y):
+    def _kfold_fit_pandas(self, model: str, X: Dataset, Y: Dataset) -> float:
         
         model_proto = CUPAC_MODELS[model]["pandasdataset"]
         
@@ -71,7 +71,7 @@ class CupacExtension(MLExtension):
         mean_var_reduction = float(np.nanmean(fold_var_reductions))
         return mean_var_reduction
     
-    def _fit_pandas(self, model, X, Y):
+    def _fit_pandas(self, model: str, X: Dataset, Y: Dataset) -> Any:
         model_proto = CUPAC_MODELS[model]["pandasdataset"]
         final_model = clone(model_proto)
         X_df = X.data
@@ -80,7 +80,7 @@ class CupacExtension(MLExtension):
         final_model.fit(X_df, y_values)
         return final_model
 
-    def _predict_pandas(self, model, X: Dataset):
+    def _predict_pandas(self, model: Any, X: Dataset) -> Dataset:
         """Make predictions using pandas backend."""
         X_df = X.data
         predictions = pd.DataFrame(model.predict(X_df), columns=['predict'])
@@ -92,7 +92,7 @@ class CupacExtension(MLExtension):
         )
 
     @staticmethod
-    def _calculate_variance_reduction(y_original, y_adjusted):
+    def _calculate_variance_reduction(y_original, y_adjusted) -> float:
         """Calculate variance reduction between original and adjusted target."""
         var_original = y_original.var()
         var_adjusted = y_adjusted.var()

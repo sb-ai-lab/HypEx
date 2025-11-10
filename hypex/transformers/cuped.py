@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, Sequence
 from copy import deepcopy
 from ..dataset.dataset import Dataset, ExperimentData
@@ -50,7 +52,7 @@ class CUPEDTransformer(Transformer):
         return result
 
     @classmethod
-    def calc(cls, data: Dataset, cuped_features: dict[str, str], **kwargs):
+    def calc(cls, data: Dataset, cuped_features: dict[str, str], **kwargs) -> Dataset:
         return cls._inner_function(data, cuped_features)
 
     def execute(self, data: ExperimentData) -> ExperimentData:

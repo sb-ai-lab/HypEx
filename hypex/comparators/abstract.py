@@ -447,10 +447,12 @@ class Comparator(Calculator, ABC):
                 ),
             )
         else:
-            combined_data = data.ds
-            for column in data.additional_fields.columns:
-                if isinstance(data.additional_fields.roles[column], AdditionalTargetRole):
-                    combined_data = combined_data.merge(data.additional_fields[column], left_index=True, right_index=True, how='outer')
+            combined_data = data.ds.merge(
+                data.additional_fields[[col for col in data.additional_fields.columns if isinstance(data.additional_fields.roles[col], AdditionalTargetRole)]],
+                left_index=True,
+                right_index=True,
+                how='outer'
+            ) if any(isinstance(data.additional_fields.roles[col], AdditionalTargetRole) for col in data.additional_fields.columns) else data.ds
             
             data.groups[group_field_data.columns[0]] = {
                 f"{group}": ds for group, ds in combined_data.groupby(group_field_data)
