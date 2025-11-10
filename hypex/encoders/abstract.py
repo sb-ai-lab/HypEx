@@ -55,6 +55,8 @@ class Encoder(Calculator):
         target_cols = data.ds.search_columns(
             roles=self.target_roles, search_types=self.search_types
         )
+        if not target_cols:
+            return data
         return self._set_value(
             data=data,
             value=self.calc(data=data.ds, target_cols=target_cols),

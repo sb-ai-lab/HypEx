@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import Literal
 
 from .analyzers.matching import MatchingAnalyzer
-from .comparators import KSTest, TTest
+from .comparators import KSTest, TTest, Chi2Test
 from .comparators.distances import MahalanobisDistance
 from .dataset import AdditionalMatchingRole, FeatureRole, TargetRole, TreatmentRole
+from .encoders.encoders import DummyEncoder
 from .executor import Executor
 from .experiments import GroupExperiment
 from .experiments.base import Experiment, OnRoleExperiment
@@ -70,11 +71,17 @@ class Matching(ExperimentShell):
         metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: (
-            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]
-            | list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]]
+            Literal["smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"]
+            | list[
+                Literal[
+                    "smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"
+                ]
+            ]
         ) = "auto",
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
         n_neighbors: int = 1,
+        weights: dict[str, float] | None = None,
+        encode_categories: bool = True,
     ) -> Experiment:
         """Creates an experiment configuration with specified matching parameters.
 
@@ -109,7 +116,10 @@ class Matching(ExperimentShell):
             )
         """
         distance_mapping = {
-            "mahalanobis": MahalanobisDistance(grouping_role=TreatmentRole())
+            "mahalanobis": MahalanobisDistance(
+                grouping_role=TreatmentRole(), weights=weights
+            ),
+            # "l2": L2Distance(grouping_role=TreatmentRole(), weights=weights),
         }
         test_mapping = {
             "t-test": TTest(
@@ -119,6 +129,11 @@ class Matching(ExperimentShell):
             ),
             # "psi": PSI(grouping_role=TreatmentRole(), compare_by="groups"),
             "ks-test": KSTest(
+                grouping_role=TreatmentRole(),
+                compare_by="matched_pairs",
+                baseline_role=AdditionalMatchingRole(),
+            ),
+            "chi2-test": Chi2Test(
                 grouping_role=TreatmentRole(),
                 compare_by="matched_pairs",
                 baseline_role=AdditionalMatchingRole(),
@@ -147,7 +162,14 @@ class Matching(ExperimentShell):
             ),
             MatchingAnalyzer(),
         ]
-        if quality_tests != "auto":
+        if quality_tests == "auto":
+            executors += [
+                OnRoleExperiment(
+                    executors=list(test_mapping.values()),
+                    role=FeatureRole(),
+                )
+            ]
+        else:
             # warnings.warn("Now quality tests aren't supported yet")
             executors += [
                 OnRoleExperiment(
@@ -155,21 +177,15 @@ class Matching(ExperimentShell):
                     role=FeatureRole(),
                 )
             ]
+        executors = (
+            executors if distance == "l2" else [distance_mapping[distance], *executors]
+        )
+        executors = executors if not encode_categories else [DummyEncoder(), *executors]
         return (
-            Experiment(
-                executors=(
-                    executors
-                    if distance == "l2"
-                    else [distance_mapping[distance], *executors]
-                )
-            )
+            Experiment(executors=executors)
             if not group_match
             else GroupExperiment(
-                executors=(
-                    executors
-                    if distance == "l2"
-                    else [distance_mapping[distance], *executors]
-                ),
+                executors=executors,
                 reporter=MatchingDatasetReporter(),
             )
         )
@@ -181,11 +197,17 @@ class Matching(ExperimentShell):
         metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: (
-            Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]
-            | list[Literal["smd", "psi", "ks-test", "repeats", "t-test", "auto"]]
+            Literal["smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"]
+            | list[
+                Literal[
+                    "smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"
+                ]
+            ]
         ) = "auto",
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
         n_neighbors: int = 1,
+        weights: dict[str, float] | None = None,
+        encode_categories: bool = True,
     ):
         super().__init__(
             experiment=self._make_experiment(
@@ -196,6 +218,8 @@ class Matching(ExperimentShell):
                 quality_tests,
                 faiss_mode,
                 n_neighbors,
+                weights,
+                encode_categories,
             ),
             output=MatchingOutput(GroupExperiment if group_match else MatchingAnalyzer),
         )

@@ -54,14 +54,15 @@ class MatchingOutput(Output):
                     matched_data.reindex(experiment_data.ds.index), axis=1
                 )
 
-    def _reformat_resume(self, resume: dict[str, Any]):
+    @staticmethod
+    def _reformat_resume(resume: dict[str, Any]):
         """
         Reformats a flat resume dictionary with composite keys into a nested structure.
-        
+
         This function processes keys containing ID_SPLIT_SYMBOL to create
         a hierarchical resume structure. Keys without the split symbol are ignored.
         """
-        
+
         reformatted_resume: dict[str, Any] = {}
 
         # Iterate through each key-value pair in the original resume in order to skip the keys that don't contain the ID_SPLIT_SYMBOL (have only one level of hierarchy)
@@ -88,36 +89,55 @@ class MatchingOutput(Output):
 
         return reformatted_resume
 
+    @staticmethod
+    def _collect_grouped_indexes(experiment_data, group) -> Dataset:
+        group_indexes_id = experiment_data.ds.search_columns(GroupingRole())
+        indexes = [
+            Dataset.from_dict(
+                {
+                    "indexes": list(
+                        map(int, values.split(MATCHING_INDEXES_SPLITTER_SYMBOL))
+                    )
+                },
+                index=experiment_data.ds[
+                    experiment_data.ds[group_indexes_id] == group
+                ].index,
+                roles={"indexes": StatisticRole()},
+            )
+            for group, values in group.items()
+        ]
+        return indexes[0].append(indexes[1:]).sort()
+
     def extract(self, experiment_data: ExperimentData):
         resume = self.resume_reporter.report(experiment_data)
         reformatted_resume = self._reformat_resume(resume)
         if "indexes" in reformatted_resume.keys():
-            group_indexes_id = experiment_data.ds.search_columns(GroupingRole())
-            indexes = [
-                Dataset.from_dict(
-                    {
-                        f"indexes_{group}": list(
-                            map(int, values.split(MATCHING_INDEXES_SPLITTER_SYMBOL))
-                        )
-                    },
-                    index=experiment_data.ds[
-                        experiment_data.ds[group_indexes_id] == group
-                    ].index,
-                    roles={f"indexes_{group}": StatisticRole()},
-                )
-                for group, values in reformatted_resume.pop("indexes").items()
-            ]
+            indexes_items = reformatted_resume.pop("indexes")
+            are_nested = all(isinstance(v, dict) for v in indexes_items.values())
+            if are_nested:
+                indexes = [
+                    self._collect_grouped_indexes(experiment_data, values).rename(
+                        {"indexes": f"indexes_{group}"}
+                    )
+                    for group, values in indexes_items.items()
+                ]
+            else:
+                indexes = [
+                    Dataset.from_dict(
+                        {
+                            f"indexes_{group}": list(
+                                map(int, values.split(MATCHING_INDEXES_SPLITTER_SYMBOL))
+                            )
+                        },
+                        roles={f"indexes_{group}": StatisticRole()},
+                    )
+                    for group, values in indexes_items.items()
+                ]
             indexes = indexes[0].append(other=indexes[1:], axis=1).sort()
         else:
+            indexes_data = resume["indexes"].split(MATCHING_INDEXES_SPLITTER_SYMBOL)
             indexes = Dataset.from_dict(
-                {
-                    "indexes": list(
-                        map(
-                            int,
-                            resume["indexes"].split(MATCHING_INDEXES_SPLITTER_SYMBOL),
-                        )
-                    )
-                },
+                {"indexes": list(map(int, indexes_data))},
                 roles={"indexes": AdditionalMatchingRole()},
             )
 

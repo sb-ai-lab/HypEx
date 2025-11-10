@@ -237,10 +237,7 @@ class MLExecutor(Calculator, ABC):
         result = cls._execute_inner_function(
             grouping_data, target_field=target_field, **kwargs
         )
-        return DatasetAdapter.to_dataset(
-            result,
-            {i: AdditionalMatchingRole() for i in list(result.keys())},
-        )
+        return result
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields = self._get_fields(data=data)
@@ -265,6 +262,7 @@ class MLExecutor(Calculator, ABC):
             target_fields=target_fields,
             features_fields=features_fields,
         )
+        # TODO: add roles to compare_result
         return self._set_value(data, compare_result)
 
 

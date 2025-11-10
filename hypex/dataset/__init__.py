@@ -6,6 +6,7 @@ from .abstract import DatasetBase
 from .dataset import Dataset, DatasetAdapter, ExperimentData
 from .roles import (
                     ABCRole,
+                    AdditionalFeatureRole,
                     AdditionalGroupingRole,
                     AdditionalMatchingRole,
                     AdditionalPreTargetRole,
@@ -31,6 +32,7 @@ from .roles import (
 
 __all__ = [
     "ABCRole",
+    "AdditionalFeatureRole",
     "AdditionalGroupingRole",
     "AdditionalMatchingRole",
     "AdditionalPreTargetRole",

@@ -287,6 +287,20 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
         super().__init__(data)
 
+    def get(
+        self,
+        key,
+        default=None,
+    ) -> Any:
+        return self.data.get(key, default)
+
+    def take(
+        self,
+        indices: int | list[int],
+        axis: Literal["index", "columns", "rows"] | int = 0,
+    ) -> Any:
+        return self.data.take(indices=indices, axis=axis)
+
     def get_values(
         self,
         row: str | None = None,
@@ -447,8 +461,20 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             return int(data.loc[data.index[0], data.columns[0]])
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
-    def dot(self, other: PandasDataset) -> pd.DataFrame:
-        result = self.data.dot(other.data)
+    def dot(self, other: PandasDataset | np.ndarray) -> pd.DataFrame:
+        if isinstance(other, np.ndarray):
+            other_df = pd.DataFrame(
+                data=other,
+                columns=self.columns if other.shape[1] == self.shape[1] else None,
+            )
+            # print(other_df.shape)
+            # print(self.data.shape)
+            result = self.data.dot(other_df.T)
+            result.columns = (
+                self.columns if other.shape[1] == self.shape[1] else result.columns
+            )
+        else:
+            result = self.data.dot(other.data)
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
     def dropna(

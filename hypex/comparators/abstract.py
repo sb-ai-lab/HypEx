@@ -36,7 +36,9 @@ from ..utils.errors import (
 class Comparator(Calculator, ABC):
     def __init__(
         self,
-        compare_by: Literal["groups", "columns", "columns_in_groups", "cross", "matched_pairs"],
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+        ],
         grouping_role: ABCRole | None = None,
         target_roles: ABCRole | list[ABCRole] | None = None,
         baseline_role: ABCRole | None = None,
@@ -74,9 +76,7 @@ class Comparator(Calculator, ABC):
             tmp_role=tmp_role,
             search_types=self.search_types,
         )
-        baseline_field_data = data.field_data_search(
-            roles=self.baseline_role
-        )
+        baseline_field_data = data.field_data_search(roles=self.baseline_role)
         return {
             "group_field": group_field_data,
             "target_fields": target_fields_data,
@@ -88,7 +88,9 @@ class Comparator(Calculator, ABC):
         cls,
         baseline_data: list[tuple[str, Dataset]],
         compared_data: list[tuple[str, Dataset]],
-        compare_by: Literal["groups", "columns", "columns_in_groups", "cross", "matched_pairs"],
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+        ],
         **kwargs,
     ) -> dict:
         result = {}
@@ -140,7 +142,9 @@ class Comparator(Calculator, ABC):
     @staticmethod
     def _grouping_data_split(
         grouping_data: dict[str, Dataset],
-        compare_by: Literal["groups", "columns", "columns_in_groups", "cross", "matched_pairs"],
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+        ],
         target_fields: list[str],
         baseline_field: str | None = None,
     ) -> GroupingDataType:
@@ -182,7 +186,9 @@ class Comparator(Calculator, ABC):
         comparison_role: Literal[
             "group_field_data", "target_fields_data", "baseline_field_data"
         ],
-        compare_by: Literal["groups", "columns", "columns_in_groups", "cross", "matched_pairs"],
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+        ],
     ) -> Dataset:
         if len(field_data.columns) == 0:
             raise NoRequiredArgumentError(comparison_role)
@@ -299,32 +305,36 @@ class Comparator(Calculator, ABC):
         baseline_field_data: Dataset,
         target_fields_data: Dataset,
     ) -> GroupingDataType:
-        group_field_data = cls._field_validity_check(group_field_data, "group_field_data", "matched_pairs")
-        baseline_field_data = cls._field_validity_check(baseline_field_data, "baseline_field_data", "matched_pairs")
-        target_fields_data = cls._field_validity_check(target_fields_data, "target_fields_data", "matched_pairs")
+        group_field_data = cls._field_validity_check(
+            group_field_data, "group_field_data", "matched_pairs"
+        )
+        baseline_field_data = cls._field_validity_check(
+            baseline_field_data, "baseline_field_data", "matched_pairs"
+        )
+        target_fields_data = cls._field_validity_check(
+            target_fields_data, "target_fields_data", "matched_pairs"
+        )
 
-        compared_data = [
-        sorted(
-            target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
-        ).pop(1)
-        ]
-        baseline_indexes = baseline_field_data.iloc[compared_data[0][1].index].data.iloc[:, 0].to_list()
-        baseline_data = target_fields_data.iloc[baseline_indexes]
-        baseline_value = [
-        sorted(
-            target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
-        ).pop(0)
-        ][0][0]
+        compared_data = target_fields_data.groupby(by=group_field_data)
+        baseline_indexes = baseline_field_data.groupby(by=group_field_data)
+        baseline_data = []
 
-        baseline_data = cls._split_ds_into_columns(data=[(baseline_value, baseline_data)])
-        compared_data = cls._split_ds_into_columns(data=compared_data)
+        # mapping the data of the baseline data to its mathes data. If there are no matches, matching index will be -1
+        for group in baseline_indexes:
+            name = group[0]
+            indexes = group[1].iget_values(column=0)
+            dummy_index = target_fields_data.index[-1]
+            indexes = list(map(lambda x: dummy_index if x < 0 else x, indexes))
+            baseline_data.append((name, target_fields_data.loc[indexes, :]))
 
         return baseline_data, compared_data
 
     @classmethod
     def _split_data_to_buckets(
         cls,
-        compare_by: Literal["groups", "columns", "columns_in_groups", "cross", "matched_pairs"],
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+        ],
         target_fields_data: Dataset,
         baseline_field_data: Dataset,
         group_field_data: Dataset,
@@ -375,7 +385,8 @@ class Comparator(Calculator, ABC):
     def calc(
         cls,
         compare_by: (
-            Literal["groups", "columns", "columns_in_groups", "cross", "matched_pairs"] | None
+            Literal["groups", "columns", "columns_in_groups", "cross", "matched_pairs"]
+            | None
         ) = None,
         target_fields_data: Dataset | None = None,
         baseline_field_data: Dataset | None = None,
@@ -407,6 +418,18 @@ class Comparator(Calculator, ABC):
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """
+        Execute the comparator on the given data.
+
+        The comparator will split the data into a baseline and a comparison
+        dataset based on the compare_by argument. Then it will calculate
+        statistics comparing the baseline and comparison datasets.
+
+        :param data: The ExperimentData to execute the comparator on
+        :type data: ExperimentData
+        :return: The ExperimentData with the comparison results
+        :rtype: ExperimentData
+        """
         fields = self._get_fields_data(data)
         group_field_data = fields["group_field"]
         target_fields_data = fields["target_fields"]
@@ -419,9 +442,8 @@ class Comparator(Calculator, ABC):
         )
 
         if len(target_fields_data.columns) == 0:
-            if (
-                data.ds.tmp_roles
-            ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
+            # If the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
+            if data.ds.tmp_roles:
                 return data
             else:
                 raise NoColumnsError(TargetRole().role_name)
@@ -484,7 +506,9 @@ class Comparator(Calculator, ABC):
 class StatHypothesisTesting(Comparator, ABC):
     def __init__(
         self,
-        compare_by: Literal["groups", "columns", "columns_in_groups", "cross", "matched_pairs"],
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+        ],
         grouping_role: ABCRole | None = None,
         target_role: ABCRole | None = None,
         baseline_role: ABCRole | None = None,

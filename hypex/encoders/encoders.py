@@ -11,7 +11,7 @@ class DummyEncoder(Encoder):
         data: Dataset, target_cols: str | None = None, **kwargs
     ) -> Dataset:
         if not target_cols:
-            return data
+            return Dataset.create_empty()
         return DummyEncoderExtension().calc(
             data=data, target_cols=target_cols, **kwargs
         )

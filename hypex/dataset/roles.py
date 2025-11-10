@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
+from copy import deepcopy
 
 from ..utils import CategoricalTypes, DefaultRoleTypes, FeatureRoleTypes, RoleNameType, TargetRoleTypes
 
@@ -17,6 +18,18 @@ class ABCRole(ABC):
 
     def __repr__(self) -> str:
         return f"{self._role_name}({self.data_type})"
+
+    def astype(self, data_type: DefaultRoleTypes | None = None) -> ABCRole:
+        role = deepcopy(self)
+        role.data_type = data_type
+        return role
+
+    def asadditional(self, data_type: DefaultRoleTypes | None = None) -> ABCRole:
+        data_type = data_type or self.data_type
+        for role_type in list(default_roles.values()):
+            if isinstance(role_type, self.__class__) and isinstance(role_type, AdditionalRole):
+                return role_type.__class__(data_type)
+        return self.__class__(data_type)
 
 
 class LagRole(ABCRole):
@@ -148,19 +161,23 @@ class AdditionalRole(ABCRole):
     _role_name: RoleNameType = "Additional"
 
 
-class AdditionalTreatmentRole(AdditionalRole):
+class AdditionalTreatmentRole(AdditionalRole, TreatmentRole):
     _role_name: RoleNameType = "AdditionalTreatment"
 
 
-class AdditionalGroupingRole(AdditionalRole):
+class AdditionalGroupingRole(AdditionalRole, GroupingRole):
     _role_name: RoleNameType = "AdditionalGrouping"
 
 
-class AdditionalTargetRole(AdditionalRole):
+class AdditionalTargetRole(AdditionalRole, TargetRole):
     _role_name: RoleNameType = "AdditionalTarget"
 
 
-class AdditionalPreTargetRole(AdditionalRole):
+class AdditionalFeatureRole(AdditionalRole, FeatureRole):
+    _role_name: RoleNameType = "AdditionalTarget"
+
+
+class AdditionalPreTargetRole(AdditionalRole, PreTargetRole):
     _role_name: RoleNameType = "AdditionalPreTarget"
 
 
@@ -183,5 +200,6 @@ default_roles: dict[RoleNameType, ABCRole] = {
     "additionaltreatment": AdditionalTreatmentRole(),
     "additionalgrouping": AdditionalGroupingRole(),
     "additionaltarget": AdditionalTargetRole(),
+    "additionalfeature": AdditionalFeatureRole(),
     "additionalpretarget": AdditionalPreTargetRole(),
 }

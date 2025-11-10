@@ -13,10 +13,10 @@ class DummyEncoderExtension(
 ):  # TODO: role types are being rewritten, needs to be fixed
     @staticmethod
     def _calc_pandas(data: Dataset, target_cols: str | None = None, **kwargs):
-        dummies_df = pd.get_dummies(data=data[target_cols].data, drop_first=True)
+        dummies_df = pd.get_dummies(data=data[target_cols].data, drop_first=True).astype(int)
         # Setting roles to the dummies in additional fields based on the original
         # roles by searching based on the part of the dummy column name
-        roles = {col: data.roles[col[: col.rfind("_")]] for col in dummies_df.columns}
+        roles = {col: data.roles[col[: col.rfind("_")]].asadditional(int) for col in dummies_df.columns}
         new_roles = copy.deepcopy(roles)
         for role in roles.values():
             role.data_type = bool
