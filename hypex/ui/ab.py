@@ -2,7 +2,7 @@ from typing import Union
 
 from ..analyzers.ab import ABAnalyzer
 from ..comparators import GroupDifference, GroupSizes
-from ..dataset import Dataset, ExperimentData, StatisticRole, TreatmentRole
+from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole, TreatmentRole
 from ..reporters.ab import ABDatasetReporter
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
 from .base import Output
@@ -60,12 +60,55 @@ class ABOutput(Output):
         )
 
     def _extract_variance_reductions(self, experiment_data: ExperimentData):
-        """Extract variance reduction data from additional_fields."""
-        variance_cols = [col for col in experiment_data.additional_fields.columns if col.endswith('_variance_reduction')]
-        if variance_cols:
-            self.variance_reductions = experiment_data.additional_fields[variance_cols]
-        else:
+        """Extract variance reduction data from analysis_tables."""
+        # Find all CUPAC report keys in analysis_tables
+        cupac_report_keys = [
+            key for key in experiment_data.analysis_tables.keys() 
+            if key.endswith('_cupac_report')
+        ]
+        
+        if not cupac_report_keys:
             self.variance_reductions = None
+            return
+        
+        # Aggregate all CUPAC reports into a single dataset
+        variance_data = []
+        for key in cupac_report_keys:
+            report = experiment_data.analysis_tables[key]
+            target_name = key.replace('_cupac_report', '')
+            
+            control_mean_bias = None
+            test_mean_bias = None
+            
+            resume_data = self.resume.data
+            if 'feature' in resume_data.columns and target_name in resume_data['feature'].values:
+                original_row = resume_data[resume_data['feature'] == target_name]
+                cupac_row = resume_data[resume_data['feature'] == f"{target_name}_cupac"]
+
+                control_mean_bias = original_row['control mean'].iloc[0] - cupac_row['control mean'].iloc[0]
+                test_mean_bias = original_row['test mean'].iloc[0] - cupac_row['test mean'].iloc[0]
+
+            variance_data.append({
+                'target': target_name,
+                'best_model': report.get('cupac_best_model'),
+                'variance_reduction_cv': report.get('cupac_variance_reduction_cv'),
+                'variance_reduction_real': report.get('cupac_variance_reduction_real'),
+                'control_mean_bias': control_mean_bias,
+                'test_mean_bias': test_mean_bias
+            })
+        
+        self.variance_reductions = Dataset.from_dict(
+            data=variance_data,
+            roles={
+                'target': InfoRole(str),
+                'best_model': InfoRole(str),
+                'variance_reduction_cv': StatisticRole(),
+                'variance_reduction_real': StatisticRole(),
+                'control_mean_bias': StatisticRole(),
+                'test_mean_bias': StatisticRole()
+            }
+        )
+            
 
     @property
     def variance_reduction_report(self) -> Dataset | str:

@@ -116,7 +116,16 @@ class DataGenerator:
             + np.random.normal(0, 2, self.n_samples)
         )
         data["y"] = np.where(data["d"] == 1, data["y1"], data["y0"])
-        return pd.DataFrame(data)
+        
+        # Create DataFrame and rename columns for clearer temporal structure
+        df = pd.DataFrame(data)
+        df = df.rename(columns={
+            'X1': 'X1_lag1',        # X1 becomes period 1 covariate
+            'X2': 'X2_lag1',        # X2 becomes period 1 covariate
+            'X1_lag': 'X1_lag2',    # X1_lag becomes period 2 covariate
+            'X2_lag': 'X2_lag2'     # X2_lag becomes period 2 covariate
+        })
+        return df
 
 def set_nans(
     data: pd.DataFrame,

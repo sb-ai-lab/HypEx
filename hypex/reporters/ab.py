@@ -31,7 +31,7 @@ class ABDictReporter(OneAADictReporter):
 class ABDatasetReporter(ABDictReporter):
     @staticmethod
     def _invert_aa_format(table: Dataset) -> Dataset:
-        return table.replace("NOT OK", "N").replace("OK", "NOT OK").replace("N", "OK")
+        return table if table.is_empty() else table.replace("NOT OK", "N").replace("OK", "NOT OK").replace("N", "OK")
 
     def report_variance_reductions(self, data: ExperimentData) -> Dataset | str:
         """Generate variance reduction report for CUPED/CUPAC transformations."""
