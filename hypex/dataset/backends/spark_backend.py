@@ -25,6 +25,8 @@ from pyspark.sql.functions import lit, monotonically_increasing_id
 from pyspark.sql import DataFrame as SparkDF
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType
+from ...utils.adapter import Adapter
+from ...utils.types import SparkTypeMapper as d
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -300,24 +302,20 @@ class SparkNavigation(DatasetBackendNavigation):
         return self.add_column(new_df)
 
     def __repr__(self) -> str:
-        spark_df = self.data
-        sort_cols = spark_df.columns
-        total_count = spark_df.count()
-        top_df = spark_df.orderBy(sort_cols).limit(5).toPandas()
-        if total_count <= 10:
-            pandas_df = top_df
+        df: SparkDF = self.data
+        cols = df.columns
+        total = df.count()
+        if total <= 10:
+            pandas_df = df.toPandas()
         else:
-            bottom_df = (
-                spark_df.orderBy([F.col(c).desc() for c in sort_cols])
-                .limit(5)
-                .orderBy(sort_cols)
-                .toPandas()
-            )
-            ellipsis_row = pd.DataFrame([['...'] * len(top_df.columns)], columns=top_df.columns)
-            pandas_df = pd.concat([top_df, ellipsis_row, bottom_df], ignore_index=True)
-        table_string = pandas_df.to_string(index=False)
-        dimension_string = f"\n\n[{total_count} rows × {len(spark_df.columns)} columns]"
-        return table_string + dimension_string
+            head_df = df.limit(5).toPandas()
+            tail_rows = df.tail(5)
+            tail_df = pd.DataFrame(tail_rows, columns=cols)
+            ellipsis = pd.DataFrame([['...'] * len(cols)], columns=cols)
+            pandas_df = pd.concat([head_df, ellipsis, tail_df], ignore_index=True)
+        table = pandas_df.to_string(index=False)
+        dim = f"\n\n[{total} rows × {len(cols)} columns]"
+        return table + dim
 
     def _repr_html_(self):
         return self.data._repr_html_()
@@ -471,68 +469,97 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return_type: Optional[T.DataType] = None,
         args: tuple = (),
         kwargs: Optional[dict] = None,
-        result_type: Literal["reduce", "expand"] = "reduce",
+        result_type: Literal["reduce", "expand", "broadcast", None] = None,
     ) -> "SparkDataset":
         kwargs = kwargs or {}
         df = self.data
+
         try:
             is_native = isinstance(func(F.col("dummy")), F.Column)
         except Exception:
             is_native = False
 
         if axis == 0 and is_native:
+            cols = Adapter.to_list(column_name)
             if column_name is None:
                 new_df = df.select([func(F.col(c)).alias(c) for c in df.columns])
             else:
-                cols = [column_name] if isinstance(column_name, str) else column_name
-                for c in cols:
-                    df = df.withColumn(c, func(F.col(c)))
+                new_cols = {c: func(F.col(c)) for c in cols}
+                df = df.withColumns(new_cols)
                 new_df = df
             return SparkDataset(new_df, session=self.session)
-        if return_type is None:
+
+        if return_type is not None:
+            udf_func = F.udf(lambda row: func(row.asDict(), *args, **kwargs), return_type)
+            struct_cols = F.struct(*[F.col(c) for c in (column_name or df.columns)])
+            col_expr = udf_func(struct_cols)
+
+            if result_type == "expand" and isinstance(return_type, T.StructType):
+                temp_df = df.withColumn("__tmp", col_expr)
+                for f in return_type.fields:
+                    temp_df = temp_df.withColumn(f.name, F.col("__tmp." + f.name))
+                new_df = temp_df.drop("__tmp")
+            elif result_type == "reduce":
+                new_df = df.withColumn("result", col_expr)
+            elif result_type == "broadcast":
+                new_df = df.withColumn("result", col_expr)
+                if isinstance(return_type, T.StructType):
+                    temp_df = new_df.withColumn("__tmp", F.col("result"))
+                    for f in return_type.fields:
+                        new_df = new_df.withColumn(f.name, F.col("__tmp." + f.name))
+                    new_df = new_df.drop("__tmp")
+                else:
+                    for col in df.columns:
+                        new_df = new_df.withColumn(col, F.col("result"))
+                    new_df = new_df.drop("result")
+            elif result_type is None:
+                if isinstance(return_type, T.StructType):
+                    temp_df = df.withColumn("__tmp", col_expr)
+                    for f in return_type.fields:
+                        new_df = temp_df.withColumn(f.name, F.col("__tmp." + f.name))
+                    new_df = new_df.drop("__tmp")
+                else:
+                    new_df = df.withColumn("result", col_expr)
+        else:
             sample_row = df.limit(1).toPandas().iloc[0].to_dict()
             try:
                 sample_res = func(sample_row, *args, **kwargs)
             except Exception as e:
                 raise ValueError("Failed to identify return_type by the first line") from e
 
-            if sample_res is None:
-                return_type = T.StringType()
-            elif isinstance(sample_res, str):
-                return_type = T.StringType()
-            elif isinstance(sample_res, bool):
-                return_type = T.BooleanType()
-            elif isinstance(sample_res, int):
-                return_type = T.LongType()
-            elif isinstance(sample_res, float):
-                return_type = T.DoubleType()
-            elif isinstance(sample_res, (list, tuple)):
-                elem = sample_res[0] if sample_res else ""
-                return_type = T.ArrayType(
-                    T.LongType() if isinstance(elem, int)
-                    else T.DoubleType() if isinstance(elem, float)
-                    else T.StringType()
-                )
-            elif isinstance(sample_res, dict):
-                fields = [
-                    T.StructField(k, self._infer_spark_type(v))
-                    for k, v in sample_res.items()
-                ]
-                return_type = T.StructType(fields)
-            else:
-                return_type = T.StringType()
+            return_type = d.types(sample_res)
 
-        udf_func = F.udf(lambda row: func(row.asDict(), *args, **kwargs), return_type)
-        struct_cols = F.struct(*[F.col(c) for c in (column_name or df.columns)])
-        col_expr = udf_func(struct_cols)
+            udf_func = F.udf(lambda row: func(row.asDict(), *args, **kwargs), return_type)
+            struct_cols = F.struct(*[F.col(c) for c in (column_name or df.columns)])
+            col_expr = udf_func(struct_cols)
 
-        if result_type == "expand" and isinstance(return_type, T.StructType):
-            temp_df = df.withColumn("__tmp", col_expr)
-            for f in return_type.fields:
-                temp_df = temp_df.withColumn(f.name, F.col("__tmp." + f.name))
-            new_df = temp_df.drop("__tmp")
-        else:
-            new_df = df.withColumn("result", col_expr)
+            if result_type == "expand" and isinstance(return_type, T.StructType):
+                temp_df = df.withColumn("__tmp", col_expr)
+                for f in return_type.fields:
+                    temp_df = temp_df.withColumn(f.name, F.col("__tmp." + f.name))
+                new_df = temp_df.drop("__tmp")
+            elif result_type == "reduce":
+                new_df = df.withColumn("result", col_expr)
+            elif result_type == "broadcast":
+                new_df = df.withColumn("result", col_expr)
+                if isinstance(return_type, T.StructType):
+                    temp_df = new_df.withColumn("__tmp", F.col("result"))
+                    for f in return_type.fields:
+                        new_df = new_df.withColumn(f.name, F.col("__tmp." + f.name))
+                    new_df = new_df.drop("__tmp")
+                else:
+                    for col in df.columns:
+                        new_df = new_df.withColumn(col, F.col("result"))
+                    new_df = new_df.drop("result")
+            elif result_type is None:
+                if isinstance(return_type, T.StructType):
+                    temp_df = df.withColumn("__tmp", col_expr)
+                    for f in return_type.fields:
+                        new_df = temp_df.withColumn(f.name, F.col("__tmp." + f.name))
+                    new_df = new_df.drop("__tmp")
+                else:
+                    new_df = df.withColumn("result", col_expr)
+
         return SparkDataset(new_df, session=self.session)
 
     def map(
@@ -542,7 +569,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return_type: T.DataType | None = None,
         na_action: None | str = None,
         **kwargs,
-    ) -> SparkDF:
+    ) -> "SparkDataset":
         df = self.data
         cols = df.columns
 
@@ -553,7 +580,18 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             actual_func = func
             use_fast_path = True
 
-        if return_type is None:
+        if return_type is not None:
+            udf_func = F.udf(actual_func, return_type)
+            if na_action == "ignore":
+                new_cols = [
+                    F.when(F.col(c).isNull(), F.col(c))
+                    .otherwise(udf_func(F.col(c)))
+                    .alias(c)
+                    for c in cols
+                ]
+            else:
+                new_cols = [udf_func(F.col(c)).alias(c) for c in cols]
+        else:
             sample_row = df.limit(1).toPandas().iloc[0].to_dict()
             col_types = {}
             for c in cols:
@@ -564,18 +602,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                         f"Failed to infer return_type for column '{c}'. "
                         f"Specify it explicitly: return_type=T.StringType()."
                     ) from e
-                if sample_val is None:
-                    col_types[c] = T.StringType()
-                elif isinstance(sample_val, str):
-                    col_types[c] = T.StringType()
-                elif isinstance(sample_val, int):
-                    col_types[c] = T.LongType()
-                elif isinstance(sample_val, float):
-                    col_types[c] = T.DoubleType()
-                else:
-                    col_types[c] = T.StringType()
+                col_types[c] = d.types(sample_val)
 
-        if return_type is None:
             if na_action == "ignore":
                 new_cols = [
                     F.when(F.col(c).isNull(), F.col(c))
@@ -588,18 +616,9 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                     F.udf(actual_func, col_types[c])(F.col(c)).alias(c)
                     for c in cols
                 ]
-        else:
-            udf_func = F.udf(actual_func, return_type)
-            if na_action == "ignore":
-                new_cols = [
-                    F.when(F.col(c).isNull(), F.col(c))
-                    .otherwise(udf_func(F.col(c)))
-                    .alias(c)
-                    for c in cols
-                ]
-            else:
-                new_cols = [udf_func(F.col(c)).alias(c) for c in cols]
-        return df.select(new_cols)
+
+        new_df = df.select(new_cols)
+        return SparkDataset(new_df, session=self.session)
 
     def is_empty(self) -> bool:
         pass
