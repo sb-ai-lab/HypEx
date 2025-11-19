@@ -4,6 +4,7 @@ This module defines data structures and roles used across the library for managi
 
 from .abstract import DatasetBase
 from .dataset import Dataset, DatasetAdapter, ExperimentData
+from .ml_experiment_data import MLExperimentData
 from .roles import (
                     ABCRole,
                     AdditionalFeatureRole,
@@ -48,6 +49,7 @@ __all__ = [
     "FilterRole",
     "GroupingRole",
     "InfoRole",
+    "MLExperimentData",
     "PreTargetRole",
     "StatisticRole",
     "StratificationRole",
