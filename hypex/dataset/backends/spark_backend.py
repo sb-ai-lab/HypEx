@@ -21,14 +21,18 @@ import pyspark.sql as spark
 from pyspark import SparkContext, SparkConf, StorageLevel
 from pyspark.sql import SparkSession, functions as F, types as T
 from pyspark.sql.functions import lit, monotonically_increasing_id
-
+from pyspark.sql.types import NumericType
+from pyspark.sql import Window
 from pyspark.sql import DataFrame as SparkDF
+from pyspark.sql import Row
+from pyspark.sql.types import StructType
+
+from functools import reduce
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType
 from ...utils.adapter import Adapter
-from ...utils.types import SparkTypeMapper as d
+from ...utils.types import SparkTypeMapper as d 
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
-
 
 class SparkNavigation(DatasetBackendNavigation):
     @staticmethod
@@ -148,8 +152,7 @@ class SparkNavigation(DatasetBackendNavigation):
             raise TypeError(
                 f"Unsupported operand type: '{type(other).__name__}'. "
             )
-
-        
+  
     # comparison operators:
     def __eq__(self, other) -> spark.DataFrame:
         other = self.__magic_determine_other(other)
@@ -181,7 +184,6 @@ class SparkNavigation(DatasetBackendNavigation):
         new_df = self.data.select((F.col(c) > other).alias(c) for c in self.data.columns)
         return self.add_column(new_df)
 
-
     # Unary operations:
     def __pos__(self) -> spark.DataFrame:
         new_df = self.data.select("*")
@@ -202,7 +204,6 @@ class SparkNavigation(DatasetBackendNavigation):
     def __round__(self, ndigits: int = 0) -> spark.DataFrame:
         new_df = self.data.select(F.round(F.col(c), ndigits).alias(c) for c in self.data.columns)
         return self.add_column(new_df)
-
 
     # Binary operations:
     def __add__(self, other) -> spark.DataFrame:
@@ -260,7 +261,6 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def __div__(self, other) -> spark.DataFrame:
         return self.__truediv__(other)
-
 
     # Right arithmetic operators:
     def __radd__(self, other) -> spark.DataFrame:
@@ -444,8 +444,20 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         super().__init__(data, session)
 
     @staticmethod
-    def _convert_agg_result(result):
-        pass
+    def _convert_agg_result(result: SparkDF):
+        if len(result.columns) > 1:
+            return SparkDataset(result)
+            
+        rows = result.take(2)
+        if len(rows) == 1:
+            value = rows[0][0]
+            if value is None:
+                return None
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return value
+        return SparkDataset(result)
 
     def get_values(
         self,
@@ -473,7 +485,6 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     ) -> "SparkDataset":
         kwargs = kwargs or {}
         df = self.data
-
         try:
             is_native = isinstance(func(F.col("dummy")), F.Column)
         except Exception:
@@ -493,7 +504,6 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             udf_func = F.udf(lambda row: func(row.asDict(), *args, **kwargs), return_type)
             struct_cols = F.struct(*[F.col(c) for c in (column_name or df.columns)])
             col_expr = udf_func(struct_cols)
-
             if result_type == "expand" and isinstance(return_type, T.StructType):
                 temp_df = df.withColumn("__tmp", col_expr)
                 for f in return_type.fields:
@@ -521,6 +531,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 else:
                     new_df = df.withColumn("result", col_expr)
         else:
+            self.data.cache()
+            df=self.data
             sample_row = df.limit(1).toPandas().iloc[0].to_dict()
             try:
                 sample_res = func(sample_row, *args, **kwargs)
@@ -528,11 +540,9 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 raise ValueError("Failed to identify return_type by the first line") from e
 
             return_type = d.types(sample_res)
-
             udf_func = F.udf(lambda row: func(row.asDict(), *args, **kwargs), return_type)
             struct_cols = F.struct(*[F.col(c) for c in (column_name or df.columns)])
             col_expr = udf_func(struct_cols)
-
             if result_type == "expand" and isinstance(return_type, T.StructType):
                 temp_df = df.withColumn("__tmp", col_expr)
                 for f in return_type.fields:
@@ -559,7 +569,6 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                     new_df = new_df.drop("__tmp")
                 else:
                     new_df = df.withColumn("result", col_expr)
-
         return SparkDataset(new_df, session=self.session)
 
     def map(
@@ -592,6 +601,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             else:
                 new_cols = [udf_func(F.col(c)).alias(c) for c in cols]
         else:
+            self.data.cache()
+            df=self.data
             sample_row = df.limit(1).toPandas().iloc[0].to_dict()
             col_types = {}
             for c in cols:
@@ -621,53 +632,194 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return SparkDataset(new_df, session=self.session)
 
     def is_empty(self) -> bool:
-        pass
+        return self.data.isEmpty()
 
-    def unique(self):
-        pass
+    def unique(self) -> SparkDF:
+        if not self.data.columns:
+            return self.data.select([])
+        exprs = [F.collect_set(c).alias(c) for c in self.data.columns]
+        return self.data.agg(*exprs)
 
-    def nunique(self, dropna: bool = True):
-        pass
+    def nunique(self, dropna: bool = True) -> SparkDF:
+        if not self.data.columns:
+            return self.data.select([])
+        if dropna:
+            exprs = [F.countDistinct(c).alias(c) for c in self.data.columns]
+        else:
+            exprs = []
+            for c in self.data.columns:
+                has_null = (F.count("*") - F.count(c) > 0).cast("int")
+                exprs.append((F.countDistinct(c) + has_null).alias(c))
+        return self.data.agg(*exprs)
 
     def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> list[tuple]:
-        pass
+        if isinstance(by, str):
+            by = [by]
+        else:
+            by = list(by)
+
+        self.data.cache()
+        keys_rows = self.data.select(*by).distinct().orderBy(*by).collect()
+        result = []
+        for row in keys_rows:
+            conditions = []
+            key_values = []
+            for col_name in by:
+                val = row[col_name]
+                key_values.append(val)
+                if val is None:
+                    conditions.append(F.col(col_name).isNull())
+                else:
+                    conditions.append(F.col(col_name) == val)
+            final_cond = reduce(lambda x, y: x & y, conditions)
+            key = key_values[0] if len(key_values) == 1 else tuple(key_values)
+            group_df = self.data.filter(final_cond)
+            result.append(
+                (key, self.__class__(group_df))
+            )
+        return result
 
     def agg(self, func: Union[str, list], **kwargs) -> Union[spark.DataFrame, float]:
-        pass
+        df = self.data
+        funcs = [func] if isinstance(func, str) else func
+        numeric_only = kwargs.get('numeric_only', False)
+        ddof = kwargs.get('ddof', 1)
+        cols = [
+            f.name for f in df.schema.fields
+            if not numeric_only or isinstance(f.dataType, NumericType)
+        ]
+        if not cols:
+            empty = df.sparkSession.createDataFrame([Row()], StructType([]))
+            return self._convert_agg_result(empty)
+        
+        special_map = {
+            "var": lambda c: F.var_samp(c) if ddof == 1 else F.var_pop(c),
+            "std": lambda c: F.stddev_samp(c) if ddof == 1 else F.stddev_pop(c),
+        }
+        exprs = []
+        multi = len(funcs) > 1
+        for f_name in funcs:
+            spark_fn = None
 
-    def max(self) -> Union[spark.DataFrame, float]:
-        pass
+            if f_name in special_map:
+                spark_fn = special_map[f_name]
+            else:
+                try:
+                    spark_fn = getattr(F, f_name)
+                except AttributeError:
+                    raise ValueError(f"Unsupported agg function: {f_name}")
+            for c in cols:
+                alias = f"{c}_{f_name}" if multi else c
+                if f_name in special_map:
+                    col_expr = spark_fn(c).alias(alias)
+                else:
+                    col_expr = spark_fn(c).alias(alias)
+                exprs.append(col_expr)
+        df_res = df.agg(*exprs)
+        return self._convert_agg_result(df_res)
 
-    def idxmax(self) -> Union[spark.DataFrame, float]:
-        pass
 
-    def min(self) -> Union[spark.DataFrame, float]:
-        pass
+    def max(self, numeric_only: bool = False):
+        return self.agg("max", numeric_only=numeric_only)
 
-    def count(self) -> Union[spark.DataFrame, float]:
-        pass
+    def idxmax(self):
+        df = self.data
+        if df is None or not df.columns:
+            return df
 
-    def sum(self) -> Union[spark.DataFrame, float]:
-        pass
+        target_idx = "id"
+        df_keyed = df.withColumn(target_idx, F.monotonically_increasing_id())
+        numeric_cols = [
+            f.name for f in df.schema.fields
+            if isinstance(f.dataType, NumericType)
+        ]
+        if not numeric_cols:
+            return df.select([])
 
-    def mean(self) -> Union[spark.DataFrame, float]:
-        pass
+        agg_exprs = [
+            F.min(
+                F.struct(
+                    -F.col(c), 
+                    F.col(target_idx).alias("idx")
+                )
+            ).alias(c)
+            for c in numeric_cols
+        ]
+        df_agg = df_keyed.agg(*agg_exprs)
+        final_exprs = [F.col(c)["idx"].alias(c) for c in numeric_cols]
+        return df_agg.select(*final_exprs)
 
-    def mode(
-        self, numeric_only: bool = False, dropna: bool = True
-    ) -> Union[spark.DataFrame, float]:
-        pass
+    def min(self, numeric_only: bool = False):
+        return self.agg("min", numeric_only=numeric_only)
 
-    def var(
-        self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
-    ) -> Union[spark.DataFrame, float]:
-        pass
+    def count(self):
+        return self.agg("count")
 
-    def log(self) -> spark.DataFrame:
-        pass
+    def sum(self, numeric_only: bool = False):
+        return self.agg("sum", numeric_only=numeric_only)
 
-    def std(self, skipna: bool = True, ddof: int = 1) -> Union[spark.DataFrame, float]:
-        pass
+    def mean(self, numeric_only: bool = False):
+        return self.agg("mean", numeric_only=numeric_only)
+
+    def mode(self, numeric_only: bool = False, dropna: bool = True) -> SparkDF:
+        df = self.data
+        if numeric_only:
+            cols = [
+                f.name for f in df.schema.fields 
+                if isinstance(f.dataType, NumericType)
+            ]
+        else:
+            cols = df.columns
+        if not cols:
+            return df.select([])
+
+        dfs_to_union = []
+        for c in cols:
+            col_df = df.select(c)
+            if dropna:
+                col_df = col_df.filter(F.col(c).isNotNull())
+            counts_df = col_df.groupBy(c).count()
+            max_freq_df = counts_df.agg(F.max("count").alias("max_freq"))
+            modes = (
+                counts_df
+                .crossJoin(max_freq_df)  
+                .filter(F.col("count") == F.col("max_freq"))
+                .select(c)
+            )
+            w_order = Window.orderBy(c)
+            modes_with_id = modes.withColumn("row_id", F.row_number().over(w_order) - 1)
+            dfs_to_union.append(modes_with_id)
+        if not dfs_to_union:
+            return df.select([])
+        final_df = reduce(
+            lambda x, y: x.unionByName(y, allowMissingColumns=True),
+            dfs_to_union
+        )
+        collapse_exprs = [F.first(c, ignorenulls=True).alias(c) for c in cols]
+        return (
+            final_df
+            .groupBy("row_id")
+            .agg(*collapse_exprs)
+            .orderBy("row_id")
+            .drop("row_id")
+        )
+
+    def var(self, numeric_only: bool = False, ddof: int = 1):
+        return self.agg("var", numeric_only=numeric_only, ddof=ddof)
+
+    def log(self) -> SparkDF:
+        df = self.data
+        numeric_cols = [
+            f.name for f in df.schema.fields
+            if isinstance(f.dataType, NumericType)
+        ]
+        exprs = [F.log(F.col(c)).alias(c) for c in numeric_cols]
+        if not exprs:
+            return df.select([])
+        return df.select(*exprs)
+
+    def std(self, numeric_only: bool = False, ddof: int = 1):
+        return self.agg("std", numeric_only=numeric_only, ddof=ddof)
 
     def cov(self):
         pass
