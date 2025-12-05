@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Iterable
 from copy import deepcopy
-from typing import Any, Callable, Hashable, Literal, Sequence
+from typing import Any, Callable, Hashable, Literal, Sequence, Optional, Union
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -130,7 +130,7 @@ class Dataset(DatasetBase):
 
     def __setitem__(self, key: str, value: Any):
         if isinstance(value, Dataset):
-            value = value.data
+            value = value.data.iloc[:, 0]
         if key not in self.columns and isinstance(key, str):
             self.add_column(value, {key: InfoRole()})
             warnings.warn(
@@ -670,13 +670,18 @@ class Dataset(DatasetBase):
         new_roles = {c: t_roles[c] for c in t_data.columns}
         return Dataset(roles=new_roles, data=t_data)
 
-    def drop(self, labels: Any = None, axis: int = 1):
+    def drop(
+        self, 
+        labels: Optional[str] = None, 
+        axis: Optional[int] = None,
+        columns: Optional[Union[str, Iterable[str]]] = None,
+    ):
         # Convert Dataset labels to list of indices
         if isinstance(labels, Dataset):
             labels = list(labels.index)
 
         # Drop specified labels
-        t_data = self._backend.drop(labels=labels, axis=axis)
+        t_data = self._backend.drop(labels=labels, axis=axis, columns=columns)
 
         # Update roles based on axis
         t_roles = (

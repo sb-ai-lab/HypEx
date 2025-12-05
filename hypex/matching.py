@@ -159,6 +159,7 @@ class Matching(ExperimentShell):
                 grouping_role=TreatmentRole(),
                 target_roles=[TargetRole()],
                 metric=metric,
+                n_neighbors=n_neighbors,
             ),
             MatchingAnalyzer(),
         ]

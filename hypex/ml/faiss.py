@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any, Literal, Sequence
+from warnings import warn
 
 from ..comparators.distances import MahalanobisDistance
 from ..dataset import (
@@ -144,9 +145,18 @@ class FaissNearestNeighbors(MLExecutor):
             two_sides=self.two_sides,
             test_pairs=self.test_pairs,
         )
+        nans = 0
+        # nans = compare_result.isna().sum().get_values(row="sum").sum()
+        
         for result in compare_result.values():
+            nans += sum(result.isna().sum().get_values(row="sum"))
             result = result.fillna(-1).astype(
                 {col: int for col in result.columns}
+            )
+        if nans > 0:
+            warn(
+                f"Faiss returned {nans} nans, which were replaced with dummy matches. Check if the data is suitable for the test.",
+                UserWarning,
             )
         ds = data.ds.groupby(group_field)
         matched_indexes = Dataset.create_empty()
