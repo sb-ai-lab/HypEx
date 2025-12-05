@@ -199,35 +199,16 @@ class MatchingMetrics(GroupOperator):
         self, data: ExperimentData,
         t_data: Dataset, group_field: str,
     ) -> Dataset:
-        indexes = data.field_search(AdditionalMatchingRole())
-        if len(indexes) == 0:
-            raise ValueError("No indexes were found")
         new_target = data.ds.search_columns(TargetRole())[0]
-        indexes = data.additional_fields[indexes]
-        indexes.index = t_data.index
+        indexes, matched_data = Bias.prepare_data(data, t_data)
+        matched_data = matched_data[new_target + "_matched"]
         grouped_data = data.ds.groupby(group_field)
         control_indexes = indexes.iloc[grouped_data[0][1].index,:]
         test_indexes = indexes.iloc[grouped_data[1][1].index,:]
         self._calc_scaled_counts(control_indexes, test_indexes, "test")
         self._calc_scaled_counts(test_indexes, control_indexes, "control")
-        filtered_field = indexes.drop(
-            indexes[indexes[indexes.columns[0]] == -1], axis=0
-        )
-        matched_data = Dataset({})
-        matched_data.index = filtered_field.index
-        for i, col in enumerate(indexes.columns):
-            index_matched_data = data.ds.loc[
-                list(filtered_field[col].get_values(column=col))
-            ][new_target].rename(
-                {new_target: new_target + f"_matched_{i}" for _ in data.ds.columns}
-            )
-            matched_data = matched_data.add_column(index_matched_data)
-        matched_data = matched_data.add_column([0], {new_target + "_matched" :AdditionalTargetRole()}).fillna(0)
-        for col in matched_data.columns:
-            if col != new_target + "_matched":
-                matched_data[new_target + "_matched"] += matched_data[col]
-        matched_data[new_target + "_matched"] /= self.n_neighbors
-        return matched_data[new_target + "_matched"]
+        
+        return matched_data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields = self._get_fields(data=data)
@@ -242,7 +223,7 @@ class MatchingMetrics(GroupOperator):
         t_data = deepcopy(data.ds)
         if len(target_fields) != 2:
             matched_data = self._prepare_new_target(data, t_data, group_field)
-            target_fields += [matched_data.search_columns(AdditionalTargetRole())[0]]
+            target_fields += [matched_data.search_columns(TargetRole())[0]]
             data.set_value(
                 ExperimentDataEnum.additional_fields,
                 self.id,
@@ -368,23 +349,43 @@ class Bias(GroupOperator):
             **kwargs,
         )
 
-    def _prepare_data(self, data: ExperimentData, t_data: Dataset) -> Dataset:
-        indexes = data.additional_fields[data.field_search(AdditionalMatchingRole())[0]]
+    @staticmethod
+    def prepare_data(data: ExperimentData, t_data: Dataset) -> Dataset:
+        indexes = data.field_search(AdditionalMatchingRole())
+        if len(indexes) == 0:
+            raise ValueError("No indexes were found")
+        indexes = data.additional_fields[indexes]
         indexes.index = t_data.index
         filtered_field = indexes.drop(
             indexes[indexes[indexes.columns[0]] == -1], axis=0
         )
-        matched_data = data.ds.loc[
-            list(map(lambda x: x[0], filtered_field.get_values()))
-        ].rename({i: i + "_matched" for i in data.ds.columns})
+        matched_data = Dataset({})
         matched_data.index = filtered_field.index
-        return matched_data
+        numeric_cols = t_data.search_columns([FeatureRole(), TargetRole()], search_types=[int, float])
+        for d_col in numeric_cols:
+            matched_data_col = Dataset({})
+            matched_data_col.index = filtered_field.index
+            for i, i_col in enumerate(indexes.columns):
+                index_matched_data = data.ds.loc[
+                    list(filtered_field[i_col].get_values(column=i_col))
+                ][d_col].rename(
+                    {d_col: d_col + f"_matched_{i}" for _ in data.ds.columns}
+                )
+                matched_data_col = matched_data_col.add_column(index_matched_data)
+            matched_data_col = matched_data_col.add_column([0], {d_col + "_matched": t_data.roles[d_col]}).fillna(0)
+            for col in matched_data_col.columns:
+                if col != d_col + "_matched":
+                    matched_data_col[d_col + "_matched"] += matched_data_col[col]
+            matched_data = matched_data.add_column([0], {d_col + "_matched": t_data.roles[d_col]}).fillna(0)  
+            matched_data[d_col + "_matched"] = matched_data_col[d_col + "_matched"] / (matched_data_col.shape[1] - 1)
+
+        return indexes, matched_data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields = self._get_fields(data)
         t_data = deepcopy(data.ds)
         if len(target_fields) < 2:
-            matched_data = self._prepare_data(data, t_data)
+            _, matched_data = self.prepare_data(data, t_data)
             target_fields += [matched_data.search_columns(TargetRole())[0]]
             t_data = t_data.append(matched_data.reindex(t_data.index), axis=1)
         self.key = str(
