@@ -39,9 +39,11 @@ class MatchingMetrics(GroupOperator):
         grouping_role: ABCRole | None = None,
         target_roles: ABCRole | list[ABCRole] | None = None,
         metric: Literal["auto", "atc", "att", "ate"] | None = None,
+        n_neighbors: int = 1,
         key: Any = "",
     ):
         self.metric = metric or "auto"
+        self.n_neighbors = n_neighbors
         self.__scaled_counts = {}
         target_roles = target_roles or TargetRole()
         super().__init__(
@@ -52,10 +54,19 @@ class MatchingMetrics(GroupOperator):
             key=key,
         )
 
-    def _calc_scaled_counts(self, matches, group):
-        s_counts = [x[0] for x in matches.value_counts()["count"].get_values()]
-        extra_counts = [0 for _ in range(len(matches) - len(s_counts))]
-        self.__scaled_counts[group] = s_counts + extra_counts
+    def _calc_scaled_counts(self, matches, indexes, group):
+        matches_counts = Dataset({})
+        matches_counts = matches_counts.add_column(indexes.index, {"indexes": InfoRole()})
+        matches_counts = matches_counts.add_column([0], {"count": InfoRole(float)})
+        for col in matches.columns:
+            v_counts = matches[col].value_counts()
+            matches_counts = matches_counts.merge(v_counts / 5, how="left", left_on="indexes", right_on=col, suffixes=(("", col))).drop(columns=col)
+        matches_counts.index = indexes.index
+        matches_counts = matches_counts.drop(columns="indexes").fillna(0)
+        for col in matches_counts.columns:
+            if col != "count":
+                matches_counts["count"] += matches_counts[col]
+        self.__scaled_counts[group] = matches_counts["count"]
 
     @staticmethod
     def _calc_vars(value):
@@ -185,29 +196,38 @@ class MatchingMetrics(GroupOperator):
         )
 
     def _prepare_new_target(
-        self, data: ExperimentData, t_data: Dataset, group_field: str
+        self, data: ExperimentData,
+        t_data: Dataset, group_field: str,
     ) -> Dataset:
         indexes = data.field_search(AdditionalMatchingRole())
         if len(indexes) == 0:
             raise ValueError("No indexes were found")
         new_target = data.ds.search_columns(TargetRole())[0]
-        indexes = data.additional_fields[indexes[0]]
+        indexes = data.additional_fields[indexes]
         indexes.index = t_data.index
         grouped_data = data.ds.groupby(group_field)
-        control_indexes = indexes.loc[grouped_data[0][1].index]
-        test_indexes = indexes.loc[grouped_data[1][1].index]
-        self._calc_scaled_counts(control_indexes, "control")
-        self._calc_scaled_counts(test_indexes, "test")
+        control_indexes = indexes.iloc[grouped_data[0][1].index,:]
+        test_indexes = indexes.iloc[grouped_data[1][1].index,:]
+        self._calc_scaled_counts(control_indexes, test_indexes, "test")
+        self._calc_scaled_counts(test_indexes, control_indexes, "control")
         filtered_field = indexes.drop(
             indexes[indexes[indexes.columns[0]] == -1], axis=0
         )
-        matched_data = data.ds.loc[
-            list(map(lambda x: x[0], filtered_field.get_values()))
-        ][new_target].rename(
-            {new_target: new_target + "_matched" for _ in data.ds.columns}
-        )
+        matched_data = Dataset({})
         matched_data.index = filtered_field.index
-        return matched_data
+        for i, col in enumerate(indexes.columns):
+            index_matched_data = data.ds.loc[
+                list(filtered_field[col].get_values(column=col))
+            ][new_target].rename(
+                {new_target: new_target + f"_matched_{i}" for _ in data.ds.columns}
+            )
+            matched_data = matched_data.add_column(index_matched_data)
+        matched_data = matched_data.add_column([0], {new_target + "_matched" :AdditionalTargetRole()}).fillna(0)
+        for col in matched_data.columns:
+            if col != new_target + "_matched":
+                matched_data[new_target + "_matched"] += matched_data[col]
+        matched_data[new_target + "_matched"] /= self.n_neighbors
+        return matched_data[new_target + "_matched"]
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, target_fields = self._get_fields(data=data)
@@ -222,7 +242,7 @@ class MatchingMetrics(GroupOperator):
         t_data = deepcopy(data.ds)
         if len(target_fields) != 2:
             matched_data = self._prepare_new_target(data, t_data, group_field)
-            target_fields += [matched_data.search_columns(TargetRole())[0]]
+            target_fields += [matched_data.search_columns(AdditionalTargetRole())[0]]
             data.set_value(
                 ExperimentDataEnum.additional_fields,
                 self.id,
