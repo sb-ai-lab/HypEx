@@ -238,7 +238,9 @@ def min_sample_size(
         equal_variance=equal_variance,
         random_state=random_state,
     )
-
+    if not isinstance(variances, list) and not equal_variance:
+        raise TypeError("variances must be a list when equal_variance is False")
+    
     if isinstance(quantile_1, float):
         quantile_1 = np.full(num_samples, quantile_1).tolist()
     if isinstance(quantile_2, float):
@@ -253,13 +255,10 @@ def min_sample_size(
         num_samples=num_samples,
         quantile_level=power,
     )
-
+    
     if multitest.equal_variance:
         var = variances[0] if isinstance(variances, list) else variances
         return int(2 * var * ((quantile_1[0] - quantile_2[0]) / mde) ** 2) + 1
-
-    if not isinstance(variances, list):
-        raise TypeError("variances must be a list when equal_variance is False")
 
     sizes: list[int] = []
     for index in range(num_samples):
