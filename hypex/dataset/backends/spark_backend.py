@@ -25,7 +25,8 @@ from pyspark.sql.types import NumericType
 from pyspark.sql import Window
 from pyspark.sql import DataFrame as SparkDF
 from pyspark.sql import Row
-from pyspark.sql.types import StructType
+from pyspark.sql.types import StructType, StructField
+from pyspark.sql.types import StringType
 
 from functools import reduce
 
@@ -325,19 +326,30 @@ class SparkNavigation(DatasetBackendNavigation):
         index: Optional[Iterable] = None,
         columns: Optional[Iterable[str]] = None,
     ):
-        pass
-
+        if index is not None:
+            self._index = list(index)
+        if columns:
+            schema = StructType([StructField(c, StringType(), True) for c in columns])
+        else:
+            schema = StructType([])
+        self.data = self.spark.createDataFrame([], schema)
+        return self 
+           
     @property
     def index(self):
-        pass
+        return self._index
 
     @property
     def columns(self):
-        return self.data.columns
+        return self.data.columns if self.data else []
 
     @property
     def shape(self):
-        pass
+        if self.data:
+            count = self.data.count()
+            cols = len(self.data.columns)
+            return (count, cols)
+        return (0, 0)
 
     def _get_column_index(
         self, column_name: Union[Sequence[str], str]
@@ -418,9 +430,28 @@ class SparkNavigation(DatasetBackendNavigation):
         pass
 
     def from_dict(
-        self, data: FromDictTypes, index: Optional[Union[Iterable, Sized]] = None
+        self,
+        data: FromDictTypes,
+        index: Optional[Union[Iterable, Sized]] = None
     ):
-        pass
+        spark = self.spark
+        if isinstance(data, dict) and all(isinstance(v, list) for v in data.values()):
+            row_count = len(next(iter(data.values())))
+            index_list = list(index) if index is not None else list(range(row_count))
+            rows = [
+                {"_index": idx, **{k: v[idx] for k, v in data.items()}}
+                for idx in index_list
+            ]
+            self.data = spark.createDataFrame(rows)
+        elif isinstance(data, list) and all(isinstance(row, dict) for row in data):
+            if index is not None:
+                rows = [{**row, "_index": idx} for idx, row in zip(index, data)]
+            else:
+                rows = [{**row, "_index": i} for i, row in enumerate(data)]
+            self.data = spark.createDataFrame(rows)
+        else:
+            raise ValueError("Unsupported data format for from_dict")
+        return self
 
     def to_dict(self) -> dict[str, Any]:
         pass
@@ -573,10 +604,10 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     def map(
         self,
-        func: Callable | dict,
+        func: Union[Callable, dict],
         *,
-        return_type: T.DataType | None = None,
-        na_action: None | str = None,
+        return_type: Union[T.DataType, None] = None,
+        na_action: Union[None, str] = None,
         **kwargs,
     ) -> "SparkDataset":
         df = self.data
