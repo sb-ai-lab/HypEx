@@ -187,6 +187,9 @@ class DatasetBase(ABC):
             },
             "data": self._backend.to_dict(),
         }
+    
+    def to_numpy(self):
+        return self._backend.to_numpy()
 
     def to_records(self):
         return self._backend.to_records()

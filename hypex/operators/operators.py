@@ -71,18 +71,21 @@ class MatchingMetrics(GroupOperator):
     @staticmethod
     def _calc_vars(value):
         var = 0 if value[value.columns[0]].isna().sum() > 0 else value.var()
-        return [var for _ in range(len(value))]
+        return value * 0 + var
 
     @staticmethod
-    def _calc_se(var_c, var_t, scaled_counts, is_ate=False):
+    def _calc_se(var_c, var_t, scaled_counts, group=None):
         n_c, n_t = len(var_c), len(var_t)
-        if not is_ate:
-            weights_c = n_c / n_t * np.array(scaled_counts)
-            weights_t = np.ones(n_t)
+        if not group is None:
+            groups = list(scaled_counts.keys())
+            groups.remove(group)
+            group_other = groups[0]
+            weights_c = scaled_counts[group] * n_c / n_t
+            weights_t = scaled_counts[group_other] * 0 + 1
         else:
             n = n_c + n_t
-            weights_c = (n_c / n) * np.array(scaled_counts["control"])
-            weights_t = (n_t / n) * np.array(scaled_counts["test"])
+            weights_c = (n_c / n) * (scaled_counts["control"]+1)
+            weights_t = (n_t / n) * (scaled_counts["test"]+1)
 
         return np.sqrt(
             (weights_t**2 * var_t).sum() / n_t**2
@@ -117,8 +120,8 @@ class MatchingMetrics(GroupOperator):
                 )
         var_t = cls._calc_vars(itt)
         var_c = cls._calc_vars(itc)
-        itt_se = cls._calc_se(var_c, var_t, scaled_counts["control"])
-        itc_se = cls._calc_se(var_t, var_c, scaled_counts["test"])
+        itt_se = cls._calc_se(var_c, var_t, scaled_counts, "control")
+        itc_se = cls._calc_se(var_t, var_c, scaled_counts, "test")
         itt = itt.mean()
         itc = itc.mean()
         p_val_itt = (
@@ -161,7 +164,7 @@ class MatchingMetrics(GroupOperator):
             }
         len_test, len_control = len(data), len(test_data)
         ate = (itt * len_test + itc * len_control) / (len_test + len_control)
-        ate_se = cls._calc_se(var_c, var_t, scaled_counts, is_ate=True)
+        ate_se = cls._calc_se(var_c, var_t, scaled_counts)
         p_val_ate = (
             NormCDF()
             .calc(
