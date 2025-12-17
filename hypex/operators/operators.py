@@ -60,13 +60,13 @@ class MatchingMetrics(GroupOperator):
         matches_counts = matches_counts.add_column([0], {"count": InfoRole(float)})
         for col in matches.columns:
             v_counts = matches[col].value_counts()
-            matches_counts = matches_counts.merge(v_counts / 5, how="left", left_on="indexes", right_on=col, suffixes=(("", col))).drop(columns=col)
+            matches_counts = matches_counts.merge(v_counts, how="left", left_on="indexes", right_on=col, suffixes=(("", col))).drop(columns=col)
         matches_counts.index = indexes.index
         matches_counts = matches_counts.drop(columns="indexes").fillna(0)
         for col in matches_counts.columns:
             if col != "count":
                 matches_counts["count"] += matches_counts[col]
-        self.__scaled_counts[group] = matches_counts["count"]
+        self.__scaled_counts[group] = matches_counts["count"] / self.n_neighbors
 
     @staticmethod
     def _calc_vars(value):
@@ -77,15 +77,15 @@ class MatchingMetrics(GroupOperator):
     def _calc_se(var_c, var_t, scaled_counts, group=None):
         n_c, n_t = len(var_c), len(var_t)
         if not group is None:
-            groups = list(scaled_counts.keys())
+            groups = list(scaled_counts.keys())  
             groups.remove(group)
             group_other = groups[0]
-            weights_c = scaled_counts[group] * n_c / n_t
-            weights_t = scaled_counts[group_other] * 0 + 1
+            weights_c = scaled_counts[group_other] * 0 + 1
+            weights_t = scaled_counts[group] * n_t / n_c
         else:
             n = n_c + n_t
-            weights_c = (n_c / n) * (scaled_counts["control"]+1)
-            weights_t = (n_t / n) * (scaled_counts["test"]+1)
+            weights_c = (n_c / n) * (scaled_counts["test"]+1)
+            weights_t = (n_t / n) * (scaled_counts["control"]+1)
 
         return np.sqrt(
             (weights_t**2 * var_t).sum() / n_t**2
@@ -118,8 +118,8 @@ class MatchingMetrics(GroupOperator):
                 itt += Dataset.from_dict(
                     {"control": bias["test"]}, roles={}, index=itt.index
                 )
-        var_t = cls._calc_vars(itt)
-        var_c = cls._calc_vars(itc)
+        var_t = cls._calc_vars(itc)
+        var_c = cls._calc_vars(itt)
         itt_se = cls._calc_se(var_c, var_t, scaled_counts, "control")
         itc_se = cls._calc_se(var_t, var_c, scaled_counts, "test")
         itt = itt.mean()
