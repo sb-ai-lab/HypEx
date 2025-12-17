@@ -56,13 +56,18 @@ class FaissExtension(MLExtension):
         X = data.data.values
         test = test_data.data.values
         if mode in ["auto", "fit"]:
-            self.index = faiss.IndexFlatL2(X.shape[1])
-            if ((
-                len(X) > 1_000_000 and self.faiss_mode == "auto"
-            ) or self.faiss_mode == "fast"
-            ) and len(X) > 1_000 and len(test) > 1_000:
+            if (
+                (
+                    (len(X) > 1_000_000 and self.faiss_mode == "auto")
+                    or self.faiss_mode == "fast"
+                )
+                and len(X) > 1_000
+                and len(test) > 1_000
+            ):
                 self.index = faiss.IndexIVFFlat(self.index, X.shape[1], 1000)
                 self.index.train(X)
+            else:
+                self.index = faiss.IndexFlatL2(X.shape[1])
             self.index.add(X)
         if mode in ["auto", "predict"]:
             if test_data is None:
