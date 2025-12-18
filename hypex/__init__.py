@@ -3,6 +3,5 @@ from .aa import AATest
 from .ab import ABTest
 from .homogeneity import HomogeneityTest
 from .matching import Matching
-from .extensions import min_sample_size
 
-__all__ = ["AATest", "ABTest", "HomogeneityTest", "Matching", "min_sample_size", "__version__"]
+__all__ = ["AATest", "ABTest", "HomogeneityTest", "Matching", "__version__"]

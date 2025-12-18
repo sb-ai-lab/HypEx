@@ -7,7 +7,7 @@ from .scipy_stats import (
                           TTestExtension,
                           UTestExtension,
 )
-from .statsmodels import MultiTest, MultitestQuantile, min_sample_size
+from .statsmodels import MultiTest, MultitestQuantile
 
 __all__ = [
     "Chi2TestExtension",
@@ -18,7 +18,6 @@ __all__ = [
     "KSTestExtension",
     "MultiTest",
     "MultitestQuantile",
-    "min_sample_size",
     "TTestExtension",
     "UTestExtension",
 ]
