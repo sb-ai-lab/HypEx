@@ -56,11 +56,19 @@ class MatchingMetrics(GroupOperator):
 
     def _calc_scaled_counts(self, matches, indexes, group):
         matches_counts = Dataset({})
-        matches_counts = matches_counts.add_column(indexes.index, {"indexes": InfoRole()})
+        matches_counts = matches_counts.add_column(
+            indexes.index, {"indexes": InfoRole()}
+        )
         matches_counts = matches_counts.add_column([0], {"count": InfoRole(float)})
         for col in matches.columns:
             v_counts = matches[col].value_counts()
-            matches_counts = matches_counts.merge(v_counts, how="left", left_on="indexes", right_on=col, suffixes=(("", col))).drop(columns=col)
+            matches_counts = matches_counts.merge(
+                v_counts,
+                how="left",
+                left_on="indexes",
+                right_on=col,
+                suffixes=(("", col)),
+            ).drop(columns=col)
         matches_counts.index = indexes.index
         matches_counts = matches_counts.drop(columns="indexes").fillna(0)
         for col in matches_counts.columns:
@@ -77,15 +85,15 @@ class MatchingMetrics(GroupOperator):
     def _calc_se(var_c, var_t, scaled_counts, group=None):
         n_c, n_t = len(var_c), len(var_t)
         if not group is None:
-            groups = list(scaled_counts.keys())  
+            groups = list(scaled_counts.keys())
             groups.remove(group)
             group_other = groups[0]
             weights_c = scaled_counts[group_other] * 0 + 1
             weights_t = scaled_counts[group] * n_t / n_c
         else:
             n = n_c + n_t
-            weights_c = (n_c / n) * (scaled_counts["test"]+1)
-            weights_t = (n_t / n) * (scaled_counts["control"]+1)
+            weights_c = (n_c / n) * (scaled_counts["test"] + 1)
+            weights_t = (n_t / n) * (scaled_counts["control"] + 1)
 
         return np.sqrt(
             (weights_t**2 * var_t).sum() / n_t**2
@@ -199,18 +207,20 @@ class MatchingMetrics(GroupOperator):
         )
 
     def _prepare_new_target(
-        self, data: ExperimentData,
-        t_data: Dataset, group_field: str,
+        self,
+        data: ExperimentData,
+        t_data: Dataset,
+        group_field: str,
     ) -> Dataset:
         new_target = data.ds.search_columns(TargetRole())[0]
         indexes, matched_data = Bias.prepare_data(data, t_data)
         matched_data = matched_data[new_target + "_matched"]
         grouped_data = data.ds.groupby(group_field)
-        control_indexes = indexes.iloc[grouped_data[0][1].index,:]
-        test_indexes = indexes.iloc[grouped_data[1][1].index,:]
+        control_indexes = indexes.iloc[grouped_data[0][1].index, :]
+        test_indexes = indexes.iloc[grouped_data[1][1].index, :]
         self._calc_scaled_counts(control_indexes, test_indexes, "test")
         self._calc_scaled_counts(test_indexes, control_indexes, "control")
-        
+
         return matched_data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -364,7 +374,9 @@ class Bias(GroupOperator):
         )
         matched_data = Dataset({})
         matched_data.index = filtered_field.index
-        numeric_cols = t_data.search_columns([FeatureRole(), TargetRole()], search_types=[int, float])
+        numeric_cols = t_data.search_columns(
+            [FeatureRole(), TargetRole()], search_types=[int, float]
+        )
         for d_col in numeric_cols:
             matched_data_col = Dataset({})
             matched_data_col.index = filtered_field.index
@@ -375,12 +387,21 @@ class Bias(GroupOperator):
                     {d_col: d_col + f"_matched_{i}" for _ in data.ds.columns}
                 )
                 matched_data_col = matched_data_col.add_column(index_matched_data)
-            matched_data_col = matched_data_col.add_column([0], {d_col + "_matched": t_data.roles[d_col]}).fillna(0)
+            default_value = [t_data.roles[d_col].data_type(0)]
+            matched_data_col = matched_data_col.add_column(
+                default_value * matched_data_col.shape[0],
+                {d_col + "_matched": t_data.roles[d_col]},
+            )
             for col in matched_data_col.columns:
                 if col != d_col + "_matched":
                     matched_data_col[d_col + "_matched"] += matched_data_col[col]
-            matched_data = matched_data.add_column([0], {d_col + "_matched": t_data.roles[d_col]}).fillna(0)  
-            matched_data[d_col + "_matched"] = matched_data_col[d_col + "_matched"] / (matched_data_col.shape[1] - 1)
+            matched_data = matched_data.add_column(
+                default_value * matched_data_col.shape[0],
+                {d_col + "_matched": t_data.roles[d_col]},
+            )
+            matched_data[d_col + "_matched"] = matched_data_col[d_col + "_matched"] / (
+                matched_data_col.shape[1] - 1
+            )
 
         return indexes, matched_data
 

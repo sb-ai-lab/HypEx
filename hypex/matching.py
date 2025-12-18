@@ -13,6 +13,7 @@ from .experiments.base import Experiment, OnRoleExperiment
 from .ml.faiss import FaissNearestNeighbors
 from .operators.operators import Bias, MatchingMetrics
 from .reporters.matching import MatchingDatasetReporter
+from .transformers import TypeCaster
 from .ui.base import ExperimentShell
 from .ui.matching import MatchingOutput
 
@@ -142,6 +143,10 @@ class Matching(ExperimentShell):
         two_sides = metric == "ate"
         test_pairs = metric == "atc"
         executors: list[Executor] = [
+            TypeCaster(
+                dtype={int: float},
+                roles=[FeatureRole(), TargetRole()],
+            ),
             FaissNearestNeighbors(
                 grouping_role=TreatmentRole(),
                 two_sides=two_sides,

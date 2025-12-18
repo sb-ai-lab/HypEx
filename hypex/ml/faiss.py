@@ -40,14 +40,18 @@ class FaissNearestNeighbors(MLExecutor):
         )
 
     @classmethod
-    def _set_global_match_indexes(cls, local_indexes: Dataset, data: tuple(str, Dataset)) -> list[int, list[int]]:
+    def _set_global_match_indexes(
+        cls, local_indexes: Dataset, data: tuple(str, Dataset)
+    ) -> list[int, list[int]]:
         if len(local_indexes) == 0:
             return local_indexes
         global_indexes = local_indexes
         for col in local_indexes.columns:
-            global_indexes[col] = data[1].index.take(local_indexes.get_values(column=col))
+            global_indexes[col] = data[1].index.take(
+                local_indexes.get_values(column=col)
+            )
         return global_indexes
-    
+
     @classmethod
     def _execute_inner_function(
         cls,
@@ -147,12 +151,10 @@ class FaissNearestNeighbors(MLExecutor):
         )
         nans = 0
         # nans = compare_result.isna().sum().get_values(row="sum").sum()
-        
+
         for result in compare_result.values():
-            nans += sum(result.isna().sum().get_values(row="sum"))
-            result = result.fillna(-1).astype(
-                {col: int for col in result.columns}
-            )
+            nans += sum(result.isna().sum().get_values(row="sum")) if self.n_neighbors > 1 else result.isna().sum()
+            result = result.fillna(-1).astype({col: int for col in result.columns})
         if nans > 0:
             warn(
                 f"Faiss returned {nans} nans, which were replaced with dummy matches. Check if the data is suitable for the test.",
@@ -161,23 +163,24 @@ class FaissNearestNeighbors(MLExecutor):
         ds = data.ds.groupby(group_field)
         matched_indexes = Dataset.create_empty()
         for res_k, res_v in compare_result.items():
-        # for i in range(len(compare_result.columns)):
-            group = (
-                grouping_data[1][1]
-                if res_k == "test"
-                else grouping_data[0][1]
-            )
+            # for i in range(len(compare_result.columns)):
+            group = grouping_data[1][1] if res_k == "test" else grouping_data[0][1]
             t_ds = ds[0][1] if res_k == "test" else ds[1][1]
             t_index_field = (
-                res_v
-                .loc[: len(group) - 1]
+                res_v.loc[: len(group) - 1]
                 # .rename({compare_result.columns[i]: "indexes"})
             )
-            n_nans = t_index_field.isna().sum().get_values(row="sum") if t_index_field.shape[1] > 1 else [t_index_field.isna().sum()]
+            n_nans = (
+                t_index_field.isna().sum().get_values(row="sum")
+                if t_index_field.shape[1] > 1
+                else [t_index_field.isna().sum()]
+            )
             if any(n_nans):
                 raise PairsNotFoundError
             # t_index_field = t_index_field.list_to_columns("indexes")
-            t_index_field = t_index_field.rename({col: f"indexes_{i}" for i, col in enumerate(t_index_field.columns)})
+            t_index_field = t_index_field.rename(
+                {col: f"indexes_{i}" for i, col in enumerate(t_index_field.columns)}
+            )
             # t_index_field.columns = ["indexes"] if len(t_index_field.columns) == 1 else [f"indexes_{i}" for i in range(len(t_index_field.columns))]
             matched_indexes = matched_indexes.append(
                 Dataset.from_dict(

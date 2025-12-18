@@ -671,8 +671,8 @@ class Dataset(DatasetBase):
         return Dataset(roles=new_roles, data=t_data)
 
     def drop(
-        self, 
-        labels: Optional[str] = None, 
+        self,
+        labels: Optional[str] = None,
         axis: Optional[int] = None,
         columns: Optional[Union[str, Iterable[str]]] = None,
     ):
@@ -1041,8 +1041,10 @@ class DatasetAdapter(Adapter):
     @staticmethod
     def list_to_dataset(data: list, roles: dict[str, ABCRole]) -> Dataset:
         return Dataset(
-            roles= roles if len(roles) > 0 else {0: DefaultRole()},
-            data=pd.DataFrame(data=data, columns=[next(iter(roles.keys()))] if len(roles) > 0 else [0]),
+            roles=roles if len(roles) > 0 else {0: DefaultRole()},
+            data=pd.DataFrame(
+                data=data, columns=[next(iter(roles.keys()))] if len(roles) > 0 else [0]
+            ),
         )
 
     @staticmethod
@@ -1051,7 +1053,7 @@ class DatasetAdapter(Adapter):
             roles=roles,
             data=data,
         )
-    
+
     @staticmethod
     def ndarray_to_dataset(data: np.ndarray, roles: dict[str, ABCRole]) -> Dataset:
         columns = range(data.shape[1]) if len(roles) == 0 else list(roles.keys())
