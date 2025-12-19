@@ -216,8 +216,8 @@ class MatchingMetrics(GroupOperator):
         indexes, matched_data = Bias.prepare_data(data, t_data)
         matched_data = matched_data[new_target + "_matched"]
         grouped_data = data.ds.groupby(group_field)
-        control_indexes = indexes.iloc[grouped_data[0][1].index, :]
-        test_indexes = indexes.iloc[grouped_data[1][1].index, :]
+        control_indexes = indexes.loc[grouped_data[0][1].index, :]
+        test_indexes = indexes.loc[grouped_data[1][1].index, :]
         self._calc_scaled_counts(control_indexes, test_indexes, "test")
         self._calc_scaled_counts(test_indexes, control_indexes, "control")
 
