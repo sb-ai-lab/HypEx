@@ -14,6 +14,7 @@ class ABOutput(Output):
     multitest: Union[Dataset, str]
     sizes: Dataset
     variance_reductions: Dataset | None
+    feature_importances: Dataset | None
 
     def __init__(self):
         self._groups = []
@@ -110,6 +111,52 @@ class ABOutput(Output):
                 'test_mean_bias': StatisticRole()
             }
         )
+
+    def _extract_feature_importances(self, experiment_data: ExperimentData):
+        """Extract feature importances from CUPAC models."""
+        # Find all CUPAC report keys in analysis_tables
+        cupac_report_keys = [
+            key for key in experiment_data.analysis_tables.keys() 
+            if key.endswith('_cupac_report')
+        ]
+        
+        if not cupac_report_keys:
+            self.feature_importances = None
+            return
+        
+        # Aggregate all feature importances into a single dataset
+        importance_data = []
+        for key in cupac_report_keys:
+            report = experiment_data.analysis_tables[key]
+            target_name = key.replace('_cupac_report', '')
+            model_name = report.get('cupac_best_model')
+            importances = report.get('cupac_feature_importances', {})
+            
+            if not importances:
+                continue
+            
+            # Convert feature importances to rows
+            for feature_idx, importance_value in importances.items():
+                importance_data.append({
+                    'target': target_name,
+                    'feature': feature_idx,
+                    'importance': importance_value,
+                    'model': model_name
+                })
+        
+        if not importance_data:
+            self.feature_importances = None
+            return
+        
+        self.feature_importances = Dataset.from_dict(
+            data=importance_data,
+            roles={
+                'target': InfoRole(str),
+                'feature': InfoRole(str),
+                'importance': StatisticRole(),
+                'model': InfoRole(str)
+            }
+        )
             
 
     @property
@@ -125,3 +172,4 @@ class ABOutput(Output):
         self._extract_multitest_result(experiment_data)
         self._extract_sizes(experiment_data)
         self._extract_variance_reductions(experiment_data)
+        self._extract_feature_importances(experiment_data)

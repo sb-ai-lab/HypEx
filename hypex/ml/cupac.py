@@ -196,15 +196,16 @@ class CUPACExecutor(MLExecutor):
         elif mode == 'predict':
             return self.predict(model, X)
 
-    def kfold_fit(self, model: str, X: Dataset, Y: Dataset) -> float:
-        var_red = self.extension.calc(
+    def kfold_fit(self, model: str, X: Dataset, Y: Dataset) -> tuple[float, dict[str, float]]:
+        """Run k-fold cross-validation and return variance reduction and feature importances."""
+        var_red, feature_importances = self.extension.calc(
             data=X,
             mode='kfold_fit',
             model=model,
             Y=Y,
         )
 
-        return var_red
+        return var_red, feature_importances
     
     def fit(self, model: str, X: Dataset, Y: Dataset) -> Any:
         return self.extension.calc(
@@ -222,7 +223,7 @@ class CUPACExecutor(MLExecutor):
         )
 
     @staticmethod
-    def _agg_data_from_cupac_data(data: ExperimentData, cupac_data_slice: list) -> Dataset:
+    def _agg_data_from_cupac_data(data: ExperimentData, cupac_data_slice: list) -> tuple[Dataset, list[str]]:
         """
         Aggregate columns from cupac_data structure into a single Dataset.
         
@@ -237,15 +238,18 @@ class CUPACExecutor(MLExecutor):
                 - [col_name_lag1, col_name_lag2, ...] for temporal sequences
                 
         Returns:
-            Dataset: Aggregated dataset with standardized column names (0, 1, 2, ...).
+            tuple: (Dataset with standardized column names (0, 1, 2, ...), 
+                    list of original column names for feature importance tracking)
         """
         res_dataset = None
         column_counter = 0
+        original_column_names = []
         
         for column in cupac_data_slice:
             if len(column) == 1:
                 # Single column case: extract directly
                 col_data = data.ds[column[0]]
+                original_column_names.append(column[0])
             else:
                 # Multiple lag columns: stack them vertically
                 res_lag_column = None
@@ -257,6 +261,7 @@ class CUPACExecutor(MLExecutor):
                     else:
                         res_lag_column = res_lag_column.append(tmp_dataset, reset_index=True, axis=0)
                 col_data = res_lag_column
+                original_column_names.append(column[0])
             
             # Standardize column names to numeric format for model training
             standard_col_name = f"{column_counter}"
@@ -267,7 +272,7 @@ class CUPACExecutor(MLExecutor):
                 res_dataset = col_data
             else:
                 res_dataset = res_dataset.add_column(data=col_data)
-        return res_dataset
+        return res_dataset, original_column_names
 
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -293,19 +298,20 @@ class CUPACExecutor(MLExecutor):
         self._validate_models()
         cupac_data = self._prepare_data(data)
         for target in cupac_data.keys():
-            X_train = self._agg_data_from_cupac_data(
+            X_train, X_train_feature_names = self._agg_data_from_cupac_data(
                 data,
                 cupac_data[target]['X_train']
             )
-            Y_train = self._agg_data_from_cupac_data(
+            Y_train, _ = self._agg_data_from_cupac_data(
                 data,
                 [cupac_data[target]['Y_train']]
             )
-            best_model, best_var_red = None, None
+            best_model, best_var_red, best_feature_importances = None, None, None
 
             # Model selection via cross-validation
+            # Feature importances are extracted during CV for efficiency
             for model in self.cupac_models:
-                var_red = self.calc(
+                var_red, fold_importances = self.calc(
                     mode='kfold_fit',
                     model=model,
                     X=X_train,
@@ -313,6 +319,11 @@ class CUPACExecutor(MLExecutor):
                     )
                 if best_var_red is None or var_red > best_var_red:
                     best_model, best_var_red = model, var_red
+                    # Map standardized column names to original feature names
+                    best_feature_importances = {
+                        X_train_feature_names[int(col_idx)]: importance 
+                        for col_idx, importance in fold_importances.items()
+                    }
 
             if best_model is None:
                 raise RuntimeError(f"No models were successfully fitted for target '{target}'. All models failed during training.")
@@ -320,17 +331,18 @@ class CUPACExecutor(MLExecutor):
             cupac_variance_reduction_real = None
 
             # Apply CUPAC adjustment to current period (if target is real, not virtual)
+            # We need to fit the model on all data for prediction, but importances are already from CV
             if 'X_predict' in cupac_data[target]:
-                X_predict = self._agg_data_from_cupac_data(
-                    data,
-                    cupac_data[target]['X_predict']
-                )
-
                 fitted_model = self.calc(
                     mode='fit',
                     model=best_model,
                     X=X_train,
                     Y=Y_train
+                )
+                
+                X_predict, _ = self._agg_data_from_cupac_data(
+                    data,
+                    cupac_data[target]['X_predict']
                 )
 
                 prediction = self.calc(
@@ -354,6 +366,7 @@ class CUPACExecutor(MLExecutor):
                 "cupac_best_model": best_model,
                 "cupac_variance_reduction_cv": best_var_red,
                 "cupac_variance_reduction_real": cupac_variance_reduction_real,
+                "cupac_feature_importances": best_feature_importances,
             }
             data.analysis_tables[f"{target}_cupac_report"] = report
 

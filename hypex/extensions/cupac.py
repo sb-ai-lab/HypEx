@@ -41,8 +41,13 @@ class CupacExtension(MLExtension):
     def predict(self, model: Any, X: Dataset) -> Dataset:
         pass
 
-    def _kfold_fit_pandas(self, model: str, X: Dataset, Y: Dataset) -> float:
+    def _kfold_fit_pandas(self, model: str, X: Dataset, Y: Dataset) -> tuple[float, dict[str, float]]:
+        """
+        Perform K-fold cross-validation and return variance reduction and feature importances.
         
+        Returns:
+            tuple: (mean_variance_reduction, mean_feature_importances)
+        """
         model_proto = CUPAC_MODELS[model]["pandasdataset"]
         
         X_df = X.data
@@ -52,6 +57,7 @@ class CupacExtension(MLExtension):
         
         kf = KFold(n_splits=self.n_folds, shuffle=True, random_state=self.random_state)
         fold_var_reductions = []
+        fold_feature_importances = []
         
         for train_idx, val_idx in kf.split(X_df):
             X_train, X_val = X_df.iloc[train_idx], X_df.iloc[val_idx]
@@ -67,9 +73,17 @@ class CupacExtension(MLExtension):
             
             var_reduction = self._calculate_variance_reduction(y_original, y_adjusted)
             fold_var_reductions.append(var_reduction)
+            
+            # Extract feature importances for this fold
+            fold_importances = self._extract_fold_importances(m, model, X_df.columns.tolist())
+            fold_feature_importances.append(fold_importances)
         
         mean_var_reduction = float(np.nanmean(fold_var_reductions))
-        return mean_var_reduction
+        
+        # Average feature importances across folds
+        mean_importances = self._average_importances(fold_feature_importances)
+        
+        return mean_var_reduction, mean_importances
     
     def _fit_pandas(self, model: str, X: Dataset, Y: Dataset) -> Any:
         model_proto = CUPAC_MODELS[model]["pandasdataset"]
@@ -90,6 +104,57 @@ class CupacExtension(MLExtension):
             },
             data=predictions
         )
+
+    @staticmethod
+    def _extract_fold_importances(model: Any, model_name: str, feature_names: list[str]) -> dict[str, float]:
+        """
+        Extract feature importances from a fitted model for a single fold.
+        
+        Args:
+            model: Fitted model object.
+            model_name: Model type ('linear', 'ridge', 'lasso', 'catboost').
+            feature_names: List of feature names.
+            
+        Returns:
+            dict: Feature name to importance mapping.
+        """
+        importances = {}
+        
+        if model_name in ['linear', 'ridge', 'lasso']:
+            for i, feature_name in enumerate(feature_names):
+                importances[feature_name] = float(model.coef_[i])
+        elif model_name == 'catboost':
+            for i, feature_name in enumerate(feature_names):
+                importances[feature_name] = float(model.feature_importances_[i])
+        
+        return importances
+    
+    @staticmethod
+    def _average_importances(fold_importances: list[dict[str, float]]) -> dict[str, float]:
+        """
+        Average feature importances across CV folds.
+        
+        Args:
+            fold_importances: List of importance dicts from each fold.
+            
+        Returns:
+            dict: Averaged feature importances.
+        """
+        if not fold_importances:
+            return {}
+        
+        # Get all feature names
+        all_features = set()
+        for fold_imp in fold_importances:
+            all_features.update(fold_imp.keys())
+        
+        # Average across folds
+        mean_importances = {}
+        for feature in all_features:
+            values = [fold_imp.get(feature, 0.0) for fold_imp in fold_importances]
+            mean_importances[feature] = float(np.mean(values))
+        
+        return mean_importances
 
     @staticmethod
     def _calculate_variance_reduction(y_original, y_adjusted) -> float:
