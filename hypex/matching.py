@@ -69,7 +69,7 @@ class Matching(ExperimentShell):
     def _make_experiment(
         group_match: bool = False,
         distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-        metric: Literal["atc", "att", "ate"] = "ate",
+        # metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: (
             Literal["smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"]
@@ -140,6 +140,7 @@ class Matching(ExperimentShell):
                 baseline_role=AdditionalMatchingRole(),
             ),
         }
+        metric = "ate"
         two_sides = metric == "ate"
         test_pairs = metric == "atc"
         executors: list[Executor] = [
