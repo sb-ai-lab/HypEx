@@ -170,7 +170,7 @@ class MatchingMetrics(GroupOperator):
                     itt + 1.96 * itt_se,
                 ]
             }
-        len_test, len_control = len(data), len(test_data)
+        len_control, len_test = len(data), len(test_data)
         ate = (itt * len_test + itc * len_control) / (len_test + len_control)
         ate_se = cls._calc_se(var_c, var_t, scaled_counts)
         p_val_ate = (
