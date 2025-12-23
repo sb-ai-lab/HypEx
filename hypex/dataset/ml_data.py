@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
 from ..dataset.dataset import Dataset, ExperimentData
-from .stats import MLExecutionStats, ModelStats
+
+if TYPE_CHECKING:
+    from ..ml.stats import MLExecutionStats, ModelStats
 
 
 class MLExperimentData(ExperimentData):
@@ -21,11 +23,11 @@ class MLExperimentData(ExperimentData):
     
     def __init__(self, data: Dataset):
         super().__init__(data)
-        self.ml_stats: Optional[MLExecutionStats] = None
+        self.ml_stats: Optional[MLExecutionStats] = None  # type: ignore[name-defined]
         self.trained_models: dict[str, Any] = {}
         self.ml_metadata: dict[str, Any] = {}
     
-    def set_ml_stats(self, stats: MLExecutionStats) -> MLExperimentData:
+    def set_ml_stats(self, stats: MLExecutionStats) -> MLExperimentData:  # type: ignore[name-defined]
         """
         Set ML execution statistics.
         
@@ -38,7 +40,7 @@ class MLExperimentData(ExperimentData):
         self.ml_stats = stats
         return self
     
-    def get_model_stats(self, target: str) -> Optional[ModelStats]:
+    def get_model_stats(self, target: str) -> Optional[ModelStats]:  # type: ignore[name-defined]
         """
         Get model statistics for a specific target.
         

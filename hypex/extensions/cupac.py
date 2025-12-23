@@ -2,12 +2,11 @@ from __future__ import annotations
 from typing import Any, Sequence, Optional, Dict, Union, Literal
 import numpy as np
 import pandas as pd
-from sklearn.base import clone
 from sklearn.model_selection import KFold
 from ..dataset import Dataset, TargetRole, AdditionalTargetRole
 from ..dataset.backends import PandasDataset
 from .abstract import MLExtension
-from ..utils.models import CUPAC_MODELS
+from ..ml.models import MODEL_REGISTRY, MLModel
 
 
 class CupacExtension(MLExtension):
@@ -48,7 +47,9 @@ class CupacExtension(MLExtension):
         Returns:
             tuple: (mean_variance_reduction, mean_feature_importances)
         """
-        model_proto = CUPAC_MODELS[model]["pandasdataset"]
+        ml_model = MODEL_REGISTRY.get_model(model, backend='pandasdataset')
+        if ml_model is None:
+            raise ValueError(f"Model '{model}' not available for pandasdataset backend")
         
         X_df = X.data
         Y_df = Y.data
@@ -65,7 +66,8 @@ class CupacExtension(MLExtension):
             X_train, X_val = X_df.iloc[train_idx], X_df.iloc[val_idx]
             y_train, y_val = y_values.iloc[train_idx], y_values.iloc[val_idx]
             
-            m = clone(model_proto)
+            # Clone the MLModel instance
+            m = ml_model.clone()
             m.fit(X_train, y_train)
             
             pred = m.predict(X_val)
@@ -76,8 +78,8 @@ class CupacExtension(MLExtension):
             var_reduction = self._calculate_variance_reduction(y_original, y_adjusted)
             fold_var_reductions.append(var_reduction)
             
-            # Extract feature importances for this fold
-            fold_importances = self._extract_fold_importances(m, model, feature_names)
+            # Extract feature importances for this fold using MLModel method
+            fold_importances = m.get_feature_importances(feature_names)
             fold_feature_importances.append(fold_importances)
         
         mean_var_reduction = float(np.nanmean(fold_var_reductions))
@@ -91,8 +93,11 @@ class CupacExtension(MLExtension):
         return mean_var_reduction, mean_importances
     
     def _fit_pandas(self, model: str, X: Dataset, Y: Dataset) -> Any:
-        model_proto = CUPAC_MODELS[model]["pandasdataset"]
-        final_model = clone(model_proto)
+        ml_model = MODEL_REGISTRY.get_model(model, backend='pandasdataset')
+        if ml_model is None:
+            raise ValueError(f"Model '{model}' not available for pandasdataset backend")
+        
+        final_model = ml_model.clone()
         X_df = X.data
         Y_df = Y.data
         y_values = Y_df.iloc[:, 0] if len(Y_df.columns) > 0 else Y_df
@@ -109,30 +114,6 @@ class CupacExtension(MLExtension):
             },
             data=predictions
         )
-
-    @staticmethod
-    def _extract_fold_importances(model: Any, model_name: str, feature_names: list[str]) -> dict[str, float]:
-        """
-        Extract feature importances from a fitted model for a single fold.
-        
-        Args:
-            model: Fitted model object.
-            model_name: Model type ('linear', 'ridge', 'lasso', 'catboost').
-            feature_names: List of feature names.
-            
-        Returns:
-            dict: Feature name to importance mapping.
-        """
-        importances = {}
-        
-        if model_name in ['linear', 'ridge', 'lasso']:
-            for i, feature_name in enumerate(feature_names):
-                importances[feature_name] = float(model.coef_[i])
-        elif model_name == 'catboost':
-            for i, feature_name in enumerate(feature_names):
-                importances[feature_name] = float(model.feature_importances_[i])
-        
-        return importances
     
     @staticmethod
     def _calculate_variance_reduction(y_original, y_adjusted) -> float:

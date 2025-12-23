@@ -11,7 +11,7 @@ from ..utils.enums import BackendsEnum
 
 from ..extensions.cupac import CupacExtension
 
-from ..utils.models import CUPAC_MODELS
+from ..ml.models import MODEL_REGISTRY
 
 class CUPACExecutor(MLExecutor):
     """
@@ -47,19 +47,20 @@ class CUPACExecutor(MLExecutor):
         """
         wrong_models = []
         if self.cupac_models is None:
-            self.cupac_models = list(CUPAC_MODELS.keys())
+            self.cupac_models = MODEL_REGISTRY.available_models
             return
 
         self.cupac_models = Adapter.to_list(self.cupac_models)
 
         for model in self.cupac_models:
-            if model.lower() not in CUPAC_MODELS:
-                wrong_models.append(model)
-            elif CUPAC_MODELS[model] is None:
-                raise ValueError(f"Model '{model}' is not available for the current backend")
+            if not MODEL_REGISTRY.is_available(model.lower(), backend='pandasdataset'):
+                if model.lower() not in MODEL_REGISTRY.available_models:
+                    wrong_models.append(model)
+                else:
+                    raise ValueError(f"Model '{model}' is not available for the current backend")
         
         if wrong_models:
-            raise ValueError(f"Wrong cupac models: {wrong_models}. Available models: {list(CUPAC_MODELS.keys())}")
+            raise ValueError(f"Wrong cupac models: {wrong_models}. Available models: {MODEL_REGISTRY.available_models}")
 
     @staticmethod
     def _prepare_data(data: ExperimentData) -> dict[str, dict[str, list]]:
