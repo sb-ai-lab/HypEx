@@ -59,6 +59,8 @@ class CupacExtension(MLExtension):
         fold_var_reductions = []
         fold_feature_importances = []
         
+        feature_names = X_df.columns.tolist()
+        
         for train_idx, val_idx in kf.split(X_df):
             X_train, X_val = X_df.iloc[train_idx], X_df.iloc[val_idx]
             y_train, y_val = y_values.iloc[train_idx], y_values.iloc[val_idx]
@@ -75,13 +77,16 @@ class CupacExtension(MLExtension):
             fold_var_reductions.append(var_reduction)
             
             # Extract feature importances for this fold
-            fold_importances = self._extract_fold_importances(m, model, X_df.columns.tolist())
+            fold_importances = self._extract_fold_importances(m, model, feature_names)
             fold_feature_importances.append(fold_importances)
         
         mean_var_reduction = float(np.nanmean(fold_var_reductions))
         
-        # Average feature importances across folds
-        mean_importances = self._average_importances(fold_feature_importances)
+        # Average feature importances across folds: convert to dict with mean values
+        mean_importances = {
+            feature: float(np.mean([fold_imp[feature] for fold_imp in fold_feature_importances]))
+            for feature in feature_names
+        }
         
         return mean_var_reduction, mean_importances
     
@@ -120,42 +125,15 @@ class CupacExtension(MLExtension):
         """
         importances = {}
         
-        if model_name in ['linear', 'ridge', 'lasso']:
-            for i, feature_name in enumerate(feature_names):
-                importances[feature_name] = float(model.coef_[i])
-        elif model_name == 'catboost':
-            for i, feature_name in enumerate(feature_names):
-                importances[feature_name] = float(model.feature_importances_[i])
+        # Get feature importance attribute name from model metadata
+        importance_attr = CUPAC_MODELS[model_name].get("feature_importance_attr")
+      
+        importance_values = getattr(model, importance_attr)
+        for i, feature_name in enumerate(feature_names):
+            importances[feature_name] = float(importance_values[i])
         
         return importances
     
-    @staticmethod
-    def _average_importances(fold_importances: list[dict[str, float]]) -> dict[str, float]:
-        """
-        Average feature importances across CV folds.
-        
-        Args:
-            fold_importances: List of importance dicts from each fold.
-            
-        Returns:
-            dict: Averaged feature importances.
-        """
-        if not fold_importances:
-            return {}
-        
-        # Get all feature names
-        all_features = set()
-        for fold_imp in fold_importances:
-            all_features.update(fold_imp.keys())
-        
-        # Average across folds
-        mean_importances = {}
-        for feature in all_features:
-            values = [fold_imp.get(feature, 0.0) for fold_imp in fold_importances]
-            mean_importances[feature] = float(np.mean(values))
-        
-        return mean_importances
-
     @staticmethod
     def _calculate_variance_reduction(y_original, y_adjusted) -> float:
         """Calculate variance reduction between original and adjusted target."""

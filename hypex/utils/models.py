@@ -10,14 +10,17 @@ CUPAC_MODELS = {
     "linear": {
         "pandasdataset": LinearRegression(),
         "polars": None,
+        "feature_importance_attr": "coef_",
     },
     "ridge": {
         "pandasdataset": Ridge(),
         "polars": None,
+        "feature_importance_attr": "coef_",
     },
     "lasso": {
         "pandasdataset": Lasso(),
         "polars": None,
+        "feature_importance_attr": "coef_",
     },
 }
 
@@ -25,4 +28,5 @@ if CATBOOST_AVAILABLE:
     CUPAC_MODELS["catboost"] = {
         "pandasdataset": CatBoostRegressor(verbose=0),
         "polars": None,
+        "feature_importance_attr": "feature_importances_",
     }

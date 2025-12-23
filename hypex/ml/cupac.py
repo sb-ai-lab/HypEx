@@ -223,7 +223,7 @@ class CUPACExecutor(MLExecutor):
         )
 
     @staticmethod
-    def _agg_data_from_cupac_data(data: ExperimentData, cupac_data_slice: list) -> tuple[Dataset, list[str]]:
+    def _agg_data_from_cupac_data(data: ExperimentData, cupac_data_slice: list) -> Dataset:
         """
         Aggregate columns from cupac_data structure into a single Dataset.
         
@@ -238,18 +238,15 @@ class CUPACExecutor(MLExecutor):
                 - [col_name_lag1, col_name_lag2, ...] for temporal sequences
                 
         Returns:
-            tuple: (Dataset with standardized column names (0, 1, 2, ...), 
-                    list of original column names for feature importance tracking)
+            Dataset with standardized column names (0, 1, 2, ...).
         """
         res_dataset = None
         column_counter = 0
-        original_column_names = []
         
         for column in cupac_data_slice:
             if len(column) == 1:
                 # Single column case: extract directly
                 col_data = data.ds[column[0]]
-                original_column_names.append(column[0])
             else:
                 # Multiple lag columns: stack them vertically
                 res_lag_column = None
@@ -261,7 +258,6 @@ class CUPACExecutor(MLExecutor):
                     else:
                         res_lag_column = res_lag_column.append(tmp_dataset, reset_index=True, axis=0)
                 col_data = res_lag_column
-                original_column_names.append(column[0])
             
             # Standardize column names to numeric format for model training
             standard_col_name = f"{column_counter}"
@@ -272,7 +268,7 @@ class CUPACExecutor(MLExecutor):
                 res_dataset = col_data
             else:
                 res_dataset = res_dataset.add_column(data=col_data)
-        return res_dataset, original_column_names
+        return res_dataset
 
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -297,14 +293,17 @@ class CUPACExecutor(MLExecutor):
         """
         self._validate_models()
         cupac_data = self._prepare_data(data)
-        for target in cupac_data.keys():
-            X_train, X_train_feature_names = self._agg_data_from_cupac_data(
+        for target, target_data in cupac_data.items():
+            # Extract feature names once before data aggregation
+            X_train_feature_names = [column[0] for column in target_data['X_train']]
+            
+            X_train = self._agg_data_from_cupac_data(
                 data,
-                cupac_data[target]['X_train']
+                target_data['X_train']
             )
-            Y_train, _ = self._agg_data_from_cupac_data(
+            Y_train = self._agg_data_from_cupac_data(
                 data,
-                [cupac_data[target]['Y_train']]
+                [target_data['Y_train']]
             )
             best_model, best_var_red, best_feature_importances = None, None, None
 
@@ -332,7 +331,7 @@ class CUPACExecutor(MLExecutor):
 
             # Apply CUPAC adjustment to current period (if target is real, not virtual)
             # We need to fit the model on all data for prediction, but importances are already from CV
-            if 'X_predict' in cupac_data[target]:
+            if 'X_predict' in target_data:
                 fitted_model = self.calc(
                     mode='fit',
                     model=best_model,
@@ -340,9 +339,9 @@ class CUPACExecutor(MLExecutor):
                     Y=Y_train
                 )
                 
-                X_predict, _ = self._agg_data_from_cupac_data(
+                X_predict = self._agg_data_from_cupac_data(
                     data,
-                    cupac_data[target]['X_predict']
+                    target_data['X_predict']
                 )
 
                 prediction = self.calc(

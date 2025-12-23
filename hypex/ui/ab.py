@@ -10,14 +10,44 @@ from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
 from .base import Output
 
 
+class CupacOutput:
+    """Container for CUPAC-specific outputs.
+    
+    Attributes:
+        variance_reductions (Dataset | None): Variance reduction metrics from CUPAC models.
+        feature_importances (Dataset | None): Feature importance scores from CUPAC models.
+    """
+    
+    def __init__(self):
+        self.variance_reductions: Dataset | None = None
+        self.feature_importances: Dataset | None = None
+    
+    def __repr__(self) -> str:
+        has_vr = self.variance_reductions is not None
+        has_fi = self.feature_importances is not None
+        
+        if not has_vr and not has_fi:
+            return "CupacOutput(no CUPAC data available)"
+        
+        parts = []
+        if has_vr:
+            n_targets = len(self.variance_reductions.data)
+            parts.append(f"variance_reductions: {n_targets} target(s)")
+        if has_fi:
+            n_features = len(self.feature_importances.data)
+            parts.append(f"feature_importances: {n_features} feature(s)")
+        
+        return f"CupacOutput({', '.join(parts)})"
+
+
 class ABOutput(Output):
     multitest: Union[Dataset, str]
     sizes: Dataset
-    variance_reductions: Dataset | None
-    feature_importances: Dataset | None
+    cupac: CupacOutput
 
     def __init__(self):
         self._groups = []
+        self.cupac = CupacOutput()
         super().__init__(resume_reporter=ABDatasetReporter())
 
     def _extract_multitest_result(self, experiment_data: ExperimentData):
@@ -71,7 +101,7 @@ class ABOutput(Output):
         ]
         
         if not cupac_report_keys:
-            self.variance_reductions = None
+            self.cupac.variance_reductions = None
             return
         
         # Aggregate all CUPAC reports into a single dataset
@@ -100,7 +130,7 @@ class ABOutput(Output):
                 'test_mean_bias': test_mean_bias
             })
         
-        self.variance_reductions = Dataset.from_dict(
+        self.cupac.variance_reductions = Dataset.from_dict(
             data=variance_data,
             roles={
                 'target': InfoRole(str),
@@ -121,7 +151,7 @@ class ABOutput(Output):
         ]
         
         if not cupac_report_keys:
-            self.feature_importances = None
+            self.cupac.feature_importances = None
             return
         
         # Aggregate all feature importances into a single dataset
@@ -145,10 +175,10 @@ class ABOutput(Output):
                 })
         
         if not importance_data:
-            self.feature_importances = None
+            self.cupac.feature_importances = None
             return
         
-        self.feature_importances = Dataset.from_dict(
+        self.cupac.feature_importances = Dataset.from_dict(
             data=importance_data,
             roles={
                 'target': InfoRole(str),
