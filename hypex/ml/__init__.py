@@ -1,4 +1,7 @@
-from .faiss import FaissNearestNeighbors
+try:
+    from .faiss import FaissNearestNeighbors
+except ImportError:
+    FaissNearestNeighbors = None
 from .cupac import CUPACExecutor
 from .models import MLModel, SklearnLinearModel, CatBoostModel, MLModelRegistry, MODEL_REGISTRY
 from .stats import CVStats, ModelStats, MLExecutionStats

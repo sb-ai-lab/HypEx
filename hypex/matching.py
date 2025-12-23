@@ -10,7 +10,10 @@ from .encoders.encoders import DummyEncoder
 from .executor import Executor
 from .experiments import GroupExperiment
 from .experiments.base import Experiment, OnRoleExperiment
-from .ml.faiss import FaissNearestNeighbors
+try:
+    from .ml.faiss import FaissNearestNeighbors
+except ImportError:
+    FaissNearestNeighbors = None
 from .operators.operators import Bias, MatchingMetrics
 from .reporters.matching import MatchingDatasetReporter
 from .ui.base import ExperimentShell

@@ -1,5 +1,8 @@
 from .encoders import DummyEncoderExtension
-from .faiss import FaissExtension
+try:
+    from .faiss import FaissExtension
+except ImportError:
+    FaissExtension = None
 from .scipy_linalg import CholeskyExtension, InverseExtension
 from .scipy_stats import (
                           Chi2TestExtension,
