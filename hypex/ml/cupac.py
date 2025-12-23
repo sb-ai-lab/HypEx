@@ -145,12 +145,18 @@ class CUPACExecutor(MLExecutor):
         # Calculate maximum lag for each target (max across target lags and cofounder feature lags)
         max_lags = {}
         for target, lags in targets.items():
-            max_lag = 1  # Default minimum lag
+            # Start with default minimum lag of 1
+            max_lag = 1
+            
+            # If target has lags, use the maximum target lag as starting point
             if lags:
                 max_lag = max(lags.keys())
-                for feature in cofounders[target]:
-                    if feature in features and features[feature]:
-                        max_lag = max(max(features[feature].keys()), max_lag)
+            
+            # Check if any cofounder features have higher lags
+            for feature in cofounders[target]:
+                if feature in features and features[feature]:
+                    max_lag = max(max(features[feature].keys()), max_lag)
+            
             max_lags[target] = max_lag
         
         # Build training and prediction structures for each target

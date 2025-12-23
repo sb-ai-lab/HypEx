@@ -47,6 +47,10 @@ class MLExperiment(Experiment):
         
         if self.convert_to_ml_data:
             # Convert regular ExperimentData to MLExperimentData
+            # Access ds property safely - all ExperimentData instances have it
+            if not hasattr(data, 'ds'):
+                raise TypeError(f"Expected ExperimentData instance, got {type(data)}")
+            
             ml_data = MLExperimentData(data.ds)
             ml_data.additional_fields = data.additional_fields
             ml_data.variables = data.variables
