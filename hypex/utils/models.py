@@ -25,5 +25,4 @@ if CATBOOST_AVAILABLE:
     CUPAC_MODELS["catboost"] = {
         "pandasdataset": CatBoostRegressor(verbose=0),
         "polars": None,
-        "feature_importance_attr": "feature_importances_",
     }
