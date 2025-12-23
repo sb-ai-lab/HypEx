@@ -145,6 +145,7 @@ class CUPACExecutor(MLExecutor):
         # Calculate maximum lag for each target (max across target lags and cofounder feature lags)
         max_lags = {}
         for target, lags in targets.items():
+            max_lag = 1  # Default minimum lag
             if lags:
                 max_lag = max(lags.keys())
                 for feature in cofounders[target]:
