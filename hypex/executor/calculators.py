@@ -1,23 +1,16 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Sequence
+from typing import Any, Iterable
 
 import numpy as np
 from scipy.stats import norm
 
-from ..dataset import (
-    ABCRole,
-    Dataset,
-    ExperimentData,
-    TargetRole,
-    TreatmentRole,
-)
+from ..dataset import ABCRole, Dataset, ExperimentData, TargetRole, TreatmentRole
 from .executor import Calculator
-from ..utils import ExperimentDataEnum, NotSuitableFieldError
+from ..utils import NotSuitableFieldError
 from ..utils.adapter import Adapter
 from ..extensions import MultitestQuantile
-
 
 class MinSampleSize(Calculator):
     """A calculator for estimating the minimum required sample size for multi-group comparisons.
@@ -68,8 +61,7 @@ class MinSampleSize(Calculator):
     Examples
     --------
     .. code-block:: python
-
-        # Create dataset with treatment grouping
+    
         ds = Dataset(
             data="data.csv",
             roles={
@@ -80,11 +72,9 @@ class MinSampleSize(Calculator):
             },
         )
 
-        # Estimate sample size for detecting an absolute MDE
-        mss = MinSampleSize(mde=0.01, alpha=0.05, power=0.2, equal_variance=False)
-        result = mss.execute(data=ds)
+        mss = MinSampleSize(mde=10.0, alpha=0.05, equal_variance=True)
+        result = mss.calc(data=ds)
     """
-
     def __init__(
         self,
         grouping_role: ABCRole | None = None,
@@ -121,20 +111,19 @@ class MinSampleSize(Calculator):
     def search_types(self) -> list[type] | None:
         return [int, float]
 
-    def _get_fields(self, data: ExperimentData):
-        group_field = data.field_search(self.grouping_role)
-        target_fields = data.field_search(
-            [TargetRole()],
-            search_types=self.search_types,
-        )
+    def _get_fields(self, data: Dataset) -> tuple[list[str], list[str]]:
+        group_field = data.search_columns(self.grouping_role, search_types=None)
+        target_fields = data.search_columns([TargetRole()], search_types=self.search_types)
         return group_field, target_fields
-    
+
     @staticmethod
-    def _variance_by_group(grouping_data: list[tuple[str, Dataset]], target_field: str) -> list[float]:
+    def _variance_by_group(
+        grouping_data: list[tuple[str, Dataset]],
+        target_field: str,
+    ) -> list[float]:
         vars_: list[float] = []
         for _, ds in grouping_data:
-            v = float(ds[target_field].var())
-            vars_.append(v)
+            vars_.append(float(ds[target_field].var()))
         return vars_
 
     @classmethod
@@ -153,7 +142,7 @@ class MinSampleSize(Calculator):
         iteration_size: int = 5000,
         equal_variance: bool = True,
         random_state: int | None = 42,
-    ):
+    ) -> int:
         multitest = MultitestQuantile(
             alpha=alpha,
             iteration_size=iteration_size,
@@ -221,112 +210,58 @@ class MinSampleSize(Calculator):
 
         return int(np.max(sizes))
 
-    @classmethod
-    def calc(
-        cls,
-        *,
-        data: Dataset,
-        group_field: Sequence[str] | str | None = None,
-        grouping_data: list[tuple[str, Dataset]] | None = None,
-        target_field: str,
-        mde: float,
-        variances: list[float] | float | None = None,
-        power: float = 0.2,
-        quantile_1: float | list[float] | None = None,
-        quantile_2: float | list[float] | None = None,
-        initial_estimate: int = 0,
-        power_iteration_size: int = 3000,
-        alpha: float = 0.05,
-        iteration_size: int = 5000,
-        equal_variance: bool = True,
-        random_state: int | None = 42,
-        **kwargs,
-    ) -> dict:
-        group_field = Adapter.to_list(group_field)
-
-        if grouping_data is None:
-            grouping_data = data.groupby(group_field)
-
-        if len(grouping_data) <= 1:
-            raise NotSuitableFieldError(group_field, "Grouping")
-
-        if variances is None:
-            group_vars = cls._variance_by_group(grouping_data, target_field=target_field)
-            if equal_variance:
-                variances_used: list[float] | float = float(np.mean(group_vars))
-            else:
-                variances_used = group_vars
-        else:
-            variances_used = variances
-
-        num_samples = len(grouping_data)
-
-        res = cls._inner_function(
-            num_samples=num_samples,
-            mde=mde,
-            variances=variances_used,
-            power=power,
-            quantile_1=quantile_1,
-            quantile_2=quantile_2,
-            initial_estimate=initial_estimate,
-            power_iteration_size=power_iteration_size,
-            alpha=alpha,
-            iteration_size=iteration_size,
-            equal_variance=equal_variance,
-            random_state=random_state,
-        )
-
-        payload = {
-            "min sample size": res,
-        }
-       
-        return {target_field: payload}
-
-    def execute(self, data: Dataset) -> dict:
-        data = ExperimentData(data)
+    def calc(self, data: Dataset) -> dict:
         group_field, target_fields = self._get_fields(data=data)
 
-        self.key = str(
-            target_fields[0] if len(target_fields) == 1 else (target_fields or "")
-        )
+        self.key = str(target_fields[0] if len(target_fields) == 1 else (target_fields or ""))
 
-        if not target_fields and data.ds.tmp_roles:
-            return data
+        if not target_fields and data.tmp_roles:
+            return {}
+    
+        grouping_data = None
+
+        t_data = deepcopy(data)
         
-        if group_field[0] in data.groups:
-            grouping_data = list(data.groups[group_field[0]].items())
-        else:
-            grouping_data = None
+        gf = Adapter.to_list(group_field)
+        if grouping_data is None:
+            grouping_data = list(t_data.groupby(gf))
 
-        t_data = deepcopy(data.ds)
-        for field in target_fields:
-            if field not in t_data.columns:
-                t_data = t_data.add_column(
-                    data.additional_fields[field],
-                    role={field: TargetRole()},
-                )
+        if len(grouping_data) <= 1:
+            raise NotSuitableFieldError(gf, "Grouping")
 
         result: dict = {}
+        sizes: list[int] = []
+
         for field in target_fields:
-            result.update(
-                self.calc(
-                    data=t_data,
-                    group_field=group_field,
-                    grouping_data=grouping_data,
-                    target_field=field,
-                    mde=self.mde,
-                    variances=self.variances,
-                    power=self.power,
-                    quantile_1=self.quantile_1,
-                    quantile_2=self.quantile_2,
-                    initial_estimate=self.initial_estimate,
-                    power_iteration_size=self.power_iteration_size,
-                    alpha=self.alpha,
-                    iteration_size=self.iteration_size,
-                    equal_variance=self.equal_variance,
-                    random_state=self.random_state,
+            if self.variances is None:
+                group_vars = self._variance_by_group(grouping_data, target_field=field)
+                variances_used: list[float] | float = (
+                    float(np.mean(group_vars)) if self.equal_variance else group_vars
                 )
+            else:
+                variances_used = self.variances
+
+            n = self._inner_function(
+                num_samples=len(grouping_data),
+                mde=self.mde,
+                variances=variances_used,
+                power=self.power,
+                quantile_1=self.quantile_1,
+                quantile_2=self.quantile_2,
+                initial_estimate=self.initial_estimate,
+                power_iteration_size=self.power_iteration_size,
+                alpha=self.alpha,
+                iteration_size=self.iteration_size,
+                equal_variance=self.equal_variance,
+                random_state=self.random_state,
             )
+
+            result[field] = {"min sample size": n}
+            sizes.append(n)
+
+        result["overall"] = {"min sample size": int(max(sizes))} if sizes else {"min sample size": 0}
 
         return result
 
+    def execute(self, data: ExperimentData) -> dict:
+        return self.calc(data)
