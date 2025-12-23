@@ -10,17 +10,14 @@ CUPAC_MODELS = {
     "linear": {
         "pandasdataset": LinearRegression(),
         "polars": None,
-        "feature_importance_attr": "coef_",
     },
     "ridge": {
         "pandasdataset": Ridge(),
         "polars": None,
-        "feature_importance_attr": "coef_",
     },
     "lasso": {
         "pandasdataset": Lasso(),
         "polars": None,
-        "feature_importance_attr": "coef_",
     },
 }
 

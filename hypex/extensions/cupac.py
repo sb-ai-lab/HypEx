@@ -125,12 +125,12 @@ class CupacExtension(MLExtension):
         """
         importances = {}
         
-        # Get feature importance attribute name from model metadata
-        importance_attr = CUPAC_MODELS[model_name].get("feature_importance_attr")
-      
-        importance_values = getattr(model, importance_attr)
-        for i, feature_name in enumerate(feature_names):
-            importances[feature_name] = float(importance_values[i])
+        if model_name in ['linear', 'ridge', 'lasso']:
+            for i, feature_name in enumerate(feature_names):
+                importances[feature_name] = float(model.coef_[i])
+        elif model_name == 'catboost':
+            for i, feature_name in enumerate(feature_names):
+                importances[feature_name] = float(model.feature_importances_[i])
         
         return importances
     
