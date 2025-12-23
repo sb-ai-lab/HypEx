@@ -76,7 +76,7 @@ class DataGenerator:
         for i in range(n_points):
             for j in range(n_points):
                 cov[i, j] = (std**2) * (rho ** abs(i - j))
-        return np.random.multivariate_normal([mean] * n_points, cov, self.n_samples).T + U
+        return np.random.multivariate_normal([mean] * n_points, cov, self.n_samples).T# + 0.1 * U
 
     def generate(self):
         data = {}
@@ -112,8 +112,8 @@ class DataGenerator:
         data["y1"] = (
             data["y0"]
             + self.effect_size
-            + 1.5 * data["U"]
-            + np.random.normal(0, 2, self.n_samples)
+            * (1 + data["U"])
+            + np.random.normal(0, 0.01, self.n_samples)
         )
         data["y"] = np.where(data["d"] == 1, data["y1"], data["y0"])
         
