@@ -216,15 +216,10 @@ class MinSampleSize(Calculator):
         self.key = str(target_fields[0] if len(target_fields) == 1 else (target_fields or ""))
 
         if not target_fields and data.tmp_roles:
-            return {}
-    
-        grouping_data = None
-
-        t_data = deepcopy(data)
-        
+            raise Exception("No target fields in data")
+            
         gf = Adapter.to_list(group_field)
-        if grouping_data is None:
-            grouping_data = list(t_data.groupby(gf))
+        grouping_data = list(data.groupby(gf))
 
         if len(grouping_data) <= 1:
             raise NotSuitableFieldError(gf, "Grouping")
@@ -264,4 +259,4 @@ class MinSampleSize(Calculator):
         return result
 
     def execute(self, data: ExperimentData) -> dict:
-        return self.calc(data)
+        return self.calc(data.ds)
