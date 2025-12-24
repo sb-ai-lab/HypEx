@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Sequence, Sized
+from typing import Any, Callable, Iterable, Literal, Sequence, Sized, Union, Optional
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -549,8 +549,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             how=how,
         )
 
-    def drop(self, labels: str = "", axis: int = 1) -> pd.DataFrame:
-        return self.data.drop(labels=labels, axis=axis)
+    def drop(
+        self, 
+        labels: Optional[str] = None, 
+        axis: Optional[int] = None,
+        columns: Optional[Union[str, Iterable[str]]] = None,
+    ) -> pd.DataFrame:
+        return self.data.drop(labels=labels, axis=axis, columns=columns)
 
     def filter(
         self,

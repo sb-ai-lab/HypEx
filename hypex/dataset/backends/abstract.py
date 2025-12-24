@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Iterable, Literal, Sequence, Sized
+from typing import Any, Callable, Iterable, Literal, Sequence, Sized, Union, Optional
 
 from ...utils import AbstractMethodError, FromDictTypes
 
@@ -392,9 +392,10 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
 
     @abstractmethod
     def drop(
-        self,
-        labels: str | Sequence[str] | None = None,
-        axis: int = 1,
+        self, 
+        labels: Optional[str] = None, 
+        axis: Optional[int] = None,
+        columns: Optional[Union[str, Iterable[str]]] = None,
     ) -> Any:
         raise AbstractMethodError
 

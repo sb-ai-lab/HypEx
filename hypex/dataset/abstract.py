@@ -110,6 +110,19 @@ class DatasetBase(ABC):
             )
         ]
 
+    def search_columns_by_type(
+        self,
+        search_types: list | type,
+    ) -> list[str]:
+        search_types = (
+            search_types if isinstance(search_types, Iterable) else [search_types]
+        )
+        return [
+            str(column)
+            for column, role in self.roles.items()
+            if any(role.data_type == t for t in search_types)
+        ]
+
     def replace_roles(
         self,
         new_roles_map: dict[ABCRole | str] | ABCRole,
@@ -187,6 +200,9 @@ class DatasetBase(ABC):
             },
             "data": self._backend.to_dict(),
         }
+
+    def to_numpy(self):
+        return self._backend.to_numpy()
 
     def to_records(self):
         return self._backend.to_records()

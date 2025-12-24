@@ -13,6 +13,7 @@ from .experiments.base import Experiment, OnRoleExperiment
 from .ml.faiss import FaissNearestNeighbors
 from .operators.operators import Bias, MatchingMetrics
 from .reporters.matching import MatchingDatasetReporter
+from .transformers import TypeCaster
 from .ui.base import ExperimentShell
 from .ui.matching import MatchingOutput
 
@@ -142,13 +143,17 @@ class Matching(ExperimentShell):
         two_sides = metric == "ate"
         test_pairs = metric == "atc"
         executors: list[Executor] = [
+            TypeCaster(
+                dtype={int: float},
+                roles=[FeatureRole(), TargetRole()],
+            ),
             FaissNearestNeighbors(
                 grouping_role=TreatmentRole(),
                 two_sides=two_sides,
                 test_pairs=test_pairs,
                 faiss_mode=faiss_mode,
                 n_neighbors=n_neighbors,
-            )
+            ),
         ]
         if bias_estimation:
             executors += [
@@ -159,6 +164,7 @@ class Matching(ExperimentShell):
                 grouping_role=TreatmentRole(),
                 target_roles=[TargetRole()],
                 metric=metric,
+                n_neighbors=n_neighbors,
             ),
             MatchingAnalyzer(),
         ]
@@ -194,7 +200,7 @@ class Matching(ExperimentShell):
         self,
         group_match: bool = False,
         distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-        metric: Literal["atc", "att", "ate"] = "ate",
+        # metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: (
             Literal["smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"]
@@ -209,6 +215,7 @@ class Matching(ExperimentShell):
         weights: dict[str, float] | None = None,
         encode_categories: bool = True,
     ):
+        metric = "ate"
         super().__init__(
             experiment=self._make_experiment(
                 group_match,

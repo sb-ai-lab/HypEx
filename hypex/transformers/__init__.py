@@ -4,6 +4,7 @@ from .filters import ConstFilter, CorrFilter, CVFilter, NanFilter, OutliersFilte
 from .na_filler import NaFiller
 from .shuffle import Shuffle
 from .cuped import CUPEDTransformer
+from .type_caster import TypeCaster
 
 __all__ = [
     "CVFilter",
@@ -16,4 +17,5 @@ __all__ = [
     "NanFilter",
     "OutliersFilter",
     "Shuffle",
+    "TypeCaster",
 ]
