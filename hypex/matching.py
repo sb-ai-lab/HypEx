@@ -69,7 +69,7 @@ class Matching(ExperimentShell):
     def _make_experiment(
         group_match: bool = False,
         distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-        # metric: Literal["atc", "att", "ate"] = "ate",
+        metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: (
             Literal["smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"]
@@ -140,7 +140,6 @@ class Matching(ExperimentShell):
                 baseline_role=AdditionalMatchingRole(),
             ),
         }
-        metric = "ate"
         two_sides = metric == "ate"
         test_pairs = metric == "atc"
         executors: list[Executor] = [
@@ -154,7 +153,7 @@ class Matching(ExperimentShell):
                 test_pairs=test_pairs,
                 faiss_mode=faiss_mode,
                 n_neighbors=n_neighbors,
-            )
+            ),
         ]
         if bias_estimation:
             executors += [
@@ -201,7 +200,7 @@ class Matching(ExperimentShell):
         self,
         group_match: bool = False,
         distance: Literal["mahalanobis", "l2"] = "mahalanobis",
-        metric: Literal["atc", "att", "ate"] = "ate",
+        # metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: (
             Literal["smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"]
@@ -216,6 +215,7 @@ class Matching(ExperimentShell):
         weights: dict[str, float] | None = None,
         encode_categories: bool = True,
     ):
+        metric = "ate"
         super().__init__(
             experiment=self._make_experiment(
                 group_match,
