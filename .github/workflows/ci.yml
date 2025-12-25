@@ -51,6 +51,7 @@ jobs:
 
       - name: Install project dependencies with retry
         # Use poetry install with retry logic for network issues
+        shell: bash
         run: |
           # Try with system dependencies first, fall back to source if needed
           poetry config virtualenvs.create true
