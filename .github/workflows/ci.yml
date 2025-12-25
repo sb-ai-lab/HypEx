@@ -19,10 +19,6 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
         os: [ubuntu-latest, macos-latest, windows-latest]
-        # Exclude Python 3.13 on Windows due to missing wheels and build tool requirements
-        exclude:
-          - os: windows-latest
-            python-version: "3.13"
     steps:
       - uses: actions/checkout@v4
 
