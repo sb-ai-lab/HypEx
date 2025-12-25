@@ -49,12 +49,8 @@ jobs:
           # Install gcc and OpenBLAS for Python versions that need compilation
           if [[ "${{ matrix.python-version }}" == "3.13" ]]; then
             brew install gcc openblas
-            # Find the actual gcc binary name (e.g., gcc-17, gcc-14, etc.)
-            GCC_VERSION=$(gcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1 | cut -d. -f1)
-            GCC_BIN=$(which gcc-${GCC_VERSION} 2>/dev/null || which gcc)
-            GXX_BIN=$(which g++-${GCC_VERSION} 2>/dev/null || which g++)
-            echo "CC=${GCC_BIN}" >> $GITHUB_ENV
-            echo "CXX=${GXX_BIN}" >> $GITHUB_ENV
+            # Add Homebrew's bin directory to PATH to ensure gcc is found
+            echo "$(brew --prefix)/bin" >> $GITHUB_PATH
           fi
 
       - name: Install dependencies for tox
