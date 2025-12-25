@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 from .analyzers.matching import MatchingAnalyzer
-from .comparators import KSTest, TTest, Chi2Test
+from .comparators import Chi2Test, KSTest, TTest
 from .comparators.distances import MahalanobisDistance
 from .dataset import AdditionalMatchingRole, FeatureRole, TargetRole, TreatmentRole
 from .encoders.encoders import DummyEncoder

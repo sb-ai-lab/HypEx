@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from ..dataset import (
     ABCRole,
+    AdditionalTargetRole,
     Dataset,
     DatasetAdapter,
     ExperimentData,
@@ -15,7 +16,6 @@ from ..dataset import (
     StatisticRole,
     TargetRole,
     TempTargetRole,
-    AdditionalTargetRole,
 )
 from ..executor import Calculator
 from ..utils import (
@@ -69,10 +69,16 @@ class Comparator(Calculator, ABC):
         raise AbstractMethodError
 
     def _get_fields_data(self, data: ExperimentData) -> dict[str, Dataset]:
-        tmp_role = True if data.ds.tmp_roles or data.additional_fields.tmp_roles else False
+        tmp_role = (
+            True if data.ds.tmp_roles or data.additional_fields.tmp_roles else False
+        )
         group_field_data = data.field_data_search(roles=self.grouping_role)
         target_fields_data = data.field_data_search(
-            roles=(TempTargetRole() if data.ds.tmp_roles else AdditionalTargetRole()) if tmp_role else self.target_roles,
+            roles=(
+                (TempTargetRole() if data.ds.tmp_roles else AdditionalTargetRole())
+                if tmp_role
+                else self.target_roles
+            ),
             tmp_role=tmp_role,
             search_types=self.search_types,
         )
@@ -469,13 +475,28 @@ class Comparator(Calculator, ABC):
                 ),
             )
         else:
-            combined_data = data.ds.merge(
-                data.additional_fields[[col for col in data.additional_fields.columns if isinstance(data.additional_fields.roles[col], AdditionalTargetRole)]],
-                left_index=True,
-                right_index=True,
-                how='outer'
-            ) if any(isinstance(data.additional_fields.roles[col], AdditionalTargetRole) for col in data.additional_fields.columns) else data.ds
-            
+            combined_data = (
+                data.ds.merge(
+                    data.additional_fields[
+                        [
+                            col
+                            for col in data.additional_fields.columns
+                            if isinstance(
+                                data.additional_fields.roles[col], AdditionalTargetRole
+                            )
+                        ]
+                    ],
+                    left_index=True,
+                    right_index=True,
+                    how="outer",
+                )
+                if any(
+                    isinstance(data.additional_fields.roles[col], AdditionalTargetRole)
+                    for col in data.additional_fields.columns
+                )
+                else data.ds
+            )
+
             data.groups[group_field_data.columns[0]] = {
                 f"{group}": ds for group, ds in combined_data.groupby(group_field_data)
             }

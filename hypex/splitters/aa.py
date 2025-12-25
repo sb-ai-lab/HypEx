@@ -105,8 +105,11 @@ class AASplitter(Calculator):
             if control_data is not None:
                 control_indexes = list(control_data.index)
             const_size = sum(len(cd) for cd in const_data.values())
-            control_size = 0 if len(data) <= const_size else (len(data) * control_size - len(const_data["control"])) / (
-                len(data) - const_size
+            control_size = (
+                0
+                if len(data) <= const_size
+                else (len(data) * control_size - len(const_data["control"]))
+                / (len(data) - const_size)
             )
             # control_size = len(data) * control_size
         experiment_data = (
@@ -125,7 +128,7 @@ class AASplitter(Calculator):
                     0 if not edges else edges[-1]
                 )
                 size = min(size, len(addition_indexes))
-                if not size in edges:
+                if size not in edges:
                     edges += [size]
         else:
             edges = [int(len(addition_indexes) * control_size), len(addition_indexes)]

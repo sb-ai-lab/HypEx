@@ -57,6 +57,4 @@ class MLExtension(Extension):
         data: Dataset,
         **kwargs,
     ):
-        return super().calc(
-            data=data, **kwargs
-        )
+        return super().calc(data=data, **kwargs)

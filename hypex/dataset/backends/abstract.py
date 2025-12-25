@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Iterable, Literal, Sequence, Sized, Union, Optional
+from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
 from ...utils import AbstractMethodError, FromDictTypes
 
@@ -270,9 +270,9 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
 
     @abstractmethod
     def take(
-            self,
-            indices: int | list[int],
-            axis: Literal["index", "columns", "rows"] | int = 0,
+        self,
+        indices: int | list[int],
+        axis: Literal["index", "columns", "rows"] | int = 0,
     ) -> Any:
         raise AbstractMethodError
 
@@ -286,9 +286,9 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
 
     @abstractmethod
     def iget_values(
-            self,
-            row: int | None = None,
-            column: int | None = None,
+        self,
+        row: int | None = None,
+        column: int | None = None,
     ) -> Any:
         raise AbstractMethodError
 
@@ -392,10 +392,10 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
 
     @abstractmethod
     def drop(
-        self, 
-        labels: Optional[str] = None, 
-        axis: Optional[int] = None,
-        columns: Optional[Union[str, Iterable[str]]] = None,
+        self,
+        labels: str | None = None,
+        axis: int | None = None,
+        columns: str | Iterable[str] | None = None,
     ) -> Any:
         raise AbstractMethodError
 

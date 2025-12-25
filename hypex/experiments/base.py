@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Iterable, Sequence
 
-from ..dataset import ABCRole, ExperimentData, TempTargetRole, AdditionalTargetRole
+from ..dataset import ABCRole, AdditionalTargetRole, ExperimentData, TempTargetRole
 from ..executor import Executor
 from ..utils import ExperimentDataEnum
 

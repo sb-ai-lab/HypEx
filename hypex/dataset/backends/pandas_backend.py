@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Sequence, Sized, Union, Optional
+from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -550,10 +550,10 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         )
 
     def drop(
-        self, 
-        labels: Optional[str] = None, 
-        axis: Optional[int] = None,
-        columns: Optional[Union[str, Iterable[str]]] = None,
+        self,
+        labels: str | None = None,
+        axis: int | None = None,
+        columns: str | Iterable[str] | None = None,
     ) -> pd.DataFrame:
         return self.data.drop(labels=labels, axis=axis, columns=columns)
 
@@ -586,7 +586,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def list_to_columns(self, column: str) -> pd.DataFrame:
         data = self.data
         n_cols = len(data.loc[0, column])
-        n_d = data[column].to_list()
 
         data_expanded = (
             pd.DataFrame(

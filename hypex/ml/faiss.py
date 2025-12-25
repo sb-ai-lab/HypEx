@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from typing import Any, Literal, Sequence
+from typing import Any, Literal
 from warnings import warn
 
 from ..comparators.distances import MahalanobisDistance
@@ -11,7 +10,6 @@ from ..dataset import (
     Dataset,
     ExperimentData,
     FeatureRole,
-    AdditionalFeatureRole,
 )
 from ..executor import MLExecutor
 from ..extensions.faiss import FaissExtension
@@ -150,7 +148,11 @@ class FaissNearestNeighbors(MLExecutor):
         nans = 0
 
         for result in compare_result.values():
-            nans += sum(result.isna().sum().get_values(row="sum")) if self.n_neighbors > 1 else result.isna().sum()
+            nans += (
+                sum(result.isna().sum().get_values(row="sum"))
+                if self.n_neighbors > 1
+                else result.isna().sum()
+            )
             result = result.fillna(-1).astype({col: int for col in result.columns})
         if nans > 0:
             warn(
@@ -160,9 +162,7 @@ class FaissNearestNeighbors(MLExecutor):
         matched_indexes = Dataset.create_empty()
         for res_k, res_v in compare_result.items():
             group = grouping_data[1][1] if res_k == "test" else grouping_data[0][1]
-            t_index_field = (
-                res_v.loc[: len(group) - 1]
-            )
+            t_index_field = res_v.loc[: len(group) - 1]
             n_nans = (
                 t_index_field.isna().sum().get_values(row="sum")
                 if t_index_field.shape[1] > 1

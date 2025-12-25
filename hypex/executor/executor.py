@@ -7,7 +7,6 @@ from ..dataset import (
     ABCRole,
     AdditionalMatchingRole,
     Dataset,
-    DatasetAdapter,
     ExperimentData,
     FeatureRole,
     GroupingRole,

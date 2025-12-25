@@ -84,7 +84,7 @@ class MatchingMetrics(GroupOperator):
     @staticmethod
     def _calc_se(var_c, var_t, scaled_counts, group=None):
         n_c, n_t = len(var_c), len(var_t)
-        if not group is None:
+        if group is not None:
             groups = list(scaled_counts.keys())
             groups.remove(group)
             group_other = groups[0]

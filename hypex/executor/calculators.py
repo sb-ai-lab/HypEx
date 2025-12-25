@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from typing import Any, Iterable
+from typing import Any
 
 import numpy as np
 from scipy.stats import norm
 
 from ..dataset import ABCRole, Dataset, ExperimentData, TargetRole, TreatmentRole
-from .executor import Calculator
+from ..extensions import MultitestQuantile
 from ..utils import NotSuitableFieldError
 from ..utils.adapter import Adapter
-from ..extensions import MultitestQuantile
+from .executor import Calculator
+
 
 class MinSampleSize(Calculator):
     """A calculator for estimating the minimum required sample size for multi-group comparisons.
@@ -61,7 +61,7 @@ class MinSampleSize(Calculator):
     Examples
     --------
     .. code-block:: python
-    
+
         ds = Dataset(
             data="data.csv",
             roles={
@@ -75,6 +75,7 @@ class MinSampleSize(Calculator):
         mss = MinSampleSize(mde=10.0, alpha=0.05, equal_variance=True)
         result = mss.calc(data=ds)
     """
+
     def __init__(
         self,
         grouping_role: ABCRole | None = None,
@@ -113,7 +114,9 @@ class MinSampleSize(Calculator):
 
     def _get_fields(self, data: Dataset) -> tuple[list[str], list[str]]:
         group_field = data.search_columns(self.grouping_role, search_types=None)
-        target_fields = data.search_columns([TargetRole()], search_types=self.search_types)
+        target_fields = data.search_columns(
+            [TargetRole()], search_types=self.search_types
+        )
         return group_field, target_fields
 
     @staticmethod
@@ -197,7 +200,8 @@ class MinSampleSize(Calculator):
                                 / np.sqrt(1 + variances[i] / variances[index])
                                 - sample[i]
                                 / np.sqrt(1 + variances[index] / variances[i])
-                                + mde * np.sqrt(size / (variances[index] + variances[i]))
+                                + mde
+                                * np.sqrt(size / (variances[index] + variances[i]))
                             )
                             min_t_value = min(min_t_value, t_value)
 
@@ -213,11 +217,13 @@ class MinSampleSize(Calculator):
     def calc(self, data: Dataset) -> dict:
         group_field, target_fields = self._get_fields(data=data)
 
-        self.key = str(target_fields[0] if len(target_fields) == 1 else (target_fields or ""))
+        self.key = str(
+            target_fields[0] if len(target_fields) == 1 else (target_fields or "")
+        )
 
         if not target_fields and data.tmp_roles:
             raise Exception("No target fields in data")
-            
+
         gf = Adapter.to_list(group_field)
         grouping_data = list(data.groupby(gf))
 
@@ -254,7 +260,9 @@ class MinSampleSize(Calculator):
             result[field] = {"min sample size": n}
             sizes.append(n)
 
-        result["overall"] = {"min sample size": int(max(sizes))} if sizes else {"min sample size": 0}
+        result["overall"] = (
+            {"min sample size": int(max(sizes))} if sizes else {"min sample size": 0}
+        )
 
         return result
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from typing import Sequence
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -10,11 +11,13 @@ from scipy import stats
 ROOT = Path("").absolute().parents[0]
 sys.path.append(str(ROOT))
 
+
 class DataGenerator:
     """
     Advanced synthetic data generator with support for two lags for Y
     and control of correlation structure.
     """
+
     def __init__(
         self,
         n_samples=2000,
@@ -53,9 +56,12 @@ class DataGenerator:
                 [params["std"] ** 2, rho * params["std"] ** 2],
                 [rho * params["std"] ** 2, params["std"] ** 2],
             ]
-            return np.random.multivariate_normal(
-                [params["mean"], params["mean"]], cov, self.n_samples
-            ).T + U_vector
+            return (
+                np.random.multivariate_normal(
+                    [params["mean"], params["mean"]], cov, self.n_samples
+                ).T
+                + U_vector
+            )
         elif dist_type == "bernoulli":
             return self._generate_bernoulli_pair(params["p"], rho)
         elif dist_type == "gamma":
@@ -76,7 +82,9 @@ class DataGenerator:
         for i in range(n_points):
             for j in range(n_points):
                 cov[i, j] = (std**2) * (rho ** abs(i - j))
-        return np.random.multivariate_normal([mean] * n_points, cov, self.n_samples).T# + 0.1 * U
+        return np.random.multivariate_normal(
+            [mean] * n_points, cov, self.n_samples
+        ).T  # + 0.1 * U
 
     def generate(self):
         data = {}
@@ -90,7 +98,7 @@ class DataGenerator:
                 self.distributions[var]["type"],
                 self.distributions[var],
                 self.time_correlations[var],
-                data['U']
+                data["U"],
             )
             data[var] = current
             data[f"{var}_lag"] = lag
@@ -111,21 +119,23 @@ class DataGenerator:
             data["y0_lag_2"] = lag2
         data["y1"] = (
             data["y0"]
-            + self.effect_size
-            * (1 + data["U"])
+            + self.effect_size * (1 + data["U"])
             + np.random.normal(0, 0.01, self.n_samples)
         )
         data["y"] = np.where(data["d"] == 1, data["y1"], data["y0"])
-        
+
         # Create DataFrame and rename columns for clearer temporal structure
         df = pd.DataFrame(data)
-        df = df.rename(columns={
-            'X1': 'X1_lag1',        # X1 becomes period 1 covariate
-            'X2': 'X2_lag1',        # X2 becomes period 1 covariate
-            'X1_lag': 'X1_lag2',    # X1_lag becomes period 2 covariate
-            'X2_lag': 'X2_lag2'     # X2_lag becomes period 2 covariate
-        })
+        df = df.rename(
+            columns={
+                "X1": "X1_lag1",  # X1 becomes period 1 covariate
+                "X2": "X2_lag1",  # X2 becomes period 1 covariate
+                "X1_lag": "X1_lag2",  # X1_lag becomes period 2 covariate
+                "X2_lag": "X2_lag2",  # X2_lag becomes period 2 covariate
+            }
+        )
         return df
+
 
 def set_nans(
     data: pd.DataFrame,

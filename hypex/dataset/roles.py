@@ -3,7 +3,13 @@ from __future__ import annotations
 from abc import ABC
 from copy import deepcopy
 
-from ..utils import CategoricalTypes, DefaultRoleTypes, FeatureRoleTypes, RoleNameType, TargetRoleTypes
+from ..utils import (
+    CategoricalTypes,
+    DefaultRoleTypes,
+    FeatureRoleTypes,
+    RoleNameType,
+    TargetRoleTypes,
+)
 
 
 class ABCRole(ABC):
@@ -27,14 +33,16 @@ class ABCRole(ABC):
     def asadditional(self, data_type: DefaultRoleTypes | None = None) -> ABCRole:
         data_type = data_type or self.data_type
         for role_type in list(default_roles.values()):
-            if isinstance(role_type, self.__class__) and isinstance(role_type, AdditionalRole):
+            if isinstance(role_type, self.__class__) and isinstance(
+                role_type, AdditionalRole
+            ):
                 return role_type.__class__(data_type)
         return self.__class__(data_type)
 
 
 class LagRole(ABCRole):
     """Base class for roles that support temporal metadata (parent, lag)."""
-    
+
     def __init__(
         self,
         data_type: DefaultRoleTypes | None = None,
@@ -53,7 +61,11 @@ class LagRole(ABCRole):
             parts.append(f"parent='{self.parent}'")
         if self.lag is not None:
             parts.append(f"lag={self.lag}")
-        return f"{self._role_name}({', '.join(parts)})" if parts else f"{self._role_name}()"
+        return (
+            f"{self._role_name}({', '.join(parts)})"
+            if parts
+            else f"{self._role_name}()"
+        )
 
 
 class InfoRole(ABCRole):
@@ -105,12 +117,13 @@ class FeatureRole(LagRole):
 class PreTargetRole(LagRole):
     _role_name: RoleNameType = "PreTarget"
 
-    def __init__(self,
+    def __init__(
+        self,
         data_type: TargetRoleTypes | None = None,
         parent: str | None = None,
         lag: int | None = None,
         cofounders: list[str] | None = None,
-        ):
+    ):
         super().__init__(data_type=data_type, parent=parent, lag=lag)
         self.cofounders = cofounders if cofounders is not None else []
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Iterable
 from copy import deepcopy
-from typing import Any, Callable, Hashable, Literal, Sequence, Optional, Union
+from typing import Any, Callable, Hashable, Literal, Sequence
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -308,7 +308,6 @@ class Dataset(DatasetBase):
         key,
         default=None,
     ) -> Dataset:
-        res = self._backend.get(key, default)
         return Dataset(data=self._backend.get(key, default), roles=deepcopy(self.roles))
 
     def take(
@@ -672,9 +671,9 @@ class Dataset(DatasetBase):
 
     def drop(
         self,
-        labels: Optional[str] = None,
-        axis: Optional[int] = None,
-        columns: Optional[Union[str, Iterable[str]]] = None,
+        labels: str | None = None,
+        axis: int | None = None,
+        columns: str | Iterable[str] | None = None,
     ):
         # Convert Dataset labels to list of indices
         if isinstance(labels, Dataset):
@@ -821,12 +820,12 @@ class ExperimentData:
                 )
             elif len(value.columns) == 1:
                 role = role[0] if isinstance(role, list) else role
-                role = list(role.values())[0] if isinstance(role, dict) else role
+                role = next(iter(role.values())) if isinstance(role, dict) else role
                 executor_id = (
                     executor_id[0] if isinstance(executor_id, list) else executor_id
                 )
                 executor_id = (
-                    list(executor_id.keys())[0]
+                    next(iter(executor_id.keys()))
                     if isinstance(executor_id, dict)
                     else executor_id
                 )
