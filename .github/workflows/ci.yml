@@ -46,9 +46,9 @@ jobs:
         run: |
           brew update
           brew install pkg-config
-          # Install gcc and OpenBLAS for Python versions that need compilation
+          # Install gcc, OpenBLAS, and freetype for Python versions that need compilation
           if [[ "${{ matrix.python-version }}" == "3.13" ]]; then
-            brew install gcc openblas
+            brew install gcc openblas freetype
             # Add Homebrew's bin directory to PATH to ensure gcc is found
             echo "$(brew --prefix)/bin" >> $GITHUB_PATH
           fi
@@ -95,6 +95,8 @@ jobs:
         env:
           # For Python 3.13 compilation
           NPY_DISTUTILS_APPEND_FLAGS: 1
+          # Set pkg-config path for freetype on macOS
+          PKG_CONFIG_PATH: ${{ matrix.os == 'macos-latest' && matrix.python-version == '3.13' && format('{0}/lib/pkgconfig', env.HOMEBREW_PREFIX) || '' }}
         run: |
           # Use tox-gh-actions to select the right tox environment
           tox
