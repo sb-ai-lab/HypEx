@@ -4,8 +4,6 @@ from typing import Any, Sequence
 
 from ..dataset.dataset import Dataset, ExperimentData
 from ..dataset.roles import ABCRole, FeatureRole
-from ..utils import ScalarType
-from ..utils.adapter import Adapter
 from .abstract import Transformer
 
 

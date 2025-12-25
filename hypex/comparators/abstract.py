@@ -325,7 +325,7 @@ class Comparator(Calculator, ABC):
         baseline_indexes = baseline_field_data.groupby(by=group_field_data)
         baseline_data = []
 
-        # mapping the data of the baseline data to its mathes data. If there are no matches, matching index will be -1
+        # mapping the data of the baseline data to its matches data. If there are no matches, matching index will be -1
         for group in baseline_indexes:
             name = group[0]
             indexes = group[1].iget_values(column=0)

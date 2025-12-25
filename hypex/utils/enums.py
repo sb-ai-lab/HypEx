@@ -1,7 +1,6 @@
 import enum
 
 
-
 @enum.unique
 class ExperimentDataEnum(enum.Enum):
     variables = "variables"
