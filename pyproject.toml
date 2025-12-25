@@ -69,7 +69,6 @@ statsmodels = "<=0.14.2"
 cat = ["catboost"]
 lgbm = ["lightgbm"]
 all = ["catboost", "lightgbm"]
-faiss = ["faiss-cpu"]
 
 [tool.poetry.group.dev.dependencies]
 docutils = ">=0.17,<0.21"

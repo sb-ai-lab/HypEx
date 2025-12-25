@@ -108,4 +108,4 @@ jobs:
 
       - name: Run linters (mypy, codespell, docs)
         run: |
-          tox -e lint
+          tox
