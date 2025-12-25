@@ -106,6 +106,7 @@ jobs:
           pip install poetry
 
       - name: Run unit tests
+        shell: bash
         env:
           # For Python 3.13 compilation
           NPY_DISTUTILS_APPEND_FLAGS: 1
