@@ -461,8 +461,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
                 data=other,
                 columns=self.columns if other.shape[1] == self.shape[1] else None,
             )
-            # print(other_df.shape)
-            # print(self.data.shape)
             result = self.data.dot(other_df.T)
             result.columns = (
                 self.columns if other.shape[1] == self.shape[1] else result.columns
@@ -500,7 +498,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     ) -> pd.DataFrame:
         return self.data.select_dtypes(include=include, exclude=exclude)
 
-    def isin(self, values: Iterable) -> Iterable[bool]:
+    def isin(self, values: Iterable) -> pd.DataFrame:
         return self.data.isin(values)
 
     def merge(
@@ -543,17 +541,16 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             how=how,
         )
 
-    def drop(self, labels: str = "", axis: int = 1) -> pd.DataFrame:
+    def drop(self, labels: Any = "", axis: int = 1) -> pd.DataFrame:
         return self.data.drop(labels=labels, axis=axis)
 
     def filter(
         self,
         items: list | None = None,
-        like: str | None = None,
         regex: str | None = None,
         axis: int = 0,
     ) -> pd.DataFrame:
-        return self.data.filter(items=items, like=like, regex=regex, axis=axis)
+        return self.data.filter(items=items, regex=regex, axis=axis)
 
     def rename(self, columns: dict[str, str]) -> pd.DataFrame:
         return self.data.rename(columns=columns)
@@ -575,7 +572,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def list_to_columns(self, column: str) -> pd.DataFrame:
         data = self.data
         n_cols = len(data.loc[0, column])
-        n_d = data[column].to_list()
 
         data_expanded = (
             pd.DataFrame(

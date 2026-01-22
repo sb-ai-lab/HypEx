@@ -144,7 +144,14 @@ class AAPassedReporter(Reporter):
             print("AA test cannot be performed as none of the analyzers passed")
             return None
         result = self._detect_pass(analyser_tables)
-        stats_cols = ["feature", "group", "control mean", "test mean", "difference", "difference %"]
+        stats_cols = [
+            "feature",
+            "group",
+            "control mean",
+            "test mean",
+            "difference",
+            "difference %",
+        ]
         differences = analyser_tables["best split statistics"].loc[
             :,
             [

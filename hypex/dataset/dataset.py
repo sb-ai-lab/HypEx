@@ -664,11 +664,10 @@ class Dataset(DatasetBase):
     def filter(
         self,
         items: list | None = None,
-        like: str | None = None,
         regex: str | None = None,
         axis: int | None = None,
     ) -> Dataset:
-        t_data = self._backend.filter(items=items, like=like, regex=regex, axis=axis)
+        t_data = self._backend.filter(items=items, regex=regex, axis=axis)
         t_roles = {c: self.roles[c] for c in t_data.columns if c in self.roles.keys()}
         return Dataset(roles=t_roles, data=t_data)
 

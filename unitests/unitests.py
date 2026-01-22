@@ -1011,7 +1011,9 @@ class TestDataset(unittest.TestCase):
     def test_groupby_with_column_name(self):
         result = self.dataset.groupby(by="col1")
         self.assertIsInstance(result, list)
-        self.assertEqual(len(result), 3)  # There should be 3 groups for values 1, 2, and 3.
+        self.assertEqual(
+            len(result), 3
+        )  # There should be 3 groups for values 1, 2, and 3.
         self.assertIsInstance(result[0][1], Dataset)
 
     def test_groupby_with_func(self):
@@ -1599,9 +1601,7 @@ class TestDataset(unittest.TestCase):
     def test_pos_operator(self):
         result = +self.dataset
         self.assertIsInstance(result, Dataset)  # Expecting a Dataset return
-        self.assertTrue(
-            (result.data >= 0).all().all()
-        )  # Expecting all elements >= 0
+        self.assertTrue((result.data >= 0).all().all())  # Expecting all elements >= 0
 
     def test_neg_operator(self):
         result = -self.dataset
@@ -1611,9 +1611,7 @@ class TestDataset(unittest.TestCase):
     def test_abs_operator(self):
         result = abs(self.dataset)
         self.assertIsInstance(result, Dataset)  # Expecting a Dataset return
-        self.assertTrue(
-            (result.data >= 0).all().all()
-        )  # Expecting all elements >= 0
+        self.assertTrue((result.data >= 0).all().all())  # Expecting all elements >= 0
 
     def test_bool_operator(self):
         result = bool(self.dataset)
@@ -1685,7 +1683,7 @@ def test_operators(self):
                 "//": lambda self, other: self.dataset // other,
                 "/": lambda self, other: self.dataset / other,
                 "%": lambda self, other: self.dataset % other,
-                "**": lambda self, other: self.dataset ** other,
+                "**": lambda self, other: self.dataset**other,
                 "&": lambda self, other: self.dataset & other,
                 "|": lambda self, other: self.dataset | other,
                 "^": lambda self, other: self.dataset ^ other,
@@ -1702,12 +1700,14 @@ def test_operators(self):
                 "rdiv": lambda self, other: other / self.dataset,
                 "rtruediv": lambda self, other: other / self.dataset,
                 "rmod": lambda self, other: other % self.dataset,
-                "rpow": lambda self, other: other ** self.dataset,
-                "rdiv2": lambda self, other: other / self.dataset
+                "rpow": lambda self, other: other**self.dataset,
+                "rdiv2": lambda self, other: other / self.dataset,
             }
 
             operator = operator  # Assuming operator is defined somewhere in the code
-            result = operator_functions.get(operator, lambda self, other: other)(self, other_dataset)
+            result = operator_functions.get(operator, lambda self, other: other)(
+                self, other_dataset
+            )
 
             # Check the result type
             self.assertIsInstance(

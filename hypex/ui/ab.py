@@ -61,7 +61,11 @@ class ABOutput(Output):
 
     def _extract_variance_reductions(self, experiment_data: ExperimentData):
         """Extract variance reduction data from additional_fields."""
-        variance_cols = [col for col in experiment_data.additional_fields.columns if col.endswith('_variance_reduction')]
+        variance_cols = [
+            col
+            for col in experiment_data.additional_fields.columns
+            if col.endswith("_variance_reduction")
+        ]
         if variance_cols:
             self.variance_reductions = experiment_data.additional_fields[variance_cols]
         else:
@@ -70,8 +74,10 @@ class ABOutput(Output):
     @property
     def variance_reduction_report(self) -> Dataset | str:
         """Get variance reduction report for CUPED/CUPAC transformations."""
-        if hasattr(self, '_experiment_data'):
-            return self.resume_reporter.report_variance_reductions(self._experiment_data)
+        if hasattr(self, "_experiment_data"):
+            return self.resume_reporter.report_variance_reductions(
+                self._experiment_data
+            )
         return "No experiment data available."
 
     def extract(self, experiment_data: ExperimentData):

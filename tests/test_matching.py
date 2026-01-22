@@ -5,7 +5,14 @@ import numpy as np
 from itertools import product
 
 from hypex import Matching
-from hypex.dataset import Dataset, FeatureRole, InfoRole, TargetRole, TreatmentRole, GroupingRole
+from hypex.dataset import (
+    Dataset,
+    FeatureRole,
+    InfoRole,
+    TargetRole,
+    TreatmentRole,
+    GroupingRole,
+)
 
 from causalinference import CausalModel
 from causalinference.utils import tools
@@ -66,10 +73,10 @@ k_values = [1, 3, 5]
 
 scenarios = [
     "default",
-    "group_match_gender",        
-    "group_match_industry",      
-    "custom_weights_1",          
-    "custom_weights_2",          
+    "group_match_gender",
+    "group_match_industry",
+    "custom_weights_1",
+    "custom_weights_2",
 ]
 
 param_combinations = list(product(feature_subsets, distances, k_values, scenarios))
@@ -116,18 +123,17 @@ def calculate_relative_ratio(p1, p2, eps=1e-9):
     return (p1 + eps) / (p2 + eps)
 
 
-@pytest.mark.parametrize(
-    "feature_subset,distance,k,scenario",
-    param_combinations
-)
-def test_matching_scenario(matching_data, matching_data_with_group, feature_subset, distance, k, scenario):
+@pytest.mark.parametrize("feature_subset,distance,k,scenario", param_combinations)
+def test_matching_scenario(
+    matching_data, matching_data_with_group, feature_subset, distance, k, scenario
+):
     print(f"Features: {feature_subset}")
 
     if "group_match" in scenario:
         data_subset = matching_data_with_group
         group_match_flag = True
         scenario_weights = None
- 
+
         if "gender" in scenario:
             data_subset.roles["gender"] = GroupingRole(int)
         elif "industry" in scenario:

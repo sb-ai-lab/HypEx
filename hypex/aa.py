@@ -253,4 +253,6 @@ class AATest(ExperimentShell):
             output=AAOutput(),
         )
         if t_test_equal_var is not None:
-            self.experiment.set_params({TTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}})
+            self.experiment.set_params(
+                {TTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
+            )

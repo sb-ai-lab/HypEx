@@ -13,6 +13,7 @@ class CupacExtension(MLExtension):
     """
     Extension for CUPAC variance reduction using backend-specific implementations.
     """
+
     def __init__(
         self,
         cupac_features: Dict[str, Sequence[str]],
@@ -49,15 +50,17 @@ class CupacExtension(MLExtension):
     def _fit_pandas(self, data: Dataset):
         """Fit models using pandas backend."""
         df = data.data.copy()
-        
+
         self.fitted_models = {}
         self.best_model_names = {}
-        
+
         for target_feature, pre_target_features in self.cupac_features.items():
             X_cov = df[pre_target_features]
             y = df[target_feature]
-            kf = KFold(n_splits=self.n_folds, shuffle=True, random_state=self.random_state)
-            
+            kf = KFold(
+                n_splits=self.n_folds, shuffle=True, random_state=self.random_state
+            )
+
             if len(self.explicit_models) == 1:
                 model_name = self.explicit_models[0]
                 model_proto = self.available_models[model_name]
@@ -67,13 +70,15 @@ class CupacExtension(MLExtension):
                 self.best_model_names[target_feature] = model_name
                 # Calculate variance reduction for the model
                 pred = model.predict(X_cov)
-                self.variance_reductions[target_feature] = self._calculate_variance_reduction(y.to_numpy(), pred)
+                self.variance_reductions[target_feature] = (
+                    self._calculate_variance_reduction(y.to_numpy(), pred)
+                )
                 continue
-                
+
             best_score = -np.inf
             best_model = None
             best_model_name = None
-            
+
             for name in self.explicit_models:
                 model_proto = self.available_models[name]
                 fold_var_reductions = []
@@ -83,13 +88,15 @@ class CupacExtension(MLExtension):
                     m = clone(model_proto)
                     m.fit(X_train, y_train)
                     pred = m.predict(X_val)
-                    fold_var_reductions.append(self._calculate_variance_reduction(y_val.to_numpy(), pred))
+                    fold_var_reductions.append(
+                        self._calculate_variance_reduction(y_val.to_numpy(), pred)
+                    )
                 score = float(np.nanmean(fold_var_reductions))
                 if score > best_score:
                     best_score = score
                     best_model = clone(model_proto)
                     best_model_name = name
-                    
+
             if best_model is None:
                 raise RuntimeError("No model was selected during model search")
             best_model.fit(X_cov, y)
@@ -97,8 +104,10 @@ class CupacExtension(MLExtension):
             self.best_model_names[target_feature] = best_model_name
             # Calculate variance reduction for the best model
             pred = best_model.predict(X_cov)
-            self.variance_reductions[target_feature] = self._calculate_variance_reduction(y.to_numpy(), pred)
-            
+            self.variance_reductions[target_feature] = (
+                self._calculate_variance_reduction(y.to_numpy(), pred)
+            )
+
         self.is_fitted = True
         return self
 
@@ -109,7 +118,9 @@ class CupacExtension(MLExtension):
         for target_feature, pre_target_features in self.cupac_features.items():
             model = self.fitted_models.get(target_feature)
             if model is None:
-                raise RuntimeError(f"Model for {target_feature} not fitted. Call fit() first.")
+                raise RuntimeError(
+                    f"Model for {target_feature} not fitted. Call fit() first."
+                )
             X_cov = df[pre_target_features]
             y = df[target_feature]
             pred = model.predict(X_cov)
@@ -117,7 +128,7 @@ class CupacExtension(MLExtension):
             result[f"{target_feature}_cupac"] = y_adj
         return result
 
-    def fit(self, X: Dataset, Y: Dataset = None) -> 'CupacExtension':
+    def fit(self, X: Dataset, Y: Dataset = None) -> "CupacExtension":
         return super().calc(X, mode="fit")
 
     def predict(self, X: Dataset) -> Dict[str, Any]:
@@ -128,7 +139,10 @@ class CupacExtension(MLExtension):
         return self.predict(data)
 
     def get_variance_reductions(self):
-        return {f"{target}_cupac_variance_reduction": reduction for target, reduction in self.variance_reductions.items()}
+        return {
+            f"{target}_cupac_variance_reduction": reduction
+            for target, reduction in self.variance_reductions.items()
+        }
 
     @staticmethod
     def _calculate_variance_reduction(y, pred):

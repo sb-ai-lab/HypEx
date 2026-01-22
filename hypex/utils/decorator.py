@@ -7,7 +7,7 @@ from hypex.utils import DecoratedType, DocstringInheritDecorator
 
 
 def inherit_docstring_from(
-        source: Callable[..., Any] | property,
+    source: Callable[..., Any] | property,
 ) -> DocstringInheritDecorator:
     """A decorator to inherit the docstring from another function or property.
 

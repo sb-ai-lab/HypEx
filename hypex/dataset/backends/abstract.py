@@ -378,7 +378,6 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     def filter(
         self,
         items: list | None = None,
-        like: str | None = None,
         regex: str | None = None,
         axis: int = 0,
     ) -> Any:

@@ -2,6 +2,7 @@ from sklearn.linear_model import LinearRegression, Ridge, Lasso
 
 try:
     from catboost import CatBoostRegressor
+
     CATBOOST_AVAILABLE = True
 except ImportError:
     CATBOOST_AVAILABLE = False

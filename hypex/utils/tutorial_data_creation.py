@@ -10,11 +10,13 @@ from scipy import stats
 ROOT = Path("").absolute().parents[0]
 sys.path.append(str(ROOT))
 
+
 class DataGenerator:
     """
     Advanced synthetic data generator with support for two lags for Y
     and control of correlation structure.
     """
+
     def __init__(
         self,
         n_samples=2000,
@@ -53,9 +55,12 @@ class DataGenerator:
                 [params["std"] ** 2, rho * params["std"] ** 2],
                 [rho * params["std"] ** 2, params["std"] ** 2],
             ]
-            return np.random.multivariate_normal(
-                [params["mean"], params["mean"]], cov, self.n_samples
-            ).T + U_vector
+            return (
+                np.random.multivariate_normal(
+                    [params["mean"], params["mean"]], cov, self.n_samples
+                ).T
+                + U_vector
+            )
         elif dist_type == "bernoulli":
             return self._generate_bernoulli_pair(params["p"], rho)
         elif dist_type == "gamma":
@@ -76,7 +81,9 @@ class DataGenerator:
         for i in range(n_points):
             for j in range(n_points):
                 cov[i, j] = (std**2) * (rho ** abs(i - j))
-        return np.random.multivariate_normal([mean] * n_points, cov, self.n_samples).T + U
+        return (
+            np.random.multivariate_normal([mean] * n_points, cov, self.n_samples).T + U
+        )
 
     def generate(self):
         data = {}
@@ -90,7 +97,7 @@ class DataGenerator:
                 self.distributions[var]["type"],
                 self.distributions[var],
                 self.time_correlations[var],
-                data['U']
+                data["U"],
             )
             data[var] = current
             data[f"{var}_lag"] = lag
@@ -117,6 +124,7 @@ class DataGenerator:
         )
         data["y"] = np.where(data["d"] == 1, data["y1"], data["y0"])
         return pd.DataFrame(data)
+
 
 def set_nans(
     data: pd.DataFrame,

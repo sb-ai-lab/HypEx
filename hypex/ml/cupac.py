@@ -8,16 +8,17 @@ from ..utils import ExperimentDataEnum
 from ..utils.enums import BackendsEnum
 
 
-
 from ..extensions.cupac import CupacExtension
 
 from typing import Union, Sequence
 from ..utils.models import CUPAC_MODELS
 
+
 class CUPACExecutor(MLExecutor):
     """Executor that fits predictive models to pre-period covariates and adjusts target
     features using the CUPAC approach (model-based prediction adjustment similar to CUPED).
     """
+
     def __init__(
         self,
         cupac_features: dict[str, list],
@@ -72,14 +73,14 @@ class CUPACExecutor(MLExecutor):
         for model_name, backends in CUPAC_MODELS.items():
             if backend_name in backends and backends[backend_name] is not None:
                 available_models[model_name.lower()] = backends[backend_name]
-        
+
         # Select explicit models
         if self.cupac_model:
             if isinstance(self.cupac_model, str):
                 names = [self.cupac_model.lower()]
             else:
                 names = [m.lower() for m in self.cupac_model]
-            
+
             # Filter to only models available for current backend
             available_names = [name for name in names if name in available_models]
             return available_models, available_names
@@ -88,9 +89,9 @@ class CUPACExecutor(MLExecutor):
     def fit(self, X: Dataset) -> "CUPACExecutor":
         # Backend is guaranteed to be correct by dataset creation
         backend_name = X.backend.name
-        
+
         available_models, explicit_models = self.get_models(backend_name)
-        
+
         self.extension = CupacExtension(
             cupac_features=self.cupac_features,
             available_models=available_models,
@@ -112,21 +113,20 @@ class CUPACExecutor(MLExecutor):
             raise RuntimeError("CUPACExecutor not fitted. Call fit() first.")
         return self.extension.get_variance_reductions()
 
-
-
     def execute(self, data: ExperimentData) -> ExperimentData:
         self.fit(data.ds)
         predictions = self.predict(data.ds)
-        new_ds = deepcopy(data.ds)  # Create a deep copy to avoid modifying original dataset
+        new_ds = deepcopy(
+            data.ds
+        )  # Create a deep copy to avoid modifying original dataset
         for key, pred in predictions.items():
-            if hasattr(pred, 'values'):
+            if hasattr(pred, "values"):
                 pred = pred.values
             new_ds = new_ds.add_column(data=pred, role={key: TargetRole()})
         # Save variance reductions to additional_fields
         variance_reductions = self.get_variance_reductions()
         for key, reduction in variance_reductions.items():
             data.additional_fields = data.additional_fields.add_column(
-                data=[reduction],
-                role={key: StatisticRole()}
+                data=[reduction], role={key: StatisticRole()}
             )
         return data.copy(data=new_ds)

@@ -30,10 +30,12 @@ class ABCRole(ABC):
     def asadditional(self, data_type: DefaultRoleTypes | None = None) -> ABCRole:
         data_type = data_type or self.data_type
         for role_type in list(default_roles.values()):
-            if isinstance(role_type, self.__class__) and isinstance(role_type, AdditionalRole):
+            if isinstance(role_type, self.__class__) and isinstance(
+                role_type, AdditionalRole
+            ):
                 return role_type.__class__(data_type)
         return self.__class__(data_type)
-    
+
 
 class InfoRole(ABCRole):
     _role_name: RoleNameType = "Info"
