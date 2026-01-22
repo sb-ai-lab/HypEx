@@ -1,5 +1,6 @@
 import os
 import sys
+from itertools import chain
 
 from pathlib import Path
 from typing import (
@@ -1031,7 +1032,20 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def replace(
         self, to_replace: Any = None, value: Any = None, regex: bool = False
     ) -> spark.DataFrame:
-        pass
+        if isinstance(to_replace, dict):
+            mgk_mapping_dict = to_replace
+        elif isinstance(to_replace, list) and isinstance(value, list):
+            mgk_mapping_dict = dict(zip(to_replace, value))
+        else:
+            mgk_mapping_dict = {to_replace: value}
+
+        mgk_mapping_expr = F.create_map([
+            F.lit(element)
+            for element in chain(*mgk_mapping_dict.items())
+        ])
+
+        return self.data.select([mgk_mapping_expr[F.col(col_name)].alias(col_name) for col_name in self.data.columns])
+
 
     def reindex(
         self, labels: str = "", fill_value: Optional[str] = None
