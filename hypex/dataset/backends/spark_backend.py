@@ -439,7 +439,7 @@ class SparkNavigation(DatasetBackendNavigation):
             return (count, cols)
         return (0, 0)
 
-    def _get_column_index(
+    def _get_column_index(      # Иван
         self, column_name: Union[Sequence[str], str]
     ) -> Union[int, Sequence[int]]:
         pass
@@ -508,7 +508,7 @@ class SparkNavigation(DatasetBackendNavigation):
         else:
             raise ValueError("new_data must be Spark DataFrame, list of values, or list of lists")
 
-    def append(
+    def append(     # Эрик
         self, other, reset_index: bool = False, axis: int = 0
     ) -> spark.DataFrame:
         pass
@@ -543,10 +543,10 @@ class SparkNavigation(DatasetBackendNavigation):
     def to_records(self) -> list[dict]:
         pass
 
-    def loc(self, items: Iterable) -> Iterable:
+    def loc(self, items: Iterable) -> Iterable:     # Иван
         pass
 
-    def iloc(self, items: Iterable) -> Iterable:
+    def iloc(self, items: Iterable) -> Iterable:        # Иван
         pass
 
 
@@ -922,26 +922,26 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def std(self, numeric_only: bool = False, ddof: int = 1):
         return self.agg("std", numeric_only=numeric_only, ddof=ddof)
 
-    def cov(self):
+    def cov(self):      # Иван
         pass
 
-    def quantile(self, q: float = 0.5) -> spark.DataFrame:
+    def quantile(self, q: float = 0.5) -> spark.DataFrame:      # Иван
         pass
 
-    def coefficient_of_variation(self) -> Union[spark.DataFrame, float]:
+    def coefficient_of_variation(self) -> Union[spark.DataFrame, float]:        # Иван
         pass
 
-    def sort_index(self, ascending: bool = True, **kwargs) -> spark.DataFrame:
+    def sort_index(self, ascending: bool = True, **kwargs) -> spark.DataFrame:      # Иван
         pass
 
-    def corr(
+    def corr(       # Иван
         self,
         method: Literal["pearson", "kendall", "spearman"] = "pearson",
         numeric_only: bool = False,
     ) -> Union[spark.DataFrame, float]:
         pass
 
-    def isna(self) -> spark.DataFrame:
+    def isna(self) -> spark.DataFrame:      # Иван
         pass
 
     def sort_values(
@@ -949,7 +949,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     ) -> spark.DataFrame:
         pass
 
-    def value_counts(
+    def value_counts(       # Иван
         self,
         normalize: bool = False,
         sort: bool = True,
@@ -958,7 +958,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     ) -> spark.DataFrame:
         pass
 
-    def fillna(
+    def fillna(     # Эрик
         self,
         values: Optional[Union[ScalarType, dict[str, ScalarType]]] = None,
         method: Optional[Literal["bfill", "ffill"]] = None,
@@ -966,13 +966,13 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     ) -> spark.DataFrame:
         pass
 
-    def na_counts(self) -> Union[spark.DataFrame, int]:
+    def na_counts(self) -> Union[spark.DataFrame, int]:     # Антон
         pass
 
-    def dot(self, other: Union["SparkDataset", np.ndarray]) -> spark.DataFrame:
+    def dot(self, other: Union["SparkDataset", np.ndarray]) -> spark.DataFrame:     # Антон
         pass
 
-    def dropna(
+    def dropna(     # Эрик
         self,
         how: Literal["any", "all"] = "any",
         subset: Optional[Union[str, Iterable[str]]] = None,
@@ -983,7 +983,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def transpose(self, names: Optional[Sequence[str]] = None) -> spark.DataFrame:
         pass
 
-    def sample(
+    def sample(     # Эрик
         self,
         frac: Optional[float] = None,
         n: Optional[int] = None,
@@ -991,17 +991,17 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     ) -> spark.DataFrame:
         pass
 
-    def select_dtypes(
+    def select_dtypes(      # Антон
         self,
         include: Optional[str] = None,
         exclude: Optional[str] = None,
     ) -> spark.DataFrame:
         pass
 
-    def isin(self, values: Iterable) -> Iterable[bool]:
+    def isin(self, values: Iterable) -> Iterable[bool]:     # Антон
         pass
 
-    def merge(
+    def merge(      # Эрик
         self,
         right: "SparkDataset",
         on: Optional[str] = None,
@@ -1014,10 +1014,10 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     ) -> spark.DataFrame:
         pass
 
-    def drop(self, labels: str = "", axis: int = 1) -> spark.DataFrame:
+    def drop(self, labels: str = "", axis: int = 1) -> spark.DataFrame:     # Антон
         pass
 
-    def filter(
+    def filter(     # Антон
         self,
         items: Optional[list] = None,
         like: Optional[str] = None,
@@ -1026,7 +1026,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     ) -> spark.DataFrame:
         pass
 
-    def rename(self, columns: dict[str, str]) -> spark.DataFrame:
+    def rename(self, columns: dict[str, str]) -> spark.DataFrame:       # Эрик
         pass
 
     def replace(
@@ -1047,10 +1047,10 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.data.select([mgk_mapping_expr[F.col(col_name)].alias(col_name) for col_name in self.data.columns])
 
 
-    def reindex(
+    def reindex(        # Антон
         self, labels: str = "", fill_value: Optional[str] = None
     ) -> spark.DataFrame:
         pass
 
-    def list_to_columns(self, column: str) -> spark.DataFrame:
+    def list_to_columns(self, column: str) -> spark.DataFrame:      # Антон
         pass
