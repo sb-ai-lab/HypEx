@@ -60,6 +60,94 @@ class Output:
         self.resume_reporter = resume_reporter
         self.additional_reporters = additional_reporters or {}
 
+    def _get_output_fields(self) -> list[str]:
+        """Get list of output fields to display in __repr__.
+        
+        This method can be overridden in subclasses for custom field ordering
+        or filtering. By default, it returns all annotated attributes from the
+        class hierarchy.
+        
+        Returns:
+            list[str]: List of field names to display, with 'resume' always first.
+        
+        Examples
+        --------
+        .. code-block:: python
+        
+            # Default behavior - automatic from annotations
+            class MyOutput(Output):
+                resume: Dataset
+                custom_field: Dataset
+            
+            # Custom override
+            class MyOutput(Output):
+                def _get_output_fields(self) -> list[str]:
+                    return ['resume', 'custom_field', 'special_metric']
+        """
+        all_annotations = {}
+        for cls in reversed(self.__class__.__mro__):
+            if cls is object:
+                continue
+            if hasattr(cls, '__annotations__'):
+                all_annotations.update(cls.__annotations__)
+        
+        fields = [
+            name for name in all_annotations.keys()
+            if not name.startswith('_') and hasattr(self, name)
+        ]
+        
+        # Ensure 'resume' is always first if it exists
+        if 'resume' in fields:
+            fields.remove('resume')
+            fields.insert(0, 'resume')
+        
+        return fields
+    
+    def __repr__(self) -> str:
+        """Return string representation showing all output fields with their data.
+        
+        Displays all experiment output fields with their actual data tables.
+        
+        Returns:
+            str: Formatted string showing all output fields with data.
+        
+        Examples
+        --------
+        .. code-block:: python
+        
+            output = ABOutput()
+            output.extract(experiment_data)
+            print(output)  # Shows all tables: resume, multitest, sizes, cupac
+        """
+        class_name = self.__class__.__name__
+        fields = self._get_output_fields()
+        
+        if not fields:
+            return f"{class_name}(no fields available)"
+        
+        output_parts = [f"{class_name}:"]
+        
+        for field_name in fields:
+            if not hasattr(self, field_name):
+                continue
+            
+            field_value = getattr(self, field_name)
+            
+            output_parts.append(f"\n{'=' * 60}")
+            output_parts.append(f"{field_name}:")
+            output_parts.append('=' * 60)
+            
+            if isinstance(field_value, Dataset):
+                output_parts.append(str(field_value))
+            elif isinstance(field_value, str):
+                output_parts.append(field_value)
+            elif field_value is None:
+                output_parts.append("None")
+            else:
+                output_parts.append(str(field_value))
+        
+        return "\n".join(output_parts)
+
     def _extract_by_reporters(self, experiment_data: ExperimentData):
         """Extracts reports from all configured reporters.
 

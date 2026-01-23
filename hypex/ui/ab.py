@@ -47,6 +47,10 @@ class ABOutput(Output):
         self._groups = []
         self.cupac = CupacOutput()
         super().__init__(resume_reporter=ABDatasetReporter())
+    
+    def _get_output_fields(self) -> list[str]:
+        """Return ordered fields for AB test output display."""
+        return ['resume', 'multitest', 'sizes', 'cupac']
 
     def _extract_multitest_result(self, experiment_data: ExperimentData):
         multitest_id = experiment_data.get_one_id(
