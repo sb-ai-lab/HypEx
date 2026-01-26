@@ -955,10 +955,49 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     def corr(       # Иван
         self,
-        method: Literal["pearson", "kendall", "spearman"] = "pearson",
         numeric_only: bool = False,
     ) -> Union[spark.DataFrame, float]:
-        pass
+
+        if numeric_only:
+            from pyspark.sql.types import (
+                IntegerType, LongType, FloatType,
+                DoubleType, DecimalType, ShortType, ByteType
+            )
+
+            numeric_types = (
+                IntegerType, LongType,
+                FloatType, DoubleType,
+                DecimalType, ShortType, ByteType
+            )
+
+            # numeric columns
+            col_list = [
+                field.name
+                for field in self.data.schema.fields
+                if isinstance(field.dataType, numeric_types)
+            ]
+        else:
+            col_list = self.data.columns
+
+        paired_corr = self.data.select(
+            *[
+                F.corr(col_list[i], col_list[j]).alias(f'{i}_{j}')
+                for i in range(0, len(col_list))
+                for j in range(i, len(col_list))
+            ]
+        ).toPandas()
+
+        result = pd.DataFrame(
+            [
+                paired_corr.loc[0, f'{i}_{j}' if i <= j else f'{j}_{i}']
+                for i in range(0, len(col_list))
+                for j in range(0, len(col_list))
+            ],
+            index=col_list,
+            columns=col_list,
+        )
+
+        return result
 
     def isna(self) -> spark.DataFrame:      # Иван
         pass

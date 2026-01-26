@@ -408,10 +408,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def corr(
         self,
-        method: Literal["pearson", "kendall", "spearman"] = "pearson",
         numeric_only: bool = False,
     ) -> pd.DataFrame | float:
-        return self.data.corr(method=method, numeric_only=numeric_only)
+        return self.data.corr(method='pearson', numeric_only=numeric_only)
 
     def isna(self) -> pd.DataFrame:
         return self.data.isna()

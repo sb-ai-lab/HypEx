@@ -313,7 +313,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def corr(self, method="pearson", numeric_only=False) -> Any:
+    def corr(self, numeric_only=False) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
