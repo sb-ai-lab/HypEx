@@ -1002,7 +1002,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def isna(self) -> spark.DataFrame:      # Иван
         return self.data.select(
             *[
-                F.isnan(col)
+                (F.isnan(col) | F.isnull(col)).alias(col)
                 for col in self.data
             ]
         )
