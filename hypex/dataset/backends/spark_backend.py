@@ -923,7 +923,26 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.agg("std", numeric_only=numeric_only, ddof=ddof)
 
     def cov(self):      # Иван
-        pass
+        col_list = self.columns
+        paired_cov = self.select(
+            *[
+                F.covar_samp(col_list[i], col_list[j]).alias(f'{i}_{j}')
+                for i in range(0, len(col_list))
+                for j in range(i, len(col_list))
+            ]
+        ).toPandas()
+
+        result = pd.DataFrame(
+            [
+                paired_cov.loc[0, f'{i}_{j}' if i <= j else f'{j}_{i}']
+                for i in range(0, len(col_list))
+                for j in range(0, len(col_list))
+            ],
+            index=col_list,
+            columns=col_list,
+        )
+
+        return result
 
     def quantile(self, q: float = 0.5) -> spark.DataFrame:      # Иван
         pass
