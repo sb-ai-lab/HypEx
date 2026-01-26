@@ -923,8 +923,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.agg("std", numeric_only=numeric_only, ddof=ddof)
 
     def cov(self):      # Иван
-        col_list = self.columns
-        paired_cov = self.select(
+        col_list = self.data.columns
+        paired_cov = self.data.select(
             *[
                 F.covar_samp(col_list[i], col_list[j]).alias(f'{i}_{j}')
                 for i in range(0, len(col_list))
@@ -944,8 +944,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         return result
 
-    def quantile(self, q: float = 0.5) -> spark.DataFrame:      # Иван
-        pass
+    def quantile(self, q: float = 0.5) -> float:      # Иван
+        return self.data.approxQuantile(self.data.columns[0], q=[q,], accuracy=1e-6)[0]
 
     def coefficient_of_variation(self) -> Union[spark.DataFrame, float]:        # Иван
         pass

@@ -391,7 +391,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def cov(self):
         return self.data.cov(ddof=1)
 
-    def quantile(self, q: float = 0.5) -> pd.DataFrame:
+    def quantile(self, q: float = 0.5) -> float:
         if isinstance(q, list) and len(q) > 1:
             return self.data.quantile(q=q)
         return self.agg(func="quantile", q=q)
