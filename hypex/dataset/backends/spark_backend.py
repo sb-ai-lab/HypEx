@@ -1000,7 +1000,12 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return result
 
     def isna(self) -> spark.DataFrame:      # Иван
-        pass
+        return self.data.select(
+            *[
+                F.isnan(col)
+                for col in self.data
+            ]
+        )
 
     def sort_values(
         self, by: Union[str, list[str]], ascending: bool = True, **kwargs
