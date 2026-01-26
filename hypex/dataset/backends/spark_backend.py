@@ -1019,7 +1019,34 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         ascending: bool = False,
         dropna: bool = True,
     ) -> spark.DataFrame:
-        pass
+
+        result = self.data
+        if dropna:
+            result = result.dropna(how="any")
+
+        result = self.data.select(
+            F.count('*').alias('_total_count'),
+            *[
+                F.countDistinct(col).alias(col)
+                for col in self.data.columns
+            ]
+        )
+
+        if normalize:
+            result = result.select(
+                *[
+                    (F.col(col) / F.col('_total_count')).alias(col)
+                    for col in self.data
+                ]
+            )
+        else:
+            result = result.drop('_total_count')
+
+        if sort:
+            raise NotImplementedError
+
+        return result
+
 
     def fillna(     # Эрик
         self,
