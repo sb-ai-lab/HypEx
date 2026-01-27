@@ -14,7 +14,7 @@ from .reporters import DatasetReporter
 from .reporters.aa import OneAADictReporter
 from .splitters import AASplitter, AASplitterWithStratification
 from .ui.aa import AAOutput
-from .ui.base import ExperimentShell
+from .ui.base import ExperimentShell, ExperimentOutput
 from .utils import SpaceEnum
 
 AA_METRICS = Experiment(
@@ -245,12 +245,15 @@ class AATest(ExperimentShell):
                 )
             )
         experiment_params.append(AAScoreAnalyzer())
+        
         super().__init__(
             experiment=Experiment(
                 experiment_params,
                 key="AATest",
             ),
-            output=AAOutput(),
+            output=ExperimentOutput(
+                main_output=AAOutput()
+            ),
         )
         if t_test_equal_var is not None:
             self.experiment.set_params(
