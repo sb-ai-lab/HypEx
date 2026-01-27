@@ -537,16 +537,16 @@ class SparkNavigation(DatasetBackendNavigation):
             raise ValueError("Unsupported data format for from_dict")
         return self
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]: # TODO: to be moved to small data
         pass
 
-    def to_records(self) -> list[dict]:
+    def to_records(self) -> list[dict]: # TODO: to be moved to small data
         pass
 
-    def loc(self, items: Iterable) -> Iterable:     # Иван
+    def loc(self, items: Iterable) -> Iterable:       # Иван    # TODO: to be moved to small data
         pass
 
-    def iloc(self, items: Iterable) -> Iterable:        # Иван
+    def iloc(self, items: Iterable) -> Iterable:        # Иван  # TODO: to be moved to small data
         pass
 
 
@@ -950,7 +950,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def coefficient_of_variation(self) -> Union[spark.DataFrame, float]:        # Иван
         pass
 
-    def sort_index(self, ascending: bool = True, **kwargs) -> spark.DataFrame:      # Иван
+    def sort_index(self, ascending: bool = True, **kwargs) -> spark.DataFrame:      # Иван # TODO: to be moved to small data
         pass
 
     def corr(       # Иван
@@ -1024,7 +1024,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         if dropna:
             result = result.dropna(how="any")
 
-        result = self.data.select(
+        result = result.select(
             F.count('*').alias('_total_count'),
             *[
                 F.countDistinct(col).alias(col)
@@ -1070,7 +1070,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     ) -> spark.DataFrame:
         pass
 
-    def transpose(self, names: Optional[Sequence[str]] = None) -> spark.DataFrame:
+    def transpose(self, names: Optional[Sequence[str]] = None) -> spark.DataFrame: # TODO: to be moved to small data
         pass
 
     def sample(     # Эрик
@@ -1137,7 +1137,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.data.select([mgk_mapping_expr[F.col(col_name)].alias(col_name) for col_name in self.data.columns])
 
 
-    def reindex(        # Антон
+    def reindex(        # Антон # TODO: to be moved to small data
         self, labels: str = "", fill_value: Optional[str] = None
     ) -> spark.DataFrame:
         pass
