@@ -927,7 +927,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def std(self, numeric_only: bool = False, ddof: int = 1):
         return self.agg("std", numeric_only=numeric_only, ddof=ddof)
 
-    def cov(self):      # Иван
+    def cov(self):      # Иван # done
         col_list = self.data.columns
         paired_cov = self.data.select(
             *[
@@ -952,13 +952,22 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def quantile(self, q: float = 0.5) -> float:      # Иван # done
         return self.data.approxQuantile(self.data.columns[0], q=[q,], accuracy=1e-6)[0]
 
-    def coefficient_of_variation(self) -> Union[spark.DataFrame, float]:        # Иван
-        pass
+    # returns float/small_data/big_data?
+    def coefficient_of_variation(self) -> Union[spark.DataFrame, float]:        # Иван # done
+        data = self.data.select(
+            F.var_samp(col).alias(col)
+            for col in self.data.columns
+            .toPandas()
+        )
+        data.index = ["cv"]
+        if data.shape[0] == 1 and data.shape[1] == 1:
+            return float(data.loc[data.index[0], data.columns[0]])
+        return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
     def sort_index(self, ascending: bool = True, **kwargs) -> spark.DataFrame:      # Иван # TODO: to be moved to small data
         pass
 
-    def corr(       # Иван
+    def corr(       # Иван # done
         self,
         numeric_only: bool = False,
     ) -> Union[spark.DataFrame, float]:
@@ -1004,7 +1013,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         return result
 
-    def isna(self) -> spark.DataFrame:      # Иван
+    def isna(self) -> spark.DataFrame:      # Иван # done
         return self.data.select(
             *[
                 (F.isnan(col) | F.isnull(col)).alias(col)
@@ -1017,7 +1026,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     ) -> spark.DataFrame:
         pass
 
-    def value_counts(       # Иван
+    def value_counts(       # Иван # done
         self,
         normalize: bool = False,
         sort: bool = True,
