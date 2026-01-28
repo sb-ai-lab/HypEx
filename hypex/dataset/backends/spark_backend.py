@@ -439,10 +439,15 @@ class SparkNavigation(DatasetBackendNavigation):
             return (count, cols)
         return (0, 0)
 
-    def _get_column_index(      # Иван
+    def _get_column_index(      # Иван # done
         self, column_name: Union[Sequence[str], str]
     ) -> Union[int, Sequence[int]]:
-        pass
+        pd_index_columns = pd.Index(self.data.columns)
+        return (
+            pd_index_columns.get_loc(column_name)
+            if isinstance(column_name, str)
+            else pd_index_columns.get_indexer(column_name)
+        )[0]
 
     def get_column_type(
         self, column_name: Union[List[str], str]
@@ -944,7 +949,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         return result
 
-    def quantile(self, q: float = 0.5) -> float:      # Иван
+    def quantile(self, q: float = 0.5) -> float:      # Иван # done
         return self.data.approxQuantile(self.data.columns[0], q=[q,], accuracy=1e-6)[0]
 
     def coefficient_of_variation(self) -> Union[spark.DataFrame, float]:        # Иван
