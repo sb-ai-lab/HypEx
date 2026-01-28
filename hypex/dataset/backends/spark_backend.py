@@ -20,16 +20,10 @@ from typing import (
 import numpy as np
 import pandas as pd
 import pyspark.sql as spark
-from patsy.util import iterable
 from pyspark import SparkContext, SparkConf, StorageLevel
-from pyspark.sql import SparkSession, functions as F, types as T
+from pyspark.sql import SparkSession, Window, Row, functions as F, types as T, DataFrame as SparkDF
 from pyspark.sql.functions import lit, monotonically_increasing_id
-from pyspark.sql.types import NumericType
-from pyspark.sql import Window
-from pyspark.sql import DataFrame as SparkDF
-from pyspark.sql import Row
-from pyspark.sql.types import StructType, StructField
-from pyspark.sql.types import StringType
+from pyspark.sql.types import NumericType, ArrayType, StructType, StructField, StringType, DoubleType
 
 from functools import reduce
 
@@ -1039,8 +1033,163 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         else:
             return int(na_counts.collect()[0][0])
 
-    def dot(self, other: Union["SparkDataset", np.ndarray]) -> spark.DataFrame:  # Антон
-        pass
+    def dot(
+            self,
+            other: Union["SparkDataset", np.ndarray],
+            broadcast_threshold_mb: float = 100.0,
+            auto_broadcast: bool = True,
+            result_col_prefix: str = ""
+    ) -> spark.DataFrame:
+        df1 = self.data
+
+        if isinstance(other, np.ndarray):
+            return self._multiply_with_broadcast(df1, other, df1.columns, df1.columns, result_col_prefix)
+
+        df2 = other.data
+
+        # Get column lists
+        n_cols_df1 = len(df1.columns)
+        n_cols_df2 = len(df2.columns)
+
+        # Validate dimensions
+        df2_row_count = df2.count()
+        if df2_row_count != n_cols_df1:
+            raise ValueError(
+                f"Matrix dimension mismatch: df1 has {n_cols_df1} columns "
+                f"but df2 has {df2_row_count} rows. For matrix multiplication, "
+                f"these must be equal."
+            )
+
+        # Decide whether to broadcast
+        should_broadcast = False
+        if auto_broadcast:
+            # Estimate df2 size (rough approximation)
+            estimated_size_mb = (df2_row_count * n_cols_df2 * 8) / (1024 * 1024)  # 8 bytes per double
+            should_broadcast = estimated_size_mb <= broadcast_threshold_mb
+            # print(f"df2 estimated size: {estimated_size_mb:.2f} MB - Broadcasting: {should_broadcast}")
+
+        if should_broadcast:
+            return self._multiply_with_broadcast(df1, df2, df1.columns, df2.columns, result_col_prefix)
+        else:
+            return self._multiply_distributed(df1, df2, df1.columns, df2.columns, result_col_prefix)
+
+    @staticmethod
+    def _multiply_with_broadcast(
+            df1: spark.DataFrame,
+            df2: Union[spark.DataFrame, np.ndarray],
+            df1_cols: list,
+            df2_cols: list,
+            result_col_prefix: str
+    ) -> spark.DataFrame:
+        """
+        Multiply using broadcast join - efficient for small df2.
+        """
+
+        # Collect df2 as a numpy matrix (it's small enough)
+        if isinstance(df2, spark.DataFrame):
+            df2_data = df2.select(*df2_cols).collect()
+            matrix = np.array([[row[col] for col in df2_cols] for row in df2_data])
+        elif isinstance(df2, np.ndarray):
+            matrix = df2
+        else:
+            raise ValueError("The other matrix should be either Dataset or numpy array.")
+
+        # Broadcast the matrix
+        broadcast_matrix = F.broadcast(F.lit(matrix.tolist()))
+
+        # Create UDF for matrix multiplication
+        @F.udf(ArrayType(DoubleType()))
+        def matmul_udf(*row_values):
+            row_array = np.array(row_values)
+            result = np.dot(row_array, matrix)
+            return result.tolist()
+
+        # Apply multiplication
+        result_array_col = matmul_udf(*[F.col(c) for c in df1_cols])
+
+        # Expand array into separate columns
+        result_df = df1.withColumn("_result_array", result_array_col)
+
+        for i, col_name in enumerate(df2_cols):
+            result_df = result_df.withColumn(
+                f"{result_col_prefix}{col_name}",
+                result_df["_result_array"][i]
+            )
+
+        return result_df.drop("_result_array")
+
+    @staticmethod
+    def _multiply_distributed(
+            df1: spark.DataFrame,
+            df2: spark.DataFrame,
+            df1_cols: list,
+            df2_cols: list,
+            result_col_prefix: str
+    ) -> spark.DataFrame:
+        """
+        Multiply using distributed joins - for large df2.
+        """
+
+        # Add row indices to df1
+        df1_indexed = df1.withColumn("_row_id", F.monotonically_increasing_id())
+
+        # Explode df1 into (row_id, col_idx, value) format
+        df1_exploded = df1_indexed.select(
+            "_row_id",
+            F.explode(F.array([
+                F.struct(F.lit(i).alias("_col_idx"), F.col(col).alias("_value"))
+                for i, col in enumerate(df1_cols)
+            ])).alias("_col_struct")
+        ).select(
+            "_row_id",
+            F.col("_col_struct._col_idx").alias("_col_idx"),
+            F.col("_col_struct._value").alias("_value")
+        )
+
+        # Add row index to df2 and explode into (row_idx, col_name, value) format
+        df2_indexed = df2.withColumn("_row_idx", F.monotonically_increasing_id())
+
+        df2_exploded = df2_indexed.select(
+            "_row_idx",
+            F.explode(F.array([
+                F.struct(F.lit(col).alias("_result_col"), F.col(col).alias("_value"))
+                for col in df2_cols
+            ])).alias("_col_struct")
+        ).select(
+            F.col("_row_idx").alias("_col_idx"),  # This matches df1's column index
+            F.col("_col_struct._result_col").alias("_result_col"),
+            F.col("_col_struct._value").alias("_value")
+        )
+
+        # Join and multiply
+        joined = df1_exploded.join(
+            df2_exploded,
+            on="_col_idx",
+            how="inner"
+        )
+
+        # Multiply values and aggregate
+        multiplied = joined.withColumn(
+            "_product",
+            F.col("_value") * F.col(df2_exploded["_value"])
+        )
+
+        # Group by row_id and result_col, sum products
+        aggregated = multiplied.groupBy("_row_id", "_result_col").agg(
+            F.sum("_product").alias("_sum")
+        )
+
+        # Pivot to get final result
+        result = aggregated.groupBy("_row_id").pivot("_result_col").agg(
+            F.first("_sum")
+        )
+
+        # Rename columns with prefix
+        for col in df2_cols:
+            if col in result.columns:
+                result = result.withColumnRenamed(col, f"{result_col_prefix}{col}")
+
+        return result.drop("_row_id").orderBy("_row_id")
 
     def dropna(  # Эрик
         self,
