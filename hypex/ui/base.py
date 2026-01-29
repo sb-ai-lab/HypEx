@@ -311,7 +311,8 @@ class ExperimentOutput:
         parts = []
         
         if hasattr(self.main_output, 'resume'):
-            parts.append("MAIN RESULTS")
+            if len(self.additional_outputs) > 0:
+                parts.append("MAIN RESULTS")
             parts.append(str(self.main_output.resume))
         
         for name, output in self.additional_outputs.items():

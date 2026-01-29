@@ -8,11 +8,13 @@ class CupedOutput:
     """Output container for CUPED variance reduction analysis.
     
     Attributes:
+        resume: Dataset with summary of CUPED results (target, covariate, variance_reduction)
         variance_reductions: Dataset containing variance reduction metrics
                            for CUPED-transformed targets
     """
 
     def __init__(self):
+        self.resume: Dataset | str | None = None
         self.variance_reductions: Dataset | str | None = None
 
     def extract(self, experiment_data: ExperimentData) -> None:
@@ -24,6 +26,7 @@ class CupedOutput:
         self.variance_reductions = CupedReporter.extract_variance_reductions(
             experiment_data
         )
+        self.resume = CupedReporter.extract_resume(experiment_data)
 
     def __repr__(self) -> str:
         """Return string representation showing available data."""

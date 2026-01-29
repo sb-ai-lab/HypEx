@@ -9,11 +9,13 @@ class CupacOutput:
     """Container for CUPAC-specific outputs.
 
     Attributes:
+        resume (Dataset | None): Summary of CUPAC results (target, best_model, variance_reduction_cv, variance_reduction_real).
         variance_reductions (Dataset | None): Variance reduction metrics from CUPAC models.
         feature_importances (Dataset | None): Feature importance scores from CUPAC models.
     """
 
     def __init__(self):
+        self.resume: Dataset | None = None
         self.variance_reductions: Dataset | None = None
         self.feature_importances: Dataset | None = None
 
@@ -23,6 +25,7 @@ class CupacOutput:
         Args:
             experiment_data: Experiment data containing CUPAC reports
         """
+        self.resume = CupacReporter.extract_resume(experiment_data)
         self.variance_reductions = CupacReporter.extract_variance_reductions(
             experiment_data
         )

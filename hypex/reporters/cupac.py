@@ -9,6 +9,50 @@ class CupacReporter:
     """Reporter for extracting CUPAC analysis results from experiment data."""
 
     @staticmethod
+    def extract_resume(experiment_data: ExperimentData) -> Dataset | None:
+        """Generate summary resume for CUPAC results.
+        
+        Args:
+            experiment_data: Experiment data containing CUPAC reports
+            
+        Returns:
+            Dataset with target, best_model, variance_reduction_cv, variance_reduction_real columns
+        """
+        cupac_report_keys = [
+            key
+            for key in experiment_data.analysis_tables.keys()
+            if key.endswith("_cupac_report")
+        ]
+
+        if not cupac_report_keys:
+            return None
+
+        resume_data = []
+        for key in cupac_report_keys:
+            report = experiment_data.analysis_tables[key]
+            target_name = key.replace("_cupac_report", "")
+            
+            vr_cv = report.get("cupac_variance_reduction_cv")
+            vr_real = report.get("cupac_variance_reduction_real")
+            
+            resume_data.append({
+                "target": target_name,
+                "best_model": report.get("cupac_best_model"),
+                "variance_reduction_cv": f"{vr_cv:.1f}%" if vr_cv is not None else "-",
+                "variance_reduction_real": f"{vr_real:.1f}%" if vr_real is not None else "-",
+            })
+
+        return Dataset.from_dict(
+            data=resume_data,
+            roles={
+                "target": InfoRole(str),
+                "best_model": InfoRole(str),
+                "variance_reduction_cv": InfoRole(str),
+                "variance_reduction_real": InfoRole(str),
+            },
+        )
+
+    @staticmethod
     def _get_group_means(experiment_data: ExperimentData, target_name: str) -> dict[str, float | None]:
         """Extract control and test means for a target from GroupDifference comparators.
         
