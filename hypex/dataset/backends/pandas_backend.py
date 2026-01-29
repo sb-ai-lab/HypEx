@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union
+from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -202,6 +202,10 @@ class PandasNavigation(DatasetBackendNavigation):
         return self.data.columns
 
     @property
+    def session(self):
+        return None
+
+    @property
     def shape(self):
         return self.data.shape
 
@@ -215,8 +219,9 @@ class PandasNavigation(DatasetBackendNavigation):
         )[0]
 
     def get_column_type(
-        self, column_name: Union[Iterable[str], str]
+        self, column_name: Union[Iterable[str], str] = None
     ) -> Optional[Union[Dict[str, type], type]]:
+        column_name = self.data.columns if column_name is None else column_name
         dtypes = {}
         for k, v in self.data[column_name].dtypes.items():
             if pd.api.types.is_integer_dtype(v):

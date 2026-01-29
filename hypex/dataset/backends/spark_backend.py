@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import sys
 import re
@@ -21,9 +23,23 @@ import numpy as np
 import pandas as pd
 import pyspark.sql as spark
 from pyspark import SparkContext, SparkConf, StorageLevel
-from pyspark.sql import SparkSession, Window, Row, functions as F, types as T, DataFrame as SparkDF
+from pyspark.sql import (
+    SparkSession,
+    Window,
+    Row,
+    functions as F,
+    types as T,
+    DataFrame as SparkDF,
+)
 from pyspark.sql.functions import lit, monotonically_increasing_id
-from pyspark.sql.types import NumericType, ArrayType, StructType, StructField, StringType, DoubleType
+from pyspark.sql.types import (
+    NumericType,
+    ArrayType,
+    StructType,
+    StructField,
+    StringType,
+    DoubleType,
+)
 
 from functools import reduce
 
@@ -105,7 +121,7 @@ class SparkNavigation(DatasetBackendNavigation):
     ):
         if session is None:
             if isinstance(data, spark.DataFrame):
-                self.session = data.spark
+                self.session = data.sparkSession
             else:
                 self.session = self._get_spark_session()
         else:
@@ -410,7 +426,7 @@ class SparkNavigation(DatasetBackendNavigation):
             tail_df = pd.DataFrame(tail_rows, columns=cols)
             ellipsis = pd.DataFrame([["..."] * len(cols)], columns=cols)
             pandas_df = pd.concat([head_df, ellipsis, tail_df], ignore_index=True)
-        table = pandas_df.to_string(index=False)
+        table = pandas_df.__repr__()
         dim = f"\n\n[{total} rows × {len(cols)} columns]"
         return table + dim
 
@@ -481,6 +497,10 @@ class SparkNavigation(DatasetBackendNavigation):
     def columns(self):
         return self.data.columns if self.data else []
 
+    # @property
+    # def session(self):
+    #     return self.session
+
     @property
     def shape(self):
         if self.data:
@@ -495,11 +515,12 @@ class SparkNavigation(DatasetBackendNavigation):
         pass
 
     def get_column_type(
-        self, column_name: Union[List[str], str]
+        self, column_name: Union[List[str], str] = None
     ) -> Optional[Union[Dict[str, type], type]]:
+        column_name = self.data.columns if column_name is None else column_name
         dtypes = {}
         for k, v in self.data.select(column_name).dtypes:
-            if pd.api.types.is_integer_dtype(v):
+            if pd.api.types.is_integer_dtype(v) or v == "bigint":
                 dtypes[k] = int
             elif pd.api.types.is_float_dtype(v):
                 dtypes[k] = float
@@ -521,7 +542,10 @@ class SparkNavigation(DatasetBackendNavigation):
     def astype(
         self, dtype: Dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> spark.DataFrame:
-        return self.data.astype(dtype)
+        for col, new_type in dtype.items():
+            new_type = str(new_type.__name__)
+            self.data = self.data.withColumn(col, self.data[col].cast(new_type))
+        return self.data
 
     def update_column_type(self, dtype: Dict[str, type]):
         if len(dtype) > 0:
@@ -620,6 +644,9 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         session: SparkSession = None,
     ):
         super().__init__(data, session)
+
+    def __deepcopy__(self, memo):
+        return SparkDataset(self.data.select("*"))
 
     @staticmethod
     def _convert_agg_result(result: SparkDF):
@@ -1034,18 +1061,20 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             return int(na_counts.collect()[0][0])
 
     def dot(
-            self,
-            other: Union["SparkDataset", np.ndarray],
-            broadcast_threshold_mb: float = 100.0,
-            auto_broadcast: bool = True,
-            result_col_prefix: str = ""
+        self,
+        other: Union["SparkDataset", np.ndarray],
+        broadcast_threshold_mb: float = 100.0,
+        auto_broadcast: bool = True,
+        result_col_prefix: str = "",
     ) -> spark.DataFrame:
-        df1 = self.data
+        df1 = self.astype({col : float for col in self.columns})
 
         if isinstance(other, np.ndarray):
-            return self._multiply_with_broadcast(df1, other, df1.columns, df1.columns, result_col_prefix)
+            return self._multiply_with_broadcast(
+                df1, other, df1.columns, df1.columns, result_col_prefix
+            )
 
-        df2 = other.data
+        df2 = other.astype({col : float for col in other.columns})
 
         # Get column lists
         n_cols_df1 = len(df1.columns)
@@ -1064,22 +1093,33 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         should_broadcast = False
         if auto_broadcast:
             # Estimate df2 size (rough approximation)
-            estimated_size_mb = (df2_row_count * n_cols_df2 * 8) / (1024 * 1024)  # 8 bytes per double
+            estimated_size_mb = (df2_row_count * n_cols_df2 * 8) / (
+                1024 * 1024
+            )  # 8 bytes per double
             should_broadcast = estimated_size_mb <= broadcast_threshold_mb
             # print(f"df2 estimated size: {estimated_size_mb:.2f} MB - Broadcasting: {should_broadcast}")
 
         if should_broadcast:
-            return self._multiply_with_broadcast(df1, df2, df1.columns, df2.columns, result_col_prefix)
+            result = self._multiply_with_broadcast(
+                df1, df2, df1.columns, df2.columns, result_col_prefix
+            )
         else:
-            return self._multiply_distributed(df1, df2, df1.columns, df2.columns, result_col_prefix)
+            result = self._multiply_distributed(
+                df1, df2, df1.columns, df2.columns, result_col_prefix
+            )
+
+        if isinstance(df2, spark.DataFrame):
+            result = result.drop(*list(set(df1.columns) - set(df2.columns)))
+
+        return result
 
     @staticmethod
     def _multiply_with_broadcast(
-            df1: spark.DataFrame,
-            df2: Union[spark.DataFrame, np.ndarray],
-            df1_cols: list,
-            df2_cols: list,
-            result_col_prefix: str
+        df1: spark.DataFrame,
+        df2: Union[spark.DataFrame, np.ndarray],
+        df1_cols: list,
+        df2_cols: list,
+        result_col_prefix: str,
     ) -> spark.DataFrame:
         """
         Multiply using broadcast join - efficient for small df2.
@@ -1092,10 +1132,9 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         elif isinstance(df2, np.ndarray):
             matrix = df2
         else:
-            raise ValueError("The other matrix should be either Dataset or numpy array.")
-
-        # Broadcast the matrix
-        broadcast_matrix = F.broadcast(F.lit(matrix.tolist()))
+            raise ValueError(
+                "The other matrix should be either Dataset or numpy array."
+            )
 
         # Create UDF for matrix multiplication
         @F.udf(ArrayType(DoubleType()))
@@ -1112,19 +1151,18 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         for i, col_name in enumerate(df2_cols):
             result_df = result_df.withColumn(
-                f"{result_col_prefix}{col_name}",
-                result_df["_result_array"][i]
+                f"{result_col_prefix}{col_name}", result_df["_result_array"][i]
             )
 
         return result_df.drop("_result_array")
 
     @staticmethod
     def _multiply_distributed(
-            df1: spark.DataFrame,
-            df2: spark.DataFrame,
-            df1_cols: list,
-            df2_cols: list,
-            result_col_prefix: str
+        df1: spark.DataFrame,
+        df2: spark.DataFrame,
+        df1_cols: list,
+        df2_cols: list,
+        result_col_prefix: str,
     ) -> spark.DataFrame:
         """
         Multiply using distributed joins - for large df2.
@@ -1136,14 +1174,18 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         # Explode df1 into (row_id, col_idx, value) format
         df1_exploded = df1_indexed.select(
             "_row_id",
-            F.explode(F.array([
-                F.struct(F.lit(i).alias("_col_idx"), F.col(col).alias("_value"))
-                for i, col in enumerate(df1_cols)
-            ])).alias("_col_struct")
+            F.explode(
+                F.array(
+                    [
+                        F.struct(F.lit(i).alias("_col_idx"), F.col(col).alias("_value"))
+                        for i, col in enumerate(df1_cols)
+                    ]
+                )
+            ).alias("_col_struct"),
         ).select(
             "_row_id",
             F.col("_col_struct._col_idx").alias("_col_idx"),
-            F.col("_col_struct._value").alias("_value")
+            F.col("_col_struct._value").alias("_value"),
         )
 
         # Add row index to df2 and explode into (row_idx, col_name, value) format
@@ -1151,27 +1193,28 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         df2_exploded = df2_indexed.select(
             "_row_idx",
-            F.explode(F.array([
-                F.struct(F.lit(col).alias("_result_col"), F.col(col).alias("_value"))
-                for col in df2_cols
-            ])).alias("_col_struct")
+            F.explode(
+                F.array(
+                    [
+                        F.struct(
+                            F.lit(col).alias("_result_col"), F.col(col).alias("_value")
+                        )
+                        for col in df2_cols
+                    ]
+                )
+            ).alias("_col_struct"),
         ).select(
             F.col("_row_idx").alias("_col_idx"),  # This matches df1's column index
             F.col("_col_struct._result_col").alias("_result_col"),
-            F.col("_col_struct._value").alias("_value")
+            F.col("_col_struct._value").alias("_value"),
         )
 
         # Join and multiply
-        joined = df1_exploded.join(
-            df2_exploded,
-            on="_col_idx",
-            how="inner"
-        )
+        joined = df1_exploded.join(df2_exploded, on="_col_idx", how="inner")
 
         # Multiply values and aggregate
         multiplied = joined.withColumn(
-            "_product",
-            F.col("_value") * F.col(df2_exploded["_value"])
+            "_product", F.col("_value") * F.col(df2_exploded["_value"])
         )
 
         # Group by row_id and result_col, sum products
@@ -1180,9 +1223,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         )
 
         # Pivot to get final result
-        result = aggregated.groupBy("_row_id").pivot("_result_col").agg(
-            F.first("_sum")
-        )
+        result = aggregated.groupBy("_row_id").pivot("_result_col").agg(F.first("_sum"))
 
         # Rename columns with prefix
         for col in df2_cols:
@@ -1204,32 +1245,40 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     def sample(  # Эрик
         self,
-        frac: Optional[float] = None,
-        n: Optional[int] = None,
-        random_state: Optional[int] = None,
+        frac: float | None = None,
+        n: int | None = None,
+        random_state: int | None = None,
     ) -> spark.DataFrame:
         pass
 
     def select_dtypes(
         self,
-        include: Optional[str] = None,
-        exclude: Optional[str] = None,
+        include: str | None = None,
+        exclude: str | None = None,
     ) -> spark.DataFrame:
-        dtypes = dict(self.data.dtypes)
         if include is not None:
-            dtypes = {k: v for k, v in dtypes.items() if v in include}
+            include = Adapter.to_list(include)
+            include = [str(v.__name__) if isinstance(v, type) else v for v in include]
+        if exclude is not None:
+            exclude = Adapter.to_list(exclude)
+            exclude = [str(v.__name__) if isinstance(v, type) else v for v in exclude]
+
+        dtypes = self.get_column_type()
+        if include is not None:
+            dtypes = {k: v for k, v in dtypes.items() if str(v.__name__) in include}
         elif exclude is not None:
-            dtypes = {k: v for k, v in dtypes.items() if v not in exclude}
+            dtypes = {k: v for k, v in dtypes.items() if str(v.__name__) not in exclude}
 
         return self.data.select([F.col(c).alias(c) for c in dtypes.keys()])
 
     def isin(self, values: Iterable) -> spark.DataFrame:
-        values = list(values)
+        values = Adapter.to_list(values)
+        col_types = self.get_column_type()
         return self.data.select(
             [
                 (
                     F.col(c).isin(values).alias(c)
-                    if isinstance(values[0], F.col(c).dataType)
+                    if isinstance(values[0], col_types[c])
                     else F.lit(False).alias(c)
                 )
                 for c in self.data.columns
@@ -1250,16 +1299,20 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         pass
 
     def drop(self, labels: Any = "", axis: int = 1) -> spark.DataFrame:
+        labels = Adapter.to_list(labels)
         if axis == 1:
             return self.data.drop(*labels)
         elif axis == 0:
-            df_with_rownum = self.data.withColumn("__row_num",
-                F.row_number().over(Window.orderBy(F.monotonically_increasing_id())) -1
+            df_with_rownum = self.data.withColumn(
+                "__row_num",
+                F.row_number().over(Window.orderBy(F.monotonically_increasing_id()))
+                - 1,
             )
-            return df_with_rownum.filter(~F.col("__row_num").isin(labels)).drop("__row_num")
+            return df_with_rownum.filter(~F.col("__row_num").isin(labels)).drop(
+                "__row_num"
+            )
         else:
             raise ValueError("Invalid axis value")
-
 
     def filter(
         self,
@@ -1272,10 +1325,14 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 items = [col for col in self.data.columns if re.search(regex, col)]
             return self.data.select(items)
         elif axis == 0:
-            df_with_rownum = self.data.withColumn("__row_num",
-                F.row_number().over(Window.orderBy(F.monotonically_increasing_id())) -1
+            df_with_rownum = self.data.withColumn(
+                "__row_num",
+                F.row_number().over(Window.orderBy(F.monotonically_increasing_id()))
+                - 1,
             )
-            return df_with_rownum.filter(F.col("__row_num").isin(items)).drop("__row_num")
+            return df_with_rownum.filter(F.col("__row_num").isin(items)).drop(
+                "__row_num"
+            )
         else:
             raise ValueError("Invalid axis value")
 
@@ -1311,4 +1368,6 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def list_to_columns(self, column: str) -> spark.DataFrame:
         n_cols = len(self.data.select(column).head(1).collect()[0][0])
 
-        return self.data.select(*[F.col(column)[i].alias(f"{column}_{i}") for i in range(n_cols)])
+        return self.data.select(
+            *[F.col(column)[i].alias(f"{column}_{i}") for i in range(n_cols)]
+        )
