@@ -19,7 +19,7 @@ class AAOutput(Output):
         )
     
     def _get_output_fields(self) -> list[str]:
-        """Return ordered fields for AB test output display."""
+        """Return ordered fields for AA test output display."""
         return ['resume', 'best_split', 'experiments', 'aa_score', 'best_split_statistic']
 
     def _extract_experiments(self, experiment_data: ExperimentData):

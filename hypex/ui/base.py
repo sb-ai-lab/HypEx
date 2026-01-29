@@ -137,11 +137,7 @@ class Output:
             output_parts.append(f"{field_name}:")
             output_parts.append('=' * 60)
             
-            if isinstance(field_value, Dataset):
-                output_parts.append(str(field_value))
-            elif isinstance(field_value, str):
-                output_parts.append(field_value)
-            elif field_value is None:
+            if field_value is None:
                 output_parts.append("None")
             else:
                 output_parts.append(str(field_value))
@@ -222,7 +218,7 @@ class ExperimentOutput:
     def __init__(
         self, 
         main_output: Output, 
-        additional_outputs: dict[str, Any] | None = None
+        additional_outputs: dict[str, Output] | None = None
     ):
         """Initialize ExperimentOutput with main and additional outputs.
         

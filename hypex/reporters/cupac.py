@@ -25,8 +25,9 @@ class CupacReporter:
         )["GroupDifference"]["analysis_tables"]
         
         for gd_id in group_diff_ids:
-            # GroupDifference IDs typically look like: "GroupDifference{ID_SPLIT_SYMBOL}target_name{ID_SPLIT_SYMBOL}..."
-            if target_name in gd_id:
+            # GroupDifference IDs format: "GroupDifference┴params_hash┴target_name"
+            gd_target = gd_id.split(ID_SPLIT_SYMBOL)[-1]
+            if gd_target == target_name:
                 gd_data = experiment_data.analysis_tables[gd_id]
                 # Extract scalar values from Dataset
                 control_mean = gd_data.data["control mean"].iloc[0] if "control mean" in gd_data.columns else None

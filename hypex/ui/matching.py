@@ -29,7 +29,7 @@ class MatchingOutput(Output):
         )
     
     def _get_output_fields(self) -> list[str]:
-        """Return ordered fields for AB test output display."""
+        """Return ordered fields for Matching test output display."""
         return ['resume', 'indexes', 'full_data', 'quality_results']
 
     def _extract_full_data(self, experiment_data: ExperimentData, indexes: Dataset):
