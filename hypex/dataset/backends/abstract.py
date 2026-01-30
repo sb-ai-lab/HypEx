@@ -313,6 +313,10 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
+    def get_numeric_columns(self) -> list[str]:
+        raise AbstractMethodError
+
+    @abstractmethod
     def corr(self, numeric_only=False) -> Any:
         raise AbstractMethodError
 
