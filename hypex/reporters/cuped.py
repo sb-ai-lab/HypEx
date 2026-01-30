@@ -1,10 +1,15 @@
 """CUPED-specific reporter for extracting variance reduction metrics."""
 
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
+from . import Reporter
 
 
-class CupedReporter:
-    """Reporter for extracting CUPED variance reduction results from experiment data."""
+class CupedReporter(Reporter):
+    """Reporter for extracting CUPED analysis results from experiment data."""
+    
+    def report(self, data: ExperimentData) -> Dataset | None:
+        """Generate summary resume for CUPED results."""
+        return self.extract_resume(data)
 
     @staticmethod
     def extract_resume(data: ExperimentData) -> Dataset | str:

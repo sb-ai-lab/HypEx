@@ -3,10 +3,15 @@
 from ..comparators import GroupDifference
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..utils import ExperimentDataEnum, ID_SPLIT_SYMBOL
+from . import Reporter
 
 
-class CupacReporter:
+class CupacReporter(Reporter):
     """Reporter for extracting CUPAC analysis results from experiment data."""
+    
+    def report(self, experiment_data: ExperimentData) -> Dataset | None:
+        """Generate summary resume for CUPAC results."""
+        return self.extract_resume(experiment_data)
 
     @staticmethod
     def extract_resume(experiment_data: ExperimentData) -> Dataset | None:

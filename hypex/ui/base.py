@@ -9,6 +9,21 @@ from ..utils import ID_SPLIT_SYMBOL
 from ..utils.enums import RenameEnum
 
 
+def _html_section(title: str, level: int = 2) -> str:
+    """Generate HTML section header."""
+    border = '3px' if level == 2 else '2px'
+    return (f'<div style="margin: {"25" if level == 2 else "20"}px 0 {"12" if level == 2 else "8"}px 0; '
+            f'padding: {"8" if level == 2 else "4"}px 0; border-bottom: {border} solid {"#333" if level == 2 else "#ddd"};">'
+            f'<strong style="font-size: {1.2 if level == 2 else 1.1}em;">{title}</strong></div>')
+
+
+def _html_content(value: Any) -> str:
+    """Generate HTML content for a value."""
+    if value is None:
+        return '<div style="color: #888;">None</div>'
+    return value._repr_html_() if hasattr(value, '_repr_html_') else f'<pre>{str(value)}</pre>'
+
+
 class Output:
     """A class for handling experiment output reporting and formatting.
 
@@ -143,6 +158,17 @@ class Output:
                 output_parts.append(str(field_value))
         
         return "\n".join(output_parts)
+    
+    def _repr_html_(self) -> str:
+        """Return HTML representation for Jupyter notebook display."""
+        fields = self._get_output_fields()
+        if not fields:
+            return f"<div><b>{self.__class__.__name__}:</b> no fields available</div>"
+        
+        return '\n'.join(
+            _html_section(f, 3) + _html_content(getattr(self, f))
+            for f in fields if hasattr(self, f)
+        )
 
     def _extract_by_reporters(self, experiment_data: ExperimentData):
         """Extracts reports from all configured reporters.
@@ -321,6 +347,21 @@ class ExperimentOutput:
                 parts.append(str(output.resume))
         
         return "\n".join(parts)
+    
+    def _repr_html_(self) -> str:
+        """Return HTML representation for Jupyter notebook display."""
+        parts = []
+        
+        if hasattr(self.main_output, 'resume'):
+            if self.additional_outputs:
+                parts.append(_html_section('MAIN RESULTS'))
+            parts.append(_html_content(self.main_output.resume))
+        
+        for name, output in self.additional_outputs.items():
+            if hasattr(output, 'resume'):
+                parts.extend([_html_section(f'{name.upper()} RESULTS'), _html_content(output.resume)])
+        
+        return '\n'.join(parts)
 
 
 class ExperimentShell:
