@@ -36,6 +36,7 @@ from ...utils import FromDictTypes, MergeOnError, ScalarType, Adapter
 from ...utils.adapter import Adapter
 from ...utils.types import SparkTypeMapper as d
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
+from ...utils.typings import PysparkScalarType
 
 
 class SparkNavigation(DatasetBackendNavigation):
@@ -443,11 +444,12 @@ class SparkNavigation(DatasetBackendNavigation):
         self, column_name: Union[Sequence[str], str]
     ) -> Union[int, Sequence[int]]:
         pd_index_columns = pd.Index(self.data.columns)
-        return (
-            pd_index_columns.get_loc(column_name)
-            if isinstance(column_name, str)
-            else pd_index_columns.get_indexer(column_name)
-        )[0]
+        if isinstance(column_name, str):
+            return pd_index_columns.get_loc(column_name)
+        elif isinstance(column_name, list):
+            return pd_index_columns.get_indexer(column_name)
+        else:
+            raise TypeError("Wrong column_name type.")
 
     def get_column_type(
         self, column_name: Union[List[str], str]
@@ -927,7 +929,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def std(self, numeric_only: bool = False, ddof: int = 1):
         return self.agg("std", numeric_only=numeric_only, ddof=ddof)
 
-    def cov(self):      # Иван # done
+    def cov(self, small_format=False):      # Иван # done
         col_list = self.data.columns
         paired_cov = self.data.select(
             *[
@@ -947,49 +949,50 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             columns=col_list,
         )
 
-        return result
+        if small_format:
+            return result
+        else:
+            return self.data.sparkSession.createDataFrame(result)
 
     def quantile(self, q: float = 0.5) -> float:      # Иван # done
-        return self.data.approxQuantile(self.data.columns[0], q=[q,], accuracy=1e-6)[0]
+        result = self.data.approxQuantile(self.data.columns[0], q=[q], accuracy=1e-6)[0]
+        if isinstance(q, list) and len(q) > 1:
+            return result
+        self.agg(func="quantile", q=q)
 
-    # returns float/small_data/big_data?
-    def coefficient_of_variation(self) -> Union[spark.DataFrame, float]:        # Иван # done
-        data = self.data.select(
+    def coefficient_of_variation(self, small_format=False) -> Union[spark.DataFrame, float]:        # Иван # done
+        result = self.data.select(
             F.var_samp(col).alias(col)
             for col in self.data.columns
-            .toPandas()
-        )
-        data.index = ["cv"]
-        if data.shape[0] == 1 and data.shape[1] == 1:
-            return float(data.loc[data.index[0], data.columns[0]])
-        return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+        ).toPandas()
+        result.index = ["cv"]
+        if result.shape[0] == 1 and result.shape[1] == 1:
+            return float(result.loc[result.index[0], result.columns[0]])
+        if not isinstance(result, pd.DataFrame):
+            result = pd.DataFrame(result)
+        if small_format:
+            return result
+        else:
+            return self.data.sparkSession.createDataFrame(result)
 
     def sort_index(self, ascending: bool = True, **kwargs) -> spark.DataFrame:      # Иван # TODO: to be moved to small data
         pass
 
+    def get_numeric_columns(self) -> list[str]:
+        return [
+            col
+            for col in self.data.columns
+            if isinstance(col, PysparkScalarType)
+        ]
+
     def corr(       # Иван # done
         self,
         numeric_only: bool = False,
+        small_format: bool = False,
     ) -> Union[spark.DataFrame, float]:
 
         if numeric_only:
-            from pyspark.sql.types import (
-                IntegerType, LongType, FloatType,
-                DoubleType, DecimalType, ShortType, ByteType
-            )
-
-            numeric_types = (
-                IntegerType, LongType,
-                FloatType, DoubleType,
-                DecimalType, ShortType, ByteType
-            )
-
-            # numeric columns
-            col_list = [
-                field.name
-                for field in self.data.schema.fields
-                if isinstance(field.dataType, numeric_types)
-            ]
+            col_list = self.get_numeric_columns()
         else:
             col_list = self.data.columns
 
@@ -1011,7 +1014,10 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             columns=col_list,
         )
 
-        return result
+        if small_format:
+            return result
+        else:
+            return self.data.sparkSession.createDataFrame(result)
 
     def isna(self) -> spark.DataFrame:      # Иван # done
         return self.data.select(

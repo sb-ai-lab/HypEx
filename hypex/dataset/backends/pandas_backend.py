@@ -19,7 +19,7 @@ class PandasNavigation(DatasetBackendNavigation):
         elif file_extension == ".xlsx":
             return pd.read_excel(filename)
         else:
-            raise ValueError(f"Unsupported file extension {file_extension}")
+            raise TypeError(f"Unsupported file extension {file_extension}")
 
     def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
         if isinstance(data, pd.DataFrame):
@@ -208,11 +208,12 @@ class PandasNavigation(DatasetBackendNavigation):
     def _get_column_index(
         self, column_name: Sequence[str] | str
     ) -> int | Sequence[int]:
-        return (
-            self.data.columns.get_loc(column_name)
-            if isinstance(column_name, str)
-            else self.data.columns.get_indexer(column_name)
-        )[0]
+        if isinstance(column_name, str):
+            return self.data.columns.get_loc(column_name)
+        elif isinstance(column_name, list):
+            return self.data.columns.get_indexer(column_name)
+        else:
+            raise ValueError("Wrong column_name type.")
 
     def get_column_type(
         self, column_name: Union[Iterable[str], str]
@@ -399,12 +400,15 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def coefficient_of_variation(self) -> pd.DataFrame | float:
         data = (self.data.std() / self.data.mean()).to_frame().T
         data.index = ["cv"]
-        if data.shape[0] == 1 and data.shape[1] == 1:
+        if data.shape == (1, 1):
             return float(data.loc[data.index[0], data.columns[0]])
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
     def sort_index(self, ascending: bool = True, **kwargs) -> pd.DataFrame:
         return self.data.sort_index(ascending=ascending, **kwargs)
+
+    def get_numeric_columns(self) -> list[str]:
+        return df.select_dtypes(include=ScalarType).columns.tolist()
 
     def corr(
         self,
