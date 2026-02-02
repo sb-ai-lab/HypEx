@@ -17,6 +17,7 @@ from typing import (
     Sized,
     Optional,
     Union,
+    Tuple,
 )
 
 import numpy as np
@@ -598,9 +599,24 @@ class SparkNavigation(DatasetBackendNavigation):
             )
 
     def append(  # Эрик
-        self, other, reset_index: bool = False, axis: int = 0
+        self, other, reset_index: bool = False, axis: int = 0 # other: Union["SparkDataset", List["SparkDataset"]]
     ) -> spark.DataFrame:
-        pass
+        other = Adapter.to_list(other)
+        if axis:
+            tmp = self.data
+            for table in other:
+                tmp = tmp.unionByName(table.data, allowMissingColumns=True)
+                return tmp
+        else:
+            tmp = self.data.withColumn("__index", monotonically_increasing_id())
+            for table in other:
+                add_cols = [F.col(col) for col in (set(table.columns) - set(tmp.columns))]
+                tmp = tmp.join((
+                                    table.data
+                                    .select(*add_cols)
+                                    .withColumn("__index", monotonically_increasing_id())
+                                ), on="__index", how="outer")
+            return tmp.drop('__index')
 
     def from_dict(
         self, data: FromDictTypes, index: Optional[Union[Iterable, Sized]] = None
@@ -1040,13 +1056,70 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     ) -> spark.DataFrame:
         pass
 
-    def fillna(  # Эрик
+    def fillna(     # Эрик
         self,
-        values: Optional[Union[ScalarType, dict[str, ScalarType]]] = None,
+        values: Optional[Union[ScalarType, Dict[str, ScalarType]]] = None,
         method: Optional[Literal["bfill", "ffill"]] = None,
         **kwargs,
     ) -> spark.DataFrame:
-        pass
+        if method is not None:
+            # if method == "bfill":
+            #     select_expr = []
+            #     prom_data = self.data
+            #     for column in self.data.columns:
+            #         prom_data = prom_data.withColumn(f"{column}_bfilled",
+            #                              (
+            #                                  F.first(F.col(column), ignorenulls=True)
+            #                                  .over(Window.rowsBetween(Window.currentRow, Window.unboundedFollowing))
+            #                              )
+            #                             )
+            #         select_expr.extend([
+            #             F.col(f"{column}_bfilled").alias(column)
+            #         ])
+            #     return prom_data.select(*select_expr)
+            # elif method == "ffill":
+            #     select_expr = []
+            #     prom_data = self.data
+            #     for column in self.data.columns:
+            #         prom_data = prom_data.withColumn(f"{column}_ffilled",
+            #                              (
+            #                                 F.last(F.col(column), ignorenulls=True)
+            #                                 .over(Window.rowsBetween(Window.unboundedPreceding, Window.currentRow))
+            #                               )
+            #                             )
+            #         select_expr.extend([
+            #             F.col(f"{column}_ffilled").alias(column)
+            #         ])
+            #     return prom_data.select(*select_expr)
+            prom_data = self.data
+            # cur_window = Window.partitionBy(monotonically_increasing_id())
+            cur_window = Window
+            # select_expr = []
+            for column in self.data.columns:
+                
+                if method == "bfill":
+                    prom_data = prom_data.withColumn(column,
+                                         (
+                                             F.first(F.col(column), ignorenulls=True)
+                                             .over(cur_window.rowsBetween(Window.currentRow, Window.unboundedFollowing))
+                                         )
+                                        )
+                elif method == "ffill":
+                    prom_data = prom_data.withColumn(column,
+                                         (
+                                             F.last(F.col(column), ignorenulls=True)
+                                             .over(cur_window.rowsBetween(Window.unboundedPreceding, Window.currentRow))
+                                         )
+                                        )
+                else:
+                    raise ValueError(f"Wrong fill method: {method}")
+            return prom_data
+        return (
+                    self.data
+                    .fillna(value=values, **kwargs)
+                    .fillna(value=f"{values}", **kwargs)
+                )
+
 
     def na_counts(self) -> Union[spark.DataFrame, int]:
         na_counts = self.data.select(
@@ -1232,24 +1305,50 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         return result.drop("_row_id").orderBy("_row_id")
 
-    def dropna(  # Эрик
+    def dropna(     # Эрик
         self,
         how: Literal["any", "all"] = "any",
         subset: Optional[Union[str, Iterable[str]]] = None,
         axis: Union[Literal["index", "rows", "columns"], int] = 0,
     ) -> spark.DataFrame:
-        pass
+        if axis in ["index", "rows"] or axis == 0:
+            return self.data.na.drop(how=how, subset=subset)
+        if subset is None:
+            subset = self.data.columns
+        # if isinstance(subset, str):
+        #     subset = [subset]
+        subset = Adapter.to_list(subset)
+        select_arr = [F.col(column) for column in self.data.columns if column not in subset]
+        
+        tmp = []
+        for col in subset:
+            condition = F.when(F.col(col).isNull(), 1)
+            tmp.extend([
+                F.count(condition).alias(col)
+            ])
+        mask = self.data.select(*tmp).collect()[0]
+        for col in subset:
+            if mask[col] == 0:
+                select_arr.extend([
+                    F.col(col)
+                ])
+        return self.data.select(*select_arr)
 
     def transpose(self, names: Optional[Sequence[str]] = None) -> spark.DataFrame:
         pass
 
-    def sample(  # Эрик
+    def sample(     # Эрик
         self,
-        frac: float | None = None,
-        n: int | None = None,
-        random_state: int | None = None,
+        frac: Optional[float] = None,
+        n: Optional[int] = None,
+        random_state: Optional[int] = None,
     ) -> spark.DataFrame:
-        pass
+        if frac:
+            return self.data.sample(fraction=frac, seed=random_state)
+        if n:
+            sample_list = self.data.rdd.takeSample(withReplacement=True, num=n, seed=random_state)
+            return self.session.createDataFrame(sample_list, self.data.schema)
+        raise 
 
     def select_dtypes(
         self,
@@ -1285,18 +1384,40 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             ]
         )
 
-    def merge(  # Эрик
+    def merge(      # Эрик
         self,
         right: "SparkDataset",
         on: Optional[str] = None,
         left_on: Optional[str] = None,
         right_on: Optional[str] = None,
-        left_index: Optional[bool] = None,
-        right_index: Optional[bool] = None,
-        suffixes: tuple[str, str] = ("_x", "_y"),
+        left_index: Optional[bool] = None, # TODO: нужны ли индексы? Вызывать Error при их использовании. Посмотреть использование флагов в аа-тесте
+        right_index: Optional[bool] = None, # TODO: нужны ли индексы? Вызывать Error при их использовании. Посмотреть использование флагов в аа-тесте
+        suffixes: Tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> spark.DataFrame:
-        pass
+        cross_columns = set(self.data.columns).intersection(set(right.data.columns))
+        prom_left, prom_right = self.data, right.data
+        if on and (on in self.data.columns and on in right.data.columns):
+            cross_columns = [i for i in cross_columns if i != on]
+            if cross_columns and suffixes[0]:
+                left_columns = [i + suffixes[0] for i in cross_columns]
+                prom_left = self.data.withColumnsRenamed(dict(zip(cross_columns, left_columns)))
+            if cross_columns and suffixes[1]:
+                right_columns = [i + suffixes[1] for i in cross_columns]
+                prom_right = right.data.withColumnsRenamed(dict(zip(cross_columns, right_columns)))
+            return prom_left.join(prom_right, on=on, how=how)
+        if left_on and right_on and (left_on in self.data.columns and right_on in right.data.columns):
+            if cross_columns and suffixes[0]:
+                cross_columns_left = [i for i in cross_columns if i != left_on]
+                left_columns = [i + suffixes[0] for i in cross_columns_left]
+                prom_left = self.data.withColumnsRenamed(dict(zip(cross_columns_left, left_columns)))
+            if cross_columns and suffixes[1]:
+                cross_columns_right = [i for i in cross_columns if i != left_on]
+                right_columns = [i + suffixes[1] for i in cross_columns_right]
+                prom_right = right.data.withColumnsRenamed(dict(zip(cross_columns_right, right_columns)))
+            return prom_left.join(prom_right, prom_left[left_on] == prom_right[right_on], how=how)
+        else:
+            raise MergeOnError()
 
     def drop(self, labels: Any = "", axis: int = 1) -> spark.DataFrame:
         labels = Adapter.to_list(labels)
@@ -1336,8 +1457,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         else:
             raise ValueError("Invalid axis value")
 
-    def rename(self, columns: dict[str, str]) -> spark.DataFrame:  # Эрик
-        pass
+    def rename(self, columns: Dict[str, str]) -> spark.DataFrame:       # Эрик
+        return self.data.withColumnsRenamed(columns)
 
     def replace(
         self, to_replace: Any = None, value: Any = None, regex: bool = False
