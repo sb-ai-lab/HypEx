@@ -1063,38 +1063,9 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         **kwargs,
     ) -> spark.DataFrame:
         if method is not None:
-            # if method == "bfill":
-            #     select_expr = []
-            #     prom_data = self.data
-            #     for column in self.data.columns:
-            #         prom_data = prom_data.withColumn(f"{column}_bfilled",
-            #                              (
-            #                                  F.first(F.col(column), ignorenulls=True)
-            #                                  .over(Window.rowsBetween(Window.currentRow, Window.unboundedFollowing))
-            #                              )
-            #                             )
-            #         select_expr.extend([
-            #             F.col(f"{column}_bfilled").alias(column)
-            #         ])
-            #     return prom_data.select(*select_expr)
-            # elif method == "ffill":
-            #     select_expr = []
-            #     prom_data = self.data
-            #     for column in self.data.columns:
-            #         prom_data = prom_data.withColumn(f"{column}_ffilled",
-            #                              (
-            #                                 F.last(F.col(column), ignorenulls=True)
-            #                                 .over(Window.rowsBetween(Window.unboundedPreceding, Window.currentRow))
-            #                               )
-            #                             )
-            #         select_expr.extend([
-            #             F.col(f"{column}_ffilled").alias(column)
-            #         ])
-            #     return prom_data.select(*select_expr)
             prom_data = self.data
             # cur_window = Window.partitionBy(monotonically_increasing_id())
             cur_window = Window
-            # select_expr = []
             for column in self.data.columns:
                 
                 if method == "bfill":
@@ -1395,6 +1366,9 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         suffixes: Tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> spark.DataFrame:
+        if right_index or left_index:
+            raise Exception("Not supported in spark")
+        
         cross_columns = set(self.data.columns).intersection(set(right.data.columns))
         prom_left, prom_right = self.data, right.data
         if on and (on in self.data.columns and on in right.data.columns):
