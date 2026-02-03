@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from ..analyzers.matching import MatchingAnalyzer
-from ..comparators import KSTest, TTest, Chi2Test
+from ..comparators import Chi2Test, KSTest, TTest
 from ..dataset import Dataset, ExperimentData
 from ..ml import FaissNearestNeighbors
 from ..reporters.abstract import DatasetReporter, DictReporter, TestDictReporter

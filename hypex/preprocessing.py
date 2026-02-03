@@ -2,11 +2,11 @@ from .encoders.encoders import DummyEncoder
 from .experiments.base import Experiment
 from .transformers.category_agg import CategoryAggregator
 from .transformers.filters import (
-                                   ConstFilter,
-                                   CorrFilter,
-                                   CVFilter,
-                                   NanFilter,
-                                   OutliersFilter,
+    ConstFilter,
+    CorrFilter,
+    CVFilter,
+    NanFilter,
+    OutliersFilter,
 )
 from .transformers.na_filler import NaFiller
 

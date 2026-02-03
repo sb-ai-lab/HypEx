@@ -76,7 +76,14 @@ class TestDictReporter(DictReporter):
         for key, value in data.items():
             if ID_SPLIT_SYMBOL in key:
                 key_split = key.split(ID_SPLIT_SYMBOL)
-                if key_split[2] in ("pass", "p-value", "difference", "difference %", "control mean", "test mean"):
+                if key_split[2] in (
+                    "pass",
+                    "p-value",
+                    "difference",
+                    "difference %",
+                    "control mean",
+                    "test mean",
+                ):
                     if key_split[0] not in dict_result:
                         dict_result[key_split[0]] = {
                             key_split[3]: {key_split[1]: {key_split[2]: value}}

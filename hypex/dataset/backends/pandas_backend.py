@@ -19,7 +19,7 @@ class PandasNavigation(DatasetBackendNavigation):
         elif file_extension == ".xlsx":
             return pd.read_excel(filename)
         else:
-            raise TypeError(f"Unsupported file extension {file_extension}")
+            raise ValueError(f"Unsupported file extension {file_extension}")
 
     def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
         if isinstance(data, pd.DataFrame):
@@ -244,7 +244,7 @@ class PandasNavigation(DatasetBackendNavigation):
         return None
 
     def astype(
-        self, dtype: Dict[str, type], errors: Literal["raise", "ignore"] = "raise"
+        self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> pd.DataFrame:
         return self.data.astype(dtype=dtype, errors=errors)
 
@@ -257,7 +257,7 @@ class PandasNavigation(DatasetBackendNavigation):
     def add_column(
         self,
         data: Sequence,
-        name: Union[str, list[str]] = None,
+        name: str | list[str],
         index: Sequence | None = None,
     ):
         if isinstance(name, list) and len(name) == 1:
@@ -326,6 +326,50 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
         super().__init__(data)
 
+    def get(
+        self,
+        key,
+        default=None,
+    ) -> Any:
+        return self.data.get(key, default)
+
+    def take(
+        self,
+        indices: int | list[int],
+        axis: Literal["index", "columns", "rows"] | int = 0,
+    ) -> Any:
+        return self.data.take(indices=indices, axis=axis)
+
+    def get_values(
+        self,
+        row: str | None = None,
+        column: str | None = None,
+    ) -> Any:
+        if (column is not None) and (row is not None):
+            return self.data.loc[row, column]
+        elif column is not None:
+            result = self.data.loc[:, column]
+        elif row is not None:
+            result = self.data.loc[row, :]
+        else:
+            result = self.data
+        return result.values.tolist()
+
+    def iget_values(
+        self,
+        row: int | None = None,
+        column: int | None = None,
+    ) -> Any:
+        if (column is not None) and (row is not None):
+            return self.data.iloc[row, column]
+        elif column is not None:
+            result = self.data.iloc[:, column]
+        elif row is not None:
+            result = self.data.iloc[row, :]
+        else:
+            result = self.data
+        return result.values.tolist()
+
     def apply(self, func: Callable, **kwargs) -> pd.DataFrame:
         single_column_name = kwargs.pop("column_name")
         result = self.data.apply(func, **kwargs)
@@ -392,7 +436,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def cov(self):
         return self.data.cov(ddof=1)
 
-    def quantile(self, q: float = 0.5) -> float:
+    def quantile(self, q: float = 0.5) -> pd.DataFrame | float:
         if isinstance(q, list) and len(q) > 1:
             return self.data.quantile(q=q)
         return self.agg(func="quantile", q=q)
@@ -546,8 +590,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             how=how,
         )
 
-    def drop(self, labels: str = "", axis: int = 1) -> pd.DataFrame:
-        return self.data.drop(labels=labels, axis=axis)
+    def drop(
+        self,
+        labels: str | None = None,
+        axis: int | None = None,
+        columns: str | Iterable[str] | None = None,
+    ) -> pd.DataFrame:
+        return self.data.drop(labels=labels, axis=axis, columns=columns)
 
     def filter(
         self,
@@ -578,7 +627,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def list_to_columns(self, column: str) -> pd.DataFrame:
         data = self.data
         n_cols = len(data.loc[0, column])
-        n_d = data[column].to_list()
 
         data_expanded = (
             pd.DataFrame(

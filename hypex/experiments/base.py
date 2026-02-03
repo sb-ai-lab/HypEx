@@ -3,14 +3,14 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Iterable, Sequence
 
-from ..dataset import ABCRole, ExperimentData, TempTargetRole
+from ..dataset import ABCRole, AdditionalTargetRole, ExperimentData, TempTargetRole
 from ..executor import Executor
 from ..utils import ExperimentDataEnum
 
 
 class Experiment(Executor):
     def _detect_transformer(self) -> bool:
-        return all(executor._is_transformer for executor in self.executors)
+        return any(executor._is_transformer for executor in self.executors)
 
     def get_executor_ids(
         self, searched_classes: type | Iterable[type] | None = None
@@ -78,8 +78,12 @@ class OnRoleExperiment(Experiment):
         super().__init__(executors, transformer, key)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        for field in data.ds.search_columns(self.role):
-            data.ds.tmp_roles = {field: TempTargetRole()}
+        for field in data.field_search(self.role):
+            if field in data.ds.columns:
+                data.ds.tmp_roles = {field: TempTargetRole()}
+            elif field in data.additional_fields.columns:
+                data.additional_fields.tmp_roles = {field: AdditionalTargetRole()}
             data = super().execute(data)
             data.ds.tmp_roles = {}
+            data.additional_fields.tmp_roles = {}
         return data

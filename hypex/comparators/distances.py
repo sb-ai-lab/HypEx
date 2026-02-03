@@ -7,12 +7,12 @@ import numpy as np
 
 from ..dataset import (
     ABCRole,
+    AdditionalFeatureRole,
     Dataset,
     ExperimentData,
     FeatureRole,
     GroupingRole,
     TargetRole,
-    AdditionalFeatureRole,
 )
 from ..executor import Calculator
 from ..extensions.scipy_linalg import CholeskyExtension, InverseExtension
