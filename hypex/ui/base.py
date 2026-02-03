@@ -289,7 +289,7 @@ class ExperimentOutput:
             )
             print(result.outputs)  # ['main', 'cupac']
         """
-        return ['main'] + list(self.additional_outputs.keys())
+        return ['main_output'] + list(self.additional_outputs.keys())
     
     def __getattr__(self, name: str):
         """Delegate attribute access to main_output first, then additional_outputs.
