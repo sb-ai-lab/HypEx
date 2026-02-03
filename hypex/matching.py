@@ -14,7 +14,7 @@ from .ml.faiss import FaissNearestNeighbors
 from .operators.operators import Bias, MatchingMetrics
 from .reporters.matching import MatchingDatasetReporter
 from .transformers import TypeCaster
-from .ui.base import ExperimentShell
+from .ui.base import ExperimentShell, ExperimentOutput
 from .ui.matching import MatchingOutput
 
 
@@ -216,6 +216,7 @@ class Matching(ExperimentShell):
         encode_categories: bool = True,
     ):
         metric = "ate"
+
         super().__init__(
             experiment=self._make_experiment(
                 group_match,
@@ -228,5 +229,7 @@ class Matching(ExperimentShell):
                 weights,
                 encode_categories,
             ),
-            output=MatchingOutput(GroupExperiment if group_match else MatchingAnalyzer),
+            output=ExperimentOutput(
+                main_output=MatchingOutput(GroupExperiment if group_match else MatchingAnalyzer)
+            ),
         )
