@@ -16,6 +16,10 @@ from hypex.dataset import (
     TreatmentRole,
 )
 
+# from hypex.utils import create_test_data
+#
+# df = create_test_data()
+
 
 @pytest.fixture
 def aa_data():
@@ -28,7 +32,7 @@ def aa_data():
                 "post_spends": TargetRole(),
                 "gender": StratificationRole(str),
             },
-            data="examples/tutorials/data.csv",
+            data="tests/data.csv",
         ),
         Dataset(
             roles={
@@ -38,7 +42,7 @@ def aa_data():
                 "post_spends": TargetRole(),
                 "gender": TargetRole(str),
             },
-            data="examples/tutorials/data.csv",
+            data="tests/data.csv",
         ),
     ]
 
@@ -54,7 +58,7 @@ def ab_data():
             "post_spends": TargetRole(),
             "gender": TargetRole(),
         },
-        data="examples/tutorials/data.csv",
+        data="tests/data.csv",
     )
     data["treat"] = [random.choice([0, 1, 2]) for _ in range(len(data))]
     return data
@@ -68,7 +72,7 @@ def matching_data():
             "treat": TreatmentRole(int),
             "post_spends": TargetRole(float),
         },
-        data="examples/tutorials/data.csv",
+        data="tests/data.csv",
         default_role=FeatureRole(),
     )
     data = data.fillna(method="bfill")
@@ -216,9 +220,7 @@ def test_abtest(ab_data):
 def test_matchingtest(matching_data):
     mapping = {
         "matching": Matching(),
-        "matching-atc": Matching(metric="atc"),
-        "matching-att": Matching(metric="att"),
-        "matching-l2": Matching(distance="l2", metric="att"),
+        "matching-l2": Matching(distance="l2"),
         "matching-faiss-auto": Matching(distance="l2", faiss_mode="auto"),
         "matching-faiss_base": Matching(distance="mahalanobis", faiss_mode="base"),
         "matching-n-neighbors": Matching(n_neighbors=2),

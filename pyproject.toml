@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "HypEx"
-version = "1.0.2"
+version = "1.0.3"
 description = "Fast and customizable framework for Causal Inference"
 authors = [
     "Dmitry Tikhomirov <dimasta00@gmail.com>",
@@ -9,7 +9,8 @@ authors = [
     "Anton Katkov <akatkov89@gmail.com>",
     "Ruslan Alsherov <ruslan-alsherov@yandex.ru>",
     "Ksenia Vasilieva <vasilievaxeniaa@gmail.com>",
-    "Anastasiia Fedorova <fedorovanasty24@gmail.com>"
+    "Anastasiia Fedorova <fedorovanasty24@gmail.com>",
+    "Daria Vigovskaya <dasha.vig@yandex.ru>"
 ]
 readme = "README.md"
 license = "Apache-2.0"
@@ -21,6 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
     "Development Status :: 4 - Beta",
@@ -32,7 +34,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.8, <3.13"
+python = ">=3.8, <3.14"
 tqdm = "*"
 scikit-learn = "*"
 
@@ -48,15 +50,20 @@ numpy = [
 
 scipy = [
     { version = ">=1.5.0, <=1.10.1", python = "<3.9" },
-    { version = ">=1.5.0, <=1.13.1", python = ">=3.9" }
+    { version = ">=1.5.0, <=1.13.1", python = ">=3.9, <3.13" },
+    { version = ">=1.14.1, <=1.16.0", python = ">=3.13" }
 ]
 
 matplotlib = [
     { version = ">=3.0.0, <=3.7.3", python = "<3.9" },
-    { version = ">=3.0.0, <=3.9.0", python = ">=3.9" }
+    { version = ">=3.0.0, <=3.9.0", python = ">=3.9, <3.13" },
+    { version = ">=3.10.0, <=3.11.0", python = ">=3.13" }
 ]
 
-faiss-cpu = ">=1.6.0, <=1.8.0"
+faiss-cpu = [
+    { version = ">=1.6.0, <=1.8.0", python = "<3.9" },
+    { version = ">=1.9.0,<=1.14.0", python = ">=3.9" }
+]
 seaborn = "<=0.13.2"
 statsmodels = "<=0.14.2"
 causalinference = "^0.1.3"

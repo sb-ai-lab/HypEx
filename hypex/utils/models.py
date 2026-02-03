@@ -1,4 +1,4 @@
-from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.linear_model import Lasso, LinearRegression, Ridge
 
 try:
     from catboost import CatBoostRegressor

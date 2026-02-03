@@ -21,12 +21,14 @@ class FaissExtension(MLExtension):
 
     @staticmethod
     def _prepare_indexes(index: np.ndarray, dist: np.ndarray, k: int):
-        new = [
-            np.concatenate(
-                [val[np.where(dist[i] == d)[0]] for d in sorted(set(dist[i]))[:k]]
-            )
-            for i, val in enumerate(index)
-        ]
+        new = np.vstack(
+            [
+                np.concatenate(
+                    [val[np.where(dist[i] == d)[0]] for d in sorted(set(dist[i]))[:k]]
+                )
+                for i, val in enumerate(index)
+            ]
+        )
         return new
 
     def _predict(self, data: Dataset, test_data: Dataset, X: np.ndarray) -> pd.Series:
@@ -43,7 +45,7 @@ class FaissExtension(MLExtension):
             ]
         else:
             indexes = self._prepare_indexes(indexes, dist, self.n_neighbors)
-        return pd.Series(indexes)
+        return self.result_to_dataset(result=indexes, roles={})
 
     def _calc_pandas(
         self,
@@ -56,6 +58,7 @@ class FaissExtension(MLExtension):
         X = data.data.values
         test = test_data.data.values
         if mode in ["auto", "fit"]:
+            self.index = faiss.IndexFlatL2(X.shape[1])
             if (
                 (
                     (len(X) > 1_000_000 and self.faiss_mode == "auto")
@@ -66,8 +69,6 @@ class FaissExtension(MLExtension):
             ):
                 self.index = faiss.IndexIVFFlat(self.index, X.shape[1], 1000)
                 self.index.train(X)
-            else:
-                self.index = faiss.IndexFlatL2(X.shape[1])
             self.index.add(X)
         if mode in ["auto", "predict"]:
             if test_data is None:

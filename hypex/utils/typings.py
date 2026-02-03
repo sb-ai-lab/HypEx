@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 StratificationRoleTypes = Union[float, str, datetime.datetime]
 DefaultRoleTypes = Union[float, bool, str, int]
 TargetRoleTypes = Union[float, int, bool]
+FeatureRoleTypes = Union[float, bool, str, int]
 CategoricalTypes = Union[str]
 ScalarType = Union[float, int, str, bool]
 PysparkScalarType = Union[
