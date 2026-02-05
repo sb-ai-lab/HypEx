@@ -437,6 +437,48 @@ class SparkNavigation(DatasetBackendNavigation):
     def _repr_html_(self):
         return self.data._repr_html_()
 
+    def get(
+        self,
+        key,
+        default=None,
+    ) -> Any:
+        key = Adapter.to_list(key)
+        # Case 1: key is a string (column name)
+        if isinstance(key[0], str):
+            columns = [k for k in key if k in self.columns]
+            if columns:
+                return self.data.select(*columns)
+            else:
+                return default
+
+        # Case 2: key is an integer (row index)
+        elif isinstance(key[0], int):
+            df_with_index = self.data.withColumn(
+                "__row_index__",
+                F.row_number().over(Window.orderBy(F.monotonically_increasing_id()))
+                - 1,
+            )
+            return df_with_index.filter(F.col("__row_index__") == key).drop("__row_index__")
+
+        # Case 3: key is a tuple (row_index, column_name)
+        elif isinstance(key[0], tuple) and len(key[0]) == 2:
+            row_idx, col_name = key[0]
+            return self.data.limit(row_idx + 1).tail(1)[0][col_name]
+
+        else:
+            return default
+
+    def take(
+        self,
+        indices: int | list[int],
+        axis: Literal["index", "columns", "rows"] | int = 0,
+    ) -> Any:
+        indices = Adapter.to_list(indices)
+        if axis == 1:
+            indices = [self.columns[index] for index in indices]
+        return self.get(indices)
+
+
     def get_values(
         self,
         row: Optional[str] = None,
