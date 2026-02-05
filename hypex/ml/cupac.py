@@ -1,21 +1,24 @@
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Union
 
-from ..dataset.dataset import Dataset, ExperimentData
+import numpy as np
+
+from ..dataset import Dataset, ExperimentData
+from ..dataset.ml_data import MLExperimentData
 from ..dataset.roles import (
     AdditionalTargetRole,
     FeatureRole,
     PreTargetRole,
     TargetRole,
 )
-from ..executor import MLExecutor
-from ..extensions.cupac import CupacExtension
+from ..executor import Executor
 from ..utils.adapter import Adapter
-from ..utils.models import CUPAC_MODELS
+from .models import MLModel
+from .stats import ModelStats
 
 
-class CUPACExecutor(MLExecutor):
+class CUPACExecutor(Executor):
     """
     Executor that applies CUPAC (Control Using Predictions As Covariates) variance reduction technique.
 
@@ -28,45 +31,47 @@ class CUPACExecutor(MLExecutor):
         key (Any): Unique identifier for the executor.
         n_folds (int): Number of folds for cross-validation during model selection.
         random_state (Optional[int]): Random seed for reproducibility.
+        cv_aggregation (str): Method for aggregating CV scores ('mean', 'median', 'max').
     """
 
     def __init__(
         self,
-        cupac_models: str | Sequence[str] | None = None,
+        cupac_models: Union[str, Sequence[str], None] = None,
         key: Any = "",
         n_folds: int = 5,
-        random_state: int | None = None,
+        random_state: Optional[int] = None,
+        cv_aggregation: str = "mean",
     ):
-        super().__init__(target_role=TargetRole(), key=key)
+        super().__init__(key=key)
         self.cupac_models = cupac_models
-        self.extension = CupacExtension(n_folds, random_state)
+        self.n_folds = n_folds
+        self.random_state = random_state
+        self.cv_aggregation = cv_aggregation
 
-    def _validate_models(self) -> None:
+    def _validate_models(self) -> List[str]:
         """
-        Validate that all specified CUPAC models are supported and available for the current backend.
+        Validate that all specified CUPAC models are supported.
+
+        Returns:
+            List of validated model names
 
         Raises:
-            ValueError: If any model is not recognized or not available for the current backend.
+            ValueError: If any model is not recognized.
         """
-        wrong_models = []
+        available_models = list(MLModel._MODEL_BACKENDS.keys())
+        
         if self.cupac_models is None:
-            self.cupac_models = list(CUPAC_MODELS.keys())
-            return
-
-        self.cupac_models = Adapter.to_list(self.cupac_models)
-
-        for model in self.cupac_models:
-            if model.lower() not in CUPAC_MODELS:
-                wrong_models.append(model)
-            elif CUPAC_MODELS[model] is None:
-                raise ValueError(
-                    f"Model '{model}' is not available for the current backend"
-                )
-
+            return available_models
+        
+        models = Adapter.to_list(self.cupac_models)
+        wrong_models = [m for m in models if m.lower() not in available_models]
+        
         if wrong_models:
             raise ValueError(
-                f"Wrong cupac models: {wrong_models}. Available models: {list(CUPAC_MODELS.keys())}"
+                f"Wrong cupac models: {wrong_models}. Available models: {available_models}"
             )
+        
+        return models
 
     @staticmethod
     def _prepare_data(data: ExperimentData) -> dict[str, dict[str, list]]:
@@ -197,51 +202,235 @@ class CUPACExecutor(MLExecutor):
 
         return cupac_data
 
-    @classmethod
-    def _execute_inner_function(cls) -> None:
-        pass
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        """
+        Execute CUPAC variance reduction on the experiment data.
 
-    @classmethod
-    def _inner_function(cls) -> None:
-        pass
+        Process:
+        1. Validate models and prepare temporal data structures
+        2. For each target:
+            a. Try all specified models with cross-validation
+            b. Select the model with best variance reduction
+            c. Fit the best model on all training data
+            d. Predict and adjust current target values (if applicable)
+            e. Calculate variance reduction metrics
+        3. Store adjusted targets and metrics in ExperimentData
 
-    def calc(
-        self, mode: str, model: str | Any, X: Dataset, Y: Dataset | None = None
-    ) -> Any:
-        if mode == "kfold_fit":
-            return self.kfold_fit(model, X, Y)
-        elif mode == "fit":
-            return self.fit(model, X, Y)
-        elif mode == "predict":
-            return self.predict(model, X)
+        Args:
+            data (ExperimentData): Input data with temporal features and targets.
 
-    def kfold_fit(
-        self, model: str, X: Dataset, Y: Dataset
-    ) -> tuple[float, dict[str, float]]:
-        """Run k-fold cross-validation and return variance reduction and feature importances."""
-        var_red, feature_importances = self.extension.calc(
-            data=X,
-            mode="kfold_fit",
-            model=model,
-            Y=Y,
+        Returns:
+            ExperimentData: Data with CUPAC-adjusted targets and variance reduction reports.
+        """
+        # Ensure MLExperimentData
+        is_ml_data = isinstance(data, MLExperimentData)
+        ml_data = (
+            data if is_ml_data else MLExperimentData.from_experiment_data(data)
         )
-
-        return var_red, feature_importances
-
-    def fit(self, model: str, X: Dataset, Y: Dataset) -> Any:
-        return self.extension.calc(
-            data=X,
-            mode="fit",
-            model=model,
-            Y=Y,
+        
+        # Validate models
+        models = self._validate_models()
+        
+        # Prepare CUPAC data structures
+        cupac_data = self._prepare_data(ml_data)
+        
+        # Process each target
+        for target, target_data in cupac_data.items():
+            self._process_target(ml_data, target, target_data, models)
+        
+        # Return appropriate type
+        return ml_data if is_ml_data else ml_data.to_experiment_data()
+    
+    def _process_target(
+        self,
+        data: MLExperimentData,
+        target: str,
+        target_data: Dict,
+        models: List[str],
+    ) -> None:
+        """Process single target with model selection and adjustment"""
+        
+        # Check if we should load pre-trained model
+        load_models_dir = data.ml.get("config", {}).get("load_models_dir")
+        
+        if load_models_dir:
+            # Load pre-trained model instead of training
+            self._load_and_apply_model(data, target, target_data, load_models_dir)
+            return
+        
+        # Original training flow
+        # Extract feature names
+        X_train_feature_names = [column[0] for column in target_data["X_train"]]
+        
+        # Prepare training data
+        X_train = self._agg_data_from_cupac_data(data, target_data["X_train"])
+        Y_train = self._agg_data_from_cupac_data(data, [target_data["Y_train"]])
+        
+        # Model selection via CV
+        best_model = None
+        best_stats = None
+        best_score = -float("inf")
+        
+        for model_name in models:
+            # Create model
+            model = MLModel.create(model_name)
+            
+            # Cross-validate (возвращает ModelStats)
+            stats = model.cross_validate(
+                X_train,
+                Y_train,
+                n_folds=self.n_folds,
+                random_state=self.random_state,
+                aggregation=self.cv_aggregation,
+            )
+            
+            # Select best by variance reduction
+            if stats.variance_reduction_cv > best_score:
+                best_score = stats.variance_reduction_cv
+                best_model = model
+                best_stats = stats
+        
+        if best_model is None:
+            raise RuntimeError(
+                f"No models were successfully fitted for target '{target}'. "
+                "All models failed during training."
+            )
+        
+        # Fit best model on all data
+        best_model.fit(X_train, Y_train)
+        
+        # Map feature importances to original names
+        mapped_importances = {
+            X_train_feature_names[int(col_idx)]: importance
+            for col_idx, importance in best_stats.feature_importances.items()
+        }
+        best_stats.feature_importances = mapped_importances
+        
+        # Apply CUPAC adjustment if target is real
+        if "X_predict" in target_data:
+            var_red_real = self._apply_cupac_adjustment(
+                data, best_model, target, target_data
+            )
+            # Update stats with real variance reduction
+            best_stats.variance_reduction_real = var_red_real
+        
+        # Store model and stats using executor ID
+        data.add_trained_model(self.id, target, best_model, best_stats)
+        
+        # Also store in old format for compatibility
+        report = {
+            "cupac_best_model": best_stats.model_name,
+            "cupac_variance_reduction_cv": best_stats.variance_reduction_cv,
+            "cupac_variance_reduction_real": best_stats.variance_reduction_real,
+            "cupac_feature_importances": best_stats.feature_importances,
+        }
+        data.analysis_tables[f"{target}_cupac_report"] = report
+    
+    def _apply_cupac_adjustment(
+        self,
+        data: MLExperimentData,
+        model: MLModel,
+        target: str,
+        target_data: Dict,
+    ) -> float:
+        """Apply CUPAC adjustment to current period"""
+        X_predict = self._agg_data_from_cupac_data(data, target_data["X_predict"])
+        
+        # Predict
+        prediction = model.predict(X_predict)
+        prediction_mean = prediction.mean()
+        
+        # Adjust target
+        target_values = data.ds[target].backend.data.values.ravel()
+        adjusted_values = target_values - prediction + prediction_mean
+        
+        # Create adjusted dataset
+        import pandas as pd
+        
+        target_cupac_df = pd.DataFrame(
+            {f"{target}_cupac": adjusted_values}, index=data.ds.index
         )
-
-    def predict(self, model: Any, X: Dataset) -> Dataset:
-        return self.extension.calc(
-            data=X,
-            mode="predict",
-            model=model,
+        target_cupac = Dataset(
+            data=target_cupac_df, roles={f"{target}_cupac": AdditionalTargetRole()}
         )
+        
+        # Add to additional_fields
+        data.additional_fields = data.additional_fields.add_column(data=target_cupac)
+        
+        # Calculate variance reduction
+        var_red = model._calculate_variance_reduction(target_values, adjusted_values)
+        return var_red
+    
+    def _load_and_apply_model(
+        self,
+        data: MLExperimentData,
+        target: str,
+        target_data: TargetData,
+        load_models_dir: str,
+    ) -> None:
+        """Load pre-trained model and apply CUPAC adjustment"""
+        import os
+        from .models import MLModel
+        from .stats import ModelStats
+        
+        # Find CUPAC executor directory (starts with "CUPACExecutor")
+        executor_dirs = [d for d in os.listdir(load_models_dir) 
+                        if os.path.isdir(os.path.join(load_models_dir, d)) 
+                        and d.startswith("CUPACExecutor")]
+        
+        if not executor_dirs:
+            raise FileNotFoundError(
+                f"No CUPACExecutor directories found in {load_models_dir}. "
+                f"Make sure you saved models with save_cupac_models=True."
+            )
+        
+        # Use the first (and should be only) CUPAC executor directory
+        executor_dir = executor_dirs[0]
+        model_path = os.path.join(load_models_dir, executor_dir, target)
+        
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(
+                f"Pre-trained model for target '{target}' not found at: {model_path}. "
+                f"Available targets: {os.listdir(os.path.join(load_models_dir, executor_dir))}"
+            )
+        
+        # Load model
+        model = MLModel.load(model_path)
+        
+        # Load stats (stored as JSON)
+        stats_path = os.path.join(model_path, "stats.json")
+        if os.path.exists(stats_path):
+            import json
+            with open(stats_path, 'r') as f:
+                stats_dict = json.load(f)
+            stats = ModelStats.from_dict(stats_dict)
+        else:
+            # Create minimal stats if not found
+            stats = ModelStats(
+                model_name=model._backend.__class__.__name__,
+                model_type=model._backend.__class__.__name__.replace("Backend", "").lower(),
+                feature_importances={},
+                training_time_seconds=0.0,
+            )
+        
+        # Apply CUPAC adjustment if target is real (has current period data)
+        if "X_predict" in target_data:
+            var_red_real = self._apply_cupac_adjustment(
+                data, model, target, target_data
+            )
+            stats.variance_reduction_real = var_red_real
+        
+        # Store model and stats
+        data.add_trained_model(self.id, target, model, stats)
+        
+        # Store report for compatibility
+        report = {
+            "cupac_best_model": stats.model_name,
+            "cupac_variance_reduction_cv": stats.variance_reduction_cv,
+            "cupac_variance_reduction_real": stats.variance_reduction_real,
+            "cupac_feature_importances": stats.feature_importances,
+        }
+        data.analysis_tables[f"{target}_cupac_report"] = report
 
     @staticmethod
     def _agg_data_from_cupac_data(
@@ -297,90 +486,3 @@ class CUPACExecutor(MLExecutor):
                 res_dataset = res_dataset.add_column(data=col_data)
         return res_dataset
 
-    def execute(self, data: ExperimentData) -> ExperimentData:
-        """
-        Execute CUPAC variance reduction on the experiment data.
-
-        Process:
-        1. Validate models and prepare temporal data structures
-        2. For each target:
-            a. Try all specified models with cross-validation
-            b. Select the model with best variance reduction
-            c. Fit the best model on all training data
-            d. Predict and adjust current target values (if applicable)
-            e. Calculate variance reduction metrics
-        3. Store adjusted targets and metrics in ExperimentData
-
-        Args:
-            data (ExperimentData): Input data with temporal features and targets.
-
-        Returns:
-            ExperimentData: Data with CUPAC-adjusted targets and variance reduction reports.
-        """
-        self._validate_models()
-        cupac_data = self._prepare_data(data)
-        for target, target_data in cupac_data.items():
-            # Extract feature names once before data aggregation
-            X_train_feature_names = [column[0] for column in target_data["X_train"]]
-
-            X_train = self._agg_data_from_cupac_data(data, target_data["X_train"])
-            Y_train = self._agg_data_from_cupac_data(data, [target_data["Y_train"]])
-            best_model, best_var_red, best_feature_importances = None, None, None
-
-            # Model selection via cross-validation
-            # Feature importances are extracted during CV for efficiency
-            for model in self.cupac_models:
-                var_red, fold_importances = self.calc(
-                    mode="kfold_fit", model=model, X=X_train, Y=Y_train
-                )
-                if best_var_red is None or var_red > best_var_red:
-                    best_model, best_var_red = model, var_red
-                    # Map standardized column names to original feature names
-                    best_feature_importances = {
-                        X_train_feature_names[int(col_idx)]: importance
-                        for col_idx, importance in fold_importances.items()
-                    }
-
-            if best_model is None:
-                raise RuntimeError(
-                    f"No models were successfully fitted for target '{target}'. All models failed during training."
-                )
-
-            cupac_variance_reduction_real = None
-
-            # Apply CUPAC adjustment to current period (if target is real, not virtual)
-            # We need to fit the model on all data for prediction, but importances are already from CV
-            if "X_predict" in target_data:
-                fitted_model = self.calc(
-                    mode="fit", model=best_model, X=X_train, Y=Y_train
-                )
-
-                X_predict = self._agg_data_from_cupac_data(
-                    data, target_data["X_predict"]
-                )
-
-                prediction = self.calc(mode="predict", model=fitted_model, X=X_predict)
-
-                # Adjust target by removing explained variation
-                explained_variation = prediction - prediction.mean()
-                target_cupac = data.ds[target] - explained_variation
-
-                target_cupac = target_cupac.rename({target: f"{target}_cupac"})
-                data.additional_fields = data.additional_fields.add_column(
-                    data=target_cupac, role={f"{target}_cupac": AdditionalTargetRole()}
-                )
-                cupac_variance_reduction_real = (
-                    self.extension._calculate_variance_reduction(
-                        data.ds[target], target_cupac
-                    )
-                )
-
-            report = {
-                "cupac_best_model": best_model,
-                "cupac_variance_reduction_cv": best_var_red,
-                "cupac_variance_reduction_real": cupac_variance_reduction_real,
-                "cupac_feature_importances": best_feature_importances,
-            }
-            data.analysis_tables[f"{target}_cupac_report"] = report
-
-        return data

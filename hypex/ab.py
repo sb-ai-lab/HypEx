@@ -55,6 +55,8 @@ class ABTest(ExperimentShell):
         cuped_features: dict[str, str] | None,
         cupac_models: str | list[str] | None,
         enable_cupac: bool,
+        save_cupac_models: bool,
+        load_cupac_models: str | None,
     ) -> Experiment:
         test_mapping: dict[str, Executor] = {
             "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
@@ -118,8 +120,16 @@ class ABTest(ExperimentShell):
 
         if enable_cupac:
             from .ml import CUPACExecutor
+            from .experiments.ml import MLExperiment
 
-            executors.insert(0, CUPACExecutor(cupac_models=cupac_models))
+            cupac_executor = CUPACExecutor(cupac_models=cupac_models)
+            ml_experiment = MLExperiment(
+                executors=[cupac_executor],
+                save_models=save_cupac_models,
+                load_models_dir=load_cupac_models,
+                cleanup_after=True,
+            )
+            executors.insert(0, ml_experiment)
 
         return Experiment(executors=executors)
 
@@ -148,6 +158,8 @@ class ABTest(ExperimentShell):
         cuped_features: dict[str, str] | None = None,
         cupac_models: str | list[str] | None = None,
         enable_cupac: bool = False,
+        save_cupac_models: bool = False,
+        load_cupac_models: str | None = None,
     ):
         """
         Args:
@@ -157,6 +169,8 @@ class ABTest(ExperimentShell):
             cuped_features: dict[str, str] — Dictionary {target_feature: pre_target_feature} for CUPED. Only dict is allowed.
             cupac_models: str | list[str] — model name (e.g. 'linear', 'ridge', 'lasso', 'catboost') or list of model names to try. If None, all available models will be tried and the best will be selected by variance reduction.
             enable_cupac: bool — Enable CUPAC variance reduction. CUPAC configuration is extracted from dataset.features_mapping.
+            save_cupac_models: bool — Save trained CUPAC models to disk for later use (default: False).
+            load_cupac_models: str | None — Directory path to load pre-trained CUPAC models from. If provided, models will be loaded instead of trained (default: None).
         """
         super().__init__(
             experiment=self._make_experiment(
@@ -165,6 +179,8 @@ class ABTest(ExperimentShell):
                 cuped_features,
                 cupac_models,
                 enable_cupac,
+                save_cupac_models,
+                load_cupac_models,
             ),
             output=ABOutput(),
         )
