@@ -12,7 +12,7 @@ from typing import (
 )
 from pyspark.sql.types import (
     IntegerType, LongType, FloatType,
-    DoubleType, DecimalType, ShortType, ByteType
+    DoubleType, DecimalType, ShortType, ByteType, StringType
 )
 
 import pandas as pd
@@ -49,3 +49,17 @@ DecoratedType = TypeVar("DecoratedType", bound=Union[Callable[..., Any], propert
 DocstringInheritDecorator = Callable[[DecoratedType], DecoratedType]
 
 SetParamsDictTypes = Union[Dict[str, Any], Dict[type, Dict[str, Any]]]
+
+class SparkTypeMapper:
+    @staticmethod
+    def types(value):
+        if value is None:
+            return StringType()
+        elif isinstance(value, str):
+            return StringType()
+        elif isinstance(value, int):
+            return LongType()
+        elif isinstance(value, float):
+            return DoubleType()
+        else:
+            return StringType()

@@ -35,7 +35,7 @@ from .roles import (
 
 class DatasetBase(ABC):
     @staticmethod
-    def _select_backend_from_data(data, session=None):
+    def _select_backend_from_data(data, session: spark.SparkSession = None):
         if isinstance(data, pd.DataFrame):
             return PandasDataset(data)
         elif isinstance(data, spark.DataFrame):
@@ -81,15 +81,23 @@ class DatasetBase(ABC):
         default_role: ABCRole | None = None,
         session: Optional[spark.SparkSession] = None,
     ):
-        self._backend = (
-            self._select_backend_from_data(data, session)
-            if any(
-                isinstance(data, source_data_type)
-                for source_data_type in SourceDataTypes.__args__
-            )
-            or isinstance(data, self.__class__)
-            else self._select_backend_from_str(data, backend, session)
-        )
+        if backend is not None:
+            self._backend = self._select_backend_from_str(data, backend, session)
+        elif any(
+            isinstance(data, source_data_type)
+            for source_data_type in [
+                *SourceDataTypes.__args__,
+                PandasDataset,
+                SparkDataset,
+                self.__class__,
+            ]
+        ):
+            self._backend = self._select_backend_from_data(data, session)
+        else:
+            if session is not None:
+                self._backend = SparkDataset(data, session)
+            self._backend = PandasDataset(data)
+
         self.default_role = default_role
         if roles is None and data.hasattr("roles") and data.roles is not None:
             roles = data.roles
@@ -167,7 +175,9 @@ class DatasetBase(ABC):
                 raise TypeError("Value type does not match the expected data type.")
 
     @classmethod
-    def create_empty(cls, roles=None, index=None, backend=BackendsEnum.pandas) -> DatasetBase:
+    def create_empty(
+        cls, roles=None, index=None, backend=BackendsEnum.pandas
+    ) -> DatasetBase:
         if roles is None:
             roles = {}
         index = [] if index is None else index
@@ -195,7 +205,9 @@ class DatasetBase(ABC):
         key,
         default=None,
     ) -> DatasetBase:
-        return self.__class__(data=self._backend.get(key, default), roles=deepcopy(self.roles))
+        return self.__class__(
+            data=self._backend.get(key, default), roles=deepcopy(self.roles)
+        )
 
     def take(
         self,
@@ -212,7 +224,8 @@ class DatasetBase(ABC):
 
     def __binary_magic_operator(self, other, func_name: str) -> Any:
         if not any(
-            isinstance(other, t) for t in [self.__class__, str, int, float, bool, Sequence]
+            isinstance(other, t)
+            for t in [self.__class__, str, int, float, bool, Sequence]
         ):
             raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
@@ -361,14 +374,16 @@ class DatasetBase(ABC):
         tmp_role: bool = False,
         auto_roles_types: bool = False,
     ):
-        new_roles_map = self._parse_roles({
-            role: (
-                self.search_columns(column, tmp_role)
-                if isinstance(column, ABCRole)
-                else column
-            )
-            for column, role in new_roles_map.items()
-        })
+        new_roles_map = self._parse_roles(
+            {
+                role: (
+                    self.search_columns(column, tmp_role)
+                    if isinstance(column, ABCRole)
+                    else column
+                )
+                for column, role in new_roles_map.items()
+            }
+        )
 
         new_roles = {
             column: new_roles_map[column] if column in new_roles_map else role
@@ -384,9 +399,9 @@ class DatasetBase(ABC):
 
         return self
 
-    # @property
-    # def index(self):
-    #     return self._backend.index
+    @property
+    def index(self):
+        return self._backend.index
 
     @property
     def data(self):
@@ -408,7 +423,6 @@ class DatasetBase(ABC):
     def roles(self, value):
         self._set_roles(new_roles_map=value, temp_role=False)
 
-
     @property
     def shape(self):
         return self._backend.shape
@@ -427,10 +441,12 @@ class DatasetBase(ABC):
         self._set_empty_types(self._tmp_roles)
 
     def _convert_data_after_agg(self, result) -> DatasetBase | float:
-        if isinstance(result, float):
+        if isinstance(result, ScalarType):
             return result
         role: ABCRole = StatisticRole()
-        return self.__class__(data=result, roles={column: role for column in result.columns})
+        return self.__class__(
+            data=result, roles={column: role for column in result.columns}
+        )
 
     def add_column(
         self,
@@ -497,9 +513,7 @@ class DatasetBase(ABC):
             self._check_other_dataset(o)
             new_roles.update(o.roles)
 
-        return self.__class__(
-            roles=new_roles, data=self.backend.append(other, axis)
-        )
+        return self.__class__(roles=new_roles, data=self.backend.append(other, axis))
 
     def apply(
         self,
@@ -513,11 +527,12 @@ class DatasetBase(ABC):
         tmp_data = self._backend.apply(
             func=func, axis=axis, column_name=next(iter(role.keys())), **kwargs
         )
-        tmp_roles = (
-            {next(iter(role.keys())): next(iter(role.values()))}
-            if ((not tmp_data.any().any()) and len(role) > 1)
-            else role
-        )
+        # tmp_roles = (
+        #     {next(iter(role.keys())): next(iter(role.values()))}
+        #     if ((Dataset({}, tmp_data).is_empty()) and len(role) > 1)
+        #     else role
+        # )
+        tmp_roles = deepcopy(role)
         return self.__class__(
             data=tmp_data,
             roles=tmp_roles,
@@ -554,7 +569,12 @@ class DatasetBase(ABC):
     ) -> list[tuple[str, DatasetBase]]:
         if isinstance(by, self.__class__) and len(by.columns) == 1:
             datasets = [
-                (group, self.__class__(roles=self.roles, data=self.data.loc[group_data.index]))
+                (
+                    group,
+                    self.__class__(
+                        roles=self.roles, data=self.data.loc[group_data.index]
+                    ),
+                )
                 for group, group_data in by._backend.groupby(by=by.columns[0], **kwargs)
             ]
         else:
@@ -607,7 +627,9 @@ class DatasetBase(ABC):
 
     def mode(self, numeric_only: bool = False, dropna: bool = True):
         t_data = self._backend.mode(numeric_only=numeric_only, dropna=dropna)
-        return self.__class__(data=t_data, roles={role: InfoRole() for role in t_data.columns})
+        return self.__class__(
+            data=t_data, roles={role: InfoRole() for role in t_data.columns}
+        )
 
     def var(self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False):
         return self._convert_data_after_agg(
@@ -683,16 +705,17 @@ class DatasetBase(ABC):
         axis: int | None = None,
         columns: str | Iterable[str] | None = None,
     ):
-        raise NotImplemented("The method 'drop' is not implemented for this type of Dataset")
+        raise NotImplemented(
+            "The method 'drop' is not implemented for this type of Dataset"
+        )
 
     def filter(
         self,
         items: list | None = None,
-        like: str | None = None,
         regex: str | None = None,
         axis: int | None = None,
     ) -> DatasetBase:
-        t_data = self._backend.filter(items=items, like=like, regex=regex, axis=axis)
+        t_data = self._backend.filter(items=items, regex=regex, axis=axis)
         t_roles = {c: self.roles[c] for c in t_data.columns if c in self.roles.keys()}
         return self.__class__(roles=t_roles, data=t_data)
 

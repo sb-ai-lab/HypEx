@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Unio
 
 import numpy as np
 import pandas as pd  # type: ignore
+import pyspark.sql as spark
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
@@ -26,6 +27,8 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data = data
         elif isinstance(data, pd.Series):
             self.data = pd.DataFrame(data)
+        elif isinstance(data, spark.DataFrame):
+            self.data = data.toPandas()
         elif isinstance(data, dict):
             if "index" in data.keys():
                 self.data = pd.DataFrame(data=data["data"], index=data["index"])
@@ -324,7 +327,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def _convert_agg_result(result):
         if isinstance(result, pd.Series):
             result = result.to_frame()
-        if result.shape[0] == 1 and result.shape[1] == 1:
+        if result.shape == (1, 1):
             return float(result.loc[result.index[0], result.columns[0]])
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
