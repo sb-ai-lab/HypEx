@@ -114,10 +114,10 @@ class DatasetBase(ABC):
         ) = {}
 
     def __repr__(self):
-        return self.data.__repr__()
+        return self._backend.__repr__()
 
     def _repr_html_(self):
-        return self.data._repr_html_()
+        return self._backend._repr_html_()
 
     def __len__(self):
         return self._backend.__len__()
@@ -416,6 +416,10 @@ class DatasetBase(ABC):
     @property
     def tmp_roles(self):
         return self._tmp_roles
+
+    @property
+    def session(self):
+        return self._backend.session
 
     @tmp_roles.setter
     def tmp_roles(self, value):
