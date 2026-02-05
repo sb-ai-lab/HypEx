@@ -121,10 +121,12 @@ class ABTest(ExperimentShell):
         if enable_cupac:
             from .ml import CUPACExecutor
             from .experiments.ml import MLExperiment
+            from .splitters import CUPACDataSplitter
 
-            cupac_executor = CUPACExecutor(cupac_models=cupac_models)
             ml_experiment = MLExperiment(
-                executors=[cupac_executor],
+                splitters=[CUPACDataSplitter()],
+                transformers=[],
+                ml_executors=[CUPACExecutor(cupac_models=cupac_models)],
                 save_models=save_cupac_models,
                 load_models_dir=load_cupac_models,
                 cleanup_after=True,

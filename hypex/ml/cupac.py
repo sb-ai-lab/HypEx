@@ -73,141 +73,12 @@ class CUPACExecutor(Executor):
         
         return models
 
-    @staticmethod
-    def _prepare_data(data: ExperimentData) -> dict[str, dict[str, list]]:
-        """
-        Prepare data for CUPAC by organizing temporal fields into training and prediction structures.
-
-        This method performs complex data organization:
-        1. Groups target and feature fields by their temporal lags
-        2. Identifies cofounders (features used for prediction)
-        3. Structures data into X_train, Y_train for model training
-        4. Creates X_predict for current period adjustment (if applicable)
-
-        Args:
-            data (ExperimentData): Input experiment data with temporal roles.
-
-        Returns:
-            dict: Nested dictionary with structure:
-                {target_name: {
-                    'X_train': [[feature_cols_at_lag_n], ..., [feature_cols_at_lag_2]],
-                    'Y_train': [target_at_lag_n-1, ..., target_at_lag_1],
-                    'X_predict': [[feature_cols_at_lag_1]] (optional, only for real targets)
-                }}
-        """
-
-        def agg_temporal_fields(role, data) -> dict[str, dict]:
-            """
-            Aggregate fields by their temporal lags.
-
-            Returns:
-                dict: {field_name: {lag: field_name_with_lag}} or {field_name: {}}
-                      Empty dict means lag=0 or None (current period).
-            """
-            fields = {}
-            searched_fields = data.field_search(
-                (
-                    [TargetRole(), PreTargetRole()]
-                    if isinstance(role, TargetRole)
-                    else role
-                ),
-                search_types=[int, float],
-            )
-
-            searched_lags = [
-                (
-                    field,
-                    (
-                        data.ds.roles[field].lag
-                        if not isinstance(data.ds.roles[field], TargetRole)
-                        else 0
-                    ),
-                )
-                for field in searched_fields
-            ]
-            sorted_fields_by_lag = sorted(searched_lags, key=lambda x: x[1])
-            for field, lag in sorted_fields_by_lag:
-                if lag in [None, 0]:
-                    fields[field] = {}
-                else:
-                    if data.ds.roles[field].parent not in fields:
-                        fields[data.ds.roles[field].parent] = {}
-                    fields[data.ds.roles[field].parent][lag] = field
-
-            return fields
-
-        def agg_train_predict_x(mode: str, lag: int) -> None:
-            """
-            Aggregate features and targets for a specific lag into training/prediction sets.
-
-            For each cofounder feature, creates a list structure where:
-            - First and last lags start new sublists
-            - Intermediate lags append to existing sublists
-            This groups temporal sequences of the same feature together.
-            """
-            for i, cofounder in enumerate(cofounders[target]):
-                if lag in [1, max_lags[target]]:
-                    cupac_data[target][mode].append([features[cofounder][lag]])
-                else:
-                    cupac_data[target][mode][i].append(cofounder)
-
-            cupac_data[target][mode].append([targets[target][lag]])
-
-        cupac_data = {}
-        targets = agg_temporal_fields(TargetRole(), data)
-        features = agg_temporal_fields(FeatureRole(), data)
-
-        # Determine cofounders (features used for prediction) for each target
-        cofounders = {}
-        for target in targets:
-            if target in data.ds.columns:
-                cofounders[target] = data.ds.roles[target].cofounders
-            else:
-                # For virtual targets, get cofounders from the earliest lag
-                min_lag = min(targets[target].keys())
-                cofounders[target] = data.ds.roles[targets[target][min_lag]].cofounders
-
-                if cofounders[target] is None:
-                    raise ValueError(
-                        f"Cofounders must be defined in the first lag for virtual target '{target}'"
-                    )
-
-        # Calculate maximum lag for each target (max across target lags and cofounder feature lags)
-        max_lags = {}
-        for target, lags in targets.items():
-            if lags:
-                max_lag = max(lags.keys())
-                for feature in cofounders[target]:
-                    if features.get(feature):
-                        max_lag = max(max(features[feature].keys()), max_lag)
-            max_lags[target] = max_lag
-
-        # Build training and prediction structures for each target
-        for target in targets.keys():
-
-            cupac_data[target] = {"X_train": [], "Y_train": []}
-            # Only real targets (not virtual) need prediction
-            if target in data.ds.columns:
-                cupac_data[target]["X_predict"] = []
-
-            # Build training data: iterate from max_lag down to 2
-            # Each iteration creates X_train entry for lag and Y_train entry for lag-1
-            for lag in range(max_lags[target], 1, -1):
-                agg_train_predict_x("X_train", lag)
-                cupac_data[target]["Y_train"].append(targets[target][lag - 1])
-
-            # Build prediction data for current period (lag=1) if applicable
-            if "X_predict" in cupac_data[target].keys():
-                agg_train_predict_x("X_predict", 1)
-
-        return cupac_data
-
     def execute(self, data: ExperimentData) -> ExperimentData:
         """
         Execute CUPAC variance reduction on the experiment data.
 
         Process:
-        1. Validate models and prepare temporal data structures
+        1. Validate models and read prepared data from splitter
         2. For each target:
             a. Try all specified models with cross-validation
             b. Select the model with best variance reduction
@@ -217,7 +88,7 @@ class CUPACExecutor(Executor):
         3. Store adjusted targets and metrics in ExperimentData
 
         Args:
-            data (ExperimentData): Input data with temporal features and targets.
+            data (ExperimentData): Input data with splits from CUPACDataSplitter.
 
         Returns:
             ExperimentData: Data with CUPAC-adjusted targets and variance reduction reports.
@@ -231,8 +102,8 @@ class CUPACExecutor(Executor):
         # Validate models
         models = self._validate_models()
         
-        # Prepare CUPAC data structures
-        cupac_data = self._prepare_data(ml_data)
+        # Read prepared data from splitter (stored in ml["splits"])
+        cupac_data = ml_data.ml.get("splits")
         
         # Process each target
         for target, target_data in cupac_data.items():

@@ -14,17 +14,35 @@ class MLExperiment(Experiment):
     Experiment specialized for ML workflows with automatic data transformation.
     
     Transforms ExperimentData → MLExperimentData at start,
-    executes ML executors, then transforms back → ExperimentData.
+    executes splitters → transformers → ml_executors in sequence,
+    then transforms back → ExperimentData.
+    
+    Args:
+        splitters: Data splitting executors (prepare train/test/val sets)
+        transformers: Data transformation executors (normalize, encode, etc.)
+        ml_executors: ML model training and prediction executors
+        save_models: Whether to save trained models to disk
+        models_dir: Directory for saving models
+        load_models_dir: Directory for loading pre-trained models
+        cleanup_after: Whether to cleanup ML artifacts after execution
+        transformer: Whether to deepcopy data between executors
+        key: Experiment identifier
     
     Example pipeline:
         Experiment(GroupSizes) → 
-        MLExperiment(Normalization, Cupac) → 
+        MLExperiment(
+            splitters=[CUPACDataSplitter()],
+            transformers=[],
+            ml_executors=[CUPACExecutor()]
+        ) → 
         Experiment(GroupDifference, ABAnalyzer)
     """
     
     def __init__(
         self,
-        executors: Sequence[Executor],
+        splitters: Sequence[Executor] | None = None,
+        transformers: Sequence[Executor] | None = None,
+        ml_executors: Sequence[Executor] | None = None,
         save_models: bool = False,
         models_dir: Optional[str] = None,
         load_models_dir: Optional[str] = None,
@@ -32,7 +50,20 @@ class MLExperiment(Experiment):
         transformer: bool | None = None,
         key: Any = "",
     ):
-        super().__init__(executors, transformer, key)
+        # Combine all executors for parent class
+        all_executors = []
+        if splitters:
+            all_executors.extend(splitters)
+        if transformers:
+            all_executors.extend(transformers)
+        if ml_executors:
+            all_executors.extend(ml_executors)
+        
+        super().__init__(all_executors, transformer, key)
+        
+        self.splitters = list(splitters) if splitters else []
+        self.transformers = list(transformers) if transformers else []
+        self.ml_executors = list(ml_executors) if ml_executors else []
         self.save_models = save_models
         self.models_dir = models_dir
         self.load_models_dir = load_models_dir
@@ -44,16 +75,30 @@ class MLExperiment(Experiment):
         
         Flow:
         1. Transform ExperimentData → MLExperimentData
-        2. Execute all ML executors (they work with MLExperimentData)
-        3. Transform back MLExperimentData → ExperimentData
-        4. Optionally cleanup ML artifacts from memory
+        2. Execute splitters (prepare data structures)
+        3. Execute transformers (preprocess data)
+        4. Execute ml_executors (train/predict with ML models)
+        5. Transform back MLExperimentData → ExperimentData
+        6. Optionally cleanup ML artifacts from memory
         """
         # Transform to ML data
         ml_data = self._ensure_ml_data(data)
         
-        # Execute ML pipeline
+        # Execute ML pipeline in order: splitters → transformers → ml_executors
         experiment_data = deepcopy(ml_data) if self.transformer else ml_data
-        for executor in self.executors:
+        
+        # Execute splitters
+        for executor in self.splitters:
+            executor.key = self.key
+            experiment_data = executor.execute(experiment_data)
+        
+        # Execute transformers
+        for executor in self.transformers:
+            executor.key = self.key
+            experiment_data = executor.execute(experiment_data)
+        
+        # Execute ML executors
+        for executor in self.ml_executors:
             executor.key = self.key
             experiment_data = executor.execute(experiment_data)
         

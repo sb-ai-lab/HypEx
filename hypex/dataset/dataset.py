@@ -772,28 +772,19 @@ class Dataset(DatasetBase):
 
 
 class ExperimentData:
-    def __init__(
-        self,
-        experiment_data: Dataset,
-        target_names: list[str] | None = None,
-    ):
-        self._data = experiment_data
-        self.target_names = target_names or []
-        self.additional_fields = Dataset.create_empty(index=experiment_data.index)
+    def __init__(self, data: Dataset):
+        self._data = data
+        self.additional_fields = Dataset.create_empty(index=data.index)
         self.variables: dict[str, dict[str, int | float]] = {}
         self.groups: dict[str, dict[str, Dataset]] = {}
         self.analysis_tables: dict[str, Dataset] = {}
         self.id_name_mapping: dict[str, str] = {}
     
-    # Backward compatibility property
-    @property
-    def experiment_data(self):
-        """Get the base dataset (new name)."""
-        return self._data
-
     @property
     def ds(self):
-        """Get the base dataset (legacy name for backward compatibility)."""
+        """
+        Get the base dataset.
+        """
         return self._data
 
     @staticmethod
@@ -801,7 +792,7 @@ class ExperimentData:
         roles=None, backend=BackendsEnum.pandas, index=None
     ) -> ExperimentData:
         ds = Dataset.create_empty(backend, roles, index)
-        return ExperimentData(experiment_data=ds)
+        return ExperimentData(ds)
 
     def check_hash(self, executor_id: int, space: ExperimentDataEnum) -> bool:
         if space == ExperimentDataEnum.additional_fields:

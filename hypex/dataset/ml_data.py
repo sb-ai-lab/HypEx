@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING
 
 from ..dataset import Dataset, ExperimentData
-from ..utils import ID_SPLIT_SYMBOL
+from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
 
 if TYPE_CHECKING:
     from ..ml.models import MLModel
@@ -22,16 +22,16 @@ class MLExperimentData(ExperimentData):
     - self.ml['trained_models'][executor_id] = {target: MLModel}
     - self.ml['model_stats'][executor_id] = {target: ModelStats}
     - self.ml['config'] = {save_models: bool, models_dir: str}
+    - self.ml['splits'] = prepared data from splitters
     """
     
     def __init__(
         self,
-        experiment_data: Dataset,
-        target_names: list[str] | None = None,
+        data: Dataset,
         save_models: bool = False,
         models_dir: Optional[str] = None,
     ):
-        super().__init__(experiment_data=experiment_data, target_names=target_names)
+        super().__init__(data=data)
         
         # Инициализируем ml пространство
         self.ml: Dict[str, Any] = {
@@ -41,6 +41,7 @@ class MLExperimentData(ExperimentData):
                 "save_models": save_models,
                 "models_dir": models_dir or self._create_default_models_dir(),
             },
+            "splits": None,  # Data prepared by splitters
         }
     
     @classmethod
@@ -49,8 +50,7 @@ class MLExperimentData(ExperimentData):
     ) -> MLExperimentData:
         """Transform ExperimentData → MLExperimentData"""
         ml_data = cls(
-            experiment_data=data.experiment_data,
-            target_names=data.target_names,
+            data=data.ds,
             save_models=save_models
         )
         
@@ -60,27 +60,40 @@ class MLExperimentData(ExperimentData):
         ml_data.groups = data.groups
         ml_data.analysis_tables = data.analysis_tables
         ml_data.id_name_mapping = data.id_name_mapping
-        
-        # Если data уже была MLExperimentData, копируем ml
-        if hasattr(data, "ml"):
-            ml_data.ml = deepcopy(data.ml)
-        
+
         return ml_data
     
     def to_experiment_data(self) -> ExperimentData:
         """Transform MLExperimentData → ExperimentData (cleanup ML artifacts)"""
-        exp_data = ExperimentData(
-            experiment_data=self.experiment_data,
-            target_names=self.target_names
-        )
+        exp_data = ExperimentData(data=self.ds)
         exp_data.additional_fields = self.additional_fields
         exp_data.variables = self.variables
         exp_data.groups = self.groups
         exp_data.analysis_tables = self.analysis_tables
         exp_data.id_name_mapping = self.id_name_mapping
         
-        # ML artifacts НЕ копируются (очистка памяти)
         return exp_data
+    
+    def set_value(
+        self,
+        space: ExperimentDataEnum,
+        executor_id: str | dict[str, str],
+        value: Any,
+        key: str | None = None,
+        role=None,
+    ) -> "MLExperimentData":
+        """
+        Override set_value to handle ML space.
+        """
+        if space == ExperimentDataEnum.ml:
+            # For ml space, executor_id is the key (like "splits")
+            # and value is the data to store
+            self.ml[executor_id] = value
+            return self
+        else:
+            # Delegate to parent for other spaces
+            super().set_value(space, executor_id, value, key, role)
+            return self
     
     def add_trained_model(
         self, executor_id: str, target_name: str, model: MLModel, stats: ModelStats
