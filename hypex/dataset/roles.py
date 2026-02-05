@@ -41,7 +41,7 @@ class ABCRole(ABC):
             ):
                 return role_type.__class__(data_type)
         return self.__class__(data_type)
-    
+
 
 class LagRole(ABCRole):
     """Base class for roles that support temporal metadata (parent, lag)."""

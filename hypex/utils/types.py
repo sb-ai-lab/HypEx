@@ -1,5 +1,6 @@
 from pyspark.sql.types import StringType, LongType, DoubleType
 
+
 class SparkTypeMapper:
     @staticmethod
     def types(value):

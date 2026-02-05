@@ -690,21 +690,19 @@ class Dataset(DatasetBase):
     def filter(
         self,
         items: list | None = None,
-        like: str | None = None,
         regex: str | None = None,
-        axis: int | None = None,
+        axis: int | None = 0,
     ) -> Dataset:
-        t_data = self._backend.filter(items=items, like=like, regex=regex, axis=axis)
+        t_data = self._backend.filter(items=items, regex=regex, axis=axis)
         t_roles = {c: self.roles[c] for c in t_data.columns if c in self.roles.keys()}
         return Dataset(roles=t_roles, data=t_data)
 
     def dot(self, other: Dataset | ndarray) -> Dataset:
-        return Dataset(
-            roles=deepcopy(other.roles) if isinstance(other, Dataset) else {},
-            data=self.backend.dot(
-                other.backend if isinstance(other, Dataset) else other
-            ),
+        roles= {col: role.astype(float) for col, role in other.roles.items()} if isinstance(other, Dataset) else {}
+        data=self.backend.dot(
+            other.backend if isinstance(other, Dataset) else other
         )
+        return Dataset(roles=roles, data=data)
 
     def transpose(
         self,

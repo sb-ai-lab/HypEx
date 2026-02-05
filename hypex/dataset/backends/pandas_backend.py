@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union
+from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -202,6 +202,10 @@ class PandasNavigation(DatasetBackendNavigation):
         return self.data.columns
 
     @property
+    def session(self):
+        return None
+
+    @property
     def shape(self):
         return self.data.shape
 
@@ -216,8 +220,9 @@ class PandasNavigation(DatasetBackendNavigation):
             raise ValueError("Wrong column_name type.")
 
     def get_column_type(
-        self, column_name: Union[Iterable[str], str]
+        self, column_name: Union[Iterable[str], str] = None
     ) -> Optional[Union[Dict[str, type], type]]:
+        column_name = self.data.columns if column_name is None else column_name
         dtypes = {}
         for k, v in self.data[column_name].dtypes.items():
             if pd.api.types.is_integer_dtype(v):
@@ -508,8 +513,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
                 data=other,
                 columns=self.columns if other.shape[1] == self.shape[1] else None,
             )
-            # print(other_df.shape)
-            # print(self.data.shape)
             result = self.data.dot(other_df.T)
             result.columns = (
                 self.columns if other.shape[1] == self.shape[1] else result.columns
@@ -547,7 +550,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     ) -> pd.DataFrame:
         return self.data.select_dtypes(include=include, exclude=exclude)
 
-    def isin(self, values: Iterable) -> Iterable[bool]:
+    def isin(self, values: Iterable) -> pd.DataFrame:
         return self.data.isin(values)
 
     def merge(
@@ -601,11 +604,10 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     def filter(
         self,
         items: list | None = None,
-        like: str | None = None,
         regex: str | None = None,
         axis: int = 0,
     ) -> pd.DataFrame:
-        return self.data.filter(items=items, like=like, regex=regex, axis=axis)
+        return self.data.filter(items=items, regex=regex, axis=axis)
 
     def rename(self, columns: dict[str, str]) -> pd.DataFrame:
         return self.data.rename(columns=columns)
