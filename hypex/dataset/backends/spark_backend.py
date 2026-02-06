@@ -48,6 +48,7 @@ from ...utils import FromDictTypes, MergeOnError, ScalarType, Adapter
 from ...utils.adapter import Adapter
 from ...utils.types import SparkTypeMapper as d
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
+from ...utils.typings import PysparkScalarType
 
 
 class SparkNavigation(DatasetBackendNavigation):
@@ -510,10 +511,16 @@ class SparkNavigation(DatasetBackendNavigation):
             return (count, cols)
         return (0, 0)
 
-    def _get_column_index(  # Иван
+    def _get_column_index(
         self, column_name: Union[Sequence[str], str]
     ) -> Union[int, Sequence[int]]:
-        pass
+        pd_index_columns = pd.Index(self.data.columns)
+        if isinstance(column_name, str):
+            return pd_index_columns.get_loc(column_name)
+        elif isinstance(column_name, list):
+            return pd_index_columns.get_indexer(column_name)
+        else:
+            raise TypeError("Wrong column_name type.")
 
     def get_column_type(
         self, column_name: Union[List[str], str] = None
@@ -640,16 +647,16 @@ class SparkNavigation(DatasetBackendNavigation):
             raise ValueError("Unsupported data format for from_dict")
         return self
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]: # TODO: to be moved to small data
         pass
 
-    def to_records(self) -> list[dict]:
+    def to_records(self) -> list[dict]: # TODO: to be moved to small data
         pass
 
-    def loc(self, items: Iterable) -> Iterable:  # Иван
+    def loc(self, items: Iterable) -> Iterable:     # TODO: to be moved to small data
         pass
 
-    def iloc(self, items: Iterable) -> Iterable:  # Иван
+    def iloc(self, items: Iterable) -> Iterable:      # TODO: to be moved to small data
         pass
 
 
@@ -1020,43 +1027,146 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def std(self, numeric_only: bool = False, ddof: int = 1):
         return self.agg("std", numeric_only=numeric_only, ddof=ddof)
 
-    def cov(self):  # Иван
+    def cov(self, small_format=False):
+        col_list = self.data.columns
+        paired_cov = self.data.select(
+            *[
+                F.covar_samp(col_list[i], col_list[j]).alias(f'{i}_{j}')
+                for i in range(0, len(col_list))
+                for j in range(i, len(col_list))
+            ]
+        ).toPandas()
+
+        result = pd.DataFrame(
+            [
+                paired_cov.loc[0, f'{i}_{j}' if i <= j else f'{j}_{i}']
+                for i in range(0, len(col_list))
+                for j in range(0, len(col_list))
+            ],
+            index=col_list,
+            columns=col_list,
+        )
+
+        if small_format:
+            return result
+        else:
+            return self.data.sparkSession.createDataFrame(result)
+
+    def quantile(self, q: float = 0.5) -> float:
+        result = self.data.approxQuantile(self.data.columns[0], q=[q], accuracy=1e-6)[0]
+        if isinstance(q, list) and len(q) > 1:
+            return result
+        self.agg(func="quantile", q=q)
+
+    def coefficient_of_variation(self, small_format=False) -> Union[spark.DataFrame, float]:
+        result = self.data.select(
+            F.var_samp(col).alias(col)
+            for col in self.data.columns
+        ).toPandas()
+        result.index = ["cv"]
+        if result.shape[0] == 1 and result.shape[1] == 1:
+            return float(result.loc[result.index[0], result.columns[0]])
+        if not isinstance(result, pd.DataFrame):
+            result = pd.DataFrame(result)
+        if small_format:
+            return result
+        else:
+            return self.data.sparkSession.createDataFrame(result)
+
+    def sort_index(self, ascending: bool = True, **kwargs) -> spark.DataFrame:      # Иван # TODO: to be moved to small data
         pass
 
-    def quantile(self, q: float = 0.5) -> spark.DataFrame:  # Иван
-        pass
+    def get_numeric_columns(self) -> list[str]:
+        return [
+            col
+            for col in self.data.columns
+            if isinstance(col, PysparkScalarType)
+        ]
 
-    def coefficient_of_variation(self) -> Union[spark.DataFrame, float]:  # Иван
-        pass
-
-    def sort_index(self, ascending: bool = True, **kwargs) -> spark.DataFrame:  # Иван
-        pass
-
-    def corr(  # Иван
+    def corr(
         self,
-        method: Literal["pearson", "kendall", "spearman"] = "pearson",
         numeric_only: bool = False,
+        small_format: bool = False,
     ) -> Union[spark.DataFrame, float]:
-        pass
 
-    def isna(self) -> spark.DataFrame:  # Иван
-        pass
+        if numeric_only:
+            col_list = self.get_numeric_columns()
+        else:
+            col_list = self.data.columns
+
+        paired_corr = self.data.select(
+            *[
+                F.corr(col_list[i], col_list[j]).alias(f'{i}_{j}')
+                for i in range(0, len(col_list))
+                for j in range(i, len(col_list))
+            ]
+        ).toPandas()
+
+        result = pd.DataFrame(
+            [
+                paired_corr.loc[0, f'{i}_{j}' if i <= j else f'{j}_{i}']
+                for i in range(0, len(col_list))
+                for j in range(0, len(col_list))
+            ],
+            index=col_list,
+            columns=col_list,
+        )
+
+        if small_format:
+            return result
+        else:
+            return self.data.sparkSession.createDataFrame(result)
+
+    def isna(self) -> spark.DataFrame:
+        return self.data.select(
+            *[
+                (F.isnan(col) | F.isnull(col)).alias(col)
+                for col in self.data
+            ]
+        )
 
     def sort_values(
         self, by: Union[str, list[str]], ascending: bool = True, **kwargs
     ) -> spark.DataFrame:
         pass
 
-    def value_counts(  # Иван
+    def value_counts(
         self,
         normalize: bool = False,
         sort: bool = True,
         ascending: bool = False,
         dropna: bool = True,
     ) -> spark.DataFrame:
-        pass
 
-    def fillna(     # Эрик
+        result = self.data
+        if dropna:
+            result = result.dropna(how="any")
+
+        result = result.select(
+            F.count('*').alias('_total_count'),
+            *[
+                F.countDistinct(col).alias(col)
+                for col in self.data.columns
+            ]
+        )
+
+        if normalize:
+            result = result.select(
+                *[
+                    (F.col(col) / F.col('_total_count')).alias(col)
+                    for col in self.data
+                ]
+            )
+        else:
+            result = result.drop('_total_count')
+
+        if sort:
+            raise NotImplementedError
+
+        return result
+
+
+    def fillna(
         self,
         values: Optional[Union[ScalarType, Dict[str, ScalarType]]] = None,
         method: Optional[Literal["bfill", "ffill"]] = None,
@@ -1090,7 +1200,6 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                     .fillna(value=values, **kwargs)
                     .fillna(value=f"{values}", **kwargs)
                 )
-
 
     def na_counts(self) -> Union[spark.DataFrame, int]:
         na_counts = self.data.select(
@@ -1276,7 +1385,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         return result.drop("_row_id").orderBy("_row_id")
 
-    def dropna(     # Эрик
+    def dropna(  # Эрик
         self,
         how: Literal["any", "all"] = "any",
         subset: Optional[Union[str, Iterable[str]]] = None,
@@ -1305,14 +1414,14 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 ])
         return self.data.select(*select_arr)
 
-    def transpose(self, names: Optional[Sequence[str]] = None) -> spark.DataFrame:
+    def transpose(self, names: Optional[Sequence[str]] = None) -> spark.DataFrame: # TODO: to be moved to small data
         pass
 
-    def sample(     # Эрик
+    def sample(  # Эрик
         self,
-        frac: Optional[float] = None,
-        n: Optional[int] = None,
-        random_state: Optional[int] = None,
+        frac: float | None = None,
+        n: int | None = None,
+        random_state: int | None = None,
     ) -> spark.DataFrame:
         if frac:
             return self.data.sample(fraction=frac, seed=random_state)
@@ -1355,7 +1464,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             ]
         )
 
-    def merge(      # Эрик
+    def merge(  # Эрик
         self,
         right: "SparkDataset",
         on: Optional[str] = None,

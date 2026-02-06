@@ -1,4 +1,4 @@
-from .faiss import FaissNearestNeighbors
 from .cupac import CUPACExecutor
+from .faiss import FaissNearestNeighbors
 
-__all__ = ["FaissNearestNeighbors", "CUPACExecutor"]
+__all__ = ["CUPACExecutor", "FaissNearestNeighbors"]

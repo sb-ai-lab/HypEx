@@ -10,6 +10,10 @@ from typing import (
     TypeVar,
     Union,
 )
+from pyspark.sql.types import (
+    IntegerType, LongType, FloatType,
+    DoubleType, DecimalType, ShortType, ByteType
+)
 
 import pandas as pd
 import pyspark.sql as spark
@@ -20,8 +24,14 @@ if TYPE_CHECKING:
 StratificationRoleTypes = Union[float, str, datetime.datetime]
 DefaultRoleTypes = Union[float, bool, str, int]
 TargetRoleTypes = Union[float, int, bool]
+FeatureRoleTypes = Union[float, bool, str, int]
 CategoricalTypes = Union[str]
 ScalarType = Union[float, int, str, bool]
+PysparkScalarType = Union[
+    IntegerType, LongType,
+    FloatType, DoubleType,
+    DecimalType, ShortType, ByteType
+]
 GroupingDataType = Tuple[List[Tuple[str, "Dataset"]], List[Tuple[str, "Dataset"]]]
 SourceDataTypes = Union[pd.DataFrame, spark.DataFrame]
 

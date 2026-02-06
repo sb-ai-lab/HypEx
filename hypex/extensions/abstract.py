@@ -37,13 +37,12 @@ class MLExtension(Extension):
     def _calc_pandas(
         self,
         data: Dataset,
-        test_data: Dataset | None = None,
         mode: Literal["auto", "fit", "predict"] | None = None,
         **kwargs,
     ):
         if mode in ["auto", "fit"]:
-            return self.fit(data, test_data, **kwargs)
-        return self.predict(data)
+            return self.fit(data, **kwargs)
+        return self.predict(data, **kwargs)
 
     @abstractmethod
     def fit(self, X, Y=None, **kwargs):
@@ -56,10 +55,6 @@ class MLExtension(Extension):
     def calc(
         self,
         data: Dataset,
-        target_data: Dataset | None = None,
-        test_data: Dataset | None = None,
         **kwargs,
     ):
-        return super().calc(
-            data=data, target_data=target_data, test_data=test_data, **kwargs
-        )
+        return super().calc(data=data, **kwargs)

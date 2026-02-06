@@ -41,6 +41,7 @@ class ABNTestMethodsEnum(enum.Enum):
 @enum.unique
 class ABTestTypesEnum(enum.Enum):
     t_test = "t-test"
+    ks_test = "ks-test"
     u_test = "u-test"
     chi2_test = "chi2-test"
 
