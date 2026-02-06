@@ -584,7 +584,7 @@ class DatasetBase(ABC):
             ]
         if fields_list:
             fields_list = Adapter.to_list(fields_list)
-            datasets = [(i, data[fields_list]) for i, data in datasets]
+            datasets = [(i, data.select(fields_list)) for i, data in datasets]
         if func:
             datasets = [(i, data.agg(func)) for i, data in datasets]
         for dataset in datasets:

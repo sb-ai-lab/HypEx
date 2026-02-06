@@ -856,7 +856,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             final_cond = reduce(lambda x, y: x & y, conditions)
             key = key_values[0] if len(key_values) == 1 else tuple(key_values)
             group_df = self.data.filter(final_cond)
-            result.append((key, self.__class__(group_df)))
+            result.append((key, group_df))
         return result
 
     def agg(self, func: Union[str, list], **kwargs) -> Union[spark.DataFrame, float]:
