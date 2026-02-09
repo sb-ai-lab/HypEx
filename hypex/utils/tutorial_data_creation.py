@@ -137,7 +137,6 @@ class DataGenerator:
         return df
 
 
-
 def set_nans(
     data: pd.DataFrame,
     na_step: Sequence[int] | int | None = None,
