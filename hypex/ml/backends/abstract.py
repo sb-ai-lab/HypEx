@@ -47,7 +47,7 @@ class MLModelBackendBase(ABC):
         raise NotImplementedError
     
     @abstractmethod
-    def predict(self, X: Dataset) -> np.ndarray:
+    def predict(self, X: Dataset) -> Dataset:
         """Predict on Dataset (backend-specific implementation)"""
         raise NotImplementedError
     

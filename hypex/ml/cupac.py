@@ -207,22 +207,19 @@ class CUPACExecutor(Executor):
         """Apply CUPAC adjustment to current period"""
         X_predict = self._agg_data_from_cupac_data(data, target_data["X_predict"])
         
-        # Predict
-        prediction = model.predict(X_predict)
-        prediction_mean = prediction.mean()
+        prediction_ds = model.predict(X_predict)
+        prediction = np.array(prediction_ds.get_values(column="prediction"))
         
-        # Adjust target
-        target_values = data.ds[target].backend.data.values.ravel()
+        prediction_mean = float(prediction_ds.mean())
+        
+        target_ds = data.ds[target]
+        target_values = np.array(target_ds.get_values(column=target))
         adjusted_values = target_values - prediction + prediction_mean
         
-        # Create adjusted dataset
-        import pandas as pd
-        
-        target_cupac_df = pd.DataFrame(
-            {f"{target}_cupac": adjusted_values}, index=data.ds.index
-        )
-        target_cupac = Dataset(
-            data=target_cupac_df, roles={f"{target}_cupac": AdditionalTargetRole()}
+        target_cupac = Dataset.from_dict(
+            data={f"{target}_cupac": adjusted_values},
+            roles={f"{target}_cupac": AdditionalTargetRole()},
+            index=data.ds.index
         )
         
         # Add to additional_fields

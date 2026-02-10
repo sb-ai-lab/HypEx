@@ -65,7 +65,7 @@ class SklearnModelBackendBase(MLModelBackendBase, ABC):
         self._feature_names = X.columns.tolist()
         return method(X, y)
     
-    def predict(self, X: Dataset) -> np.ndarray:
+    def predict(self, X: Dataset) -> Dataset:
         """Predict - dispatches to backend-specific method"""
         backend_type = type(X.backend)
         
@@ -93,14 +93,21 @@ class SklearnModelBackendBase(MLModelBackendBase, ABC):
         self._is_fitted = True
         return self
     
-    def _predict_pandas(self, X: Dataset) -> np.ndarray:
+    def _predict_pandas(self, X: Dataset) -> Dataset:
         """Predict using pandas backend"""
         if not self._is_fitted:
             raise ValueError("Model must be fitted first")
         
         X_data = X.backend.data
         X_np = X_data.values
-        return self._data.predict(X_np)
+        predictions = self._data.predict(X_np)
+        
+        # Return as Dataset
+        return Dataset.from_dict(
+            data={"prediction": predictions},
+            roles={},
+            index=X.index
+        )
     
     def get_feature_importances(self) -> np.ndarray:
         """For linear models: absolute coefficients"""

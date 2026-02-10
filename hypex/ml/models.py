@@ -109,7 +109,7 @@ class MLModel:
         self._backend.fit(X, y)
         return self
     
-    def predict(self, X: Dataset) -> np.ndarray:
+    def predict(self, X: Dataset) -> Dataset:
         """
         Predict on Dataset.
         
@@ -119,7 +119,7 @@ class MLModel:
             X: Features Dataset
         
         Returns:
-            Predictions as numpy array
+            Predictions as Dataset
         """
         return self._backend.predict(X)
     
@@ -162,7 +162,9 @@ class MLModel:
         Returns:
             ModelStats with aggregated CV results
         """
-        # Используем pandas backend для KFold (работает с numpy)
+        # Note: sklearn KFold requires numpy arrays for indexing,
+        # so we temporarily access backend.data here for technical reasons.
+        # This is an exception - the rest of the code uses Dataset API.
         X_data = X.backend.data
         y_data = y.backend.data
         
@@ -199,26 +201,24 @@ class MLModel:
             fold_model = self.clone()
             fold_model.fit(X_train_fold, y_train_fold)
             
-            # Predict
-            y_pred = fold_model.predict(X_val_fold)
+            # Predict (returns Dataset)
+            y_pred_ds = fold_model.predict(X_val_fold)
+            y_pred = np.array(y_pred_ds.get_values(column="prediction"))
             
             # Calculate score
             if metric_func is None:
                 # Default: variance reduction for CUPAC
-                y_val_np = (
-                    y_val_fold.backend.data.values.ravel()
-                    if hasattr(y_val_fold.backend.data.values, "ravel")
-                    else y_val_fold.backend.data.values
-                )
-                y_train_mean = y_train_fold.backend.data.values.mean()
+                y_val_col = y_val_fold.columns[0]
+                y_val_np = np.array(y_val_fold.get_values(column=y_val_col))
+                
+                # mean() returns float for single column Dataset
+                y_train_mean = float(y_train_fold.mean())
+                
                 y_adjusted = y_val_np - y_pred + y_train_mean
                 score = self._calculate_variance_reduction(y_val_np, y_adjusted)
             else:
-                y_val_np = (
-                    y_val_fold.backend.data.values.ravel()
-                    if hasattr(y_val_fold.backend.data.values, "ravel")
-                    else y_val_fold.backend.data.values
-                )
+                y_val_col = y_val_fold.columns[0]
+                y_val_np = np.array(y_val_fold.get_values(column=y_val_col))
                 score = metric_func(y_val_np, y_pred)
             
             fold_scores.append(score)
