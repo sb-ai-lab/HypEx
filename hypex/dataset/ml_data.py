@@ -12,6 +12,7 @@ from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
 if TYPE_CHECKING:
     from ..ml.models import MLModel
     from ..ml.stats import ModelStats
+    from ..transformers.state import TransformerState
 
 
 class MLExperimentData(ExperimentData):
@@ -37,6 +38,7 @@ class MLExperimentData(ExperimentData):
         self.ml: Dict[str, Any] = {
             "trained_models": {},  # {executor_id: {target: MLModel}}
             "model_stats": {},  # {executor_id: {target: ModelStats}}
+            "fitted_transformers": {},  # {transformer_id: TransformerState}
             "config": {
                 "save_models": save_models,
                 "models_dir": models_dir or self._create_default_models_dir(),
@@ -185,6 +187,41 @@ class MLExperimentData(ExperimentData):
         """Free memory by clearing ML models (keep stats)"""
         self.ml["trained_models"].clear()
         # model_stats остаются для анализа
+    
+    # === Transformer state management ===
+    
+    def add_fitted_transformer(self, transformer_id: str, state: "TransformerState") -> None:
+        """
+        Add fitted transformer state.
+        
+        Args:
+            transformer_id: Transformer ID (e.g., "NaFiller__hash")
+            state: TransformerState with fitted parameters
+        """
+        self.ml["fitted_transformers"][transformer_id] = state
+    
+    def get_fitted_transformer(self, transformer_id: str) -> Optional["TransformerState"]:
+        """
+        Get fitted transformer state.
+        
+        Returns:
+            TransformerState or None if not found
+        """
+        return self.ml["fitted_transformers"].get(transformer_id)
+    
+    def has_fitted_transformer(self, transformer_id: str) -> bool:
+        """Check if transformer is fitted"""
+        return transformer_id in self.ml["fitted_transformers"]
+    
+    def get_all_fitted_transformers(self) -> Dict[str, "TransformerState"]:
+        """Get all fitted transformer states"""
+        return self.ml["fitted_transformers"].copy()
+    
+    def cleanup_transformer_artifacts(self) -> None:
+        """Clear all fitted transformer states"""
+        self.ml["fitted_transformers"].clear()
+    
+    # === Model artifacts management ===
     
     def _save_model_artifacts(
         self, executor_id: str, target_name: str, model: MLModel, stats: ModelStats

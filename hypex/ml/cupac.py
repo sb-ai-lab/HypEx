@@ -121,7 +121,36 @@ class CUPACExecutor(Executor):
     ) -> None:
         """Process single target with model selection and adjustment"""
         
-        # Check if we should load pre-trained model
+        # Check if we should load pre-trained model from artifact
+        trained_models = data.ml.get('trained_models', {})
+        model_stats = data.ml.get('model_stats', {})
+        
+        if self.id in trained_models and target in trained_models[self.id]:
+            # Use model from loaded artifact
+            model = trained_models[self.id][target]
+            stats = model_stats[self.id][target]
+            
+            # Apply CUPAC adjustment if target is real (has current period data)
+            if "X_predict" in target_data:
+                var_red_real = self._apply_cupac_adjustment(
+                    data, model, target, target_data
+                )
+                stats.variance_reduction_real = var_red_real
+            
+            # Store model and stats
+            data.add_trained_model(self.id, target, model, stats)
+            
+            # Store report for compatibility
+            report = {
+                "cupac_best_model": stats.model_name,
+                "cupac_variance_reduction_cv": stats.variance_reduction_cv,
+                "cupac_variance_reduction_real": stats.variance_reduction_real,
+                "cupac_feature_importances": stats.feature_importances,
+            }
+            data.analysis_tables[f"{target}_cupac_report"] = report
+            return
+        
+        # Check if we should load pre-trained model from directory (old way)
         load_models_dir = data.ml.get("config", {}).get("load_models_dir")
         
         if load_models_dir:

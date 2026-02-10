@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import os
 from copy import deepcopy
+from pathlib import Path
 from typing import Any, Optional, Sequence
 
 from ..dataset import ExperimentData
 from ..dataset.ml_data import MLExperimentData
 from ..executor import Executor
+from ..transformers import TransformerMode
+from .artifact import ExperimentArtifact
 from .base import Experiment
 
 
@@ -25,6 +29,9 @@ class MLExperiment(Experiment):
         models_dir: Directory for saving models
         load_models_dir: Directory for loading pre-trained models
         cleanup_after: Whether to cleanup ML artifacts after execution
+        save_experiment: Save experiment artifact (transformers + models) for reuse
+        load_experiment: Experiment ID to load fitted transformers from
+        experiment_dir: Directory for saving/loading experiment artifacts (default: .hypex_experiments/)
         transformer: Whether to deepcopy data between executors
         key: Experiment identifier
     
@@ -36,6 +43,21 @@ class MLExperiment(Experiment):
             ml_executors=[CUPACExecutor()]
         ) → 
         Experiment(GroupDifference, ABAnalyzer)
+    
+    Example workflow with save/load:
+        # Fit on virtual target
+        ab_test = ABTest(
+            enable_cupac=True,
+            save_experiment=True
+        )
+        ab_test.execute(virtual_data)
+        
+        # Apply to real target
+        ab_test = ABTest(
+            enable_cupac=True,
+            load_experiment="exp_id"
+        )
+        ab_test.execute(real_data)
     """
     
     def __init__(
@@ -47,6 +69,9 @@ class MLExperiment(Experiment):
         models_dir: Optional[str] = None,
         load_models_dir: Optional[str] = None,
         cleanup_after: bool = True,
+        save_experiment: bool = False,
+        load_experiment: Optional[str] = None,
+        experiment_dir: Optional[str] = None,
         transformer: bool | None = None,
         key: Any = "",
     ):
@@ -68,21 +93,38 @@ class MLExperiment(Experiment):
         self.models_dir = models_dir
         self.load_models_dir = load_models_dir
         self.cleanup_after = cleanup_after
+        
+        # Experiment artifact management
+        self.save_experiment = save_experiment
+        self.load_experiment = load_experiment
+        self.experiment_dir = experiment_dir or self._get_default_experiment_dir()
+        self._loaded_artifact: Optional[ExperimentArtifact] = None
     
     def execute(self, data: ExperimentData) -> ExperimentData:
         """
         Execute ML pipeline with automatic data transformation.
         
         Flow:
-        1. Transform ExperimentData → MLExperimentData
-        2. Execute splitters (prepare data structures)
-        3. Execute transformers (preprocess data)
-        4. Execute ml_executors (train/predict with ML models)
-        5. Transform back MLExperimentData → ExperimentData
-        6. Optionally cleanup ML artifacts from memory
+        1. Load artifact if load_experiment is specified
+        2. Transform ExperimentData → MLExperimentData
+        3. Configure transformers for inference mode if loading
+        4. Execute splitters (prepare data structures)
+        5. Execute transformers (preprocess data)
+        6. Execute ml_executors (train/predict with ML models)
+        7. Save artifact if save_experiment is True
+        8. Transform back MLExperimentData → ExperimentData
+        9. Optionally cleanup ML artifacts from memory
         """
+        # Load artifact if specified
+        if self.load_experiment is not None:
+            self._load_artifact()
+        
         # Transform to ML data
         ml_data = self._ensure_ml_data(data)
+        
+        # If loading, configure transformers for inference mode
+        if self._loaded_artifact is not None:
+            self._configure_for_inference(ml_data)
         
         # Execute ML pipeline in order: splitters → transformers → ml_executors
         experiment_data = deepcopy(ml_data) if self.transformer else ml_data
@@ -101,6 +143,10 @@ class MLExperiment(Experiment):
         for executor in self.ml_executors:
             executor.key = self.key
             experiment_data = executor.execute(experiment_data)
+        
+        # Save artifact if requested
+        if self.save_experiment:
+            self._save_artifact(experiment_data)
         
         # Transform back to regular ExperimentData
         result_data = experiment_data.to_experiment_data()
@@ -125,3 +171,115 @@ class MLExperiment(Experiment):
         if self.load_models_dir is not None:
             ml_data.ml["config"]["load_models_dir"] = self.load_models_dir
         return ml_data
+    
+    def _save_artifact(self, ml_data: MLExperimentData) -> None:
+        """Save experiment artifact with models and transformer states"""
+        artifact_path = self._resolve_artifact_path()
+        
+        artifact = ExperimentArtifact.create_from_experiment(
+            ml_experiment=self,
+            base_dir=artifact_path
+        )
+        
+        # Save transformer states from ml_data
+        artifact.transformer_states = ml_data.get_all_fitted_transformers()
+        
+        # Save trained models from ml_data (combine models + stats)
+        if self.save_models:
+            trained_models = ml_data.ml.get('trained_models', {})
+            model_stats = ml_data.ml.get('model_stats', {})
+            
+            # Combine into {executor_id: {target: {'model': MLModel, 'stats': ModelStats}}}
+            artifact.models_data = {}
+            for executor_id, executor_models in trained_models.items():
+                artifact.models_data[executor_id] = {}
+                for target, model in executor_models.items():
+                    stats = model_stats.get(executor_id, {}).get(target)
+                    artifact.models_data[executor_id][target] = {
+                        'model': model,
+                        'stats': stats
+                    }
+        
+        artifact.save()
+    
+    def _load_artifact(self) -> None:
+        """Load experiment artifact"""
+        artifact_path = self._resolve_artifact_path(load=True)
+        
+        if not os.path.exists(artifact_path):
+            raise FileNotFoundError(
+                f"Experiment artifact not found at {artifact_path}. "
+                f"Make sure you saved it with save_experiment=True"
+            )
+        
+        self._loaded_artifact = ExperimentArtifact.load_from_directory(artifact_path)
+        
+        # Validate compatibility
+        is_compatible, msg = self._loaded_artifact.validate_compatibility(self)
+        if not is_compatible:
+            raise ValueError(f"Incompatible experiment configuration: {msg}")
+    
+    def _configure_for_inference(self, ml_data: MLExperimentData) -> None:
+        """
+        Configure transformers for inference mode.
+        Load fitted states from artifact into ml_data.
+        Switch all transformers to TRANSFORM mode.
+        Load trained models if available.
+        """
+        if self._loaded_artifact is None:
+            return
+        
+        # Load transformer states from artifact
+        transformer_states = self._loaded_artifact.load_transformer_states()
+        
+        # Add to ml_data
+        for transformer_id, state in transformer_states.items():
+            ml_data.add_fitted_transformer(transformer_id, state)
+        
+        # Switch all transformers to TRANSFORM mode
+        for transformer in self.transformers:
+            if hasattr(transformer, 'mode'):
+                transformer.mode = TransformerMode.TRANSFORM
+        
+        # Load trained models if available
+        models_data = self._loaded_artifact.load_models()
+        if models_data:
+            # Split into trained_models and model_stats
+            ml_data.ml['trained_models'] = {}
+            ml_data.ml['model_stats'] = {}
+            
+            for executor_id, executor_models in models_data.items():
+                ml_data.ml['trained_models'][executor_id] = {}
+                ml_data.ml['model_stats'][executor_id] = {}
+                
+                for target, model_info in executor_models.items():
+                    ml_data.ml['trained_models'][executor_id][target] = model_info['model']
+                    ml_data.ml['model_stats'][executor_id][target] = model_info['stats']
+    
+    def _resolve_artifact_path(self, load: bool = False) -> str:
+        """
+        Resolve artifact path based on configuration.
+        
+        Args:
+            load: If True, resolving for load operation
+        
+        Returns:
+            Full path to artifact directory
+        """
+        # Base directory
+        base_dir = Path(self.experiment_dir)
+        
+        # Experiment ID
+        if load:
+            exp_id = self.load_experiment
+        else:
+            # Generate ID from key or timestamp
+            from datetime import datetime
+            exp_id = self.key if self.key else f"exp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        return str(base_dir / exp_id)
+    
+    @staticmethod
+    def _get_default_experiment_dir() -> str:
+        """Get default directory for experiment artifacts"""
+        return os.path.join(os.getcwd(), ".hypex_experiments")
