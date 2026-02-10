@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType
+from ...utils.adapter import Adapter
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -281,6 +282,7 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data.loc[:, name] = data
 
     def append(self, other, reset_index: bool = False, axis: int = 0) -> pd.DataFrame:
+        other = Adapter.to_list(other)
         new_data = pd.concat([self.data] + [d.data for d in other], axis=axis)
         if reset_index:
             new_data = new_data.reset_index(drop=True)
@@ -392,7 +394,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return {column: self.data[column].unique() for column in self.data.columns}
 
     def nunique(self, dropna: bool = True):
-        return {column: self.data[column].nunique() for column in self.data.columns}
+        return {column: self.data[column].nunique(dropna=dropna) for column in self.data.columns}
 
     def groupby(self, by: str | Iterable[str], **kwargs) -> list[tuple]:
         groups = self.data.groupby(by=by, observed=False, **kwargs)

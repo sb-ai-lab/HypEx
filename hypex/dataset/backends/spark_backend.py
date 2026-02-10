@@ -17,12 +17,12 @@ from typing import (
     Sized,
     Optional,
     Union,
+    Tuple,
 )
 
 import numpy as np
 import pandas as pd
 import pyspark.sql as spark
-from patsy.util import iterable
 from pyspark import SparkContext, SparkConf, StorageLevel
 from pyspark.sql import (
     SparkSession,
@@ -218,9 +218,7 @@ class SparkNavigation(DatasetBackendNavigation):
         elif isinstance(other, (np.integer, np.floating, np.bool_)):
             return F.lit(other.item())
         else:
-            raise TypeError(
-                f"Unsupported operand type: '{type(other).__name__}'. "
-            )
+            raise TypeError(f"Unsupported operand type: '{type(other).__name__}'. ")
 
     # comparison operators:
     def __eq__(self, other) -> spark.DataFrame:
@@ -501,6 +499,10 @@ class SparkNavigation(DatasetBackendNavigation):
     def columns(self):
         return self.data.columns if self.data else []
 
+    # @property
+    # def session(self):
+    #     return self.session
+
     @property
     def shape(self):
         if self.data:
@@ -604,9 +606,24 @@ class SparkNavigation(DatasetBackendNavigation):
             )
 
     def append(  # Эрик
-        self, other, reset_index: bool = False, axis: int = 0
+        self, other, reset_index: bool = False, axis: int = 0 # other: Union["SparkDataset", List["SparkDataset"]]
     ) -> spark.DataFrame:
-        pass
+        other = Adapter.to_list(other)
+        if axis == 0:
+            tmp = self.data
+            for table in other:
+                tmp = tmp.unionByName(table.data, allowMissingColumns=True)
+                return tmp
+        else:
+            tmp = self.data.withColumn("__index", F.row_number().over(Window.orderBy(F.monotonically_increasing_id())) - 1)
+            for table in other:
+                add_cols = [F.col(col) for col in (set(table.columns) - set(tmp.columns))]
+                tmp = tmp.join((
+                                    table.data
+                                    .select(*add_cols)
+                                    .withColumn("__index", F.row_number().over(Window.orderBy(F.monotonically_increasing_id())) - 1)
+                                ), on="__index", how="outer")
+            return tmp.drop('__index')
 
     def from_dict(
         self, data: FromDictTypes, index: Optional[Union[Iterable, Sized]] = None
@@ -1155,7 +1172,33 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         method: Optional[Literal["bfill", "ffill"]] = None,
         **kwargs,
     ) -> spark.DataFrame:
-        pass
+        if method is None:
+            return (
+                    self.data
+                    .fillna(value=values, **kwargs)
+                    .fillna(value=f"{values}", **kwargs)
+                )
+        
+        tmp = self.data
+        for column in self.data.columns:
+            
+            if method == "bfill":
+                tmp = tmp.withColumn(column,
+                                        (
+                                            F.first(F.col(column), ignorenulls=True)
+                                            .over(Window.rowsBetween(Window.currentRow, Window.unboundedFollowing))
+                                        )
+                                    )
+            elif method == "ffill":
+                tmp = tmp.withColumn(column,
+                                        (
+                                            F.last(F.col(column), ignorenulls=True)
+                                            .over(Window.rowsBetween(Window.unboundedPreceding, Window.currentRow))
+                                        )
+                                    )
+            else:
+                raise ValueError(f"Wrong fill method: {method}")
+        return tmp
 
     def na_counts(self) -> Union[spark.DataFrame, int]:
         na_counts = self.data.select(
@@ -1347,7 +1390,26 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         subset: Optional[Union[str, Iterable[str]]] = None,
         axis: Union[Literal["index", "rows", "columns"], int] = 0,
     ) -> spark.DataFrame:
-        pass
+        if axis in ["index", "rows"] or axis == 0:
+            return self.data.na.drop(how=how, subset=subset)
+        if subset is None:
+            subset = self.data.columns
+        subset = Adapter.to_list(subset)
+        select_arr = [F.col(column) for column in self.data.columns if column not in subset]
+        
+        tmp = []
+        for col in subset:
+            condition = F.when(F.col(col).isNull(), 1)
+            tmp.extend([
+                F.count(condition).alias(col)
+            ])
+        mask = self.data.select(*tmp).collect()[0]
+        for col in subset:
+            if mask[col] == 0:
+                select_arr.extend([
+                    F.col(col)
+                ])
+        return self.data.select(*select_arr)
 
     def transpose(self, names: Optional[Sequence[str]] = None) -> spark.DataFrame: # TODO: to be moved to small data
         pass
@@ -1358,7 +1420,12 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         n: int | None = None,
         random_state: int | None = None,
     ) -> spark.DataFrame:
-        pass
+        if frac:
+            return self.data.sample(fraction=frac, seed=random_state)
+        if n:
+            sample_list = self.data.rdd.takeSample(withReplacement=True, num=n, seed=random_state)
+            return self.session.createDataFrame(sample_list, self.data.schema)
+        raise 
 
     def select_dtypes(
         self,
@@ -1400,12 +1467,68 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         on: Optional[str] = None,
         left_on: Optional[str] = None,
         right_on: Optional[str] = None,
-        left_index: Optional[bool] = None,
-        right_index: Optional[bool] = None,
-        suffixes: tuple[str, str] = ("_x", "_y"),
+        left_index: Optional[bool] = None, 
+        right_index: Optional[bool] = None, 
+        suffixes: Tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> spark.DataFrame:
-        pass
+        tmp_left, tmp_right = self.data, right.data
+        on_column = None
+
+        if on is not None and (on in self.data.columns and on in right.data.columns):
+            left_on, right_on = on, on
+            on_column = on
+        
+        if left_index:
+            tmp_left = (
+                            tmp_left
+                            .withColumn("row_index", F.row_number().over(Window.orderBy(F.monotonically_increasing_id())) - 1)
+                        )
+            left_on = "row_index"
+        
+        if right_index:
+            tmp_right = (
+                            tmp_right
+                            .withColumn("row_index", F.row_number().over(Window.orderBy(F.monotonically_increasing_id())) - 1)
+                        )
+            right_on = "row_index"
+        
+        if any([
+                right_on is None and left_on is None,
+                left_on not in tmp_left.columns,
+                right_on not in tmp_right.columns
+                ]):
+            raise MergeOnError()
+        
+        cross_columns = set(tmp_left.columns).intersection(set(tmp_right.columns))
+        
+        if cross_columns and suffixes[0]:
+            cross_columns_left = {column : f"{column}{suffixes[0]}"  for column in cross_columns}
+            tmp_left = tmp_left.withColumnsRenamed(cross_columns_left)
+            if left_on in cross_columns_left.keys():
+                left_on = cross_columns_left[left_on]
+        
+        if cross_columns and suffixes[1]:
+            cross_columns_right = {column : f"{column}{suffixes[1]}" for column in cross_columns}
+            tmp_right = tmp_right.withColumnsRenamed(cross_columns_right)
+            if right_on in cross_columns_right.keys():
+                right_on = cross_columns_right[right_on]
+
+        result = tmp_left.join(tmp_right, tmp_left[left_on] == tmp_right[right_on], how=how)
+
+        if left_index:
+            result = result.drop(f"row_index{suffixes[0]}")
+        
+        if right_index:
+            result = result.drop(f"row_index{suffixes[1]}")
+
+        if on is not None:
+            result = (
+                        result
+                        .drop(right_on)
+                        .withColumnRenamed(f"{on_column}{suffixes[0]}", on_column) 
+                    )
+        return  result
 
     def drop(self, labels: Any = "", axis: int = 1) -> spark.DataFrame:
         labels = Adapter.to_list(labels)
@@ -1445,8 +1568,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         else:
             raise ValueError("Invalid axis value")
 
-    def rename(self, columns: dict[str, str]) -> spark.DataFrame:  # Эрик
-        pass
+    def rename(self, columns: Dict[str, str]) -> spark.DataFrame:       # Эрик
+        return self.data.withColumnsRenamed(columns)
 
     def replace(
         self, to_replace: Any = None, value: Any = None, regex: bool = False
