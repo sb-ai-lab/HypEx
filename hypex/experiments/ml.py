@@ -9,6 +9,7 @@ from ..dataset import ExperimentData
 from ..dataset.ml_data import MLExperimentData
 from ..executor import Executor
 from ..transformers import TransformerMode
+from ..utils.constants import DEFAULT_EXPERIMENT_DIR
 from .artifact import ExperimentArtifact
 from .base import Experiment
 
@@ -162,11 +163,10 @@ class MLExperiment(Experiment):
     
     def _save_artifact(self, ml_data: MLExperimentData) -> None:
         """Save experiment artifact with models and transformer states"""
-        artifact_path = self._resolve_artifact_path()
-        
         artifact = ExperimentArtifact.create_from_experiment(
             ml_experiment=self,
-            base_dir=artifact_path
+            base_dir=self.experiment_dir,
+            experiment_id=self.key if self.key else None
         )
         
         # Save transformer states from ml_data
@@ -192,7 +192,8 @@ class MLExperiment(Experiment):
     
     def _load_artifact(self) -> None:
         """Load experiment artifact"""
-        artifact_path = self._resolve_artifact_path(load=True)
+        # User passes experiment ID, construct full path
+        artifact_path = os.path.join(self.experiment_dir, self.load_experiment)
         
         if not os.path.exists(artifact_path):
             raise FileNotFoundError(
@@ -260,30 +261,7 @@ class MLExperiment(Experiment):
                     ml_data.ml['trained_models'][executor_id][target] = model_info['model']
                     ml_data.ml['model_stats'][executor_id][target] = model_info['stats']
     
-    def _resolve_artifact_path(self, load: bool = False) -> str:
-        """
-        Resolve artifact path based on configuration.
-        
-        Args:
-            load: If True, resolving for load operation
-        
-        Returns:
-            Full path to artifact directory
-        """
-        # Base directory
-        base_dir = Path(self.experiment_dir)
-        
-        # Experiment ID
-        if load:
-            exp_id = self.load_experiment
-        else:
-            # Generate ID from key or timestamp
-            from datetime import datetime
-            exp_id = self.key if self.key else f"exp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        
-        return str(base_dir / exp_id)
-    
     @staticmethod
     def _get_default_experiment_dir() -> str:
         """Get default directory for experiment artifacts"""
-        return os.path.join(os.getcwd(), ".hypex_experiments")
+        return os.path.join(os.getcwd(), DEFAULT_EXPERIMENT_DIR)

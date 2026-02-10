@@ -74,13 +74,27 @@ class ExperimentArtifact:
         cls,
         ml_experiment: MLExperiment,
         base_dir: str,
+        experiment_id: Optional[str] = None,
     ) -> ExperimentArtifact:
         """
         Create artifact from MLExperiment.
         
         Extracts pipeline config from executors.
+        
+        Args:
+            ml_experiment: MLExperiment instance
+            base_dir: Base directory for all experiments
+            experiment_id: Optional experiment ID. If not provided, generates from key or timestamp
         """
-        experiment_id = os.path.basename(base_dir)
+        # Generate experiment ID if not provided
+        if experiment_id is None:
+            if ml_experiment.key:
+                experiment_id = str(ml_experiment.key)
+            else:
+                experiment_id = f"exp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Full path: base_dir / experiment_id
+        full_path = os.path.join(base_dir, experiment_id)
         
         pipeline_config = {
             'splitters': [
@@ -100,7 +114,7 @@ class ExperimentArtifact:
         return cls(
             experiment_id=experiment_id,
             experiment_class=ml_experiment.__class__.__name__,
-            base_dir=base_dir,
+            base_dir=full_path,
             pipeline_config=pipeline_config,
         )
     
