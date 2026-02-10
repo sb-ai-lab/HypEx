@@ -41,7 +41,7 @@ class MLExperimentData(ExperimentData):
             "fitted_transformers": {},  # {transformer_id: TransformerState}
             "config": {
                 "save_models": save_models,
-                "models_dir": models_dir or self._create_default_models_dir(),
+                "models_dir": models_dir,  # Сохранено для совместимости, но не используется
             },
             "splits": None,  # Data prepared by splitters
         }
@@ -108,6 +108,10 @@ class MLExperimentData(ExperimentData):
             target_name: Target column name
             model: Trained MLModel
             stats: ModelStats for this model
+        
+        Note:
+            Models are stored in memory only. Disk saving happens through 
+            ExperimentArtifact.save() when save_experiment=True.
         """
         # Store in ml space
         if executor_id not in self.ml["trained_models"]:
@@ -120,10 +124,6 @@ class MLExperimentData(ExperimentData):
         # Also store stats in analysis_tables for reporting
         stats_key = f"{executor_id}_{target_name}_stats"
         self.analysis_tables[stats_key] = stats.to_dict()
-        
-        # Save model if configured
-        if self.ml["config"]["save_models"]:
-            self._save_model_artifacts(executor_id, target_name, model, stats)
     
     def get_trained_model(self, executor_id: str, target_name: str) -> MLModel:
         """Get trained model by executor and target"""
@@ -220,32 +220,3 @@ class MLExperimentData(ExperimentData):
     def cleanup_transformer_artifacts(self) -> None:
         """Clear all fitted transformer states"""
         self.ml["fitted_transformers"].clear()
-    
-    # === Model artifacts management ===
-    
-    def _save_model_artifacts(
-        self, executor_id: str, target_name: str, model: MLModel, stats: ModelStats
-    ) -> None:
-        """Save model and stats to disk"""
-        model_dir = self._get_model_path(executor_id, target_name)
-        os.makedirs(model_dir, exist_ok=True)
-        
-        # Save model
-        model.save(model_dir)
-        
-        # Save stats separately
-        stats_path = os.path.join(model_dir, "stats.json")
-        with open(stats_path, "w") as f:
-            json.dump(stats.to_dict(), f, indent=2)
-    
-    def _get_model_path(self, executor_id: str, target_name: str) -> str:
-        """Get directory path for model storage"""
-        base_dir = self.ml["config"]["models_dir"]
-        # Sanitize executor_id for filename
-        safe_id = executor_id.replace(ID_SPLIT_SYMBOL, "_")
-        return os.path.join(base_dir, safe_id, target_name)
-    
-    @staticmethod
-    def _create_default_models_dir() -> str:
-        """Create default directory for saving models in current working directory"""
-        return os.getcwd()

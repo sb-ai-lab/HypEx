@@ -27,10 +27,9 @@ class MLExperiment(Experiment):
         ml_executors: ML model training and prediction executors
         save_models: Whether to save trained models to disk
         models_dir: Directory for saving models
-        load_models_dir: Directory for loading pre-trained models
         cleanup_after: Whether to cleanup ML artifacts after execution
         save_experiment: Save experiment artifact (transformers + models) for reuse
-        load_experiment: Experiment ID to load fitted transformers from
+        load_experiment: Experiment ID to load fitted transformers and models from
         experiment_dir: Directory for saving/loading experiment artifacts (default: .hypex_experiments/)
         transformer: Whether to deepcopy data between executors
         key: Experiment identifier
@@ -67,7 +66,6 @@ class MLExperiment(Experiment):
         ml_executors: Sequence[Executor] | None = None,
         save_models: bool = False,
         models_dir: Optional[str] = None,
-        load_models_dir: Optional[str] = None,
         cleanup_after: bool = True,
         save_experiment: bool = False,
         load_experiment: Optional[str] = None,
@@ -91,7 +89,6 @@ class MLExperiment(Experiment):
         self.ml_executors = list(ml_executors) if ml_executors else []
         self.save_models = save_models
         self.models_dir = models_dir
-        self.load_models_dir = load_models_dir
         self.cleanup_after = cleanup_after
         
         # Experiment artifact management
@@ -167,9 +164,6 @@ class MLExperiment(Experiment):
         # Override models_dir if specified
         if self.models_dir is not None:
             ml_data.ml["config"]["models_dir"] = self.models_dir
-        # Set load_models_dir if specified
-        if self.load_models_dir is not None:
-            ml_data.ml["config"]["load_models_dir"] = self.load_models_dir
         return ml_data
     
     def _save_artifact(self, ml_data: MLExperimentData) -> None:
@@ -240,6 +234,22 @@ class MLExperiment(Experiment):
         for transformer in self.transformers:
             if hasattr(transformer, 'mode'):
                 transformer.mode = TransformerMode.TRANSFORM
+        
+        # Restore executor IDs from saved configuration
+        # This ensures that loaded models can be found by their original executor IDs
+        saved_config = self._loaded_artifact.pipeline_config
+        
+        # Restore ML executor IDs
+        for i, executor in enumerate(self.ml_executors):
+            if i < len(saved_config.get('ml_executors', [])):
+                saved_executor = saved_config['ml_executors'][i]
+                executor._id = saved_executor['id']
+        
+        # Restore transformer IDs (if any)
+        for i, transformer in enumerate(self.transformers):
+            if i < len(saved_config.get('transformers', [])):
+                saved_transformer = saved_config['transformers'][i]
+                transformer._id = saved_transformer['id']
         
         # Load trained models if available
         models_data = self._loaded_artifact.load_models()

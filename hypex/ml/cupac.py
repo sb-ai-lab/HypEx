@@ -150,14 +150,6 @@ class CUPACExecutor(Executor):
             data.analysis_tables[f"{target}_cupac_report"] = report
             return
         
-        # Check if we should load pre-trained model from directory (old way)
-        load_models_dir = data.ml.get("config", {}).get("load_models_dir")
-        
-        if load_models_dir:
-            # Load pre-trained model instead of training
-            self._load_and_apply_model(data, target, target_data, load_models_dir)
-            return
-        
         # Original training flow
         # Extract feature names
         X_train_feature_names = [column[0] for column in target_data["X_train"]]
@@ -257,77 +249,6 @@ class CUPACExecutor(Executor):
         # Calculate variance reduction
         var_red = model._calculate_variance_reduction(target_values, adjusted_values)
         return var_red
-    
-    def _load_and_apply_model(
-        self,
-        data: MLExperimentData,
-        target: str,
-        target_data: TargetData,
-        load_models_dir: str,
-    ) -> None:
-        """Load pre-trained model and apply CUPAC adjustment"""
-        import os
-        from .models import MLModel
-        from .stats import ModelStats
-        
-        # Find CUPAC executor directory (starts with "CUPACExecutor")
-        executor_dirs = [d for d in os.listdir(load_models_dir) 
-                        if os.path.isdir(os.path.join(load_models_dir, d)) 
-                        and d.startswith("CUPACExecutor")]
-        
-        if not executor_dirs:
-            raise FileNotFoundError(
-                f"No CUPACExecutor directories found in {load_models_dir}. "
-                f"Make sure you saved models with save_cupac_models=True."
-            )
-        
-        # Use the first (and should be only) CUPAC executor directory
-        executor_dir = executor_dirs[0]
-        model_path = os.path.join(load_models_dir, executor_dir, target)
-        
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(
-                f"Pre-trained model for target '{target}' not found at: {model_path}. "
-                f"Available targets: {os.listdir(os.path.join(load_models_dir, executor_dir))}"
-            )
-        
-        # Load model
-        model = MLModel.load(model_path)
-        
-        # Load stats (stored as JSON)
-        stats_path = os.path.join(model_path, "stats.json")
-        if os.path.exists(stats_path):
-            import json
-            with open(stats_path, 'r') as f:
-                stats_dict = json.load(f)
-            stats = ModelStats.from_dict(stats_dict)
-        else:
-            # Create minimal stats if not found
-            stats = ModelStats(
-                model_name=model._backend.__class__.__name__,
-                model_type=model._backend.__class__.__name__.replace("Backend", "").lower(),
-                feature_importances={},
-                training_time_seconds=0.0,
-            )
-        
-        # Apply CUPAC adjustment if target is real (has current period data)
-        if "X_predict" in target_data:
-            var_red_real = self._apply_cupac_adjustment(
-                data, model, target, target_data
-            )
-            stats.variance_reduction_real = var_red_real
-        
-        # Store model and stats
-        data.add_trained_model(self.id, target, model, stats)
-        
-        # Store report for compatibility
-        report = {
-            "cupac_best_model": stats.model_name,
-            "cupac_variance_reduction_cv": stats.variance_reduction_cv,
-            "cupac_variance_reduction_real": stats.variance_reduction_real,
-            "cupac_feature_importances": stats.feature_importances,
-        }
-        data.analysis_tables[f"{target}_cupac_report"] = report
 
     @staticmethod
     def _agg_data_from_cupac_data(

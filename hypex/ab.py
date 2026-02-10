@@ -55,8 +55,6 @@ class ABTest(ExperimentShell):
         cuped_features: dict[str, str] | None,
         cupac_models: str | list[str] | None,
         enable_cupac: bool,
-        save_cupac_models: bool,
-        load_cupac_models: str | None,
         save_experiment: bool,
         load_experiment: str | None,
         experiment_dir: str | None,
@@ -130,8 +128,7 @@ class ABTest(ExperimentShell):
                 splitters=[CUPACDataSplitter()],
                 transformers=[],
                 ml_executors=[CUPACExecutor(cupac_models=cupac_models)],
-                save_models=save_cupac_models,
-                load_models_dir=load_cupac_models,
+                save_models=save_experiment,
                 cleanup_after=True,
                 save_experiment=save_experiment,
                 load_experiment=load_experiment,
@@ -166,8 +163,6 @@ class ABTest(ExperimentShell):
         cuped_features: dict[str, str] | None = None,
         cupac_models: str | list[str] | None = None,
         enable_cupac: bool = False,
-        save_cupac_models: bool = False,
-        load_cupac_models: str | None = None,
         save_experiment: bool = False,
         load_experiment: str | None = None,
         experiment_dir: str | None = None,
@@ -180,10 +175,8 @@ class ABTest(ExperimentShell):
             cuped_features: dict[str, str] — Dictionary {target_feature: pre_target_feature} for CUPED. Only dict is allowed.
             cupac_models: str | list[str] — model name (e.g. 'linear', 'ridge', 'lasso', 'catboost') or list of model names to try. If None, all available models will be tried and the best will be selected by variance reduction.
             enable_cupac: bool — Enable CUPAC variance reduction. CUPAC configuration is extracted from dataset.features_mapping.
-            save_cupac_models: bool — Save trained CUPAC models to disk for later use (default: False).
-            load_cupac_models: str | None — Directory path to load pre-trained CUPAC models from. If provided, models will be loaded instead of trained (default: None).
-            save_experiment: bool — Save experiment artifact (transformers + models) for reuse on real data (default: False).
-            load_experiment: str | None — Experiment ID to load fitted transformers from. Use this to apply fitted transformers to new data (default: None).
+            save_experiment: bool — Save experiment artifact (transformers + models) for reuse on real data. When enabled with CUPAC, automatically saves trained models (default: False).
+            load_experiment: str | None — Experiment ID to load fitted transformers and models from. Use this to apply fitted transformers and models to new data (default: None).
             experiment_dir: str | None — Directory for saving/loading experiment artifacts (default: .hypex_experiments/).
         """
         super().__init__(
@@ -193,8 +186,6 @@ class ABTest(ExperimentShell):
                 cuped_features,
                 cupac_models,
                 enable_cupac,
-                save_cupac_models,
-                load_cupac_models,
                 save_experiment,
                 load_experiment,
                 experiment_dir,
