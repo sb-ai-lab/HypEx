@@ -1,53 +1,110 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from ..dataset import Dataset, ExperimentData
+from ..dataset.ml_data import MLData, MLExperimentData
 from ..dataset.roles import FeatureRole, PreTargetRole, TargetRole
-from ..executor import Calculator
-from ..utils import ExperimentDataEnum
+from .base import Splitter
 
 
-class CUPACDataSplitter(Calculator):
+class CUPACDataSplitter(Splitter):
     """
     Splitter that prepares temporal data structures for CUPAC ML models.
     
     This splitter organizes temporal fields (targets and features with lags) into
-    training and prediction structures used by CUPACExecutor for ML model training.
+    MLData objects that encapsulate all data needed for ML model training.
     
     Process:
     1. Groups target and feature fields by their temporal lags
     2. Identifies cofounders (features used for prediction)
-    3. Structures data into X_train, Y_train for model training
-    4. Creates X_predict for current period adjustment (if applicable)
+    3. Creates MLData for each target with:
+       - X_train, Y_train: aggregated training data from all lags
+       - X_predict: current period features (optional, for real targets only)
+       - crossval: optional CV folds if generate_cv_folds=True
     
-    The results are stored in data.ml["splits"] and consumed by CUPACExecutor.
+    The results are stored in MLExperimentData.ml as {target_name: MLData}.
     """
     
-    def __init__(self, key: Any = ""):
-        super().__init__(key)
-    
-    @staticmethod
-    def _inner_function(data: ExperimentData) -> dict[str, dict[str, list]]:
+    def __init__(
+        self,
+        n_folds: int = 5,
+        random_state: Optional[int] = None,
+        generate_cv_folds: bool = False,
+        key: Any = "",
+    ):
         """
-        Prepare data for CUPAC by organizing temporal fields into training and prediction structures.
-
-        This method performs complex data organization:
-        1. Groups target and feature fields by their temporal lags
-        2. Identifies cofounders (features used for prediction)
-        3. Structures data into X_train, Y_train for model training
-        4. Creates X_predict for current period adjustment (if applicable)
-
+        Initialize CUPAC data splitter.
+        
         Args:
-            data (ExperimentData): Input experiment data with temporal roles.
-
+            n_folds: Number of cross-validation folds
+            random_state: Random seed for reproducibility
+            generate_cv_folds: Whether to generate CV folds for each target
+            key: Executor identifier
+        """
+        super().__init__(n_folds=n_folds, random_state=random_state, key=key)
+        self.generate_cv_folds = generate_cv_folds
+    
+    def execute(self, data: ExperimentData) -> MLExperimentData:
+        """
+        Execute CUPAC data splitting.
+        
+        Organizes temporal data and creates MLData objects for each target.
+        
+        Args:
+            data: ExperimentData with temporal roles
+            
         Returns:
-            dict: Nested dictionary with structure:
-                {target_name: {
-                    'X_train': [[feature_cols_at_lag_n], ..., [feature_cols_at_lag_2]],
-                    'Y_train': [target_at_lag_n-1, ..., target_at_lag_1],
-                    'X_predict': [[feature_cols_at_lag_1]] (optional, only for real targets)
-                }}
+            MLExperimentData with MLData objects in .ml
+        """
+        # Ensure MLExperimentData
+        ml_data = self.ensure_ml_experiment_data(data)
+        
+        # Prepare raw splits structure
+        raw_splits = self._prepare_splits(data)
+        
+        # Convert to MLData objects
+        for target_name, target_splits in raw_splits.items():
+            # Aggregate X_train and Y_train
+            X_train = self.aggregate_columns(data, target_splits["X_train"])
+            Y_train = self.aggregate_columns(data, [target_splits["Y_train"]])
+            
+            # Aggregate X_predict if exists
+            X_predict = None
+            if "X_predict" in target_splits:
+                X_predict = self.aggregate_columns(data, target_splits["X_predict"])
+            
+            # Create MLData
+            ml_data_obj = MLData(
+                X_train=X_train,
+                Y_train=Y_train,
+                X_predict=X_predict,
+            )
+            
+            # Generate CV folds if requested
+            if self.generate_cv_folds:
+                ml_data_obj = self.add_cv_folds_to_mldata(
+                    ml_data_obj,
+                    n_folds=self.n_folds,
+                    random_state=self.random_state,
+                )
+            
+            # Store in MLExperimentData
+            ml_data.add_ml_data(target_name, ml_data_obj)
+        
+        # Always return MLExperimentData (MLExperiment will handle conversion back)
+        return ml_data
+    
+    def _prepare_splits(self, data: ExperimentData) -> dict[str, dict[str, list]]:
+        """
+        Prepare raw data splits structure (backward compatible with old implementation).
+        
+        Returns:
+            dict: {target_name: {
+                'X_train': [[feature_cols_at_lag_n], ..., [feature_cols_at_lag_2]],
+                'Y_train': [target_at_lag_n-1, ..., target_at_lag_1],
+                'X_predict': [[feature_cols_at_lag_1]] (optional)
+            }}
         """
 
         def agg_temporal_fields(role, data_obj) -> dict[str, dict]:
@@ -156,29 +213,3 @@ class CUPACDataSplitter(Calculator):
                 agg_train_predict_x("X_predict", 1)
 
         return cupac_data
-    
-    def execute(self, data: ExperimentData) -> ExperimentData:
-        """
-        Execute CUPAC data splitting.
-        
-        Organizes temporal data and stores result in data.ml["splits"].
-        
-        Args:
-            data: ExperimentData with temporal roles
-            
-        Returns:
-            ExperimentData with splits stored in ml namespace
-        """
-        # Calculate splits - pass ExperimentData directly
-        cupac_splits = self.calc(data=data)
-        
-        # Store in ExperimentData
-        return self._set_value(data, cupac_splits)
-    
-    def _set_value(self, data: ExperimentData, value) -> ExperimentData:
-        """Store splits in ml namespace"""
-        return data.set_value(
-            ExperimentDataEnum.ml,
-            "splits",
-            value
-        )

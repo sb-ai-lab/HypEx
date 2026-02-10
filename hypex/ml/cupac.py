@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Sequence, Union
-
-import numpy as np
+from typing import Any, Dict, List, Optional, Sequence, Union, TYPE_CHECKING
 
 from ..dataset import Dataset, ExperimentData
 from ..dataset.ml_data import MLExperimentData
@@ -16,6 +14,9 @@ from ..executor import Executor
 from ..utils.adapter import Adapter
 from .models import MLModel
 from .stats import ModelStats
+
+if TYPE_CHECKING:
+    from ..dataset.ml_data import MLData
 
 
 class CUPACExecutor(Executor):
@@ -78,7 +79,7 @@ class CUPACExecutor(Executor):
         Execute CUPAC variance reduction on the experiment data.
 
         Process:
-        1. Validate models and read prepared data from splitter
+        1. Validate models and read MLData from splitter
         2. For each target:
             a. Try all specified models with cross-validation
             b. Select the model with best variance reduction
@@ -88,7 +89,7 @@ class CUPACExecutor(Executor):
         3. Store adjusted targets and metrics in ExperimentData
 
         Args:
-            data (ExperimentData): Input data with splits from CUPACDataSplitter.
+            data (ExperimentData): Input data with MLData from CUPACDataSplitter.
 
         Returns:
             ExperimentData: Data with CUPAC-adjusted targets and variance reduction reports.
@@ -102,12 +103,10 @@ class CUPACExecutor(Executor):
         # Validate models
         models = self._validate_models()
         
-        # Read prepared data from splitter (stored in ml["splits"])
-        cupac_data = ml_data.ml.get("splits")
-        
-        # Process each target
-        for target, target_data in cupac_data.items():
-            self._process_target(ml_data, target, target_data, models)
+        # Process each target with MLData
+        for target_name in ml_data.get_all_targets():
+            ml_data_obj = ml_data.get_ml_data(target_name)
+            self._process_target(ml_data, target_name, ml_data_obj, models)
         
         # Return appropriate type
         return ml_data if is_ml_data else ml_data.to_experiment_data()
@@ -116,24 +115,21 @@ class CUPACExecutor(Executor):
         self,
         data: MLExperimentData,
         target: str,
-        target_data: Dict,
+        ml_data_obj: "MLData",
         models: List[str],
     ) -> None:
         """Process single target with model selection and adjustment"""
         
         # Check if we should load pre-trained model from artifact
-        trained_models = data.ml.get('trained_models', {})
-        model_stats = data.ml.get('model_stats', {})
-        
-        if self.id in trained_models and target in trained_models[self.id]:
+        if self.id in data.trained_models and target in data.trained_models[self.id]:
             # Use model from loaded artifact
-            model = trained_models[self.id][target]
-            stats = model_stats[self.id][target]
+            model = data.trained_models[self.id][target]
+            stats = data.model_stats[self.id][target]
             
             # Apply CUPAC adjustment if target is real (has current period data)
-            if "X_predict" in target_data:
+            if ml_data_obj.X_predict is not None:
                 var_red_real = self._apply_cupac_adjustment(
-                    data, model, target, target_data
+                    data, model, target, ml_data_obj
                 )
                 stats.variance_reduction_real = var_red_real
             
@@ -151,12 +147,8 @@ class CUPACExecutor(Executor):
             return
         
         # Original training flow
-        # Extract feature names
-        X_train_feature_names = [column[0] for column in target_data["X_train"]]
-        
-        # Prepare training data
-        X_train = self._agg_data_from_cupac_data(data, target_data["X_train"])
-        Y_train = self._agg_data_from_cupac_data(data, [target_data["Y_train"]])
+        # Get feature names from X_train columns
+        X_train_feature_names = list(ml_data_obj.X_train.columns)
         
         # Model selection via CV
         best_model = None
@@ -169,8 +161,8 @@ class CUPACExecutor(Executor):
             
             # Cross-validate (возвращает ModelStats)
             stats = model.cross_validate(
-                X_train,
-                Y_train,
+                ml_data_obj.X_train,
+                ml_data_obj.Y_train,
                 n_folds=self.n_folds,
                 random_state=self.random_state,
                 aggregation=self.cv_aggregation,
@@ -189,7 +181,7 @@ class CUPACExecutor(Executor):
             )
         
         # Fit best model on all data
-        best_model.fit(X_train, Y_train)
+        best_model.fit(ml_data_obj.X_train, ml_data_obj.Y_train)
         
         # Map feature importances to original names
         mapped_importances = {
@@ -199,9 +191,9 @@ class CUPACExecutor(Executor):
         best_stats.feature_importances = mapped_importances
         
         # Apply CUPAC adjustment if target is real
-        if "X_predict" in target_data:
+        if ml_data_obj.X_predict is not None:
             var_red_real = self._apply_cupac_adjustment(
-                data, best_model, target, target_data
+                data, best_model, target, ml_data_obj
             )
             # Update stats with real variance reduction
             best_stats.variance_reduction_real = var_red_real
@@ -223,30 +215,33 @@ class CUPACExecutor(Executor):
         data: MLExperimentData,
         model: MLModel,
         target: str,
-        target_data: Dict,
+        ml_data_obj: "MLData",
     ) -> float:
         """Apply CUPAC adjustment to current period"""
-        X_predict = self._agg_data_from_cupac_data(data, target_data["X_predict"])
+        prediction_ds = model.predict(ml_data_obj.X_predict)
         
-        prediction_ds = model.predict(X_predict)
-        prediction = np.array(prediction_ds.get_values(column="prediction"))
-        
+        # Get prediction mean using Dataset API
         prediction_mean = float(prediction_ds.mean())
         
+        # Get target and prediction as Datasets
         target_ds = data.ds[target]
-        target_values = np.array(target_ds.get_values(column=target))
-        adjusted_values = target_values - prediction + prediction_mean
         
-        target_cupac = Dataset.from_dict(
-            data={f"{target}_cupac": adjusted_values},
-            roles={f"{target}_cupac": AdditionalTargetRole()},
-            index=data.ds.index
-        )
+        # Perform adjustment using Dataset arithmetic operations
+        # adjusted = target - prediction + prediction_mean
+        adjusted_ds = target_ds - prediction_ds["prediction"] + prediction_mean
+        
+        # Rename to cupac column
+        adjusted_ds = adjusted_ds.rename({target: f"{target}_cupac"})
+        
+        # Update role to AdditionalTargetRole
+        adjusted_ds.roles[f"{target}_cupac"] = AdditionalTargetRole()
         
         # Add to additional_fields
-        data.additional_fields = data.additional_fields.add_column(data=target_cupac)
+        data.additional_fields = data.additional_fields.add_column(data=adjusted_ds)
         
-        # Calculate variance reduction
+        # Calculate variance reduction using Dataset values
+        target_values = target_ds.get_values(column=target)
+        adjusted_values = adjusted_ds.get_values(column=f"{target}_cupac")
         var_red = model._calculate_variance_reduction(target_values, adjusted_values)
         return var_red
 
@@ -256,6 +251,9 @@ class CUPACExecutor(Executor):
     ) -> Dataset:
         """
         Aggregate columns from cupac_data structure into a single Dataset.
+        
+        DEPRECATED: This method is kept for backward compatibility.
+        New code should use MLData directly from CUPACDataSplitter.
 
         This method handles two types of column structures:
         1. Single column: [column_name] - directly extracted

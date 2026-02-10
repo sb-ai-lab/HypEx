@@ -15,14 +15,53 @@ if TYPE_CHECKING:
     from ..transformers.state import TransformerState
 
 
+class MLData:
+    """
+    Container for ML training/prediction data for a single target.
+    
+    This class encapsulates all data needed for ML model training:
+    - Training data (X_train, Y_train)
+    - Prediction data (X_predict) for current period
+    - Cross-validation folds
+    
+    Attributes:
+        X_train (Dataset): Training features
+        Y_train (Dataset): Training target
+        X_predict (Optional[Dataset]): Prediction features for current period
+        crossval (Dict[int, Tuple[Dataset, Dataset]]): CV folds {fold_id: (X_val, Y_val)}
+    """
+    
+    def __init__(
+        self,
+        X_train: Dataset,
+        Y_train: Dataset,
+        X_predict: Optional[Dataset] = None,
+        crossval: Optional[Dict[int, Tuple[Dataset, Dataset]]] = None,
+    ):
+        self.X_train = X_train
+        self.Y_train = Y_train
+        self.X_predict = X_predict
+        self.crossval = crossval or {}
+    
+    def __repr__(self) -> str:
+        return (
+            f"MLData(X_train={self.X_train.shape}, "
+            f"Y_train={self.Y_train.shape}, "
+            f"X_predict={self.X_predict.shape if self.X_predict else None}, "
+            f"n_folds={len(self.crossval)})"
+        )
+
+
 class MLExperimentData(ExperimentData):
     """
     Extended ExperimentData with ML artifacts.
     
-    - self.ml['trained_models'][executor_id] = {target: MLModel}
-    - self.ml['model_stats'][executor_id] = {target: ModelStats}
-    - self.ml['config'] = {save_models: bool}
-    - self.ml['splits'] = prepared data from splitters
+    Structure:
+    - self.ml: Dict[str, MLData] - {target_name: MLData}
+    - self.trained_models: Dict[str, Dict[str, MLModel]] - {executor_id: {target: MLModel}}
+    - self.model_stats: Dict[str, Dict[str, ModelStats]] - {executor_id: {target: ModelStats}}
+    - self.fitted_transformers: Dict[str, TransformerState] - {transformer_id: TransformerState}
+    - self.config: Dict[str, Any] - configuration
     """
     
     def __init__(
@@ -32,14 +71,19 @@ class MLExperimentData(ExperimentData):
     ):
         super().__init__(data=data)
         
-        self.ml: Dict[str, Any] = {
-            "trained_models": {},  # {executor_id: {target: MLModel}}
-            "model_stats": {},  # {executor_id: {target: ModelStats}}
-            "fitted_transformers": {},  # {transformer_id: TransformerState}
-            "config": {
-                "save_models": save_models,
-            },
-            "splits": None,  # Data prepared by splitters
+        # Main ML data storage: {target_name: MLData}
+        self.ml: Dict[str, MLData] = {}
+        
+        # Trained models and stats
+        self.trained_models: Dict[str, Dict[str, MLModel]] = {}  # {executor_id: {target: MLModel}}
+        self.model_stats: Dict[str, Dict[str, ModelStats]] = {}  # {executor_id: {target: ModelStats}}
+        
+        # Fitted transformers
+        self.fitted_transformers: Dict[str, TransformerState] = {}  # {transformer_id: TransformerState}
+        
+        # Configuration
+        self.config: Dict[str, Any] = {
+            "save_models": save_models,
         }
     
     @classmethod
@@ -72,26 +116,33 @@ class MLExperimentData(ExperimentData):
         
         return exp_data
     
-    def set_value(
-        self,
-        space: ExperimentDataEnum,
-        executor_id: str | dict[str, str],
-        value: Any,
-        key: str | None = None,
-        role=None,
-    ) -> "MLExperimentData":
+    # === MLData management ===
+    
+    def add_ml_data(self, target_name: str, ml_data: MLData) -> None:
         """
-        Override set_value to handle ML space.
+        Add MLData for a target.
+        
+        Args:
+            target_name: Target column name
+            ml_data: MLData instance with training/prediction data
         """
-        if space == ExperimentDataEnum.ml:
-            # For ml space, executor_id is the key (like "splits")
-            # and value is the data to store
-            self.ml[executor_id] = value
-            return self
-        else:
-            # Delegate to parent for other spaces
-            super().set_value(space, executor_id, value, key, role)
-            return self
+        self.ml[target_name] = ml_data
+    
+    def get_ml_data(self, target_name: str) -> MLData:
+        """Get MLData for a target"""
+        if target_name not in self.ml:
+            raise KeyError(f"MLData not found for target '{target_name}'")
+        return self.ml[target_name]
+    
+    def has_ml_data(self, target_name: str) -> bool:
+        """Check if MLData exists for target"""
+        return target_name in self.ml
+    
+    def get_all_targets(self) -> list[str]:
+        """Get list of all targets with MLData"""
+        return list(self.ml.keys())
+    
+    # === Trained models management ===
     
     def add_trained_model(
         self, executor_id: str, target_name: str, model: MLModel, stats: ModelStats
@@ -109,13 +160,13 @@ class MLExperimentData(ExperimentData):
             Models are stored in memory only. Disk saving happens through 
             ExperimentArtifact.save() when save_experiment=True.
         """
-        # Store in ml space
-        if executor_id not in self.ml["trained_models"]:
-            self.ml["trained_models"][executor_id] = {}
-            self.ml["model_stats"][executor_id] = {}
+        # Store in trained_models
+        if executor_id not in self.trained_models:
+            self.trained_models[executor_id] = {}
+            self.model_stats[executor_id] = {}
         
-        self.ml["trained_models"][executor_id][target_name] = model
-        self.ml["model_stats"][executor_id][target_name] = stats
+        self.trained_models[executor_id][target_name] = model
+        self.model_stats[executor_id][target_name] = stats
         
         # Also store stats in analysis_tables for reporting
         stats_key = f"{executor_id}_{target_name}_stats"
@@ -123,9 +174,9 @@ class MLExperimentData(ExperimentData):
     
     def get_trained_model(self, executor_id: str, target_name: str) -> MLModel:
         """Get trained model by executor and target"""
-        if executor_id in self.ml["trained_models"]:
-            if target_name in self.ml["trained_models"][executor_id]:
-                return self.ml["trained_models"][executor_id][target_name]
+        if executor_id in self.trained_models:
+            if target_name in self.trained_models[executor_id]:
+                return self.trained_models[executor_id][target_name]
         
         raise KeyError(
             f"Model not found: executor={executor_id}, target={target_name}"
@@ -133,15 +184,15 @@ class MLExperimentData(ExperimentData):
     
     def get_model_stats(self, executor_id: str, target_name: str) -> ModelStats:
         """Get model stats by executor and target"""
-        if executor_id in self.ml["model_stats"]:
-            if target_name in self.ml["model_stats"][executor_id]:
-                return self.ml["model_stats"][executor_id][target_name]
+        if executor_id in self.model_stats:
+            if target_name in self.model_stats[executor_id]:
+                return self.model_stats[executor_id][target_name]
         raise KeyError(f"Stats not found: executor={executor_id}, target={target_name}")
     
     def get_all_models_for_target(self, target_name: str) -> Dict[str, MLModel]:
         """Get all models trained for a specific target across all executors"""
         result = {}
-        for executor_id, models in self.ml["trained_models"].items():
+        for executor_id, models in self.trained_models.items():
             if target_name in models:
                 result[executor_id] = models[target_name]
         return result
@@ -158,7 +209,7 @@ class MLExperimentData(ExperimentData):
         best_score = -float("inf")
         best_executor = None
         
-        for executor_id, stats_dict in self.ml["model_stats"].items():
+        for executor_id, stats_dict in self.model_stats.items():
             if target_name in stats_dict:
                 stats = stats_dict[target_name]
                 score = getattr(stats, metric, 0.0)
@@ -175,7 +226,7 @@ class MLExperimentData(ExperimentData):
     
     def cleanup_ml_artifacts(self) -> None:
         """Free memory by clearing ML models (keep stats)"""
-        self.ml["trained_models"].clear()
+        self.trained_models.clear()
         # model_stats остаются для анализа
     
     # === Transformer state management ===
@@ -188,7 +239,7 @@ class MLExperimentData(ExperimentData):
             transformer_id: Transformer ID (e.g., "NaFiller__hash")
             state: TransformerState with fitted parameters
         """
-        self.ml["fitted_transformers"][transformer_id] = state
+        self.fitted_transformers[transformer_id] = state
     
     def get_fitted_transformer(self, transformer_id: str) -> Optional["TransformerState"]:
         """
@@ -197,16 +248,16 @@ class MLExperimentData(ExperimentData):
         Returns:
             TransformerState or None if not found
         """
-        return self.ml["fitted_transformers"].get(transformer_id)
+        return self.fitted_transformers.get(transformer_id)
     
     def has_fitted_transformer(self, transformer_id: str) -> bool:
         """Check if transformer is fitted"""
-        return transformer_id in self.ml["fitted_transformers"]
+        return transformer_id in self.fitted_transformers
     
     def get_all_fitted_transformers(self) -> Dict[str, "TransformerState"]:
         """Get all fitted transformer states"""
-        return self.ml["fitted_transformers"].copy()
+        return self.fitted_transformers.copy()
     
     def cleanup_transformer_artifacts(self) -> None:
         """Clear all fitted transformer states"""
-        self.ml["fitted_transformers"].clear()
+        self.fitted_transformers.clear()
