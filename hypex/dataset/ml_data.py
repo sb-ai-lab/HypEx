@@ -19,10 +19,9 @@ class MLExperimentData(ExperimentData):
     """
     Extended ExperimentData with ML artifacts.
     
-    Хранит ML данные в стандартной структуре HypEx:
     - self.ml['trained_models'][executor_id] = {target: MLModel}
     - self.ml['model_stats'][executor_id] = {target: ModelStats}
-    - self.ml['config'] = {save_models: bool, models_dir: str}
+    - self.ml['config'] = {save_models: bool}
     - self.ml['splits'] = prepared data from splitters
     """
     
@@ -30,18 +29,15 @@ class MLExperimentData(ExperimentData):
         self,
         data: Dataset,
         save_models: bool = False,
-        models_dir: Optional[str] = None,
     ):
         super().__init__(data=data)
         
-        # Инициализируем ml пространство
         self.ml: Dict[str, Any] = {
             "trained_models": {},  # {executor_id: {target: MLModel}}
             "model_stats": {},  # {executor_id: {target: ModelStats}}
             "fitted_transformers": {},  # {transformer_id: TransformerState}
             "config": {
                 "save_models": save_models,
-                "models_dir": models_dir,  # Сохранено для совместимости, но не используется
             },
             "splits": None,  # Data prepared by splitters
         }
@@ -130,12 +126,6 @@ class MLExperimentData(ExperimentData):
         if executor_id in self.ml["trained_models"]:
             if target_name in self.ml["trained_models"][executor_id]:
                 return self.ml["trained_models"][executor_id][target_name]
-        
-        # Try loading from disk if saved
-        if self.ml["config"]["save_models"]:
-            model_dir = self._get_model_path(executor_id, target_name)
-            if os.path.exists(model_dir):
-                return MLModel.load(model_dir)
         
         raise KeyError(
             f"Model not found: executor={executor_id}, target={target_name}"

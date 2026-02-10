@@ -779,7 +779,7 @@ class ExperimentData:
         self.groups: dict[str, dict[str, Dataset]] = {}
         self.analysis_tables: dict[str, Dataset] = {}
         self.id_name_mapping: dict[str, str] = {}
-    
+
     @property
     def ds(self):
         """

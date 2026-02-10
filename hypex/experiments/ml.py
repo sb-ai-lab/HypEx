@@ -26,7 +26,6 @@ class MLExperiment(Experiment):
         transformers: Data transformation executors (normalize, encode, etc.)
         ml_executors: ML model training and prediction executors
         save_models: Whether to save trained models to disk
-        models_dir: Directory for saving models
         cleanup_after: Whether to cleanup ML artifacts after execution
         save_experiment: Save experiment artifact (transformers + models) for reuse
         load_experiment: Experiment ID to load fitted transformers and models from
@@ -65,7 +64,6 @@ class MLExperiment(Experiment):
         transformers: Sequence[Executor] | None = None,
         ml_executors: Sequence[Executor] | None = None,
         save_models: bool = False,
-        models_dir: Optional[str] = None,
         cleanup_after: bool = True,
         save_experiment: bool = False,
         load_experiment: Optional[str] = None,
@@ -88,7 +86,6 @@ class MLExperiment(Experiment):
         self.transformers = list(transformers) if transformers else []
         self.ml_executors = list(ml_executors) if ml_executors else []
         self.save_models = save_models
-        self.models_dir = models_dir
         self.cleanup_after = cleanup_after
         
         # Experiment artifact management
@@ -161,9 +158,6 @@ class MLExperiment(Experiment):
         ml_data = MLExperimentData.from_experiment_data(
             data, save_models=self.save_models
         )
-        # Override models_dir if specified
-        if self.models_dir is not None:
-            ml_data.ml["config"]["models_dir"] = self.models_dir
         return ml_data
     
     def _save_artifact(self, ml_data: MLExperimentData) -> None:
