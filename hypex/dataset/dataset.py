@@ -124,14 +124,31 @@ class SmallDataset(DatasetBase):
     @staticmethod
     def from_dict(
             data: FromDictTypes,
-            roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
-            backend: BackendsEnum = BackendsEnum.pandas,
-            index=None,
+            roles: ABCRole | dict[str, ABCRole],
     ) -> Dataset:
-        ds = Dataset(roles=roles, backend=backend)
-        ds._backend = ds._backend.from_dict(data, index)
-        ds.data = ds._backend.data
-        return ds
+        roles_names = list(data.keys())
+        if any(
+            [
+                any(isinstance(i, t) for t in [int, str, float, bool])
+                for i in list(data.values())
+            ]
+        ):
+            data = [data]
+        if isinstance(roles, dict):
+            return Dataset.from_dict(data=data, roles=roles)
+        elif isinstance(roles, ABCRole):
+            return Dataset.from_dict(
+                data=data, roles={name: roles for name in roles_names}
+            )
+
+    @staticmethod
+    def to_small_dataset(dataset: Dataset) -> SmallDataset:
+        """Преобразует Dataset в SmallDataset"""
+        return SmallDataset(
+            roles=dataset.roles,
+            data=dataset.data,
+            default_role=dataset.default_role,
+        )
 
     def sort(
             self,
@@ -181,7 +198,7 @@ class ExperimentData:
         self.additional_fields = Dataset.create_empty(index=data.index)
         self.variables: dict[str, dict[str, int | float]] = {}
         self.groups: dict[str, dict[str, Dataset]] = {}
-        self.analysis_tables: dict[str, Dataset] = {}
+        self.analysis_tables: dict[str, SmallDataset] = {}  # Используем SmallDataset
         self.id_name_mapping: dict[str, str] = {}
 
     @property
@@ -249,6 +266,12 @@ class ExperimentData:
 
         # Handle analysis tables
         elif space == ExperimentDataEnum.analysis_tables:
+            # Преобразуем Dataset в SmallDataset
+            if isinstance(value, Dataset):
+                value = SmallDataset.to_small_dataset(value)
+            elif not isinstance(value, SmallDataset):
+                # Если значение не Dataset/SmallDataset, создаем SmallDataset
+                value = SmallDataset.from_dict(value.to_dict(), roles=role)
             self.analysis_tables[executor_id] = value
 
         # Handle variables
@@ -279,7 +302,7 @@ class ExperimentData:
             result = id_[: id_.find(ID_SPLIT_SYMBOL)] == class_
 
             if result and key is not None:
-                result = id_[id_.rfind(ID_SPLIT_SYMBOL) + 1 :] == key
+                result = id_[id_.rfind(ID_SPLIT_symbol) + 1 :] == key
             return result
 
         # Define spaces to search
@@ -425,7 +448,9 @@ class DatasetAdapter(Adapter):
         )
 
     @staticmethod
-    def dict_to_dataset(data: dict, roles: ABCRole | dict[str, ABCRole]) -> Dataset:
+    def dict_to_dataset(
+        data: dict, roles: ABCRole | dict[str, ABCRole]
+    ) -> Dataset:
         roles_names = list(data.keys())
         if any(
             [
@@ -442,7 +467,9 @@ class DatasetAdapter(Adapter):
             )
 
     @staticmethod
-    def list_to_dataset(data: list, roles: dict[str, ABCRole]) -> Dataset:
+    def list_to_dataset(
+        data: list, roles: dict[str, ABCRole]
+    ) -> Dataset:
         return Dataset(
             roles=roles if len(roles) > 0 else {0: DefaultRole()},
             data=pd.DataFrame(
@@ -451,14 +478,18 @@ class DatasetAdapter(Adapter):
         )
 
     @staticmethod
-    def frame_to_dataset(data: pd.DataFrame, roles: dict[str, ABCRole]) -> Dataset:
+    def frame_to_dataset(
+        data: pd.DataFrame, roles: dict[str, ABCRole]
+    ) -> Dataset:
         return Dataset(
             roles=roles,
             data=data,
         )
 
     @staticmethod
-    def ndarray_to_dataset(data: np.ndarray, roles: dict[str, ABCRole]) -> Dataset:
+    def ndarray_to_dataset(
+        data: np.ndarray, roles: dict[str, ABCRole]
+    ) -> Dataset:
         columns = range(data.shape[1]) if len(roles) == 0 else list(roles.keys())
         data = pd.DataFrame(data=data, columns=columns)
         return Dataset(
