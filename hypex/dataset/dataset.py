@@ -302,7 +302,7 @@ class ExperimentData:
             result = id_[: id_.find(ID_SPLIT_SYMBOL)] == class_
 
             if result and key is not None:
-                result = id_[id_.rfind(ID_SPLIT_symbol) + 1 :] == key
+                result = id_[id_.rfind(ID_SPLIT_SYMBOL) + 1 :] == key
             return result
 
         # Define spaces to search
