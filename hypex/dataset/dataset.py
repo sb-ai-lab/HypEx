@@ -125,21 +125,11 @@ class SmallDataset(DatasetBase):
     def from_dict(
             data: FromDictTypes,
             roles: ABCRole | dict[str, ABCRole],
-    ) -> Dataset:
-        roles_names = list(data.keys())
-        if any(
-            [
-                any(isinstance(i, t) for t in [int, str, float, bool])
-                for i in list(data.values())
-            ]
-        ):
-            data = [data]
+    ) -> SmallDataset:
         if isinstance(roles, dict):
-            return Dataset.from_dict(data=data, roles=roles)
-        elif isinstance(roles, ABCRole):
-            return Dataset.from_dict(
-                data=data, roles={name: roles for name in roles_names}
-            )
+            return SmallDataset.__init__(data=data, roles=roles)
+        else:
+            raise TypeError(f"Value {data} is not a dict type.")
 
     @staticmethod
     def to_small_dataset(dataset: Dataset) -> SmallDataset:
