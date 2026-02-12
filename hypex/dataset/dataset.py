@@ -38,6 +38,14 @@ class Dataset(DatasetBase):
     ):
         super().__init__(roles, data, backend, default_role, session)
 
+    def to_small_dataset(self) -> SmallDataset:
+        """Преобразует Dataset в SmallDataset"""
+        return SmallDataset(
+            roles=self.roles,
+            data=self.data,
+            default_role=self.default_role,
+        )
+
 
 class SmallDataset(DatasetBase):
     class Locker:
@@ -130,15 +138,6 @@ class SmallDataset(DatasetBase):
             return SmallDataset.__init__(data=data, roles=roles)
         else:
             raise TypeError(f"Value {data} is not a dict type.")
-
-    @staticmethod
-    def to_small_dataset(dataset: Dataset) -> SmallDataset:
-        """Преобразует Dataset в SmallDataset"""
-        return SmallDataset(
-            roles=dataset.roles,
-            data=dataset.data,
-            default_role=dataset.default_role,
-        )
 
     def sort(
             self,
@@ -258,10 +257,12 @@ class ExperimentData:
         elif space == ExperimentDataEnum.analysis_tables:
             # Преобразуем Dataset в SmallDataset
             if isinstance(value, Dataset):
-                value = SmallDataset.to_small_dataset(value)
+                value = value.to_small_dataset()
+            elif isinstance(value, Dataset):
+                value = SmallDataset.from_dict(value.to_dict(), roles=role)
             elif not isinstance(value, SmallDataset):
                 # Если значение не Dataset/SmallDataset, создаем SmallDataset
-                value = SmallDataset.from_dict(value.to_dict(), roles=role)
+                raise TypeError(f"Wrong value {value} for converting to SmallDataset")
             self.analysis_tables[executor_id] = value
 
         # Handle variables
