@@ -27,6 +27,7 @@ from .roles import (
     ABCRole,
     DefaultRole,
     FilterRole,
+    IndexRole,
     InfoRole,
     StatisticRole,
     default_roles,
@@ -478,6 +479,9 @@ class DatasetBase(ABC):
             self._backend.add_column(data, list(role.keys()), index)
         return self
 
+    def add_index_col(self, index_col_name: str | None):
+        self.data.add_index_col(index_col_name)
+
     def _check_other_dataset(self, other):
         if not isinstance(other, self.__class__):
             raise ConcatDataError(type(other))
@@ -711,11 +715,20 @@ class DatasetBase(ABC):
 
     def filter(
         self,
-        items: list | None = None,
+        items: list | DatasetBase | None = None,
         regex: str | None = None,
+        column: str | None = None,
         axis: int | None = None,
     ) -> DatasetBase:
-        t_data = self._backend.filter(items=items, regex=regex, axis=axis)
+        if isinstance(items, DatasetBase):
+            t_data = (
+                self
+                .append(items.iselect(0), axis=0)
+                .filter(column=items.columns[0], axis=0)
+                .drop(columns=items.columns[0])
+            )
+        else:
+            t_data = self._backend.filter(items=items, regex=regex, column=column, axis=axis)
         t_roles = {c: self.roles[c] for c in t_data.columns if c in self.roles.keys()}
         return self.__class__(roles=t_roles, data=t_data)
 
@@ -727,6 +740,9 @@ class DatasetBase(ABC):
         columns = Adapter.to_list(columns)
         columns = [self.columns[n] for n in columns]
         return self.filter(items=columns, axis=1)
+
+    def limit(self, num):
+        return self.limit(num=num)
 
     def select_dtypes(self, include: Any = None, exclude: Any = None):
         # Filter data by dtypes

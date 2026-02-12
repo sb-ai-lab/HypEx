@@ -38,6 +38,9 @@ class Dataset(DatasetBase):
     ):
         super().__init__(roles, data, backend, default_role, session)
 
+    def checkpoint(self):
+        self._backend.checkpoint()
+
 
 class SmallDataset(DatasetBase):
     class Locker:

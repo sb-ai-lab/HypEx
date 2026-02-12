@@ -209,6 +209,9 @@ class DatasetBackendNavigation(ABC):
     def append(self, other, index: bool = False) -> Any:
         raise AbstractMethodError
 
+    def add_index_col(self, index_col_name: str | None) -> Any:
+        raise AbstractMethodError
+
     @abstractmethod
     def loc(self, values: Iterable) -> Iterable:
         raise AbstractMethodError
@@ -381,6 +384,10 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
+    def limit(self, num: int | None = None) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
     def merge(
         self,
         right: Any,
@@ -407,6 +414,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         self,
         items: list | None = None,
         regex: str | None = None,
+        column: str | None = None,
         axis: int = 0,
     ) -> Any:
         raise AbstractMethodError
@@ -430,4 +438,8 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     def replace(
         self, to_replace: Any = None, value: Any = None, regex: bool = False
     ) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def checkpoint(self):
         raise AbstractMethodError

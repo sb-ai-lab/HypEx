@@ -10,9 +10,9 @@ from ..dataset import (
     Dataset,
     ExperimentData,
     StratificationRole,
-    TreatmentRole,
+    TreatmentRole, StatisticRole,
 )
-from ..dataset.roles import ConstGroupRole
+from ..dataset.roles import ConstGroupRole, IndexRole
 from ..executor import Calculator
 from ..utils import ExperimentDataEnum
 
@@ -95,15 +95,17 @@ class AASplitter(Calculator):
         groups_sizes: list[float] | None = None,
         sample_size: float | None = None,
         const_group_field: str | None = None,
+        index_col_name: str | None = None,
         **kwargs,
     ) -> list[str]:
         sample_size = 1.0 if sample_size is None else sample_size
-        control_indexes = []
+        control_indexes = data.create_empty({index_col_name: IndexRole()})
+        data = data.checkpoint()
         if const_group_field:
             const_data = dict(data.groupby(const_group_field))
-            control_data = const_data.get("control")
+            control_data = const_data.get["control"]
             if control_data is not None:
-                control_indexes = list(control_data.index)
+                control_indexes = control_data.select(index_col_name)
             const_size = sum(len(cd) for cd in const_data.values())
             control_size = (
                 0
@@ -111,14 +113,13 @@ class AASplitter(Calculator):
                 else (len(data) * control_size - len(const_data["control"]))
                 / (len(data) - const_size)
             )
-            # control_size = len(data) * control_size
         experiment_data = (
-            data[data[const_group_field].isna()] if const_group_field else data
+            data.filter(data.select(const_group_field).isna()) if const_group_field else data
         )
-        experiment_data_index = experiment_data.sample(
+        addition_indexes = experiment_data.sample(
             frac=sample_size, random_state=random_state
-        ).index
-        addition_indexes = list(experiment_data_index)
+        ).select(index_col_name)
+
         edges = []
         if groups_sizes:
             if sum(groups_sizes) != 1:
@@ -132,17 +133,15 @@ class AASplitter(Calculator):
                     edges += [size]
         else:
             edges = [int(len(addition_indexes) * control_size), len(addition_indexes)]
-        control_indexes += addition_indexes[: edges[0]]
+
+        control_indexes = control_indexes.append(addition_indexes.limit(edges[0]), axis=0)
         test_indexes = [
-            addition_indexes[edges[i - 1] : edges[i]] for i in range(1, len(edges))
+            addition_indexes.take(slice(edges[i - 1], edges[i])) for i in range(1, len(edges))
         ]
 
-        split_series = pd.Series(
-            np.ones(data.data.shape[0], dtype="int"), index=data.data.index
-        )
-        split_series[control_indexes] -= 1
+        split_series = control_indexes.add_column(0, {"split": StatisticRole()})
         for i, test_index in enumerate(test_indexes):
-            split_series[test_index] += i
+            split_series.append(test_indexes[i].add_column(i+1, {"split": StatisticRole()}), axis=0)
 
         label_map = {0: "control"}
         label_map.update({i: f"test_{i}" for i in range(1, len(edges))})
@@ -151,6 +150,8 @@ class AASplitter(Calculator):
         return split_series.to_list()
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        index_col_name = "__index__"
+        data.ds.add_index_col(index_col_name)
         const_group_fields = data.ds.search_columns(ConstGroupRole())
         const_group_fields = (
             const_group_fields[0] if len(const_group_fields) > 0 else None
@@ -162,6 +163,7 @@ class AASplitter(Calculator):
             sample_size=self.sample_size,
             const_group_field=const_group_fields,
             groups_sizes=self.groups_sizes,
+            index_col_name=index_col_name,
         )
         return self._set_value(
             data,
@@ -204,32 +206,3 @@ class AASplitterWithStratification(AASplitter):
         if isinstance(result, Dataset):
             result = result.replace_roles({"split": AdditionalTreatmentRole()})
         return self._set_value(data, result)
-
-
-#
-# class AASplitterWithStratification(AASplitter):
-#     def __init__(
-#         self,
-#         control_size: float = 0.5,
-#         random_state: Optional[int] = None,
-# #         key: Any = "",
-#     ):
-#         super().__init__(control_size, random_state,  key)
-#
-#     def calc(self, data: Dataset):
-#         stratification_columns = data.get_columns_by_roles(StratificationRole())
-#
-#         groups = data.groupby(stratification_columns)
-#         result = Dataset._create_empty()
-#         for _, gd in groups:
-#             ged = ExperimentData(gd)
-#             ged = super().execute(ged)
-#
-#             result = ged if result is None else result.append(ged)
-#         return result["group"]
-
-
-# As idea
-# class SplitterAAMulti(ExperimentMulti):
-#     def execute(self, data):
-#         raise NotImplementedError
