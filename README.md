@@ -159,6 +159,23 @@ result.variance_reduction_report  # Variance reduction report for CUPED/CUPAC
 ```
 More about A/B test [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/ABTestTutorial.ipynb)
 
+## Spark backend compatibility (Python 3.8.17 / Spark 3.5.1)
+
+HypEx includes a Spark backend (`SparkDataset`) for distributed data processing.
+For stable work with **Python 3.8.17** and **Spark 3.5.1**, use:
+
+```bash
+pip install "pyspark==3.5.1"
+```
+
+What is supported:
+- Spark session creation with explicit Python interpreter propagation (`PYSPARK_PYTHON` / `PYSPARK_DRIVER_PYTHON`).
+- Core dataframe navigation and transformations (`select`, `drop`, `rename`, `merge`, `fillna`, `sort_values`, `agg`, etc.).
+- Compatibility-oriented behavior for methods that mirror Pandas semantics.
+
+Practical note:
+- Some Spark backend operations internally align with Pandas-compatible behavior to preserve API parity with the main `Dataset` interface. This prioritizes correctness and version compatibility.
+
 ## Documentation
 
 For more detailed information about the library and its features, visit
