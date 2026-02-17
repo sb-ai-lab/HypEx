@@ -134,10 +134,17 @@ class SmallDataset(DatasetBase):
             data: FromDictTypes,
             roles: ABCRole | dict[str, ABCRole],
     ) -> SmallDataset:
-        if isinstance(roles, dict):
-            return SmallDataset.__init__(data=data, roles=roles)
-        else:
+        if not isinstance(roles, dict):
             raise TypeError(f"Value {data} is not a dict type.")
+
+        if isinstance(data, dict) and "data" in data:
+            payload = data
+        elif isinstance(data, dict):
+            payload = {"data": data}
+        else:
+            payload = data
+
+        return SmallDataset(data=payload, roles=roles)
 
     def sort(
             self,
@@ -255,13 +262,13 @@ class ExperimentData:
 
         # Handle analysis tables
         elif space == ExperimentDataEnum.analysis_tables:
-            # Преобразуем Dataset в SmallDataset
             if isinstance(value, Dataset):
                 value = value.to_small_dataset()
-            elif isinstance(value, Dataset):
-                value = SmallDataset.from_dict(value.to_dict(), roles=role)
+            elif isinstance(value, dict):
+                if not isinstance(role, dict):
+                    raise TypeError("For dict analysis table value, role must be dict[str, ABCRole]")
+                value = SmallDataset.from_dict(value, roles=role)
             elif not isinstance(value, SmallDataset):
-                # Если значение не Dataset/SmallDataset, создаем SmallDataset
                 raise TypeError(f"Wrong value {value} for converting to SmallDataset")
             self.analysis_tables[executor_id] = value
 
