@@ -40,12 +40,14 @@ from pyspark.sql.types import (
     StructField,
     StringType,
     DoubleType,
+    LongType,
 )
 
 from functools import reduce
 
-from ...utils import FromDictTypes, MergeOnError, ScalarType, Adapter
+from ...utils import FromDictTypes, MergeOnError, ScalarType, Adapter, UTILITY_COL_SYMBOL
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
+from ...utils.constants import UTILITY_INDEX_COL_NAME
 from ...utils.typings import PysparkScalarType, SparkTypeMapper as d
 
 
@@ -143,7 +145,16 @@ class SparkNavigation(DatasetBackendNavigation):
         elif isinstance(data, str):
             self.data = self._read_file(data, self.session)
         else:
-            self.data = self.session.emptyDataFrame
+            self.data = self.session.createDataFrame([], StructType([]))
+
+    def _add_row_index(self, df: spark.DataFrame, index_column_name: str):
+        rdd = df.rdd.zipWithIndex()
+        # new_rdd = rdd.map(lambda x: (x[1],) + tuple(x[0]))
+        new_rdd = rdd.map(lambda x: (int(x[1]),) + tuple(x[0]))
+        new_schema = StructType(
+            [StructField(index_column_name, LongType(), False)] + list(self.data.schema.fields)
+        )
+        return self.session.createDataFrame(new_rdd, new_schema)
 
     def __getitem__(self, item):
         raise NotImplementedError("Spark-base Dataset does not support indexing")
@@ -461,7 +472,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def create_empty(
         self,
-        index: Optional[Iterable] = None,
+        index: Optional[Iterable] | spark.DataFrame = None,
         columns: Optional[Iterable[str]] = None,
     ):
         columns = list(columns or [])
@@ -471,22 +482,21 @@ class SparkNavigation(DatasetBackendNavigation):
         empty_rdd = self.session.sparkContext.emptyRDD()
         self.data = self.session.createDataFrame(empty_rdd, schema)
         if index is not None:
-            index_rows = [(value,) for value in index]
-            index_df = self.session.createDataFrame(index_rows, ["index"])
+            if isinstance(index, spark.DataFrame):
+                index_df = index.select(UTILITY_INDEX_COL_NAME)
+            else:
+                index_rows = [(value,) for value in index]
+                index_df = self.session.createDataFrame(index_rows, ["index"])
             self.data = index_df.join(self.data, how="cross") if columns else index_df
         return self
 
     @property
     def index(self):
-        index_col_name = "__index__"
         if self.data is None:
             return []
-        if index_col_name in self.data.columns:
-            return self.data.select(index_col_name)
-        return self.data.withColumn(
-            index_col_name,
-            F.row_number().over(Window.orderBy(F.monotonically_increasing_id())) - 1,
-        ).select(index_col_name)
+        if UTILITY_INDEX_COL_NAME in self.data.columns:
+            return self.data.select(UTILITY_INDEX_COL_NAME)
+        return self.add_index_col()
 
     @property
     def columns(self):
@@ -623,19 +633,16 @@ class SparkNavigation(DatasetBackendNavigation):
                                 ), on="__index", how="outer")
             return tmp.drop('__index')
 
-    def add_index_col(self, index_col_name: str | None):
-        index_col_name = "__index__" if not index_col_name else index_col_name
-        if index_col_name in self.data.columns:
-            self.data = self.data.drop(index_col_name)
-        return self.data.withColumn(
-            index_col_name,
-            F.row_number().over(Window.orderBy(F.monotonically_increasing_id())) - 1,
-        ).select(index_col_name)
+    def add_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
+        self.data = self._add_row_index(self.data, index_col_name)
+
+    def remove_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
+        self.data = self.data.drop(index_col_name)
 
     def from_dict(
         self, data: FromDictTypes, index: Optional[Union[Iterable, Sized]] = None
     ):
-        spark = self.spark
+        spark = self.session
         if isinstance(data, dict) and all(isinstance(v, list) for v in data.values()):
             row_count = len(next(iter(data.values())))
             index_list = list(index) if index is not None else list(range(row_count))

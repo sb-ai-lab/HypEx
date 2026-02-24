@@ -3,6 +3,8 @@ from .constants import (
     ID_SPLIT_SYMBOL,
     MATCHING_INDEXES_SPLITTER_SYMBOL,
     NAME_BORDER_SYMBOL,
+    UTILITY_COL_SYMBOL,
+    UTILITY_INDEX_COL_NAME,
     NUMBER_TYPES_LIST,
 )
 from .enums import (
@@ -54,6 +56,8 @@ __all__ = [
     "ID_SPLIT_SYMBOL",
     "MATCHING_INDEXES_SPLITTER_SYMBOL",
     "NAME_BORDER_SYMBOL",
+    "UTILITY_COL_SYMBOL",
+    "UTILITY_INDEX_COL_NAME",
     "NUMBER_TYPES_LIST",
     "ABNTestMethodsEnum",
     "ABTestTypesEnum",

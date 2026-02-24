@@ -7,9 +7,10 @@ import numpy as np
 import pandas as pd  # type: ignore
 import pyspark.sql as spark
 
-from ...utils import FromDictTypes, MergeOnError, ScalarType
+from ...utils import FromDictTypes, MergeOnError, ScalarType, UTILITY_COL_SYMBOL
 from ...utils.adapter import Adapter
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
+from ...utils.constants import UTILITY_INDEX_COL_NAME
 
 
 class PandasNavigation(DatasetBackendNavigation):
@@ -293,9 +294,11 @@ class PandasNavigation(DatasetBackendNavigation):
             new_data = new_data.reset_index(drop=True)
         return new_data
 
-    def add_index_col(self, index_col_name: str | None):
-        index_col_name = "__index__" if not index_col_name else index_col_name
+    def add_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
         self.data[index_col_name] = np.array(range(len(self.data)))
+
+    def remove_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
+        self.data = self.data.drop(index_col_name)
 
     def from_dict(self, data: FromDictTypes, index: Iterable | Sized | None = None):
         if isinstance(data, dict):

@@ -100,10 +100,9 @@ class AASplitter(Calculator):
     ) -> list[str]:
         sample_size = 1.0 if sample_size is None else sample_size
         control_indexes = data.create_empty({index_col_name: IndexRole()})
-        data = data.checkpoint()
         if const_group_field:
             const_data = dict(data.groupby(const_group_field))
-            control_data = const_data.get["control"]
+            control_data = const_data.get("control")
             if control_data is not None:
                 control_indexes = control_data.select(index_col_name)
             const_size = sum(len(cd) for cd in const_data.values())
@@ -147,7 +146,7 @@ class AASplitter(Calculator):
         label_map.update({i: f"test_{i}" for i in range(1, len(edges))})
         split_series = split_series.map(label_map)
 
-        return split_series.to_list()
+        return split_series
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         index_col_name = "__index__"

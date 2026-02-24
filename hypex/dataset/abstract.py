@@ -19,7 +19,7 @@ from ..utils import (
     DataTypeError,
     ScalarType,
     RoleColumnError,
-    SourceDataTypes,
+    SourceDataTypes, UTILITY_INDEX_COL_NAME,
 )
 from ..utils.adapter import Adapter
 from .backends import PandasDataset, SparkDataset
@@ -121,6 +121,7 @@ class DatasetBase(ABC):
         self._tmp_roles: (
             dict[ABCRole, list[str] | str] | dict[list[str] | str] | ABCRole
         ) = {}
+
 
     def __repr__(self):
         return self._backend.__repr__()
@@ -436,6 +437,15 @@ class DatasetBase(ABC):
     def session(self):
         return self._backend.session
 
+    @property
+    def backend_type(self):
+        if isinstance(self._backend, PandasDataset):
+            return BackendsEnum.pandas
+        elif isinstance(self._backend, SparkDataset):
+            return BackendsEnum.spark
+        else:
+            raise ValueError("Unknown backend type")
+
     @tmp_roles.setter
     def tmp_roles(self, value):
         self._set_roles(new_roles_map=value, temp_role=True)
@@ -479,8 +489,21 @@ class DatasetBase(ABC):
             self._backend.add_column(data, list(role.keys()), index)
         return self
 
-    def add_index_col(self, index_col_name: str | None):
-        self.data.add_index_col(index_col_name)
+    def add_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
+        if index_col_name in self.columns:
+            if len(self.columns) < 2:
+                return self
+            self.remove_index_col(index_col_name)
+        self._backend.add_index_col(index_col_name)
+        self.roles[index_col_name] = IndexRole()
+        return self
+
+    def remove_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
+        if index_col_name not in self.columns:
+            return self
+        self._backend.remove_index_col(index_col_name)
+        self.roles.pop(index_col_name)
+        return self
 
     def _check_other_dataset(self, other):
         if not isinstance(other, self.__class__):

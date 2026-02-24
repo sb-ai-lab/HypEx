@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Optional
 
-from ...utils import AbstractMethodError, FromDictTypes
+from ...utils import AbstractMethodError, FromDictTypes, UTILITY_INDEX_COL_NAME
 
 
 class DatasetBackendNavigation(ABC):
@@ -209,7 +209,10 @@ class DatasetBackendNavigation(ABC):
     def append(self, other, index: bool = False) -> Any:
         raise AbstractMethodError
 
-    def add_index_col(self, index_col_name: str | None) -> Any:
+    def add_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME) -> Any:
+        raise AbstractMethodError
+
+    def remove_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME) -> Any:
         raise AbstractMethodError
 
     @abstractmethod

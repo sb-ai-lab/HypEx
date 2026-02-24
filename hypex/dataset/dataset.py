@@ -29,12 +29,12 @@ from .roles import (
 
 class Dataset(DatasetBase):
     def __init__(
-            self,
-            roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
-            data: pd.DataFrame | str | None = None,
-            backend: BackendsEnum | None = None,
-            default_role: ABCRole | None = None,
-            session: Optional[spark.SparkSession] = None,
+        self,
+        roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
+        data: pd.DataFrame | spark.DataFrame | str | None = None,
+        backend: BackendsEnum | None = None,
+        default_role: ABCRole | None = None,
+        session: Optional[spark.SparkSession] = None,
     ):
         super().__init__(roles, data, backend, default_role, session)
 
@@ -126,10 +126,10 @@ class SmallDataset(DatasetBase):
 
     @staticmethod
     def from_dict(
-            data: FromDictTypes,
-            roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
-            backend: BackendsEnum = BackendsEnum.pandas,
-            index=None,
+        data: FromDictTypes,
+        roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
+        backend: BackendsEnum = BackendsEnum.pandas,
+        index=None,
     ) -> Dataset:
         ds = Dataset(roles=roles, backend=backend)
         ds._backend = ds._backend.from_dict(data, index)
@@ -137,10 +137,10 @@ class SmallDataset(DatasetBase):
         return ds
 
     def sort(
-            self,
-            by: MultiFieldKeyTypes | None = None,
-            ascending: bool = True,
-            **kwargs,
+        self,
+        by: MultiFieldKeyTypes | None = None,
+        ascending: bool = True,
+        **kwargs,
     ):
         if by is None:
             return Dataset(
@@ -161,8 +161,8 @@ class SmallDataset(DatasetBase):
         return self._convert_data_after_agg(self._backend.idxmax())
 
     def transpose(
-            self,
-            roles: dict[str, ABCRole] | list[str] | None = None,
+        self,
+        roles: dict[str, ABCRole] | list[str] | None = None,
     ) -> Dataset:
         # Get role names if provided
         roles_names: list[str | None] = (
@@ -181,11 +181,15 @@ class SmallDataset(DatasetBase):
 class ExperimentData:
     def __init__(self, data: Dataset):
         self._data = data
-        self.additional_fields = Dataset.create_empty(index=data.index)
+        self._data.add_index_col()
+        self.additional_fields = Dataset.create_empty(index=data.index, backend=data.backend_type)
         self.variables: dict[str, dict[str, int | float]] = {}
         self.groups: dict[str, dict[str, Dataset]] = {}
-        self.analysis_tables: dict[str, Dataset] = {}
+        self.analysis_tables: dict[str, SmallDataset] = {}
         self.id_name_mapping: dict[str, str] = {}
+
+    def __del__(self):
+        self._data.remove_index_col()
 
     @property
     def ds(self):
@@ -198,6 +202,8 @@ class ExperimentData:
     def create_empty(
         roles=None, backend=BackendsEnum.pandas, index=None
     ) -> ExperimentData:
+        if isinstance(index, Dataset):
+            index = index.index
         ds = Dataset.create_empty(backend, roles, index)
         return ExperimentData(ds)
 
