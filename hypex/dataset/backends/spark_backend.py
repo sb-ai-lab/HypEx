@@ -1,60 +1,60 @@
 from __future__ import annotations
 
 import os
-import sys
 import re
+import sys
+from collections.abc import Callable, Iterable, Sequence, Sized
+from functools import reduce
 from itertools import chain
-
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Literal,
-    Sequence,
-    Sized,
-    Optional,
-    Union,
-    Tuple,
-)
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
 import pyspark.sql as spark
-from pyspark import SparkContext, SparkConf, StorageLevel
+from pyspark import SparkConf, SparkContext, StorageLevel
 from pyspark.sql import (
+    DataFrame as SparkDF,
+)
+from pyspark.sql import (
+    Row,
     SparkSession,
     Window,
-    Row,
+)
+from pyspark.sql import (
     functions as F,
+)
+from pyspark.sql import (
     types as T,
-    DataFrame as SparkDF,
 )
 from pyspark.sql.functions import lit, monotonically_increasing_id
 from pyspark.sql.types import (
-    NumericType,
     ArrayType,
-    StructType,
-    StructField,
-    StringType,
     DoubleType,
     LongType,
+    NumericType,
+    StringType,
+    StructField,
+    StructType,
 )
 
-from functools import reduce
-
-from ...utils import FromDictTypes, MergeOnError, ScalarType, Adapter, UTILITY_COL_SYMBOL
-from .abstract import DatasetBackendCalc, DatasetBackendNavigation
+from ...utils import (
+    UTILITY_COL_SYMBOL,
+    Adapter,
+    FromDictTypes,
+    MergeOnError,
+    ScalarType,
+)
 from ...utils.constants import UTILITY_INDEX_COL_NAME
-from ...utils.typings import PysparkScalarType, SparkTypeMapper as d
+from ...utils.typings import PysparkScalarType
+from ...utils.typings import SparkTypeMapper as d
+from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
 class SparkNavigation(DatasetBackendNavigation):
     @staticmethod
     def _read_file(
-        filename: Union[str, Path], session: SparkSession
+        filename: str | Path, session: SparkSession
     ) -> spark.DataFrame:
         file_extension = Path(filename).suffix
         if file_extension == ".csv":
@@ -75,9 +75,9 @@ class SparkNavigation(DatasetBackendNavigation):
     @staticmethod
     def _get_spark_session(
         app_name: str = "HypEx",
-        python_path: Optional[str] = None,
+        python_path: str | None = None,
         dynamic_allocation: bool = True,
-        mode: Optional[str] = None,
+        mode: str | None = None,
     ):
         if python_path is None:
             python_path = sys.executable
@@ -118,7 +118,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def __init__(
         self,
-        data: Optional[Union[spark.DataFrame, pd.DataFrame, dict, str]] = None,
+        data: spark.DataFrame | pd.DataFrame | dict | str | None = None,
         session: SparkSession = None,
     ):
         if session is None:
@@ -439,8 +439,8 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def get_values(
         self,
-        row: Optional[str] = None,
-        column: Optional[str] = None,
+        row: str | None = None,
+        column: str | None = None,
     ) -> Any:
         if row:
             try:
@@ -457,8 +457,8 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def iget_values(
         self,
-        row: Optional[int] = None,
-        column: Optional[int] = None,
+        row: int | None = None,
+        column: int | None = None,
     ) -> Any:
         if (column is not None) and (row is not None):
             column = self.columns[column]
@@ -472,8 +472,8 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def create_empty(
         self,
-        index: Optional[Iterable] | spark.DataFrame = None,
-        columns: Optional[Iterable[str]] = None,
+        index: Iterable | None | spark.DataFrame = None,
+        columns: Iterable[str] | None = None,
     ):
         columns = list(columns or [])
         schema = T.StructType(
@@ -515,8 +515,8 @@ class SparkNavigation(DatasetBackendNavigation):
         return (0, 0)
 
     def _get_column_index(
-        self, column_name: Union[Sequence[str], str]
-    ) -> Union[int, Sequence[int]]:
+        self, column_name: Sequence[str] | str
+    ) -> int | Sequence[int]:
         pd_index_columns = pd.Index(self.data.columns)
         if isinstance(column_name, str):
             return pd_index_columns.get_loc(column_name)
@@ -526,8 +526,8 @@ class SparkNavigation(DatasetBackendNavigation):
             raise TypeError("Wrong column_name type.")
 
     def get_column_type(
-        self, column_name: Union[List[str], str] = None
-    ) -> Optional[Union[Dict[str, type], type]]:
+        self, column_name: list[str] | str = None
+    ) -> dict[str, type] | type | None:
         column_name = self.data.columns if column_name is None else column_name
         dtypes = {}
         for k, v in self.data.select(column_name).dtypes:
@@ -551,14 +551,14 @@ class SparkNavigation(DatasetBackendNavigation):
         return None
 
     def astype(
-        self, dtype: Dict[str, type], errors: Literal["raise", "ignore"] = "raise"
+        self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> spark.DataFrame:
         for col, new_type in dtype.items():
             new_type = str(new_type.__name__)
             self.data = self.data.withColumn(col, self.data[col].cast(new_type))
         return self.data
 
-    def update_column_type(self, dtype: Dict[str, type]):
+    def update_column_type(self, dtype: dict[str, type]):
         if len(dtype) > 0:
             self.data = self.astype(dtype)
         return self
@@ -584,7 +584,7 @@ class SparkNavigation(DatasetBackendNavigation):
             self.data = result.drop("__join_id")
 
         def _add_columns_from_list(
-            df: spark.DataFrame, data_list: List, column_names: str
+            df: spark.DataFrame, data_list: list, column_names: str
         ) -> spark.DataFrame:
             if len(data_list) != df.count():
                 raise ValueError(
@@ -640,7 +640,7 @@ class SparkNavigation(DatasetBackendNavigation):
         self.data = self.data.drop(index_col_name)
 
     def from_dict(
-        self, data: FromDictTypes, index: Optional[Union[Iterable, Sized]] = None
+        self, data: FromDictTypes, index: Iterable | Sized | None = None
     ):
         spark = self.session
         if isinstance(data, dict) and all(isinstance(v, list) for v in data.values()):
@@ -677,7 +677,7 @@ class SparkNavigation(DatasetBackendNavigation):
 class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def __init__(
         self,
-        data: Optional[Union[spark.DataFrame, pd.DataFrame, dict, str]] = None,
+        data: spark.DataFrame | pd.DataFrame | dict | str | None = None,
         session: SparkSession = None,
     ):
         super().__init__(data, session)
@@ -694,11 +694,11 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def apply(
         self,
         func: Callable,
-        column_name: Optional[Union[str, List[str]]] = None,
+        column_name: str | list[str] | None = None,
         axis: int = 0,
-        return_type: Optional[T.DataType] = None,
+        return_type: T.DataType | None = None,
         args: tuple = (),
-        kwargs: Optional[dict] = None,
+        kwargs: dict | None = None,
         result_type: Literal["reduce", "expand", "broadcast", None] = None,
     ) -> spark.DataFrame:
         kwargs = kwargs or {}
@@ -797,10 +797,10 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     def map(
         self,
-        func: Union[Callable, dict],
+        func: Callable | dict,
         *,
-        return_type: Union[T.DataType, None] = None,
-        na_action: Union[None, str] = None,
+        return_type: T.DataType | None = None,
+        na_action: None | str = None,
         **kwargs,
     ) -> spark.DataFrame:
         df = self.data
@@ -875,7 +875,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 exprs.append((F.countDistinct(c) + has_null).alias(c))
         return self.data.agg(*exprs)
 
-    def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> list[tuple]:
+    def groupby(self, by: str | Iterable[str], **kwargs) -> list[tuple]:
         if isinstance(by, str):
             by = [by]
         else:
@@ -900,7 +900,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             result.append((key, group_df))
         return result
 
-    def agg(self, func: Union[str, list], **kwargs) -> Union[spark.DataFrame, float]:
+    def agg(self, func: str | list, **kwargs) -> spark.DataFrame | float:
         df = self.data
         funcs = [func] if isinstance(func, str) else func
         numeric_only = kwargs.get("numeric_only", False)
@@ -1064,7 +1064,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     def coefficient_of_variation(
         self, small_format=False
-    ) -> Union[spark.DataFrame, float]:
+    ) -> spark.DataFrame | float:
         result = self.data.select(
             F.var_samp(col).alias(col) for col in self.data.columns
         ).toPandas()
@@ -1090,7 +1090,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         self,
         numeric_only: bool = False,
         small_format: bool = False,
-    ) -> Union[spark.DataFrame, float]:
+    ) -> spark.DataFrame | float:
 
         if numeric_only:
             col_list = self.get_numeric_columns()
@@ -1126,7 +1126,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         )
 
     def sort_values(
-        self, by: Union[str, list[str]], ascending: bool = True, **kwargs
+        self, by: str | list[str], ascending: bool = True, **kwargs
     ) -> spark.DataFrame:
         pass
 
@@ -1161,8 +1161,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     def fillna(
         self,
-        values: Optional[Union[ScalarType, dict[str, ScalarType]]] = None,
-        method: Optional[Literal["bfill", "ffill"]] = None,
+        values: ScalarType | dict[str, ScalarType] | None = None,
+        method: Literal["bfill", "ffill"] | None = None,
         **kwargs,
     ) -> spark.DataFrame:
         if method is None:
@@ -1193,7 +1193,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 raise ValueError(f"Wrong fill method: {method}")
         return tmp
 
-    def na_counts(self) -> Union[spark.DataFrame, int]:
+    def na_counts(self) -> spark.DataFrame | int:
         na_counts = self.data.select(
             [
                 F.count(F.when(F.isnan(c) | F.col(c).isNull(), c)).alias(c)
@@ -1261,7 +1261,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     @staticmethod
     def _multiply_with_broadcast(
         df1: spark.DataFrame,
-        df2: Union[spark.DataFrame, np.ndarray],
+        df2: spark.DataFrame | np.ndarray,
         df1_cols: list,
         df2_cols: list,
         result_col_prefix: str,
@@ -1380,8 +1380,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def dropna(  # Эрик
         self,
         how: Literal["any", "all"] = "any",
-        subset: Optional[Union[str, Iterable[str]]] = None,
-        axis: Union[Literal["index", "rows", "columns"], int] = 0,
+        subset: str | Iterable[str] | None = None,
+        axis: Literal["index", "rows", "columns"] | int = 0,
     ) -> spark.DataFrame:
         if axis in ["index", "rows"] or axis == 0:
             return self.data.na.drop(how=how, subset=subset)
@@ -1405,7 +1405,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.data.select(*select_arr)
 
     def transpose(
-        self, names: Optional[Sequence[str]] = None
+        self, names: Sequence[str] | None = None
     ) -> spark.DataFrame:  # TODO: to be moved to small data
         pass
 
@@ -1465,12 +1465,12 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def merge(  # Эрик
         self,
         right: SparkDataset,
-        on: Optional[str] = None,
-        left_on: Optional[str] = None,
-        right_on: Optional[str] = None,
-        left_index: Optional[bool] = None, 
-        right_index: Optional[bool] = None, 
-        suffixes: Tuple[str, str] = ("_x", "_y"),
+        on: str | None = None,
+        left_on: str | None = None,
+        right_on: str | None = None,
+        left_index: bool | None = None, 
+        right_index: bool | None = None, 
+        suffixes: tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> spark.DataFrame:
         tmp_left, tmp_right = self.data, right.data
@@ -1572,7 +1572,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         else:
             raise ValueError("Invalid axis value")
 
-    def rename(self, columns: Dict[str, str]) -> spark.DataFrame:       # Эрик
+    def rename(self, columns: dict[str, str]) -> spark.DataFrame:       # Эрик
         return self.data.withColumnsRenamed(columns)
 
     def replace(
@@ -1597,7 +1597,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         )
 
     def reindex(
-        self, labels: str = "", fill_value: Optional[str] = None
+        self, labels: str = "", fill_value: str | None = None
     ) -> spark.DataFrame:
         pass
 

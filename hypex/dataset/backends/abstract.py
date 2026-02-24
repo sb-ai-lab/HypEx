@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Optional
+from collections.abc import Callable, Iterable, Sequence, Sized
+from typing import Any, Literal
 
-from ...utils import AbstractMethodError, FromDictTypes, UTILITY_INDEX_COL_NAME
+from ...utils import UTILITY_INDEX_COL_NAME, AbstractMethodError, FromDictTypes
 
 
 class DatasetBackendNavigation(ABC):
@@ -188,20 +189,20 @@ class DatasetBackendNavigation(ABC):
 
     @abstractmethod
     def astype(
-        self, dtype: Dict[str, type], errors: Literal["raise", "ignore"] = "raise"
+        self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
-    def update_column_type(self, dtype: Dict[str, type]):
+    def update_column_type(self, dtype: dict[str, type]):
         raise AbstractMethodError
 
     @abstractmethod
     def add_column(
         self,
         data,
-        name: Optional[str] = None,
-        index: Optional[Sequence] = None,
+        name: str | None = None,
+        index: Sequence | None = None,
     ):
         raise AbstractMethodError
 

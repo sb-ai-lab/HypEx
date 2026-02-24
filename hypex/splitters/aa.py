@@ -9,8 +9,9 @@ from ..dataset import (
     AdditionalTreatmentRole,
     Dataset,
     ExperimentData,
+    StatisticRole,
     StratificationRole,
-    TreatmentRole, StatisticRole,
+    TreatmentRole,
 )
 from ..dataset.roles import ConstGroupRole, IndexRole
 from ..executor import Calculator

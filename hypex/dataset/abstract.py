@@ -1,25 +1,27 @@
 from __future__ import annotations
 
-import warnings
 import copy
-from copy import deepcopy
 import json  # type: ignore
+import warnings
 from abc import ABC
-from typing import Any, Iterable, Callable, Hashable, Literal, Optional, Sequence
+from collections.abc import Callable, Hashable, Iterable, Sequence
+from copy import deepcopy
+from typing import Any, Literal, Optional
 
 import pandas as pd  # type: ignore
-from numpy import ndarray
 import pyspark.sql as spark
+from numpy import ndarray
 
 from ..utils import (
+    UTILITY_INDEX_COL_NAME,
     BackendsEnum,
     BackendTypeError,
     ConcatBackendError,
     ConcatDataError,
     DataTypeError,
-    ScalarType,
     RoleColumnError,
-    SourceDataTypes, UTILITY_INDEX_COL_NAME,
+    ScalarType,
+    SourceDataTypes,
 )
 from ..utils.adapter import Adapter
 from .backends import PandasDataset, SparkDataset
@@ -80,7 +82,7 @@ class DatasetBase(ABC):
         data: spark.DataFame | pd.DataFrame | str | None = None,
         backend: BackendsEnum | None = None,
         default_role: ABCRole | None = None,
-        session: Optional[spark.SparkSession] = None,
+        session: spark.SparkSession | None = None,
     ):
         if backend is not None:
             self._backend = self._select_backend_from_str(data, backend, session)

@@ -1,54 +1,51 @@
+from __future__ import annotations
+
 import datetime
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    List,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-)
-from pyspark.sql.types import (
-    IntegerType, LongType, FloatType,
-    DoubleType, DecimalType, ShortType, ByteType, StringType
-)
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import pandas as pd
 import pyspark.sql as spark
+from pyspark.sql.types import (
+    ByteType,
+    DecimalType,
+    DoubleType,
+    FloatType,
+    IntegerType,
+    LongType,
+    ShortType,
+    StringType,
+)
 
 if TYPE_CHECKING:
     from hypex.dataset import Dataset
 
-StratificationRoleTypes = Union[float, str, datetime.datetime]
-DefaultRoleTypes = Union[float, bool, str, int]
-TargetRoleTypes = Union[float, int, bool]
-FeatureRoleTypes = Union[float, bool, str, int]
-CategoricalTypes = Union[str]
-ScalarType = Union[float, int, str, bool]
-PysparkScalarType = Union[
-    IntegerType, LongType,
-    FloatType, DoubleType,
-    DecimalType, ShortType, ByteType
-]
-GroupingDataType = Tuple[List[Tuple[str, "Dataset"]], List[Tuple[str, "Dataset"]]]
-SourceDataTypes = Union[pd.DataFrame, spark.DataFrame]
+StratificationRoleTypes = float | str | datetime.datetime
+DefaultRoleTypes = float | bool | str | int
+TargetRoleTypes = float | int | bool
+FeatureRoleTypes = float | bool | str | int
+CategoricalTypes = str
+ScalarType = float | int | str | bool
+PysparkScalarType = (
+    IntegerType | LongType | FloatType | DoubleType | DecimalType | ShortType | ByteType
+)
+GroupingDataType = tuple[list[tuple[str, "Dataset"]], list[tuple[str, "Dataset"]]]
+SourceDataTypes = pd.DataFrame | spark.DataFrame
 
 
-MultiFieldKeyTypes = Union[str, Sequence[str]]
+MultiFieldKeyTypes = str | Sequence[str]
 
-FromDictTypes = Union[
-    Dict[str, List[Any]],
-    List[Dict[Any, Any]],
-    Dict[str, Dict[Any, List]],
-    Dict[str, "Dataset"],
-]
+FromDictTypes = (
+    dict[str, list[Any]]
+    | list[dict[Any, Any]]
+    | dict[str, dict[Any, list]]
+    | dict[str, "Dataset"]
+)
 RoleNameType = str
-DecoratedType = TypeVar("DecoratedType", bound=Union[Callable[..., Any], property])
+DecoratedType = TypeVar("DecoratedType", bound=Callable[..., Any] | property)
 DocstringInheritDecorator = Callable[[DecoratedType], DecoratedType]
 
-SetParamsDictTypes = Union[Dict[str, Any], Dict[type, Dict[str, Any]]]
+SetParamsDictTypes = dict[str, Any] | dict[type, dict[str, Any]]
 
 class SparkTypeMapper:
     @staticmethod

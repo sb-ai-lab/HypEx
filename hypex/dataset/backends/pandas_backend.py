@@ -1,16 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Sequence, Sized
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd  # type: ignore
 import pyspark.sql as spark
 
-from ...utils import FromDictTypes, MergeOnError, ScalarType, UTILITY_COL_SYMBOL
+from ...utils import UTILITY_COL_SYMBOL, FromDictTypes, MergeOnError, ScalarType
 from ...utils.adapter import Adapter
-from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 from ...utils.constants import UTILITY_INDEX_COL_NAME
+from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
 class PandasNavigation(DatasetBackendNavigation):
@@ -225,8 +226,8 @@ class PandasNavigation(DatasetBackendNavigation):
             raise ValueError("Wrong column_name type.")
 
     def get_column_type(
-        self, column_name: Union[Iterable[str], str] = None
-    ) -> Optional[Union[Dict[str, type], type]]:
+        self, column_name: Iterable[str] | str = None
+    ) -> dict[str, type] | type | None:
         column_name = self.data.columns if column_name is None else column_name
         dtypes = {}
         for k, v in self.data[column_name].dtypes.items():
@@ -258,7 +259,7 @@ class PandasNavigation(DatasetBackendNavigation):
     ) -> pd.DataFrame:
         return self.data.astype(dtype=dtype, errors=errors)
 
-    def update_column_type(self, dtype: Dict[str, type]):
+    def update_column_type(self, dtype: dict[str, type]):
         for column_name, type_name in dtype.items():
             if not self.data[column_name].isna().any():
                 self.data = self.astype({column_name: type_name})

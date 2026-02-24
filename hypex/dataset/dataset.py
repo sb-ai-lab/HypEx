@@ -34,7 +34,7 @@ class Dataset(DatasetBase):
         data: pd.DataFrame | spark.DataFrame | str | None = None,
         backend: BackendsEnum | None = None,
         default_role: ABCRole | None = None,
-        session: Optional[spark.SparkSession] = None,
+        session: spark.SparkSession | None = None,
     ):
         super().__init__(roles, data, backend, default_role, session)
 
@@ -110,7 +110,7 @@ class SmallDataset(DatasetBase):
         data: pd.DataFrame | str | None = None,
         # backend: BackendsEnum | None = None,
         default_role: ABCRole | None = None,
-        session: Optional[spark.SparkSession] = None,
+        session: spark.SparkSession | None = None,
     ):
         super().__init__(roles, data, BackendsEnum.pandas, default_role, session)
         self.loc = self.Locker(self._backend, self.roles)
