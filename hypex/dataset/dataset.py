@@ -255,15 +255,19 @@ class ExperimentData:
 
         # Handle analysis tables
         elif space == ExperimentDataEnum.analysis_tables:
-            # Преобразуем Dataset в SmallDataset
             if isinstance(value, Dataset):
                 value = value.to_small_dataset()
-            elif isinstance(value, Dataset):
-                value = SmallDataset.from_dict(value.to_dict(), roles=role)
-            elif not isinstance(value, SmallDataset):
-                # Если значение не Dataset/SmallDataset, создаем SmallDataset
+            elif isinstance(value, SmallDataset):
+                value = {executor_id: value}
+            elif isinstance(value, dict):
+                value = {
+                    _key : _val.to_small_dataset() if isinstance(value, Dataset) else _val
+                    for _key, _val in value.items()
+                }
+            else:
+                # Если значение не Dataset/SmallDataset/dict
                 raise TypeError(f"Wrong value {value} for converting to SmallDataset")
-            self.analysis_tables[executor_id] = value
+            self.analysis_tables.update(value)
 
         # Handle variables
         elif space == ExperimentDataEnum.variables:
