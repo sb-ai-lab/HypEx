@@ -25,7 +25,7 @@ class PandasNavigation(DatasetBackendNavigation):
             raise ValueError(f"Unsupported file extension {file_extension}")
 
     def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
-        self.labels_dict = None
+        self._labels_dict = None
         if isinstance(data, pd.DataFrame):
             self.data = data
         elif isinstance(data, pd.Series):
@@ -33,7 +33,7 @@ class PandasNavigation(DatasetBackendNavigation):
         elif isinstance(data, spark.DataFrame):
             downcaster = Downcast(data)
             self.data = downcaster.execute()
-            self.labels_dict = downcaster.labels_dict
+            self._labels_dict = downcaster.labels_dict
         elif isinstance(data, dict):
             if "index" in data.keys():
                 self.data = pd.DataFrame(data=data["data"], index=data["index"])
@@ -219,7 +219,7 @@ class PandasNavigation(DatasetBackendNavigation):
     
     @property
     def lables_dict(self):
-        return self.labels_dict
+        return self._labels_dict
 
     def _get_column_index(
         self, column_name: Sequence[str] | str
