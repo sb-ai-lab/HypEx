@@ -5,6 +5,7 @@ from .constants import (
     NAME_BORDER_SYMBOL,
     NUMBER_TYPES_LIST,
 )
+from .downcaster import Downcast
 from .enums import (
     ABNTestMethodsEnum,
     ABTestTypesEnum,
@@ -55,6 +56,7 @@ __all__ = [
     "MATCHING_INDEXES_SPLITTER_SYMBOL",
     "NAME_BORDER_SYMBOL",
     "NUMBER_TYPES_LIST",
+    "Downcast",
     "ABNTestMethodsEnum",
     "ABTestTypesEnum",
     "AbstractMethodError",

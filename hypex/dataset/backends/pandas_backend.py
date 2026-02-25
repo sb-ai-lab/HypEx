@@ -9,6 +9,7 @@ import pyspark.sql as spark
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType
 from ...utils.adapter import Adapter
+from ...utils.downcaster import Downcast
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -24,12 +25,15 @@ class PandasNavigation(DatasetBackendNavigation):
             raise ValueError(f"Unsupported file extension {file_extension}")
 
     def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
+        self.labels_dict = None
         if isinstance(data, pd.DataFrame):
             self.data = data
         elif isinstance(data, pd.Series):
             self.data = pd.DataFrame(data)
         elif isinstance(data, spark.DataFrame):
-            self.data = data.toPandas()
+            downcaster = Downcast(data)
+            self.data = downcaster.execute()
+            self.labels_dict = downcaster.labels_dict
         elif isinstance(data, dict):
             if "index" in data.keys():
                 self.data = pd.DataFrame(data=data["data"], index=data["index"])
@@ -212,6 +216,10 @@ class PandasNavigation(DatasetBackendNavigation):
     @property
     def shape(self):
         return self.data.shape
+    
+    @property
+    def lables_dict(self):
+        return self.labels_dict
 
     def _get_column_index(
         self, column_name: Sequence[str] | str
