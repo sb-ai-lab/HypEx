@@ -46,6 +46,16 @@ class Dataset(DatasetBase):
             default_role=self.default_role,
         )
 
+    @staticmethod
+    def from_dict(
+            data: FromDictTypes,
+            roles: ABCRole | dict[str, ABCRole],
+    ) -> Dataset:
+        if isinstance(roles, dict):
+            return Dataset.__init__(data=data, roles=roles)
+        else:
+            raise TypeError(f"Value {data} is not a dict type.")
+
 
 class SmallDataset(DatasetBase):
     class Locker:
@@ -129,15 +139,15 @@ class SmallDataset(DatasetBase):
     def index(self, value):
         self.backend.data.index = value
 
-    @staticmethod
-    def from_dict(
-            data: FromDictTypes,
-            roles: ABCRole | dict[str, ABCRole],
-    ) -> SmallDataset:
-        if isinstance(roles, dict):
-            return SmallDataset.__init__(data=data, roles=roles)
-        else:
-            raise TypeError(f"Value {data} is not a dict type.")
+    # @staticmethod
+    # def from_dict(
+    #         data: FromDictTypes,
+    #         roles: ABCRole | dict[str, ABCRole],
+    # ) -> SmallDataset:
+    #     if isinstance(roles, dict):
+    #         return SmallDataset.__init__(data=data, roles=roles)
+    #     else:
+    #         raise TypeError(f"Value {data} is not a dict type.")
 
     def sort(
             self,
