@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import re
-from itertools import chain
+from itertools import chain, reduce
 
 from pathlib import Path
 from typing import (
@@ -23,15 +23,11 @@ import numpy as np
 import pandas as pd
 import pyspark.sql as spark
 from pyspark import SparkContext, SparkConf, StorageLevel
-from pyspark.sql import (
-    SparkSession,
-    Window,
-    Row,
-    functions as F,
-    types as T,
-    DataFrame as SparkDF,
-)
-from pyspark.sql.functions import lit, monotonically_increasing_id
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
+from pyspark.sql import types as T
+from pyspark.sql import DataFrame as SparkDF
+
 from pyspark.sql.types import (
     NumericType,
     ArrayType,
@@ -41,88 +37,49 @@ from pyspark.sql.types import (
     DoubleType,
 )
 
-from functools import reduce
-
 from ...utils import FromDictTypes, MergeOnError, ScalarType, Adapter
+from ...utils.typings import SparkTypeMapper as stm
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
-from ...utils.typings import PysparkScalarType, SparkTypeMapper as d
 
 
 class SparkNavigation(DatasetBackendNavigation):
     @staticmethod
-    def _read_file(
-        filename: Union[str, Path], session: SparkSession
-    ) -> spark.DataFrame:
-        file_extension = Path(filename).suffix
-        if file_extension == ".csv":
-            return (
-                session.read.format("csv")
+    def _read_file(filename: str | Path, session: SparkSession) -> spark.DataFrame:
+        file_path = Path(filename).resolve()
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: '{file_path}'")
+        if not file_path.is_file():
+            raise ValueError(f"Path is not a file: '{file_path}'")
+        if not os.access(file_path, os.R_OK):
+            raise PermissionError(f"Permission denied: '{file_path}'")
+        
+        
+        suffix = file_path.suffix.lower()
+        
+        if suffix == ".csv":
+            return (session
+                .read
+                .format("csv")
                 .option("header", "true")
-                .option("inferSchema", "true")  # TODO: find faster solution in future
-                .load(filename)
+                .option("inferSchema", "true")
+                .option("encoding", "UTF-8")
+                .load(str(file_path))
             )
-        elif file_extension == ".parquet":
-            return session.read.parquet(filename)
+        elif suffix == ".parquet":
+            return session.read.parquet(str(file_path))
+        elif suffix == ".json":
+            return session.read.json(str(file_path))
+        elif suffix == ".orc":
+            return session.read.orc(str(file_path))
         else:
-            try:
-                return session.read.table(filename)
-            except:
-                raise ValueError(f"Unsupported file extension {file_extension}")
+            raise ValueError(f"Unsupported file extension: '{suffix}'. "
+                             f"Supported: .csv, .parquet, .json, .orc")            
 
-    @staticmethod
-    def _get_spark_session(
-        app_name: str = "HypEx",
-        python_path: Optional[str] = None,
-        dynamic_allocation: bool = True,
-        mode: Optional[str] = None,
-    ):
-        if python_path is None:
-            python_path = sys.executable
-
-        os.environ["PYSPARK_PYTHON"] = python_path
-        os.environ["PYSPARK_DRIVER_PYTHON"] = python_path
-
-        if mode == "local":
-            conf = (
-                SparkConf()
-                .setAppName(app_name)
-                .setMaster("local[*]")
-                .set("spark.driver.memory", "6g")
-                .set("spark.executor.memory", "6g")
-            )
-        else:
-            conf = (
-                SparkConf()
-                .setAppName(app_name)
-                .
-                # setMaster("yarn").
-                set("spark.executor.cores", "8")
-                .set("spark.executor.memory", "8g")
-                .set("spark.executor.memoryOverhead", "8g")
-                .set("spark.driver.cores", "12")
-                .set("spark.driver.memory", "16g")
-                .set("spark.driver.maxResultSize", "32g")
-                .set("spark.shuffle.service.enabled", "true")
-                .set("spark.dynamicAllocation.enabled", dynamic_allocation)
-                .set("spark.dynamicAllocation.initialExecutors", "6")
-                .set("spark.dynamicAllocation.maxExecutors", "32")
-                .set("spark.dynamicAllocation.executorIdleTimeout", "120s")
-                .set("spark.dynamicAllocation.cachedExecutorIdleTimeout", "600s")
-                .set("spark.port.maxRetries", "150")
-            )
-
-        return SparkSession.builder.config(conf=conf).enableHiveSupport().getOrCreate()
-
-    def __init__(
-        self,
-        data: Optional[Union[spark.DataFrame, pd.DataFrame, dict, str]] = None,
-        session: SparkSession = None,
-    ):
+    def __init__(self,
+                 data: spark.DataFrame | pd.DataFrame | dict[str, Any] | str | None = None,
+                 session: SparkSession | None = None):
         if session is None:
-            if isinstance(data, spark.DataFrame):
-                self.session = data.sparkSession
-            else:
-                self.session = self._get_spark_session()
+            raise ValueError("Session not set")
         else:
             if isinstance(session, SparkSession):
                 self.session = session
@@ -142,13 +99,23 @@ class SparkNavigation(DatasetBackendNavigation):
         elif isinstance(data, str):
             self.data = self._read_file(data, self.session)
         else:
-            self.data = self.session.emptyDataFrame
+            self.data = self.session.createDataFrame([], schema=StructType([]))
+        self.count_data: int | None = None
+            
+    def __add_row_index(self, df: spark.DataFrame, index_column_name: str) -> spark.DataFrame:
+        """Not used."""
+        rdd = df.rdd.zipWithIndex()
+        new_rdd = rdd.map(lambda x: tuple(x[0]) + (x[1],))
+        new_schema = T.StructType(df.schema.fields + [T.StructField(index_column_name, T.LongType(), False)])
+        return self.session.createDataFrame(new_rdd, schema=new_schema)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: Any):
         raise NotImplementedError("Spark-base Dataset does not support indexing")
 
-    def __len__(self):
-        return 0 if self.data is None else self.data.count()
+    def __len__(self) -> int:
+        if self.count_data is None:
+            self.count_data = 0 if self.data is None else self.data.count()
+        return self.count_data
 
     @staticmethod
     def __magic_determine_other(other) -> Any:
@@ -164,341 +131,301 @@ class SparkNavigation(DatasetBackendNavigation):
             return F.lit(other.item())
         else:
             raise TypeError(f"Unsupported operand type: '{type(other).__name__}'. ")
+        
+    def add_column(self, data: spark.DataFrame | list, name: str | None = None, index = None) -> 'SparkNavigation':
+        raise NotImplementedError("For add column need implement uniq_column")
 
     # comparison operators:
-    def __eq__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) == other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __eq__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(F.col(c) == other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __ne__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) != other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __ne__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(F.col(c) != other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __lt__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) < other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __lt__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(F.col(c) < other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __le__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) <= other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __le__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(F.col(c) <= other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __ge__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) >= other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __ge__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(F.col(c) >= other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __gt__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) > other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __gt__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(F.col(c) > other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    # Unary operations:
-    def __pos__(self) -> spark.DataFrame:
-        new_df = self.data.select("*")
-        return self.add_column(new_df)
+    # unary operators:
+    def __pos__(self) -> 'SparkNavigation':
+        result_df = self.data.select([F.col(c).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __neg__(self) -> spark.DataFrame:
-        new_df = self.data.select((-F.col(c)).alias(c) for c in self.data.columns)
-        return self.add_column(new_df)
+    def __neg__(self) -> 'SparkNavigation':
+        result_df = self.data.select([(-F.col(c)).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __abs__(self) -> spark.DataFrame:
-        new_df = self.data.select(F.abs(F.col(c)).alias(c) for c in self.data.columns)
-        return self.add_column(new_df)
+    def __abs__(self) -> 'SparkNavigation':
+        result_df = self.data.select([F.abs(F.col(c)).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __invert__(self) -> spark.DataFrame:
-        new_df = self.data.select((~F.col(c)).alias(c) for c in self.data.columns)
-        return self.add_column(new_df)
+    def __invert__(self) -> 'SparkNavigation':
+        result_df = self.data.select([(~F.col(c)).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __round__(self, ndigits: int = 0) -> spark.DataFrame:
-        new_df = self.data.select(
-            F.round(F.col(c), ndigits).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __round__(self, n: int = 0) -> 'SparkNavigation':
+        result_df = self.data.select([F.round(F.col(c), n).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    # Binary operations:
-    def __add__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) + other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    # binary arithmetic operations:
+    def __add__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(F.col(c) + other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __sub__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) - other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __sub__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(F.col(c) - other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __mul__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) * other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __mul__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(F.col(c) * other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __floordiv__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.floor(F.col(c) / other)).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __floordiv__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([F.floor(F.col(c) / other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __truediv__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) / other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __truediv__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(F.col(c) / other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __div__(self, other) -> spark.DataFrame:
-        return self.__truediv__(other)
+    def __mod__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(F.col(c) % other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __mod__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) % other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __pow__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([F.pow(F.col(c), other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __pow__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            F.pow(F.col(c), other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    # binary logical operators:
+    def __and__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(F.col(c) & other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __and__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) & other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __or__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(F.col(c) | other_val).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __or__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) | other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __xor__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        try:
+            result_df = self.data.select([F.xor(F.col(c), other_val).alias(c) for c in self.data.columns])
+        except (AttributeError, TypeError):
+            result_df = self.data.select([
+                ((F.col(c) & ~other_val) | (~F.col(c) & other_val)).alias(c) 
+                for c in self.data.columns
+            ])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __truediv__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.col(c) / other).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    # reverse arithmetic operators:
+    def __radd__(self, other) -> 'SparkNavigation':
+        return self.__add__(other)
 
-    def __div__(self, other) -> spark.DataFrame:
-        return self.__truediv__(other)
+    def __rsub__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(other_val - F.col(c)).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    # Right arithmetic operators:
-    def __radd__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (other + F.col(c)).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __rmul__(self, other) -> 'SparkNavigation':
+        return self.__mul__(other)
 
-    def __rsub__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (other - F.col(c)).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __rfloordiv__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([F.floor(other_val / F.col(c)).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __rmul__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (other * F.col(c)).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __rtruediv__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(other_val / F.col(c)).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __rfloordiv__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (F.floor(other / F.col(c))).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
-
-    def __rtruediv__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (other / F.col(c)).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
-
-    def __rdiv__(self, other) -> spark.DataFrame:
+    def __rdiv__(self, other) -> 'SparkNavigation':
         return self.__rtruediv__(other)
 
-    def __rmod__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            (other % F.col(c)).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __rmod__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([(other_val % F.col(c)).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
-    def __rpow__(self, other) -> spark.DataFrame:
-        other = self.__magic_determine_other(other)
-        new_df = self.data.select(
-            F.pow(other, F.col(c)).alias(c) for c in self.data.columns
-        )
-        return self.add_column(new_df)
+    def __rpow__(self, other) -> 'SparkNavigation':
+        other_val = self.__magic_determine_other(other)
+        result_df = self.data.select([F.pow(other_val, F.col(c)).alias(c) for c in self.data.columns])
+        return SparkNavigation(data=result_df, session=self.session)
 
+    # representation methods:
     def __repr__(self) -> str:
-        df: SparkDF = self.data
-        cols = df.columns
-        total = df.count()
-        if total <= 10:
-            pandas_df = df.toPandas()
+        if self.data is None:
+            return "SparkNavigation(data=None)"
+        
+        rows = self.data.count()
+        columns = len(self.data.columns)
+        schema_summary = ", ".join(f"{field.name}:{field.dataType.simpleString()}" 
+                                   for field in self.data.schema.fields[:5])
+        if len(self.data.schema.fields) > 5:
+            schema_summary += f", ... ({len(self.data.schema.fields)} total)"
+        
+        return f"SparkNavigation(rows={rows}, columns={columns}, schema=[{schema_summary}])"
+
+    def _repr_html_(self) -> str:
+        if self.data is None:
+            return "<p>SparkNavigation(data=None)</p>"
+        try:
+            pdf = self.data.limit(10).toPandas()
+            html_table = pdf.to_html(index=False, classes="dataframe", border=0)
+            
+            rows = self.data.count()
+            columns = len(self.data.columns)
+            
+            html_info = f"""
+            <div style="margin: 10px 0;">
+                <p style="font-family: monospace; font-size: 12px; color: #666;">
+                    SparkNavigation: {rows} rows × {columns} columns
+                </p>
+            </div>
+            {html_table}
+            <div style="margin: 10px 0;">
+                <p style="font-family: monospace; font-size: 12px; color: #666;">
+                    [Showing first 10 rows of {rows}]
+                </p>
+            </div>
+            """
+            return html_info
+        except Exception as e:
+            return f"<p>Error rendering DataFrame: {str(e)}</p>"
+    
+
+    def get(self, key: str | int | list[Any] | tuple[Any, ...], default: Any = None) -> 'SparkNavigation | Any':
+        if isinstance(key, tuple) and len(key) == 2:
+            row_idx, col_name = key
+            if isinstance(row_idx, int):
+                raise NotImplementedError("Access by row index is not supported")
+        
+        if not isinstance(key, (list, tuple)):
+            key_list = [key]
         else:
-            head_df = df.limit(5).toPandas()
-            tail_rows = df.tail(5)
-            tail_df = pd.DataFrame(tail_rows, columns=cols)
-            ellipsis = pd.DataFrame([["..."] * len(cols)], columns=cols)
-            pandas_df = pd.concat([head_df, ellipsis, tail_df], ignore_index=True)
-        table = pandas_df.__repr__()
-        dim = f"\n\n[{total} rows × {len(cols)} columns]"
-        return table + dim
-
-    def _repr_html_(self):
-        return self.data._repr_html_()
-
-    def get(
-        self,
-        key,
-        default=None,
-    ) -> Any:
-        key = Adapter.to_list(key)
-        # Case 1: key is a string (column name)
-        if isinstance(key[0], str):
-            columns = [k for k in key if k in self.columns]
-            if columns:
-                return self.data.select(*columns)
+            key_list = list(key)
+            
+        if not key_list:
+            return default
+            
+        if isinstance(key_list[0], str):
+            existing_cols = [k for k in key_list if k in self.data.columns]
+            if existing_cols:
+                return SparkNavigation(data=self.data.select(*existing_cols), session=self.session)
             else:
                 return default
-
-        # Case 2: key is an integer (row index)
-        elif isinstance(key[0], int):
-            df_with_index = self.data.withColumn(
-                "__row_index__",
-                F.row_number().over(Window.orderBy(F.monotonically_increasing_id()))
-                - 1,
-            )
-            return df_with_index.filter(F.col("__row_index__") == key).drop(
-                "__row_index__"
-            )
-
-        # Case 3: key is a tuple (row_index, column_name)
-        elif isinstance(key[0], tuple) and len(key[0]) == 2:
-            row_idx, col_name = key[0]
-            return self.data.limit(row_idx + 1).tail(1)[0][col_name]
-
+        elif isinstance(key_list[0], int):
+            raise NotImplementedError("Access by row index list is not supported")
         else:
             return default
 
-    def take(
-        self,
-        indices: int | list[int],
-        axis: Literal["index", "columns", "rows"] | int = 0,
-    ) -> Any:
-        indices = Adapter.to_list(indices)
-        if axis == 1:
-            indices = [self.columns[index] for index in indices]
-        return self.get(indices)
+    def take(self, indices: int | list[int], axis: Literal["index", "columns", "rows"] | int = 0) -> 'SparkNavigation':
+        if not isinstance(indices, list):
+            indices = [indices]
 
-    def get_values(
-        self,
-        row: Optional[str] = None,
-        column: Optional[str] = None,
-    ) -> Any:
-        if (column is not None) and (row is not None):
-            return self[row].data.select(column)
-        if column is not None:
-            return self[column].data.toPandas.values.tolist()
-        if row is not None:
-            return self[row].data.toPandas.values.tolist()
-        return self
+        if axis in (1, "columns"):
+            col_names = []
+            for idx in indices:
+                if 0 <= idx < len(self.data.columns):
+                    col_names.append(self.data.columns[idx])
+                else:
+                    raise IndexError(f"Column index {idx} out of range")
+            
+            return SparkNavigation(data=self.data.select(*col_names), session=self.session)
 
-    def iget_values(
-        self,
-        row: Optional[int] = None,
-        column: Optional[int] = None,
-    ) -> Any:
-        if (column is not None) and (row is not None):
-            column = self.columns[column]
-            return self[row].data.select(column)
-        if column is not None:
-            column = self.columns[column]
-            return self[column].data.toPandas.values.tolist()
-        if row is not None:
-            return self[row].data.toPandas.values.tolist()
-        return self
+        elif axis in (0, "index", "rows"):
+            raise NotImplementedError("Taking rows by index is not supported in Spark")
+        else:
+            raise ValueError(f"Invalid axis: {axis}. Must be 0, 1, 'index', 'columns', or 'rows'")
 
-    def create_empty(
-        self,
-        index: Optional[Iterable] = None,
-        columns: Optional[Iterable[str]] = None,
-    ):
-        columns = list(columns or [])
-        schema = T.StructType(
-            [T.StructField(column, T.StringType(), True) for column in columns]
-        )
-        empty_rdd = self.session.sparkContext.emptyRDD()
-        self.data = self.session.createDataFrame(empty_rdd, schema)
-        if index is not None:
-            index_rows = [(value,) for value in index]
-            index_df = self.session.createDataFrame(index_rows, ["index"])
-            self.data = index_df.join(self.data, how="cross") if columns else index_df
-        return self
-
-    @property
-    def index(self):
-        # if self.data is None:
-        #     return []
-        # if "index" in self.data.columns:
-        #     return self.get_values(column="index")
-        # if "__index__" in self.data.columns:
-        #     return pd.Index(self.data.select("__index__").toPandas()["__index__"])
-        # return pd.Index(
-        #     [
-        #         row["__row_id"]
-        #         for row in self._with_row_index(self.data).select("__row_id").collect()
-        #     ]
-        # )
-        raise AttributeError("Spark-based Dataset has no index")
+    def create_empty(self,
+                     index: Iterable | None = None,
+                     columns: Iterable[str] | None = None) -> "SparkNavigation":
+        
+        columns = list(columns) if columns is not None else []
+        index_values = list(index) if index is not None else None
+        
+        if index_values is not None and len(index_values) > 0:
+            rows = [
+                (idx_val,) + tuple([None] * len(columns))
+                for idx_val in index_values
+            ]
+            
+            if index_values[0] is not None:
+                first = index_values[0]
+                if isinstance(first, bool):
+                    index_type = T.BooleanType()
+                elif isinstance(first, int):
+                    index_type = T.LongType()
+                elif isinstance(first, float):
+                    index_type = T.DoubleType()
+                elif isinstance(first, str):
+                    index_type = T.StringType()
+                else:
+                    index_type = T.StringType()
+            else:
+                index_type = T.StringType()
+            
+            fields = [T.StructField("index", index_type, True)]
+            fields += [T.StructField(col, T.StringType(), True) for col in columns]
+            schema = T.StructType(fields)
+            
+            new_df = self.session.createDataFrame(rows, schema)
+        
+        elif columns:
+            schema = T.StructType(
+                [T.StructField(col, T.StringType(), True) for col in columns]
+            )
+            new_df = self.session.createDataFrame(
+                self.session.sparkContext.emptyRDD(),
+                schema
+            )
+        else:
+            new_df = self.session.createDataFrame([], schema=T.StructType([]))
+        
+        return SparkNavigation(data=new_df, session=self.session)
 
     @property
-    def columns(self):
+    def columns(self) -> list[str]:
         return self.data.columns if self.data else []
 
     @property
-    def shape(self):
+    def shape(self) -> tuple[int, int]:
         if self.data:
             count = self.data.count()
             cols = len(self.data.columns)
             return (count, cols)
         return (0, 0)
 
-    def _get_column_index(
-        self, column_name: Union[Sequence[str], str]
-    ) -> Union[int, Sequence[int]]:
+    def get_column_index(self, column_name: Sequence[str] | str) -> int | Sequence[int]:
         pd_index_columns = pd.Index(self.data.columns)
         if isinstance(column_name, str):
             return pd_index_columns.get_loc(column_name)
@@ -507,141 +434,107 @@ class SparkNavigation(DatasetBackendNavigation):
         else:
             raise TypeError("Wrong column_name type.")
 
-    def get_column_type(
-        self, column_name: Union[List[str], str] = None
-    ) -> Optional[Union[Dict[str, type], type]]:
-        column_name = self.data.columns if column_name is None else column_name
+    def get_column_type(self, column_name: list[str] | str = None) -> dict[str, type] | type | None:
+        if column_name is None:
+            column_name = self.data.columns
+        elif isinstance(column_name, str):
+            column_name = [column_name]
+        
         dtypes = {}
-        for k, v in self.data.select(column_name).dtypes:
-            if pd.api.types.is_integer_dtype(v) or v == "bigint":
-                dtypes[k] = int
-            elif pd.api.types.is_float_dtype(v):
-                dtypes[k] = float
-            elif (
-                pd.api.types.is_string_dtype(v)
-                or pd.api.types.is_object_dtype(v)
-                or v == "category"
-            ):
-                dtypes[k] = str
-            elif pd.api.types.is_bool_dtype(v):
-                dtypes[k] = bool
+        for field in self.data.schema.fields:
+            if field.name in column_name:
+                dtypes[field.name] = stm.to_python(field.dataType)
+        
         if isinstance(column_name, list):
+            if len(column_name) == 1:
+                return dtypes.get(column_name[0])
             return dtypes
         else:
-            if column_name in dtypes:
-                return dtypes[column_name]
-        return None
+            return dtypes.get(column_name[0]) if column_name else None
 
-    def astype(
-        self, dtype: Dict[str, type], errors: Literal["raise", "ignore"] = "raise"
-    ) -> spark.DataFrame:
+    def astype(self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise") -> 'SparkNavigation':
         for col, new_type in dtype.items():
-            new_type = str(new_type.__name__)
-            self.data = self.data.withColumn(col, self.data[col].cast(new_type))
-        return self.data
+            if col not in self.data.columns:
+                if errors == "raise":
+                    raise ValueError(f"Column '{col}' not found in DataFrame")
+                elif errors == "ignore":
+                    continue
+                else:
+                    raise ValueError(f"Invalid errors parameter: {errors}")
+            
+            try:
+                spark_type = stm.to_spark(new_type)
+                new_df = self.data.withColumn(col, F.col(col).cast(spark_type))
+            except Exception as e:
+                if errors == "raise":
+                    raise TypeError(f"Cannot cast column '{col}' to {new_type}: {e}")
+                elif errors == "ignore":
+                    continue
+        
+        return SparkNavigation(data=new_df, session=self.session)
 
-    def update_column_type(self, dtype: Dict[str, type]):
+    def update_column_type(self, dtype: dict[str, type]):
         if len(dtype) > 0:
             self.data = self.astype(dtype)
         return self
 
-    def add_column(
-        self, data: Union[spark.DataFrame, List], name: Optional[str] = None, index=None
-    ) -> spark.DataFrame:
-        def _add_columns_from_dataframe(
-            df: spark.DataFrame, new_df: spark.DataFrame
-        ) -> spark.DataFrame:
-            if df.count() != new_df.count():
-                raise ValueError(
-                    f"Row count mismatch: original DF has {df.count()} rows, new DF has {new_df.count()} rows"
-                )
-
-            df_with_index = df.withColumn("__join_id", monotonically_increasing_id())
-            new_df_with_index = new_df.withColumn(
-                "__join_id", monotonically_increasing_id()
+    def append(self, 
+               other: 'SparkNavigation | list[SparkNavigation]',
+               axis: int = 0) -> 'SparkNavigation':
+        others = other if isinstance(other, list) else [other]
+        
+        datasets = [self.data] + [
+            d.data if isinstance(d, SparkNavigation) else d 
+            for d in others
+        ]
+        
+        if axis == 0:
+            new_data = reduce(
+                lambda x, y: x.unionByName(y, allowMissingColumns=True), 
+                datasets
             )
+            return SparkNavigation(data=new_data, session=self.session)
+        
+        if axis == 1:
+            raise NotImplementedError("append on axis == 1 is not supported in Spark backend")
+        
+        raise ValueError("axis should be 0 or 1")
+    
+    @property
+    def index(self):
+        raise AttributeError("Spark-based Dataset has no index")
 
-            result = df_with_index.join(new_df_with_index, "__join_id", "inner")
+    def from_dict(self, data: FromDictTypes, index: Optional[Union[Iterable, Sized]] = None):
+        raise NotImplementedError("Need implement")
 
-            return result.drop("__join_id")
+    def get_values(self, row: str | int | None = None, column: str | None = None) -> Any:
+        raise NotImplementedError("Row-based value access is not supported")
 
-        def _add_columns_from_list(
-            df: spark.DataFrame, data_list: List, column_names: str
-        ) -> spark.DataFrame:
-            if len(data_list) != df.count():
-                raise ValueError(
-                    f"Data length {len(data_list)} doesn't match DataFrame row count {df.count()}"
-                )
+    def iget_values(self, row: int | None = None, column: int | None = None) -> Any:
+        raise NotImplementedError("Row-based value access is not supported")
 
-            original_rdd = df.rdd
-            zipped_rdd = original_rdd.zip(
-                self.session.sparkContext.parallelize(data_list)
-            )
-            new_df = zipped_rdd.map(lambda x: x[0] + (x[1],)).toDF(
-                df.columns + column_names
-            )
+    def to_dict(self) -> dict[str, Any]:
+        raise NotImplementedError("to_dict is not supported in Spark backend")
 
-            self.data = new_df
+    def to_records(self) -> list[dict]:
+        raise NotImplementedError("to_records is not supported in Spark backend")
 
-        if isinstance(data, spark.DataFrame):
-            return _add_columns_from_dataframe(self.data, data)
-        elif isinstance(data, list):
-            return _add_columns_from_list(self.data, data, name)
-        else:
-            raise ValueError(
-                "new_data must be Spark DataFrame, list of values, or list of lists"
-            )
+    def loc(self, items: Iterable) -> Iterable:
+        raise NotImplementedError("loc indexing is not supported in Spark backend")
 
-    def append(  # Эрик
-        self, other, reset_index: bool = False, axis: int = 0
-    ) -> spark.DataFrame:
-        pass
 
-    def from_dict(
-        self, data: FromDictTypes, index: Optional[Union[Iterable, Sized]] = None
-    ):
-        spark = self.spark
-        if isinstance(data, dict) and all(isinstance(v, list) for v in data.values()):
-            row_count = len(next(iter(data.values())))
-            index_list = list(index) if index is not None else list(range(row_count))
-            rows = [
-                {"_index": idx, **{k: v[idx] for k, v in data.items()}}
-                for idx in index_list
-            ]
-            self.data = spark.createDataFrame(rows)
-        elif isinstance(data, list) and all(isinstance(row, dict) for row in data):
-            if index is not None:
-                rows = [{**row, "_index": idx} for idx, row in zip(index, data)]
-            else:
-                rows = [{**row, "_index": i} for i, row in enumerate(data)]
-            self.data = spark.createDataFrame(rows)
-        else:
-            raise ValueError("Unsupported data format for from_dict")
-        return self
-
-    def to_dict(self) -> dict[str, Any]:  # TODO: to be moved to small data
-        pass
-
-    def to_records(self) -> list[dict]:  # TODO: to be moved to small data
-        pass
-
-    def loc(self, items: Iterable) -> Iterable:  # TODO: to be moved to small data
-        pass
-
-    def iloc(self, items: Iterable) -> Iterable:  # TODO: to be moved to small data
-        pass
+    def iloc(self, items: Iterable) -> Iterable:
+        raise NotImplementedError("iloc indexing is not supported in Spark backend")
 
 
 class SparkDataset(SparkNavigation, DatasetBackendCalc):
-    def __init__(
-        self,
-        data: Optional[Union[spark.DataFrame, pd.DataFrame, dict, str]] = None,
-        session: SparkSession = None,
-    ):
+    def __init__(self,
+                 data: spark.DataFrame | pd.DataFrame | dict | str | None = None,
+                 session: SparkSession = None):
         super().__init__(data, session)
 
     def __deepcopy__(self, memo):
-        return SparkDataset(self.data.select("*"))
+        return SparkDataset(data=self.data.select("*"), session=self.session)
 
     @staticmethod
     def _convert_agg_result(result: spark.DataFrame):
@@ -649,191 +542,206 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             return result.limit(1).take(1)[0][result.columns[0]]
         return result
 
-    def apply(
-        self,
-        func: Callable,
-        column_name: Optional[Union[str, List[str]]] = None,
-        axis: int = 0,
-        return_type: Optional[T.DataType] = None,
-        args: tuple = (),
-        kwargs: Optional[dict] = None,
-        result_type: Literal["reduce", "expand", "broadcast", None] = None,
-    ) -> spark.DataFrame:
+    def apply(self,
+              func: Callable,
+              column_name: str | list[str] | None = None,
+              axis: int = 0,
+              return_type: Optional[T.DataType] = None,
+              args: tuple = (),
+              kwargs: Optional[Dict[str, Any]] = None,
+              result_type: Literal["reduce", "expand", "broadcast"] | None = None) -> "SparkDataset":
         kwargs = kwargs or {}
         df = self.data
-        try:
-            is_native = isinstance(func(F.col("dummy")), F.Column)
-        except Exception:
-            is_native = False
-
-        if axis == 0 and is_native:
-            cols = Adapter.to_list(column_name)
-            if column_name is None:
-                new_df = df.select([func(F.col(c)).alias(c) for c in df.columns])
-            else:
-                new_cols = {c: func(F.col(c)) for c in cols}
-                df = df.withColumns(new_cols)
-                new_df = df
-            return new_df
-
-        if return_type is not None:
-            udf_func = F.udf(
-                lambda row: func(row.asDict(), *args, **kwargs), return_type
-            )
-            struct_cols = F.struct(*[F.col(c) for c in (column_name or df.columns)])
-            col_expr = udf_func(struct_cols)
-            if result_type == "expand" and isinstance(return_type, T.StructType):
-                temp_df = df.withColumn("__tmp", col_expr)
-                for f in return_type.fields:
-                    temp_df = temp_df.withColumn(f.name, F.col("__tmp." + f.name))
-                new_df = temp_df.drop("__tmp")
-            elif result_type == "reduce":
-                new_df = df.withColumn("result", col_expr)
-            elif result_type == "broadcast":
-                new_df = df.withColumn("result", col_expr)
-                if isinstance(return_type, T.StructType):
-                    temp_df = new_df.withColumn("__tmp", F.col("result"))
-                    for f in return_type.fields:
-                        new_df = new_df.withColumn(f.name, F.col("__tmp." + f.name))
-                    new_df = new_df.drop("__tmp")
-                else:
-                    for col in df.columns:
-                        new_df = new_df.withColumn(col, F.col("result"))
-                    new_df = new_df.drop("result")
-            elif result_type is None:
-                if isinstance(return_type, T.StructType):
-                    temp_df = df.withColumn("__tmp", col_expr)
-                    for f in return_type.fields:
-                        new_df = temp_df.withColumn(f.name, F.col("__tmp." + f.name))
-                    new_df = new_df.drop("__tmp")
-                else:
-                    new_df = df.withColumn("result", col_expr)
-        else:
-            self.data.cache()
-            df = self.data
-            sample_row = df.limit(1).toPandas().iloc[0].to_dict()
+        
+        if axis == 0:
             try:
-                sample_res = func(sample_row, *args, **kwargs)
-            except Exception as e:
-                raise ValueError(
-                    "Failed to identify return_type by the first line"
-                ) from e
+                test_col = func(F.lit(None))
+                is_native = isinstance(test_col, F.Column)
+            except Exception:
+                is_native = False
+            
+            if is_native:
+                return self._apply_native_func(df, func, column_name)
+        
+        if return_type is None:
+            return_type = self._infer_return_type(df, func, column_name, args, kwargs)
+        
+        udf_func = F.udf(
+            lambda row: func(row.asDict(), *args, **kwargs), 
+            return_type
+        )
+        
+        target_cols = self._get_target_columns(df, column_name)
+        struct_cols = F.struct(*[F.col(c) for c in target_cols])
+        col_expr = udf_func(struct_cols)
+        
+        new_df = self._apply_udf_result(df, col_expr, return_type, result_type)
+        
+        return self.__class__(new_df, self.session)
 
-            return_type = d.types(sample_res)
-            udf_func = F.udf(
-                lambda row: func(row.asDict(), *args, **kwargs), return_type
-            )
-            struct_cols = F.struct(*[F.col(c) for c in (column_name or df.columns)])
-            col_expr = udf_func(struct_cols)
-            if result_type == "expand" and isinstance(return_type, T.StructType):
-                temp_df = df.withColumn("__tmp", col_expr)
-                for f in return_type.fields:
-                    temp_df = temp_df.withColumn(f.name, F.col("__tmp." + f.name))
-                new_df = temp_df.drop("__tmp")
-            elif result_type == "reduce":
-                new_df = df.withColumn("result", col_expr)
-            elif result_type == "broadcast":
-                new_df = df.withColumn("result", col_expr)
-                if isinstance(return_type, T.StructType):
-                    temp_df = new_df.withColumn("__tmp", F.col("result"))
-                    for f in return_type.fields:
-                        new_df = new_df.withColumn(f.name, F.col("__tmp." + f.name))
-                    new_df = new_df.drop("__tmp")
-                else:
-                    for col in df.columns:
-                        new_df = new_df.withColumn(col, F.col("result"))
-                    new_df = new_df.drop("result")
-            elif result_type is None:
-                if isinstance(return_type, T.StructType):
-                    temp_df = df.withColumn("__tmp", col_expr)
-                    for f in return_type.fields:
-                        new_df = temp_df.withColumn(f.name, F.col("__tmp." + f.name))
-                    new_df = new_df.drop("__tmp")
-                else:
-                    new_df = df.withColumn("result", col_expr)
-        return new_df
+    def _apply_native_func(self, 
+                           df: spark.DataFrame, 
+                           func: Callable, 
+                           column_name: str | list[str] | None) -> "SparkDataset":
+        target_cols = self._get_target_columns(df, column_name)
+        
+        if column_name is None:
+            new_cols = [func(F.col(c)).alias(c) for c in df.columns]
+            new_df = df.select(*new_cols)
+        else:
+            new_cols_dict = {c: func(F.col(c)) for c in target_cols}
+            new_df = df.withColumns(new_cols_dict)
+        
+        return self.__class__(new_df, self.session)
 
-    def map(
-        self,
-        func: Union[Callable, dict],
-        *,
-        return_type: Union[T.DataType, None] = None,
-        na_action: Union[None, str] = None,
-        **kwargs,
-    ) -> spark.DataFrame:
+    def _apply_udf_result(self,
+                          df: spark.DataFrame,
+                          col_expr: F.Column,
+                          return_type: T.DataType,
+                          result_type: Literal["reduce", "expand", "broadcast"] | None) -> spark.DataFrame:
+        is_struct = isinstance(return_type, T.StructType)
+        
+        if result_type == "expand" and is_struct:
+            return self._expand_struct(df, col_expr, return_type)
+        
+        elif result_type == "reduce":
+            return df.withColumn("result", col_expr)
+        
+        elif result_type == "broadcast":
+            return self._broadcast_result(df, col_expr, return_type)
+        
+        else:
+            if is_struct:
+                return self._expand_struct(df, col_expr, return_type)
+            else:
+                return df.withColumn("result", col_expr)
+
+    def _expand_struct(self, 
+                       df: spark.DataFrame, 
+                       col_expr: F.Column, 
+                       struct_type: T.StructType) -> spark.DataFrame:
+        existing_cols = [F.col(c) for c in df.columns]
+        new_cols = [F.col(col_expr.alias("__tmp"))[f.name].alias(f.name) 
+                    for f in struct_type.fields]
+        return df.select(*existing_cols, *new_cols).drop("__tmp")
+
+    def _broadcast_result(self, 
+                          df: spark.DataFrame, 
+                          col_expr: F.Column, 
+                          return_type: T.DataType) -> spark.DataFrame:
+        is_struct = isinstance(return_type, T.StructType)
+        
+        if is_struct:
+            temp_df = df.withColumn("__tmp", col_expr)
+            new_cols = [F.col("__tmp")[f.name].alias(f.name) 
+                        for f in return_type.fields]
+            return temp_df.select(*new_cols).drop("__tmp")
+        else:
+            return df.select([col_expr.alias(c) for c in df.columns])
+
+    def _infer_return_type(self,
+                           df: spark.DataFrame,
+                           func: Callable,
+                           column_name: str | list[str] | None,
+                           args: tuple,
+                           kwargs: dict[str, Any]) -> T.DataType:
+        target_cols = self._get_target_columns(df, column_name)
+        
+        sample_df = df.select(*target_cols).limit(1)
+        if sample_df.isEmpty():
+            raise ValueError("Cannot infer return_type: DataFrame is empty")
+        
+        sample_row = sample_df.collect()[0].asDict()
+        
+        try:
+            sample_res = func(sample_row, *args, **kwargs)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to identify return_type. "
+                f"Specify it explicitly: return_type=T.StringType(). "
+                f"Error: {str(e)}"
+            ) from e
+        
+        return d.types(sample_res)
+
+    def _get_target_columns(self, 
+                            df: spark.DataFrame, 
+                            column_name: str | list[str] | None) -> List[str]:
+        if column_name is None:
+            return df.columns
+        return Adapter.to_list(column_name)
+
+    def map(self,
+            func: Callable | dict,
+            *,
+            return_type: T.DataType | None = None,
+            na_action: Optional[Literal["ignore"]] = None,
+            **kwargs) -> "SparkDataset":
         df = self.data
         cols = df.columns
-
+        
+        if not cols or df.isEmpty():
+            return self.__class__(df, self.session)
+        
         if isinstance(func, dict):
-            actual_func = func.get
-            use_fast_path = False
+            if return_type is None:
+                sample_val = next(iter(func.values()), None)
+                return_type = d.types(sample_val) if sample_val is not None else T.StringType()
+            
+            mapping = func
+            actual_func = lambda x: mapping.get(x, x)
         else:
             actual_func = func
-            use_fast_path = True
-
-        if return_type is not None:
-            udf_func = F.udf(actual_func, return_type)
-            if na_action == "ignore":
-                new_cols = [
-                    F.when(F.col(c).isNull(), F.col(c))
-                    .otherwise(udf_func(F.col(c)))
-                    .alias(c)
-                    for c in cols
-                ]
-            else:
-                new_cols = [udf_func(F.col(c)).alias(c) for c in cols]
+        
+        if return_type is None:
+            return_type = self._infer_map_return_type(df, actual_func, cols, kwargs)
+        
+        udf_func = F.udf(actual_func, return_type)
+        
+        if na_action == "ignore":
+            new_cols = [
+                F.when(F.col(c).isNull(), F.col(c))
+                .otherwise(udf_func(F.col(c)))
+                .alias(c)
+                for c in cols
+            ]
+        elif na_action is None:
+            new_cols = [udf_func(F.col(c)).alias(c) for c in cols]
         else:
-            self.data.cache()
-            df = self.data
-            sample_row = df.limit(1).toPandas().iloc[0].to_dict()
-            col_types = {}
-            for c in cols:
-                try:
-                    sample_val = actual_func(sample_row[c], **kwargs)
-                except Exception as e:
-                    raise ValueError(
-                        f"Failed to infer return_type for column '{c}'. "
-                        f"Specify it explicitly: return_type=T.StringType()."
-                    ) from e
-                col_types[c] = d.types(sample_val)
+            raise ValueError(f"Unsupported na_action: {na_action}. Use 'ignore' or None")
+        
+        new_df = df.select(*new_cols)
+        return self.__class__(new_df, self.session)
 
-            if na_action == "ignore":
-                new_cols = [
-                    F.when(F.col(c).isNull(), F.col(c))
-                    .otherwise(F.udf(actual_func, col_types[c])(F.col(c)))
-                    .alias(c)
-                    for c in cols
-                ]
-            else:
-                new_cols = [
-                    F.udf(actual_func, col_types[c])(F.col(c)).alias(c) for c in cols
-                ]
-
-        new_df = df.select(new_cols)
-        return new_df
+    def _infer_map_return_type(
+        self,
+        df: spark.DataFrame,
+        func: Callable,
+        cols: List[str],
+        kwargs: Dict[str, Any]
+    ) -> T.DataType:
+        sample_df = df.select(cols[0]).limit(1)
+        if sample_df.isEmpty():
+            raise ValueError("Cannot infer return_type: DataFrame is empty")
+        
+        sample_val = sample_df.collect()[0][0]
+        
+        try:
+            result = func(sample_val, **kwargs)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to infer return_type for column '{cols[0]}'. "
+                f"Specify explicitly: return_type=T.StringType(). "
+                f"Error: {str(e)}"
+            ) from e
+        
+        return d.types(result)
 
     def is_empty(self) -> bool:
         return self.data.isEmpty()
 
-    def unique(self) -> SparkDF:
-        if not self.data.columns:
-            return self.data.select([])
-        exprs = [F.collect_set(c).alias(c) for c in self.data.columns]
-        return self.data.agg(*exprs)
 
-    def nunique(self, dropna: bool = True) -> SparkDF:
-        if not self.data.columns:
-            return self.data.select([])
-        if dropna:
-            exprs = [F.countDistinct(c).alias(c) for c in self.data.columns]
-        else:
-            exprs = []
-            for c in self.data.columns:
-                has_null = (F.count("*") - F.count(c) > 0).cast("int")
-                exprs.append((F.countDistinct(c) + has_null).alias(c))
-        return self.data.agg(*exprs)
-
-    def groupby(self, by: Union[str, Iterable[str]], **kwargs) -> list[tuple]:
+    def groupby(self, by: str | Iterable[str], **kwargs) -> list[tuple]:
         if isinstance(by, str):
             by = [by]
         else:
@@ -858,7 +766,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             result.append((key, group_df))
         return result
 
-    def agg(self, func: Union[str, list], **kwargs) -> Union[spark.DataFrame, float]:
+    def agg(self, func: str | list, **kwargs) -> Union[spark.DataFrame, float]:
         df = self.data
         funcs = [func] if isinstance(func, str) else func
         numeric_only = kwargs.get("numeric_only", False)
@@ -900,27 +808,6 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     def max(self, numeric_only: bool = False):
         return self.agg("max", numeric_only=numeric_only)
-
-    def idxmax(self):
-        df = self.data
-        if df is None or not df.columns:
-            return df
-
-        target_idx = "id"
-        df_keyed = df.withColumn(target_idx, F.monotonically_increasing_id())
-        numeric_cols = [
-            f.name for f in df.schema.fields if isinstance(f.dataType, NumericType)
-        ]
-        if not numeric_cols:
-            return df.select([])
-
-        agg_exprs = [
-            F.min(F.struct(-F.col(c), F.col(target_idx).alias("idx"))).alias(c)
-            for c in numeric_cols
-        ]
-        df_agg = df_keyed.agg(*agg_exprs)
-        final_exprs = [F.col(c)["idx"].alias(c) for c in numeric_cols]
-        return df_agg.select(*final_exprs)
 
     def min(self, numeric_only: bool = False):
         return self.agg("min", numeric_only=numeric_only)
@@ -1015,10 +902,9 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             return self.data.sparkSession.createDataFrame(result)
 
     def quantile(self, q: float = 0.5) -> float:
-        result = self.data.approxQuantile(self.data.columns[0], q=[q], accuracy=1e-6)[0]
-        if isinstance(q, list) and len(q) > 1:
-            return result
-        self.agg(func="quantile", q=q)
+        if isinstance(q, (list, tuple)) and len(q) > 1:
+            return self.data.approxQuantile(self.data.columns[0], q=q, accuracy=1e-6)
+        return self.data.agg(F.expr(f"percentile_approx(`{self.data.columns[0]}`, {q})")).collect()[0][0]
 
     def coefficient_of_variation(
         self, small_format=False
@@ -1036,19 +922,16 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         else:
             return self.data.sparkSession.createDataFrame(result)
 
-    def sort_index(
-        self, ascending: bool = True, **kwargs
-    ) -> spark.DataFrame:  # Иван # TODO: to be moved to small data
-        pass
-
     def get_numeric_columns(self) -> list[str]:
-        return [col for col in self.data.columns if isinstance(col, PysparkScalarType)]
+        return [
+            field.name
+            for field in self.data.schema.fields
+            if isinstance(field.dataType, NumericType)
+        ]
 
-    def corr(
-        self,
-        numeric_only: bool = False,
-        small_format: bool = False,
-    ) -> Union[spark.DataFrame, float]:
+    def corr(self,
+             numeric_only: bool = False,
+             small_format: bool = False) -> Union[spark.DataFrame, float]:
 
         if numeric_only:
             col_list = self.get_numeric_columns()
@@ -1083,10 +966,9 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             *[(F.isnan(col) | F.isnull(col)).alias(col) for col in self.data]
         )
 
-    def sort_values(
-        self, by: Union[str, list[str]], ascending: bool = True, **kwargs
-    ) -> spark.DataFrame:
-        pass
+    def sort_values(self, by: str | list[str], ascending: bool = True, **kwargs) -> spark.DataFrame:
+        by = Adapter.to_list(by)
+        return self.data.orderBy(*by, ascending=ascending)
 
     def value_counts(
         self,
@@ -1123,7 +1005,24 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         method: Optional[Literal["bfill", "ffill"]] = None,
         **kwargs,
     ) -> spark.DataFrame:
-        pass
+        if values is not None and method is not None:
+            raise ValueError("Cannot specify both values and method")
+        if values is not None:
+            return self.data.fillna(values)
+        if method is None:
+            return self.data
+
+        window = Window.orderBy(F.monotonically_increasing_id())
+        if method == "ffill":
+            window = window.rowsBetween(Window.unboundedPreceding, Window.currentRow)
+            expr = lambda c: F.last(F.col(c), ignorenulls=True).over(window)
+        elif method == "bfill":
+            window = window.rowsBetween(Window.currentRow, Window.unboundedFollowing)
+            expr = lambda c: F.first(F.col(c), ignorenulls=True).over(window)
+        else:
+            raise ValueError(f"Wrong fill method: {method}")
+
+        return self.data.select(*[expr(c).alias(c) for c in self.data.columns])
 
     def na_counts(self) -> Union[spark.DataFrame, int]:
         na_counts = self.data.select(
@@ -1315,12 +1214,27 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         subset: Optional[Union[str, Iterable[str]]] = None,
         axis: Union[Literal["index", "rows", "columns"], int] = 0,
     ) -> spark.DataFrame:
-        pass
+        subset = Adapter.to_list(subset) if subset is not None else None
+        if axis in (0, "index", "rows"):
+            return self.data.na.drop(how=how, subset=subset)
+        if axis in (1, "columns"):
+            counts = self.data.select(
+                *[F.sum(F.when(F.col(c).isNull(), 1).otherwise(0)).alias(c) for c in self.columns]
+            ).collect()[0].asDict()
+            if how == "any":
+                keep_cols = [c for c in self.columns if counts[c] == 0]
+            else:
+                keep_cols = [c for c in self.columns if counts[c] < self.data.count()]
+            return self.data.select(*keep_cols)
+        raise ValueError("Invalid axis value")
 
     def transpose(
         self, names: Optional[Sequence[str]] = None
     ) -> spark.DataFrame:  # TODO: to be moved to small data
-        pass
+        pdf = self.data.toPandas().transpose()
+        if names is not None:
+            pdf.columns = names
+        return self.session.createDataFrame(pdf.reset_index(drop=True))
 
     def sample(  # Эрик
         self,
@@ -1328,7 +1242,19 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         n: int | None = None,
         random_state: int | None = None,
     ) -> spark.DataFrame:
-        pass
+        if frac is not None and n is not None:
+            raise ValueError("Only one of frac or n should be specified")
+        if frac is None and n is None:
+            raise ValueError("Either frac or n should be specified")
+        if frac is not None:
+            return self.data.sample(withReplacement=False, fraction=frac, seed=random_state)
+
+        total = self.data.count()
+        if total == 0:
+            return self.data
+        fraction = min(float(n) / float(total), 1.0)
+        sampled = self.data.sample(withReplacement=False, fraction=fraction, seed=random_state)
+        return sampled.limit(n)
 
     def select_dtypes(
         self,
@@ -1375,21 +1301,48 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         suffixes: tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> spark.DataFrame:
-        pass
+        left_df = self.data
+        right_df = right.data
+
+        if on is not None:
+            left_on = on
+            right_on = on
+        if left_index and right_index:
+            left_df = left_df.withColumn("__index__", F.monotonically_increasing_id())
+            right_df = right_df.withColumn("__index__", F.monotonically_increasing_id())
+            left_on = "__index__"
+            right_on = "__index__"
+
+        if left_on is None or right_on is None:
+            raise MergeOnError(on or left_on or right_on)
+
+        joined = left_df.join(right_df, left_df[left_on] == right_df[right_on], how=how)
+
+        right_renames = {}
+        for col in right_df.columns:
+            if col == right_on:
+                continue
+            if col in left_df.columns:
+                right_renames[col] = f"{col}{suffixes[1]}"
+
+        result = joined
+        for old, new in right_renames.items():
+            result = result.withColumnRenamed(old, new)
+
+        if left_on == right_on:
+            duplicate_col = f"{right_on}{suffixes[1]}"
+            if duplicate_col in result.columns:
+                result = result.drop(duplicate_col)
+
+        return result.drop("__index__") if "__index__" in result.columns else result
 
     def drop(self, labels: Any = "", axis: int = 1) -> spark.DataFrame:
         labels = Adapter.to_list(labels)
         if axis == 1:
             return self.data.drop(*labels)
         elif axis == 0:
-            df_with_rownum = self.data.withColumn(
-                "__row_num",
-                F.row_number().over(Window.orderBy(F.monotonically_increasing_id()))
-                - 1,
-            )
-            return df_with_rownum.filter(~F.col("__row_num").isin(labels)).drop(
-                "__row_num"
-            )
+            raise NotImplementedError("Dropping rows by index is not supported in Spark")
+
         else:
             raise ValueError("Invalid axis value")
 
@@ -1404,19 +1357,16 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 items = [col for col in self.data.columns if re.search(regex, col)]
             return self.data.select(items)
         elif axis == 0:
-            df_with_rownum = self.data.withColumn(
-                "__row_num",
-                F.row_number().over(Window.orderBy(F.monotonically_increasing_id()))
-                - 1,
-            )
-            return df_with_rownum.filter(F.col("__row_num").isin(items)).drop(
-                "__row_num"
-            )
+            raise NotImplementedError("Filtering rows by index list is not supported. Use SQL conditions instead.")
+
         else:
             raise ValueError("Invalid axis value")
 
     def rename(self, columns: dict[str, str]) -> spark.DataFrame:  # Эрик
-        pass
+        df = self.data
+        for old_name, new_name in columns.items():
+            df = df.withColumnRenamed(old_name, new_name)
+        return df
 
     def replace(
         self, to_replace: Any = None, value: Any = None, regex: bool = False
@@ -1442,7 +1392,15 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def reindex(
         self, labels: str = "", fill_value: Optional[str] = None
     ) -> spark.DataFrame:
-        pass
+        labels = Adapter.to_list(labels)
+        existing = self.data.columns
+        selected = []
+        for c in labels:
+            if c in existing:
+                selected.append(F.col(c).alias(c))
+            else:
+                selected.append(F.lit(fill_value).alias(c))
+        return self.data.select(*selected)
 
     def list_to_columns(self, column: str) -> spark.DataFrame:
         n_cols = len(self.data.select(column).head(1).collect()[0][0])
@@ -1450,3 +1408,15 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.data.select(
             *[F.col(column)[i].alias(f"{column}_{i}") for i in range(n_cols)]
         )
+        
+    def idxmax(self):
+        raise NotImplementedError("idxmax is not supported in Spark backend")
+        
+    def sort_index(self, ascending: bool = True, **kwargs) -> spark.DataFrame:
+        raise NotImplementedError("sort_index is not supported in Spark backend")
+    
+    def unique(self) -> SparkDF:
+        raise NotImplementedError("unique is not supported in Spark backend")
+
+    def nunique(self, dropna: bool = True) -> SparkDF:
+        raise NotImplementedError("nunique is not supported in Spark backend")
