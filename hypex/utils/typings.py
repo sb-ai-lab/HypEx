@@ -86,10 +86,10 @@ class SparkTypeMapper:
         np.float64: DoubleType(),
         np.float32: FloatType(),
         # Date/Time
-        # datetime.date: DateType(),  # Раскомментировать при необходимости
+        # datetime.date: DateType(),
         # datetime.datetime: TimestampType(),
         # Special
-        type(None): StringType(),  # NULL по умолчанию → String
+        type(None): StringType(),
         object: StringType(),
     }
 
@@ -161,7 +161,7 @@ class SparkTypeMapper:
         # Boolean
         "boolean": bool,
         "bool": bool,
-        # Date/Time → str (безопасный дефолт, можно заменить на datetime)
+        # Date/Time → str
         "date": str,
         "timestamp": str,
         "timestamp_ntz": str,
