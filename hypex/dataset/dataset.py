@@ -502,12 +502,16 @@ class DatasetAdapter(Adapter):
         data: pd.DataFrame, roles: dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
-        result = SmallDataset(
-            roles=roles,
-            data=data,
-        )
-        if not small:
-            result = result.to_dataset()
+        if small:
+            result = SmallDataset(
+                roles=roles,
+                data=data,
+            )
+        else:
+            result = Dataset(
+                roles=roles,
+                data=data,
+            )
         return result
 
     @staticmethod
