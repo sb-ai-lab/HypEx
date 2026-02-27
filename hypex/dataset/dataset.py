@@ -181,7 +181,6 @@ class SmallDataset(DatasetBase):
         return Dataset(roles=roles, data=result_data)
 
     def to_dataset(self) -> Dataset:
-        """Преобразует Dataset в SmallDataset"""
         return Dataset(
             roles=self.roles,
             data=self.data,
@@ -265,7 +264,7 @@ class ExperimentData:
         elif space == ExperimentDataEnum.analysis_tables:
             if isinstance(value, Dataset):
                 value = value.to_small_dataset()
-            elif isinstance(value, SmallDataset):
+            if isinstance(value, SmallDataset):
                 value = {executor_id: value}
             elif isinstance(value, dict):
                 value = {
@@ -414,7 +413,7 @@ class ExperimentData:
         return searched_data
 
 
-# todo: optimize
+
 class DatasetAdapter(Adapter):
     @staticmethod
     def to_dataset(

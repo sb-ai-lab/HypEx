@@ -60,10 +60,9 @@ class OneAAStatAnalyzer(Executor):
         if sum_weight:
             analysis_data["mean test score"] /= sum_weight
 
-        analysis_dataset = Dataset.from_dict(
+        analysis_dataset = SmallDataset.from_dict(
             [analysis_data],
             {field: StatisticRole(float) for field in analysis_data},
-            BackendsEnum.pandas,
         )
 
         return self._set_value(data, analysis_dataset)
