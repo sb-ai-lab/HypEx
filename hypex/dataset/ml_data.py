@@ -170,7 +170,7 @@ class MLExperimentData(ExperimentData):
         
         # Also store stats in analysis_tables for reporting
         stats_key = f"{executor_id}_{target_name}_stats"
-        self.analysis_tables[stats_key] = stats.to_dict()
+        self.set_value(ExperimentDataEnum.analysis_tables, stats_key, stats.to_dict())
     
     def get_trained_model(self, executor_id: str, target_name: str) -> MLModel:
         """Get trained model by executor and target"""

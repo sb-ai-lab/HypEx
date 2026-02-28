@@ -11,7 +11,6 @@ from ..dataset.roles import (
     TargetRole,
 )
 from ..executor import Executor
-from ..experiments.ml import MLMode
 from ..utils import ExperimentDataEnum
 from ..utils.adapter import Adapter
 from .models import MLModel
@@ -27,11 +26,6 @@ class CUPACExecutor(Executor):
 
     CUPAC uses machine learning models to predict target values based on historical data,
     then adjusts current targets by removing the predicted variation to reduce variance.
-    
-    Supports three execution modes (set by MLExperiment):
-    - fit: Only train models, save for later
-    - predict: Only apply adjustment using pre-trained models
-    - fit_predict: Train and apply adjustment (default)
 
     Args:
         cupac_models (Union[str, Sequence[str], None]): Model(s) to use for prediction.
@@ -40,7 +34,6 @@ class CUPACExecutor(Executor):
         n_folds (int): Number of folds for cross-validation during model selection.
         random_state (Optional[int]): Random seed for reproducibility.
         cv_aggregation (str): Method for aggregating CV scores ('mean', 'median', 'max').
-        mode (str | MLMode | None): Execution mode - set by MLExperiment, defaults to fit_predict.
     """
 
     def __init__(
@@ -50,18 +43,12 @@ class CUPACExecutor(Executor):
         n_folds: int = 5,
         random_state: Optional[int] = None,
         cv_aggregation: str = "mean",
-        mode: str | MLMode | None = None,
     ):
         super().__init__(key=key)
         self.cupac_models = cupac_models
         self.n_folds = n_folds
         self.random_state = random_state
         self.cv_aggregation = cv_aggregation
-        
-        # Mode will be set by MLExperiment
-        if mode is None:
-            mode = MLMode.FIT_PREDICT
-        self.mode = MLMode(mode) if isinstance(mode, str) else mode
 
     def _validate_models(self) -> List[str]:
         """
@@ -90,13 +77,18 @@ class CUPACExecutor(Executor):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         """
-        Execute CUPAC variance reduction based on current mode.
-        
-        Modes:
-        - fit: Train models only, save for later
-        - predict: Apply adjustment using pre-trained models
-        - fit_predict: Train models and apply adjustment
-        
+        Execute CUPAC variance reduction on the experiment data.
+
+        Process:
+        1. Validate models and read MLData from splitter
+        2. For each target:
+            a. Try all specified models with cross-validation
+            b. Select the model with best variance reduction
+            c. Fit the best model on all training data
+            d. Predict and adjust current target values (if applicable)
+            e. Calculate variance reduction metrics
+        3. Store adjusted targets and metrics in ExperimentData
+
         Args:
             data (ExperimentData): Input data with MLData from CUPACDataSplitter.
 
@@ -112,47 +104,50 @@ class CUPACExecutor(Executor):
         # Validate models
         models = self._validate_models()
         
-        # Process each target based on mode
+        # Process each target with MLData
         for target_name in ml_data.get_all_targets():
             ml_data_obj = ml_data.get_ml_data(target_name)
-            
-            if self.mode == MLMode.FIT:
-                # Mode 1: Only fit models
-                self._fit_models(ml_data, target_name, ml_data_obj, models)
-            
-            elif self.mode == MLMode.PREDICT:
-                # Mode 2: Only predict and adjust
-                self._predict_with_model(ml_data, target_name, ml_data_obj)
-            
-            elif self.mode == MLMode.FIT_PREDICT:
-                # Mode 3: Fit and predict
-                self._fit_models(ml_data, target_name, ml_data_obj, models)
-                self._predict_with_model(ml_data, target_name, ml_data_obj)
-            
-            else:
-                raise ValueError(f"Unknown mode: {self.mode}")
+            self._process_target(ml_data, target_name, ml_data_obj, models)
         
         # Return appropriate type
         return ml_data if is_ml_data else ml_data.to_experiment_data()
     
-    def _fit_models(
+    def _process_target(
         self,
         data: MLExperimentData,
         target: str,
         ml_data_obj: "MLData",
         models: List[str],
     ) -> None:
-        """
-        Train models for a target and save them.
+        """Process single target with model selection and adjustment"""
         
-        This is the FIT phase - no adjustment applied yet.
-        Only trains if model doesn't already exist (for idempotency).
-        """
-        # Check if already trained (skip if already exists)
+        # Check if we should load pre-trained model from artifact
         if self.id in data.trained_models and target in data.trained_models[self.id]:
-            # Model already trained, skip
+            # Use model from loaded artifact
+            model = data.trained_models[self.id][target]
+            stats = data.model_stats[self.id][target]
+            
+            # Apply CUPAC adjustment if target is real (has current period data)
+            if ml_data_obj.X_predict is not None:
+                var_red_real = self._apply_cupac_adjustment(
+                    data, model, target, ml_data_obj
+                )
+                stats.variance_reduction_real = var_red_real
+            
+            # Store model and stats
+            data.add_trained_model(self.id, target, model, stats)
+            
+            # Store report for compatibility
+            report = {
+                "cupac_best_model": stats.model_name,
+                "cupac_variance_reduction_cv": stats.variance_reduction_cv,
+                "cupac_variance_reduction_real": stats.variance_reduction_real,
+                "cupac_feature_importances": stats.feature_importances,
+            }
+            data.set_value(ExperimentDataEnum.analysis_tables, f"{target}_cupac_report", report)
             return
         
+        # Original training flow
         # Get feature names from X_train columns
         X_train_feature_names = list(ml_data_obj.X_train.columns)
         
@@ -165,7 +160,7 @@ class CUPACExecutor(Executor):
             # Create model
             model = MLModel.create(model_name)
             
-            # Cross-validate
+            # Cross-validate (возвращает ModelStats)
             stats = model.cross_validate(
                 ml_data_obj.X_train,
                 ml_data_obj.Y_train,
@@ -186,7 +181,7 @@ class CUPACExecutor(Executor):
                 "All models failed during training."
             )
         
-        # Fit best model on all training data
+        # Fit best model on all data
         best_model.fit(ml_data_obj.X_train, ml_data_obj.Y_train)
         
         # Map feature importances to original names
@@ -196,65 +191,25 @@ class CUPACExecutor(Executor):
         }
         best_stats.feature_importances = mapped_importances
         
-        # Store model and stats (no variance_reduction_real yet in FIT mode)
+        # Apply CUPAC adjustment if target is real
+        if ml_data_obj.X_predict is not None:
+            var_red_real = self._apply_cupac_adjustment(
+                data, best_model, target, ml_data_obj
+            )
+            # Update stats with real variance reduction
+            best_stats.variance_reduction_real = var_red_real
+        
+        # Store model and stats using executor ID
         data.add_trained_model(self.id, target, best_model, best_stats)
         
-        # Store report for compatibility
+        # Also store in old format for compatibility
         report = {
             "cupac_best_model": best_stats.model_name,
             "cupac_variance_reduction_cv": best_stats.variance_reduction_cv,
-            "cupac_variance_reduction_real": None,  # Not computed in FIT-only mode
+            "cupac_variance_reduction_real": best_stats.variance_reduction_real,
             "cupac_feature_importances": best_stats.feature_importances,
         }
         data.set_value(ExperimentDataEnum.analysis_tables, f"{target}_cupac_report", report)
-    
-    def _predict_with_model(
-        self,
-        data: MLExperimentData,
-        target: str,
-        ml_data_obj: "MLData",
-    ) -> None:
-        """
-        Apply CUPAC adjustment using trained model.
-        
-        This is the PREDICT phase - uses pre-trained model.
-        """
-        # Get trained model
-        if self.id not in data.trained_models or target not in data.trained_models[self.id]:
-            raise ValueError(
-                f"No trained model found for target '{target}' (executor={self.id}). "
-                f"Make sure to run FIT mode first or load experiment. "
-                f"Available models: {list(data.trained_models.keys())}"
-            )
-        
-        model = data.trained_models[self.id][target]
-        stats = data.model_stats[self.id][target]
-        
-        # Apply CUPAC adjustment only if we have prediction data
-        if ml_data_obj.X_predict is not None:
-            var_red_real = self._apply_cupac_adjustment(
-                data=data,
-                model=model,
-                target=target,
-                ml_data_obj=ml_data_obj
-            )
-            
-            # Update stats with real variance reduction
-            stats.variance_reduction_real = var_red_real
-            data.add_trained_model(self.id, target, model, stats)
-            
-            # Update report
-            report = {
-                "cupac_best_model": stats.model_name,
-                "cupac_variance_reduction_cv": stats.variance_reduction_cv,
-                "cupac_variance_reduction_real": stats.variance_reduction_real,
-                "cupac_feature_importances": stats.feature_importances,
-            }
-            data.set_value(ExperimentDataEnum.analysis_tables, f"{target}_cupac_report", report)
-        else:
-            # No current period data - cannot apply adjustment
-            # This is valid in FIT mode with only historical data
-            pass
     
     def _apply_cupac_adjustment(
         self,
@@ -347,3 +302,4 @@ class CUPACExecutor(Executor):
             else:
                 res_dataset = res_dataset.add_column(data=col_data)
         return res_dataset
+
