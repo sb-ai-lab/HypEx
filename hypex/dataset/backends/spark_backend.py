@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 import pyspark.sql as spark
 from pyspark import SparkContext, SparkConf, StorageLevel
-from pyspark.sql import Window, SparkSession, Row
+from pyspark.sql import Window, SparkSession, Row, Column
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 from pyspark.sql import DataFrame as SparkDF
@@ -47,11 +47,12 @@ from pyspark.sql.types import (
     
     ArrayType,
     StructType,
-    StructField,
+    StructField
 )
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType, Adapter
 from ...utils.typings import SparkTypeMapper as stm
+from ...utils.constants import UTILITY_INDEX_COL_NAME
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -65,7 +66,6 @@ class SparkNavigation(DatasetBackendNavigation):
             raise ValueError(f"Path is not a file: '{file_path}'")
         if not os.access(file_path, os.R_OK):
             raise PermissionError(f"Permission denied: '{file_path}'")
-        
         
         suffix = file_path.suffix.lower()
         
@@ -87,6 +87,7 @@ class SparkNavigation(DatasetBackendNavigation):
         else:
             raise ValueError(f"Unsupported file extension: '{suffix}'. "
                              f"Supported: .csv, .parquet, .json, .orc")            
+
 
     def __init__(self,
                  data: SparkDF | pd.DataFrame | dict[str, Any] | str | None = None,
@@ -113,10 +114,17 @@ class SparkNavigation(DatasetBackendNavigation):
             self.data = self._read_file(data, self.session)
         else:
             self.data = self.session.createDataFrame([], schema=StructType([]))
-        self.count_data: int | None = None
+            
+        if UTILITY_INDEX_COL_NAME not in self.data.columns:
+            self.data = self.__add_row_index(df=self.data, index_column_name=UTILITY_INDEX_COL_NAME)
+        
+        self._count_data: int | None = None
+        
+    @property
+    def _public_columns(self) -> list[str]:
+        return [c for c in self.data.columns if c != UTILITY_INDEX_COL_NAME]
             
     def __add_row_index(self, df: SparkDF, index_column_name: str) -> SparkDF:
-        """Not used."""
         rdd = df.rdd.zipWithIndex()
         new_rdd = rdd.map(lambda x: tuple(x[0]) + (x[1],))
         new_schema = T.StructType(df.schema.fields + [T.StructField(index_column_name, T.LongType(), False)])
@@ -124,25 +132,46 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def __len__(self) -> int:
         if self.count_data is None:
-            self.count_data = 0 if self.data is None else self.data.count()
-        return self.count_data
-
+            self._count_data = 0 if self.data is None else self.data.count()
+        return self._count_data
+    
     @staticmethod
-    def __magic_determine_other(other) -> Any:
-        if isinstance(other, SparkDataset):
-            return [F.col(c) for c in other.data.columns]
-        elif isinstance(other, SparkNavigation):
-            return [F.col(c) for c in other.data.columns]
+    def __magic_determine_other(
+        other: 'SparkDataset' | 'SparkNavigation' | SparkDF | Column | list[int | float | str | bool] |
+                tuple | int | float | str | bool | np.generic | np.ndarray) -> list[Column] | Column:
+        if isinstance(other, (SparkDataset, SparkNavigation)):
+            return [F.col(c) for c in other.data.columns if c != UTILITY_INDEX_COL_NAME]
+        
         elif isinstance(other, SparkDF):
+            raise TypeError(
+                "SparkDF cannot be used directly in operations. "
+                "Wrap it in SparkDataset or extract columns explicitly."
+            )
+        
+        elif isinstance(other, Column):
             return other
-        elif isinstance(other, F.Column):
-            return other
+        
+        elif isinstance(other, (list, tuple)):
+            return [F.lit(v) for v in other]
+        
         elif isinstance(other, (int, float, str, bool)):
             return F.lit(other)
-        elif isinstance(other, (np.integer, np.floating, np.bool_)):
+        
+        elif isinstance(other, np.generic):
+            if isinstance(other, np.bool_):
+                return F.lit(bool(other))
             return F.lit(other.item())
+        
+        elif isinstance(other, np.ndarray):
+            if other.ndim != 1:
+                raise ValueError(f"Only 1D numpy arrays supported, got {other.ndim}D")
+            return [F.lit(v) for v in other.tolist()]
+        
         else:
-            raise TypeError(f"Unsupported operand type: '{type(other).__name__}'. ")
+            raise TypeError(
+                f"Unsupported operand type: '{type(other).__name__}'. "
+                f"Expected: Dataset, Column, scalar, or list"
+            )
         
     def add_column(self, data: SparkDF | list, name: str | None = None, index = None) -> 'SparkNavigation':
         raise NotImplementedError("For add column need implement uniq_column")
@@ -150,79 +179,79 @@ class SparkNavigation(DatasetBackendNavigation):
     # comparison operators:
     def __eq__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(F.col(c) == other_val).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(F.col(c) == other_val).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __ne__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(F.col(c) != other_val).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(F.col(c) != other_val).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __lt__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(F.col(c) < other_val).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(F.col(c) < other_val).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __le__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(F.col(c) <= other_val).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(F.col(c) <= other_val).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __ge__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(F.col(c) >= other_val).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(F.col(c) >= other_val).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __gt__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(F.col(c) > other_val).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(F.col(c) > other_val).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     # unary operators:
     def __pos__(self) -> 'SparkNavigation':
-        result_df = self.data.select([F.col(c).alias(c) for c in self.data.columns])
+        result_df = self.data.select([F.col(c).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __neg__(self) -> 'SparkNavigation':
-        result_df = self.data.select([(-F.col(c)).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(-F.col(c)).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __abs__(self) -> 'SparkNavigation':
-        result_df = self.data.select([F.abs(F.col(c)).alias(c) for c in self.data.columns])
+        result_df = self.data.select([F.abs(F.col(c)).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __invert__(self) -> 'SparkNavigation':
-        result_df = self.data.select([(~F.col(c)).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(~F.col(c)).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __round__(self, n: int = 0) -> 'SparkNavigation':
-        result_df = self.data.select([F.round(F.col(c), n).alias(c) for c in self.data.columns])
+        result_df = self.data.select([F.round(F.col(c), n).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     # binary arithmetic operations:
     def __add__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(F.col(c) + other_val).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(F.col(c) + other_val).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __sub__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(F.col(c) - other_val).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(F.col(c) - other_val).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __mul__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(F.col(c) * other_val).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(F.col(c) * other_val).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __floordiv__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([F.floor(F.col(c) / other_val).alias(c) for c in self.data.columns])
+        result_df = self.data.select([F.floor(F.col(c) / other_val).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __truediv__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(F.col(c) / other_val).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(F.col(c) / other_val).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
     
     def __div__(self, other) -> 'SparkNavigation':
@@ -230,70 +259,70 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def __mod__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(F.col(c) % other_val).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(F.col(c) % other_val).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __pow__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([F.pow(F.col(c), other_val).alias(c) for c in self.data.columns])
+        result_df = self.data.select([F.pow(F.col(c), other_val).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     # binary logical operators:
     def __and__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
         if isinstance(other_val, list):
-            if len(other_val) != len(self.data.columns):
+            if len(other_val) != len(self._public_columns):
                 raise ValueError(
                     f"Datasets must have the same number of columns for logical operations. "
-                    f"Self: {len(self.data.columns)}, Other: {len(other_val)}"
+                    f"Self: {len(self._public_columns)}, Other: {len(other_val)}"
                 )
             result_df = self.data.select([
                 (F.col(self_col) & other_val[i]).alias(self_col)
-                for i, self_col in enumerate(self.data.columns)
+                for i, self_col in enumerate(self._public_columns)
             ])
         else:
             result_df = self.data.select([
-                (F.col(c) & other_val).alias(c) for c in self.data.columns
+                (F.col(c) & other_val).alias(c) for c in self._public_columns
             ])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __or__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
         if isinstance(other_val, list):
-            if len(other_val) != len(self.data.columns):
+            if len(other_val) != len(self._public_columns):
                 raise ValueError(
                     f"Datasets must have the same number of columns for logical operations. "
-                    f"Self: {len(self.data.columns)}, Other: {len(other_val)}"
+                    f"Self: {len(self._public_columns)}, Other: {len(other_val)}"
                 )
             result_df = self.data.select([
                 (F.col(self_col) | other_val[i]).alias(self_col)
-                for i, self_col in enumerate(self.data.columns)
+                for i, self_col in enumerate(self._public_columns)
             ])
         else:
             result_df = self.data.select([
-                (F.col(c) | other_val).alias(c) for c in self.data.columns
+                (F.col(c) | other_val).alias(c) for c in self._public_columns
             ])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __xor__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
         if isinstance(other_val, list):
-            if len(other_val) != len(self.data.columns):
+            if len(other_val) != len(self._public_columns):
                 raise ValueError(
                     f"Datasets must have the same number of columns for logical operations. "
-                    f"Self: {len(self.data.columns)}, Other: {len(other_val)}"
+                    f"Self: {len(self._public_columns)}, Other: {len(other_val)}"
                 )
             result_df = self.data.select([
                 ((F.col(self_col) & ~other_val[i]) | (~F.col(self_col) & other_val[i])).alias(self_col)
-                for i, self_col in enumerate(self.data.columns)
+                for i, self_col in enumerate(self._public_columns)
             ])
         else:
             try:
-                result_df = self.data.select([F.xor(F.col(c), other_val).alias(c) for c in self.data.columns])
+                result_df = self.data.select([F.xor(F.col(c), other_val).alias(c) for c in self._public_columns])
             except (AttributeError, TypeError):
                 result_df = self.data.select([
                     ((F.col(c) & ~other_val) | (~F.col(c) & other_val)).alias(c)
-                    for c in self.data.columns
+                    for c in self._public_columns
                 ])
         return SparkNavigation(data=result_df, session=self.session)
 
@@ -303,7 +332,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def __rsub__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(other_val - F.col(c)).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(other_val - F.col(c)).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __rmul__(self, other) -> 'SparkNavigation':
@@ -311,12 +340,12 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def __rfloordiv__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([F.floor(other_val / F.col(c)).alias(c) for c in self.data.columns])
+        result_df = self.data.select([F.floor(other_val / F.col(c)).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __rtruediv__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(other_val / F.col(c)).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(other_val / F.col(c)).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __rdiv__(self, other) -> 'SparkNavigation':
@@ -324,12 +353,12 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def __rmod__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([(other_val % F.col(c)).alias(c) for c in self.data.columns])
+        result_df = self.data.select([(other_val % F.col(c)).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     def __rpow__(self, other) -> 'SparkNavigation':
         other_val = self.__magic_determine_other(other)
-        result_df = self.data.select([F.pow(other_val, F.col(c)).alias(c) for c in self.data.columns])
+        result_df = self.data.select([F.pow(other_val, F.col(c)).alias(c) for c in self._public_columns])
         return SparkNavigation(data=result_df, session=self.session)
 
     # representation methods:
@@ -338,7 +367,7 @@ class SparkNavigation(DatasetBackendNavigation):
             return "SparkNavigation(data=None)"
         
         rows = self.data.count()
-        columns = len(self.data.columns)
+        columns = len(self._public_columns)
         schema_summary = ", ".join(f"{field.name}:{field.dataType.simpleString()}" 
                                    for field in self.data.schema.fields[:5])
         if len(self.data.schema.fields) > 5:
@@ -354,7 +383,7 @@ class SparkNavigation(DatasetBackendNavigation):
             html_table = pdf.to_html(index=False, classes="dataframe", border=0)
             
             rows = self.data.count()
-            columns = len(self.data.columns)
+            columns = len(self._public_columns)
             
             html_info = f"""
             <div style="margin: 10px 0;">
@@ -389,7 +418,7 @@ class SparkNavigation(DatasetBackendNavigation):
             return default
             
         if isinstance(key_list[0], str):
-            existing_cols = [k for k in key_list if k in self.data.columns]
+            existing_cols = [k for k in key_list if k in self._public_columns]
             if existing_cols:
                 return SparkNavigation(data=self.data.select(*existing_cols), session=self.session)
             else:
@@ -406,8 +435,8 @@ class SparkNavigation(DatasetBackendNavigation):
         if axis in (1, "columns"):
             col_names = []
             for idx in indices:
-                if 0 <= idx < len(self.data.columns):
-                    col_names.append(self.data.columns[idx])
+                if 0 <= idx < len(self._public_columns):
+                    col_names.append(self._public_columns[idx])
                 else:
                     raise IndexError(f"Column index {idx} out of range")
             
@@ -467,18 +496,18 @@ class SparkNavigation(DatasetBackendNavigation):
 
     @property
     def columns(self) -> list[str]:
-        return self.data.columns if self.data else []
+        return self._public_columns if self.data else []
 
     @property
     def shape(self) -> tuple[int, int]:
         if self.data:
             count = self.data.count()
-            cols = len(self.data.columns)
+            cols = len(self._public_columns)
             return (count, cols)
         return (0, 0)
 
     def _get_column_index(self, column_name: Sequence[str] | str) -> int | Sequence[int]:
-        pd_index_columns = pd.Index(self.data.columns)
+        pd_index_columns = pd.Index(self._public_columns)
         if isinstance(column_name, str):
             return pd_index_columns.get_loc(column_name)
         elif isinstance(column_name, list):
@@ -488,7 +517,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def get_column_type(self, column_name: list[str] | str = None) -> dict[str, type] | type | None:
         if column_name is None:
-            column_name = self.data.columns
+            column_name = self._public_columns
         elif isinstance(column_name, str):
             column_name = [column_name]
         
@@ -506,7 +535,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def astype(self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise") -> 'SparkNavigation':
         for col, new_type in dtype.items():
-            if col not in self.data.columns:
+            if col not in self._public_columns:
                 if errors == "raise":
                     raise ValueError(f"Column '{col}' not found in DataFrame")
                 elif errors == "ignore":
@@ -577,7 +606,6 @@ class SparkNavigation(DatasetBackendNavigation):
     def loc(self, items: Iterable) -> Iterable:
         raise NotImplementedError("loc indexing is not supported in Spark backend")
 
-
     def iloc(self, items: Iterable) -> Iterable:
         raise NotImplementedError("iloc indexing is not supported in Spark backend")
 
@@ -586,7 +614,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     @staticmethod
     @contextmanager
     def _cached(df: SparkDF):
-        df.cache()
+        df = df.cache()
+        df.count()
         try:
             yield df
         finally:
@@ -597,9 +626,6 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                  data: SparkDF | pd.DataFrame | dict[str, Any] | str | None = None,
                  session: SparkSession = None):
         super().__init__(data, session)
-
-    def __deepcopy__(self, memo):
-        return SparkDataset(data=self.data.select("*"), session=self.session)
 
     @staticmethod
     def _convert_agg_result(result: SparkDF):
@@ -803,7 +829,6 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def is_empty(self) -> bool:
         return self.data.isEmpty()
 
-
     def groupby(self, by: str | Iterable[str], **kwargs) -> list[tuple]:
         if isinstance(by, str):
             by = [by]
@@ -856,7 +881,6 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         multi = len(funcs) > 1
         
         for f_name in funcs:
-            # Получаем функцию один раз
             if f_name in special_map:
                 spark_fn = special_map[f_name]
             else:
@@ -961,7 +985,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
 
     def cov(self, small_format: bool = False) -> 'SparkDataset' | dict:
-        col_list = self.data.columns
+        col_list = self._public_columns
         n_cols = len(col_list)
         
         if n_cols == 0:
@@ -1010,7 +1034,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
 
     def coefficient_of_variation(self, small_format: bool = False) -> 'SparkDataset' | float | dict:
-        col_list = self.data.columns
+        col_list = self._public_columns
         n_cols = len(col_list)
         
         if n_cols == 0:
@@ -1055,8 +1079,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     def quantile(self, q: float = 0.5) -> float:
         if isinstance(q, (list, tuple)) and len(q) > 1:
-            return self.data.approxQuantile(self.data.columns[0], q=q, accuracy=1e-6)
-        return self.data.agg(F.expr(f"percentile_approx(`{self.data.columns[0]}`, {q})")).collect()[0][0]
+            return self.data.approxQuantile(self._public_columns[0], q=q, accuracy=1e-6)
+        return self.data.agg(F.expr(f"percentile_approx(`{self._public_columns[0]}`, {q})")).collect()[0][0]
 
     def get_numeric_columns(self) -> list[str]:
         return [
@@ -1071,7 +1095,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         if numeric_only:
             col_list = self.get_numeric_columns()
         else:
-            col_list = self.data.columns
+            col_list = self._public_columns
         
         with self._cached(self.data):
             paired_corr = self.data.select(
@@ -1105,7 +1129,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                     if isinstance(self.data.schema[c].dataType, (FloatType, DoubleType))
                     else F.isnull(F.col(c)).alias(c)
                 )
-                for c in self.data.columns
+                for c in self._public_columns
             ]
         )
         return self.__class__(result_df, self.session)
@@ -1275,7 +1299,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         
         if not values:
             result_df = self.data.select(
-                [F.lit(False).alias(c) for c in self.data.columns]
+                [F.lit(False).alias(c) for c in self._public_columns]
             )
             return self.__class__(result_df, self.session)
         
@@ -1289,7 +1313,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                         if isinstance(values[0], col_types[c])
                         else F.lit(False).alias(c)
                     )
-                    for c in self.data.columns
+                    for c in self._public_columns
                 ]
             )
         
@@ -1371,7 +1395,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                axis: int = 1) -> 'SparkDataset':
         if axis == 1:
             if items is None and regex is not None:
-                items = [col for col in self.data.columns if re.search(regex, col)]
+                items = [col for col in self._public_columns if re.search(regex, col)]
             
             if items is None:
                 return self.__class__(self.data.select([]), self.session)
@@ -1400,7 +1424,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 regex: bool = False) -> 'SparkDataset':
         if regex:
             if isinstance(to_replace, str) and isinstance(value, str):
-                cols = subset if subset else self.data.columns
+                cols = subset if subset else self._public_columns
                 df = self.data
                 for col_name in cols:
                     df = df.withColumn(col_name, F.regexp_replace(col_name, to_replace, value))
@@ -1425,7 +1449,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         if not mapping_dict:
             return self
 
-        all_cols = self.data.columns
+        all_cols = self._public_columns
         target_cols_set = set(subset) if subset else set(all_cols)
         
         col_types = {f.name: f.dataType for f in self.data.schema.fields}
@@ -1480,7 +1504,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 labels: str | list[str] = "", 
                 fill_value: str | None = None) -> 'SparkDataset':
         labels = Adapter.to_list(labels)
-        existing = self.data.columns
+        existing = self._public_columns
         selected = []
         
         for c in labels:
