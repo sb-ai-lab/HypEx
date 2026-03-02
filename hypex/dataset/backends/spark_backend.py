@@ -190,11 +190,115 @@ class SparkNavigation(DatasetBackendNavigation):
                 f"Expected: Dataset, Column, scalar, or list"
             )
         
-    def add_column(self, 
-                   data: SparkDF | list, 
-                   name: str | None = None, 
-                   index = None) -> 'SparkNavigation' | 'SparkDataset':
-        raise NotImplementedError("For add column need implement uniq_column")
+    def add_column(self,
+                   data: SparkDF | list | tuple | np.ndarray | Any,
+                   name: str | list[str] | None = None,
+                   index: Sequence | None = None) -> 'SparkNavigation' | 'SparkDataset':
+        if isinstance(name, list) and len(name) == 1:
+            name = name[0]
+        if name is None:
+            name = f"col_{len(self._public_columns)}"
+        
+        if name in (UTILITY_INDEX_COL_NAME, UTILITY_PHYSICAL_INDEX_COL_NAME):
+            raise ValueError(f"Cannot use reserved utility column name: '{name}'")
+        
+        if isinstance(data, SparkDF):
+            data_cols = [c for c in data.columns 
+                        if c not in (UTILITY_INDEX_COL_NAME, UTILITY_PHYSICAL_INDEX_COL_NAME)]
+            if len(data_cols) != 1:
+                raise ValueError(f"SparkDF must have exactly 1 public column, got {len(data_cols)}")
+            col_name = data_cols[0]
+            if index is not None:
+                data_with_index = data.withColumnRenamed(col_name, name)
+                new_df = self.data.join(
+                    data_with_index.select(UTILITY_INDEX_COL_NAME, name),
+                    on=UTILITY_INDEX_COL_NAME,
+                    how="left"
+                )
+            else:
+                new_df = self.data.withColumn(name, F.col(col_name))
+                
+        elif isinstance(data, Column):
+            new_df = self.data.withColumn(name, data)
+            
+        elif isinstance(data, (list, tuple, np.ndarray)):
+            data_list = list(data) if not isinstance(data, list) else data
+            
+            if isinstance(data, np.ndarray):
+                if data.ndim != 1:
+                    raise ValueError(f"Only 1D numpy arrays supported, got {data.ndim}D")
+                data_list = data.tolist()
+            
+            current_len = len(self)
+            if len(data_list) != current_len:
+                if len(data_list) == 1:
+                    spark_type = stm.to_spark(data_list[0])
+                    new_df = self.data.withColumn(name, F.lit(data_list[0]).cast(spark_type))
+                else:
+                    raise ValueError(
+                        f"Data length ({len(data_list)}) must match DataFrame "
+                        f"length ({current_len}) or be 1 for broadcasting"
+                    )
+            else:
+                if index is not None:
+                    spark_type = self._infer_spark_type_from_list(data_list)
+                    
+                    index_df = self.session.createDataFrame(
+                        [(idx, val) for idx, val in zip(index, data_list)],
+                        schema=StructType([
+                            StructField(UTILITY_INDEX_COL_NAME, LongType(), True),
+                            StructField(name, spark_type, True)
+                        ])
+                    )
+                    new_df = self.data.join(
+                        index_df,
+                        on=UTILITY_INDEX_COL_NAME,
+                        how="left"
+                    )
+                else:
+                    rdd_with_index = self.data.rdd.zipWithIndex()
+                    data_rdd = self.session.sparkContext.parallelize(
+                        [(i, val) for i, val in enumerate(data_list)]
+                    )
+                    joined_rdd = rdd_with_index.map(
+                        lambda x: (x[1], x[0])
+                    ).join(data_rdd).map(
+                        lambda x: tuple(x[1][0]) + (x[1][1],)
+                    )
+                    
+                    spark_type = self._infer_spark_type_from_list(data_list)
+                    new_schema = StructType(
+                        self.data.schema.fields + [
+                            StructField(name, spark_type, True)
+                        ]
+                    )
+                    new_df = self.session.createDataFrame(joined_rdd, schema=new_schema)
+                    
+        else:
+            spark_type = stm.to_spark(data)
+            new_df = self.data.withColumn(name, F.lit(data).cast(spark_type))
+        
+        return self.__class__(
+            data=new_df,
+            session=self.session,
+            physical_index_actual_flag=False
+        )
+
+
+    def _infer_spark_type_from_list(self, values: list) -> T.DataType:
+        if not values:
+            return StringType()
+        
+        sample = None
+        for val in values:
+            if val is not None:
+                sample = val
+                break
+        
+        if sample is None:
+            return StringType()
+        
+        return stm.to_spark(sample)
 
     # comparison operators:
     def __eq__(self, other) -> 'SparkNavigation' | 'SparkDataset':
@@ -423,51 +527,147 @@ class SparkNavigation(DatasetBackendNavigation):
             return f"<p>Error rendering DataFrame: {str(e)}</p>"
     
 
-    def get(self, key: str | int | list[Any] | tuple[Any, ...], default: Any = None) -> 'SparkNavigation | Any':
+    def get(self, key: str | int | list[Any] | tuple[Any, ...], default: Any = None) -> 'SparkNavigation' | Any:
         if isinstance(key, tuple) and len(key) == 2:
             row_idx, col_name = key
+            
+            if isinstance(col_name, str):
+                if col_name not in self._public_columns:
+                    return default
+            elif isinstance(col_name, int):
+                if col_name < 0 or col_name >= len(self._public_columns):
+                    return default
+                col_name = self._public_columns[col_name]
+            else:
+                return default
+            
             if isinstance(row_idx, int):
-                raise NotImplementedError("Access by row index is not supported")
+                if not self._physical_index_actual_flag:
+                    self.__reindex_physical_index()
+                    self._physical_index_actual_flag = True
+                
+                row_df = self.data.filter(
+                    F.col(UTILITY_PHYSICAL_INDEX_COL_NAME) == row_idx
+                )
+                rows = row_df.select(col_name).collect()
+                return rows[0][0] if rows else default
+            else:
+                row_df = self.data.filter(
+                    F.col(UTILITY_INDEX_COL_NAME) == row_idx
+                )
+                rows = row_df.select(col_name).collect()
+                return rows[0][0] if rows else default
         
         if not isinstance(key, (list, tuple)):
             key_list = [key]
         else:
             key_list = list(key)
-            
+        
         if not key_list:
             return default
-            
+        
         if isinstance(key_list[0], str):
             existing_cols = [k for k in key_list if k in self._public_columns]
-            if existing_cols:
-                return self.__class__(data=self.data.select(*existing_cols), session=self.session) 
-            else:
+            
+            if not existing_cols:
                 return default
+            
+            if len(existing_cols) == len(key_list):
+                return self.__class__(
+                    data=self.data.select(*[F.col(c) for c in existing_cols]),
+                    session=self.session,
+                    physical_index_actual_flag=False
+                )
+            else:
+                if len(existing_cols) > 0:
+                    return self.__class__(
+                        data=self.data.select(*[F.col(c) for c in existing_cols]),
+                        session=self.session,
+                        physical_index_actual_flag=False
+                    )
+                else:
+                    return default
+        
         elif isinstance(key_list[0], int):
-            raise NotImplementedError("Access by row index list is not supported")
+            existing_cols = []
+            for idx in key_list:
+                if 0 <= idx < len(self._public_columns):
+                    existing_cols.append(self._public_columns[idx])
+                elif default is not None:
+                    return default
+            
+            if not existing_cols:
+                return default
+            
+            return self.__class__(
+                data=self.data.select(*[F.col(c) for c in existing_cols]),
+                session=self.session,
+                physical_index_actual_flag=False
+            )
+        
         else:
             return default
 
     def take(self, 
              indices: int | list[int], 
              axis: Literal["index", "columns", "rows"] | int = 0) -> 'SparkNavigation' | 'SparkDataset':
+
         if not isinstance(indices, list):
             indices = [indices]
-
+        
+        if not indices:
+            return self.__class__(
+                data=self.data.limit(0),
+                session=self.session,
+                physical_index_actual_flag=False
+            )
+        
         if axis in (1, "columns"):
             col_names = []
             for idx in indices:
                 if 0 <= idx < len(self._public_columns):
                     col_names.append(self._public_columns[idx])
                 else:
-                    raise IndexError(f"Column index {idx} out of range")
+                    raise IndexError(f"Column index {idx} out of range (0-{len(self._public_columns)-1})")
             
-            return self.__class__(data=self.data.select(*col_names), session=self.session)
-
+            return self.__class__(
+                data=self.data.select(*[F.col(c) for c in col_names]), 
+                session=self.session,
+                physical_index_actual_flag=False
+            )
+        
         elif axis in (0, "index", "rows"):
-            raise NotImplementedError("Taking rows by index is not supported in Spark")
+            for idx in indices:
+                if idx < 0:
+                    raise IndexError(
+                        f"Negative index {idx} not supported for Spark take. "
+                        f"Use iloc for negative indexing."
+                    )
+            
+            total_rows = len(self)
+            for idx in indices:
+                if idx >= total_rows:
+                    raise IndexError(
+                        f"Row index {idx} out of range (0-{total_rows-1})"
+                    )
+            
+            if not self._physical_index_actual_flag:
+                self.__reindex_physical_index()
+                self._physical_index_actual_flag = True
+            
+            result_df = self.data.filter(
+                F.col(UTILITY_PHYSICAL_INDEX_COL_NAME).isin(indices)
+            )
+            
+            return self.__class__(
+                data=result_df,
+                session=self.session,
+                physical_index_actual_flag=False
+            )
         else:
-            raise ValueError(f"Invalid axis: {axis}. Must be 0, 1, 'index', 'columns', or 'rows'")
+            raise ValueError(
+                f"Invalid axis: {axis}. Must be 0, 1, 'index', 'columns', or 'rows'"
+            )
 
     def create_empty(self,
                      index: Iterable | None = None,
@@ -585,6 +785,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def append(self, 
                other: 'SparkNavigation | list[SparkNavigation]',
+               reset_index: bool = False,
                axis: int = 0) -> 'SparkNavigation' | 'SparkDataset':
         others = other if isinstance(other, list) else [other]
         
@@ -598,12 +799,73 @@ class SparkNavigation(DatasetBackendNavigation):
                 lambda x, y: x.unionByName(y, allowMissingColumns=True), 
                 datasets
             )
-            return self.__class__(data=new_data, session=self.session, physical_index_actual_flag=False)
+            
+            if reset_index:
+                new_data = self.__add_row_index(
+                    df=new_data.drop(F.col(UTILITY_PHYSICAL_INDEX_COL_NAME)),
+                    index_column_name=UTILITY_PHYSICAL_INDEX_COL_NAME
+                )
+                physical_index_actual = True
+            else:
+                physical_index_actual = False
+            
+            return self.__class__(
+                data=new_data, 
+                session=self.session, 
+                physical_index_actual_flag=physical_index_actual
+            )
         
-        if axis == 1:
-            raise NotImplementedError("append on axis == 1 is not supported in Spark backend")
+        elif axis == 1:
+            if len(datasets) == 1:
+                return self.__class__(
+                    data=self.data, 
+                    session=self.session, 
+                    physical_index_actual_flag=self._physical_index_actual_flag
+                )
+            
+            base_count = datasets[0].count()
+            for i, df in enumerate(datasets[1:], 1):
+                df_count = df.count()
+                if df_count != base_count:
+                    raise ValueError(
+                        f"All DataFrames must have the same number of rows for axis=1 append. "
+                        f"DataFrame 0 has {base_count} rows, DataFrame {i} has {df_count} rows"
+                    )
+            
+            if not self._physical_index_actual_flag:
+                self.__reindex_physical_index()
+            
+            result_df = datasets[0]
+            for df in datasets[1:]:
+                join_cols = [
+                    F.col(c).alias(c) 
+                    for c in df.columns 
+                    if c not in (UTILITY_INDEX_COL_NAME, UTILITY_PHYSICAL_INDEX_COL_NAME)
+                ]
+                
+                result_df = result_df.join(
+                    df.select(UTILITY_PHYSICAL_INDEX_COL_NAME, *join_cols),
+                    on=UTILITY_PHYSICAL_INDEX_COL_NAME,
+                    how="inner"
+                )
+            
+            if reset_index:
+                result_df = self.__add_row_index(
+                    df=result_df.drop(F.col(UTILITY_PHYSICAL_INDEX_COL_NAME)),
+                    index_column_name=UTILITY_PHYSICAL_INDEX_COL_NAME
+                )
+                physical_index_actual = True
+            else:
+                physical_index_actual = self._physical_index_actual_flag
+            
+            return self.__class__(
+                data=result_df, 
+                session=self.session, 
+                physical_index_actual_flag=physical_index_actual
+            )
         
-        raise ValueError("axis should be 0 or 1")
+        else:
+            raise ValueError("axis should be 0 or 1")
     
     @property
     def index(self) -> list[Any]:
@@ -1596,8 +1858,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         
         if left_index or right_index:
             raise NotImplementedError(
-                "Merging by index is not supported in Spark. "
-                "Use 'on', 'left_on', or 'right_on' parameters instead."
+                "need implement"
             )
         
         if on is not None:
@@ -1659,8 +1920,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             return self.__class__(result_df, self.session)
         elif axis == 0:
             raise NotImplementedError(
-                "Dropping rows by index is not supported in Spark. "
-                "Use SQL conditions instead (e.g., ds.data.filter(F.col('age') > 18))"
+                "need implement"
             )
         else:
             raise ValueError(f"Invalid axis value: {axis}. Must be 0 or 1.")
@@ -1681,8 +1941,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         
         elif axis == 0:
             raise NotImplementedError(
-                "Filtering rows by index list is not supported in Spark. "
-                "Use SQL conditions instead (e.g., ds.filter(F.col('age') > 18))"
+                "need implement"
             )
         else:
             raise ValueError(f"Invalid axis value: {axis}. Must be 0 or 1.")
@@ -1828,14 +2087,12 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.__class__(result_df, self.session)
         
     def fillna(self,
-            values: ScalarType | dict[str, ScalarType] | None = None,
-            method: Literal["bfill", "ffill"] | None = None,
+               values: ScalarType | dict[str, ScalarType] | None = None,
+               method: Literal["bfill", "ffill"] | None = None,
             **kwargs) -> 'SparkDataset':
         if method is not None:
             raise NotImplementedError(
-                "Fill method ('ffill', 'bfill') requires row ordering (Window functions). "
-                "In Spark backend, this requires an explicit ordering column. "
-                "Please use SQL conditions or add an index column before calling fillna with method."
+                "need implement"
             )
         if values is None:
             return self
@@ -1866,16 +2123,16 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             broadcast_threshold_mb: float = 100.0,
             auto_broadcast: bool = True,
             result_col_prefix: str = "") -> 'SparkDataset':
-        raise NotImplementedError("dot is not supported in Spark backend")
+        raise NotImplementedError("need implement")
         
     def idxmax(self):
-        raise NotImplementedError("idxmax is not supported in Spark backend")
+        raise NotImplementedError("need implement")
         
     def sort_index(self, ascending: bool = True, **kwargs) -> 'SparkDataset':
-        raise NotImplementedError("sort_index is not supported in Spark backend")
+        raise NotImplementedError("need implement")
     
     def unique(self) -> 'SparkDataset':
-        raise NotImplementedError("unique is not supported in Spark backend")
+        raise NotImplementedError("need implement")
 
     def nunique(self, dropna: bool = True) -> 'SparkDataset':
-        raise NotImplementedError("nunique is not supported in Spark backend")
+        raise NotImplementedError("need implement")
