@@ -809,33 +809,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         """
         return self.data.take(indices=indices, axis=axis)
 
-    def get_values(self, row: str | None = None, column: str | None = None) -> Any:
-        
-        if (column is not None) and (row is not None):
-            return self.data.loc[row, column]
-        elif column is not None:
-            result = self.data.loc[:, column]
-        elif row is not None:
-            result = self.data.loc[row, :]
-        else:
-            result = self.data
-        return result.values.tolist()
-
-    def iget_values(
-        self,
-        row: int | None = None,
-        column: int | None = None,
-    ) -> Any:
-        if (column is not None) and (row is not None):
-            return self.data.iloc[row, column]
-        elif column is not None:
-            result = self.data.iloc[:, column]
-        elif row is not None:
-            result = self.data.iloc[row, :]
-        else:
-            result = self.data
-        return result.values.tolist()
-
     def apply(self, func: Callable, **kwargs) -> pd.DataFrame:
         """Apply function along axis of DataFrame.
         
@@ -1072,7 +1045,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             list[str]: Names of numeric columns.
         """
-        return df.select_dtypes(include=ScalarType).columns.tolist()
+        return self.df.select_dtypes(include=ScalarType).columns.tolist()
 
     def corr(
         self,
