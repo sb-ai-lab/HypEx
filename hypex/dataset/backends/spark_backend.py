@@ -606,26 +606,207 @@ class SparkNavigation(DatasetBackendNavigation):
         raise ValueError("axis should be 0 or 1")
     
     @property
-    def index(self):
-        raise AttributeError("Spark-based Dataset has no index")
+    def index(self) -> list[Any]:
+        if self.data is None or self.data.isEmpty():
+            return []
+        
+        index_values = self.data.select(F.col(UTILITY_INDEX_COL_NAME)).collect()
+        
+        return [row[UTILITY_INDEX_COL_NAME] for row in index_values]
     
-    def __getitem__(self, item: Any):
-        raise NotImplementedError("Spark-base Dataset does not support indexing")
+    def __getitem__(self, item: Any) -> 'SparkNavigation' | 'SparkDataset' | 'Any':
+        if isinstance(item, (int, slice)):
+            return self.iloc[item]
+        
+        if isinstance(item, str):
+            if item not in self._public_columns:
+                raise KeyError(f"Column '{item}' not found")
+            result_df = self.data.select(F.col(item))
+            return self.__class__(data=result_df, session=self.session, physical_index_actual_flag=False)
+        
+        if isinstance(item, (list, tuple)):
+            if all(isinstance(i, str) for i in item):
+                invalid_cols = [i for i in item if i not in self._public_columns]
+                if invalid_cols:
+                    raise KeyError(f"Columns not found: {invalid_cols}")
+                result_df = self.data.select(*[F.col(c) for c in item])
+                return self.__class__(data=result_df, session=self.session,
+                                    physical_index_actual_flag=False)
+            elif all(isinstance(i, int) for i in item):
+                return self.iloc[item]
+            else:
+                raise TypeError("List must contain all strings (columns) or all integers (positions)")
+        
+        if isinstance(item, Column):
+            result_df = self.data.filter(item)
+            return self.__class__(data=result_df, session=self.session,
+                                physical_index_actual_flag=False)
+        
+        if isinstance(item, (SparkDataset, SparkNavigation)):
+            if len(item._public_columns) == 1:
+                return self.__getitem__(item._public_columns[0])
+            else:
+                return self.__getitem__(item._public_columns)
+        
+        raise KeyError(f"Unsupported indexer type: {type(item).__name__}")
 
-    def from_dict(self, data: FromDictTypes, index: Iterable | Sized | None = None):
-        raise NotImplementedError("Need implement")
+    def from_dict(self, data: FromDictTypes, index: Iterable | Sized | None = None) -> 'SparkDataset':
+        if isinstance(data, dict):
+            if data and all(isinstance(v, (list, tuple)) for v in data.values()):
+                if index is not None:
+                    pdf = pd.DataFrame(data=data, index=index)
+                else:
+                    pdf = pd.DataFrame(data=data)
+            else:
+                if index is not None:
+                    pdf = pd.DataFrame.from_records([data], index=index)
+                else:
+                    pdf = pd.DataFrame.from_records([data])
+        elif isinstance(data, (list, tuple)):
+            if index is not None:
+                pdf = pd.DataFrame.from_records(data, index=index)
+            else:
+                pdf = pd.DataFrame.from_records(data)
+        else:
+            raise TypeError(
+                f"Unsupported data type: {type(data).__name__}. "
+                f"Expected: dict, list of dicts, or dict of lists"
+            )
+        
+        self.data = self.session.createDataFrame(pdf)
+        
+        if UTILITY_INDEX_COL_NAME not in self.data.columns:
+            self.data = self.__add_row_index(
+                df=self.data, 
+                index_column_name=UTILITY_INDEX_COL_NAME
+            )
+        
+        if UTILITY_PHYSICAL_INDEX_COL_NAME not in self.data.columns:
+            self.data = self.data.withColumn(
+                UTILITY_PHYSICAL_INDEX_COL_NAME,
+                F.col(UTILITY_INDEX_COL_NAME)
+            )
+        
+        self._physical_index_actual_flag = True
+        self._count_data = None
+        
+        return self
 
     def get_values(self, row: str | int | None = None, column: str | None = None) -> Any:
-        raise NotImplementedError("Row-based value access is not supported")
+        if column is not None:
+            if isinstance(column, str):
+                if column not in self._public_columns:
+                    raise KeyError(f"Column '{column}' not found")
+                columns = [column]
+            elif isinstance(column, (list, tuple)):
+                invalid_cols = [c for c in column if c not in self._public_columns]
+                if invalid_cols:
+                    raise KeyError(f"Columns not found: {invalid_cols}")
+                columns = list(column)
+            else:
+                raise TypeError("column must be str or list of strings")
+        else:
+            columns = self._public_columns
+        
+        df = self.data
+        if row is not None:
+            df = df.filter(F.col(UTILITY_INDEX_COL_NAME) == row)
+        
+        df = df.select(*[F.col(c) for c in columns])
+        
+        rows = df.collect()
+        
+        if not rows:
+            if row is not None and column is not None:
+                return None
+            return []
+        
+        if row is not None and column is not None and isinstance(column, str):
+            return rows[0][0] if rows else None
+        
+        if len(columns) == 1:
+            return [row[0] for row in rows]
+        else:
+            return [list(row) for row in rows]
 
     def iget_values(self, row: int | None = None, column: int | None = None) -> Any:
-        raise NotImplementedError("Row-based value access is not supported")
+        if column is not None:
+            if isinstance(column, int):
+                if column < 0 or column >= len(self._public_columns):
+                    raise IndexError(f"Column index {column} out of range")
+                columns = [self._public_columns[column]]
+            elif isinstance(column, (list, tuple)):
+                for idx in column:
+                    if idx < 0 or idx >= len(self._public_columns):
+                        raise IndexError(f"Column index {idx} out of range")
+                columns = [self._public_columns[idx] for idx in column]
+            else:
+                raise TypeError("column must be int or list of ints")
+        else:
+            columns = self._public_columns
+        
+        df = self.data
+        if row is not None:
+            if not self._physical_index_actual_flag:
+                self.__reindex_physical_index()
+                self._physical_index_actual_flag = True
+            
+            df = df.filter(F.col(UTILITY_PHYSICAL_INDEX_COL_NAME) == row)
+        
+        df = df.select(*[F.col(c) for c in columns])
+        rows = df.collect()
+        
+        if not rows:
+            if row is not None and column is not None:
+                return None
+            return []
+        
+        if row is not None and column is not None and isinstance(column, int):
+            return rows[0][0] if rows else None
+        
+        if len(columns) == 1:
+            return [row[0] for row in rows]
+        else:
+            return [list(row) for row in rows]
 
     def to_dict(self) -> dict[str, Any]:
-        raise NotImplementedError("to_dict is not supported in Spark backend")
+        if self.data is None or self.data.isEmpty():
+            return {"data": {}, "index": []}
+        
+        rows = self.data.collect()
+        
+        if not rows:
+            return {"data": {}, "index": []}  
+        public_cols = self._public_columns
+        
+        data_dict = {}
+        for col in public_cols:
+            data_dict[col] = [row[col] for row in rows]
+        
+        index_values = [row[UTILITY_INDEX_COL_NAME] for row in rows]
+        
+        return {
+            "data": data_dict,
+            "index": index_values,
+        }
 
     def to_records(self) -> list[dict]:
-        raise NotImplementedError("to_records is not supported in Spark backend")
+        if self.data is None or self.data.isEmpty():
+            return []
+        
+        rows = self.data.collect()
+        
+        if not rows:
+            return []
+        
+        public_cols = self._public_columns
+        
+        records = []
+        for row in rows:
+            record = {col: row[col] for col in public_cols}
+            records.append(record)
+        
+        return records
 
     def loc(self, items: Iterable) -> 'SparkNavigation' | 'SparkDataset':
         items_list = list(items) 
