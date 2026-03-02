@@ -52,7 +52,7 @@ from pyspark.sql.types import (
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType, Adapter
 from ...utils.typings import SparkTypeMapper as stm
-from ...utils.constants import UTILITY_INDEX_COL_NAME
+from ...utils.constants import UTILITY_INDEX_COL_NAME, UTILITY_PHYSICAL_INDEX_COL_NAME
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -91,7 +91,8 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def __init__(self,
                  data: SparkDF | pd.DataFrame | dict[str, Any] | str | None = None,
-                 session: SparkSession | None = None):
+                 session: SparkSession | None = None,
+                 physical_index_actual_flag: bool = True):
         if session is None:
             raise ValueError("Session not set")
         else:
@@ -117,18 +118,27 @@ class SparkNavigation(DatasetBackendNavigation):
             
         if UTILITY_INDEX_COL_NAME not in self.data.columns:
             self.data = self.__add_row_index(df=self.data, index_column_name=UTILITY_INDEX_COL_NAME)
-        
+            self.data = self.data.withColumn(UTILITY_PHYSICAL_INDEX_COL_NAME, F.col(UTILITY_INDEX_COL_NAME))
+            
+        self._physical_index_actual_flag: bool = physical_index_actual_flag
         self._count_data: int | None = None
         
     @property
     def _public_columns(self) -> list[str]:
-        return [c for c in self.data.columns if c != UTILITY_INDEX_COL_NAME]
+        return [c for c in self.data.columns 
+                if c not in (UTILITY_INDEX_COL_NAME, UTILITY_PHYSICAL_INDEX_COL_NAME)]
             
     def __add_row_index(self, df: SparkDF, index_column_name: str) -> SparkDF:
         rdd = df.rdd.zipWithIndex()
         new_rdd = rdd.map(lambda x: tuple(x[0]) + (x[1],))
         new_schema = T.StructType(df.schema.fields + [T.StructField(index_column_name, T.LongType(), False)])
         return self.session.createDataFrame(new_rdd, schema=new_schema)
+   
+    def __reindex_physical_index(self) -> None:
+        self.data = self.__add_row_index(
+            df=self.data.drop(F.col(UTILITY_PHYSICAL_INDEX_COL_NAME)).orderBy(F.col(UTILITY_INDEX_COL_NAME)), 
+            index_column_name=UTILITY_PHYSICAL_INDEX_COL_NAME
+        ) 
 
     def __len__(self) -> int:
         if self.count_data is None:
@@ -137,138 +147,134 @@ class SparkNavigation(DatasetBackendNavigation):
     
     @staticmethod
     def __magic_determine_other(
-        other: 'SparkDataset' | 'SparkNavigation' | SparkDF | Column | list[int | float | str | bool] |
-                tuple | int | float | str | bool | np.generic | np.ndarray) -> list[Column] | Column:
+        other: 'SparkDataset' | 'SparkNavigation' | SparkDF | 
+               Column | list[int | float | str | bool] | tuple | 
+               int | float | str | 
+               bool | np.generic | np.ndarray) -> list[Column] | Column:
         if isinstance(other, (SparkDataset, SparkNavigation)):
-            return [F.col(c) for c in other.data.columns if c != UTILITY_INDEX_COL_NAME]
-        
+            return [F.col(c) for c in other.data.columns 
+                    if c not in (UTILITY_INDEX_COL_NAME, UTILITY_PHYSICAL_INDEX_COL_NAME)]
         elif isinstance(other, SparkDF):
             raise TypeError(
                 "SparkDF cannot be used directly in operations. "
                 "Wrap it in SparkDataset or extract columns explicitly."
             )
-        
         elif isinstance(other, Column):
             return other
-        
         elif isinstance(other, (list, tuple)):
             return [F.lit(v) for v in other]
-        
         elif isinstance(other, (int, float, str, bool)):
             return F.lit(other)
-        
         elif isinstance(other, np.generic):
             if isinstance(other, np.bool_):
                 return F.lit(bool(other))
             return F.lit(other.item())
-        
         elif isinstance(other, np.ndarray):
             if other.ndim != 1:
                 raise ValueError(f"Only 1D numpy arrays supported, got {other.ndim}D")
             return [F.lit(v) for v in other.tolist()]
-        
         else:
             raise TypeError(
                 f"Unsupported operand type: '{type(other).__name__}'. "
                 f"Expected: Dataset, Column, scalar, or list"
             )
         
-    def add_column(self, data: SparkDF | list, name: str | None = None, index = None) -> 'SparkNavigation':
+    def add_column(self, data: SparkDF | list, name: str | None = None, index = None) -> 'SparkNavigation' | 'SparkDataset':
         raise NotImplementedError("For add column need implement uniq_column")
 
     # comparison operators:
-    def __eq__(self, other) -> 'SparkNavigation':
+    def __eq__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(F.col(c) == other_val).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __ne__(self, other) -> 'SparkNavigation':
+    def __ne__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(F.col(c) != other_val).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __lt__(self, other) -> 'SparkNavigation':
+    def __lt__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(F.col(c) < other_val).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __le__(self, other) -> 'SparkNavigation':
+    def __le__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(F.col(c) <= other_val).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __ge__(self, other) -> 'SparkNavigation':
+    def __ge__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(F.col(c) >= other_val).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __gt__(self, other) -> 'SparkNavigation':
+    def __gt__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(F.col(c) > other_val).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
     # unary operators:
-    def __pos__(self) -> 'SparkNavigation':
+    def __pos__(self) -> 'SparkNavigation' | 'SparkDataset':
         result_df = self.data.select([F.col(c).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __neg__(self) -> 'SparkNavigation':
+    def __neg__(self) -> 'SparkNavigation' | 'SparkDataset':
         result_df = self.data.select([(-F.col(c)).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __abs__(self) -> 'SparkNavigation':
+    def __abs__(self) -> 'SparkNavigation' | 'SparkDataset':
         result_df = self.data.select([F.abs(F.col(c)).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __invert__(self) -> 'SparkNavigation':
+    def __invert__(self) -> 'SparkNavigation' | 'SparkDataset':
         result_df = self.data.select([(~F.col(c)).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __round__(self, n: int = 0) -> 'SparkNavigation':
+    def __round__(self, n: int = 0) -> 'SparkNavigation' | 'SparkDataset':
         result_df = self.data.select([F.round(F.col(c), n).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
     # binary arithmetic operations:
-    def __add__(self, other) -> 'SparkNavigation':
+    def __add__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(F.col(c) + other_val).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __sub__(self, other) -> 'SparkNavigation':
+    def __sub__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(F.col(c) - other_val).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __mul__(self, other) -> 'SparkNavigation':
+    def __mul__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(F.col(c) * other_val).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __floordiv__(self, other) -> 'SparkNavigation':
+    def __floordiv__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([F.floor(F.col(c) / other_val).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __truediv__(self, other) -> 'SparkNavigation':
+    def __truediv__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(F.col(c) / other_val).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
     
-    def __div__(self, other) -> 'SparkNavigation':
+    def __div__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         return self.__truediv__(other)
 
-    def __mod__(self, other) -> 'SparkNavigation':
+    def __mod__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(F.col(c) % other_val).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __pow__(self, other) -> 'SparkNavigation':
+    def __pow__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([F.pow(F.col(c), other_val).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
     # binary logical operators:
-    def __and__(self, other) -> 'SparkNavigation':
+    def __and__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         if isinstance(other_val, list):
             if len(other_val) != len(self._public_columns):
@@ -284,9 +290,9 @@ class SparkNavigation(DatasetBackendNavigation):
             result_df = self.data.select([
                 (F.col(c) & other_val).alias(c) for c in self._public_columns
             ])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __or__(self, other) -> 'SparkNavigation':
+    def __or__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         if isinstance(other_val, list):
             if len(other_val) != len(self._public_columns):
@@ -302,9 +308,9 @@ class SparkNavigation(DatasetBackendNavigation):
             result_df = self.data.select([
                 (F.col(c) | other_val).alias(c) for c in self._public_columns
             ])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __xor__(self, other) -> 'SparkNavigation':
+    def __xor__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         if isinstance(other_val, list):
             if len(other_val) != len(self._public_columns):
@@ -324,42 +330,42 @@ class SparkNavigation(DatasetBackendNavigation):
                     ((F.col(c) & ~other_val) | (~F.col(c) & other_val)).alias(c)
                     for c in self._public_columns
                 ])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
     # reverse arithmetic operators:
-    def __radd__(self, other) -> 'SparkNavigation':
+    def __radd__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         return self.__add__(other)
 
-    def __rsub__(self, other) -> 'SparkNavigation':
+    def __rsub__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(other_val - F.col(c)).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __rmul__(self, other) -> 'SparkNavigation':
+    def __rmul__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         return self.__mul__(other)
 
-    def __rfloordiv__(self, other) -> 'SparkNavigation':
+    def __rfloordiv__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([F.floor(other_val / F.col(c)).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __rtruediv__(self, other) -> 'SparkNavigation':
+    def __rtruediv__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(other_val / F.col(c)).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __rdiv__(self, other) -> 'SparkNavigation':
+    def __rdiv__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         return self.__rtruediv__(other)
 
-    def __rmod__(self, other) -> 'SparkNavigation':
+    def __rmod__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([(other_val % F.col(c)).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
-    def __rpow__(self, other) -> 'SparkNavigation':
+    def __rpow__(self, other) -> 'SparkNavigation' | 'SparkDataset':
         other_val = self.__magic_determine_other(other)
         result_df = self.data.select([F.pow(other_val, F.col(c)).alias(c) for c in self._public_columns])
-        return SparkNavigation(data=result_df, session=self.session)
+        return self.__class__(data=result_df, session=self.session)
 
     # representation methods:
     def __repr__(self) -> str:
@@ -420,7 +426,7 @@ class SparkNavigation(DatasetBackendNavigation):
         if isinstance(key_list[0], str):
             existing_cols = [k for k in key_list if k in self._public_columns]
             if existing_cols:
-                return SparkNavigation(data=self.data.select(*existing_cols), session=self.session)
+                return self.__class__(data=self.data.select(*existing_cols), session=self.session)
             else:
                 return default
         elif isinstance(key_list[0], int):
@@ -428,7 +434,7 @@ class SparkNavigation(DatasetBackendNavigation):
         else:
             return default
 
-    def take(self, indices: int | list[int], axis: Literal["index", "columns", "rows"] | int = 0) -> 'SparkNavigation':
+    def take(self, indices: int | list[int], axis: Literal["index", "columns", "rows"] | int = 0) -> 'SparkNavigation' | 'SparkDataset':
         if not isinstance(indices, list):
             indices = [indices]
 
@@ -440,7 +446,7 @@ class SparkNavigation(DatasetBackendNavigation):
                 else:
                     raise IndexError(f"Column index {idx} out of range")
             
-            return SparkNavigation(data=self.data.select(*col_names), session=self.session)
+            return self.__class__(data=self.data.select(*col_names), session=self.session)
 
         elif axis in (0, "index", "rows"):
             raise NotImplementedError("Taking rows by index is not supported in Spark")
@@ -492,7 +498,7 @@ class SparkNavigation(DatasetBackendNavigation):
         else:
             new_df = self.session.createDataFrame([], schema=T.StructType([]))
         
-        return SparkNavigation(data=new_df, session=self.session)
+        return self.__class__(data=new_df, session=self.session)
 
     @property
     def columns(self) -> list[str]:
@@ -533,7 +539,7 @@ class SparkNavigation(DatasetBackendNavigation):
         else:
             return dtypes.get(column_name[0]) if column_name else None
 
-    def astype(self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise") -> 'SparkNavigation':
+    def astype(self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise") -> 'SparkNavigation' | 'SparkDataset':
         for col, new_type in dtype.items():
             if col not in self._public_columns:
                 if errors == "raise":
@@ -552,7 +558,7 @@ class SparkNavigation(DatasetBackendNavigation):
                 elif errors == "ignore":
                     continue
         
-        return SparkNavigation(data=new_df, session=self.session)
+        return self.__class__(data=new_df, session=self.session)
 
     def update_column_type(self, dtype: dict[str, type]):
         if len(dtype) > 0:
@@ -561,7 +567,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def append(self, 
                other: 'SparkNavigation | list[SparkNavigation]',
-               axis: int = 0) -> 'SparkNavigation':
+               axis: int = 0) -> 'SparkNavigation' | 'SparkDataset':
         others = other if isinstance(other, list) else [other]
         
         datasets = [self.data] + [
@@ -574,7 +580,7 @@ class SparkNavigation(DatasetBackendNavigation):
                 lambda x, y: x.unionByName(y, allowMissingColumns=True), 
                 datasets
             )
-            return SparkNavigation(data=new_data, session=self.session)
+            return self.__class__(data=new_data, session=self.session, physical_index_actual_flag=False)
         
         if axis == 1:
             raise NotImplementedError("append on axis == 1 is not supported in Spark backend")
@@ -603,8 +609,20 @@ class SparkNavigation(DatasetBackendNavigation):
     def to_records(self) -> list[dict]:
         raise NotImplementedError("to_records is not supported in Spark backend")
 
-    def loc(self, items: Iterable) -> Iterable:
-        raise NotImplementedError("loc indexing is not supported in Spark backend")
+    def loc(self, items: Iterable) -> 'SparkNavigation' | 'SparkDataset':
+        items_list = list(items) 
+        
+        if not items_list:
+            return self.__class__(
+                data=self.data.limit(0), 
+                session=self.session
+            )
+
+        return self.__class__(
+            data=self.data.filter(F.col(UTILITY_INDEX_COL_NAME).isin(items_list)), 
+            session=self.session,
+            need_reindex_dense_index=True
+        )
 
     def iloc(self, items: Iterable) -> Iterable:
         raise NotImplementedError("iloc indexing is not supported in Spark backend")
@@ -624,8 +642,9 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     
     def __init__(self,
                  data: SparkDF | pd.DataFrame | dict[str, Any] | str | None = None,
-                 session: SparkSession = None):
-        super().__init__(data, session)
+                 session: SparkSession = None,
+                 physical_index_actual_flag = True):
+        super().__init__(data = data, session = session, physical_index_actual_flag = physical_index_actual_flag)
 
     @staticmethod
     def _convert_agg_result(result: SparkDF):
@@ -898,7 +917,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         res = self._convert_agg_result(df_res)
         
         if isinstance(res, SparkDF):
-            return self.__class__(res, self.session)
+            return self.__class__(data=res, session=self.session, physical_index_actual_flag=False)
         return res
 
     def max(self, numeric_only: bool = False) -> 'SparkDataset' | Any:
@@ -1030,7 +1049,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             schema = StructType(fields)
             
             result_df = self.session.createDataFrame(rows, schema)
-            return self.__class__(result_df, self.session)
+            return self.__class__(data=result_df, session=self.session, physical_index_actual_flag=False)
 
 
     def coefficient_of_variation(self, small_format: bool = False) -> 'SparkDataset' | float | dict:
@@ -1371,7 +1390,9 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 if "__index__" in result.columns:
                     result = result.drop("__index__")
         
-        return self.__class__(result, self.session)
+        return self.__class__(data=result, 
+                              session=self.session, 
+                              physical_index_actual_flag=False)
 
     def drop(self, 
              labels: Any = "", 

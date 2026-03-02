@@ -4,7 +4,8 @@ from .constants import (
     MATCHING_INDEXES_SPLITTER_SYMBOL,
     NAME_BORDER_SYMBOL,
     NUMBER_TYPES_LIST,
-    UTILITY_INDEX_COL_NAME
+    UTILITY_INDEX_COL_NAME,
+    UTILITY_PHYSICAL_INDEX_COL_NAME
 )
 from .enums import (
     ABNTestMethodsEnum,
@@ -57,6 +58,7 @@ __all__ = [
     "NAME_BORDER_SYMBOL",
     "NUMBER_TYPES_LIST",
     "UTILITY_INDEX_COL_NAME",
+    "UTILITY_PHYSICAL_INDEX_COL_NAME",
     "ABNTestMethodsEnum",
     "ABTestTypesEnum",
     "AbstractMethodError",
