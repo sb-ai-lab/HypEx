@@ -118,58 +118,31 @@ class AAScoreAnalyzer(Executor):
             raise ValueError(f"{splitter_id} is not a valid splitter id")
         return splitter_class.build_from_id(splitter_id)
 
-    def _get_best_split(
-        self,
-        data: ExperimentData,
-        score_table: Dataset,
-        if_param_scores: Dataset | None = None,
-    ) -> dict[str, Any]:
-        # TODO: add split_scores in ExperimentData
-        if if_param_scores is None:
-            if len(self.__feature_weights) < 1:
-                best_index = 0
-            else:
-                aa_split_scores = score_table.apply(
-                    lambda x: (
-                        (
-                            (
-                                (
-                                    sum(
-                                        x[
-                                            key.replace(
-                                                f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}",
-                                                f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}",
-                                            )
-                                        ]
-                                        * value
-                                        for key, value in self.__feature_weights.items()
-                                        if (isinstance(value, float) and value > 0)
-                                        and (
-                                            key.replace(
-                                                f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}",
-                                                f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}",
-                                            )
-                                            in x["splitter_id"]
-                                        )
-                                    )
-                                    / len(self.__feature_weights)
-                                )
-                                * 2
-                            )
-                            / 3
-                        )
-                        + x["mean test score"] / 3
-                    ),
-                    axis=1,
-                    role={"aa split score": StatisticRole(float)},
-                )
-                best_index = aa_split_scores.idxmax()
-            best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
-            score_dict = score_table.loc[best_index, :].transpose().to_records()[0]
-        else:
+    def _get_best_split(self, data, score_table, if_param_scores=None):
+        if if_param_scores is not None:
             best_index = 0
-            best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
-            score_dict = if_param_scores.loc[best_index, :].transpose().to_records()[0]
+        elif not self.__feature_weights:
+            best_index = 0
+        else:
+            # Calculate weighted p-value score
+            pvalue_weight = 2 / 3
+            test_score_weight = 1 / 3
+
+            def calculate_split_score(row):
+                weighted_pvalues = sum(
+                    row[key.replace("__pass__", "__p-value__")] * weight
+                    for key, weight in self.__feature_weights.items()
+                    if weight > 0
+                ) / len(self.__feature_weights)
+
+                return (weighted_pvalues * pvalue_weight +
+                        row["mean test score"] * test_score_weight)
+
+            scores = score_table.apply(calculate_split_score, axis=1)
+            best_index = scores.idxmax()
+
+        best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
+        score_dict = if_param_scores.loc[best_index, :].transpose().to_records()[0]
         best_score_stat = OneAADictReporter.convert_flat_dataset(score_dict)
         self.key = "best split statistics"
         result = self._set_value(data, best_score_stat)
@@ -217,5 +190,6 @@ class AAScoreAnalyzer(Executor):
                 ifparam_experiment_id["IfParamsExperiment"]["analysis_tables"][0]
             ]
         )
+
         data = self._analyze_aa_score(data, score_table)
         return self._analyze_best_split(data, score_table, if_param_scores)

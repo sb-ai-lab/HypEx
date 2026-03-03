@@ -4,6 +4,8 @@ from .constants import (
     MATCHING_INDEXES_SPLITTER_SYMBOL,
     NAME_BORDER_SYMBOL,
     NUMBER_TYPES_LIST,
+    UTILITY_COL_SYMBOL,
+    UTILITY_INDEX_COL_NAME,
 )
 from .enums import (
     ABNTestMethodsEnum,
@@ -44,9 +46,9 @@ from .typings import (
     RoleNameType,
     ScalarType,
     SetParamsDictTypes,
+    SourceDataTypes,
     StratificationRoleTypes,
     TargetRoleTypes,
-    SourceDataTypes,
 )
 
 __all__ = [
@@ -54,6 +56,8 @@ __all__ = [
     "ID_SPLIT_SYMBOL",
     "MATCHING_INDEXES_SPLITTER_SYMBOL",
     "NAME_BORDER_SYMBOL",
+    "UTILITY_COL_SYMBOL",
+    "UTILITY_INDEX_COL_NAME",
     "NUMBER_TYPES_LIST",
     "ABNTestMethodsEnum",
     "ABTestTypesEnum",

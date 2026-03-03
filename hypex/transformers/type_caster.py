@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from ..dataset.dataset import Dataset, ExperimentData
 from ..dataset.roles import ABCRole, FeatureRole

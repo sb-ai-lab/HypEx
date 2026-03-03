@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Sequence, Sized
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd  # type: ignore
 import pyspark.sql as spark
 
-from ...utils import FromDictTypes, MergeOnError, ScalarType
+from ...utils import UTILITY_COL_SYMBOL, FromDictTypes, MergeOnError, ScalarType
+from ...utils.adapter import Adapter
+from ...utils.constants import UTILITY_INDEX_COL_NAME
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -223,8 +226,8 @@ class PandasNavigation(DatasetBackendNavigation):
             raise ValueError("Wrong column_name type.")
 
     def get_column_type(
-        self, column_name: Union[Iterable[str], str] = None
-    ) -> Optional[Union[Dict[str, type], type]]:
+        self, column_name: Iterable[str] | str = None
+    ) -> dict[str, type] | type | None:
         column_name = self.data.columns if column_name is None else column_name
         dtypes = {}
         for k, v in self.data[column_name].dtypes.items():
@@ -256,7 +259,7 @@ class PandasNavigation(DatasetBackendNavigation):
     ) -> pd.DataFrame:
         return self.data.astype(dtype=dtype, errors=errors)
 
-    def update_column_type(self, dtype: Dict[str, type]):
+    def update_column_type(self, dtype: dict[str, type]):
         for column_name, type_name in dtype.items():
             if not self.data[column_name].isna().any():
                 self.data = self.astype({column_name: type_name})
@@ -264,7 +267,7 @@ class PandasNavigation(DatasetBackendNavigation):
 
     def add_column(
         self,
-        data: Sequence,
+        data: Any,
         name: str | list[str],
         index: Sequence | None = None,
     ):
@@ -272,6 +275,8 @@ class PandasNavigation(DatasetBackendNavigation):
             name = name[0]
         if isinstance(data, pd.DataFrame):
             data = data.values
+        else:
+            data = Adapter.to_list(data)
         if len(self.data) != len(data):
             if isinstance(data[0], Iterable) and len(data[0]) == 1:
                 data = data.squeeze()
@@ -284,10 +289,17 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data.loc[:, name] = data
 
     def append(self, other, reset_index: bool = False, axis: int = 0) -> pd.DataFrame:
+        other = Adapter.to_list(other)
         new_data = pd.concat([self.data] + [d.data for d in other], axis=axis)
         if reset_index:
             new_data = new_data.reset_index(drop=True)
         return new_data
+
+    def add_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
+        self.data[index_col_name] = np.array(range(len(self.data)))
+
+    def remove_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
+        self.data = self.data.drop(index_col_name)
 
     def from_dict(self, data: FromDictTypes, index: Iterable | Sized | None = None):
         if isinstance(data, dict):
@@ -343,7 +355,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def take(
         self,
-        indices: int | list[int],
+        indices: int | list[int] | slice,
         axis: Literal["index", "columns", "rows"] | int = 0,
     ) -> Any:
         return self.data.take(indices=indices, axis=axis)
@@ -395,7 +407,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return {column: self.data[column].unique() for column in self.data.columns}
 
     def nunique(self, dropna: bool = True):
-        return {column: self.data[column].nunique() for column in self.data.columns}
+        return {column: self.data[column].nunique(dropna=dropna) for column in self.data.columns}
 
     def groupby(self, by: str | Iterable[str], **kwargs) -> list[tuple]:
         groups = self.data.groupby(by=by, observed=False, **kwargs)
@@ -460,7 +472,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return self.data.sort_index(ascending=ascending, **kwargs)
 
     def get_numeric_columns(self) -> list[str]:
-        return df.select_dtypes(include=ScalarType).columns.tolist()
+        return self.select_dtypes(include=ScalarType).columns.tolist()
 
     def corr(
         self,
@@ -553,6 +565,12 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     ) -> pd.DataFrame:
         return self.data.select_dtypes(include=include, exclude=exclude)
 
+    def limit(self, num: int | None = None) -> Any:
+        if not num:
+            return self.data
+        else:
+            return self.data.iloc[: num]
+
     def isin(self, values: Iterable) -> pd.DataFrame:
         return self.data.isin(values)
 
@@ -608,8 +626,11 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         self,
         items: list | None = None,
         regex: str | None = None,
+        column: str | None = None,
         axis: int = 0,
     ) -> pd.DataFrame:
+        if (axis == 0) and (items is None) and (column is not None):
+            return self.data[self.data[column]]
         return self.data.filter(items=items, regex=regex, axis=axis)
 
     def rename(self, columns: dict[str, str]) -> pd.DataFrame:
@@ -642,3 +663,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         )
 
         return data_expanded
+
+    def checkpoint(self):
+        pass

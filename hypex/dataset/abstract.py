@@ -1,24 +1,26 @@
 from __future__ import annotations
 
-import warnings
 import copy
-from copy import deepcopy
 import json  # type: ignore
+import warnings
 from abc import ABC
-from typing import Any, Iterable, Callable, Hashable, Literal, Optional, Sequence
+from collections.abc import Callable, Hashable, Iterable, Sequence
+from copy import deepcopy
+from typing import Any, Literal, Optional
 
 import pandas as pd  # type: ignore
-from numpy import ndarray
 import pyspark.sql as spark
+from numpy import ndarray
 
 from ..utils import (
+    UTILITY_INDEX_COL_NAME,
     BackendsEnum,
     BackendTypeError,
     ConcatBackendError,
     ConcatDataError,
     DataTypeError,
-    ScalarType,
     RoleColumnError,
+    ScalarType,
     SourceDataTypes,
 )
 from ..utils.adapter import Adapter
@@ -27,6 +29,7 @@ from .roles import (
     ABCRole,
     DefaultRole,
     FilterRole,
+    IndexRole,
     InfoRole,
     StatisticRole,
     default_roles,
@@ -79,7 +82,7 @@ class DatasetBase(ABC):
         data: spark.DataFame | pd.DataFrame | str | None = None,
         backend: BackendsEnum | None = None,
         default_role: ABCRole | None = None,
-        session: Optional[spark.SparkSession] = None,
+        session: spark.SparkSession | None = None,
     ):
         if backend is not None:
             self._backend = self._select_backend_from_str(data, backend, session)
@@ -120,6 +123,7 @@ class DatasetBase(ABC):
         self._tmp_roles: (
             dict[ABCRole, list[str] | str] | dict[list[str] | str] | ABCRole
         ) = {}
+
 
     def __repr__(self):
         return self._backend.__repr__()
@@ -435,6 +439,15 @@ class DatasetBase(ABC):
     def session(self):
         return self._backend.session
 
+    @property
+    def backend_type(self):
+        if isinstance(self._backend, PandasDataset):
+            return BackendsEnum.pandas
+        elif isinstance(self._backend, SparkDataset):
+            return BackendsEnum.spark
+        else:
+            raise ValueError("Unknown backend type")
+
     @tmp_roles.setter
     def tmp_roles(self, value):
         self._set_roles(new_roles_map=value, temp_role=True)
@@ -476,6 +489,22 @@ class DatasetBase(ABC):
                 data = data.data
             self.roles.update(role)
             self._backend.add_column(data, list(role.keys()), index)
+        return self
+
+    def add_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
+        if index_col_name in self.columns:
+            if len(self.columns) < 2:
+                return self
+            self.remove_index_col(index_col_name)
+        self._backend.add_index_col(index_col_name)
+        self.roles[index_col_name] = IndexRole()
+        return self
+
+    def remove_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
+        if index_col_name not in self.columns:
+            return self
+        self._backend.remove_index_col(index_col_name)
+        self.roles.pop(index_col_name)
         return self
 
     def _check_other_dataset(self, other):
@@ -711,11 +740,20 @@ class DatasetBase(ABC):
 
     def filter(
         self,
-        items: list | None = None,
+        items: list | DatasetBase | None = None,
         regex: str | None = None,
+        column: str | None = None,
         axis: int | None = None,
     ) -> DatasetBase:
-        t_data = self._backend.filter(items=items, regex=regex, axis=axis)
+        if isinstance(items, DatasetBase):
+            t_data = (
+                self
+                .append(items.iselect(0), axis=0)
+                .filter(column=items.columns[0], axis=0)
+                .drop(columns=items.columns[0])
+            )
+        else:
+            t_data = self._backend.filter(items=items, regex=regex, column=column, axis=axis)
         t_roles = {c: self.roles[c] for c in t_data.columns if c in self.roles.keys()}
         return self.__class__(roles=t_roles, data=t_data)
 
@@ -727,6 +765,9 @@ class DatasetBase(ABC):
         columns = Adapter.to_list(columns)
         columns = [self.columns[n] for n in columns]
         return self.filter(items=columns, axis=1)
+
+    def limit(self, num):
+        return self.limit(num=num)
 
     def select_dtypes(self, include: Any = None, exclude: Any = None):
         # Filter data by dtypes
