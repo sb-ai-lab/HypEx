@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Literal
+from typing import Any, Callable, ClassVar, Literal
 
 from ..dataset import (
     ABCRole,
@@ -33,12 +33,14 @@ from ..utils.errors import (
 )
 
 
-class Comparator(Calculator, ABC):
+class BaseComparator(Calculator, ABC):
+    """
+    Base class for all comparators. Owns role management, field resolution,
+    and result storage. Does not prescribe how the comparison is performed.
+    """
+
     def __init__(
         self,
-        compare_by: Literal[
-            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
-        ],
         grouping_role: ABCRole | None = None,
         target_roles: ABCRole | list[ABCRole] | None = None,
         baseline_role: ABCRole | None = None,
@@ -47,7 +49,6 @@ class Comparator(Calculator, ABC):
     ):
         super().__init__(key=key)
         self.grouping_role = grouping_role or GroupingRole()
-        self.compare_by = compare_by
         self.target_roles = target_roles or TargetRole()
         self.baseline_role = baseline_role or PreTargetRole()
         self.calc_kwargs = calc_kwargs
@@ -55,18 +56,6 @@ class Comparator(Calculator, ABC):
     @property
     def search_types(self) -> list[type] | None:
         return None
-
-    def _local_extract_dataset(
-        self, compare_result: dict[Any, Any], roles: dict[Any, ABCRole]
-    ) -> Dataset:
-        return self._extract_dataset(compare_result, roles)
-
-    @classmethod
-    @abstractmethod
-    def _inner_function(
-        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ) -> Any:
-        raise AbstractMethodError
 
     def _get_fields_data(self, data: ExperimentData) -> dict[str, Dataset]:
         tmp_role = (
@@ -88,6 +77,75 @@ class Comparator(Calculator, ABC):
             "target_fields": target_fields_data,
             "baseline_field": baseline_field_data,
         }
+
+    def _set_value(
+        self, data: ExperimentData, value: Dataset | None = None, key: Any = None
+    ) -> ExperimentData:
+        data.set_value(
+            ExperimentDataEnum.analysis_tables,
+            self.id,
+            value,
+        )
+        return data
+
+    @staticmethod
+    def _extract_dataset(
+        compare_result: FromDictTypes, roles: dict[Any, ABCRole]
+    ) -> Dataset:
+        if isinstance(next(iter(compare_result.values())), Dataset):
+            cr_list_v: list[Dataset] = list(compare_result.values())
+            result = cr_list_v[0]
+            if len(cr_list_v) > 1:
+                result = result.append(cr_list_v[1:])
+            result.index = list(compare_result.keys())
+            return result
+        return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
+
+
+class GroupsComparator(BaseComparator, ABC):
+    """
+    Comparator that splits data into groups and performs pairwise comparison.
+    Supports five comparison modes: groups, columns, columns_in_groups, cross,
+    matched_pairs. _inner_function receives raw Dataset slices for each pair.
+    """
+
+    def __init__(
+        self,
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+        ],
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | list[ABCRole] | None = None,
+        baseline_role: ABCRole | None = None,
+        key: Any = "",
+        calc_kwargs: dict[str, Any] = {},
+    ):
+        super().__init__(
+            grouping_role=grouping_role,
+            target_roles=target_roles,
+            baseline_role=baseline_role,
+            key=key,
+            calc_kwargs=calc_kwargs,
+        )
+        self.compare_by = compare_by
+
+    def _local_extract_dataset(
+        self, compare_result: dict[Any, Any], roles: dict[Any, ABCRole]
+    ) -> Dataset:
+        return self._extract_dataset(compare_result, roles)
+
+    @classmethod
+    @abstractmethod
+    def _inner_function(
+        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
+    ) -> Any:
+        raise AbstractMethodError
+
+    @staticmethod
+    def _check_test_data(test_data: Dataset | None = None) -> Dataset:
+        if test_data is None:
+            raise ValueError("test_data is needed for evaluation")
+        return test_data
 
     @classmethod
     def _execute_inner_function(
@@ -115,35 +173,6 @@ class Comparator(Calculator, ABC):
                 InfoRole(),
             )
         return result
-
-    @staticmethod
-    def _check_test_data(test_data: Dataset | None = None) -> Dataset:
-        if test_data is None:
-            raise ValueError("test_data is needed for evaluation")
-        return test_data
-
-    def _set_value(
-        self, data: ExperimentData, value: Dataset | None = None, key: Any = None
-    ) -> ExperimentData:
-        data.set_value(
-            ExperimentDataEnum.analysis_tables,
-            self.id,
-            value,
-        )
-        return data
-
-    @staticmethod
-    def _extract_dataset(
-        compare_result: FromDictTypes, roles: dict[Any, ABCRole]
-    ) -> Dataset:
-        if isinstance(next(iter(compare_result.values())), Dataset):
-            cr_list_v: list[Dataset] = list(compare_result.values())
-            result = cr_list_v[0]
-            if len(cr_list_v) > 1:
-                result = result.append(cr_list_v[1:])
-            result.index = list(compare_result.keys())
-            return result
-        return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
 
     @staticmethod
     def _grouping_data_split(
@@ -183,7 +212,6 @@ class Comparator(Calculator, ABC):
             for bucket in data
             for column in bucket[1].columns
         ]
-
         return result
 
     @staticmethod
@@ -203,7 +231,6 @@ class Comparator(Calculator, ABC):
                 f"{comparison_role} must have only one column when the comparison is done by {compare_by}. {len(field_data.columns)} passed. {field_data.columns[0]} will be used.",
             )
             field_data = field_data[field_data.columns[0]]
-
         return field_data
 
     @classmethod
@@ -240,7 +267,6 @@ class Comparator(Calculator, ABC):
             raise NoRequiredArgumentError(target_fields_data)
 
         baseline_data = [(f"{baseline_field_data.columns[0]}", baseline_field_data)]
-
         compared_data = [
             (f"{column}", target_fields_data[column])
             for column in target_fields_data.columns
@@ -266,7 +292,6 @@ class Comparator(Calculator, ABC):
         )
 
         baseline_data = baseline_field_data.groupby(by=group_field_data)
-
         compared_data = cls._split_ds_into_columns(
             target_fields_data.groupby(by=group_field_data)
         )
@@ -325,7 +350,6 @@ class Comparator(Calculator, ABC):
         baseline_indexes = baseline_field_data.groupby(by=group_field_data)
         baseline_data = []
 
-        # mapping the data of the baseline data to its matches data. If there are no matches, matching index will be -1
         for group in baseline_indexes:
             name = group[0]
             indexes = group[1].iget_values(column=0)
@@ -346,19 +370,23 @@ class Comparator(Calculator, ABC):
         group_field_data: Dataset,
     ) -> GroupingDataType:
         """
-        Splits the given dataset into buckets into baseline and compared data, based on the specified comparison mode.
+        Splits the given dataset into buckets into baseline and compared data,
+        based on the specified comparison mode.
 
         Args:
             group_field (Union[Sequence[str], str]): The field(s) to group the data by.
             target_fields (Union[str, List[str]]): The field(s) to target for comparison.
-            compare_by (Literal['groups', 'columns', 'columns_in_groups', 'cross', 'matched_pairs'], optional): The method to compare the data. Defaults to 'groups'.
-            baseline_field (Optional[str], optional): The column to use as the baseline for comparison. Required if `compare_by` is 'columns' or 'columns_in_groups'. Defaults to None.
+            compare_by (Literal['groups', 'columns', 'columns_in_groups', 'cross', 'matched_pairs'], optional):
+                The method to compare the data. Defaults to 'groups'.
+            baseline_field (Optional[str], optional): The column to use as the baseline for comparison.
+                Required if `compare_by` is 'columns' or 'columns_in_groups'. Defaults to None.
 
         Returns:
             Tuple: A tuple containing the baseline data and the compared data.
 
         Raises:
-            NoRequiredArgumentError: If `baseline_field` is None and `compare_by` is 'columns' or 'columns_in_groups' or 'cross'.
+            NoRequiredArgumentError: If `baseline_field` is None and `compare_by` is
+                'columns' or 'columns_in_groups' or 'cross'.
             ValueError: If `compare_by` is not one of the allowed values.
         """
         if compare_by == "groups":
@@ -516,7 +544,6 @@ class Comparator(Calculator, ABC):
             baseline_field_data=baseline_field_data,
             group_field_data=group_field_data,
             grouping_data=grouping_data,
-            # kwargs=,
         )
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key in compare_result}
@@ -524,7 +551,11 @@ class Comparator(Calculator, ABC):
         return self._set_value(data, result_dataset)
 
 
-class StatHypothesisTesting(Comparator, ABC):
+# Backward-compatible alias — existing code importing Comparator continues to work.
+Comparator = GroupsComparator
+
+
+class StatHypothesisTesting(GroupsComparator, ABC):
     def __init__(
         self,
         compare_by: Literal[
@@ -546,3 +577,186 @@ class StatHypothesisTesting(Comparator, ABC):
             calc_kwargs=calc_kwargs,
         )
         self.reliability = reliability
+
+
+class StatsComparator(BaseComparator, ABC):
+    """
+    Two-phase comparator that operates on aggregated statistics instead of raw data.
+
+    Phase 1 — Aggregate: _compute_stats() is called once per group with the full
+    multi-column group slice. It returns {col: {stat: value}} for all target columns
+    in a single pass, allowing backends (e.g. Spark) to issue one aggregation job
+    instead of one per column.
+
+    Phase 2 — Compare: _inner_function() receives the per-column stats dicts of two
+    groups (baseline vs compared) and returns the test result for that column.
+
+    Two datasets are stored in analysis_tables:
+    - ``{self.id}{NAME_BORDER_SYMBOL}stats`` — per-group stats table (rows=groups,
+      cols={stat}{NAME_BORDER_SYMBOL}{col})
+    - ``self.id`` — pairwise test results in the same shape as GroupsComparator output
+
+    This design is particularly efficient for Spark backends, where Phase 1 runs
+    as distributed aggregations and only small scalar dicts reach the driver.
+    """
+
+    STAT_FUNCTIONS: ClassVar[dict[str, Callable[[Dataset], Any]]] = {
+        "mean": lambda d: d.mean(),
+        "var": lambda d: d.var(),
+        "std": lambda d: d.std(),
+        "count": lambda d: len(d),
+        "sum": lambda d: d.sum(),
+        "min": lambda d: d.min(),
+        "max": lambda d: d.max(),
+    }
+
+    def __init__(
+        self,
+        stats: list[str],
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | list[ABCRole] | None = None,
+        key: Any = "",
+        calc_kwargs: dict[str, Any] = {},
+    ):
+        super().__init__(
+            grouping_role=grouping_role,
+            target_roles=target_roles,
+            key=key,
+            calc_kwargs=calc_kwargs,
+        )
+        self.stats = stats
+
+    @classmethod
+    def _compute_stats( #TODO: needs to be rewritten once we have a propper group_by 
+        cls, data: Dataset, stats: list[str] | None = None, **kwargs
+    ) -> dict[str, dict[str, Any]]:
+        """
+        Compute the requested statistics for all target columns in one group slice.
+
+        Called once per group with the full multi-column Dataset, returning a nested
+        dict ``{col: {stat: value}}``. Subclasses may override to use a single
+        vectorised aggregation call (e.g. a Spark ``.agg()``) across all columns.
+
+        Args:
+            data: Multi-column Dataset slice for one group.
+            stats: List of stat names to compute (keys of STAT_FUNCTIONS).
+
+        Returns:
+            Nested dict ``{column_name: {stat_name: scalar_value}}``.
+        """
+        stats = stats or []
+        result: dict[str, dict[str, Any]] = {}
+        for col in data.columns:
+            col_result: dict[str, Any] = {}
+            for stat in stats:
+                if stat not in cls.STAT_FUNCTIONS:
+                    raise ValueError(
+                        f"Unknown stat '{stat}'. Available: {list(cls.STAT_FUNCTIONS)}"
+                    )
+                col_result[stat] = cls.STAT_FUNCTIONS[stat](data[[col]])
+            result[col] = col_result
+        return result
+
+    @classmethod
+    @abstractmethod
+    def _inner_function(
+        cls,
+        baseline_stats: dict[str, Any],
+        compared_stats: dict[str, Any],
+        **kwargs,
+    ) -> dict[str, Any]:
+        """
+        Compute a test result from pre-aggregated statistics of two groups for one column.
+
+        Args:
+            baseline_stats: ``{stat: value}`` for the baseline group, e.g.
+                ``{"mean": 4.2, "var": 1.1, "count": 500}``.
+            compared_stats: ``{stat: value}`` for the compared group.
+
+        Returns:
+            Result dict, e.g. ``{"p-value": 0.03, "statistic": 2.1, "pass": True}``.
+        """
+        raise AbstractMethodError
+
+    def _set_stats_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
+        data.set_value(
+            ExperimentDataEnum.analysis_tables,
+            f"{self.id}{NAME_BORDER_SYMBOL}stats",
+            value,
+        )
+        return data
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        fields = self._get_fields_data(data)
+        group_field_data = fields["group_field"]
+        target_fields_data = fields["target_fields"]
+
+        if len(target_fields_data.columns) == 0:
+            if data.ds.tmp_roles:
+                return data
+            raise NoColumnsError(TargetRole().role_name)
+
+        if len(group_field_data.columns) != 1:
+            raise NotSuitableFieldError(group_field_data, "Grouping")
+
+        self.key = str(
+            target_fields_data.columns[0]
+            if len(target_fields_data.columns) == 1
+            else list(target_fields_data.columns)
+        )
+
+        groups = sorted(
+            target_fields_data.groupby(by=group_field_data),
+            key=lambda t: t[0],
+        )
+
+        #TODO: Phase 1 needs to be rewritten once we have a propper group_by 
+        # Phase 1: one _compute_stats call per group covering all target columns.
+        # Returns {group_name: {col: {stat: value}}}.
+        group_col_stats: dict[str, dict[str, dict[str, Any]]] = {
+            str(group_name): self._compute_stats(group_data, stats=self.stats)
+            for group_name, group_data in groups
+        }
+
+        # Build and store flattened stats table: rows=groups, cols={stat}ǂ{col}
+        stats_single_datasets = [
+            DatasetAdapter.to_dataset(
+                {
+                    f"{stat}{NAME_BORDER_SYMBOL}{col}": col_stats[stat]
+                    for col, col_stats in col_stats_dict.items()
+                    for stat in col_stats
+                },
+                StatisticRole(),
+            )
+            for col_stats_dict in group_col_stats.values()
+        ]
+
+        stats_dataset = stats_single_datasets[0]
+        if len(stats_single_datasets) > 1:
+            stats_dataset = stats_dataset.append(stats_single_datasets[1:])
+        stats_dataset.index = list(group_col_stats.keys())
+        data = self._set_stats_value(data, stats_dataset)
+
+        group_names = list(group_col_stats.keys())
+        if len(group_names) < 2:
+            return data
+
+        # Phase 2: pairwise comparison using pre-computed per-column stats.
+        baseline_name = group_names[0]
+        compare_result: dict[str, Dataset] = {}
+        for compared_name in group_names[1:]:
+            for col in target_fields_data.columns:
+                res_name = f"{compared_name}{NAME_BORDER_SYMBOL}{col}"
+                compare_result[res_name] = DatasetAdapter.to_dataset(
+                    self._inner_function(
+                        group_col_stats[baseline_name][col],
+                        group_col_stats[compared_name][col],
+                        **self.calc_kwargs,
+                    ),
+                    InfoRole(),
+                )
+
+        result_dataset = self._extract_dataset(
+            compare_result, {k: StatisticRole() for k in compare_result}
+        )
+        return self._set_value(data, result_dataset)
