@@ -67,12 +67,12 @@ class DatasetBase(ABC):
         return roles
 
     def _set_empty_types(self, roles):
-        colunms_dtypes = self._backend.get_column_type(self._backend.columns)
+        columns_dtypes = self._backend.get_column_type(self._backend.columns)
         new_types = {}
         for column, role in roles.items():
             if role.data_type is None:
-                role.data_type = colunms_dtypes[column]
-            elif role.data_type != colunms_dtypes[column]:
+                role.data_type = columns_dtypes[column]
+            elif role.data_type != columns_dtypes[column]:
                 new_types[column] = role.data_type
         self._backend = self._backend.update_column_type(new_types)
 

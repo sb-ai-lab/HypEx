@@ -6,6 +6,7 @@ import numpy as np
 
 from ..comparators import Chi2Test, KSTest, TTest
 from ..dataset import Dataset, ExperimentData, StatisticRole
+from ..dataset.dataset import SmallDataset
 from ..executor import Executor
 from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from ..reporters.aa import OneAADictReporter
@@ -59,10 +60,9 @@ class OneAAStatAnalyzer(Executor):
         if sum_weight:
             analysis_data["mean test score"] /= sum_weight
 
-        analysis_dataset = Dataset.from_dict(
+        analysis_dataset = SmallDataset.from_dict(
             [analysis_data],
             {field: StatisticRole(float) for field in analysis_data},
-            BackendsEnum.pandas,
         )
 
         return self._set_value(data, analysis_dataset)
@@ -106,7 +106,7 @@ class AAScoreAnalyzer(Executor):
         aa_passed = {
             class_: value >= self.threshold for class_, value in aa_scores.items()
         }
-        result = Dataset.from_dict({"score": aa_scores, "pass": aa_passed}, roles={})
+        result = SmallDataset.from_dict({"score": aa_scores, "pass": aa_passed}, roles={})
         self.key = "aa score"
         return self._set_value(data, result)
 
