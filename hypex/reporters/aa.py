@@ -4,6 +4,7 @@ from typing import Any, ClassVar
 
 from ..comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
+from ..dataset.dataset import SmallDataset
 from ..splitters import AASplitter, AASplitterWithStratification
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, NotFoundInExperimentDataError
 from .abstract import Reporter, TestDictReporter
@@ -13,7 +14,7 @@ class OneAADictReporter(TestDictReporter):
     tests: ClassVar[list] = [TTest, KSTest, Chi2Test]
 
     @staticmethod
-    def convert_flat_dataset(data: dict) -> Dataset:
+    def convert_flat_dataset(data: dict) -> SmallDataset:
         struct_dict = OneAADictReporter._get_struct_dict(data)
         return OneAADictReporter._convert_struct_dict_to_dataset(struct_dict)
 
