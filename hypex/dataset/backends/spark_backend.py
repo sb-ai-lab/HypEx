@@ -100,46 +100,6 @@ class SparkNavigation(DatasetBackendNavigation):
             self.data = ps.DataFrame(self.session.createDataFrame([], schema=StructType([])))
         else:
             raise TypeError(f"Unsupported data type: {type(data)}")
-    
-    # def __init__(self,
-    #                 data: ps.DataFrame | SparkDF | pd.DataFrame | dict[str, Any] | str | None = None,
-    #                 session: SparkSession | None = None):        
-            
-    #         ps.set_option('compute.ops_on_diff_frames', True)
-            
-    #         if isinstance(data, dict):
-    #             if "index" in data:
-    #                 data = pd.DataFrame(data=data["data"], index=data["index"])
-    #             else:
-    #                 data = pd.DataFrame(data=data["data"])
-
-    #         if isinstance(data, ps.DataFrame):
-    #             self.data = data
-    #             session = data.to_spark().sparkSession
-    #         elif isinstance(data, SparkDF):
-    #             self.data = ps.DataFrame(data)
-    #             session = data.session
-                
-    #         if session is None:
-    #             raise ValueError(f"Session not set")
-    #         elif isinstance(session, SparkSession):
-    #             self.session = session
-    #         else:
-    #             raise TypeError("Session must be an instance of SparkSession")
-            
-    #         if isinstance(data, pd.DataFrame):
-    #             spark_df = self.session.createDataFrame(data)
-    #             self.data = ps.DataFrame(spark_df)
-    #         elif isinstance(data, (ps.Series, pd.Series)):
-    #             temp_df = pd.DataFrame(data)
-    #             spark_df = self.session.createDataFrame(temp_df.reset_index())
-    #             self.data = ps.DataFrame(spark_df)
-    #         elif isinstance(data, str):
-    #             self.data = self._read_file(data, self.session)
-    #         elif data is None:
-    #             self.data = ps.DataFrame(self.session.createDataFrame([], schema=StructType([])))
-    #         # else:
-    #         #     raise TypeError(f"Unsupported data type: {type(data)}")
 
     def __getitem__(self, 
                     item: slice | int | str | list | ps.DataFrame | ps.Series) -> ps.DataFrame | ps.Series:
@@ -205,7 +165,6 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def __round__(self, ndigits: int = 0) -> Any:
         return self.data.round(ndigits)
-
 
     # Binary operations:
     def __add__(self, other) -> Any:
@@ -464,8 +423,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             result = result.to_frame(name=single_column_name)
         return result
 
-    def map(self, func: Callable, **kwargs) -> SparkDataset:
-        return self.data.apply(lambda col: col.apply(func, **kwargs))
+    def map(self, func: Callable, na_action=None, **kwargs) -> SparkDataset:
+        return self.data.apply(lambda col: col.map(func, na_action=na_action), **kwargs)
 
     def is_empty(self) -> bool:
         return self.data.empty
@@ -523,7 +482,6 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     def agg(self, func: str | list, **kwargs) -> SparkDataset | float:
         subset = kwargs.pop('subset', None)
-        
         func = func if isinstance(func, (list, dict)) else [func]
         
         if subset is not None:
@@ -531,9 +489,26 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 subset = [subset]
             data_to_agg = self.data[subset]
         else:
-            data_to_agg = self.data
+            types = self.get_column_type()
+            numeric_cols = [
+                col for col, dtype in types.items() 
+                if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]
+            ]
+            
+            if len(numeric_cols) == 0:
+                return None
+            
+            data_to_agg = self.data[numeric_cols]
         
-        result = data_to_agg.agg(func, **kwargs)
+        if data_to_agg is None or len(data_to_agg.columns) == 0:
+            return None
+        
+        if isinstance(func, list) and len(func) == 1:
+            agg_dict = {col: func[0] for col in data_to_agg.columns}
+        else:
+            agg_dict = {col: func for col in data_to_agg.columns}
+        
+        result = data_to_agg.agg(agg_dict, **kwargs)
         converted = self._convert_agg_result(result)
         
         if isinstance(converted, ps.DataFrame):
@@ -556,7 +531,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.agg(["sum"])
 
     def mean(self) -> SparkDataset | float:
-        return self.agg(["mean"])
+        return self.agg("mean")
 
     def mode(self, numeric_only: bool = False, dropna: bool = True) -> SparkDataset:
         return self.data.mode(numeric_only=numeric_only, dropna=dropna)
@@ -576,7 +551,15 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return ps.DataFrame(np_data, columns=self.data.columns)
 
     def cov(self) -> SparkDataset:
-        return self.data.cov()
+        # ✅ Фильтруем только числовые колонки
+        numeric_cols = self.get_numeric_columns()
+        print(f"num cols = {numeric_cols}")
+        
+        if len(numeric_cols) == 0:
+            return None
+        
+        result = self.data[numeric_cols].cov()
+        return result
 
     def quantile(self, q: float = 0.5) -> ps.DataFrame | float:
         if isinstance(q, list) and len(q) > 1:
@@ -589,16 +572,31 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             return converted
 
     def coefficient_of_variation(self) -> ps.DataFrame | float:
-        std_series = self.data.std()
-        mean_series = self.data.mean()
-        cv_series = std_series / mean_series
+        # Выбираем только числовые колонки
+        numeric_cols = self.get_numeric_columns()
+        if len(numeric_cols) == 0:
+            return None
+        
+        data_to_calc = self.data[numeric_cols]
+        
+        std_series = data_to_calc.std()
+        mean_series = data_to_calc.mean()
+        
+        # Избегаем деления на ноль
+        cv_series = std_series / mean_series.replace(0, np.nan)
         cv_df = cv_series.to_frame().T
         
-        if cv_df.shape == (1, 1):
+        # ✅ Если одно значение — возвращаем float
+        if cv_df.shape[0] == 1 and cv_df.shape[1] == 1:
             return float(cv_df.to_spark().collect()[0][0])
         
-        old_index_name = list(cv_df.index)[0]
-        cv_df = cv_df.rename(index={old_index_name: "cv"})
+        # ✅ Исправление: используем tolist() вместо list()
+        try:
+            old_index_name = cv_df.index.tolist()[0]
+            cv_df = cv_df.rename(index={old_index_name: "cv"})
+        except (PandasNotImplementedError, AttributeError):
+            # Fallback для старых версий pyspark.pandas
+            cv_df = cv_df.rename(index={0: "cv"})
         
         return cv_df
 
@@ -607,10 +605,17 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     def get_numeric_columns(self) -> list[str]:
         types = self.get_column_type()
-        return [col for col, dtype in types.items() if dtype in [int, float, np.int64, np.float64]]
+        return [col for col, dtype in types.items() if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]]
 
     def corr(self, numeric_only: bool = False) -> ps.DataFrame | float:
-        result = self.data.corr(method='pearson') 
+        # ✅ ИСПРАВЛЕНИЕ: Фильтруем только числовые колонки
+        numeric_cols = self.get_numeric_columns()
+        
+        if len(numeric_cols) == 0:
+            return None
+        
+        # Вычисляем корреляцию только для числовых колонок
+        result = self.data[numeric_cols].corr(method='pearson')
         
         if isinstance(result, ps.DataFrame):
             return result
@@ -623,10 +628,12 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.data.sort_values(by=by, ascending=ascending, **kwargs)
 
     def value_counts(self,
-                     normalize: bool = False,
-                     sort: bool = True,
-                     ascending: bool = False,
-                     dropna: bool = True) -> ps.DataFrame:
+        normalize: bool = False,
+        sort: bool = True,
+        ascending: bool = False,
+        dropna: bool = True) -> ps.DataFrame:
+        
+        # ✅ Сохраняем имя оригинальной колонки
         col = list(self.data.columns)[0]
         series = self.data[col]
         
@@ -637,8 +644,11 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             dropna=dropna
         )
         
+        # ✅ Создаём DataFrame с правильными именами колонок
         result_df = result.to_frame(name="count").reset_index()
-        result_df = result_df.rename(columns={"index": "value"})
+        
+        # ✅ ИСПРАВЛЕНИЕ: Используем имя оригинальной колонки, не 'value'
+        result_df = result_df.rename(columns={"index": col})
         
         return result_df
 
@@ -648,47 +658,64 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         if data.shape[0] == 1 and data.shape[1] == 1:
             return int(data.to_spark().collect()[0][0])
         
-        old_index_name = list(data.index)[0]
+        old_index_name = data.index.tolist()[0]
                 
         return data.rename(index={old_index_name: "na_counts"})
 
     def dot(self, other: 'SparkDataset' | np.ndarray | pd.DataFrame) -> ps.DataFrame | float:
         if isinstance(other, np.ndarray):
             if other.ndim == 1:
-                other_df = ps.DataFrame({'vec': other})
-                result = self.data.dot(other_df['vec'])
+                # ✅ Проверка: вектор должен соответствовать количеству колонок
+                if len(other) != len(self.data.columns):
+                    raise ValueError(
+                        f"Vector length ({len(other)}) must match number of columns ({len(self.data.columns)})"
+                    )
+                # ✅ Создаём Series с индексом = имена колонок
+                other_series = ps.Series(other, index=self.data.columns)
+                result = self.data.dot(other_series)
             else:
                 other_df = ps.DataFrame(other)
+                if other_df.shape[0] != len(self.data.columns):
+                    raise ValueError(
+                        f"Matrix dimensions not aligned: {self.data.shape} dot {other_df.shape}"
+                    )
+                other_df.index = self.data.columns
                 result = self.data.dot(other_df)
-            
             return result if isinstance(result, ps.DataFrame) else result.to_frame()
-
+        
         elif isinstance(other, pd.DataFrame):
             other_ps = ps.DataFrame(other)
+            if other_ps.shape[0] != len(self.data.columns):
+                raise ValueError(
+                    f"Matrix dimensions not aligned: {self.data.shape} dot {other_ps.shape}"
+                )
+            other_ps.index = self.data.columns
             result = self.data.dot(other_ps)
             return result if isinstance(result, ps.DataFrame) else result.to_frame()
-
+        
         elif isinstance(other, SparkDataset):
+            # ✅ Находим общие колонки
             common_cols = self.data.columns.intersection(other.data.columns)
             
             if len(common_cols) == 0:
                 raise ValueError(
-                    "No common columns for dot product. "
+                    f"No common columns for dot product. "
                     f"Self columns: {self.columns}, Other columns: {other.columns}"
                 )
             
             other_subset = other.data[common_cols]
             self_subset = self.data[common_cols]
             
-            result = self_subset.dot(other_subset)
-            
-            if isinstance(result, ps.Series) and len(result) == 1:
-                return float(result.iloc[0])
-            elif isinstance(result, (int, float, np.number)):
-                return float(result)
-            
-            return result if isinstance(result, ps.DataFrame) else result.to_frame()
-
+            # ✅ Для DataFrame-to-DataFrame используем поэлементное умножение + sum
+            if len(common_cols) == 1:
+                # Одна колонка → извлекаем Series
+                result = self_subset.iloc[:, 0].dot(other_subset.iloc[:, 0])
+                return float(result) if isinstance(result, (int, float, np.number)) else result
+            else:
+                # Несколько колонок → матричное умножение через multiply + sum
+                result = (self_subset * other_subset).sum()
+                return result if isinstance(result, ps.DataFrame) else result.to_frame()
+        
         else:
             raise TypeError(
                 f"Unsupported type for dot: {type(other)}. "
@@ -709,23 +736,35 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return result if isinstance(result, ps.DataFrame) else ps.DataFrame(result)
 
     def sample(self,
-               frac: float | None = None,
-               n: int | None = None,
-               random_state: int | None = None) -> ps.DataFrame:
+        frac: float | None = None,
+        n: int | None = None,
+        random_state: int | None = None) -> ps.DataFrame:
+        
         if n is not None:
             if frac is not None:
                 raise ValueError("Cannot specify both 'n' and 'frac'")
             
             total_rows = len(self.data)
+            
             if total_rows == 0:
-                frac = 0.0
-            else:
-                frac = n / total_rows
+                return self.data
+            
+            # ✅ Для точного количества строк используем iloc с случайными индексами
+            if random_state is not None:
+                np.random.seed(random_state)
+            
+            # Генерируем n случайных уникальных индексов
+            indices = np.random.choice(total_rows, size=min(n, total_rows), replace=False)
+            return self.data.iloc[sorted(indices)]
         
-        if frac is None and n is None:
+        # ✅ Для frac используем sample с seed (не random_state!)
+        if frac is None:
             frac = 1.0
-                
-        return self.data.sample(frac=frac, random_state=random_state)
+        
+        if random_state is not None:
+            return self.data.sample(frac=frac, random_state=random_state)  # ✅ seed, не random_state
+        else:
+            return self.data.sample(frac=frac)
 
     def select_dtypes(self,
                       include: str | None = None,
@@ -733,7 +772,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.data.select_dtypes(include=include, exclude=exclude)
 
     def isin(self, values: Iterable) -> SparkDataset:
-        return self.data.isin(values)
+        # ✅ Используем apply для применения isin ко всем колонкам
+        return self.data.apply(lambda col: col.isin(values))
 
     def merge(self,
               right: SparkDataset,

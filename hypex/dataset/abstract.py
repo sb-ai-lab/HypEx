@@ -5,6 +5,7 @@ import copy
 from copy import deepcopy
 import json
 from abc import ABC
+from dataclasses import dataclass, field
 from typing import Any, Iterable, Callable, Hashable, Literal, Optional, Sequence
 
 import pandas as pd 
@@ -287,6 +288,10 @@ class DatasetBase(ABC):
     def __getitem__(self, item: Iterable | str | int) -> DatasetBase:
         if isinstance(item, DatasetBase):
             item = item.data
+        elif isinstance(item, slice):
+            # Обработка среза строк
+            result = self._backend.__getitem__(item)
+            return self.__class__(roles=self.roles, data=result)
         items = (
             [item] if isinstance(item, str) or not isinstance(item, Iterable) else item
         )
@@ -491,12 +496,10 @@ class DatasetBase(ABC):
     def __rpow__(self, other) -> Any:
         return self.__binary_magic_operator(other=other, func_name="__rpow__")
 
-    def search_columns(
-        self,
-        roles: ABCRole | Iterable[ABCRole],
-        tmp_role=False,
-        search_types: list | None = None,
-    ) -> list[str]:
+    def search_columns(self,
+                       roles: ABCRole | Iterable[ABCRole],
+                       tmp_role=False,
+                       search_types: list | None = None) -> list[str]:
         roles = roles if isinstance(roles, Iterable) else [roles]
         roles_for_search = self._tmp_roles if tmp_role else self.roles
         return [
@@ -594,9 +597,18 @@ class DatasetBase(ABC):
         self._set_roles(new_roles_map=value, temp_role=True)
         self._set_empty_types(self._tmp_roles)
 
-    def _convert_data_after_agg(self, result) -> DatasetBase | float:
+    def _convert_data_after_agg(self, result) -> DatasetBase | float | None:
+        # ✅ Обработка None результата
+        if result is None:
+            return None
+        
         if isinstance(result, ScalarType):
             return result
+        
+        # ✅ Проверка что result имеет columns
+        if not hasattr(result, 'columns'):
+            return result
+        
         role: ABCRole = StatisticRole()
         return self.__class__(
             data=result, roles={column: role for column in result.columns}
@@ -639,25 +651,30 @@ class DatasetBase(ABC):
             raise ConcatBackendError(type(other._backend), type(self._backend))
 
     def astype(
-        self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
+        self, 
+        dtype: dict[str, type], 
+        errors: Literal["raise", "ignore"] = "raise"
     ) -> DatasetBase:
+        # 1. Валидация колонок
         for col, _ in dtype.items():
             if (errors == "raise") and (col not in self.columns):
                 raise KeyError(f"Column '{col}' does not exist in the Dataset.")
-
-        new_backend = deepcopy(self._backend)
-        new_backend.data = new_backend.astype(dtype, errors)
+        
+        # 2. ❌ УБРАТЬ: new_backend = deepcopy(self._backend)
+        # ✅ Вместо этого: применяем astype напрямую к данным
+        new_data = self._backend.astype(dtype, errors)
+        
+        # 3. Копируем только роли (без backend)
+        from copy import deepcopy
         new_roles = deepcopy(self.roles)
-
-        if errors == "ignore":
-            for col, target_type in dtype.items():
-                if new_backend.get_column_type(col) == target_type:
-                    new_roles[col].data_type = target_type
-        elif errors == "raise":
-            for col, target_type in dtype.items():
+        
+        # 4. Обновляем типы в ролях
+        for col, target_type in dtype.items():
+            if col in new_roles:
                 new_roles[col].data_type = target_type
-
-        return self.__class__(roles=new_roles, data=new_backend.data)
+        
+        # 5. Создаём новый Dataset с новыми данными и ролями
+        return self.__class__(roles=new_roles, data=new_data)
 
     def append(self, other, axis=0) -> DatasetBase:
         other = Adapter.to_list(other)
