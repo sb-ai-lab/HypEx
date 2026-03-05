@@ -3,11 +3,11 @@ from __future__ import annotations
 import warnings
 import copy
 from copy import deepcopy
-import json  # type: ignore
+import json
 from abc import ABC
 from typing import Any, Iterable, Callable, Hashable, Literal, Optional, Sequence
 
-import pandas as pd  # type: ignore
+import pandas as pd 
 from numpy import ndarray
 import pyspark.sql as spark
 import pyspark.pandas as ps
@@ -34,13 +34,152 @@ from .roles import (
     default_roles,
 )
 
+class GroupedDataset:
+    def __init__(self, backend_groupby, dataset_class, roles, tmp_roles, group_cols=None):
+        self._groupby = backend_groupby
+        self._dataset_class = dataset_class
+        self.roles = roles
+        self.tmp_roles = tmp_roles
+        self._group_cols = group_cols if group_cols is not None else []
+
+    def _get_agg_roles(self, result_columns: list[str]) -> dict[str, ABCRole]:
+        new_roles = {}
+        for col in result_columns:
+            if col in self.roles:
+                new_roles[col] = copy.deepcopy(self.roles[col])
+            else:
+                new_roles[col] = StatisticRole()
+        return new_roles
+
+    def _execute_agg(self, func: str | dict | list) -> Any:
+        if hasattr(self._groupby, 'agg'):
+            return self._groupby.agg(func)
+        
+        elif isinstance(self._groupby, list):
+            aggregated_groups = []
+            for key, group_df in self._groupby:
+                if hasattr(group_df, 'agg'):
+                    agg_res = group_df.agg(func)
+                else:
+                    agg_res = group_df.agg(func)
+                aggregated_groups.append(agg_res)
+            
+            if not aggregated_groups:
+                return None
+            result_data = ps.concat(aggregated_groups)
+            return result_data
+            
+        else:
+            raise TypeError(f"Unsupported groupby object type: {type(self._groupby)}")
+
+    def agg(self, func: str | dict | list) -> DatasetBase:
+        result_data = self._execute_agg(func)
+        
+        if result_data is None:
+            return self._dataset_class(roles={}, data=None)
+        
+        if hasattr(result_data, 'columns'):
+            result_columns = list(result_data.columns)
+            new_roles = self._get_agg_roles(result_columns)
+        else:
+            new_roles = {}
+            
+        return self._dataset_class(roles=new_roles, data=result_data)
+
+    def apply(self, func: Callable) -> DatasetBase:
+        if hasattr(self._groupby, 'apply'):
+            result_data = self._groupby.apply(func)
+        elif isinstance(self._groupby, list):
+            results = []
+            for key, group_df in self._groupby:
+                res = group_df.apply(func)
+                results.append(res)
+            result_data = ps.concat(results)
+        else:
+            raise NotImplementedError("Apply not supported for this groupby type")
+            
+        if hasattr(result_data, 'columns'):
+            new_roles = {col: InfoRole() for col in result_data.columns}
+        else:
+            new_roles = {}
+            
+        return self._dataset_class(roles=new_roles, data=result_data)
+
+    def count(self) -> DatasetBase:
+        return self.agg("count")
+
+    def sum(self, *cols) -> DatasetBase:
+        if cols:
+            return self.agg({col: 'sum' for col in cols})
+        return self.agg("sum")
+
+    def mean(self, *cols) -> DatasetBase:
+        if cols:
+            return self.agg({col: 'mean' for col in cols})
+        return self.agg("mean")
+
+    def min(self, *cols) -> DatasetBase:
+        if cols:
+            return self.agg({col: 'min' for col in cols})
+        return self.agg("min")
+
+    def max(self, *cols) -> DatasetBase:
+        if cols:
+            return self.agg({col: 'max' for col in cols})
+        return self.agg("max")
+
+    def first(self, *cols) -> DatasetBase:
+        if cols:
+            return self.agg({col: 'first' for col in cols})
+        return self.agg("first")
+
+    def last(self, *cols) -> DatasetBase:
+        if cols:
+            return self.agg({col: 'last' for col in cols})
+        return self.agg("last")
+
+    def std(self, *cols) -> DatasetBase:
+        if cols:
+            return self.agg({col: 'std' for col in cols})
+        return self.agg("std")
+
+    def var(self, *cols) -> DatasetBase:
+        if cols:
+            return self.agg({col: 'var' for col in cols})
+        return self.agg("var")
+
+    def median(self, *cols) -> DatasetBase:
+        if cols:
+            return self.agg({col: 'median' for col in cols})
+        return self.agg("median")
+
+    def prod(self, *cols) -> DatasetBase:
+        if cols:
+            return self.agg({col: 'prod' for col in cols})
+        return self.agg("prod")
+
+    def size(self) -> DatasetBase:
+        result = self._groupby.size() if hasattr(self._groupby, 'size') else self.agg("count")
+        if hasattr(result, 'to_frame'):
+            result = result.to_frame('size')
+        return self._dataset_class(roles={'size': StatisticRole()}, data=result)
+
+    def __iter__(self):
+        if isinstance(self._groupby, list):
+            for key, data in self._groupby:
+                yield key, self._dataset_class(roles=self.roles, data=data)
+        elif hasattr(self._groupby, '__iter__'):
+            for key, group in self._groupby:
+                yield key, self._dataset_class(roles=self.roles, data=group)
+        else:
+            raise TypeError("Grouped object is not iterable")
+
 
 class DatasetBase(ABC):
     @staticmethod
     def _select_backend_from_data(data, session: spark.SparkSession = None):
-        # Добавляем проверку на уже существующие обертки
         if isinstance(data, PandasDataset):
-            return data # Или data._backend, в зависимости от архитектуры
+            return data
         if isinstance(data, SparkDataset):
             return data
             
@@ -49,10 +188,7 @@ class DatasetBase(ABC):
         elif isinstance(data, (spark.DataFrame, ps.DataFrame)):
             return SparkDataset(data, session)
         
-        # Если data None или что-то другое, обработку лучше вынести или вернуть None
-        raise TypeError(
-            "Data must be an instance of either pandas.DataFrame, spark.DataFrame or Dataset"
-        )
+        raise TypeError("Data must be an instance of either pandas.DataFrame, spark.DataFrame or Dataset")
 
     @staticmethod
     def _select_backend_from_str(data, backend, session=None):
@@ -113,40 +249,30 @@ class DatasetBase(ABC):
                 self._backend = SparkDataset(data, session)
             else:
                 self._backend = PandasDataset(data)
-        # 2. Инициализация default_role
         self.default_role = default_role or DefaultRole()
 
-        # 3. Обработка ролей
         if roles is None and data is not None and hasattr(data, "roles") and data.roles is not None:
-            # Берем роли из переданного объекта data, если они есть
             roles = data.roles
         elif roles is None:
-            # Если роли не указаны, создаем пустой dict
             roles = {}
         else:
-            # Парсим роли, если ключи являются экземплярами ABCRole
             if any(isinstance(role, ABCRole) for role in roles.keys()):
                 roles = self._parse_roles(roles)
             
-            # Валидация типов ролей
             if any(not isinstance(role, ABCRole) for role in roles.values()):
                 raise TypeError("Roles must be instances of ABCRole type")
             
-            # Валидация наличия колонок в данных (только если data не None)
             if data is not None and hasattr(self._backend, 'columns'):
                 invalid_columns = [i for i in roles.keys() if i not in self._backend.columns]
                 if invalid_columns:
                     raise RoleColumnError(invalid_columns, self._backend.columns)
 
-        # 4. Установка всех ролей для колонок
         if data is not None and hasattr(self._backend, 'columns'):
             roles = self._set_all_roles(roles)
             self._set_empty_types(roles)
         
-        # 5. Сохранение ролей
         self._roles: dict[str, ABCRole] = roles
         
-        # 6. Инициализация временных ролей
         self._tmp_roles: dict[str, ABCRole] = {}
 
     def __repr__(self):
@@ -588,37 +714,15 @@ class DatasetBase(ABC):
             data=self._backend.isin(values),
         )
 
-    def groupby(
-        self,
-        by: Any,
-        func: str | list | None = None,
-        fields_list: str | list | None = None,
-        **kwargs,
-    ) -> list[tuple[str, DatasetBase]]:
-        if isinstance(by, self.__class__) and len(by.columns) == 1:
-            datasets = [
-                (
-                    group,
-                    self.__class__(
-                        roles=self.roles, data=self.data.loc[group_data.index]
-                    ),
-                )
-                for group, group_data in by._backend.groupby(by=by.columns[0], **kwargs)
-            ]
-        else:
-            datasets = [
-                (group, self.__class__(roles=self.roles, data=data))
-                for group, data in self._backend.groupby(by=by, **kwargs)
-            ]
-        if fields_list:
-            fields_list = Adapter.to_list(fields_list)
-            datasets = [(i, data.select(fields_list)) for i, data in datasets]
-        if func:
-            datasets = [(i, data.agg(func)) for i, data in datasets]
-        for dataset in datasets:
-            if isinstance(dataset, self.__class__):
-                dataset[1].tmp_roles = self.tmp_roles
-        return datasets
+    def groupby(self,
+                by: str | Iterable[str],
+                **kwargs) -> GroupedDataset:
+        return GroupedDataset(
+            backend_groupby=self._backend.groupby(by=by, **kwargs),
+            dataset_class=self.__class__,
+            roles=self.roles,
+            tmp_roles=self.tmp_roles,
+        )
 
     def fillna(
         self,

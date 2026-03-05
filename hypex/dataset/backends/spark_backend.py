@@ -100,6 +100,46 @@ class SparkNavigation(DatasetBackendNavigation):
             self.data = ps.DataFrame(self.session.createDataFrame([], schema=StructType([])))
         else:
             raise TypeError(f"Unsupported data type: {type(data)}")
+    
+    # def __init__(self,
+    #                 data: ps.DataFrame | SparkDF | pd.DataFrame | dict[str, Any] | str | None = None,
+    #                 session: SparkSession | None = None):        
+            
+    #         ps.set_option('compute.ops_on_diff_frames', True)
+            
+    #         if isinstance(data, dict):
+    #             if "index" in data:
+    #                 data = pd.DataFrame(data=data["data"], index=data["index"])
+    #             else:
+    #                 data = pd.DataFrame(data=data["data"])
+
+    #         if isinstance(data, ps.DataFrame):
+    #             self.data = data
+    #             session = data.to_spark().sparkSession
+    #         elif isinstance(data, SparkDF):
+    #             self.data = ps.DataFrame(data)
+    #             session = data.session
+                
+    #         if session is None:
+    #             raise ValueError(f"Session not set")
+    #         elif isinstance(session, SparkSession):
+    #             self.session = session
+    #         else:
+    #             raise TypeError("Session must be an instance of SparkSession")
+            
+    #         if isinstance(data, pd.DataFrame):
+    #             spark_df = self.session.createDataFrame(data)
+    #             self.data = ps.DataFrame(spark_df)
+    #         elif isinstance(data, (ps.Series, pd.Series)):
+    #             temp_df = pd.DataFrame(data)
+    #             spark_df = self.session.createDataFrame(temp_df.reset_index())
+    #             self.data = ps.DataFrame(spark_df)
+    #         elif isinstance(data, str):
+    #             self.data = self._read_file(data, self.session)
+    #         elif data is None:
+    #             self.data = ps.DataFrame(self.session.createDataFrame([], schema=StructType([])))
+    #         # else:
+    #         #     raise TypeError(f"Unsupported data type: {type(data)}")
 
     def __getitem__(self, 
                     item: slice | int | str | list | ps.DataFrame | ps.Series) -> ps.DataFrame | ps.Series:
@@ -281,30 +321,37 @@ class SparkNavigation(DatasetBackendNavigation):
         else:
             raise ValueError("Wrong column_name type.")
 
-    def get_column_type(self,
-                        column_name: Iterable[str] | str | None = None) -> dict[str, type] | type | None:
-        def _get_type_for_column(col: str) -> type:
-            if col not in self.data.columns:
-                raise KeyError(f"Column '{col}' not found. Available: {list(self.data.columns)}")
-            
-            spark_dtype = self.data.dtypes[col]
-            
-            return SparkTypeMapper.to_python(spark_dtype)
-                
-        if column_name is None:
-            columns_to_check = list(self.data.columns)
-        elif isinstance(column_name, str):
-            columns_to_check = [column_name]
-        else:
-            columns_to_check = list(column_name)
-
-        if len(columns_to_check) == 0:
-            return None if isinstance(column_name, str) else {}
-
+    def get_column_type(self, column_name: Iterable[str] | str = None) -> dict[str, type] | type | None:
+        column_name = self.data.columns if column_name is None else column_name
+        pdf = self.data.to_pandas()
+        
         if isinstance(column_name, str):
-            return _get_type_for_column(column_name)
-
-        return {col: _get_type_for_column(col) for col in columns_to_check}
+            dtype = pdf[column_name].dtype
+            if pd.api.types.is_integer_dtype(dtype):
+                return int
+            elif pd.api.types.is_float_dtype(dtype):
+                return float
+            elif pd.api.types.is_bool_dtype(dtype):
+                return bool
+            elif pd.api.types.is_string_dtype(dtype) or pd.api.types.is_object_dtype(dtype):
+                return str
+            return type(pdf[column_name].iloc[0]) if len(pdf) > 0 else None
+        
+        dtypes = {}
+        for col in column_name:
+            dtype = pdf[col].dtype
+            if pd.api.types.is_integer_dtype(dtype):
+                dtypes[col] = int
+            elif pd.api.types.is_float_dtype(dtype):
+                dtypes[col] = float
+            elif pd.api.types.is_bool_dtype(dtype):
+                dtypes[col] = bool
+            elif pd.api.types.is_string_dtype(dtype) or pd.api.types.is_object_dtype(dtype):
+                dtypes[col] = str
+            else:
+                dtypes[col] = type(pdf[col].iloc[0]) if len(pdf) > 0 else object
+        
+        return dtypes
 
     def astype(self, 
                dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise") -> ps.DataFrame:
@@ -335,32 +382,20 @@ class SparkNavigation(DatasetBackendNavigation):
                     )        
         return self
 
-    def add_column(self,
-                   data: Sequence | ps.Series | ps.DataFrame,
-                   name: str | list[str],
-                   index: Sequence | None = None) -> None:
+    def add_column(self, data: Sequence, name: str | list[str], index: Sequence | None = None):
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
-        elif isinstance(name, list):
-            raise ValueError("Multiple column names not supported for single data sequence")
-
         if isinstance(data, ps.DataFrame):
-            if len(data.columns) != 1:
-                raise ValueError("DataFrame must have exactly one column")
-            data = data.iloc[:, 0]
-        elif not isinstance(data, ps.Series):
-            data = ps.Series(data)
-
+            data = data.to_pandas().values
         if len(self.data) != len(data):
-            raise ValueError(
-                f"Data length ({len(data)}) must match DataFrame length ({len(self.data)})"
-            )
-
-        if index is not None:
-            data.index = index
-            self.data[name] = data.reindex(self.data.index)
+            if isinstance(data[0], Iterable) and len(data[0]) == 1:
+                data = data.squeeze()
+            data = ps.Series(data)
+        
+        if index:
+            self.data[name] = data
         else:
-            self.data[name] = data.values
+            self.data[name] = data
 
     def append(self, other, reset_index: bool = False, axis: int = 0) -> ps.DataFrame:
         new_data = ps.concat([self.data] + [d.data for d in other], axis=axis)

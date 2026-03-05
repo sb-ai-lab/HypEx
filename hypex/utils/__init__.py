@@ -49,6 +49,7 @@ from .typings import (
     StratificationRoleTypes,
     TargetRoleTypes,
     SourceDataTypes,
+    SparkTypeMapper
 )
 
 __all__ = [
