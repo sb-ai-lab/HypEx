@@ -10,6 +10,8 @@ from typing import Any, Iterable, Callable, Hashable, Literal, Optional, Sequenc
 import pandas as pd  # type: ignore
 from numpy import ndarray
 import pyspark.sql as spark
+import pyspark.pandas as ps
+
 
 from ..utils import (
     BackendsEnum,
@@ -36,12 +38,20 @@ from .roles import (
 class DatasetBase(ABC):
     @staticmethod
     def _select_backend_from_data(data, session: spark.SparkSession = None):
+        # Добавляем проверку на уже существующие обертки
+        if isinstance(data, PandasDataset):
+            return data # Или data._backend, в зависимости от архитектуры
+        if isinstance(data, SparkDataset):
+            return data
+            
         if isinstance(data, pd.DataFrame):
             return PandasDataset(data)
-        elif isinstance(data, spark.DataFrame):
+        elif isinstance(data, (spark.DataFrame, ps.DataFrame)):
             return SparkDataset(data, session)
+        
+        # Если data None или что-то другое, обработку лучше вынести или вернуть None
         raise TypeError(
-            "Data must be an instance of either pandas.DataFrame or spark.DataFrame"
+            "Data must be an instance of either pandas.DataFrame, spark.DataFrame or Dataset"
         )
 
     @staticmethod
@@ -75,51 +85,69 @@ class DatasetBase(ABC):
 
     def __init__(
         self,
-        roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
-        data: spark.DataFame | pd.DataFrame | str | None = None,
+        roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole] | None = None,
+        data: spark.DataFrame | pd.DataFrame | str | DatasetBase | None = None,
         backend: BackendsEnum | None = None,
         default_role: ABCRole | None = None,
         session: Optional[spark.SparkSession] = None,
     ):
         if backend is not None:
             self._backend = self._select_backend_from_str(data, backend, session)
-        elif any(
-            isinstance(data, source_data_type)
-            for source_data_type in [
-                *SourceDataTypes.__args__,
-                PandasDataset,
-                SparkDataset,
-                self.__class__,
-            ]
-        ):
-            self._backend = self._select_backend_from_data(data, session)
+        elif data is not None:
+            if isinstance(data, DatasetBase):
+                self._backend = copy.deepcopy(data._backend)
+            elif isinstance(data, (PandasDataset, SparkDataset)):
+                self._backend = copy.deepcopy(data)
+            elif any(
+                isinstance(data, source_data_type)
+                for source_data_type in SourceDataTypes.__args__
+            ):
+                self._backend = self._select_backend_from_data(data, session)
+            else:
+                if session is not None:
+                    self._backend = SparkDataset(data, session)
+                else:
+                    self._backend = PandasDataset(data)
         else:
             if session is not None:
                 self._backend = SparkDataset(data, session)
-            self._backend = PandasDataset(data)
+            else:
+                self._backend = PandasDataset(data)
+        # 2. Инициализация default_role
+        self.default_role = default_role or DefaultRole()
 
-        self.default_role = default_role
-        if roles is None and data.hasattr("roles") and data.roles is not None:
+        # 3. Обработка ролей
+        if roles is None and data is not None and hasattr(data, "roles") and data.roles is not None:
+            # Берем роли из переданного объекта data, если они есть
             roles = data.roles
+        elif roles is None:
+            # Если роли не указаны, создаем пустой dict
+            roles = {}
         else:
-            roles = (
-                self._parse_roles(roles)
-                if any(isinstance(role, ABCRole) for role in roles.keys())
-                else roles
-            )
+            # Парсим роли, если ключи являются экземплярами ABCRole
+            if any(isinstance(role, ABCRole) for role in roles.keys()):
+                roles = self._parse_roles(roles)
+            
+            # Валидация типов ролей
             if any(not isinstance(role, ABCRole) for role in roles.values()):
                 raise TypeError("Roles must be instances of ABCRole type")
-            if data is not None and any(
-                i not in self._backend.columns for i in list(roles.keys())
-            ):
-                raise RoleColumnError(list(roles.keys()), self._backend.columns)
-        if data is not None:
+            
+            # Валидация наличия колонок в данных (только если data не None)
+            if data is not None and hasattr(self._backend, 'columns'):
+                invalid_columns = [i for i in roles.keys() if i not in self._backend.columns]
+                if invalid_columns:
+                    raise RoleColumnError(invalid_columns, self._backend.columns)
+
+        # 4. Установка всех ролей для колонок
+        if data is not None and hasattr(self._backend, 'columns'):
             roles = self._set_all_roles(roles)
             self._set_empty_types(roles)
+        
+        # 5. Сохранение ролей
         self._roles: dict[str, ABCRole] = roles
-        self._tmp_roles: (
-            dict[ABCRole, list[str] | str] | dict[list[str] | str] | ABCRole
-        ) = {}
+        
+        # 6. Инициализация временных ролей
+        self._tmp_roles: dict[str, ABCRole] = {}
 
     def __repr__(self):
         return self._backend.__repr__()

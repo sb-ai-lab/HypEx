@@ -34,6 +34,8 @@ from pyspark.sql.types import (
 import numpy as np
 import pandas as pd
 import pyspark.sql as spark
+import pyspark.pandas as ps
+
 
 if TYPE_CHECKING:
     from hypex.dataset import Dataset
@@ -50,7 +52,7 @@ PysparkScalarType = Union[
     DecimalType, ShortType, ByteType
 ]
 GroupingDataType = Tuple[List[Tuple[str, "Dataset"]], List[Tuple[str, "Dataset"]]]
-SourceDataTypes = Union[pd.DataFrame, spark.DataFrame]
+SourceDataTypes = Union[pd.DataFrame, ps.DataFrame, spark.DataFrame]
 
 
 MultiFieldKeyTypes = Union[str, Sequence[str]]
