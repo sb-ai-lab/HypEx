@@ -865,7 +865,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         """
         return {column: self.data[column].nunique() for column in self.data.columns}
 
-    def groupby(self, by: str | Iterable[str], **kwargs) -> list[tuple]:
+    def groupby(self, by: str | Iterable[str], **kwargs) -> pd.Grouper:
         """Group DataFrame by specified column(s).
         
         Args:
@@ -873,10 +873,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             **kwargs: Additional arguments passed to pandas groupby().
             
         Returns:
-            list[tuple]: List of (group_key, group_dataframe) tuples.
+            pd.Grouper
         """
-        groups = self.data.groupby(by=by, observed=False, **kwargs)
-        return list(groups)
+        return self.data.groupby(by=by, observed=False, **kwargs)
 
     def agg(self, func: str | list, **kwargs) -> pd.DataFrame | float:
         """Aggregate DataFrame using specified function(s).
