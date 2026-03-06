@@ -12,6 +12,12 @@ import pandas as pd
 
 import pyspark.pandas as ps
 ps.set_option('compute.ops_on_diff_frames', True)
+from pyspark.pandas.exceptions import PandasNotImplementedError
+from pyspark.sql.types import (
+    IntegerType, LongType, ShortType, ByteType,
+    FloatType, DoubleType, BooleanType, StringType, DateType, TimestampType
+)
+        
 
 import pyspark.sql as spark
 from pyspark.sql import SparkSession
@@ -286,37 +292,36 @@ class SparkNavigation(DatasetBackendNavigation):
         else:
             raise ValueError("Wrong column_name type.")
 
-    def get_column_type(self, column_name: Iterable[str] | str = None) -> dict[str, type] | type | None:
-        column_name = self.data.columns if column_name is None else column_name
-        pdf = self.data.to_pandas()
+    def get_column_type(self, column_name: str | Iterable[str] | None = None) -> dict[str, type] | type | None:
+        spark_schema = self.data.to_spark().schema
+        
+        # TODO: NEED USE CLASS FROM TYPING
+        TYPE_MAP = {
+            IntegerType: int, 
+            LongType: int, 
+            ShortType: int, 
+            ByteType: int,
+            FloatType: float, 
+            DoubleType: float,
+            BooleanType: bool,
+            StringType: str,
+            DateType: str, TimestampType: str,
+        }
+        
+        def _get_type(spark_type) -> type:
+            return TYPE_MAP.get(type(spark_type), object)
         
         if isinstance(column_name, str):
-            dtype = pdf[column_name].dtype
-            if pd.api.types.is_integer_dtype(dtype):
-                return int
-            elif pd.api.types.is_float_dtype(dtype):
-                return float
-            elif pd.api.types.is_bool_dtype(dtype):
-                return bool
-            elif pd.api.types.is_string_dtype(dtype) or pd.api.types.is_object_dtype(dtype):
-                return str
-            return type(pdf[column_name].iloc[0]) if len(pdf) > 0 else None
+            field = next((f for f in spark_schema.fields if f.name == column_name), None)
+            return _get_type(field.dataType) if field else None
         
-        dtypes = {}
-        for col in column_name:
-            dtype = pdf[col].dtype
-            if pd.api.types.is_integer_dtype(dtype):
-                dtypes[col] = int
-            elif pd.api.types.is_float_dtype(dtype):
-                dtypes[col] = float
-            elif pd.api.types.is_bool_dtype(dtype):
-                dtypes[col] = bool
-            elif pd.api.types.is_string_dtype(dtype) or pd.api.types.is_object_dtype(dtype):
-                dtypes[col] = str
-            else:
-                dtypes[col] = type(pdf[col].iloc[0]) if len(pdf) > 0 else object
+        result = {}
+        target_cols = column_name if column_name is not None else self.data.columns
+        for col in target_cols:
+            field = next((f for f in spark_schema.fields if f.name == col), None)
+            result[col] = _get_type(field.dataType) if field else object
         
-        return dtypes
+        return result           
 
     def astype(self, 
                dtype: dict[str, type], 
@@ -404,7 +409,7 @@ class SparkNavigation(DatasetBackendNavigation):
             data = ps.DataFrame(data)
         return data
 
-    def iloc(self, items: Iterable[Any]) -> SparkDataset:
+    def iloc(self, items: Iterable[Any]) -> ps.DataFrame:
         data = self.data.iloc[items]
         if not isinstance(data, ps.DataFrame):
             data = ps.DataFrame(data)
