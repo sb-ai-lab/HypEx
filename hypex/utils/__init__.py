@@ -9,7 +9,9 @@ from .enums import (
     ABTestTypesEnum,
     BackendsEnum,
     ExperimentDataEnum,
+    PredictorModeEnum,
     SpaceEnum,
+    TransformerModeEnum,
 )
 from .errors import (
     AbstractMethodError,
@@ -74,6 +76,7 @@ __all__ = [
     "NoRequiredArgumentError",
     "NotFoundInExperimentDataError",
     "NotSuitableFieldError",
+    "PredictorModeEnum",
     "RoleColumnError",
     "RoleNameType",
     "ScalarType",
@@ -82,6 +85,7 @@ __all__ = [
     "SpaceError",
     "StratificationRoleTypes",
     "TargetRoleTypes",
+    "TransformerModeEnum",
     "create_test_data",
     "gen_control_variates_df",
     "gen_oracle_df",

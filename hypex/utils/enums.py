@@ -50,3 +50,17 @@ class RenameEnum(enum.Enum):
     all = "all"
     columns = "columns"
     index = "index"
+
+
+@enum.unique
+class TransformerModeEnum(enum.Enum):
+    fit = "fit"
+    transform = "transform"
+    fit_transform = "fit_transform"
+
+
+@enum.unique
+class PredictorModeEnum(enum.Enum):
+    fit = "fit"
+    predict = "predict"
+    fit_predict = "fit_predict"

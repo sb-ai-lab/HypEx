@@ -9,13 +9,13 @@ from ..dataset.roles import (
     PreTargetRole,
     TargetRole,
 )
-from ..executor import MLExecutor
+from ..executor import MatchingExecutor
 from ..extensions.cupac import CupacExtension
 from ..utils.adapter import Adapter
 from ..utils.models import CUPAC_MODELS
 
 
-class CUPACExecutor(MLExecutor):
+class CUPACExecutor(MatchingExecutor):
     """
     Executor that applies CUPAC (Control Using Predictions As Covariates) variance reduction technique.
 
