@@ -13,11 +13,11 @@ from ..dataset import (
     TreatmentRole,
 )
 from ..dataset.roles import ConstGroupRole
-from ..executor import Calculator
+from .base import Splitter
 from ..utils import ExperimentDataEnum
 
 
-class AASplitter(Calculator):
+class AASplitter(Splitter):
     def __init__(
         self,
         control_size: float = 0.5,
@@ -35,7 +35,7 @@ class AASplitter(Calculator):
         self.save_groups = save_groups
         self.sample_size = sample_size
         self.groups_sizes = groups_sizes
-        super().__init__(key)
+        super().__init__(key=key)
 
     def _generate_params_hash(self):
         hash_parts: list[str] = []
@@ -155,7 +155,7 @@ class AASplitter(Calculator):
         const_group_fields = (
             const_group_fields[0] if len(const_group_fields) > 0 else None
         )
-        result = self.calc(
+        result = self._inner_function(
             data.ds,
             random_state=self.random_state,
             control_size=self.control_size,
@@ -194,7 +194,7 @@ class AASplitterWithStratification(AASplitter):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         grouping_fields = data.ds.search_columns(StratificationRole())
-        result = self.calc(
+        result = self._inner_function(
             data.ds,
             random_state=self.random_state,
             control_size=self.control_size,

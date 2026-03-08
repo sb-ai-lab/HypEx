@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, TYPE_CHECKING
 from ..dataset import Dataset, ExperimentData
 from ..executor import Calculator
 from ..utils import AbstractMethodError
-from .state import TransformerState
+from .state import TransformerParams
 
 if TYPE_CHECKING:
     from ..dataset.ml_data import MLExperimentData
@@ -54,7 +54,7 @@ class Transformer(Calculator):
     ):
         super().__init__(key=key, **kwargs)
         self.mode = TransformerMode(mode) if isinstance(mode, str) else mode
-        self._fitted_state: Optional[TransformerState] = None
+        self._fitted_state: Optional[TransformerParams] = None
     
     @property
     def _is_transformer(self):
@@ -121,16 +121,16 @@ class Transformer(Calculator):
     # === Public methods ===
     
     @classmethod
-    def fit(cls, data: Dataset, **kwargs) -> TransformerState:
+    def fit(cls, data: Dataset, **kwargs) -> TransformerParams:
         """
         Fit transformer on data.
         
         Returns:
-            TransformerState with fitted parameters
+            TransformerParams with fitted parameters
         """
         fitted_params = cls._fit(data, **kwargs)
         
-        return TransformerState(
+        return TransformerParams(
             transformer_id="temp",  # will be updated in execute
             transformer_class=cls.__name__,
             fitted_params=fitted_params,
@@ -145,7 +145,7 @@ class Transformer(Calculator):
         return cls._transform(data, fitted_params, **kwargs)
     
     @classmethod
-    def fit_transform(cls, data: Dataset, **kwargs) -> tuple[Dataset, TransformerState]:
+    def fit_transform(cls, data: Dataset, **kwargs) -> tuple[Dataset, TransformerParams]:
         """
         Fit and apply transformation.
         

@@ -251,9 +251,9 @@ class ExperimentArtifact:
         Load fitted transformer states from disk.
         
         Returns:
-            Dict of transformer_id -> TransformerState
+            Dict of transformer_id -> TransformerParams
         """
-        from ..transformers.state import TransformerState
+        from ..transformers.state import TransformerParams
         
         transformer_states = {}
         
@@ -267,7 +267,7 @@ class ExperimentArtifact:
                 
                 with open(state_file, 'r') as f:
                     state_dict = json.load(f)
-                state = TransformerState.from_dict(state_dict)
+                state = TransformerParams.from_dict(state_dict)
                 transformer_states[transformer_id] = state
         
         return transformer_states

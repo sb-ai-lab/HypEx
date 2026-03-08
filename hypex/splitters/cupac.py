@@ -3,12 +3,12 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from ..dataset import Dataset, ExperimentData
-from ..dataset.ml_data import MLData, MLExperimentData
+from ..dataset.ml_data import MLExperimentData
 from ..dataset.roles import FeatureRole, PreTargetRole, TargetRole
-from .base import Splitter
+from .base import MLSplitter
 
 
-class CUPACDataSplitter(Splitter):
+class CUPACDataSplitter(MLSplitter):
     """
     Splitter that prepares temporal data structures for CUPAC ML models.
     
@@ -45,7 +45,7 @@ class CUPACDataSplitter(Splitter):
         super().__init__(n_folds=n_folds, random_state=random_state, key=key)
         self.generate_cv_folds = generate_cv_folds
     
-    def execute(self, data: ExperimentData) -> MLExperimentData:
+    def execute(self, data: MLExperimentData) -> MLExperimentData:
         """
         Execute CUPAC data splitting.
         
@@ -57,43 +57,17 @@ class CUPACDataSplitter(Splitter):
         Returns:
             MLExperimentData with MLData objects in .ml
         """
-        # Ensure MLExperimentData
-        ml_data = self.ensure_ml_experiment_data(data)
+        # CUPAC splitter is ML-only and must run inside MLExperiment.
+        ml_data = data
         
         # Prepare raw splits structure
-        raw_splits = self._prepare_splits(data)
-        
-        # Convert to MLData objects
-        for target_name, target_splits in raw_splits.items():
-            # Aggregate X_train and Y_train
-            X_train = self.aggregate_columns(data, target_splits["X_train"])
-            Y_train = self.aggregate_columns(data, [target_splits["Y_train"]])
-            
-            # Aggregate X_predict if exists
-            X_predict = None
-            if "X_predict" in target_splits:
-                X_predict = self.aggregate_columns(data, target_splits["X_predict"])
-            
-            # Create MLData
-            ml_data_obj = MLData(
-                X_train=X_train,
-                Y_train=Y_train,
-                X_predict=X_predict,
-            )
-            
-            # Generate CV folds if requested
-            if self.generate_cv_folds:
-                ml_data_obj = self.add_cv_folds_to_mldata(
-                    ml_data_obj,
-                    n_folds=self.n_folds,
-                    random_state=self.random_state,
-                )
-            
-            # Store in MLExperimentData
-            ml_data.add_ml_data(target_name, ml_data_obj)
-        
-        # Always return MLExperimentData (MLExperiment will handle conversion back)
-        return ml_data
+        raw_splits = self._prepare_splits(ml_data)
+
+        return self.build_mldata_from_splits(
+            data=ml_data,
+            raw_splits=raw_splits,
+            generate_cv_folds=self.generate_cv_folds,
+        )
     
     def _prepare_splits(self, data: ExperimentData) -> dict[str, dict[str, list]]:
         """
@@ -106,47 +80,6 @@ class CUPACDataSplitter(Splitter):
                 'X_predict': [[feature_cols_at_lag_1]] (optional)
             }}
         """
-
-        def agg_temporal_fields(role, data_obj) -> dict[str, dict]:
-            """
-            Aggregate fields by their temporal lags.
-
-            Returns:
-                dict: {field_name: {lag: field_name_with_lag}} or {field_name: {}}
-                      Empty dict means lag=0 or None (current period).
-            """
-            fields = {}
-            searched_fields = data_obj.field_search(
-                (
-                    [TargetRole(), PreTargetRole()]
-                    if isinstance(role, TargetRole)
-                    else role
-                ),
-                search_types=[int, float],
-            )
-
-            searched_lags = [
-                (
-                    field,
-                    (
-                        data_obj.ds.roles[field].lag
-                        if not isinstance(data_obj.ds.roles[field], TargetRole)
-                        else 0
-                    ),
-                )
-                for field in searched_fields
-            ]
-            # Sort, treating None as 0
-            sorted_fields_by_lag = sorted(searched_lags, key=lambda x: x[1] if x[1] is not None else 0)
-            for field, lag in sorted_fields_by_lag:
-                if lag in [None, 0]:
-                    fields[field] = {}
-                else:
-                    if data_obj.ds.roles[field].parent not in fields:
-                        fields[data_obj.ds.roles[field].parent] = {}
-                    fields[data_obj.ds.roles[field].parent][lag] = field
-
-            return fields
 
         def agg_train_predict_x(mode: str, lag: int) -> None:
             """
@@ -166,8 +99,8 @@ class CUPACDataSplitter(Splitter):
             cupac_data[target][mode].append([targets[target][lag]])
 
         cupac_data = {}
-        targets = agg_temporal_fields(TargetRole(), data)
-        features = agg_temporal_fields(FeatureRole(), data)
+        targets = self.aggregate_fields_by_lag(data, TargetRole())
+        features = self.aggregate_fields_by_lag(data, FeatureRole())
 
         # Determine cofounders (features used for prediction) for each target
         cofounders = {}

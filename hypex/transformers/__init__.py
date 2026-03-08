@@ -5,7 +5,7 @@ from .cuped import CUPEDTransformer
 from .filters import ConstFilter, CorrFilter, CVFilter, NanFilter, OutliersFilter
 from .na_filler import NaFiller
 from .shuffle import Shuffle
-from .state import TransformerState
+from .state import TransformerParams
 from .type_caster import TypeCaster
 
 __all__ = [
@@ -21,6 +21,6 @@ __all__ = [
     "OutliersFilter",
     "Shuffle",
     "TransformerMode",
-    "TransformerState",
+    "TransformerParams",
     "TypeCaster",
 ]

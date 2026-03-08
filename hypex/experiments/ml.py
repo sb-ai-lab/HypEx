@@ -9,6 +9,7 @@ from typing import Any, Optional, Sequence
 from ..dataset import ExperimentData
 from ..dataset.ml_data import MLExperimentData
 from ..executor import Executor
+from ..splitters.base import MLSplitter
 from ..transformers import TransformerMode
 from ..utils.constants import DEFAULT_EXPERIMENT_DIR
 from .artifact import ExperimentArtifact
@@ -73,7 +74,7 @@ class MLExperiment(Experiment):
     
     def __init__(
         self,
-        splitters: Sequence[Executor] | None = None,
+        splitters: Sequence[MLSplitter] | None = None,
         transformers: Sequence[Executor] | None = None,
         ml_executors: Sequence[Executor] | None = None,
         mode: str | MLMode = MLMode.FIT_PREDICT,
@@ -83,6 +84,12 @@ class MLExperiment(Experiment):
     ):
         # Combine all executors for parent class
         all_executors = []
+        if splitters and not all(isinstance(splitter, MLSplitter) for splitter in splitters):
+            wrong = [type(splitter).__name__ for splitter in splitters if not isinstance(splitter, MLSplitter)]
+            raise TypeError(
+                "MLExperiment.splitters must contain only MLSplitter instances. "
+                f"Got: {wrong}"
+            )
         if splitters:
             all_executors.extend(splitters)
         if transformers:

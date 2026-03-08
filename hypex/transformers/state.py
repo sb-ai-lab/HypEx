@@ -1,11 +1,11 @@
-"""Transformer state management for MLExperiment."""
+"""Transformer parameter management for MLExperiment."""
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 
-class TransformerState:
+class TransformerParams:
     """
     Stores fitted parameters of a transformer.
     
@@ -21,7 +21,7 @@ class TransformerState:
     
     Examples:
         >>> # StandardScaler saves means and stds
-        >>> state = TransformerState(
+        >>> state = TransformerParams(
         ...     transformer_id="StandardScaler_abc123",
         ...     transformer_class="StandardScaler",
         ...     fitted_params={
@@ -55,7 +55,7 @@ class TransformerState:
         }
     
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> TransformerState:
+    def from_dict(cls, data: Dict[str, Any]) -> TransformerParams:
         """Deserialize from dict"""
         state = cls(
             transformer_id=data["transformer_id"],
@@ -68,7 +68,7 @@ class TransformerState:
     
     def __repr__(self) -> str:
         return (
-            f"TransformerState(id={self.transformer_id}, "
+            f"TransformerParams(id={self.transformer_id}, "
             f"class={self.transformer_class}, "
             f"params={list(self.fitted_params.keys())})"
         )

@@ -1,5 +1,11 @@
 from .aa import AASplitter, AASplitterWithStratification
-from .base import Splitter
+from .base import MLSplitter, Splitter
 from .cupac import CUPACDataSplitter
 
-__all__ = ["AASplitter", "AASplitterWithStratification", "CUPACDataSplitter", "Splitter"]
+__all__ = [
+	"AASplitter",
+	"AASplitterWithStratification",
+	"CUPACDataSplitter",
+	"Splitter",
+	"MLSplitter",
+]

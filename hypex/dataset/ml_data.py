@@ -12,7 +12,7 @@ from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
 if TYPE_CHECKING:
     from ..ml.models import MLModel
     from ..ml.stats import ModelStats
-    from ..transformers.state import TransformerState
+    from ..transformers.state import TransformerParams
 
 
 class MLData:
@@ -60,7 +60,7 @@ class MLExperimentData(ExperimentData):
     - self.ml: Dict[str, MLData] - {target_name: MLData}
     - self.trained_models: Dict[str, Dict[str, MLModel]] - {executor_id: {target: MLModel}}
     - self.model_stats: Dict[str, Dict[str, ModelStats]] - {executor_id: {target: ModelStats}}
-    - self.fitted_transformers: Dict[str, TransformerState] - {transformer_id: TransformerState}
+    - self.fitted_transformers: Dict[str, TransformerParams] - {transformer_id: TransformerParams}
     - self.config: Dict[str, Any] - configuration
     """
     
@@ -79,7 +79,7 @@ class MLExperimentData(ExperimentData):
         self.model_stats: Dict[str, Dict[str, ModelStats]] = {}  # {executor_id: {target: ModelStats}}
         
         # Fitted transformers
-        self.fitted_transformers: Dict[str, TransformerState] = {}  # {transformer_id: TransformerState}
+        self.fitted_transformers: Dict[str, TransformerParams] = {}  # {transformer_id: TransformerParams}
         
         # Configuration
         self.config: Dict[str, Any] = {
@@ -231,22 +231,22 @@ class MLExperimentData(ExperimentData):
     
     # === Transformer state management ===
     
-    def add_fitted_transformer(self, transformer_id: str, state: "TransformerState") -> None:
+    def add_fitted_transformer(self, transformer_id: str, state: "TransformerParams") -> None:
         """
         Add fitted transformer state.
         
         Args:
             transformer_id: Transformer ID (e.g., "NaFiller__hash")
-            state: TransformerState with fitted parameters
+            state: TransformerParams with fitted parameters
         """
         self.fitted_transformers[transformer_id] = state
     
-    def get_fitted_transformer(self, transformer_id: str) -> Optional["TransformerState"]:
+    def get_fitted_transformer(self, transformer_id: str) -> Optional["TransformerParams"]:
         """
         Get fitted transformer state.
         
         Returns:
-            TransformerState or None if not found
+            TransformerParams or None if not found
         """
         return self.fitted_transformers.get(transformer_id)
     
@@ -254,7 +254,7 @@ class MLExperimentData(ExperimentData):
         """Check if transformer is fitted"""
         return transformer_id in self.fitted_transformers
     
-    def get_all_fitted_transformers(self) -> Dict[str, "TransformerState"]:
+    def get_all_fitted_transformers(self) -> Dict[str, "TransformerParams"]:
         """Get all fitted transformer states"""
         return self.fitted_transformers.copy()
     

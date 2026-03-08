@@ -6,25 +6,56 @@ from typing import Any, Dict, Optional, Tuple
 
 from ..dataset import Dataset, ExperimentData
 from ..dataset.ml_data import MLData, MLExperimentData
+from ..dataset.roles import PreTargetRole, TargetRole
 from ..executor import Executor
 
 
 class Splitter(Executor, ABC):
     """
-    Base class for data splitters that prepare data for ML models.
-    
-    Splitters organize data into training, validation, and prediction sets,
-    and can generate cross-validation folds for model selection.
-    
-    This class provides common functionality:
-    - CV fold generation using only Dataset API (no external dependencies)
-    - Data aggregation utilities
-    - MLExperimentData handling
-    
-    Subclasses should implement:
-    - execute(): Main splitting logic
+    Base class for general splitters.
+
+    Splitter contains only generic execution contract and common splitter params.
+
+    Subclasses should implement execute(): main splitting logic.
     """
     
+    def __init__(
+        self,
+        key: Any = "",
+    ):
+        """
+        Initialize Splitter.
+        
+        Args:
+            key: Executor identifier
+        """
+        super().__init__(key=key)
+    
+    @abstractmethod
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        """
+        Execute data splitting.
+        
+        Args:
+            data: Input experiment data
+            
+        Returns:
+            ExperimentData with prepared data
+        """
+        raise NotImplementedError
+
+
+class MLSplitter(Splitter, ABC):
+    """
+    Base class for ML splitters used in MLExperiment.
+
+    MLSplitter operates on MLExperimentData only and provides ML-specific helpers:
+    - CV fold generation using Dataset API
+    - Temporal field aggregation by lag
+    - Column aggregation for temporal/lagged ML inputs
+    - MLData construction from raw split specs
+    """
+
     def __init__(
         self,
         n_folds: int = 5,
@@ -32,8 +63,8 @@ class Splitter(Executor, ABC):
         key: Any = "",
     ):
         """
-        Initialize Splitter.
-        
+        Initialize MLSplitter.
+
         Args:
             n_folds: Number of cross-validation folds
             random_state: Random seed for reproducibility
@@ -42,17 +73,17 @@ class Splitter(Executor, ABC):
         super().__init__(key=key)
         self.n_folds = n_folds
         self.random_state = random_state
-    
+
     @abstractmethod
-    def execute(self, data: ExperimentData) -> MLExperimentData:
+    def execute(self, data: MLExperimentData) -> MLExperimentData:
         """
-        Execute data splitting.
-        
+        Execute ML data splitting.
+
         Args:
-            data: Input experiment data
-            
+            data: ML experiment data
+
         Returns:
-            MLExperimentData with prepared data
+            MLExperimentData with prepared ML inputs
         """
         raise NotImplementedError
     
@@ -140,21 +171,91 @@ class Splitter(Executor, ABC):
             random_state=random_state,
         )
         return ml_data
-    
+
     @staticmethod
-    def ensure_ml_experiment_data(data: ExperimentData) -> MLExperimentData:
+    def aggregate_fields_by_lag(
+        data: ExperimentData,
+        role,
+        include_pretarget_for_target: bool = True,
+    ) -> dict[str, dict[int, str]]:
         """
-        Ensure data is MLExperimentData.
-        
-        Args:
-            data: Input data
-            
-        Returns:
-            MLExperimentData instance
+        Aggregate fields by temporal lag.
+
+        Returns mapping:
+        - current period fields as {field_name: {}}
+        - lagged fields grouped by parent: {parent_name: {lag: field_name}}
         """
-        if isinstance(data, MLExperimentData):
-            return data
-        return MLExperimentData.from_experiment_data(data)
+        fields: dict[str, dict[int, str]] = {}
+        search_role = (
+            [TargetRole(), PreTargetRole()]
+            if include_pretarget_for_target and isinstance(role, TargetRole)
+            else role
+        )
+
+        searched_fields = data.field_search(search_role, search_types=[int, float])
+        searched_lags = [
+            (
+                field,
+                (data.ds.roles[field].lag if not isinstance(data.ds.roles[field], TargetRole) else 0),
+            )
+            for field in searched_fields
+        ]
+
+        sorted_fields_by_lag = sorted(
+            searched_lags,
+            key=lambda x: x[1] if x[1] is not None else 0,
+        )
+
+        for field, lag in sorted_fields_by_lag:
+            if lag in [None, 0]:
+                fields[field] = {}
+                continue
+
+            parent = data.ds.roles[field].parent
+            if parent not in fields:
+                fields[parent] = {}
+            fields[parent][lag] = field
+
+        return fields
+
+    def build_mldata_from_splits(
+        self,
+        data: MLExperimentData,
+        raw_splits: dict[str, dict[str, list]],
+        generate_cv_folds: bool = False,
+    ) -> MLExperimentData:
+        """
+        Build and store MLData objects from raw split specification.
+
+        raw_splits format:
+            {
+                target_name: {
+                    "X_train": [...],
+                    "Y_train": [...],
+                    "X_predict": [...],  # optional
+                }
+            }
+        """
+        for target_name, target_splits in raw_splits.items():
+            X_train = self.aggregate_columns(data, target_splits["X_train"])
+            Y_train = self.aggregate_columns(data, [target_splits["Y_train"]])
+
+            X_predict = None
+            if "X_predict" in target_splits:
+                X_predict = self.aggregate_columns(data, target_splits["X_predict"])
+
+            ml_data_obj = MLData(X_train=X_train, Y_train=Y_train, X_predict=X_predict)
+
+            if generate_cv_folds:
+                ml_data_obj = self.add_cv_folds_to_mldata(
+                    ml_data_obj,
+                    n_folds=self.n_folds,
+                    random_state=self.random_state,
+                )
+
+            data.add_ml_data(target_name, ml_data_obj)
+
+        return data
     
     @staticmethod
     def aggregate_columns(
