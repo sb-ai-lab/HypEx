@@ -1,27 +1,23 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Sequence, Union, TYPE_CHECKING
+from typing import Any, List, Optional, Sequence, TYPE_CHECKING, Union
 
 from ..dataset import Dataset, ExperimentData
 from ..dataset.ml_data import MLExperimentData
 from ..dataset.roles import (
     AdditionalTargetRole,
-    FeatureRole,
-    PreTargetRole,
-    TargetRole,
 )
-from ..executor import Executor
-from ..experiments.ml import MLMode
+from ..executor.ml_executor import MLExecutor
 from ..utils import ExperimentDataEnum
 from ..utils.adapter import Adapter
 from .models import MLModel
-from .stats import ModelStats
+
 
 if TYPE_CHECKING:
     from ..dataset.ml_data import MLData
 
 
-class CUPACExecutor(Executor):
+class CUPACExecutor(MLExecutor):
     """
     Executor that applies CUPAC (Control Using Predictions As Covariates) variance reduction technique.
 
@@ -50,18 +46,13 @@ class CUPACExecutor(Executor):
         n_folds: int = 5,
         random_state: Optional[int] = None,
         cv_aggregation: str = "mean",
-        mode: str | MLMode | None = None,
+        mode: str | None = None,
     ):
-        super().__init__(key=key)
+        super().__init__(key=key, mode=mode)
         self.cupac_models = cupac_models
         self.n_folds = n_folds
         self.random_state = random_state
         self.cv_aggregation = cv_aggregation
-        
-        # Mode will be set by MLExperiment
-        if mode is None:
-            mode = MLMode.FIT_PREDICT
-        self.mode = MLMode(mode) if isinstance(mode, str) else mode
 
     def _validate_models(self) -> List[str]:
         """
@@ -88,52 +79,29 @@ class CUPACExecutor(Executor):
         
         return models
 
-    def execute(self, data: ExperimentData) -> ExperimentData:
-        """
-        Execute CUPAC variance reduction based on current mode.
-        
-        Modes:
-        - fit: Train models only, save for later
-        - predict: Apply adjustment using pre-trained models
-        - fit_predict: Train models and apply adjustment
-        
-        Args:
-            data (ExperimentData): Input data with MLData from CUPACDataSplitter.
-
-        Returns:
-            ExperimentData: Data with CUPAC-adjusted targets and variance reduction reports.
-        """
-        # Ensure MLExperimentData
-        is_ml_data = isinstance(data, MLExperimentData)
-        ml_data = (
-            data if is_ml_data else MLExperimentData.from_experiment_data(data)
-        )
-        
-        # Validate models
+    def execute_fit(self, data: MLExperimentData) -> MLExperimentData:
+        """Train CUPAC models only (fit mode)."""
         models = self._validate_models()
-        
-        # Process each target based on mode
-        for target_name in ml_data.get_all_targets():
-            ml_data_obj = ml_data.get_ml_data(target_name)
-            
-            if self.mode == MLMode.FIT:
-                # Mode 1: Only fit models
-                self._fit_models(ml_data, target_name, ml_data_obj, models)
-            
-            elif self.mode == MLMode.PREDICT:
-                # Mode 2: Only predict and adjust
-                self._predict_with_model(ml_data, target_name, ml_data_obj)
-            
-            elif self.mode == MLMode.FIT_PREDICT:
-                # Mode 3: Fit and predict
-                self._fit_models(ml_data, target_name, ml_data_obj, models)
-                self._predict_with_model(ml_data, target_name, ml_data_obj)
-            
-            else:
-                raise ValueError(f"Unknown mode: {self.mode}")
-        
-        # Return appropriate type
-        return ml_data if is_ml_data else ml_data.to_experiment_data()
+        for target_name in data.get_all_targets():
+            ml_data_obj = data.get_ml_data(target_name)
+            self._fit_models(data, target_name, ml_data_obj, models)
+        return data
+
+    def execute_predict(self, data: MLExperimentData) -> MLExperimentData:
+        """Apply CUPAC adjustment using pre-trained models (predict mode)."""
+        for target_name in data.get_all_targets():
+            ml_data_obj = data.get_ml_data(target_name)
+            self._predict_with_model(data, target_name, ml_data_obj)
+        return data
+
+    def execute_fit_predict(self, data: MLExperimentData) -> MLExperimentData:
+        """Train and apply CUPAC in one pass (fit_predict mode)."""
+        models = self._validate_models()
+        for target_name in data.get_all_targets():
+            ml_data_obj = data.get_ml_data(target_name)
+            self._fit_models(data, target_name, ml_data_obj, models)
+            self._predict_with_model(data, target_name, ml_data_obj)
+        return data
     
     def _fit_models(
         self,

@@ -150,7 +150,8 @@ class ExperimentArtifact:
         
         # For transformers - save mode
         if hasattr(executor, 'mode'):
-            config['mode'] = executor.mode.value
+            mode = executor.mode
+            config['mode'] = mode.value if hasattr(mode, 'value') else mode
         
         # Save parameters
         if hasattr(executor, 'calc_kwargs'):

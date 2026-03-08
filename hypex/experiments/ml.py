@@ -9,6 +9,7 @@ from typing import Any, Optional, Sequence
 from ..dataset import ExperimentData
 from ..dataset.ml_data import MLExperimentData
 from ..executor import Executor
+from ..executor.ml_executor import MLExecutor
 from ..splitters.base import MLSplitter
 from ..transformers import TransformerMode
 from ..utils.constants import DEFAULT_EXPERIMENT_DIR
@@ -41,7 +42,7 @@ class MLExperiment(Experiment):
         transformers: Data transformation executors (normalize, encode, etc.)
         ml_executors: ML model training and prediction executors
         mode: Execution mode - 'fit', 'predict', or 'fit_predict' (default: 'fit_predict')
-        load_experiment: Experiment ID to load fitted transformers and models from (only for mode='predict')
+        experiment_id: Experiment ID to load fitted transformers and models from (only for mode='predict')
         transformer: Whether to deepcopy data between executors
         key: Experiment identifier
     
@@ -58,16 +59,14 @@ class MLExperiment(Experiment):
     Example workflow with fit/predict:
         # Fit on virtual target
         ab_test = ABTest(
-            enable_cupac=True,
             cupac_mode='fit'
         )
         ab_test.execute(virtual_data)
         
         # Apply to real target
         ab_test = ABTest(
-            enable_cupac=True,
             cupac_mode='predict',
-            load_experiment="exp_id"
+            experiment_id="exp_id"
         )
         ab_test.execute(real_data)
     """
@@ -76,9 +75,9 @@ class MLExperiment(Experiment):
         self,
         splitters: Sequence[MLSplitter] | None = None,
         transformers: Sequence[Executor] | None = None,
-        ml_executors: Sequence[Executor] | None = None,
+        ml_executors: Sequence[MLExecutor] | None = None,
         mode: str | MLMode = MLMode.FIT_PREDICT,
-        load_experiment: Optional[str] = None,
+        experiment_id: Optional[str] = None,
         transformer: bool | None = None,
         key: Any = "",
     ):
@@ -94,6 +93,12 @@ class MLExperiment(Experiment):
             all_executors.extend(splitters)
         if transformers:
             all_executors.extend(transformers)
+        if ml_executors and not all(isinstance(executor, MLExecutor) for executor in ml_executors):
+            wrong = [type(executor).__name__ for executor in ml_executors if not isinstance(executor, MLExecutor)]
+            raise TypeError(
+                "MLExperiment.ml_executors must contain only MLExecutor instances. "
+                f"Got: {wrong}"
+            )
         if ml_executors:
             all_executors.extend(ml_executors)
         
@@ -106,19 +111,19 @@ class MLExperiment(Experiment):
         # Mode management
         self.mode = MLMode(mode) if isinstance(mode, str) else mode
         
-        # Validate load_experiment usage
-        if load_experiment is not None and self.mode != MLMode.PREDICT:
+        # Validate experiment_id usage
+        if experiment_id is not None and self.mode != MLMode.PREDICT:
             raise ValueError(
-                f"load_experiment can only be used with mode='predict', got mode='{self.mode.value}'"
+                f"experiment_id can only be used with mode='predict', got mode='{self.mode.value}'"
             )
         
-        if self.mode == MLMode.PREDICT and load_experiment is None:
+        if self.mode == MLMode.PREDICT and experiment_id is None:
             raise ValueError(
-                "load_experiment is required when mode='predict'"
+                "experiment_id is required when mode='predict'"
             )
         
         # Experiment artifact management
-        self.load_experiment = load_experiment
+        self.experiment_id = experiment_id
         self.experiment_dir = self._get_default_experiment_dir()
         self._loaded_artifact: Optional[ExperimentArtifact] = None
         
@@ -245,7 +250,7 @@ class MLExperiment(Experiment):
     def _load_artifact(self) -> None:
         """Load experiment artifact"""
         # User passes experiment ID, construct full path
-        artifact_path = os.path.join(self.experiment_dir, self.load_experiment)
+        artifact_path = os.path.join(self.experiment_dir, self.experiment_id)
         
         if not os.path.exists(artifact_path):
             raise FileNotFoundError(

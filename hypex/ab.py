@@ -40,7 +40,7 @@ class ABTest(ExperimentShell):
 
         # A/B test with CUPAC - train and apply
         ab_test = ABTest(
-            enable_cupac=True,
+            cupac_mode='fit_predict',
             cupac_models=['linear', 'ridge']
         )
         results = ab_test.execute(data)
@@ -48,7 +48,6 @@ class ABTest(ExperimentShell):
         # CUPAC with fit/predict pattern
         # Step 1: Fit on historical data
         ab_test_fit = ABTest(
-            enable_cupac=True,
             cupac_mode='fit',
             cupac_models=['linear', 'ridge']
         )
@@ -56,9 +55,8 @@ class ABTest(ExperimentShell):
         
         # Step 2: Predict on current data
         ab_test_predict = ABTest(
-            enable_cupac=True,
             cupac_mode='predict',
-            cupac_experiment_id='experiment_id_from_first_run'
+            experiment_id='experiment_id_from_first_run'
         )
         results = ab_test_predict.execute(current_data)
     """
@@ -69,9 +67,8 @@ class ABTest(ExperimentShell):
         multitest_method: ABNTestMethodsEnum | str | None,
         cuped_features: dict[str, str] | None,
         cupac_models: str | list[str] | None,
-        enable_cupac: bool,
         cupac_mode: str | MLMode | None,
-        cupac_experiment_id: str | None,
+        experiment_id: str | None,
     ) -> Experiment:
         test_mapping: dict[str, Executor] = {
             "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
@@ -113,6 +110,8 @@ class ABTest(ExperimentShell):
         for test_name in additional_tests:
             on_role_executors.append(test_mapping[test_name.value])
 
+        use_cupac = cupac_mode is not None
+
         # Build base executors list
         executors: list[Executor] = [
             GroupSizes(grouping_role=TreatmentRole()),
@@ -120,7 +119,7 @@ class ABTest(ExperimentShell):
                 executors=on_role_executors,
                 role=(
                     [TargetRole(), AdditionalTargetRole()]
-                    if enable_cupac
+                    if use_cupac
                     else TargetRole()
                 ),
             ),
@@ -133,20 +132,17 @@ class ABTest(ExperimentShell):
         if cuped_features:
             executors.insert(0, CUPEDTransformer(cuped_features=cuped_features))
 
-        if enable_cupac:
+        if use_cupac:
             from .ml import CUPACExecutor
             from .experiments.ml import MLExperiment
             from .splitters import CUPACDataSplitter
-
-            # Determine mode (default to fit_predict if not specified)
-            mode = cupac_mode if cupac_mode is not None else MLMode.FIT_PREDICT
             
             ml_experiment = MLExperiment(
                 splitters=[CUPACDataSplitter()],
                 transformers=[],
                 ml_executors=[CUPACExecutor(cupac_models=cupac_models)],
-                mode=mode,
-                load_experiment=cupac_experiment_id,
+                mode=cupac_mode,
+                experiment_id=experiment_id,
             )
             executors.insert(0, ml_experiment)
 
@@ -176,9 +172,8 @@ class ABTest(ExperimentShell):
         t_test_equal_var: bool | None = None,
         cuped_features: dict[str, str] | None = None,
         cupac_models: str | list[str] | None = None,
-        enable_cupac: bool = False,
         cupac_mode: Literal["fit", "predict", "fit_predict"] | None = None,
-        cupac_experiment_id: str | None = None,
+        experiment_id: str | None = None,
     ):
         """
         Args:
@@ -192,24 +187,22 @@ class ABTest(ExperimentShell):
             cuped_features: dict[str, str] — Dictionary {target_feature: pre_target_feature} for CUPED. Only dict is allowed.
             cupac_models: str | list[str] — model name (e.g. 'linear', 'ridge', 'lasso', 'catboost') or list of model names to try. 
                 If None, all available models will be tried and the best will be selected by variance reduction.
-            enable_cupac: bool — Enable CUPAC variance reduction. CUPAC configuration is extracted from dataset.features_mapping.
-            cupac_mode: str | None — Execution mode for CUPAC:
+            cupac_mode: str | None — Execution mode for CUPAC. If None, CUPAC is disabled:
                 - 'fit_predict': Train models and apply adjustment (default)
                 - 'fit': Only train models, save for later use
                 - 'predict': Only apply adjustment using pre-trained models
-            cupac_experiment_id: str | None — When cupac_mode='predict', specifies the experiment ID to load models from.
+            experiment_id: str | None — When cupac_mode='predict', specifies the experiment ID to load models from.
                 This is the folder name created during a previous run with mode='fit' or 'fit_predict'.
         
         Examples:
             # Standard CUPAC - train and apply in one go
             ab_test = ABTest(
-                enable_cupac=True,
+                cupac_mode='fit_predict',
                 cupac_models=['linear', 'ridge']
             )
             
             # Fit on virtual target with lagged features
             ab_test_fit = ABTest(
-                enable_cupac=True,
                 cupac_mode='fit',
                 cupac_models=['linear']
             )
@@ -219,9 +212,8 @@ class ABTest(ExperimentShell):
             import os
             exp_id = os.listdir('.hypex_experiments')[0]
             ab_test_predict = ABTest(
-                enable_cupac=True,
                 cupac_mode='predict',
-                cupac_experiment_id=exp_id
+                experiment_id=exp_id
             )
             result = ab_test_predict.execute(real_data)
         """
@@ -231,9 +223,8 @@ class ABTest(ExperimentShell):
                 multitest_method,
                 cuped_features,
                 cupac_models,
-                enable_cupac,
                 cupac_mode,
-                cupac_experiment_id,
+                experiment_id,
             ),
             output=ABOutput(),
         )
