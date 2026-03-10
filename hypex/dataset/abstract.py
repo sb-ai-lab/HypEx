@@ -74,7 +74,7 @@ class GroupedDataset:
             
             if not aggregated_groups:
                 return None
-            result_data = ps.concat(aggregated_groups)
+            result_data = self._dataset_class._backend.concat(aggregated_groups)
             return result_data
             
         else:
@@ -258,6 +258,8 @@ class DatasetBase(ABC):
                 self._backend = SparkDataset(data, session)
             else:
                 self._backend = PandasDataset(data)
+                
+        self.backend_type = type(self._backend)
         self.default_role = default_role or DefaultRole()
 
         if roles is None and data is not None and hasattr(data, "roles") and data.roles is not None:
@@ -872,10 +874,6 @@ class DatasetBase(ABC):
               right_index: bool = False,
               suffixes: tuple[str, str] = ("_x", "_y"),
               how: Literal["left", "right", "outer", "inner", "cross"] = "inner") -> DatasetBase:
-        if not any([on, left_on, right_on, left_index, right_index]):
-            left_index = True
-            right_index = True
-
         if not isinstance(right, self.__class__):
             raise DataTypeError(type(right))
         if type(right._backend) is not type(self._backend):

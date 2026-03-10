@@ -18,17 +18,24 @@ from pyspark.sql.types import (
     FloatType, DoubleType, BooleanType, StringType, DateType, TimestampType
 )
         
-
 import pyspark.sql as spark
 from pyspark.sql import SparkSession
+import pyspark.sql.functions as F
 from pyspark.sql import DataFrame as SparkDF
 
 from pyspark.sql.types import StructType
 
-from ...utils import FromDictTypes, MergeOnError, ScalarType
+from ...utils import FromDictTypes, MergeOnError, ScalarType, SparkTypeMapper
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 class SparkNavigation(DatasetBackendNavigation):
+    PANDAS_CONVERSION_LIMIT: int = 100_000
+    
+    def _check_pandas_conversion(self, obj: ps.DataFrame | ps.Series, context: str = "") -> None:
+        n: int = obj.__len__()
+        if n > self.PANDAS_CONVERSION_LIMIT:
+            raise ValueError(f"{context}: {n} rows exceed limit {self.PANDAS_CONVERSION_LIMIT}")
+    
     @staticmethod
     def _read_file(filename: str | Path, session: SparkSession) -> ps.DataFrame:
         file_path = Path(filename).resolve()
@@ -119,10 +126,10 @@ class SparkNavigation(DatasetBackendNavigation):
         if isinstance(item, list):
             return self.data[item]
         if isinstance(item, ps.DataFrame):
-            if len(item.columns) == 1:
-                return self.data[item.iloc[:, 0]]
-            else:
-                return self.data[item]
+            if len(item.columns) != 1:
+                raise ValueError("Boolean DataFrame mask must have exactly one column")
+            
+            return self.data[item.iloc[:, 0]]
         if isinstance(item, ps.Series):
             return self.data[item]
         raise KeyError("No such column or row")
@@ -247,6 +254,7 @@ class SparkNavigation(DatasetBackendNavigation):
             result = self.data
         
         if isinstance(result, (ps.DataFrame, ps.Series)):
+            self._check_pandas_conversion(obj=result, context="get_values")
             return result.to_pandas().values.tolist()
         return result
 
@@ -263,6 +271,7 @@ class SparkNavigation(DatasetBackendNavigation):
             result = self.data
             
         if isinstance(result, (ps.DataFrame, ps.Series)):
+            self._check_pandas_conversion(obj=result, context="iget_values")
             return result.to_pandas().values.tolist()
         return result
 
@@ -295,31 +304,15 @@ class SparkNavigation(DatasetBackendNavigation):
     def get_column_type(self, column_name: str | Iterable[str] | None = None) -> dict[str, type] | type | None:
         spark_schema = self.data.to_spark().schema
         
-        # TODO: NEED USE CLASS FROM TYPING
-        TYPE_MAP = {
-            IntegerType: int, 
-            LongType: int, 
-            ShortType: int, 
-            ByteType: int,
-            FloatType: float, 
-            DoubleType: float,
-            BooleanType: bool,
-            StringType: str,
-            DateType: str, TimestampType: str,
-        }
-        
-        def _get_type(spark_type) -> type:
-            return TYPE_MAP.get(type(spark_type), object)
-        
         if isinstance(column_name, str):
             field = next((f for f in spark_schema.fields if f.name == column_name), None)
-            return _get_type(field.dataType) if field else None
+            return SparkTypeMapper.to_python(field.dataType) if field else None
         
         result = {}
         target_cols = column_name if column_name is not None else self.data.columns
         for col in target_cols:
             field = next((f for f in spark_schema.fields if f.name == col), None)
-            result[col] = _get_type(field.dataType) if field else object
+            result[col] = SparkTypeMapper.to_python(field.dataType) if field else object
         
         return result           
 
@@ -356,20 +349,20 @@ class SparkNavigation(DatasetBackendNavigation):
     def add_column(self, 
                    data: Sequence[Any], 
                    name: str | list[str], 
-                   index: Sequence[Any] | None  = None) -> None:
+                   index: Sequence[Any] | None = None) -> None:
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
-        if isinstance(data, ps.DataFrame):
-            data = data.to_pandas().values
-        if len(self.data) != len(data):
-            if isinstance(data[0], Iterable) and len(data[0]) == 1:
-                data = data.squeeze()
+        
+        if isinstance(data, (ps.DataFrame, ps.Series)):
+            if isinstance(data, ps.DataFrame) and data.shape[1] == 1:
+                data = data.iloc[:, 0]
+            self.data[name] = data
+            return
+        
+        if not isinstance(data, ps.Series):
             data = ps.Series(data)
         
-        if index:
-            self.data[name] = data
-        else:
-            self.data[name] = data
+        self.data[name] = data
 
     def append(self, 
                other: Sequence[SparkNavigation], 
@@ -392,6 +385,7 @@ class SparkNavigation(DatasetBackendNavigation):
         return self
 
     def to_dict(self) -> dict[str, list[Any]]:
+        self._check_pandas_conversion(obj=self.data, context="to_dict")
         pdf = self.data.to_pandas()
         return {
             "data": {
@@ -401,6 +395,7 @@ class SparkNavigation(DatasetBackendNavigation):
         }
 
     def to_records(self) -> list[dict[str, Any]]:
+        self._check_pandas_conversion(obj=self.data, context="to_records")
         return self.data.to_pandas().to_dict(orient="records")
 
     def loc(self, items: Iterable[Any]) -> ps.DataFrame:
@@ -452,6 +447,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.data.empty
 
     def unique(self) -> dict[str, list[Any]]:
+        
         return {column: self.data[column].unique().to_pandas().tolist() for column in self.data.columns}
 
     def nunique(self, dropna: bool = True)-> dict[str, int]:
@@ -699,32 +695,34 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return result if isinstance(result, ps.DataFrame) else ps.DataFrame(result)
 
     def sample(self,
-        frac: float | None = None,
-        n: int | None = None,
-        random_state: int | None = None) -> ps.DataFrame:
+               frac: float | None = None,
+               n: int | None = None,
+               random_state: int | None = None,
+               method: Literal["approx", "exact"] = "exact") -> ps.DataFrame:
+        
+        if n is not None and frac is not None:
+            raise ValueError("Cannot specify both 'n' and 'frac'")
+        
+        spark_df = self.data.to_spark()
         
         if n is not None:
-            if frac is not None:
-                raise ValueError("Cannot specify both 'n' and 'frac'")
-            
-            total_rows = len(self.data)
-            
-            if total_rows == 0:
+            total = spark_df.count()
+            if n >= total:
                 return self.data
             
-            if random_state is not None:
-                np.random.seed(random_state)
+            if method == "exact":
+                sampled = spark_df.orderBy(F.rand(seed=random_state)).limit(n)
+            else:
+                frac_calc = min(1.0, n / total * 1.3)
+                sampled = spark_df.sample(
+                    withReplacement=False, 
+                    fraction=frac_calc, 
+                    seed=random_state
+                ).limit(n)
             
-            indices = np.random.choice(total_rows, size=min(n, total_rows), replace=False)
-            return self.data.iloc[sorted(indices)]
+            return ps.DataFrame(sampled)
         
-        if frac is None:
-            frac = 1.0
-        
-        if random_state is not None:
-            return self.data.sample(frac=frac, random_state=random_state)
-        else:
-            return self.data.sample(frac=frac)
+        return self.data.sample(frac=frac or 1.0, random_state=random_state)
 
     def select_dtypes(self,
                       include: str | None = None,
@@ -774,19 +772,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def filter(self,
                items: list | None = None,
                regex: str | None = None,
-               axis: int = 0) -> ps.DataFrame:
-        if items is not None:
-            result = self.data[items]
-        elif regex is not None:
-            pattern = re.compile(regex)
-            matched_cols = [col for col in self.data.columns if pattern.match(col)]
-            result = self.data[matched_cols]
-        else:
-            if axis == 1:
-                result = self.data
-            else:
-                result = self.data
-        return result
+               axis: int | str = 0) -> ps.DataFrame:
+        return self.data.filter(items=items, regex=regex, axis=axis)
 
     def rename(self, columns: dict[str, str]) -> ps.DataFrame:
         return self.data.rename(columns=columns)

@@ -39,7 +39,6 @@ class Dataset(DatasetBase):
         super().__init__(roles, data, backend, default_role, session)
 
     def to_small_dataset(self) -> SmallDataset:
-        """Преобразует Dataset в SmallDataset"""
         return SmallDataset(
             roles=self.roles,
             data=self.data,
