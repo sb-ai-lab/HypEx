@@ -17,7 +17,7 @@ from ..dataset import (
     TargetRole,
     TempTargetRole,
 )
-from ..dataset.abstract import DatasetBase, GroupedDataset
+from ..dataset.abstract import GroupedDataset
 from ..executor import Calculator
 from ..utils import (
     NAME_BORDER_SYMBOL,
@@ -708,22 +708,21 @@ class StatsComparator(BaseComparator, ABC):
 
         grouped: GroupedDataset = target_fields_data.groupby(by=group_field_data)
 
-        # Phase 1: one agg call per stat — each covers ALL groups in one Spark job.
-        # Result per stat: Dataset of shape (n_groups × n_target_cols).
-        stat_datasets: dict[str, DatasetBase] = {
-            stat: grouped.agg(stat) for stat in self.stats
-        }
+        # Phase 1: single agg call — all stats × all groups in ONE Spark job.
+        # List agg produces flattened columns "{col}┆{stat}" via GroupedDataset.agg.
+        agg_ds = grouped.agg(self.stats)
 
-        first_stat_ds = stat_datasets[self.stats[0]] if self.stats else None
-        raw_group_names = sorted(first_stat_ds.index) if first_stat_ds is not None else []
+        raw_group_names = sorted(agg_ds.index)
         group_names = [str(g) for g in raw_group_names]
 
         # Reconstruct nested stats dict for _inner_function (all driver-side).
         group_col_stats: dict[str, dict[str, dict[str, Any]]] = {
             str(raw): {
                 col: {
-                    stat: stat_ds.get_values(row=raw, column=col)
-                    for stat, stat_ds in stat_datasets.items()
+                    stat: agg_ds.get_values(
+                        row=raw, column=f"{col}{NAME_BORDER_SYMBOL}{stat}"
+                    )
+                    for stat in self.stats
                 }
                 for col in target_fields_data.columns
             }
@@ -731,7 +730,6 @@ class StatsComparator(BaseComparator, ABC):
         }
 
         # Build and store flattened stats table: one Dataset per group, then append.
-        group_names = list(group_col_stats.keys())
         stats_ds_list = [
             DatasetAdapter.to_dataset(
                 {
