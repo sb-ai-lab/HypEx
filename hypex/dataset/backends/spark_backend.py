@@ -447,8 +447,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.data.empty
 
     def unique(self) -> dict[str, list[Any]]:
-        
-        return {column: self.data[column].unique().to_pandas().tolist() for column in self.data.columns}
+        return {column: self.data[column].unique() for column in self.data.columns}
 
     def nunique(self, dropna: bool = True)-> dict[str, int]:
         return {column: self.data[column].nunique() for column in self.data.columns}
