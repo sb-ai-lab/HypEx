@@ -17,6 +17,7 @@ from ..dataset import (
     TargetRole,
     TempTargetRole,
 )
+from ..dataset.abstract import DatasetBase, GroupedDataset
 from ..executor import Calculator
 from ..utils import (
     NAME_BORDER_SYMBOL,
@@ -705,21 +706,33 @@ class StatsComparator(BaseComparator, ABC):
             else list(target_fields_data.columns)
         )
 
-        groups = sorted(
-            target_fields_data.groupby(by=group_field_data),
-            key=lambda t: t[0],
-        )
+        grouped: GroupedDataset = target_fields_data.groupby(by=group_field_data)
 
-        #TODO: Phase 1 needs to be rewritten once we have a propper group_by 
-        # Phase 1: one _compute_stats call per group covering all target columns.
-        # Returns {group_name: {col: {stat: value}}}.
-        group_col_stats: dict[str, dict[str, dict[str, Any]]] = {
-            str(group_name): self._compute_stats(group_data, stats=self.stats)
-            for group_name, group_data in groups
+        # Phase 1: one agg call per stat — each covers ALL groups in one Spark job.
+        # Result per stat: Dataset of shape (n_groups × n_target_cols).
+        stat_datasets: dict[str, DatasetBase] = {
+            stat: grouped.agg(stat) for stat in self.stats
         }
 
-        # Build and store flattened stats table: rows=groups, cols={stat}ǂ{col}
-        stats_single_datasets = [
+        first_stat_ds = stat_datasets[self.stats[0]] if self.stats else None
+        raw_group_names = sorted(first_stat_ds.index) if first_stat_ds is not None else []
+        group_names = [str(g) for g in raw_group_names]
+
+        # Reconstruct nested stats dict for _inner_function (all driver-side).
+        group_col_stats: dict[str, dict[str, dict[str, Any]]] = {
+            str(raw): {
+                col: {
+                    stat: stat_ds.get_values(row=raw, column=col)
+                    for stat, stat_ds in stat_datasets.items()
+                }
+                for col in target_fields_data.columns
+            }
+            for raw in raw_group_names
+        }
+
+        # Build and store flattened stats table: one Dataset per group, then append.
+        group_names = list(group_col_stats.keys())
+        stats_ds_list = [
             DatasetAdapter.to_dataset(
                 {
                     f"{stat}{NAME_BORDER_SYMBOL}{col}": col_stats[stat]
@@ -730,33 +743,34 @@ class StatsComparator(BaseComparator, ABC):
             )
             for col_stats_dict in group_col_stats.values()
         ]
-
-        stats_dataset = stats_single_datasets[0]
-        if len(stats_single_datasets) > 1:
-            stats_dataset = stats_dataset.append(stats_single_datasets[1:])
-        stats_dataset.index = list(group_col_stats.keys())
+        stats_dataset = stats_ds_list[0].append(stats_ds_list[1:])
+        stats_dataset.index = group_names
         data = self._set_stats_value(data, stats_dataset)
 
-        group_names = list(group_col_stats.keys())
         if len(group_names) < 2:
             return data
 
-        # Phase 2: pairwise comparison using pre-computed per-column stats.
+        # Phase 2: one Dataset per (compared_group, col) pair, then append once.
         baseline_name = group_names[0]
-        compare_result: dict[str, Dataset] = {}
-        for compared_name in group_names[1:]:
-            for col in target_fields_data.columns:
-                res_name = f"{compared_name}{NAME_BORDER_SYMBOL}{col}"
-                compare_result[res_name] = DatasetAdapter.to_dataset(
-                    self._inner_function(
-                        group_col_stats[baseline_name][col],
-                        group_col_stats[compared_name][col],
-                        **self.calc_kwargs,
-                    ),
-                    InfoRole(),
-                )
+        result_ds_list = [
+            DatasetAdapter.to_dataset(
+                self._inner_function(
+                    group_col_stats[baseline_name][col],
+                    group_col_stats[compared_name][col],
+                    **self.calc_kwargs,
+                ),
+                StatisticRole(),
+            )
+            for compared_name in group_names[1:]
+            for col in target_fields_data.columns
+        ]
+        if not result_ds_list:
+            return data
 
-        result_dataset = self._extract_dataset(
-            compare_result, {k: StatisticRole() for k in compare_result}
-        )
+        result_dataset = result_ds_list[0].append(result_ds_list[1:])
+        result_dataset.index = [
+            f"{compared_name}{NAME_BORDER_SYMBOL}{col}"
+            for compared_name in group_names[1:]
+            for col in target_fields_data.columns
+        ]
         return self._set_value(data, result_dataset)

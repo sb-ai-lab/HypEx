@@ -259,7 +259,9 @@ class DatasetBase(ABC):
             else:
                 self._backend = PandasDataset(data)
                 
-        self.backend_type = type(self._backend)
+        self.backend_type = (
+            BackendsEnum.spark if isinstance(self._backend, SparkDataset) else BackendsEnum.pandas
+        )
         self.default_role = default_role or DefaultRole()
 
         if roles is None and data is not None and hasattr(data, "roles") and data.roles is not None:
@@ -346,9 +348,9 @@ class DatasetBase(ABC):
                 raise TypeError("Value type does not match the expected data type.")
 
     @classmethod
-    def create_empty(cls, 
-                     roles: dict[str, ABCRole] | None = None, 
-                     index=None, 
+    def create_empty(cls,
+                     roles: dict[str, ABCRole] | None = None,
+                     index=None,
                      backend=BackendsEnum.pandas) -> DatasetBase:
         if roles is None:
             roles = {}

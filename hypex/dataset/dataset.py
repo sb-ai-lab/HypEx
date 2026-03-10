@@ -257,8 +257,6 @@ class ExperimentData:
             # Преобразуем Dataset в SmallDataset
             if isinstance(value, Dataset):
                 value = value.to_small_dataset()
-            elif isinstance(value, Dataset):
-                value = SmallDataset.from_dict(value.to_dict(), roles=role)
             elif not isinstance(value, SmallDataset):
                 # Если значение не Dataset/SmallDataset, создаем SmallDataset
                 raise TypeError(f"Wrong value {value} for converting to SmallDataset")
@@ -443,18 +441,13 @@ class DatasetAdapter(Adapter):
     ) -> Dataset:
         roles_names = list(data.keys())
         if any(
-            [
-                any(isinstance(i, t) for t in [int, str, float, bool])
-                for i in list(data.values())
-            ]
+            any(isinstance(i, t) for t in [int, str, float, bool])
+            for i in data.values()
         ):
             data = [data]
-        if isinstance(roles, dict):
-            return Dataset.from_dict(data=data, roles=roles)
-        elif isinstance(roles, ABCRole):
-            return Dataset.from_dict(
-                data=data, roles={name: roles for name in roles_names}
-            )
+        if isinstance(roles, ABCRole):
+            roles = {name: roles for name in roles_names}
+        return Dataset(roles=roles, data=pd.DataFrame(data))
 
     @staticmethod
     def list_to_dataset(
