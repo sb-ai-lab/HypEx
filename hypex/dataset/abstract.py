@@ -133,22 +133,21 @@ class DatasetBase(ABC):
         self._tmp_roles: (
             dict[ABCRole, list[str] | str] | dict[list[str] | str] | ABCRole
         ) = {}
-        self.n_rows: Union[int, None] = None
 
     def __repr__(self):
         n_cols = len(self.columns)
-        df = self._build_repr()
-        return f"{df.to_string()}\n\n{self.n_rows} rows × {n_cols} columns"
+        n_rows = self._backend.shape[0]
+        df = self._build_repr(n_cols, n_rows)
+        return f"{df.to_string()}\n\n{n_rows} rows × {n_cols} columns"
 
     def _repr_html_(self):
-        df = self._build_repr()
-        html_table = df.to_html()
-    
         n_cols = len(self.columns)
-        
+        n_rows = self._backend.shape[0]
+        df = self._build_repr(n_cols, n_rows)
+        html_table = df.to_html()
         html_info = f'''
         <div style="font-size: 12px; color: #bdbdbd; margin-top: 5px; font-family: monospace;">
-            {self.n_rows} rows × {n_cols} columns
+            {n_rows} rows × {n_cols} columns
         </div>
         '''
         return html_table + html_info
@@ -200,35 +199,30 @@ class DatasetBase(ABC):
             else:
                 raise TypeError("Value type does not match the expected data type.")
             
-    def _build_repr(self) -> pd.DataFrame:
-        max_cols = len(self.columns)
-        max_rows = self._rows_counter()
-        head = self._limit(max_cols)
+    def _build_repr(self, max_cols, max_rows) -> pd.DataFrame:
+        # max_cols = len(self.columns)
+        # max_rows = self._backend.shape[0]
+        head = self._limit(max_cols, max_rows)
 
         if max_rows > self.DISPLAY_ROWS * 2:
-            tail = pd.concat([pd.DataFrame([["..."] * len(head.columns)], index=["..."], columns=head.columns), self._limit(max_cols, tail=True)], axis=0)
+            tail = pd.concat([pd.DataFrame([["..."] * len(head.columns)], index=["..."], columns=head.columns), self._limit(max_cols, max_rows, tail=True)], axis=0)
             return pd.concat([head, tail], axis=0)
         else:
             return head
 
-    def _rows_counter(self) -> int:
-        if self.n_rows is None:
-            self.n_rows = self._backend.shape[0]
-        return self.n_rows
-
-    def _limit(self, max_cols: int, tail: bool=False) -> pd.DataFrame:
+    def _limit(self, max_cols: int, max_rows: int, tail: bool=False) -> pd.DataFrame:
         n = self.DISPLAY_ROWS
         if isinstance(self._backend, PandasDataset):
             if tail:
                 df = self._backend.data.tail(n).copy()
-                df.index = [(self.n_rows - n + i) for i in range(n)]
+                df.index = [(max_rows - n + i) for i in range(n)]
             else:
                 df =  self._backend.data.head(n)
         elif isinstance(self._backend, SparkDataset):
             if tail:
                 df = pd.DataFrame([list(row) for row in self._backend.data.tail(n)], 
                                   columns=self.columns,
-                                  index=[(self.n_rows - n + i) for i in range(n)])
+                                  index=[(max_rows - n + i) for i in range(n)])
             else:
                 df = pd.DataFrame([list(row) for row in self._backend.data.head(n)], 
                                   columns=self.columns)
