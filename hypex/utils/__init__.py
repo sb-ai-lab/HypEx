@@ -6,6 +6,7 @@ from .constants import (
     NUMBER_TYPES_LIST,
     UTILITY_COL_SYMBOL,
     UTILITY_INDEX_COL_NAME,
+    UTILITY_PHYSICAL_INDEX_COL_NAME
 )
 from .enums import (
     ABNTestMethodsEnum,
@@ -49,6 +50,7 @@ from .typings import (
     SourceDataTypes,
     StratificationRoleTypes,
     TargetRoleTypes,
+    SparkTypeMapper
 )
 
 __all__ = [
@@ -59,6 +61,7 @@ __all__ = [
     "UTILITY_COL_SYMBOL",
     "UTILITY_INDEX_COL_NAME",
     "NUMBER_TYPES_LIST",
+    "UTILITY_PHYSICAL_INDEX_COL_NAME",
     "ABNTestMethodsEnum",
     "ABTestTypesEnum",
     "AbstractMethodError",

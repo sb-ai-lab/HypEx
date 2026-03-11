@@ -1,21 +1,46 @@
 from __future__ import annotations
 
 import datetime
+from types import MappingProxyType
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    Type,
+    Union
+)
+from pyspark.sql.types import (
+    DataType,
+    StringType,
+    LongType,
+    DoubleType,
+    BooleanType,
+    DecimalType,
+    DateType,
+    TimestampType,
+    ArrayType,
+    StructType,
+    MapType,
+    BinaryType,
+    IntegerType,
+    FloatType,
+    ShortType,
+    ByteType,
+)
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
 
+import numpy as np
 import pandas as pd
 import pyspark.sql as spark
-from pyspark.sql.types import (
-    ByteType,
-    DecimalType,
-    DoubleType,
-    FloatType,
-    IntegerType,
-    LongType,
-    ShortType,
-    StringType,
-)
+import pyspark.pandas as ps
+
 
 if TYPE_CHECKING:
     from hypex.dataset import Dataset
@@ -27,10 +52,12 @@ FeatureRoleTypes = float | bool | str | int
 CategoricalTypes = str
 ScalarType = float | int | str | bool
 PysparkScalarType = (
-    IntegerType | LongType | FloatType | DoubleType | DecimalType | ShortType | ByteType
+    IntegerType | LongType |
+    FloatType | DoubleType |
+    DecimalType | ShortType | ByteType
 )
 GroupingDataType = tuple[list[tuple[str, "Dataset"]], list[tuple[str, "Dataset"]]]
-SourceDataTypes = pd.DataFrame | spark.DataFrame
+SourceDataTypes = pd.DataFrame | ps.DataFrame | spark.DataFrame
 
 
 MultiFieldKeyTypes = str | Sequence[str]
@@ -48,15 +75,19 @@ DocstringInheritDecorator = Callable[[DecoratedType], DecoratedType]
 SetParamsDictTypes = dict[str, Any] | dict[type, dict[str, Any]]
 
 class SparkTypeMapper:
-    @staticmethod
-    def types(value):
-        if value is None:
-            return StringType()
-        elif isinstance(value, str):
-            return StringType()
-        elif isinstance(value, int):
-            return LongType()
-        elif isinstance(value, float):
-            return DoubleType()
-        else:
-            return StringType()
+    _SPARK_TO_PY: MappingProxyType[type[DataType], type] = MappingProxyType({
+        IntegerType: int,
+        LongType: int,
+        ShortType: int,
+        ByteType: int,
+        FloatType: float,
+        DoubleType: float,
+        BooleanType: bool,
+        StringType: str,
+        DateType: str,
+        TimestampType: str,
+    })
+
+    @classmethod
+    def to_python(cls, spark_type: DataType | str) -> type:
+        return cls._SPARK_TO_PY.get(type(spark_type), object)

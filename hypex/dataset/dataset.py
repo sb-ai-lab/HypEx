@@ -39,7 +39,6 @@ class Dataset(DatasetBase):
         super().__init__(roles, data, backend, default_role, session)
 
     def to_small_dataset(self) -> SmallDataset:
-        """Преобразует Dataset в SmallDataset"""
         return SmallDataset(
             roles=self.roles,
             data=self.data,
@@ -171,8 +170,8 @@ class SmallDataset(DatasetBase):
         return self._convert_data_after_agg(self._backend.idxmax())
 
     def transpose(
-        self,
-        roles: dict[str, ABCRole] | list[str] | None = None,
+            self,
+            roles: dict[str, ABCRole] | list[str] | None = None,
     ) -> Dataset:
         # Get role names if provided
         roles_names: list[str | None] = (
@@ -198,15 +197,11 @@ class SmallDataset(DatasetBase):
 class ExperimentData:
     def __init__(self, data: Dataset):
         self._data = data
-        self._data.add_index_col()
-        self.additional_fields = Dataset.create_empty(index=data.index, backend=data.backend_type)
+        self.additional_fields = Dataset.create_empty(index=data.index)
         self.variables: dict[str, dict[str, int | float]] = {}
         self.groups: dict[str, dict[str, Dataset]] = {}
         self.analysis_tables: dict[str, SmallDataset] = {}  # Используем SmallDataset
         self.id_name_mapping: dict[str, str] = {}
-
-    def __del__(self):
-        self._data.remove_index_col()
 
     @property
     def ds(self):
@@ -275,15 +270,15 @@ class ExperimentData:
 
         # Handle analysis tables
         elif space == ExperimentDataEnum.analysis_tables:
+            # Преобразуем Dataset в SmallDataset
             if isinstance(value, Dataset):
                 value = value.to_small_dataset()
-            elif isinstance(value, dict):
-                if not isinstance(role, dict):
-                    raise TypeError("For dict analysis table value, role must be dict[str, ABCRole]")
-                value = SmallDataset.from_dict(value, roles=role)
+            elif isinstance(value, Dataset):
+                value = SmallDataset.from_dict(value.to_dict(), roles=role)
             elif not isinstance(value, SmallDataset):
+                # Если значение не Dataset/SmallDataset, создаем SmallDataset
                 raise TypeError(f"Wrong value {value} for converting to SmallDataset")
-            self.analysis_tables.update(value)
+            self.analysis_tables[executor_id] = value
 
         # Handle variables
         elif space == ExperimentDataEnum.variables:
@@ -420,7 +415,6 @@ class ExperimentData:
         if not searched_data.is_empty():
             searched_data.index = self.ds.index
         return searched_data
-
 
 
 class DatasetAdapter(Adapter):
