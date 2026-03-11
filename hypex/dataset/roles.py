@@ -73,6 +73,7 @@ class LagRole(ABCRole):
 class IndexRole(ABCRole):
     _role_name: RoleNameType = "Index"
 
+
 class InfoRole(ABCRole):
     _role_name: RoleNameType = "Info"
 
