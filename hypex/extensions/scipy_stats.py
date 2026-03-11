@@ -231,11 +231,6 @@ class Chi2TestExtension(StatTest):
         contingency_table = self.matrix_preparation(data, other)
 
         statistic, pvalue, dof, expected_freq = chi2_contingency(contingency_table, **kwargs)
-        print({
-                "p-value": pvalue,
-                "statistic": statistic,
-                "pass": pvalue < self.reliability,
-            })
         one_result = SmallDataset.from_dict(
             {
                 "p-value": pvalue,
@@ -244,6 +239,7 @@ class Chi2TestExtension(StatTest):
             },
             StatisticRole(),
         )
+        return one_result
 
 
 class NormCDF(StatTest):
