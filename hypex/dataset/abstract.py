@@ -5,7 +5,16 @@ import copy
 from copy import deepcopy
 import json  # type: ignore
 from abc import ABC
-from typing import Any, Iterable, Callable, Hashable, Literal, Optional, Sequence
+from typing import (
+    Any, 
+    Iterable, 
+    Callable, 
+    Hashable, 
+    Literal, 
+    Optional, 
+    Sequence,
+    Union,
+)
 
 import pandas as pd  # type: ignore
 from numpy import ndarray
@@ -35,6 +44,9 @@ from .roles import (
 
 
 class DatasetBase(ABC):
+    DISPLAY_ROWS = 5
+    DISPLAY_COLS = 10
+
     @staticmethod
     def _select_backend_from_data(data, session: spark.SparkSession = None):
         if isinstance(data, pd.DataFrame):
@@ -121,12 +133,25 @@ class DatasetBase(ABC):
         self._tmp_roles: (
             dict[ABCRole, list[str] | str] | dict[list[str] | str] | ABCRole
         ) = {}
+        self.n_rows: Union[int, None] = None
 
     def __repr__(self):
-        return self._backend.__repr__()
+        n_cols = len(self.columns)
+        df = self._build_repr()
+        return f"{df.to_string()}\n\n{self.n_rows} rows × {n_cols} columns"
 
     def _repr_html_(self):
-        return self._backend._repr_html_()
+        df = self._build_repr()
+        html_table = df.to_html()
+    
+        n_cols = len(self.columns)
+        
+        html_info = f'''
+        <div style="font-size: 12px; color: #bdbdbd; margin-top: 5px; font-family: monospace;">
+            {self.n_rows} rows × {n_cols} columns
+        </div>
+        '''
+        return html_table + html_info
 
     def __len__(self):
         return self._backend.__len__()
@@ -174,6 +199,55 @@ class DatasetBase(ABC):
                 self.data[key] = value
             else:
                 raise TypeError("Value type does not match the expected data type.")
+            
+    def _build_repr(self) -> pd.DataFrame:
+        max_cols = len(self.columns)
+        max_rows = self._rows_counter()
+        head = self._limit(max_cols)
+
+        if max_rows > self.DISPLAY_ROWS * 2:
+            tail = pd.concat([pd.DataFrame([["..."] * len(head.columns)], index=["..."], columns=head.columns), self._limit(max_cols, tail=True)], axis=0)
+            return pd.concat([head, tail], axis=0)
+        else:
+            return head
+
+    def _rows_counter(self) -> int:
+        if self.n_rows is None:
+            self.n_rows = self._backend.shape[0]
+        return self.n_rows
+
+    def _limit(self, max_cols: int, tail: bool=False) -> pd.DataFrame:
+        n = self.DISPLAY_ROWS
+        if isinstance(self._backend, PandasDataset):
+            if tail:
+                df = self._backend.data.tail(n).copy()
+                df.index = [(self.n_rows - n + i) for i in range(n)]
+            else:
+                df =  self._backend.data.head(n)
+        elif isinstance(self._backend, SparkDataset):
+            if tail:
+                df = pd.DataFrame([list(row) for row in self._backend.data.tail(n)], 
+                                  columns=self.columns,
+                                  index=[(self.n_rows - n + i) for i in range(n)])
+            else:
+                df = pd.DataFrame([list(row) for row in self._backend.data.head(n)], 
+                                  columns=self.columns)
+        
+        if max_cols > 2 * self.DISPLAY_COLS:
+            left_cols = self.columns[: self.DISPLAY_COLS]
+            right_cols = self.columns[-self.DISPLAY_COLS:]
+            tmp = pd.DataFrame(
+                [["..."] for _ in range(len(df))], 
+                index=df.index, 
+                columns=["..."]
+            )
+            
+            return pd.concat([df.loc[:, left_cols],
+                              tmp,
+                              df.loc[:, right_cols]],
+                              axis=1).replace(self.labels_dict)
+        else:
+            return df.replace(self.labels_dict)
 
     @classmethod
     def create_empty(
@@ -435,6 +509,13 @@ class DatasetBase(ABC):
     @property
     def session(self):
         return self._backend.session
+    
+    @property
+    def labels_dict(self):
+        if isinstance(self._backend, PandasDataset):
+            return self._backend.labels_dict
+        else:
+            return {}
 
     @tmp_roles.setter
     def tmp_roles(self, value):

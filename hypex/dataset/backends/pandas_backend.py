@@ -6,14 +6,46 @@ from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Unio
 import numpy as np
 import pandas as pd  # type: ignore
 import pyspark.sql as spark
+import pyspark.sql.functions as F
+
+from pyspark.ml.feature import StringIndexer
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType
 from ...utils.adapter import Adapter
-from ...utils.downcaster import Downcast
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
 class PandasNavigation(DatasetBackendNavigation):
+    @staticmethod
+    def _downcast(data: spark.DataFrame) -> tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
+        columns_dict = dict(data.dtypes)
+
+        double_columns = [col for col, c_type in columns_dict.items() 
+                               if c_type == 'double' or c_type.startswith('decimal')]
+        categorical_columns = [col for col, c_type in columns_dict.items() 
+                               if c_type in ['string', 'varchar']]
+
+        indexer = StringIndexer(inputCols=categorical_columns,
+                                outputCols=[f"{col}_indexed" for col in categorical_columns],
+                                handleInvalid="keep")
+        filled_data = data.na.fill("UNKNOWN")
+        model = indexer.fit(filled_data)
+        # labels = {col : pd.DataFrame({"labels": label, 
+        #                               "encoded" : range(len(label))}) for label, col in zip(model.labelsArray, categorical_columns)}
+        labels = {col : {idx : label for idx, label in  enumerate(labels_list)} 
+                  for labels_list, col in zip(model.labelsArray, categorical_columns)}
+
+        return ((
+                    model
+                    .transform(filled_data)
+                    .select(*[
+                            F.col(col).cast("float") if col in double_columns else
+                            F.col(f"{col}_indexed").cast("int").alias(col) if col in categorical_columns else
+                            F.col(col) for col in filled_data.columns
+                            ])
+                    .toPandas()
+                ), labels)
+
     @staticmethod
     def _read_file(filename: str | Path) -> pd.DataFrame:
         file_extension = Path(filename).suffix
@@ -25,15 +57,13 @@ class PandasNavigation(DatasetBackendNavigation):
             raise ValueError(f"Unsupported file extension {file_extension}")
 
     def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
-        self._labels_dict = None
+        self._labels_dict = {}
         if isinstance(data, pd.DataFrame):
             self.data = data
         elif isinstance(data, pd.Series):
             self.data = pd.DataFrame(data)
         elif isinstance(data, spark.DataFrame):
-            downcaster = Downcast(data)
-            self.data = downcaster.execute()
-            self._labels_dict = downcaster.labels_dict
+            self.data, self._labels_dict = self._downcast(data)
         elif isinstance(data, dict):
             if "index" in data.keys():
                 self.data = pd.DataFrame(data=data["data"], index=data["index"])
@@ -218,7 +248,7 @@ class PandasNavigation(DatasetBackendNavigation):
         return self.data.shape
     
     @property
-    def lables_dict(self):
+    def labels_dict(self):
         return self._labels_dict
 
     def _get_column_index(

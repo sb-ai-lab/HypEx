@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+import numpy as np
 from typing import Callable
 
 from scipy.stats import (  # type: ignore
@@ -11,7 +12,8 @@ from scipy.stats import (  # type: ignore
     ttest_ind,
 )
 
-from ..dataset import Dataset, DatasetAdapter, StatisticRole
+from ..dataset import SmallDataset, Dataset, DatasetAdapter, StatisticRole
+from ..dataset.backends import PandasDataset, SparkDataset
 from .abstract import CompareExtension
 
 
@@ -53,11 +55,37 @@ class StatTest(CompareExtension):
             other.backend.data.values.flatten(),
             **kwargs,
         )
-        one_result = DatasetAdapter.to_dataset(
+        one_result = SmallDataset.from_dict(
             {
                 "p-value": one_result.pvalue,
                 "statistic": one_result.statistic,
                 "pass": one_result.pvalue < self.reliability,
+            },
+            StatisticRole(),
+        )
+        return one_result
+    
+    def _calc_spark(
+        self, data: Dataset, other: Dataset | None = None, **kwargs
+        ) -> Dataset | float:
+        other = self.check_data(data, other)
+        if self.test_function is None:
+            raise ValueError("test_function is needed for execution")
+        one_result = self.test_function(
+            data.data.rdd.flatMap(lambda row: row).collect(),
+            other.data.rdd.flatMap(lambda row: row).collect(),
+            **kwargs
+        )
+        print({
+                "p-value": one_result[1],
+                "statistic": one_result[0],
+                "pass": one_result[1] < self.reliability,
+            })
+        one_result = SmallDataset.from_dict(
+            {
+                "p-value": one_result[1],
+                "statistic": one_result[0],
+                "pass": one_result[1] < self.reliability,
             },
             StatisticRole(),
         )
@@ -111,6 +139,14 @@ class Chi2TestExtension(StatTest):
         return counts
 
     def matrix_preparation(self, data: Dataset, other: Dataset) -> Dataset | None:
+        if isinstance(data._backend, PandasDataset):
+            return self._pandas_prep(data, other)
+        elif isinstance(data._backend, SparkDataset):
+            return self._spark_prep(data, other)
+        else:
+            raise TypeError("Incorrect data type!")
+    
+    def _pandas_prep(self, data: Dataset, other: Dataset) -> Dataset | None:
         proportion = len(data) / (len(data) + len(other))
         counted_data = data.value_counts()
         counted_data = self.mini_category_replace(counted_data)
@@ -127,6 +163,30 @@ class Chi2TestExtension(StatTest):
         return data_vc.merge(other_vc, on=counted_data.columns[0])[
             ["count_x", "count_y"]
         ].fillna(0)
+    
+    @staticmethod
+    def _spark_prep(data: Dataset, other: Dataset) -> np.ndarray:
+        other = np.array((
+                            other
+                            .data
+                            .rdd
+                            .flatMap(lambda row: row)
+                            .collect()
+                        ))
+        data = np.array((
+                            data
+                            .data
+                            .rdd
+                            .flatMap(lambda row: row)
+                            .collect()
+                        ))
+        unique_values = (set(other) | set(data))
+        contingency_table = np.zeros((2, len(unique_values)))
+        for index, element in enumerate(unique_values):
+            contingency_table[0, index] = len(data[data == element])
+            contingency_table[1, index] = len(other[other == element])
+
+        return contingency_table
 
     def _calc_pandas(
         self, data: Dataset, other: Dataset | None = None, **kwargs
@@ -162,6 +222,25 @@ class Chi2TestExtension(StatTest):
                     else one_result.pvalue
                 )
                 < self.reliability,
+            },
+            StatisticRole(),
+        )
+    
+    def _calc_spark(self, data, other = None, **kwargs):
+        other = self.check_data(data, other)
+        contingency_table = self.matrix_preparation(data, other)
+
+        statistic, pvalue, dof, expected_freq = chi2_contingency(contingency_table, **kwargs)
+        print({
+                "p-value": pvalue,
+                "statistic": statistic,
+                "pass": pvalue < self.reliability,
+            })
+        one_result = SmallDataset.from_dict(
+            {
+                "p-value": pvalue,
+                "statistic": statistic,
+                "pass": pvalue < self.reliability,
             },
             StatisticRole(),
         )

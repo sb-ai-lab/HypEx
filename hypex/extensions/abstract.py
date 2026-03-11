@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Literal
 
 from ..dataset import ABCRole, Dataset
-from ..dataset.backends import PandasDataset
+from ..dataset.backends import PandasDataset, SparkDataset
 from ..dataset.dataset import DatasetAdapter
 from ..utils.errors import AbstractMethodError
 
@@ -13,10 +13,15 @@ class Extension(ABC):
     def __init__(self):
         self.BACKEND_MAPPING = {
             PandasDataset: self._calc_pandas,
+            SparkDataset: self._calc_spark,
         }
 
     @abstractmethod
     def _calc_pandas(self, data: Dataset, **kwargs):
+        raise AbstractMethodError
+    
+    @abstractmethod
+    def _calc_spark(self, data: Dataset, **kwargs):
         raise AbstractMethodError
 
     def calc(self, data: Dataset, **kwargs):
