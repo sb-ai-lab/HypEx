@@ -284,6 +284,10 @@ class SparkNavigation(DatasetBackendNavigation):
     def columns(self) -> list[str]:
         return self.data.columns.tolist()
 
+    # @property
+    # def session(self):
+    #     return self.session
+
     @property
     def shape(self) -> tuple[int, int]:
         return self.data.shape

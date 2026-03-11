@@ -8,6 +8,7 @@ import pandas as pd
 import pyspark.sql as spark
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType
+from ...utils.adapter import Adapter
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
