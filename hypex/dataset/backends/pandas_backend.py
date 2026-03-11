@@ -13,6 +13,7 @@ from pyspark.ml.feature import StringIndexer
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType
 from ...utils.adapter import Adapter
+from ...utils.constants import UTILITY_INDEX_COL_NAME
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -31,8 +32,6 @@ class PandasNavigation(DatasetBackendNavigation):
                                 handleInvalid="keep")
         filled_data = data.na.fill("UNKNOWN")
         model = indexer.fit(filled_data)
-        # labels = {col : pd.DataFrame({"labels": label,
-        #                               "encoded" : range(len(label))}) for label, col in zip(model.labelsArray, categorical_columns)}
         labels = {col : {idx : label for idx, label in  enumerate(labels_list)}
                   for labels_list, col in zip(model.labelsArray, categorical_columns)}
 
@@ -477,6 +476,46 @@ class PandasNavigation(DatasetBackendNavigation):
             str: HTML string representation.
         """
         return self.data._repr_html_()
+    
+    def _display_head_tail(self, 
+                           rows_display_limit: int,
+                           cols_display_limit: int,
+                           n_cols: int,
+                           n_rows: int,  
+                           tail: bool=False
+    ) -> pd.DataFrame:
+        """Returns n head rows or n tail rows
+        Args:
+            rows_display_limit: rows display limit.
+            cols_display_limit: columns display limit.
+            n_cols: number of columns in dataframe.
+            n_rows: number of rows in dataframe.
+            tail: flag of direction. If False, head rows returned.
+        Return:
+            pd.DataFrame: head or tail part of dataframe.
+            If downcasting is applyed, repr substitutes encoded values to real one.
+        """
+        if tail:
+            head_tail = self.data.tail(rows_display_limit)
+            head_tail.index = [(n_rows - rows_display_limit + i) for i in range(rows_display_limit)]
+        else:
+            head_tail = self.data.head(rows_display_limit)
+
+        if n_cols > 2 * cols_display_limit:
+            left_cols = self.columns[: cols_display_limit]
+            right_cols = self.columns[-cols_display_limit:]
+            tmp = pd.DataFrame(
+                [["..."] for _ in range(len(head_tail))],
+                index=head_tail.index,
+                columns=["..."]
+            )
+
+            return pd.concat([head_tail.loc[:, left_cols],
+                              tmp,
+                              head_tail.loc[:, right_cols]],
+                             axis=1).replace(self.labels_dict)
+        else:
+            return head_tail.replace(self.labels_dict)
 
     def get_values(
             self,

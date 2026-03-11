@@ -114,7 +114,7 @@ class DatasetBase(ABC):
             else:
                 self._backend = PandasDataset(data)
 
-        self.backend_type = type(self._backend)
+        # self.backend_type = type(self._backend)
         self.default_role = default_role or DefaultRole()
 
         if roles is None and data is not None and hasattr(data, "roles") and data.roles is not None:
@@ -138,6 +138,7 @@ class DatasetBase(ABC):
             self._set_empty_types(roles)
 
         self._roles: dict[str, ABCRole] = roles
+        self._tmp_roles = {}
 
     def __repr__(self):
         n_cols = len(self.columns)
@@ -210,49 +211,25 @@ class DatasetBase(ABC):
             else:
                 raise TypeError("Value type does not match the expected data type.")
 
-    def _build_repr(self, max_cols, max_rows) -> pd.DataFrame:
-        # max_cols = len(self.columns)
-        # max_rows = self._backend.shape[0]
-        head = self._limit(max_cols, max_rows)
+    def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
+        head = self._backend._display_head_tail(rows_display_limit=self.DISPLAY_ROWS,
+                                                cols_display_limit=self.DISPLAY_COLS,
+                                                n_cols=n_cols,
+                                                n_rows=n_rows)
 
-        if max_rows > self.DISPLAY_ROWS * 2:
-            tail = pd.concat([pd.DataFrame([["..."] * len(head.columns)], index=["..."], columns=head.columns), self._limit(max_cols, max_rows, tail=True)], axis=0)
+        if n_rows > self.DISPLAY_ROWS * 2:
+            _tmp_tail = self._backend._display_head_tail(rows_display_limit=self.DISPLAY_ROWS,
+                                                         cols_display_limit=self.DISPLAY_COLS,
+                                                         n_cols=n_cols,
+                                                         n_rows=n_rows,
+                                                         tail=True)
+            tail = pd.concat([pd.DataFrame([["..."] * len(head.columns)], 
+                                           index=["..."], 
+                                           columns=head.columns), 
+                            _tmp_tail], axis=0)
             return pd.concat([head, tail], axis=0)
         else:
             return head
-
-    def _limit(self, max_cols: int, max_rows: int, tail: bool=False) -> pd.DataFrame:
-        n = self.DISPLAY_ROWS
-        if isinstance(self._backend, PandasDataset):
-            if tail:
-                df = self._backend.data.tail(n).copy()
-                df.index = [(max_rows - n + i) for i in range(n)]
-            else:
-                df =  self._backend.data.head(n)
-        elif isinstance(self._backend, SparkDataset):
-            if tail:
-                df = pd.DataFrame([list(row) for row in self._backend.data.tail(n)],
-                                  columns=self.columns,
-                                  index=[(max_rows - n + i) for i in range(n)])
-            else:
-                df = pd.DataFrame([list(row) for row in self._backend.data.head(n)],
-                                  columns=self.columns)
-
-        if max_cols > 2 * self.DISPLAY_COLS:
-            left_cols = self.columns[: self.DISPLAY_COLS]
-            right_cols = self.columns[-self.DISPLAY_COLS:]
-            tmp = pd.DataFrame(
-                [["..."] for _ in range(len(df))],
-                index=df.index,
-                columns=["..."]
-            )
-
-            return pd.concat([df.loc[:, left_cols],
-                              tmp,
-                              df.loc[:, right_cols]],
-                             axis=1).replace(self.labels_dict)
-        else:
-            return df.replace(self.labels_dict)
 
     @classmethod
     def create_empty(cls,
@@ -508,10 +485,7 @@ class DatasetBase(ABC):
 
     @property
     def labels_dict(self):
-        if isinstance(self._backend, PandasDataset):
-            return self._backend.labels_dict
-        else:
-            return {}
+        return self._backend.labels_dict
 
     @property
     def backend_type(self):

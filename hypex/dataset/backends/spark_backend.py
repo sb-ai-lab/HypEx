@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Sequence, Sized, Self
+from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
 import numpy as np
 import pandas as pd
@@ -25,6 +25,12 @@ from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 class SparkNavigation(DatasetBackendNavigation):
     PANDAS_CONVERSION_LIMIT: int = 100_000
+
+    def checkpoint(self):
+        pass
+    
+    def limit(self):
+        pass
     
     def _check_pandas_conversion(self, obj: ps.DataFrame | ps.Series, context: str = "") -> None:
         n: int = obj.__len__()
@@ -235,6 +241,45 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def _repr_html_(self) -> str:
         return self.data._repr_html_()
+    
+    def _display_head_tail(self, 
+                           rows_display_limit: int,
+                           cols_display_limit: int,
+                           n_cols: int,
+                           n_rows: int,  
+                           tail: bool=False
+    ) -> pd.DataFrame:
+        """Returns n head rows or n tail rows
+        Args:
+            rows_display_limit: rows display limit.
+            cols_display_limit: columns display limit.
+            n_cols: number of columns in dataframe.
+            n_rows: number of rows in dataframe.
+            tail: flag of direction. If False, head rows returned.
+        Return:
+            pd.DataFrame: head or tail part of dataframe. 
+        """
+        if tail:
+            head_tail = self.data.tail(rows_display_limit).to_pandas()
+            head_tail.index = [(n_rows - rows_display_limit + i) for i in range(rows_display_limit)]
+        else:
+            head_tail = self.data.head(rows_display_limit).to_pandas()
+
+        if n_cols > 2 * cols_display_limit:
+            left_cols = self.columns[: cols_display_limit]
+            right_cols = self.columns[-cols_display_limit:]
+            tmp = pd.DataFrame(
+                [["..."] for _ in range(len(head_tail))],
+                index=head_tail.index,
+                columns=["..."]
+            )
+
+            return pd.concat([head_tail.loc[:, left_cols],
+                              tmp,
+                              head_tail.loc[:, right_cols]],
+                             axis=1)
+        else:
+            return head_tail
 
     def get_values(self, 
                    row: str | None = None, 
@@ -272,7 +317,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def create_empty(self, 
                      index: Iterable[Any] | None = None, 
-                     columns: Iterable[str] | None = None) -> Self:
+                     columns: Iterable[str] | None = None) -> "SparkNavigation":
         self.data = ps.DataFrame(index=index, columns=columns)
         return self
 
@@ -291,6 +336,10 @@ class SparkNavigation(DatasetBackendNavigation):
     @property
     def shape(self) -> tuple[int, int]:
         return self.data.shape
+    
+    @property
+    def labels_dict(self):
+        return {}
 
     def _get_column_index(self, column_name: Sequence[str] | str) -> int | list[int]:
         if isinstance(column_name, str):

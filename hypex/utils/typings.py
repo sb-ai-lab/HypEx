@@ -33,8 +33,7 @@ from pyspark.sql.types import (
     ShortType,
     ByteType,
 )
-from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Callable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -45,34 +44,34 @@ import pyspark.pandas as ps
 if TYPE_CHECKING:
     from hypex.dataset import Dataset
 
-StratificationRoleTypes = float | str | datetime.datetime
-DefaultRoleTypes = float | bool | str | int
-TargetRoleTypes = float | int | bool
-FeatureRoleTypes = float | bool | str | int
+StratificationRoleTypes = Union[float, str, datetime.datetime]
+DefaultRoleTypes = Union[float, bool, str, int]
+TargetRoleTypes = Union[float, int, bool]
+FeatureRoleTypes = Union[float, bool, str, int]
 CategoricalTypes = str
-ScalarType = float | int | str | bool
+ScalarType = Union[float, int, str, bool]
 PysparkScalarType = (
-    IntegerType | LongType |
-    FloatType | DoubleType |
-    DecimalType | ShortType | ByteType
+    IntegerType, LongType,
+    FloatType, DoubleType,
+    DecimalType, ShortType, ByteType
 )
-GroupingDataType = tuple[list[tuple[str, "Dataset"]], list[tuple[str, "Dataset"]]]
-SourceDataTypes = pd.DataFrame | ps.DataFrame | spark.DataFrame
+GroupingDataType = Tuple[List[Tuple[str, "Dataset"]], List[Tuple[str, "Dataset"]]]
+SourceDataTypes = Union[pd.DataFrame, ps.DataFrame, spark.DataFrame]
 
 
-MultiFieldKeyTypes = str | Sequence[str]
+MultiFieldKeyTypes = Union[str, Sequence[str]]
 
-FromDictTypes = (
-    dict[str, list[Any]]
-    | list[dict[Any, Any]]
-    | dict[str, dict[Any, list]]
-    | dict[str, "Dataset"]
-)
+FromDictTypes = Union[
+    Dict[str, List[Any]],
+    List[Dict[Any, Any]],
+    Dict[str, Dict[Any, List]],
+    Dict[str, "Dataset"]
+]
 RoleNameType = str
-DecoratedType = TypeVar("DecoratedType", bound=Callable[..., Any] | property)
+DecoratedType = TypeVar("DecoratedType", bound=Union[Callable[..., Any], property])
 DocstringInheritDecorator = Callable[[DecoratedType], DecoratedType]
 
-SetParamsDictTypes = dict[str, Any] | dict[type, dict[str, Any]]
+SetParamsDictTypes = Union[Dict[str, Any], Dict[type, Dict[str, Any]]]
 
 class SparkTypeMapper:
     _SPARK_TO_PY: MappingProxyType[type[DataType], type] = MappingProxyType({
@@ -89,5 +88,5 @@ class SparkTypeMapper:
     })
 
     @classmethod
-    def to_python(cls, spark_type: DataType | str) -> type:
+    def to_python(cls, spark_type: Union[DataType, str]) -> type:
         return cls._SPARK_TO_PY.get(type(spark_type), object)
