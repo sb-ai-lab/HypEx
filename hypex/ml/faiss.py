@@ -162,7 +162,7 @@ class FaissNearestNeighbors(MLExecutor):
         matched_indexes = Dataset.create_empty()
         for res_k, res_v in compare_result.items():
             group = grouping_data[1][1] if res_k == "test" else grouping_data[0][1]
-            t_index_field = res_v.loc[: len(group) - 1]
+            t_index_field = res_v.limit(len(group) - 1)
             n_nans = (
                 t_index_field.isna().sum().get_values(row="sum")
                 if t_index_field.shape[1] > 1

@@ -12,7 +12,7 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
-    Type, 
+    Type,
     Union
 )
 from pyspark.sql.types import (
@@ -33,6 +33,8 @@ from pyspark.sql.types import (
     ShortType,
     ByteType,
 )
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -61,28 +63,28 @@ SourceDataTypes = pd.DataFrame | ps.DataFrame | spark.DataFrame
 MultiFieldKeyTypes = str | Sequence[str]
 
 FromDictTypes = (
-    dict[str, list[Any]] |
-    list[Dict[Any, Any]] |
-    dict[str, Dict[Any, List]] |
-    dict[str, "Dataset"]
+    dict[str, list[Any]]
+    | list[dict[Any, Any]]
+    | dict[str, dict[Any, list]]
+    | dict[str, "Dataset"]
 )
 RoleNameType = str
-DecoratedType = TypeVar("DecoratedType", bound=Union[Callable[..., Any], property])
+DecoratedType = TypeVar("DecoratedType", bound=Callable[..., Any] | property)
 DocstringInheritDecorator = Callable[[DecoratedType], DecoratedType]
 
 SetParamsDictTypes = dict[str, Any] | dict[type, dict[str, Any]]
 
 class SparkTypeMapper:
     _SPARK_TO_PY: MappingProxyType[type[DataType], type] = MappingProxyType({
-        IntegerType: int, 
-        LongType: int, 
-        ShortType: int, 
+        IntegerType: int,
+        LongType: int,
+        ShortType: int,
         ByteType: int,
-        FloatType: float, 
+        FloatType: float,
         DoubleType: float,
         BooleanType: bool,
         StringType: str,
-        DateType: str, 
+        DateType: str,
         TimestampType: str,
     })
 

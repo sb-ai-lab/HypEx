@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from ..dataset import Dataset, ExperimentData
+from ..dataset.dataset import SmallDataset
 from ..dataset.roles import InfoRole, ReportRole, TreatmentRole
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
 from ..utils.errors import AbstractMethodError
@@ -103,7 +104,7 @@ class TestDictReporter(DictReporter):
         return dict_result
 
     @staticmethod
-    def _convert_struct_dict_to_dataset(data: dict) -> Dataset:
+    def _convert_struct_dict_to_dataset(data: dict) -> SmallDataset:
         def rename_passed(data: dict[str, bool]):
             return {
                 c: (
@@ -129,7 +130,7 @@ class TestDictReporter(DictReporter):
                         t_values[f"{test} p-value"] = values.get("p-value")
                 result.append(t_values)
         result = [rename_passed(d) for d in result]
-        return Dataset.from_dict(
+        return SmallDataset.from_dict(
             result,
             roles={"feature": InfoRole(), "group": TreatmentRole()},
         )

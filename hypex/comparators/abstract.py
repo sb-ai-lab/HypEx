@@ -331,7 +331,7 @@ class Comparator(Calculator, ABC):
             indexes = group[1].iget_values(column=0)
             dummy_index = target_fields_data.index[-1]
             indexes = list(map(lambda x: dummy_index if x < 0 else x, indexes))
-            baseline_data.append((name, target_fields_data.loc[indexes, :]))
+            baseline_data.append((name, target_fields_data.loc[indexes, :]))    #TODO: add spark backend support
 
         return baseline_data, compared_data
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import Callable
+from collections.abc import Callable
 
 from scipy.stats import (  # type: ignore
     chi2_contingency,
