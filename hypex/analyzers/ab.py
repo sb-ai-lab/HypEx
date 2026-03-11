@@ -5,6 +5,7 @@ from typing import Any
 
 from ..comparators import TTest, UTest
 from ..dataset import Dataset, ExperimentData, StatisticRole, TargetRole, TreatmentRole
+from ..dataset.dataset import SmallDataset
 from ..experiments.base import Executor
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
 from ..utils import (
@@ -64,7 +65,7 @@ class ABAnalyzer(Executor):
                 )
 
             else:
-                multitest_result = Dataset.create_empty()
+                multitest_result = SmallDataset.create_empty()
                 for target_field in target_fields:
                     multitest_result = multitest_result.append(
                         MultitestQuantile(
@@ -123,10 +124,9 @@ class ABAnalyzer(Executor):
                         f"{c} {name[name.find(NAME_BORDER_SYMBOL) + 1 : name.rfind(NAME_BORDER_SYMBOL)]}"
                     ] = value[0]
 
-        analysis_dataset = Dataset.from_dict(
+        analysis_dataset = SmallDataset.from_dict(
             [analysis_data],
-            {f: StatisticRole(float) for f in analysis_data},
-            BackendsEnum.pandas,
+            {f: StatisticRole(float) for f in analysis_data}
         )
         data = self.execute_multitest(
             data,

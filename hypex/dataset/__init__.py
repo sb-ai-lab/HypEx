@@ -3,6 +3,7 @@ This module defines data structures and roles used across the library for managi
 """
 
 from .abstract import DatasetBase
+from .groupby_dataset import GroupedDataset
 from .dataset import Dataset, DatasetAdapter, ExperimentData, SmallDataset
 from .roles import (
     ABCRole,
@@ -43,6 +44,7 @@ __all__ = [
     "Dataset",
     "DatasetAdapter",
     "DatasetBase",
+    "GroupedDataset",
     "DefaultRole",
     "ExperimentData",
     "FeatureRole",
@@ -51,6 +53,7 @@ __all__ = [
     "indexRole",
     "InfoRole",
     "PreTargetRole",
+    "SmallDataset",
     "StatisticRole",
     "StratificationRole",
     "TargetRole",
