@@ -5,26 +5,21 @@ import re
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized, Self
 
-from functools import reduce
-
 import numpy as np
 import pandas as pd
 
-import pyspark.pandas as ps
-ps.set_option('compute.ops_on_diff_frames', True)
-from pyspark.pandas.exceptions import PandasNotImplementedError
-from pyspark.sql.types import (
-    IntegerType, LongType, ShortType, ByteType,
-    FloatType, DoubleType, BooleanType, StringType, DateType, TimestampType
-)
-        
 import pyspark.sql as spark
 from pyspark.sql import SparkSession
-import pyspark.sql.functions as F
 from pyspark.sql import DataFrame as SparkDF
-
+import pyspark.sql.functions as F
 from pyspark.sql.types import StructType
 
+
+import pyspark.pandas as ps
+from pyspark.pandas.exceptions import PandasNotImplementedError
+
+ps.set_option('compute.ops_on_diff_frames', True)
+        
 from ...utils import FromDictTypes, MergeOnError, ScalarType, SparkTypeMapper
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
