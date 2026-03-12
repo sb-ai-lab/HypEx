@@ -32,10 +32,6 @@ class MLOneHotEncoder(MLTransformer):
         return [CategoricalTypes]
 
     @staticmethod
-    def _inner_function(data: Dataset, **kwargs) -> Dataset:
-        return data
-
-    @staticmethod
     def _fit(
         data: Dataset,
         target_cols: str | Sequence[str] | None = None,
