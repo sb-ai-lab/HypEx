@@ -67,7 +67,7 @@ class MLExperiment(Experiment):
     def __init__(
         self,
         splitters: Sequence[MLSplitter] | None = None,
-        transformers: Sequence[Executor] | None = None,
+        transformers: Sequence[MLTransformer] | None = None,
         ml_executors: Sequence[MLExecutor] | None = None,
         mode: str | MLMode = MLMode.FIT_PREDICT,
         experiment_id: Optional[str] = None,
@@ -187,6 +187,7 @@ class MLExperiment(Experiment):
         
         # Always cleanup ML artifacts from memory
         experiment_data.cleanup_ml_artifacts()
+        experiment_data.cleanup_ml_executor_artifacts()
         
         return result_data
     

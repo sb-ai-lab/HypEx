@@ -17,6 +17,10 @@ class MLTransformer(MLExecutor):
         self._fitted_state: MLExecutorState | None = None
 
     @property
+    def _is_transformer(self):
+        return True
+
+    @property
     def is_fitted(self) -> bool:
         return self._fitted_state is not None
 
