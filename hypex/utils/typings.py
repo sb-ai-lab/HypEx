@@ -1,6 +1,5 @@
 import datetime
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -10,9 +9,6 @@ from typing import (
     TypeVar,
     Union,
 )
-
-if TYPE_CHECKING:
-    from hypex.dataset import Dataset
 
 StratificationRoleTypes = Union[float, str, datetime.datetime]
 DefaultRoleTypes = Union[float, bool, str, int]

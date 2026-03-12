@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, List, Optional, Sequence, TYPE_CHECKING, Union
+from typing import Any, List, Optional, Sequence, Union
 
 from ..dataset import Dataset, ExperimentData
 from ..dataset.ml_data import MLExperimentData
@@ -11,10 +11,7 @@ from ..executor.ml_executor import MLExecutor
 from ..utils import ExperimentDataEnum
 from ..utils.adapter import Adapter
 from .models import MLModel
-
-
-if TYPE_CHECKING:
-    from ..dataset.ml_data import MLData
+from ..dataset.ml_data import MLData
 
 
 class CUPACExecutor(MLExecutor):

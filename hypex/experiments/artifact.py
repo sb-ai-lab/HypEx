@@ -4,11 +4,8 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
-
-if TYPE_CHECKING:
-    from ..dataset.ml_data import MLExperimentData
-    from .ml import MLExperiment
+from typing import Any, Dict, List, Optional
+from ..dataset.ml_data import MLExperimentData
 
 
 class ExperimentArtifact:

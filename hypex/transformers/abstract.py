@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from enum import Enum
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, Optional
 
 from ..dataset import Dataset, ExperimentData
 from ..executor import Calculator
 from ..utils import AbstractMethodError
 from .state import TransformerParams
-
-if TYPE_CHECKING:
-    from ..dataset.ml_data import MLExperimentData
+from ..dataset.ml_data import MLExperimentData
 
 
 class TransformerMode(str, Enum):

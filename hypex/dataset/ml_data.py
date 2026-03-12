@@ -4,15 +4,10 @@ import json
 import os
 from copy import deepcopy
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, Optional, Tuple
 
 from ..dataset import Dataset, ExperimentData
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
-
-if TYPE_CHECKING:
-    from ..ml.models import MLModel
-    from ..ml.stats import ModelStats
-    from ..transformers.state import TransformerParams
 
 
 class MLData:
