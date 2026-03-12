@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from copy import deepcopy
-from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
@@ -11,17 +10,11 @@ from ..dataset.ml_data import MLExperimentData
 from ..executor import Executor
 from ..executor.ml_executor import MLExecutor
 from ..splitters.base import MLSplitter
-from ..transformers import TransformerMode
+from ..transformers import MLTransformer
 from ..utils.constants import DEFAULT_EXPERIMENT_DIR
+from ..utils.enums import MLMode
 from .artifact import ExperimentArtifact
 from .base import Experiment
-
-
-class MLMode(str, Enum):
-    """MLExperiment execution modes"""
-    FIT_PREDICT = "fit_predict"  # Train and apply (default)
-    FIT = "fit"                  # Only train, save models
-    PREDICT = "predict"          # Only apply using saved models
 
 
 class MLExperiment(Experiment):
@@ -91,6 +84,16 @@ class MLExperiment(Experiment):
             )
         if splitters:
             all_executors.extend(splitters)
+        if transformers and not all(isinstance(transformer, MLTransformer) for transformer in transformers):
+            wrong = [
+                type(transformer).__name__
+                for transformer in transformers
+                if not isinstance(transformer, MLTransformer)
+            ]
+            raise TypeError(
+                "MLExperiment.transformers must contain only MLTransformer instances. "
+                f"Got: {wrong}"
+            )
         if transformers:
             all_executors.extend(transformers)
         if ml_executors and not all(isinstance(executor, MLExecutor) for executor in ml_executors):
@@ -140,8 +143,8 @@ class MLExperiment(Experiment):
         2. Transform ExperimentData → MLExperimentData
         3. Configure executors for correct mode
         4. Execute splitters (prepare data structures)
-        5. Execute transformers (with mode mapping to fit/transform/fit_transform)
-        6. Execute ml_executors (with mode mapping to fit/predict/fit_predict)
+        5. Execute ML transformers (with MLMode propagation)
+        6. Execute ml_executors (with MLMode propagation)
         7. Save artifact if mode='fit' or mode='fit_predict'
         8. Transform back MLExperimentData → ExperimentData
         9. Cleanup ML artifacts from memory
@@ -163,22 +166,17 @@ class MLExperiment(Experiment):
         # Execute splitters (always same behavior)
         for executor in self.splitters:
             executor.key = self.key
-            experiment_data = executor.execute(experiment_data)
+            experiment_data = executor.execute(experiment_data, mode=self.mode)
         
-        # Execute transformers with mode mapping
-        transformer_mode = self._map_mode_for_transformer()
+        # Execute ML transformers with mode propagation
         for executor in self.transformers:
             executor.key = self.key
-            if hasattr(executor, 'mode'):
-                executor.mode = transformer_mode
-            experiment_data = executor.execute(experiment_data)
+            experiment_data = executor.execute(experiment_data, mode=self.mode)
         
         # Execute ML executors with mode propagation
         for executor in self.ml_executors:
             executor.key = self.key
-            if hasattr(executor, 'mode'):
-                executor.mode = self.mode
-            experiment_data = executor.execute(experiment_data)
+            experiment_data = executor.execute(experiment_data, mode=self.mode)
         
         # Save artifact if in fit or fit_predict mode
         if self.save_experiment:
@@ -191,23 +189,6 @@ class MLExperiment(Experiment):
         experiment_data.cleanup_ml_artifacts()
         
         return result_data
-    
-    def _map_mode_for_transformer(self) -> TransformerMode:
-        """
-        Map MLExperiment mode to Transformer mode.
-        
-        MLExperiment.fit → Transformer.fit
-        MLExperiment.predict → Transformer.transform
-        MLExperiment.fit_predict → Transformer.fit_transform
-        """
-        if self.mode == MLMode.FIT:
-            return TransformerMode.FIT
-        elif self.mode == MLMode.PREDICT:
-            return TransformerMode.TRANSFORM
-        elif self.mode == MLMode.FIT_PREDICT:
-            return TransformerMode.FIT_TRANSFORM
-        else:
-            raise ValueError(f"Unknown mode: {self.mode}")
     
     def _ensure_ml_data(self, data: ExperimentData) -> MLExperimentData:
         """Convert to MLExperimentData if needed"""

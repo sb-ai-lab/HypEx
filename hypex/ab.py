@@ -7,11 +7,11 @@ from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest, U
 from .dataset import AdditionalTargetRole, TargetRole, TreatmentRole
 from .executor.executor import Executor
 from .experiments.base import Experiment, OnRoleExperiment
-from .experiments.ml import MLMode
 from .transformers import CUPEDTransformer
 from .ui.ab import ABOutput
 from .ui.base import ExperimentShell
 from .utils import ABNTestMethodsEnum, ABTestTypesEnum
+from .utils.enums import MLMode
 
 
 class ABTest(ExperimentShell):

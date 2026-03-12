@@ -8,6 +8,7 @@ from ..dataset import Dataset, ExperimentData
 from ..dataset.ml_data import MLData, MLExperimentData
 from ..dataset.roles import PreTargetRole, TargetRole
 from ..executor import Executor
+from ..utils.enums import MLMode
 
 
 class Splitter(Executor, ABC):
@@ -75,12 +76,17 @@ class MLSplitter(Splitter, ABC):
         self.random_state = random_state
 
     @abstractmethod
-    def execute(self, data: MLExperimentData) -> MLExperimentData:
+    def execute(
+        self,
+        data: MLExperimentData,
+        mode: MLMode | None = None,
+    ) -> MLExperimentData:
         """
         Execute ML data splitting.
 
         Args:
             data: ML experiment data
+            mode: ML execution mode
 
         Returns:
             MLExperimentData with prepared ML inputs

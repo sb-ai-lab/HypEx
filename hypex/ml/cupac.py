@@ -33,7 +33,6 @@ class CUPACExecutor(MLExecutor):
         n_folds (int): Number of folds for cross-validation during model selection.
         random_state (Optional[int]): Random seed for reproducibility.
         cv_aggregation (str): Method for aggregating CV scores ('mean', 'median', 'max').
-        mode (str | MLMode | None): Execution mode - set by MLExperiment, defaults to fit_predict.
     """
 
     def __init__(
@@ -43,9 +42,8 @@ class CUPACExecutor(MLExecutor):
         n_folds: int = 5,
         random_state: Optional[int] = None,
         cv_aggregation: str = "mean",
-        mode: str | None = None,
     ):
-        super().__init__(key=key, mode=mode)
+        super().__init__(key=key)
         self.cupac_models = cupac_models
         self.n_folds = n_folds
         self.random_state = random_state
