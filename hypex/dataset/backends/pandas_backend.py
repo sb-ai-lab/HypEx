@@ -82,11 +82,11 @@ class PandasNavigation(DatasetBackendNavigation):
 
     @staticmethod    
     def _downcasting(data: spark.DataFrame, numeric_columns: List[str]) -> spark.DataFrame:
-        """Encoding categorical features.
+        """Downcasting data.
 
         Args:
             data: `spark.DataFrame data` copressing data.
-            categorical_columns: `List[str]` list of columns for downcasting.
+            numeric_columns: `List[str]` list of floating point columns.
         
         Returns:
             `spark.DataFrame`: downcasted dataframe.
