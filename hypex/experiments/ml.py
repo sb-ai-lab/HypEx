@@ -207,8 +207,8 @@ class MLExperiment(Experiment):
             experiment_id=self.key if self.key else None
         )
         
-        # Save transformer states from ml_data
-        artifact.transformer_states = ml_data.get_all_fitted_transformers()
+        # Save fitted ML executor states from ml_data
+        artifact.ml_executor_states = ml_data.get_all_fitted_ml_executors()
         
         # Save trained models from ml_data (combine models + stats)
         if self.save_models:
@@ -255,12 +255,12 @@ class MLExperiment(Experiment):
         if self._loaded_artifact is None:
             return
         
-        # Load transformer states from artifact
-        transformer_states = self._loaded_artifact.load_transformer_states()
-        
+        # Load fitted ML executor states from artifact
+        ml_executor_states = self._loaded_artifact.load_ml_executor_states()
+
         # Add to ml_data
-        for transformer_id, state in transformer_states.items():
-            ml_data.add_fitted_transformer(transformer_id, state)
+        for executor_id, state in ml_executor_states.items():
+            ml_data.add_fitted_ml_executor(executor_id, state)
         
         # Restore executor IDs from saved configuration
         # This ensures that loaded models can be found by their original executor IDs

@@ -6,9 +6,9 @@ from typing import Any
 from ..dataset import Dataset
 from ..dataset.ml_data import MLExperimentData
 from ..executor.ml_executor import MLExecutor
+from ..executor.state import MLExecutorState
 from ..utils import AbstractMethodError
 from .abstract import Transformer
-from .state import TransformerParams
 
 
 class MLTransformer(MLExecutor, Transformer):
@@ -17,7 +17,7 @@ class MLTransformer(MLExecutor, Transformer):
     def __init__(self, key: Any = "", **calc_kwargs):
         super().__init__(key=key)
         self.calc_kwargs = calc_kwargs
-        self._fitted_state: TransformerParams | None = None
+        self._fitted_state: MLExecutorState | None = None
 
     @property
     def is_fitted(self) -> bool:
@@ -43,11 +43,11 @@ class MLTransformer(MLExecutor, Transformer):
         return MLTransformer._inner_function(data, **kwargs)
 
     @classmethod
-    def fit(cls, data: Dataset, **kwargs) -> TransformerParams:
+    def fit(cls, data: Dataset, **kwargs) -> MLExecutorState:
         fitted_params = cls._fit(data, **kwargs)
-        return TransformerParams(
-            transformer_id="temp",
-            transformer_class=cls.__name__,
+        return MLExecutorState(
+            executor_id="temp",
+            executor_class=cls.__name__,
             fitted_params=fitted_params,
             metadata={"init_kwargs": kwargs},
         )
@@ -57,20 +57,20 @@ class MLTransformer(MLExecutor, Transformer):
         return cls._transform(data, fitted_params, **kwargs)
 
     @classmethod
-    def fit_transform(cls, data: Dataset, **kwargs) -> tuple[Dataset, TransformerParams]:
+    def fit_transform(cls, data: Dataset, **kwargs) -> tuple[Dataset, MLExecutorState]:
         state = cls.fit(data, **kwargs)
         transformed = cls.transform(data, state.fitted_params, **kwargs)
         return transformed, state
 
     def execute_fit(self, data: MLExperimentData) -> MLExperimentData:
         state = self.fit(data.ds, **self.calc_kwargs)
-        state.transformer_id = self.id
+        state.executor_id = self.id
         self._fitted_state = state
-        data.add_fitted_transformer(self.id, state)
+        data.add_fitted_ml_executor(self.id, state)
         return data
 
     def execute_predict(self, data: MLExperimentData) -> MLExperimentData:
-        state = data.get_fitted_transformer(self.id)
+        state = data.get_fitted_ml_executor(self.id)
         if state is None:
             raise ValueError(
                 f"Transformer {self.__class__.__name__} (id={self.id}) "
@@ -82,7 +82,7 @@ class MLTransformer(MLExecutor, Transformer):
 
     def execute_fit_predict(self, data: MLExperimentData) -> MLExperimentData:
         transformed_ds, state = self.fit_transform(data.ds, **self.calc_kwargs)
-        state.transformer_id = self.id
+        state.executor_id = self.id
         self._fitted_state = state
-        data.add_fitted_transformer(self.id, state)
+        data.add_fitted_ml_executor(self.id, state)
         return data.copy(data=transformed_ds)

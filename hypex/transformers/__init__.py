@@ -6,7 +6,6 @@ from .ml_one_hot_encoder import MLOneHotEncoder
 from .ml_transformer import MLTransformer
 from .na_filler import NaFiller
 from .shuffle import Shuffle
-from .state import TransformerParams
 from .type_caster import TypeCaster
 
 __all__ = [
@@ -23,6 +22,5 @@ __all__ = [
     "NanFilter",
     "OutliersFilter",
     "Shuffle",
-    "TransformerParams",
     "TypeCaster",
 ]

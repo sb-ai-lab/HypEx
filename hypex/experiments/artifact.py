@@ -10,11 +10,11 @@ from ..dataset.ml_data import MLExperimentData
 
 class ExperimentArtifact:
     """
-    Experiment artifact - manages saving/loading of fitted transformers and models.
+    Experiment artifact - manages saving/loading of fitted ML executor states and models.
     
     Owns all save/load logic for:
     - Metadata (experiment.json)
-    - Fitted transformers (transformers/)
+    - Fitted ML executor states (ml_executors/)
     - Trained models (models/)
     
     MLExperiment delegates to this class instead of doing it itself.
@@ -22,9 +22,9 @@ class ExperimentArtifact:
     Directory structure:
         experiment_20260210_123456/
             experiment.json          # Metadata + pipeline config
-            transformers/            # Fitted transformer states
+            ml_executors/            # Fitted ML executor states
                 NaFiller_abc.json
-                CVFilter_def.json
+                SomeExecutor_def.json
             models/                  # Trained models
                 CUPACExecutor_123/
                     y/
@@ -35,12 +35,12 @@ class ExperimentArtifact:
     Examples:
         # Save
         artifact = ExperimentArtifact.create_from_experiment(ml_experiment, "exp_dir/")
-        artifact.transformer_states = ml_data.get_all_fitted_transformers()
+        artifact.ml_executor_states = ml_data.get_all_fitted_ml_executors()
         artifact.save()
         
         # Load
         artifact = ExperimentArtifact.load_from_directory("exp_dir/")
-        states = artifact.load_transformer_states()
+        states = artifact.load_ml_executor_states()
     """
     
     def __init__(
@@ -56,11 +56,13 @@ class ExperimentArtifact:
         self.base_dir = base_dir
         self.pipeline_config = pipeline_config
         self.created_at = created_at or datetime.now().isoformat()
-        self.transformer_states: Dict[str, Any] = {}  # Will be populated
+        self.ml_executor_states: Dict[str, Any] = {}  # Will be populated
         self.models_data: Dict[str, Any] = {}  # Will store trained models info
         
         # Paths
         self.metadata_file = os.path.join(base_dir, "experiment.json")
+        self.ml_executors_dir = os.path.join(base_dir, "ml_executors")
+        # Legacy path for backward-compatible loading.
         self.transformers_dir = os.path.join(base_dir, "transformers")
         self.models_dir = os.path.join(base_dir, "models")
     
@@ -145,11 +147,6 @@ class ExperimentArtifact:
             'id': executor.id,
         }
         
-        # For transformers - save mode
-        if hasattr(executor, 'mode'):
-            mode = executor.mode
-            config['mode'] = mode.value if hasattr(mode, 'value') else mode
-        
         # Save parameters
         if hasattr(executor, 'calc_kwargs'):
             config['params'] = executor.calc_kwargs
@@ -172,8 +169,8 @@ class ExperimentArtifact:
         # 2. Save metadata
         self._save_metadata()
         
-        # 3. Save transformers
-        self._save_transformers()
+        # 3. Save ML executor states
+        self._save_ml_executor_states()
         
         # 4. Save models
         self._save_models()
@@ -181,7 +178,7 @@ class ExperimentArtifact:
     def _create_directory_structure(self) -> None:
         """Create directories for artifact"""
         os.makedirs(self.base_dir, exist_ok=True)
-        os.makedirs(self.transformers_dir, exist_ok=True)
+        os.makedirs(self.ml_executors_dir, exist_ok=True)
         os.makedirs(self.models_dir, exist_ok=True)
     
     def _save_metadata(self) -> None:
@@ -196,16 +193,16 @@ class ExperimentArtifact:
         with open(self.metadata_file, 'w') as f:
             json.dump(metadata, f, indent=2)
     
-    def _save_transformers(self) -> None:
+    def _save_ml_executor_states(self) -> None:
         """
-        Save fitted transformers.
+        Save fitted ML executor states.
         
         Structure:
-        transformers/
+        ml_executors/
             StandardScaler_abc123.json
         """
-        for transformer_id, state in self.transformer_states.items():
-            state_file = os.path.join(self.transformers_dir, f"{transformer_id}.json")
+        for executor_id, state in self.ml_executor_states.items():
+            state_file = os.path.join(self.ml_executors_dir, f"{executor_id}.json")
             with open(state_file, 'w') as f:
                 json.dump(state.to_dict(), f, indent=2)
     
@@ -244,31 +241,39 @@ class ExperimentArtifact:
     
     # === Load ===
     
-    def load_transformer_states(self) -> Dict[str, Any]:
+    def load_ml_executor_states(self) -> Dict[str, Any]:
         """
-        Load fitted transformer states from disk.
+        Load fitted ML executor states from disk.
         
         Returns:
-            Dict of transformer_id -> TransformerParams
+            Dict of executor_id -> MLExecutorState
         """
-        from ..transformers.state import TransformerParams
-        
-        transformer_states = {}
-        
-        if not os.path.exists(self.transformers_dir):
-            return transformer_states
-        
-        for filename in os.listdir(self.transformers_dir):
+        from ..executor.state import MLExecutorState
+
+        ml_executor_states = {}
+
+        # Prefer new path, fallback to legacy transformers path.
+        states_dir = self.ml_executors_dir
+        if not os.path.exists(states_dir):
+            states_dir = self.transformers_dir
+        if not os.path.exists(states_dir):
+            return ml_executor_states
+
+        for filename in os.listdir(states_dir):
             if filename.endswith('.json'):
-                transformer_id = filename[:-5]  # Remove .json
-                state_file = os.path.join(self.transformers_dir, filename)
-                
+                executor_id = filename[:-5]
+                state_file = os.path.join(states_dir, filename)
+
                 with open(state_file, 'r') as f:
                     state_dict = json.load(f)
-                state = TransformerParams.from_dict(state_dict)
-                transformer_states[transformer_id] = state
-        
-        return transformer_states
+                state = MLExecutorState.from_dict(state_dict)
+                ml_executor_states[executor_id] = state
+
+        return ml_executor_states
+
+    # Backward-compatible alias.
+    def load_transformer_states(self) -> Dict[str, Any]:
+        return self.load_ml_executor_states()
     
     def load_models(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
         """
