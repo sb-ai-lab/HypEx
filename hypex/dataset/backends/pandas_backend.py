@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional
+from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional, List
 
 import numpy as np
-import pyspark.sql as spark
 import pandas as pd  # type: ignore
 import pyspark.sql as spark
 import pyspark.sql.functions as F
@@ -18,33 +17,87 @@ from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
 class PandasNavigation(DatasetBackendNavigation):
-    @staticmethod
-    def _downcast(data: spark.DataFrame) -> tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
+    
+    def _data_compression(self,
+                  data: spark.DataFrame,
+                  data_compression: Literal["downcasting", "encoding", "auto", "disable"],
+                  non_compresion_cols: List[str] | None
+    ) -> pd.DataFrame:
+        """Compress data before convertation `spark.DataFrame` to pandas.DataFrame.
+        
+        Args:
+            data: `spark.DataFrame data` copressing data.
+            data_compression: `Literal["downcasting", "encoding", "auto", "disable"]` compression mode.
+            non_compresion_cols: `List[str] | None` list of columns that shouldn't be encoded.
+        
+        Returns:
+            `pd.DataFrame`: compressed dataframe.
+        """
         columns_dict = dict(data.dtypes)
+        labels = {}
+        result = data
 
-        double_columns = [col for col, c_type in columns_dict.items()
+        if data_compression in ["downcasting", "auto"]:
+            double_columns = [col for col, c_type in columns_dict.items()
                           if c_type == 'double' or c_type.startswith('decimal')]
-        categorical_columns = [col for col, c_type in columns_dict.items()
-                               if c_type in ['string', 'varchar']]
+            result = self._downcasting(data, double_columns)
 
+        if data_compression in ["encoding", "auto"]:
+            if non_compresion_cols is None:
+                non_compresion_cols = []
+            categorical_columns = [col for col, c_type in columns_dict.items()
+                               if c_type in ['string', 'varchar'] and col not in non_compresion_cols]
+            result, labels = self._encoding(result, categorical_columns)
+
+        self._labels_dict = labels
+        return result.toPandas()
+    
+    @staticmethod
+    def _encoding(data: spark.DataFrame, categorical_columns: List[str]) -> spark.DataFrame:
+        """Encoding categorical features.
+
+        Args:
+            data: `spark.DataFrame data` copressing data.
+            categorical_columns: `List[str]` list of columns for encoding.
+        
+        Returns:
+            `spark.DataFrame`: dataframe with encoded categorical columns.
+        """
+        filled_data = data.na.fill("UNKNOWN")
         indexer = StringIndexer(inputCols=categorical_columns,
                                 outputCols=[f"{col}_indexed" for col in categorical_columns],
                                 handleInvalid="keep")
-        filled_data = data.na.fill("UNKNOWN")
         model = indexer.fit(filled_data)
         labels = {col : {idx : label for idx, label in  enumerate(labels_list)}
                   for labels_list, col in zip(model.labelsArray, categorical_columns)}
-
+        
         return ((
                     model
                     .transform(filled_data)
                     .select(*[
-                        F.col(col).cast("float") if col in double_columns else
                         F.col(f"{col}_indexed").cast("int").alias(col) if col in categorical_columns else
                         F.col(col) for col in filled_data.columns
                     ])
-                    .toPandas()
-                ), labels)
+                ), labels) 
+
+    @staticmethod    
+    def _downcasting(data: spark.DataFrame, numeric_columns: List[str]) -> spark.DataFrame:
+        """Encoding categorical features.
+
+        Args:
+            data: `spark.DataFrame data` copressing data.
+            categorical_columns: `List[str]` list of columns for downcasting.
+        
+        Returns:
+            `spark.DataFrame`: downcasted dataframe.
+        """
+        return (
+            data
+            .select(*[
+                F.col(col).cast("float") if col in numeric_columns else
+                F.col(col) for col in data.columns
+            ])
+        )
 
     @staticmethod
     def _read_file(filename: str | Path) -> pd.DataFrame:
@@ -67,7 +120,10 @@ class PandasNavigation(DatasetBackendNavigation):
         else:
             raise ValueError(f"Unsupported file extension {file_extension}")
 
-    def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
+    def __init__(self, 
+                 data: pd.DataFrame | dict | str | pd.Series | None = None,
+                 data_compression: Literal["downcasting", "encoding", "auto", "disable"] = "auto",
+                 non_compresion_cols: List[str] | None = None):
         """Initialize PandasNavigation with various data sources.
 
         Args:
@@ -78,6 +134,8 @@ class PandasNavigation(DatasetBackendNavigation):
                 - dict: Expected format {"data": ..., "index": ...} or {"data": ...}.
                 - str: Path to a file (.csv or .xlsx) to be read.
                 - None: Creates an empty DataFrame.
+
+             data_compression: regime for compression `spark.DataFrame` to `pandas.DataFrame`.
         """
         self._labels_dict = {}
         if isinstance(data, pd.DataFrame):
@@ -85,7 +143,7 @@ class PandasNavigation(DatasetBackendNavigation):
         elif isinstance(data, pd.Series):
             self.data = pd.DataFrame(data)
         elif isinstance(data, spark.DataFrame):
-            self.data, self._labels_dict = self._downcast(data)
+            self.data = self._data_compression(data, data_compression, non_compresion_cols)
         elif isinstance(data, dict):
             if "index" in data.keys():
                 self.data = pd.DataFrame(data=data["data"], index=data["index"])
@@ -718,6 +776,9 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         for column_name, type_name in dtype.items():
             if not self.data[column_name].isna().any():
+                # if isinstance(type_name, str):
+                #     self.data = self.data.replace({column_name : self.labels_dict[column_name]})
+                #     self.labels_dict.pop(column_name)
                 self.data = self.astype({column_name: type_name})
         return self
 
@@ -868,8 +929,11 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             return float(result.loc[result.index[0], result.columns[0]])
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
-    def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
-        super().__init__(data)
+    def __init__(self, 
+                 data: pd.DataFrame | dict | str | pd.Series | None = None, 
+                 data_compression: str | None = None,
+                 non_compresion_cols: list | None = None):
+        super().__init__(data, data_compression, non_compresion_cols)
 
     def get(self, key, default=None) -> Any:
         """Get value for key from underlying DataFrame, with default fallback.

@@ -43,7 +43,7 @@ class DatasetBase(ABC):
 
     @staticmethod
     def _select_backend_from_data(data: Any,
-                                  session: spark.SparkSession = None) -> PandasDataset | SparkDataset:
+                                  session: spark.SparkSession = None,) -> PandasDataset | SparkDataset:
         if isinstance(data, (PandasDataset, SparkDataset)):
             return data
         elif isinstance(data, pd.DataFrame):
@@ -53,19 +53,37 @@ class DatasetBase(ABC):
 
         raise TypeError("data must be an instance of either"
                         "pandas.DataFrame, spark.DataFrame or PandasDataset, SparkDataset")
+    
+    def _select_non_encoding_columns(
+        self,
+        roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole] | None = None,
+    ) -> list[str] | None:
+        columns = None
+        if isinstance(roles, dict):
+            if any(isinstance(role, ABCRole) for role in roles.keys()):
+                roles = self._parse_roles(roles)
+            columns = []
+            for column, role in roles.items():
+                if role.data_type == str:
+                    columns.append(column)
+        return columns
 
     @staticmethod
-    def _select_backend_from_str(data: Any,
-                                 backend: BackendsEnum | None,
-                                 session: spark.SparkSession | None=None):
+    def _select_backend_from_str(
+        data: Any,
+        backend: BackendsEnum | None,
+        data_compression: Literal["downcasting", "encoding", "auto", "disable"],
+        session: spark.SparkSession | None = None,
+        non_compresion_cols: list[str] | None = None,
+    ) -> PandasDataset | SparkDataset:
         if backend == BackendsEnum.pandas:
-            return PandasDataset(data)
+            return PandasDataset(data, data_compression, non_compresion_cols)
         elif backend == BackendsEnum.spark:
             return SparkDataset(data, session)
         elif backend is None:
             if session is not None:
                 return SparkDataset(data, session)
-            return PandasDataset(data)
+            return PandasDataset(data, data_compression, non_compresion_cols)
         raise TypeError("Backend must be an instance of BackendsEnum")
 
     def _set_all_roles(self,
@@ -92,9 +110,11 @@ class DatasetBase(ABC):
                  data: spark.DataFrame | pd.DataFrame | str | DatasetBase | None = None,
                  backend: BackendsEnum | None = None,
                  default_role: ABCRole | None = None,
-                 session: Optional[spark.SparkSession] = None):
+                 session: Optional[spark.SparkSession] = None,
+                 data_compression: Literal["downcasting", "encoding", "auto", "disable"] = "auto"):
         if backend is not None:
-            self._backend = self._select_backend_from_str(data, backend, session)
+            non_compresion_cols = self._select_non_encoding_columns(roles)
+            self._backend = self._select_backend_from_str(data, backend, data_compression,session, non_compresion_cols)
         elif data is not None:
             if isinstance(data, DatasetBase):
                 self._backend = copy.deepcopy(data._backend)
