@@ -38,9 +38,12 @@ from .roles import (
 
 
 class DatasetBase(ABC):
+    DISPLAY_ROWS = 5
+    DISPLAY_COLS = 10
+
     @staticmethod
     def _select_backend_from_data(data: Any,
-                                  session: spark.SparkSession = None) -> PandasDataset | SparkDataset:
+                                  session: spark.SparkSession = None,) -> PandasDataset | SparkDataset:
         if isinstance(data, (PandasDataset, SparkDataset)):
             return data
         elif isinstance(data, pd.DataFrame):
@@ -50,19 +53,37 @@ class DatasetBase(ABC):
 
         raise TypeError("data must be an instance of either"
                         "pandas.DataFrame, spark.DataFrame or PandasDataset, SparkDataset")
+    
+    def _select_non_encoding_columns(
+        self,
+        roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole] | None = None,
+    ) -> list[str] | None:
+        columns = None
+        if isinstance(roles, dict):
+            if any(isinstance(role, ABCRole) for role in roles.keys()):
+                roles = self._parse_roles(roles)
+            columns = []
+            for column, role in roles.items():
+                if role.data_type == str:
+                    columns.append(column)
+        return columns
 
     @staticmethod
-    def _select_backend_from_str(data: Any,
-                                 backend: BackendsEnum | None,
-                                 session: spark.SparkSession | None=None):
+    def _select_backend_from_str(
+        data: Any,
+        backend: BackendsEnum | None,
+        data_compression: Literal["downcasting", "encoding", "auto", "disable"],
+        session: spark.SparkSession | None = None,
+        non_compresion_cols: list[str] | None = None,
+    ) -> PandasDataset | SparkDataset:
         if backend == BackendsEnum.pandas:
-            return PandasDataset(data)
+            return PandasDataset(data, data_compression, non_compresion_cols)
         elif backend == BackendsEnum.spark:
             return SparkDataset(data, session)
         elif backend is None:
             if session is not None:
                 return SparkDataset(data, session)
-            return PandasDataset(data)
+            return PandasDataset(data, data_compression, non_compresion_cols)
         raise TypeError("Backend must be an instance of BackendsEnum")
 
     def _set_all_roles(self,
@@ -89,9 +110,11 @@ class DatasetBase(ABC):
                  data: spark.DataFrame | pd.DataFrame | str | DatasetBase | None = None,
                  backend: BackendsEnum | None = None,
                  default_role: ABCRole | None = None,
-                 session: Optional[spark.SparkSession] = None):
+                 session: Optional[spark.SparkSession] = None,
+                 data_compression: Literal["downcasting", "encoding", "auto", "disable"] = "auto"):
         if backend is not None:
-            self._backend = self._select_backend_from_str(data, backend, session)
+            non_compresion_cols = self._select_non_encoding_columns(roles)
+            self._backend = self._select_backend_from_str(data, backend, data_compression,session, non_compresion_cols)
         elif data is not None:
             if isinstance(data, DatasetBase):
                 self._backend = copy.deepcopy(data._backend)
@@ -111,7 +134,7 @@ class DatasetBase(ABC):
             else:
                 self._backend = PandasDataset(data)
 
-        self.backend_type = type(self._backend)
+        # self.backend_type = type(self._backend)
         self.default_role = default_role or DefaultRole()
 
         if roles is None and data is not None and hasattr(data, "roles") and data.roles is not None:
@@ -135,14 +158,25 @@ class DatasetBase(ABC):
             self._set_empty_types(roles)
 
         self._roles: dict[str, ABCRole] = roles
+        self._tmp_roles = {}
 
-        self._tmp_roles: dict[str, ABCRole] = {}
+    def __repr__(self):
+        n_cols = len(self.columns)
+        n_rows = self._backend.shape[0]
+        df = self._build_repr(n_cols, n_rows)
+        return f"{df.to_string()}\n\n{n_rows} rows × {n_cols} columns"
 
-    def __repr__(self) -> str:
-        return self._backend.__repr__()
-
-    def _repr_html_(self) -> str:
-        return self._backend._repr_html_()
+    def _repr_html_(self):
+        n_cols = len(self.columns)
+        n_rows = self._backend.shape[0]
+        df = self._build_repr(n_cols, n_rows)
+        html_table = df.to_html()
+        html_info = f'''
+        <div style="font-size: 12px; color: #bdbdbd; margin-top: 5px; font-family: monospace;">
+            {n_rows} rows × {n_cols} columns
+        </div>
+        '''
+        return html_table + html_info
 
     def __len__(self) -> int:
         return self._backend.__len__()
@@ -196,6 +230,26 @@ class DatasetBase(ABC):
                 self.data[key] = value
             else:
                 raise TypeError("Value type does not match the expected data type.")
+
+    def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
+        head = self._backend._display_head_tail(rows_display_limit=self.DISPLAY_ROWS,
+                                                cols_display_limit=self.DISPLAY_COLS,
+                                                n_cols=n_cols,
+                                                n_rows=n_rows)
+
+        if n_rows > self.DISPLAY_ROWS * 2:
+            _tmp_tail = self._backend._display_head_tail(rows_display_limit=self.DISPLAY_ROWS,
+                                                         cols_display_limit=self.DISPLAY_COLS,
+                                                         n_cols=n_cols,
+                                                         n_rows=n_rows,
+                                                         tail=True)
+            tail = pd.concat([pd.DataFrame([["..."] * len(head.columns)], 
+                                           index=["..."], 
+                                           columns=head.columns), 
+                            _tmp_tail], axis=0)
+            return pd.concat([head, tail], axis=0)
+        else:
+            return head
 
     @classmethod
     def create_empty(cls,
@@ -448,6 +502,10 @@ class DatasetBase(ABC):
     @property
     def session(self) -> spark.SparkSession | None:
         return self._backend.session
+
+    @property
+    def labels_dict(self):
+        return self._backend.labels_dict
 
     @property
     def backend_type(self):

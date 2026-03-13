@@ -26,6 +26,7 @@ from .roles import (
     DefaultRole,
 )
 
+from typing import Literal
 
 class Dataset(DatasetBase):
     def __init__(
@@ -35,8 +36,9 @@ class Dataset(DatasetBase):
         backend: BackendsEnum | None = None,
         default_role: ABCRole | None = None,
         session: spark.SparkSession | None = None,
+        data_compression: Literal["downcasting", "encoding", "auto", "disable"] = "auto"
     ):
-        super().__init__(roles, data, backend, default_role, session)
+        super().__init__(roles, data, backend, default_role, session, data_compression)
 
     def to_small_dataset(self) -> SmallDataset:
         return SmallDataset(
