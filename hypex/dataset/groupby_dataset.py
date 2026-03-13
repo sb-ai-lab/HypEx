@@ -4,6 +4,8 @@ import copy
 
 from typing import Any, Callable, TYPE_CHECKING
 
+from utils import NAME_BORDER_SYMBOL
+
 from .roles import (
     ABCRole,
     InfoRole,
