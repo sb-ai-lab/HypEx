@@ -72,15 +72,10 @@ class StatTest(CompareExtension):
         if self.test_function is None:
             raise ValueError("test_function is needed for execution")
         one_result = self.test_function(
-            data.data.rdd.flatMap(lambda row: row).collect(),
-            other.data.rdd.flatMap(lambda row: row).collect(),
+            data.data.to_spark().rdd.flatMap(lambda row: row).collect(),
+            other.data.to_spark().rdd.flatMap(lambda row: row).collect(),
             **kwargs
         )
-        print({
-                "p-value": one_result[1],
-                "statistic": one_result[0],
-                "pass": one_result[1] < self.reliability,
-            })
         one_result = SmallDataset.from_dict(
             {
                 "p-value": one_result[1],
@@ -125,6 +120,13 @@ class UTestExtension(StatTest):
 
 
 class Chi2TestExtension(StatTest):
+    def __init__(self, test_function = None, reliability = 0.05):
+        super().__init__(test_function, reliability)
+        self.DATA_MAPPER = {
+            PandasDataset: self._pandas_prep,
+            SparkDataset: self._spark_prep
+        }
+
     @staticmethod
     def mini_category_replace(counts: Dataset) -> Dataset:
         mini_counts = counts["count"][counts["count"] < 7]
@@ -139,12 +141,7 @@ class Chi2TestExtension(StatTest):
         return counts
 
     def matrix_preparation(self, data: Dataset, other: Dataset) -> Dataset | None:
-        if isinstance(data._backend, PandasDataset):
-            return self._pandas_prep(data, other)
-        elif isinstance(data._backend, SparkDataset):
-            return self._spark_prep(data, other)
-        else:
-            raise TypeError("Incorrect data type!")
+        return self.DATA_MAPPER[type(data.backend)](data, other)
     
     def _pandas_prep(self, data: Dataset, other: Dataset) -> Dataset | None:
         proportion = len(data) / (len(data) + len(other))
@@ -169,6 +166,7 @@ class Chi2TestExtension(StatTest):
         other = np.array((
                             other
                             .data
+                            .to_spark()
                             .rdd
                             .flatMap(lambda row: row)
                             .collect()
@@ -176,6 +174,7 @@ class Chi2TestExtension(StatTest):
         data = np.array((
                             data
                             .data
+                            .to_spark()
                             .rdd
                             .flatMap(lambda row: row)
                             .collect()
