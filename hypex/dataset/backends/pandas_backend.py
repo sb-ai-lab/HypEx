@@ -1,18 +1,104 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional
+from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional, List
 
 import numpy as np
 import pandas as pd  # type: ignore
 import pyspark.sql as spark
+import pyspark.sql.functions as F
+
+from pyspark.ml.feature import StringIndexer
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType
 from ...utils.adapter import Adapter
+from ...utils.constants import UTILITY_INDEX_COL_NAME
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
 class PandasNavigation(DatasetBackendNavigation):
+
+    def _data_compression(self,
+                  data: spark.DataFrame,
+                  data_compression: Literal["downcasting", "encoding", "auto", "disable"],
+                  non_compresion_cols: List[str] | None
+    ) -> pd.DataFrame:
+        """Compress data before convertation `spark.DataFrame` to pandas.DataFrame.
+
+        Args:
+            data: `spark.DataFrame data` copressing data.
+            data_compression: `Literal["downcasting", "encoding", "auto", "disable"]` compression mode.
+            non_compresion_cols: `List[str] | None` list of columns that shouldn't be encoded.
+
+        Returns:
+            `pd.DataFrame`: compressed dataframe.
+        """
+        columns_dict = dict(data.dtypes)
+        labels = {}
+        result = data
+
+        if data_compression in ["downcasting", "auto"]:
+            double_columns = [col for col, c_type in columns_dict.items()
+                          if c_type == 'double' or c_type.startswith('decimal')]
+            result = self._downcasting(data, double_columns)
+
+        if data_compression in ["encoding", "auto"]:
+            if non_compresion_cols is None:
+                non_compresion_cols = []
+            categorical_columns = [col for col, c_type in columns_dict.items()
+                               if c_type in ['string', 'varchar'] and col not in non_compresion_cols]
+            result, labels = self._encoding(result, categorical_columns)
+
+        self._labels_dict = labels
+        return result.toPandas()
+
+    @staticmethod
+    def _encoding(data: spark.DataFrame, categorical_columns: List[str]) -> spark.DataFrame:
+        """Encoding categorical features.
+
+        Args:
+            data: `spark.DataFrame data` copressing data.
+            categorical_columns: `List[str]` list of columns for encoding.
+
+        Returns:
+            `spark.DataFrame`: dataframe with encoded categorical columns.
+        """
+        filled_data = data.na.fill("UNKNOWN")
+        indexer = StringIndexer(inputCols=categorical_columns,
+                                outputCols=[f"{col}_indexed" for col in categorical_columns],
+                                handleInvalid="keep")
+        model = indexer.fit(filled_data)
+        labels = {col : {idx : label for idx, label in  enumerate(labels_list)}
+                  for labels_list, col in zip(model.labelsArray, categorical_columns)}
+
+        return ((
+                    model
+                    .transform(filled_data)
+                    .select(*[
+                        F.col(f"{col}_indexed").cast("int").alias(col) if col in categorical_columns else
+                        F.col(col) for col in filled_data.columns
+                    ])
+                ), labels)
+
+    @staticmethod
+    def _downcasting(data: spark.DataFrame, numeric_columns: List[str]) -> spark.DataFrame:
+        """Downcasting data.
+
+        Args:
+            data: `spark.DataFrame data` copressing data.
+            numeric_columns: `List[str]` list of floating point columns.
+
+        Returns:
+            `spark.DataFrame`: downcasted dataframe.
+        """
+        return (
+            data
+            .select(*[
+                F.col(col).cast("float") if col in numeric_columns else
+                F.col(col) for col in data.columns
+            ])
+        )
+
     @staticmethod
     def _read_file(filename: str | Path) -> pd.DataFrame:
         """Read a file into a pandas DataFrame based on file extension.
@@ -34,7 +120,10 @@ class PandasNavigation(DatasetBackendNavigation):
         else:
             raise ValueError(f"Unsupported file extension {file_extension}")
 
-    def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
+    def __init__(self,
+                 data: pd.DataFrame | dict | str | pd.Series | None = None,
+                 data_compression: Literal["downcasting", "encoding", "auto", "disable"] = "auto",
+                 non_compresion_cols: List[str] | None = None):
         """Initialize PandasNavigation with various data sources.
 
         Args:
@@ -45,13 +134,16 @@ class PandasNavigation(DatasetBackendNavigation):
                 - dict: Expected format {"data": ..., "index": ...} or {"data": ...}.
                 - str: Path to a file (.csv or .xlsx) to be read.
                 - None: Creates an empty DataFrame.
+
+             data_compression: regime for compression `spark.DataFrame` to `pandas.DataFrame`.
         """
+        self._labels_dict = {}
         if isinstance(data, pd.DataFrame):
             self.data = data
         elif isinstance(data, pd.Series):
             self.data = pd.DataFrame(data)
         elif isinstance(data, spark.DataFrame):
-            self.data = data.toPandas()
+            self.data = self._data_compression(data, data_compression, non_compresion_cols)
         elif isinstance(data, dict):
             if "index" in data.keys():
                 self.data = pd.DataFrame(data=data["data"], index=data["index"])
@@ -443,10 +535,50 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self.data._repr_html_()
 
+    def _display_head_tail(self,
+                           rows_display_limit: int,
+                           cols_display_limit: int,
+                           n_cols: int,
+                           n_rows: int,
+                           tail: bool=False
+    ) -> pd.DataFrame:
+        """Returns n head rows or n tail rows
+        Args:
+            rows_display_limit: rows display limit.
+            cols_display_limit: columns display limit.
+            n_cols: number of columns in dataframe.
+            n_rows: number of rows in dataframe.
+            tail: flag of direction. If False, head rows returned.
+        Return:
+            pd.DataFrame: head or tail part of dataframe.
+            If downcasting is applyed, repr substitutes encoded values to real one.
+        """
+        if tail:
+            head_tail = self.data.tail(rows_display_limit)
+            head_tail.index = [(n_rows - rows_display_limit + i) for i in range(rows_display_limit)]
+        else:
+            head_tail = self.data.head(rows_display_limit)
+
+        if n_cols > 2 * cols_display_limit:
+            left_cols = self.columns[: cols_display_limit]
+            right_cols = self.columns[-cols_display_limit:]
+            tmp = pd.DataFrame(
+                [["..."] for _ in range(len(head_tail))],
+                index=head_tail.index,
+                columns=["..."]
+            )
+
+            return pd.concat([head_tail.loc[:, left_cols],
+                              tmp,
+                              head_tail.loc[:, right_cols]],
+                             axis=1).replace(self.labels_dict)
+        else:
+            return head_tail.replace(self.labels_dict)
+
     def get_values(
-        self,
-        row: str | None = None,
-        column: str | None = None,
+            self,
+            row: str | None = None,
+            column: str | None = None,
     ) -> Any:
         """Get values by label-based indexing.
 
@@ -469,9 +601,9 @@ class PandasNavigation(DatasetBackendNavigation):
         return result.values.tolist()
 
     def iget_values(
-        self,
-        row: int | None = None,
-        column: int | None = None,
+            self,
+            row: int | None = None,
+            column: int | None = None,
     ) -> Any:
         """Get values by integer-position-based indexing.
 
@@ -494,9 +626,9 @@ class PandasNavigation(DatasetBackendNavigation):
         return result.values.tolist()
 
     def create_empty(
-        self,
-        index: Iterable | None = None,
-        columns: Iterable[str] | None = None,
+            self,
+            index: Iterable | None = None,
+            columns: Iterable[str] | None = None,
     ):
         """Replace current data with an empty DataFrame with specified structure.
 
@@ -546,8 +678,12 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self.data.shape
 
+    @property
+    def labels_dict(self):
+        return self._labels_dict
+
     def _get_column_index(
-        self, column_name: Sequence[str] | str
+            self, column_name: Sequence[str] | str
     ) -> int | Sequence[int]:
         """Get integer position(s) of column(s) by name(s).
 
@@ -568,8 +704,8 @@ class PandasNavigation(DatasetBackendNavigation):
             raise ValueError("Wrong column_name type.")
 
     def get_column_type(
-        self, column_name: Union[Iterable[str], str] = None
-    ) -> Optional[Union[Dict[str, type], type]]:
+            self, column_name: Iterable[str] | str = None
+    ) -> dict[str, type] | type | None:
         """Get Python type(s) corresponding to pandas dtype(s) of column(s).
 
         Maps pandas dtypes to native Python types:
@@ -594,13 +730,13 @@ class PandasNavigation(DatasetBackendNavigation):
             elif pd.api.types.is_float_dtype(v):
                 dtypes[k] = float
             elif pd.api.types.is_object_dtype(v) and pd.api.types.is_list_like(
-                self.data[column_name].iloc[0]
+                    self.data[column_name].iloc[0]
             ):
                 dtypes[k] = object
             elif (
-                pd.api.types.is_string_dtype(v)
-                or pd.api.types.is_object_dtype(v)
-                or v == "category"
+                    pd.api.types.is_string_dtype(v)
+                    or pd.api.types.is_object_dtype(v)
+                    or v == "category"
             ):
                 dtypes[k] = str
             elif pd.api.types.is_bool_dtype(v):
@@ -613,7 +749,7 @@ class PandasNavigation(DatasetBackendNavigation):
         return None
 
     def astype(
-        self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
+            self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> pd.DataFrame:
         """Cast DataFrame columns to specified dtypes.
 
@@ -626,7 +762,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self.data.astype(dtype=dtype, errors=errors)
 
-    def update_column_type(self, dtype: Dict[str, type]):
+    def update_column_type(self, dtype: dict[str, type]):
         """Update column types, skipping columns with NaN values.
 
         Only updates columns that have no missing values to avoid
@@ -640,14 +776,17 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         for column_name, type_name in dtype.items():
             if not self.data[column_name].isna().any():
+                # if isinstance(type_name, str):
+                #     self.data = self.data.replace({column_name : self.labels_dict[column_name]})
+                #     self.labels_dict.pop(column_name)
                 self.data = self.astype({column_name: type_name})
         return self
 
     def add_column(
-        self,
-        data: Sequence,
-        name: str | list[str],
-        index: Sequence | None = None,
+            self,
+            data: Any,
+            name: str | list[str],
+            index: Sequence | None = None,
     ):
         """Add a new column to the DataFrame.
 
@@ -664,6 +803,8 @@ class PandasNavigation(DatasetBackendNavigation):
             name = name[0]
         if isinstance(data, pd.DataFrame):
             data = data.values
+        else:
+            data = Adapter.to_list(data)
         if len(self.data) != len(data):
             if isinstance(data[0], Iterable) and len(data[0]) == 1:
                 data = data.squeeze()
@@ -691,6 +832,12 @@ class PandasNavigation(DatasetBackendNavigation):
         if reset_index:
             new_data = new_data.reset_index(drop=True)
         return new_data
+
+    def add_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
+        self.data[index_col_name] = np.array(range(len(self.data)))
+
+    def remove_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
+        self.data = self.data.drop(index_col_name)
 
     def from_dict(self, data: FromDictTypes, index: Iterable | Sized | None = None):
         """Load data from dict-like structure into DataFrame.
@@ -783,8 +930,11 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             return float(result.loc[result.index[0], result.columns[0]])
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
-    def __init__(self, data: pd.DataFrame | dict | str | pd.Series | None = None):
-        super().__init__(data)
+    def __init__(self,
+                 data: pd.DataFrame | dict | str | pd.Series | None = None,
+                 data_compression: str | None = None,
+                 non_compresion_cols: list | None = None):
+        super().__init__(data, data_compression, non_compresion_cols)
 
     def get(self, key, default=None) -> Any:
         """Get value for key from underlying DataFrame, with default fallback.
@@ -865,7 +1015,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             dict: Mapping of column names to unique value counts.
         """
-
         return {column: self.data[column].nunique() for column in self.data.columns}
 
     def groupby(self, by: str | Iterable[str], **kwargs) -> pd.Grouper:
@@ -1238,6 +1387,12 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         """
         return self.data.select_dtypes(include=include, exclude=exclude)
 
+    def limit(self, num: int | None = None) -> Any:
+        if not num:
+            return self.data
+        else:
+            return self.data.iloc[: num]
+
     def isin(self, values: Iterable) -> pd.DataFrame:
         """Check if elements are contained in passed values.
 
@@ -1329,6 +1484,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         self,
         items: list | None = None,
         regex: str | None = None,
+        column: str | None = None,
         axis: int = 0,
     ) -> pd.DataFrame:
         """Subset DataFrame using labels or regex matching.
@@ -1341,6 +1497,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Filtered DataFrame.
         """
+        if (axis == 0) and (items is None) and (column is not None):
+            return self.data[self.data[column]]
         return self.data.filter(items=items, regex=regex, axis=axis)
 
     def rename(self, columns: dict[str, str]) -> pd.DataFrame:
@@ -1412,3 +1570,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         )
 
         return data_expanded
+
+    def checkpoint(self):
+        pass

@@ -70,6 +70,9 @@ class LagRole(ABCRole):
             else f"{self._role_name}()"
         )
 
+class IndexRole(ABCRole):
+    _role_name: RoleNameType = "Index"
+
 
 class InfoRole(ABCRole):
     _role_name: RoleNameType = "Info"
@@ -133,7 +136,6 @@ class PreTargetRole(LagRole):
 
 class StatisticRole(ABCRole):
     _role_name: RoleNameType = "Statistic"
-
 
 class ResumeRole(ABCRole):
     _role_name = "Resume"
@@ -211,6 +213,7 @@ default_roles: dict[RoleNameType, ABCRole] = {
     "pretarget": PreTargetRole(),
     "stratification": StratificationRole(),
     "statistic": StatisticRole(),
+    "index": IndexRole(),
     "filter": FilterRole(),
     "constgroup": ConstGroupRole(),
     "additionaltreatment": AdditionalTreatmentRole(),

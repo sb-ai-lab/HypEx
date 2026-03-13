@@ -8,7 +8,7 @@ from abc import ABC
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Callable, Hashable, Literal, Optional, Sequence
 
-import pandas as pd 
+import pandas as pd  # type: ignore
 from numpy import ndarray
 import pyspark.sql as spark
 import pyspark.pandas as ps
@@ -26,6 +26,7 @@ from ..utils import (
     SourceDataTypes,
 )
 from ..utils.adapter import Adapter
+from .groupby_dataset import GroupedDataset
 from .backends import PandasDataset, SparkDataset
 from .roles import (
     ABCRole,
@@ -36,192 +37,57 @@ from .roles import (
     default_roles,
 )
 
-class GroupedDataset:
-    def __init__(self,
-                 backend_groupby: Any, 
-                 dataset_class: type[DatasetBase], 
-                 roles: dict[str, ABCRole], 
-                 tmp_roles: dict[str, ABCRole], 
-                 group_cols: list[str] | None=None):
-        self._groupby = backend_groupby
-        self._dataset_class = dataset_class
-        self.roles = roles
-        self.tmp_roles = tmp_roles
-        self._group_cols = group_cols if group_cols is not None else []
-
-    def _get_agg_roles(self, 
-                       result_columns: list[str]) -> dict[str, ABCRole]:
-        new_roles = {}
-        for col in result_columns:
-            if col in self.roles:
-                new_roles[col] = copy.deepcopy(self.roles[col])
-            else:
-                new_roles[col] = StatisticRole()
-        return new_roles
-
-    def _execute_agg(self, 
-                     func: str | dict[str, str] | list[str]) -> Any:
-        if hasattr(self._groupby, 'agg'):
-            return self._groupby.agg(func)
-        
-        elif isinstance(self._groupby, list):
-            aggregated_groups = []
-            for key, group_df in self._groupby:
-                if hasattr(group_df, 'agg'):
-                    agg_res = group_df.agg(func)
-                else:
-                    agg_res = group_df.agg(func)
-                aggregated_groups.append(agg_res)
-            
-            if not aggregated_groups:
-                return None
-            result_data = self._dataset_class._backend.concat(aggregated_groups)
-            return result_data
-            
-        else:
-            raise TypeError(f"Unsupported groupby object type: {type(self._groupby)}")
-
-    def agg(self,
-            func: str | dict[str, str] | list[str]) -> DatasetBase:
-        result_data = self._execute_agg(func)
-
-        if result_data is None:
-            return self._dataset_class(roles={}, data=None)
-
-        if isinstance(func, list) and hasattr(result_data, 'columns'):
-            if hasattr(result_data.columns, 'levels'):  # MultiIndex from list agg
-                result_data.columns = [
-                    f"{col}{NAME_BORDER_SYMBOL}{stat}"
-                    for col, stat in result_data.columns
-                ]
-
-        if hasattr(result_data, 'columns'):
-            result_columns = list(result_data.columns)
-            new_roles = self._get_agg_roles(result_columns)
-        else:
-            new_roles = {}
-
-        return self._dataset_class(roles=new_roles, data=result_data)
-
-    def apply(self, 
-              func: Callable[..., Any]) -> DatasetBase:
-        if hasattr(self._groupby, 'apply'):
-            result_data = self._groupby.apply(func)
-        elif isinstance(self._groupby, list):
-            results = []
-            for key, group_df in self._groupby:
-                res = group_df.apply(func)
-                results.append(res)
-            result_data = ps.concat(results)
-        else:
-            raise NotImplementedError("Apply not supported for this groupby type")
-            
-        if hasattr(result_data, 'columns'):
-            new_roles = {col: InfoRole() for col in result_data.columns}
-        else:
-            new_roles = {}
-            
-        return self._dataset_class(roles=new_roles, data=result_data)
-
-    def count(self) -> DatasetBase:
-        return self.agg("count")
-
-    def sum(self, *cols: str) -> DatasetBase:
-        if cols:
-            return self.agg({col: 'sum' for col in cols})
-        return self.agg("sum")
-
-    def mean(self, *cols: str) -> DatasetBase:
-        if cols:
-            return self.agg({col: 'mean' for col in cols})
-        return self.agg("mean")
-
-    def min(self, *cols: str) -> DatasetBase:
-        if cols:
-            return self.agg({col: 'min' for col in cols})
-        return self.agg("min")
-
-    def max(self, *cols: str) -> DatasetBase:
-        if cols:
-            return self.agg({col: 'max' for col in cols})
-        return self.agg("max")
-
-    def first(self, *cols: str) -> DatasetBase:
-        if cols:
-            return self.agg({col: 'first' for col in cols})
-        return self.agg("first")
-
-    def last(self, *cols: str) -> DatasetBase:
-        if cols:
-            return self.agg({col: 'last' for col in cols})
-        return self.agg("last")
-
-    def std(self, *cols: str) -> DatasetBase:
-        if cols:
-            return self.agg({col: 'std' for col in cols})
-        return self.agg("std")
-
-    def var(self, *cols: str) -> DatasetBase:
-        if cols:
-            return self.agg({col: 'var' for col in cols})
-        return self.agg("var")
-
-    def median(self, *cols: str) -> DatasetBase:
-        if cols:
-            return self.agg({col: 'median' for col in cols})
-        return self.agg("median")
-
-    def prod(self, *cols: str) -> DatasetBase:
-        if cols:
-            return self.agg({col: 'prod' for col in cols})
-        return self.agg("prod")
-
-    def size(self) -> DatasetBase:
-        result = self._groupby.size() if hasattr(self._groupby, 'size') else self.agg("count")
-        if hasattr(result, 'to_frame'):
-            result = result.to_frame('size')
-        return self._dataset_class(roles={'size': StatisticRole()}, data=result)
-
-    def __iter__(self) -> Iterable[tuple[Any, DatasetBase]]:
-        if isinstance(self._groupby, list):
-            for key, data in self._groupby:
-                yield key, self._dataset_class(roles=self.roles, data=data)
-        elif hasattr(self._groupby, '__iter__'):
-            for key, group in self._groupby:
-                yield key, self._dataset_class(roles=self.roles, data=group)
-        else:
-            raise TypeError("Grouped object is not iterable")
-
 
 class DatasetBase(ABC):
+    DISPLAY_ROWS = 5
+    DISPLAY_COLS = 10
+
     @staticmethod
-    def _select_backend_from_data(data: Any, 
-                                  session: spark.SparkSession = None) -> PandasDataset | SparkDataset:
+    def _select_backend_from_data(data: Any,
+                                  session: spark.SparkSession = None,) -> PandasDataset | SparkDataset:
         if isinstance(data, (PandasDataset, SparkDataset)):
             return data
         elif isinstance(data, pd.DataFrame):
             return PandasDataset(data)
         elif isinstance(data, (spark.DataFrame, ps.DataFrame)):
             return SparkDataset(data, session)
-        
+
         raise TypeError("data must be an instance of either"
                         "pandas.DataFrame, spark.DataFrame or PandasDataset, SparkDataset")
 
+    def _select_non_encoding_columns(
+        self,
+        roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole] | None = None,
+    ) -> list[str] | None:
+        columns = None
+        if isinstance(roles, dict):
+            if any(isinstance(role, ABCRole) for role in roles.keys()):
+                roles = self._parse_roles(roles)
+            columns = []
+            for column, role in roles.items():
+                if role.data_type == str:
+                    columns.append(column)
+        return columns
+
     @staticmethod
-    def _select_backend_from_str(data: Any, 
-                                 backend: BackendsEnum | None, 
-                                 session: spark.SparkSession | None=None):
+    def _select_backend_from_str(
+        data: Any,
+        backend: BackendsEnum | None,
+        data_compression: Literal["downcasting", "encoding", "auto", "disable"],
+        session: spark.SparkSession | None = None,
+        non_compresion_cols: list[str] | None = None,
+    ) -> PandasDataset | SparkDataset:
         if backend == BackendsEnum.pandas:
-            return PandasDataset(data)
+            return PandasDataset(data, data_compression, non_compresion_cols)
         elif backend == BackendsEnum.spark:
             return SparkDataset(data, session)
         elif backend is None:
             if session is not None:
                 return SparkDataset(data, session)
-            return PandasDataset(data)
+            return PandasDataset(data, data_compression, non_compresion_cols)
         raise TypeError("Backend must be an instance of BackendsEnum")
 
-    def _set_all_roles(self, 
+    def _set_all_roles(self,
                        roles: dict[str, ABCRole]) -> dict[str, ABCRole]:
         keys = list(roles.keys())
         for column in self.columns:
@@ -229,7 +95,7 @@ class DatasetBase(ABC):
                 roles[column] = copy.deepcopy(self.default_role) or DefaultRole()
         return roles
 
-    def _set_empty_types(self, 
+    def _set_empty_types(self,
                          roles: dict[str, ABCRole]) -> None:
         colunms_dtypes = self._backend.get_column_type(self._backend.columns)
         new_types = {}
@@ -245,9 +111,11 @@ class DatasetBase(ABC):
                  data: spark.DataFrame | pd.DataFrame | str | DatasetBase | None = None,
                  backend: BackendsEnum | None = None,
                  default_role: ABCRole | None = None,
-                 session: Optional[spark.SparkSession] = None):
+                 session: Optional[spark.SparkSession] = None,
+                 data_compression: Literal["downcasting", "encoding", "auto", "disable"] = "auto"):
         if backend is not None:
-            self._backend = self._select_backend_from_str(data, backend, session)
+            non_compresion_cols = self._select_non_encoding_columns(roles)
+            self._backend = self._select_backend_from_str(data, backend, data_compression,session, non_compresion_cols)
         elif data is not None:
             if isinstance(data, DatasetBase):
                 self._backend = copy.deepcopy(data._backend)
@@ -266,23 +134,19 @@ class DatasetBase(ABC):
                 self._backend = SparkDataset(data, session)
             else:
                 self._backend = PandasDataset(data)
-                
-        self.backend_type = (
-            BackendsEnum.spark if isinstance(self._backend, SparkDataset) else BackendsEnum.pandas
-        )
-        self.default_role = default_role or DefaultRole()
 
-        if roles is None and data is not None and hasattr(data, "roles") and data.roles is not None:
+        self.default_role = default_role
+        if roles is None and data.hasattr("roles") and data.roles is not None:
             roles = data.roles
         elif roles is None:
             roles = {}
         else:
             if any(isinstance(role, ABCRole) for role in roles.keys()):
                 roles = self._parse_roles(roles)
-            
+
             if any(not isinstance(role, ABCRole) for role in roles.values()):
                 raise TypeError("Roles must be instances of ABCRole type")
-            
+
             if data is not None and hasattr(self._backend, 'columns'):
                 invalid_columns = [i for i in roles.keys() if i not in self._backend.columns]
                 if invalid_columns:
@@ -291,21 +155,32 @@ class DatasetBase(ABC):
         if data is not None and hasattr(self._backend, 'columns'):
             roles = self._set_all_roles(roles)
             self._set_empty_types(roles)
-        
+
         self._roles: dict[str, ABCRole] = roles
-        
         self._tmp_roles: dict[str, ABCRole] = {}
 
-    def __repr__(self) -> str:
-        return self._backend.__repr__()
+    def __repr__(self):
+        n_cols = len(self.columns)
+        n_rows = self._backend.shape[0]
+        df = self._build_repr(n_cols, n_rows)
+        return f"{df.to_string()}\n\n{n_rows} rows × {n_cols} columns"
 
-    def _repr_html_(self) -> str:
-        return self._backend._repr_html_()
+    def _repr_html_(self):
+        n_cols = len(self.columns)
+        n_rows = self._backend.shape[0]
+        df = self._build_repr(n_cols, n_rows)
+        html_table = df.to_html()
+        html_info = f'''
+        <div style="font-size: 12px; color: #bdbdbd; margin-top: 5px; font-family: monospace;">
+            {n_rows} rows × {n_cols} columns
+        </div>
+        '''
+        return html_table + html_info
 
     def __len__(self) -> int:
         return self._backend.__len__()
 
-    def __getitem__(self, 
+    def __getitem__(self,
                     item: str | int | Iterable[str | int] | slice | DatasetBase) -> DatasetBase:
         if isinstance(item, DatasetBase):
             item = item.data
@@ -329,8 +204,8 @@ class DatasetBase(ABC):
         }
         return result
 
-    def __setitem__(self, 
-                    key: str, 
+    def __setitem__(self,
+                    key: str,
                     value: Any) -> None:
         if isinstance(value, DatasetBase):
             value = value.iselect(0).data
@@ -348,12 +223,32 @@ class DatasetBase(ABC):
                 or (
                     isinstance(value, Iterable)
                     and all(isinstance(v, column_data_type) for v in value)
-                ) 
+                )
                 or isinstance(value, column_data_type)
             ):
                 self.data[key] = value
             else:
                 raise TypeError("Value type does not match the expected data type.")
+
+    def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
+        head = self._backend._display_head_tail(rows_display_limit=self.DISPLAY_ROWS,
+                                                cols_display_limit=self.DISPLAY_COLS,
+                                                n_cols=n_cols,
+                                                n_rows=n_rows)
+
+        if n_rows > self.DISPLAY_ROWS * 2:
+            _tmp_tail = self._backend._display_head_tail(rows_display_limit=self.DISPLAY_ROWS,
+                                                         cols_display_limit=self.DISPLAY_COLS,
+                                                         n_cols=n_cols,
+                                                         n_rows=n_rows,
+                                                         tail=True)
+            tail = pd.concat([pd.DataFrame([["..."] * len(head.columns)],
+                                           index=["..."],
+                                           columns=head.columns),
+                            _tmp_tail], axis=0)
+            return pd.concat([head, tail], axis=0)
+        else:
+            return head
 
     @classmethod
     def create_empty(cls,
@@ -400,10 +295,10 @@ class DatasetBase(ABC):
         )
         return self.__class__(data=new_data, roles=new_roles)
 
-    def __binary_magic_operator(self, 
-                                other: Any, 
+    def __binary_magic_operator(self,
+                                other: Any,
                                 func_name: str) -> Any:
-        if not any(isinstance(other, t) 
+        if not any(isinstance(other, t)
                    for t in [self.__class__, str, int, float, bool, Sequence]):
             raise DataTypeError(type(other))
         func = getattr(self._backend, func_name)
@@ -607,22 +502,35 @@ class DatasetBase(ABC):
     def session(self) -> spark.SparkSession | None:
         return self._backend.session
 
+    @property
+    def labels_dict(self):
+        return self._backend.labels_dict
+
+    @property
+    def backend_type(self):
+        if isinstance(self._backend, PandasDataset):
+            return BackendsEnum.pandas
+        elif isinstance(self._backend, SparkDataset):
+            return BackendsEnum.spark
+        else:
+            raise ValueError("Unknown backend type")
+
     @tmp_roles.setter
     def tmp_roles(self, value: dict[str, ABCRole]) -> None:
         self._set_roles(new_roles_map=value, temp_role=True)
         self._set_empty_types(self._tmp_roles)
 
-    def _convert_data_after_agg(self, 
+    def _convert_data_after_agg(self,
                                 result: Any) -> DatasetBase | ScalarType | None:
         if result is None:
             return None
-        
+
         if isinstance(result, ScalarType):
             return result
-        
+
         if not hasattr(result, 'columns'):
             return result
-        
+
         role: ABCRole = StatisticRole()
         return self.__class__(
             data=result, roles={column: role for column in result.columns}
@@ -662,25 +570,25 @@ class DatasetBase(ABC):
         if type(other._backend) is not type(self._backend):
             raise ConcatBackendError(type(other._backend), type(self._backend))
 
-    def astype(self, 
-               dtype: dict[str, type], 
+    def astype(self,
+               dtype: dict[str, type],
                errors: Literal["raise", "ignore"] = "raise") -> DatasetBase:
         for col, _ in dtype.items():
             if (errors == "raise") and (col not in self.columns):
                 raise KeyError(f"Column '{col}' does not exist in the Dataset.")
-        
+
         new_data = self._backend.astype(dtype, errors)
-        
+
         new_roles = deepcopy(self.roles)
-        
+
         for col, target_type in dtype.items():
             if col in new_roles:
                 new_roles[col].data_type = target_type
-        
+
         return self.__class__(roles=new_roles, data=new_data)
 
-    def append(self, 
-               other: DatasetBase | Iterable[DatasetBase], 
+    def append(self,
+               other: DatasetBase | Iterable[DatasetBase],
                axis: int = 0) -> DatasetBase:
         other = Adapter.to_list(other)
 
@@ -707,9 +615,9 @@ class DatasetBase(ABC):
             roles=tmp_roles,
         )
 
-    def map(self, 
-            func: Callable[..., Any], 
-            na_action: Any = None, 
+    def map(self,
+            func: Callable[..., Any],
+            na_action: Any = None,
             **kwargs) -> DatasetBase:
         return self.__class__(
             roles=self.roles,
@@ -773,32 +681,32 @@ class DatasetBase(ABC):
     def log(self) -> DatasetBase | ScalarType | None:
         return self._convert_data_after_agg(self._backend.log())
 
-    def mode(self, 
-             numeric_only: bool = False, 
+    def mode(self,
+             numeric_only: bool = False,
              dropna: bool = True) -> DatasetBase:
         t_data = self._backend.mode(numeric_only=numeric_only, dropna=dropna)
         return self.__class__(
             data=t_data, roles={role: InfoRole() for role in t_data.columns}
         )
 
-    def var(self, 
-            skipna: bool = True, 
-            ddof: int = 1, 
+    def var(self,
+            skipna: bool = True,
+            ddof: int = 1,
             numeric_only: bool = False) -> DatasetBase | ScalarType | None:
         return self._convert_data_after_agg(
             self._backend.var(skipna=skipna, ddof=ddof, numeric_only=numeric_only)
         )
 
-    def agg(self, 
+    def agg(self,
             func: str | list) -> DatasetBase | ScalarType | None:
         return self._convert_data_after_agg(self._backend.agg(func))
 
-    def std(self, 
-            skipna: bool = True, 
+    def std(self,
+            skipna: bool = True,
             ddof: int = 1) -> DatasetBase | ScalarType | None:
         return self._convert_data_after_agg(self._backend.std(skipna=skipna, ddof=ddof))
 
-    def quantile(self, 
+    def quantile(self,
                  q: float = 0.5) -> DatasetBase | ScalarType | None:
         return self._convert_data_after_agg(self._backend.quantile(q=q))
 

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Optional
+from collections.abc import Callable, Iterable, Sequence, Sized
+from typing import Any, Literal
 
-from ...utils import AbstractMethodError, FromDictTypes
+from ...utils import UTILITY_INDEX_COL_NAME, AbstractMethodError, FromDictTypes
 
 
 class DatasetBackendNavigation(ABC):
@@ -188,25 +189,31 @@ class DatasetBackendNavigation(ABC):
 
     @abstractmethod
     def astype(
-        self, dtype: Dict[str, type], errors: Literal["raise", "ignore"] = "raise"
+        self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
-    def update_column_type(self, dtype: Dict[str, type]):
+    def update_column_type(self, dtype: dict[str, type]):
         raise AbstractMethodError
 
     @abstractmethod
     def add_column(
         self,
         data,
-        name: Optional[str] = None,
-        index: Optional[Sequence] = None,
+        name: str | None = None,
+        index: Sequence | None = None,
     ):
         raise AbstractMethodError
 
     @abstractmethod
     def append(self, other, index: bool = False) -> Any:
+        raise AbstractMethodError
+
+    def add_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME) -> Any:
+        raise AbstractMethodError
+
+    def remove_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
@@ -381,6 +388,10 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
+    def limit(self, num: int | None = None) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
     def merge(
         self,
         right: Any,
@@ -407,6 +418,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         self,
         items: list | None = None,
         regex: str | None = None,
+        column: str | None = None,
         axis: int = 0,
     ) -> Any:
         raise AbstractMethodError
@@ -430,4 +442,8 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     def replace(
         self, to_replace: Any = None, value: Any = None, regex: bool = False
     ) -> Any:
+        raise AbstractMethodError
+
+    @abstractmethod
+    def checkpoint(self):
         raise AbstractMethodError

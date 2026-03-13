@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
 from .comparators import GroupDifference, GroupSizes
