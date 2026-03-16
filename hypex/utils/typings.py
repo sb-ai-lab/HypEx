@@ -11,7 +11,6 @@ from typing import (
     Sequence,
     Tuple,
     TypeVar,
-    Union,
     Type,
     Union
 )

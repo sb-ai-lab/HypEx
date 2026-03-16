@@ -17,19 +17,19 @@ from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
 class PandasNavigation(DatasetBackendNavigation):
-    
+
     def _data_compression(self,
                   data: spark.DataFrame,
                   data_compression: Literal["downcasting", "encoding", "auto", "disable"],
                   non_compresion_cols: List[str] | None
     ) -> pd.DataFrame:
         """Compress data before convertation `spark.DataFrame` to pandas.DataFrame.
-        
+
         Args:
             data: `spark.DataFrame data` copressing data.
             data_compression: `Literal["downcasting", "encoding", "auto", "disable"]` compression mode.
             non_compresion_cols: `List[str] | None` list of columns that shouldn't be encoded.
-        
+
         Returns:
             `pd.DataFrame`: compressed dataframe.
         """
@@ -51,7 +51,7 @@ class PandasNavigation(DatasetBackendNavigation):
 
         self._labels_dict = labels
         return result.toPandas()
-    
+
     @staticmethod
     def _encoding(data: spark.DataFrame, categorical_columns: List[str]) -> spark.DataFrame:
         """Encoding categorical features.
@@ -59,7 +59,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Args:
             data: `spark.DataFrame data` copressing data.
             categorical_columns: `List[str]` list of columns for encoding.
-        
+
         Returns:
             `spark.DataFrame`: dataframe with encoded categorical columns.
         """
@@ -70,7 +70,7 @@ class PandasNavigation(DatasetBackendNavigation):
         model = indexer.fit(filled_data)
         labels = {col : {idx : label for idx, label in  enumerate(labels_list)}
                   for labels_list, col in zip(model.labelsArray, categorical_columns)}
-        
+
         return ((
                     model
                     .transform(filled_data)
@@ -78,16 +78,16 @@ class PandasNavigation(DatasetBackendNavigation):
                         F.col(f"{col}_indexed").cast("int").alias(col) if col in categorical_columns else
                         F.col(col) for col in filled_data.columns
                     ])
-                ), labels) 
+                ), labels)
 
-    @staticmethod    
+    @staticmethod
     def _downcasting(data: spark.DataFrame, numeric_columns: List[str]) -> spark.DataFrame:
         """Downcasting data.
 
         Args:
             data: `spark.DataFrame data` copressing data.
             numeric_columns: `List[str]` list of floating point columns.
-        
+
         Returns:
             `spark.DataFrame`: downcasted dataframe.
         """
@@ -120,7 +120,7 @@ class PandasNavigation(DatasetBackendNavigation):
         else:
             raise ValueError(f"Unsupported file extension {file_extension}")
 
-    def __init__(self, 
+    def __init__(self,
                  data: pd.DataFrame | dict | str | pd.Series | None = None,
                  data_compression: Literal["downcasting", "encoding", "auto", "disable"] = "auto",
                  non_compresion_cols: List[str] | None = None):
@@ -534,12 +534,12 @@ class PandasNavigation(DatasetBackendNavigation):
             str: HTML string representation.
         """
         return self.data._repr_html_()
-    
-    def _display_head_tail(self, 
+
+    def _display_head_tail(self,
                            rows_display_limit: int,
                            cols_display_limit: int,
                            n_cols: int,
-                           n_rows: int,  
+                           n_rows: int,
                            tail: bool=False
     ) -> pd.DataFrame:
         """Returns n head rows or n tail rows
@@ -827,6 +827,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Concatenated DataFrame.
         """
+        other = Adapter.to_list(other)
         new_data = pd.concat([self.data] + [d.data for d in other], axis=axis)
         if reset_index:
             new_data = new_data.reset_index(drop=True)
@@ -929,8 +930,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             return float(result.loc[result.index[0], result.columns[0]])
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
-    def __init__(self, 
-                 data: pd.DataFrame | dict | str | pd.Series | None = None, 
+    def __init__(self,
+                 data: pd.DataFrame | dict | str | pd.Series | None = None,
                  data_compression: str | None = None,
                  non_compresion_cols: list | None = None):
         super().__init__(data, data_compression, non_compresion_cols)

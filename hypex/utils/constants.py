@@ -7,4 +7,7 @@ UTILITY_INDEX_COL_NAME = "\u23e3index"
 UTILITY_INDEX_COL_NAME = "\u23e3index"
 UTILITY_PHYSICAL_INDEX_COL_NAME = "\u23e3_physical_index"
 
+UTILITY_INDEX_COL_NAME = "\u23e3index"
+UTILITY_PHYSICAL_INDEX_COL_NAME = "\u23e3_physical_index"
+
 NUMBER_TYPES_LIST = [int, float]

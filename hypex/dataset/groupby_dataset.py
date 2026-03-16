@@ -4,6 +4,8 @@ import copy
 
 from typing import Any, Callable, TYPE_CHECKING
 
+from utils import NAME_BORDER_SYMBOL
+
 from .roles import (
     ABCRole,
     InfoRole,
@@ -59,19 +61,26 @@ class GroupedDataset:
         else:
             raise TypeError(f"Unsupported groupby object type: {type(self._groupby)}")
 
-    def agg(self, 
+    def agg(self,
             func: str | dict[str, str] | list[str]) -> DatasetBase:
         result_data = self._execute_agg(func)
-        
+
         if result_data is None:
             return self._dataset_class(roles={}, data=None)
-        
+
+        if isinstance(func, list) and hasattr(result_data, 'columns'):
+            if hasattr(result_data.columns, 'levels'):  # MultiIndex from list agg
+                result_data.columns = [
+                    f"{col}{NAME_BORDER_SYMBOL}{stat}"
+                    for col, stat in result_data.columns
+                ]
+
         if hasattr(result_data, 'columns'):
             result_columns = list(result_data.columns)
             new_roles = self._get_agg_roles(result_columns)
         else:
             new_roles = {}
-            
+
         return self._dataset_class(roles=new_roles, data=result_data)
 
     def apply(self, 

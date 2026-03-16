@@ -8,7 +8,7 @@ from abc import ABC
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Callable, Hashable, Literal, Optional, Sequence
 
-import pandas as pd
+import pandas as pd  # type: ignore
 from numpy import ndarray
 import pyspark.sql as spark
 import pyspark.pandas as ps
@@ -20,6 +20,7 @@ from ..utils import (
     ConcatBackendError,
     ConcatDataError,
     DataTypeError,
+    NAME_BORDER_SYMBOL,
     ScalarType,
     RoleColumnError,
     SourceDataTypes,
@@ -53,7 +54,7 @@ class DatasetBase(ABC):
 
         raise TypeError("data must be an instance of either"
                         "pandas.DataFrame, spark.DataFrame or PandasDataset, SparkDataset")
-    
+
     def _select_non_encoding_columns(
         self,
         roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole] | None = None,
@@ -134,10 +135,8 @@ class DatasetBase(ABC):
             else:
                 self._backend = PandasDataset(data)
 
-        # self.backend_type = type(self._backend)
-        self.default_role = default_role or DefaultRole()
-
-        if roles is None and data is not None and hasattr(data, "roles") and data.roles is not None:
+        self.default_role = default_role
+        if roles is None and data.hasattr("roles") and data.roles is not None:
             roles = data.roles
         elif roles is None:
             roles = {}
@@ -158,7 +157,7 @@ class DatasetBase(ABC):
             self._set_empty_types(roles)
 
         self._roles: dict[str, ABCRole] = roles
-        self._tmp_roles = {}
+        self._tmp_roles: dict[str, ABCRole] = {}
 
     def __repr__(self):
         n_cols = len(self.columns)
@@ -243,9 +242,9 @@ class DatasetBase(ABC):
                                                          n_cols=n_cols,
                                                          n_rows=n_rows,
                                                          tail=True)
-            tail = pd.concat([pd.DataFrame([["..."] * len(head.columns)], 
-                                           index=["..."], 
-                                           columns=head.columns), 
+            tail = pd.concat([pd.DataFrame([["..."] * len(head.columns)],
+                                           index=["..."],
+                                           columns=head.columns),
                             _tmp_tail], axis=0)
             return pd.concat([head, tail], axis=0)
         else:

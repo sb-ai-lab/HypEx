@@ -50,6 +50,7 @@ from .typings import (
     SourceDataTypes,
     StratificationRoleTypes,
     TargetRoleTypes,
+    SourceDataTypes,
     SparkTypeMapper
 )
 
@@ -61,6 +62,7 @@ __all__ = [
     "UTILITY_COL_SYMBOL",
     "UTILITY_INDEX_COL_NAME",
     "NUMBER_TYPES_LIST",
+    "UTILITY_INDEX_COL_NAME",
     "UTILITY_PHYSICAL_INDEX_COL_NAME",
     "ABNTestMethodsEnum",
     "ABTestTypesEnum",
