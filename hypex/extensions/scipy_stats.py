@@ -93,7 +93,7 @@ class KSTestExtension(StatTest):
     def _calc_pandas(
         self, data: Dataset, other: Dataset | None = None, **kwargs
     ) -> Dataset | float:
-        return super()._calc_pandas(data, other, nan_policy="omit", **kwargs)
+        return super()._calc_pandas(data.dropna(), other.dropna() if other is not None else other, **kwargs)
 
 
 class UTestExtension(StatTest):
@@ -103,7 +103,7 @@ class UTestExtension(StatTest):
     def _calc_pandas(
         self, data: Dataset, other: Dataset | None = None, **kwargs
     ) -> Dataset | float:
-        return super()._calc_pandas(data, other, nan_policy="omit", **kwargs)
+        return super()._calc_pandas(data.dropna(), other.dropna() if other is not None else other, **kwargs)
 
 
 class Chi2TestExtension(StatTest):
