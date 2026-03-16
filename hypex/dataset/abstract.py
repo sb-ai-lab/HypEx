@@ -120,7 +120,7 @@ class DatasetBase(ABC):
             if isinstance(data, DatasetBase):
                 self._backend_data = copy.deepcopy(data._backend)
             elif isinstance(data, (PandasDataset, SparkDataset)):
-                self._backend_data = copy.deepcopy(data)
+                self._backend_data = data
             elif any(isinstance(data, source_data_type)
                      for source_data_type in SourceDataTypes.__args__):
                 self._backend_data = self._select_backend_from_data(data, session)
@@ -314,7 +314,7 @@ class DatasetBase(ABC):
                     for i in range(len(other.columns))
                 }
             ).backend
-        return self.__class__(roles=t_roles, data=func(other))
+        return self.__class__(roles=t_roles, data=func(other), session=self.session)
 
     # comparison operators:
     def __eq__(self, other: Any) -> DatasetBase:
@@ -337,19 +337,19 @@ class DatasetBase(ABC):
 
     # unary operators:
     def __pos__(self) -> DatasetBase:
-        return self.__class__(roles=self.roles, data=(+self._backend_data))
+        return self.__class__(roles=self.roles, data=(+self._backend_data), session=self.session)
 
     def __neg__(self) -> DatasetBase:
-        return self.__class__(roles=self.roles, data=(-self._backend_data))
+        return self.__class__(roles=self.roles, data=(-self._backend_data), session=self.session)
 
     def __abs__(self) -> DatasetBase:
-        return self.__class__(roles=self.roles, data=abs(self._backend_data))
+        return self.__class__(roles=self.roles, data=abs(self._backend_data), session=self.session)
 
     def __invert__(self) -> DatasetBase:
-        return self.__class__(roles=self.roles, data=(~self._backend_data))
+        return self.__class__(roles=self.roles, data=(~self._backend_data), session=self.session)
 
     def __round__(self, ndigits: int = 0) -> DatasetBase:
-        return self.__class__(roles=self.roles, data=round(self._backend_data, ndigits))
+        return self.__class__(roles=self.roles, data=round(self._backend_data, ndigits), session=self.session)
 
     def __bool__(self) -> DatasetBase:
         return not self._backend_data.is_empty()
@@ -726,9 +726,10 @@ class DatasetBase(ABC):
         t_data = self._backend_data.value_counts(
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
         )
+        print(type(t_data))
         t_roles = deepcopy(self.roles)
         column_name = "proportion" if normalize else "count"
-        if column_name not in t_data:
+        if column_name not in t_data.data:
             t_data = t_data.rename(columns={0: column_name})
         t_roles[column_name] = StatisticRole()
         return self.__class__(roles=t_roles, data=t_data)
