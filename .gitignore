@@ -160,3 +160,4 @@ lama_venv/
 temp/
 
 poetry.lock
+/*.ipynb

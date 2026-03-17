@@ -90,10 +90,20 @@ class KSTestExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ks_2samp, reliability=reliability)
 
+    def _calc_pandas(
+        self, data: Dataset, other: Dataset | None = None, **kwargs
+    ) -> Dataset | float:
+        return super()._calc_pandas(data.dropna(), other.dropna() if other is not None else other, **kwargs)
+
 
 class UTestExtension(StatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(mannwhitneyu, reliability=reliability)
+
+    def _calc_pandas(
+        self, data: Dataset, other: Dataset | None = None, **kwargs
+    ) -> Dataset | float:
+        return super()._calc_pandas(data.dropna(), other.dropna() if other is not None else other, **kwargs)
 
 
 class Chi2TestExtension(StatTest):
