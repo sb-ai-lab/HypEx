@@ -23,14 +23,68 @@ ps.set_option('compute.ops_on_diff_frames', True)
 from ...utils import FromDictTypes, MergeOnError, ScalarType, SparkTypeMapper
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
+
+class _LocIndexer:
+    """Indexer for label-based selection via .loc[]"""
+    
+    def __init__(self, obj: SparkNavigation):
+        self._obj = obj
+    
+    def __getitem__(self, key) -> SparkNavigation | ps.Series | Any:
+        # key может быть: 
+        # - (row_key, col_key) для выбора строк и колонок
+        # - row_key только для выбора строк
+        # - (slice, str) и т.д.
+        
+        if isinstance(key, tuple):
+            if len(key) == 2:
+                rows, cols = key
+                result = self._obj.data.loc[rows, cols]
+            else:
+                raise IndexError(f"Invalid key length: {len(key)}, expected 1 or 2")
+        else:
+            # только строки
+            result = self._obj.data.loc[key]
+        
+        # Оборачиваем результат, если это DataFrame
+        if isinstance(result, ps.DataFrame):
+            return self._obj._wrap_result(result)
+        elif isinstance(result, ps.Series):
+            return self._obj._wrap_result(result.to_frame())
+        return result
+
+
+class _IlocIndexer:
+    """Indexer for position-based selection via .iloc[]"""
+    
+    def __init__(self, obj: SparkNavigation):
+        self._obj = obj
+    
+    def __getitem__(self, key) -> SparkNavigation | ps.Series | Any:
+        if isinstance(key, tuple):
+            if len(key) == 2:
+                rows, cols = key
+                result = self._obj.data.iloc[rows, cols]
+            else:
+                raise IndexError(f"Invalid key length: {len(key)}, expected 1 or 2")
+        else:
+            # только строки
+            result = self._obj.data.iloc[key]
+        
+        if isinstance(result, ps.DataFrame):
+            return self._obj._wrap_result(result)
+        elif isinstance(result, ps.Series):
+            return self._obj._wrap_result(result.to_frame())
+        return result
+
 class SparkNavigation(DatasetBackendNavigation):
     PANDAS_CONVERSION_LIMIT: int = 100_000
 
     def checkpoint(self):
         pass
     
-    def limit(self):
-        pass
+    def limit(self, num: int | None = None) -> Any:
+        return self._wrap_result(self.data.iloc[:num])
     
     def _check_pandas_conversion(self, obj: ps.DataFrame | ps.Series, context: str = "") -> None:
         n: int = obj.__len__()
@@ -329,12 +383,20 @@ class SparkNavigation(DatasetBackendNavigation):
     def create_empty(self, 
                      index: Iterable[Any] | None = None, 
                      columns: Iterable[str] | None = None) -> "SparkNavigation":
-        self.data = ps.DataFrame(index=index, columns=columns)
-        return self
+        return self._wrap_result(ps.DataFrame(index=index, columns=columns))
 
     @property
     def index(self) -> ps.Index:
         return self.data.index
+    
+    def reset_index(self, 
+                    drop: bool = False,
+                    inplace: bool = False,
+                    **kwargs) -> Self | None:
+        kwargs['inplace'] = False
+        
+        result = self.data.reset_index(drop=drop, **kwargs)
+        return self._wrap_result(result)
 
     @property
     def columns(self) -> list[str]:
@@ -414,12 +476,14 @@ class SparkNavigation(DatasetBackendNavigation):
         
         if isinstance(data, (ps.DataFrame, ps.Series)):
             if isinstance(data, ps.DataFrame) and data.shape[1] == 1:
-                data = data.iloc[:, 0]
-            self.data[name] = data
+                data_col = data.columns[0]
+                data_tmp = data
+                data_tmp[name] = data_tmp[data_col]
+                data_tmp = data_tmp.drop(columns=[data_col])                
+                self.data = self.data.join(data_tmp)
+                return
+            self.data = self.data.join(data)
             return
-        
-        if not isinstance(data, ps.Series):
-            data = ps.Series(data)
         
         self.data[name] = data
 
@@ -430,7 +494,7 @@ class SparkNavigation(DatasetBackendNavigation):
         new_data = ps.concat([self.data] + [d.data for d in other], axis=axis)
         if reset_index:
             new_data = new_data.reset_index(drop=True)
-        return new_data
+        return self._wrap_result(new_data)
 
     def from_dict(self, 
                   data: FromDictTypes, 
@@ -459,12 +523,13 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def loc(self, items: Iterable[Any]) -> Self:
         data = self.data.loc[items]
-        if not isinstance(data, ps.DataFrame):
-            data = ps.DataFrame(data)
         return data
 
     def iloc(self, items: Iterable[Any]) -> Self:
-        data = self.data.iloc[items]
+        if isinstance(items, int): 
+            data = self.data.iloc[[items]]
+        else:
+            data = self.data.iloc[items]
         if not isinstance(data, ps.DataFrame):
             data = ps.DataFrame(data)
         return data
@@ -490,6 +555,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def take(self, 
              indices: int | Sequence[int], 
              axis: Literal["index", "columns", "rows"] | int = 0) -> Self | ps.Series:
+        if isinstance(indices, slice) and (axis == 1):
+            self._wrap_result(self.data.iloc[indices])
         return self._wrap_result(self.data.take(indices=indices, axis=axis))
 
     def apply(self, func: Callable[..., Any], **kwargs) -> SparkDataset:
@@ -500,7 +567,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self._wrap_result(result)
 
     def map(self, func: Callable[..., Any], na_action: Any = None, **kwargs) -> SparkDataset:
-        return self._wrap_result(self.data.apply(lambda col: col.map(func, na_action=na_action), **kwargs))
+        return self._wrap_result(self.data.map(func, **kwargs))
 
     def is_empty(self) -> bool:
         return self.data.empty
@@ -585,9 +652,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self._wrap_result(ps.DataFrame(np_data, columns=self.data.columns))
 
     def cov(self) -> SparkDataset:
-        numeric_cols = self.get_numeric_columns()
-        print(f"num cols = {numeric_cols}")
-        
+        numeric_cols = self.get_numeric_columns()        
         if len(numeric_cols) == 0:
             return None
         
@@ -751,6 +816,44 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         if names is not None:
             result.columns = names
         return self._wrap_result(result if isinstance(result, ps.DataFrame) else ps.DataFrame(result))
+    
+    @staticmethod
+    def _reproducible_sample(df: ps.DataFrame,
+                             n: int = None,
+                             frac: float = None,
+                             replace: bool = False,
+                             seed: int = 42) -> ps.DataFrame:
+        
+        df_with_index = df.reset_index()
+        index_cols = df_with_index.columns[:df.index.nlevels]
+        
+        df_with_index['_shuffle_key'] = F.abs(
+            F.hash(*[F.col(col) for col in index_cols], F.lit(seed))
+        )
+        
+        shuffled = df_with_index.sort_values('_shuffle_key')
+        
+        total_rows = len(df)
+        if n is not None:
+            sample_size = n
+        elif frac is not None:
+            sample_size = int(total_rows * frac)
+        else:
+            sample_size = total_rows
+        
+        if replace:
+            indices = [i % total_rows for i in range(sample_size)]
+            sampled = shuffled.iloc[indices]
+        else:
+            sampled = shuffled.iloc[:sample_size]
+        
+        sampled = sampled.drop(columns=['_shuffle_key'])
+        if df.index.nlevels == 1:
+            sampled = sampled.set_index(index_cols[0])
+        else:
+            sampled = sampled.set_index(index_cols)
+        
+        return sampled
 
     def sample(self,
                frac: float | None = None,
@@ -758,29 +861,31 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                random_state: int | None = None,
                method: Literal["approx", "exact"] = "exact") -> Self:
         
-        if n is not None and frac is not None:
-            raise ValueError("Cannot specify both 'n' and 'frac'")
+        # if n is not None and frac is not None:
+        #     raise ValueError("Cannot specify both 'n' and 'frac'")
         
-        spark_df = self.data.to_spark()
+        # spark_df = self.data.to_spark()
         
-        if n is not None:
-            total = spark_df.count()
-            if n >= total:
-                return self._wrap_result(self.data)
+        # if n is not None:
+        #     total = spark_df.count()
+        #     if n >= total:
+        #         return self._wrap_result(self.data)
             
-            if method == "exact":
-                sampled = spark_df.orderBy(F.rand(seed=random_state)).limit(n)
-            else:
-                frac_calc = min(1.0, n / total * 1.3)
-                sampled = spark_df.sample(
-                    withReplacement=False, 
-                    fraction=frac_calc, 
-                    seed=random_state
-                ).limit(n)
+        #     if method == "exact":
+        #         sampled = spark_df.orderBy(F.rand(seed=random_state)).limit(n)
+        #     else:
+        #         frac_calc = min(1.0, n / total * 1.3)
+        #         sampled = spark_df.sample(
+        #             withReplacement=False, 
+        #             fraction=frac_calc, 
+        #             seed=random_state
+        #         ).limit(n)
             
-            return self._wrap_result(ps.DataFrame(sampled))
+        #     return self._wrap_result(ps.DataFrame(sampled))
         
-        return self._wrap_result(self.data.sample(frac=frac or 1.0, random_state=random_state))
+        # return self._wrap_result(self.data.sample(frac=frac or 1.0, random_state=random_state))
+        return self._wrap_result(self._reproducible_sample(df=self.data, n=n, frac=frac or 1.0, seed=random_state))
+
 
     def select_dtypes(self,
                       include: str | None = None,

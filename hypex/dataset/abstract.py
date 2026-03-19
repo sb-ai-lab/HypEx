@@ -7,12 +7,12 @@ import json
 from abc import ABC
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Callable, Hashable, Literal, Optional, Sequence
+from collections.abc import Iterable as IterableABC
 
 import pandas as pd  # type: ignore
 from numpy import ndarray
 import pyspark.sql as spark
 import pyspark.pandas as ps
-
 
 from ..utils import (
     BackendsEnum,
@@ -38,10 +38,76 @@ from .roles import (
 )
 
 
+
 class DatasetBase(ABC):
     DISPLAY_ROWS = 5
     DISPLAY_COLS = 10
+    
+    @dataclass
+    class Locker:
+        call_class: Any
+        backend: Any
+        roles: dict[str, Any]
 
+        def __getitem__(self, item):
+            t_data = self.backend.loc(item)
+            return self.call_class(
+                data=t_data,
+                roles={k: v for k, v in self.roles.items() if k in t_data.columns},
+            )
+
+        def __setitem__(self, item, value):
+            column_name = item[1]
+            if column_name not in self.roles:
+                raise KeyError(f"Role for column {column_name} not found")
+                
+            column_data_type = self.roles[column_name].data_type
+            
+            is_valid_type = (
+                column_data_type is None
+                or isinstance(value, column_data_type)
+                or (isinstance(value, IterableABC) and all(isinstance(v, column_data_type) for v in value))
+            )
+
+            if is_valid_type:
+                if column_name not in self.backend.data.columns:
+                    raise KeyError("Column must be added by using add_column method.")
+                self.backend.data.loc[item] = value
+            else:
+                raise TypeError("Value type does not match the expected data type.")
+
+    @dataclass
+    class ILocker:
+        call_class: Any
+        backend: Any
+        roles: dict[str, Any]
+
+        def __getitem__(self, item):
+            t_data = self.backend.iloc(item)
+            return self.call_class(
+                data=t_data,
+                roles={k: v for k, v in self.roles.items() if k in t_data.columns},
+            )
+
+        def __setitem__(self, item, value):
+            column_index = item[1]
+            if column_index >= len(self.backend.data.columns):
+                raise IndexError("Column index out of range")
+
+            column_name = self.backend.data.columns[column_index]
+            column_data_type = self.roles[column_name].data_type
+            
+            is_valid_type = (
+                column_data_type is None
+                or isinstance(value, column_data_type)
+                or (isinstance(value, IterableABC) and all(isinstance(v, column_data_type) for v in value))
+            )
+
+            if is_valid_type:
+                self.backend.data.iloc[item] = value
+            else:
+                raise TypeError("Value type does not match the expected data type.")
+    
     @staticmethod
     def _select_backend_from_data(data: Any,
                                   session: spark.SparkSession = None,) -> PandasDataset | SparkDataset:
@@ -158,6 +224,9 @@ class DatasetBase(ABC):
 
         self._roles: dict[str, ABCRole] = roles
         self._tmp_roles: dict[str, ABCRole] = {}
+        
+        self.loc = self.Locker(call_class=self.__class__, backend=self._backend_data, roles=self.roles)
+        self.iloc = self.ILocker(call_class=self.__class__, backend=self._backend_data, roles=self.roles)
 
     def __repr__(self):
         n_cols = len(self.columns)
@@ -203,6 +272,22 @@ class DatasetBase(ABC):
             key: value for key, value in self.tmp_roles.items() if key in items
         }
         return result
+    
+    def reset_index(self,
+                    drop: bool = False,
+                    **kwargs) -> DatasetBase:
+        kwargs['inplace'] = False
+        
+        new_data = self._backend_data.reset_index(drop=drop, **kwargs)
+        
+        new_roles = deepcopy(self.roles)
+        
+        if not drop:
+            for col in new_data.columns:
+                if col not in new_roles:
+                    new_roles[col] = deepcopy(self.default_role) or InfoRole()
+        
+        return self.__class__(roles=new_roles, data=new_data)
 
     def __setitem__(self,
                     key: str,
@@ -254,14 +339,15 @@ class DatasetBase(ABC):
     def create_empty(cls,
                      roles: dict[str, ABCRole] | None = None,
                      index=None,
+                     session=None,
                      backend=BackendsEnum.pandas) -> DatasetBase:
         if roles is None:
             roles = {}
         index = [] if index is None else index
         columns = list(roles.keys())
-        ds = cls(roles=roles, backend=backend)
-        ds._backend_data = ds._backend.create_empty(index, columns)
-        ds.data = ds.backend.data
+        ds = cls(roles=roles, backend=backend, session=session)
+        ds._backend_data = ds._backend_data.create_empty(index, columns)
+        ds.data = ds._backend_data.data
         return ds
 
     @staticmethod
@@ -276,6 +362,8 @@ class DatasetBase(ABC):
             else:
                 new_roles[roles[role]] = copy.deepcopy(r)
         return new_roles or roles
+    
+    
 
     def get(self,
             key: Any,
@@ -469,6 +557,10 @@ class DatasetBase(ABC):
     @property
     def index(self) -> Any:
         return self._backend_data.index
+    
+    @index.setter
+    def index(self, value):
+        self._backend_data.index = value
 
     @property
     def data(self) -> pd.DataFrame | spark.DataFrame:
@@ -589,6 +681,7 @@ class DatasetBase(ABC):
 
     def append(self,
                other: DatasetBase | Iterable[DatasetBase],
+               reset_index=False,
                axis: int = 0) -> DatasetBase:
         other = Adapter.to_list(other)
 
@@ -597,7 +690,11 @@ class DatasetBase(ABC):
             self._check_other_dataset(o)
             new_roles.update(o.roles)
 
-        return self.__class__(roles=new_roles, data=self.backend_data.append(other, axis))
+        return self.__class__(roles=new_roles, 
+                              data=self.backend_data.append(other=other, reset_index=reset_index, axis=axis))
+    
+    def limit(self, num: int | None = None) -> Any:
+        return self.__class__(data=self._backend_data.limit(num=num), roles=self.roles)
 
     def apply(self,
               func: Callable[..., Any],
@@ -726,7 +823,6 @@ class DatasetBase(ABC):
         t_data = self._backend_data.value_counts(
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
         )
-        print(type(t_data))
         t_roles = deepcopy(self.roles)
         column_name = "proportion" if normalize else "count"
         if column_name not in t_data.data:
@@ -893,7 +989,7 @@ class DatasetBase(ABC):
 
     def get_values(self,
                    row: str | None = None,
-                  column: str | None = None) -> Any:
+                   column: str | None = None) -> Any:
         return self._backend_data.get_values(row=row, column=column)
 
     def iget_values(self,

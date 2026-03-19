@@ -59,10 +59,16 @@ class BaseComparator(Calculator, ABC):
         return None
 
     def _get_fields_data(self, data: ExperimentData) -> dict[str, Dataset]:
+        print(f"data_t = {data.ds.backend_type}, {data.ds.backend_data.shape}")
         tmp_role = (
             True if data.ds.tmp_roles or data.additional_fields.tmp_roles else False
         )
+        print(f"self.grouping_role = {self.grouping_role}")
         group_field_data = data.field_data_search(roles=self.grouping_role)
+        
+        print(f"group_field_data = {group_field_data.shape}")
+        
+        
         target_fields_data = data.field_data_search(
             roles=(
                 (TempTargetRole() if data.ds.tmp_roles else AdditionalTargetRole())
@@ -467,8 +473,11 @@ class GroupsComparator(BaseComparator, ABC):
         """
         fields = self._get_fields_data(data)
         group_field_data = fields["group_field"]
+
         target_fields_data = fields["target_fields"]
         baseline_field_data = fields["baseline_field"]
+        
+        print(target_fields_data)
 
         self.key = str(
             target_fields_data.columns[0]
@@ -525,6 +534,7 @@ class GroupsComparator(BaseComparator, ABC):
                 )
                 else data.ds
             )
+            
 
             data.groups[group_field_data.columns[0]] = {
                 f"{group}": ds for group, ds in combined_data.groupby(group_field_data)
