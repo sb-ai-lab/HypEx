@@ -1,5 +1,5 @@
 from .analyzers.aa import OneAAStatAnalyzer
-from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
+from .comparators import GroupChi2Test, GroupDifference, GroupSizes, GroupKSTest, GroupTTest
 from .dataset import TargetRole, TreatmentRole
 from .experiments.base import Experiment, OnRoleExperiment
 from .ui.base import ExperimentShell
@@ -11,9 +11,9 @@ HOMOGENEITY_TEST = Experiment(
             executors=[
                 GroupSizes(grouping_role=TreatmentRole(), compare_by="groups"),
                 GroupDifference(grouping_role=TreatmentRole(), compare_by="groups"),
-                TTest(grouping_role=TreatmentRole(), compare_by="groups"),
-                KSTest(grouping_role=TreatmentRole(), compare_by="groups"),
-                Chi2Test(grouping_role=TreatmentRole(), compare_by="groups"),
+                GroupTTest(grouping_role=TreatmentRole(), compare_by="groups"),
+                GroupKSTest(grouping_role=TreatmentRole(), compare_by="groups"),
+                GroupChi2Test(grouping_role=TreatmentRole(), compare_by="groups"),
             ],
             role=TargetRole(),
         ),

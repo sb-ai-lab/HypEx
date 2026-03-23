@@ -8,10 +8,10 @@ from ..extensions.scipy_stats import (
     UTestExtension,
 )
 from ..utils.constants import NUMBER_TYPES_LIST
-from .abstract import StatHypothesisTesting
+from .abstract import GroupHypothesisTesting
 
 
-class TTest(StatHypothesisTesting):
+class GroupTTest(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         return NUMBER_TYPES_LIST
@@ -25,7 +25,7 @@ class TTest(StatHypothesisTesting):
         )
 
 
-class KSTest(StatHypothesisTesting):
+class GroupKSTest(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         return NUMBER_TYPES_LIST
@@ -39,7 +39,7 @@ class KSTest(StatHypothesisTesting):
         )
 
 
-class UTest(StatHypothesisTesting):
+class GroupUTest(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         return NUMBER_TYPES_LIST
@@ -53,7 +53,7 @@ class UTest(StatHypothesisTesting):
         )
 
 
-class Chi2Test(StatHypothesisTesting):
+class GroupChi2Test(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         return [str]

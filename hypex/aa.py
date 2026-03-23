@@ -6,7 +6,7 @@ from typing import Any
 from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
 from .comparators import GroupDifference, GroupSizes
 from .comparators.abstract import Comparator
-from .comparators.hypothesis_testing import Chi2Test, KSTest, TTest
+from .comparators.hypothesis_testing import GroupChi2Test, GroupKSTest, GroupTTest
 from .dataset import AdditionalTreatmentRole, TargetRole
 from .experiments.base import Experiment, OnRoleExperiment
 from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
@@ -27,9 +27,9 @@ AA_METRICS = Experiment(
                 GroupDifference(
                     compare_by="groups", grouping_role=AdditionalTreatmentRole()
                 ),
-                TTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
-                KSTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
-                Chi2Test(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
+                GroupTTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
+                GroupKSTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
+                GroupChi2Test(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
             ],
             role=TargetRole(),
         ),
@@ -256,5 +256,5 @@ class AATest(ExperimentShell):
         )
         if t_test_equal_var is not None:
             self.experiment.set_params(
-                {TTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
+                {GroupTTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
             )
