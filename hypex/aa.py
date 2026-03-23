@@ -18,6 +18,7 @@ from .ui.aa import AAOutput
 from .ui.base import ExperimentShell
 from .utils import SpaceEnum
 
+
 AA_METRICS = Experiment(
     executors=[
         GroupSizes(grouping_role=AdditionalTreatmentRole()),

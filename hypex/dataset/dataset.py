@@ -119,8 +119,8 @@ class SmallDataset(DatasetBase):
         session: spark.SparkSession | None = None,
     ):
         super().__init__(roles, data, BackendsEnum.pandas, default_role, session)
-        self.loc = self.Locker(self._backend, self.roles)
-        self.iloc = self.ILocker(self._backend, self.roles)
+        self.loc = self.Locker(backend=self._backend, roles=self.roles)
+        self.iloc = self.ILocker(backend=self._backend, roles=self.roles)
 
     @property
     def index(self):
@@ -202,7 +202,9 @@ class SmallDataset(DatasetBase):
 class ExperimentData:
     def __init__(self, data: Dataset):
         self._data = data
-        self.additional_fields = Dataset.create_empty(index=data.index)
+        self.additional_fields = data.create_empty(index=data.index, 
+                                                   backend=data.backend_type,
+                                                   session=data.session)
         self.variables: dict[str, dict[str, int | float]] = {}
         self.groups: dict[str, dict[str, Dataset]] = {}
         self.analysis_tables: dict[str, SmallDataset] = {}  # Используем SmallDataset
@@ -398,14 +400,16 @@ class ExperimentData:
         tmp_role: bool = False,
         search_types=None,
     ) -> Dataset:
-        searched_data: Dataset = Dataset.create_empty()
+        searched_data: Dataset = Dataset.create_empty(index=self._data.index,
+                                                      backend=self._data.backend_type,
+                                                      session=self._data.session)
         roles = Adapter.to_list(roles)
 
         # Map roles to columns
         roles_columns_map = {
             role: self.field_search(role, tmp_role, search_types) for role in roles
         }
-
+        
         # Build dataset from matching columns
         for role, columns in roles_columns_map.items():
             for column in columns:
@@ -417,8 +421,8 @@ class ExperimentData:
                 searched_data = searched_data.add_column(
                     data=t_data, role={column: role}
                 )
-        if not searched_data.is_empty():
-            searched_data.index = self.ds.index
+        # if not searched_data.is_empty():
+        #     searched_data.index = self.ds.index
         return searched_data
 
 
