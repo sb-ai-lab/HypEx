@@ -745,6 +745,8 @@ class DatasetBase(ABC):
             dataset_class=self.__class__,
             roles=self.roles,
             tmp_roles=self.tmp_roles,
+            group_cols=Adapter.to_list(by),
+            backend_data=self._backend_data
         )
 
     def fillna(self,
