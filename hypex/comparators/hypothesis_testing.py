@@ -9,7 +9,7 @@ from ..extensions.scipy_stats import (
 )
 from ..utils.constants import NUMBER_TYPES_LIST
 from .abstract import GroupHypothesisTesting, StatsComparator
-from typing import Any
+
 
 class GroupTTest(GroupHypothesisTesting):
     @property
@@ -24,21 +24,6 @@ class GroupTTest(GroupHypothesisTesting):
             data, other=test_data, **kwargs
         )
 
-class StatsTTest(StatsComparator):
-    @property
-    def search_types(self) -> list[type] | None:
-        return NUMBER_TYPES_LIST
-    
-    @classmethod
-    def _inner_function(
-        cls,
-        baseline_stats: dict[str, Any],
-        compared_stats: dict[str, Any],
-        reliability: float = 0.05,
-        **kwargs,
-    ) -> dict[str, Any]:
-        ...
-
 class GroupKSTest(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
@@ -51,9 +36,6 @@ class GroupKSTest(GroupHypothesisTesting):
         return GroupKSTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
-
-class StatsKSTest(StatsComparator):
-    ...
 
 class GroupUTest(GroupHypothesisTesting):
     @property
@@ -81,6 +63,3 @@ class GroupChi2Test(GroupHypothesisTesting):
         return GroupChi2TestExtension(reliability=kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
-    
-class StatsChi2Test(StatsComparator):
-    ...

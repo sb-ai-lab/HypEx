@@ -49,66 +49,66 @@ class Dataset(DatasetBase):
 
 
 class SmallDataset(DatasetBase):
-    class Locker:
-        def __init__(self, backend, roles):
-            self.backend = backend
-            self.roles = roles
+    # class Locker:
+    #     def __init__(self, backend, roles):
+    #         self.backend = backend
+    #         self.roles = roles
 
-        def __getitem__(self, item) -> Dataset:
-            t_data = self.backend.loc(item)
-            return Dataset(
-                data=t_data,
-                roles={k: v for k, v in self.roles.items() if k in t_data.columns},
-            )
+    #     def __getitem__(self, item) -> Dataset:
+    #         t_data = self.backend.loc(item)
+    #         return Dataset(
+    #             data=t_data,
+    #             roles={k: v for k, v in self.roles.items() if k in t_data.columns},
+    #         )
 
-        def __setitem__(self, item, value):
-            column_name = item[1]
-            column_data_type = self.roles[column_name].data_type
-            if (
-                column_data_type is None
-                or (
-                    isinstance(value, Iterable)
-                    and all(isinstance(v, column_data_type) for v in value)
-                )
-                or isinstance(value, column_data_type)
-            ):
-                if column_name not in self.backend.data.columns:
-                    raise KeyError("Column must be added by using add_column method.")
-                else:
-                    self.backend.data.loc[item] = value
-            else:
-                raise TypeError("Value type does not match the expected data type.")
+    #     def __setitem__(self, item, value):
+    #         column_name = item[1]
+    #         column_data_type = self.roles[column_name].data_type
+    #         if (
+    #             column_data_type is None
+    #             or (
+    #                 isinstance(value, Iterable)
+    #                 and all(isinstance(v, column_data_type) for v in value)
+    #             )
+    #             or isinstance(value, column_data_type)
+    #         ):
+    #             if column_name not in self.backend.data.columns:
+    #                 raise KeyError("Column must be added by using add_column method.")
+    #             else:
+    #                 self.backend.data.loc[item] = value
+    #         else:
+    #             raise TypeError("Value type does not match the expected data type.")
 
-    class ILocker:
-        def __init__(self, backend, roles):
-            self.backend = backend
-            self.roles = roles
+    # class ILocker:
+    #     def __init__(self, backend, roles):
+    #         self.backend = backend
+    #         self.roles = roles
 
-        def __getitem__(self, item) -> Dataset:
-            t_data = self.backend.iloc(item)
-            return Dataset(
-                data=t_data,
-                roles={k: v for k, v in self.roles.items() if k in t_data.columns},
-            )
+    #     def __getitem__(self, item) -> Dataset:
+    #         t_data = self.backend.iloc(item)
+    #         return Dataset(
+    #             data=t_data,
+    #             roles={k: v for k, v in self.roles.items() if k in t_data.columns},
+    #         )
 
-        def __setitem__(self, item, value):
-            column_index = item[1]
-            column_name = self.backend.data.columns[column_index]
-            column_data_type = self.roles[column_name].data_type
-            if (
-                column_data_type is None
-                or (
-                    isinstance(value, Iterable)
-                    and all(isinstance(v, column_data_type) for v in value)
-                )  # check for backend specific list (?)
-                or isinstance(value, column_data_type)
-            ):
-                if column_index >= len(self.backend.data.columns):
-                    raise IndexError("Column must be added by using add_column method.")
-                else:
-                    self.backend.data.iloc[item] = value
-            else:
-                raise TypeError("Value type does not match the expected data type.")
+    #     def __setitem__(self, item, value):
+    #         column_index = item[1]
+    #         column_name = self.backend.data.columns[column_index]
+    #         column_data_type = self.roles[column_name].data_type
+    #         if (
+    #             column_data_type is None
+    #             or (
+    #                 isinstance(value, Iterable)
+    #                 and all(isinstance(v, column_data_type) for v in value)
+    #             )  # check for backend specific list (?)
+    #             or isinstance(value, column_data_type)
+    #         ):
+    #             if column_index >= len(self.backend.data.columns):
+    #                 raise IndexError("Column must be added by using add_column method.")
+    #             else:
+    #                 self.backend.data.iloc[item] = value
+    #         else:
+    #             raise TypeError("Value type does not match the expected data type.")
 
     def __init__(
         self,
@@ -119,8 +119,8 @@ class SmallDataset(DatasetBase):
         session: spark.SparkSession | None = None,
     ):
         super().__init__(roles, data, BackendsEnum.pandas, default_role, session)
-        self.loc = self.Locker(backend=self._backend, roles=self.roles)
-        self.iloc = self.ILocker(backend=self._backend, roles=self.roles)
+        self.loc = self.Locker(call_class=self.__class__, backend=self._backend_data, roles=self.roles)
+        self.iloc = self.ILocker(call_class=self.__class__, backend=self._backend_data, roles=self.roles)
 
     @property
     def index(self):
@@ -172,7 +172,7 @@ class SmallDataset(DatasetBase):
         )
 
     def idxmax(self):
-        return self._convert_data_after_agg(self._backend.idxmax())
+        return self._convert_data_after_agg(self._backend_data.idxmax())
 
     def transpose(
             self,

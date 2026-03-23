@@ -51,8 +51,8 @@ class GroupStatTest(CompareExtension):
         if self.test_function is None:
             raise ValueError("test_function is needed for execution")
         one_result = self.test_function(
-            data.backend.data.values.flatten(),
-            other.backend.data.values.flatten(),
+            data.backend_data.data.values.flatten(),
+            other.backend_data.data.values.flatten(),
             **kwargs,
         )
         one_result = SmallDataset.from_dict(
@@ -141,7 +141,7 @@ class GroupChi2TestExtension(GroupStatTest):
         return counts
 
     def matrix_preparation(self, data: Dataset, other: Dataset) -> Dataset | None:
-        return self.DATA_MAPPER[type(data.backend)](data, other)
+        return self.DATA_MAPPER[type(data.backend_data)](data, other)
     
     def _pandas_prep(self, data: Dataset, other: Dataset) -> Dataset | None:
         proportion = len(data) / (len(data) + len(other))
@@ -202,7 +202,7 @@ class GroupChi2TestExtension(GroupStatTest):
                 },
                 StatisticRole(),
             )
-        one_result = chi2_contingency(matrix.backend.data)
+        one_result = chi2_contingency(matrix.backend_data.data)
         return DatasetAdapter.to_dataset(
             {
                 "p-value": (
