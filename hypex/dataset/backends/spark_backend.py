@@ -527,6 +527,16 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     
     def groupby(self, by: str | Iterable[str], **kwargs) -> ps.groupby.GroupBy:
         return self.data.groupby(by=by, **kwargs)
+    
+    def iter_groups(self, by: list[str]):
+        keys_df = self.data[by].drop_duplicates().to_pandas()
+        for _, row in keys_df.iterrows():
+            key = row[by[0]] if len(by) == 1 else tuple(row[col] for col in by)
+            mask = None
+            for col in by:
+                col_mask = self.data[col] == row[col]
+                mask = col_mask if mask is None else mask & col_mask
+            yield key, self.data[mask]
 
     def agg(self, func: str | list, **kwargs) -> SparkDataset | float:
         subset = kwargs.pop('subset', None)
