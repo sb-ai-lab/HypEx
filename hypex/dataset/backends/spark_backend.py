@@ -24,59 +24,6 @@ from ...utils import FromDictTypes, MergeOnError, ScalarType, SparkTypeMapper
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
-class _LocIndexer:
-    """Indexer for label-based selection via .loc[]"""
-    
-    def __init__(self, obj: SparkNavigation):
-        self._obj = obj
-    
-    def __getitem__(self, key) -> SparkNavigation | ps.Series | Any:
-        # key может быть: 
-        # - (row_key, col_key) для выбора строк и колонок
-        # - row_key только для выбора строк
-        # - (slice, str) и т.д.
-        
-        if isinstance(key, tuple):
-            if len(key) == 2:
-                rows, cols = key
-                result = self._obj.data.loc[rows, cols]
-            else:
-                raise IndexError(f"Invalid key length: {len(key)}, expected 1 or 2")
-        else:
-            # только строки
-            result = self._obj.data.loc[key]
-        
-        # Оборачиваем результат, если это DataFrame
-        if isinstance(result, ps.DataFrame):
-            return self._obj._wrap_result(result)
-        elif isinstance(result, ps.Series):
-            return self._obj._wrap_result(result.to_frame())
-        return result
-
-
-class _IlocIndexer:
-    """Indexer for position-based selection via .iloc[]"""
-    
-    def __init__(self, obj: SparkNavigation):
-        self._obj = obj
-    
-    def __getitem__(self, key) -> SparkNavigation | ps.Series | Any:
-        if isinstance(key, tuple):
-            if len(key) == 2:
-                rows, cols = key
-                result = self._obj.data.iloc[rows, cols]
-            else:
-                raise IndexError(f"Invalid key length: {len(key)}, expected 1 or 2")
-        else:
-            # только строки
-            result = self._obj.data.iloc[key]
-        
-        if isinstance(result, ps.DataFrame):
-            return self._obj._wrap_result(result)
-        elif isinstance(result, ps.Series):
-            return self._obj._wrap_result(result.to_frame())
-        return result
-
 class SparkNavigation(DatasetBackendNavigation):
     PANDAS_CONVERSION_LIMIT: int = 100_000
 
@@ -473,13 +420,13 @@ class SparkNavigation(DatasetBackendNavigation):
                    index: Sequence[Any] | None = None) -> None:
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
-        
         if isinstance(data, (ps.DataFrame, ps.Series)):
             if isinstance(data, ps.DataFrame) and data.shape[1] == 1:
                 data_col = data.columns[0]
                 data_tmp = data
-                data_tmp[name] = data_tmp[data_col]
-                data_tmp = data_tmp.drop(columns=[data_col])                
+                if name != data_col:
+                    data_tmp[name] = data_tmp[data_col]
+                    data_tmp = data_tmp.drop(columns=[data_col])   
                 self.data = self.data.join(data_tmp)
                 return
             self.data = self.data.join(data)

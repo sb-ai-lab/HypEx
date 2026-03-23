@@ -400,7 +400,6 @@ class ExperimentData:
         searched_data: Dataset = Dataset.create_empty(index=self._data.index,
                                                       backend=self._data.backend_type,
                                                       session=self._data.session)
-        print(f"searched_data_shape = {searched_data.shape}")
         roles = Adapter.to_list(roles)
 
         # Map roles to columns
@@ -408,8 +407,6 @@ class ExperimentData:
             role: self.field_search(role, tmp_role, search_types) for role in roles
         }
         
-        print(f"roles_columns_map = {roles_columns_map}")
-
         # Build dataset from matching columns
         for role, columns in roles_columns_map.items():
             for column in columns:
@@ -418,7 +415,6 @@ class ExperimentData:
                     if isinstance(role, AdditionalRole)
                     else self.ds[column]
                 )
-                print(t_data.shape)
                 searched_data = searched_data.add_column(
                     data=t_data, role={column: role}
                 )
