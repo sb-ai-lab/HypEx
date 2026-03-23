@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 from .analyzers.ab import ABAnalyzer
-from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest, UTest
+from .comparators import GroupChi2Test, GroupDifference, GroupSizes, GroupKSTest, GroupTTest, GroupUTest
 from .dataset import AdditionalTargetRole, TargetRole, TreatmentRole
 from .executor.executor import Executor
 from .experiments.base import Experiment, OnRoleExperiment
@@ -57,10 +57,10 @@ class ABTest(ExperimentShell):
         enable_cupac: bool,
     ) -> Experiment:
         test_mapping: dict[str, Executor] = {
-            "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
-            "ks-test": KSTest(compare_by="groups", grouping_role=TreatmentRole()),
-            "u-test": UTest(compare_by="groups", grouping_role=TreatmentRole()),
-            "chi2-test": Chi2Test(compare_by="groups", grouping_role=TreatmentRole()),
+            "t-test": GroupTTest(compare_by="groups", grouping_role=TreatmentRole()),
+            "ks-test": GroupKSTest(compare_by="groups", grouping_role=TreatmentRole()),
+            "u-test": GroupUTest(compare_by="groups", grouping_role=TreatmentRole()),
+            "chi2-test": GroupChi2Test(compare_by="groups", grouping_role=TreatmentRole()),
         }
         on_role_executors: list[Executor] = [
             GroupDifference(grouping_role=TreatmentRole())
@@ -170,5 +170,5 @@ class ABTest(ExperimentShell):
         )
         if t_test_equal_var is not None:
             self.experiment.set_params(
-                {TTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
+                {GroupTTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
             )

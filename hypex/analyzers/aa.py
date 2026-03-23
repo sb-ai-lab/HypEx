@@ -4,7 +4,7 @@ from typing import Any, ClassVar
 
 import numpy as np
 
-from ..comparators import Chi2Test, KSTest, TTest
+from ..comparators import GroupChi2Test, GroupKSTest, GroupTTest
 from ..dataset import Dataset, ExperimentData, StatisticRole
 from ..dataset.dataset import SmallDataset
 from ..executor import Executor
@@ -19,7 +19,7 @@ class OneAAStatAnalyzer(Executor):
         return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        analysis_tests: list[type] = [TTest, KSTest, Chi2Test]
+        analysis_tests: list[type] = [GroupTTest, GroupKSTest, GroupChi2Test]
         executor_ids = data.get_ids(
             analysis_tests, searched_space=ExperimentDataEnum.analysis_tables
         )
@@ -44,17 +44,17 @@ class OneAAStatAnalyzer(Executor):
             for key, value in analysis_data.items()
         }
         if (
-            "mean TTest p-value" in analysis_data
-            and "mean KSTest p-value" in analysis_data
+            "mean GroupTTest p-value" in analysis_data
+            and "mean GroupKSTest p-value" in analysis_data
         ):
             analysis_data["mean test score"] = (
-                analysis_data["mean TTest p-value"]
-                + 2 * analysis_data["mean KSTest p-value"]
+                analysis_data["mean GroupTTest p-value"]
+                + 2 * analysis_data["mean GroupKSTest p-value"]
             )
             sum_weight += 3
-        if "mean Chi2Test p-value" in analysis_data:
+        if "mean GroupChi2Test p-value" in analysis_data:
             analysis_data["mean test score"] += (
-                2 * analysis_data["mean Chi2Test p-value"]
+                2 * analysis_data["mean GroupChi2Test p-value"]
             )
             sum_weight += 2
         if sum_weight:

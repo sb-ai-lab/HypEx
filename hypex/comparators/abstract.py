@@ -556,7 +556,7 @@ class GroupsComparator(BaseComparator, ABC):
 Comparator = GroupsComparator
 
 
-class StatHypothesisTesting(GroupsComparator, ABC):
+class GroupHypothesisTesting(GroupsComparator, ABC):
     def __init__(
         self,
         compare_by: Literal[
@@ -764,3 +764,33 @@ class StatsComparator(BaseComparator, ABC):
             for col in target_fields_data.columns
         ]
         return self._set_value(data, result_dataset)
+
+
+class StatsHypothesisTesting(StatsComparator, ABC):
+    """
+    StatsComparator subclass that adds a ``reliability`` parameter — the direct
+    analog of :class:`GroupHypothesisTesting` for the stats-based comparator branch.
+
+    Concrete subclasses only need to implement ``_inner_function`` and declare
+    ``REQUIRED_STATS``; the ``reliability`` value is forwarded via ``calc_kwargs``
+    so it is available inside ``_inner_function`` without extra wiring.
+    """
+
+    def __init__(
+        self,
+        stats: list[str],
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | list[ABCRole] | None = None,
+        reliability: float = 0.05,
+        key: Any = "",
+        calc_kwargs: dict[str, Any] = {},
+    ):
+        merged_kwargs = {"reliability": reliability, **calc_kwargs}
+        super().__init__(
+            stats=stats,
+            grouping_role=grouping_role,
+            target_roles=target_roles,
+            key=key,
+            calc_kwargs=merged_kwargs,
+        )
+        self.reliability = reliability

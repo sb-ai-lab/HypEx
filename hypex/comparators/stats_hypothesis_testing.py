@@ -7,10 +7,10 @@ from scipy.stats import t as t_dist
 
 from ..dataset import ABCRole
 from ..utils.constants import NUMBER_TYPES_LIST
-from .abstract import StatsComparator
+from .abstract import StatsHypothesisTesting
 
 
-class AggTTest(StatsComparator):
+class AggTTest(StatsHypothesisTesting):
     """
     Analytical two-sample t-test operating on aggregated sufficient statistics.
 
@@ -18,8 +18,8 @@ class AggTTest(StatsComparator):
     _compute_stats call per group, then applies Welch's t-test formula analytically
     — without requiring access to raw data.
 
-    Output shape is identical to TTest: rows indexed by compared group name, columns
-    are p-value, statistic, pass — making AggTTest a drop-in replacement for TTest
+    Output shape is identical to GroupTTest: rows indexed by compared group name, columns
+    are p-value, statistic, pass — making AggTTest a drop-in replacement for GroupTTest
     in pipelines where raw data transfer is expensive (e.g. Spark backend).
     """
 
@@ -36,10 +36,9 @@ class AggTTest(StatsComparator):
             stats=self.REQUIRED_STATS,
             grouping_role=grouping_role,
             target_roles=target_roles,
+            reliability=reliability,
             key=key,
-            calc_kwargs={"reliability": reliability},
         )
-        self.reliability = reliability
 
     @property
     def search_types(self) -> list[type] | None:
