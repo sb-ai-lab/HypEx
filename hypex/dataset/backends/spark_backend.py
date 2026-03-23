@@ -503,7 +503,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
              indices: int | Sequence[int], 
              axis: Literal["index", "columns", "rows"] | int = 0) -> Self | ps.Series:
         if isinstance(indices, slice) and (axis == 1):
-            self._wrap_result(self.data.iloc[indices])
+            return self._wrap_result(self.data.iloc[indices])
         return self._wrap_result(self.data.take(indices=indices, axis=axis))
 
     def apply(self, func: Callable[..., Any], **kwargs) -> SparkDataset:
