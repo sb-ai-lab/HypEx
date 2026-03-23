@@ -17,7 +17,7 @@ from ..dataset.backends import PandasDataset, SparkDataset
 from .abstract import CompareExtension
 
 
-class StatTest(CompareExtension):
+class GroupStatTest(CompareExtension):
     def __init__(
         self, test_function: Callable | None = None, reliability: float = 0.05
     ):
@@ -87,7 +87,7 @@ class StatTest(CompareExtension):
         return one_result
 
 
-class TTestExtension(StatTest):
+class GroupTTestExtension(GroupStatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ttest_ind, reliability=reliability)
 
@@ -109,17 +109,17 @@ class TTestExtension(StatTest):
         return super()._calc_pandas(data, other, nan_policy="omit", **kwargs)
 
 
-class KSTestExtension(StatTest):
+class GroupKSTestExtension(GroupStatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ks_2samp, reliability=reliability)
 
 
-class UTestExtension(StatTest):
+class GroupUTestExtension(GroupStatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(mannwhitneyu, reliability=reliability)
 
 
-class Chi2TestExtension(StatTest):
+class GroupChi2TestExtension(GroupStatTest):
     def __init__(self, test_function = None, reliability = 0.05):
         super().__init__(test_function, reliability)
         self.DATA_MAPPER = {
@@ -241,7 +241,7 @@ class Chi2TestExtension(StatTest):
         return one_result
 
 
-class NormCDF(StatTest):
+class NormCDF(GroupStatTest):
     def _calc_pandas(
         self, data: Dataset, other: Dataset | None = None, **kwargs
     ) -> Dataset | float:

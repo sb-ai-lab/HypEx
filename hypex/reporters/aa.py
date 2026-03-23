@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from ..comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
+from ..comparators import GroupChi2Test, GroupDifference, GroupSizes, GroupKSTest, GroupTTest
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..dataset.dataset import SmallDataset
 from ..splitters import AASplitter, AASplitterWithStratification
@@ -11,7 +11,7 @@ from .abstract import Reporter, TestDictReporter
 
 
 class OneAADictReporter(TestDictReporter):
-    tests: ClassVar[list] = [TTest, KSTest, Chi2Test]
+    tests: ClassVar[list] = [GroupTTest, GroupKSTest, GroupChi2Test]
 
     @staticmethod
     def convert_flat_dataset(data: dict) -> SmallDataset:

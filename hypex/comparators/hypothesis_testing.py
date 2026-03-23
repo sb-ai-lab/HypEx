@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from ..dataset import Dataset
 from ..extensions.scipy_stats import (
-    Chi2TestExtension,
-    KSTestExtension,
-    TTestExtension,
-    UTestExtension,
+    GroupChi2TestExtension,
+    GroupKSTestExtension,
+    GroupTTestExtension,
+    GroupUTestExtension,
 )
 from ..utils.constants import NUMBER_TYPES_LIST
-from .abstract import StatHypothesisTesting
+from .abstract import GroupHypothesisTesting, StatsComparator
+from typing import Any
 
-
-class TTest(StatHypothesisTesting):
+class GroupTTest(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         return NUMBER_TYPES_LIST
@@ -20,12 +20,26 @@ class TTest(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return TTestExtension(kwargs.get("reliability", 0.05)).calc(
+        return GroupTTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
+class StatsTTest(StatsComparator):
+    @property
+    def search_types(self) -> list[type] | None:
+        return NUMBER_TYPES_LIST
+    
+    @classmethod
+    def _inner_function(
+        cls,
+        baseline_stats: dict[str, Any],
+        compared_stats: dict[str, Any],
+        reliability: float = 0.05,
+        **kwargs,
+    ) -> dict[str, Any]:
+        ...
 
-class KSTest(StatHypothesisTesting):
+class GroupKSTest(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         return NUMBER_TYPES_LIST
@@ -34,12 +48,14 @@ class KSTest(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return KSTestExtension(kwargs.get("reliability", 0.05)).calc(
+        return GroupKSTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
+class StatsKSTest(StatsComparator):
+    ...
 
-class UTest(StatHypothesisTesting):
+class GroupUTest(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         return NUMBER_TYPES_LIST
@@ -48,12 +64,12 @@ class UTest(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return UTestExtension(kwargs.get("reliability", 0.05)).calc(
+        return GroupUTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
 
-class Chi2Test(StatHypothesisTesting):
+class GroupChi2Test(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         return [str]
@@ -62,6 +78,9 @@ class Chi2Test(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return Chi2TestExtension(reliability=kwargs.get("reliability", 0.05)).calc(
+        return GroupChi2TestExtension(reliability=kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
+    
+class StatsChi2Test(StatsComparator):
+    ...

@@ -4,7 +4,7 @@ from typing import Any, ClassVar
 
 import numpy as np
 
-from ..comparators import Chi2Test, KSTest, TTest
+from ..comparators import GroupChi2Test, GroupKSTest, GroupTTest
 from ..dataset import Dataset, ExperimentData, StatisticRole
 from ..dataset.dataset import SmallDataset
 from ..executor import Executor
@@ -19,7 +19,7 @@ class OneAAStatAnalyzer(Executor):
         return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        analysis_tests: list[type] = [TTest, KSTest, Chi2Test]
+        analysis_tests: list[type] = [GroupTTest, GroupKSTest, GroupChi2Test]
         executor_ids = data.get_ids(
             analysis_tests, searched_space=ExperimentDataEnum.analysis_tables
         )

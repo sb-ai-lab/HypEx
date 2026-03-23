@@ -556,7 +556,7 @@ class GroupsComparator(BaseComparator, ABC):
 Comparator = GroupsComparator
 
 
-class StatHypothesisTesting(GroupsComparator, ABC):
+class GroupHypothesisTesting(GroupsComparator, ABC):
     def __init__(
         self,
         compare_by: Literal[

@@ -136,7 +136,10 @@ class SmallDataset(DatasetBase):
             roles: ABCRole | dict[str, ABCRole],
     ) -> SmallDataset:
         if not isinstance(roles, dict):
-            raise TypeError(f"Value {data} is not a dict type.")
+            if isinstance(roles, ABCRole):
+                roles = {col : roles for col in data.keys()}
+            else:
+                raise TypeError(f"Value {roles} is not a dict type.")
 
         if isinstance(data, dict) and "data" in data:
             payload = data

@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from ..comparators import TTest, UTest
+from ..comparators import GroupTTest, GroupUTest
 from ..dataset import Dataset, ExperimentData, StatisticRole, TargetRole, TreatmentRole
 from ..dataset.dataset import SmallDataset
 from ..experiments.base import Executor
@@ -93,7 +93,7 @@ class ABAnalyzer(Executor):
         return multitest_pvalues
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        executor_ids = data.get_ids([TTest, UTest])
+        executor_ids = data.get_ids([GroupTTest, GroupUTest])
         num_groups = len(data.groups[data.ds.search_columns(TreatmentRole())[0]]) - 1
         groups = list(data.groups[data.ds.search_columns(TreatmentRole())[0]].items())
         multitest_pvalues = Dataset.create_empty()

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from ..analyzers.matching import MatchingAnalyzer
-from ..comparators import Chi2Test, KSTest, TTest
+from ..comparators import GroupChi2Test, GroupKSTest, GroupTTest
 from ..dataset import Dataset, ExperimentData
 from ..ml import FaissNearestNeighbors
 from ..reporters.abstract import DatasetReporter, DictReporter, TestDictReporter
@@ -60,7 +60,7 @@ class MatchingDictReporter(DictReporter):
 
 
 class MatchingQualityDictReporter(TestDictReporter):
-    tests: ClassVar[list] = [TTest, KSTest, Chi2Test]
+    tests: ClassVar[list] = [GroupTTest, GroupKSTest, GroupChi2Test]
 
     def report(self, data: ExperimentData) -> dict[str, Any]:
         return self.extract_tests(data)

@@ -146,9 +146,9 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data = self._data_compression(data, data_compression, non_compresion_cols)
         elif isinstance(data, dict):
             if "index" in data.keys():
-                self.data = pd.DataFrame(data=data["data"], index=data["index"])
+                self.data = pd.DataFrame(data=[data["data"]], index=data["index"])
             else:
-                self.data = pd.DataFrame(data=data["data"])
+                self.data = pd.DataFrame(data=[data["data"]])
         elif isinstance(data, str):
             self.data = self._read_file(data)
         else:

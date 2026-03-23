@@ -3,14 +3,14 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from ..analyzers.ab import ABAnalyzer
-from ..comparators import Chi2Test, TTest, UTest
+from ..comparators import GroupChi2Test, GroupTTest, GroupUTest
 from ..dataset import Dataset, ExperimentData, StatisticRole
 from ..utils import ExperimentDataEnum
 from .aa import OneAADictReporter
 
 
 class ABDictReporter(OneAADictReporter):
-    tests: ClassVar[list] = [TTest, UTest, Chi2Test]
+    tests: ClassVar[list] = [GroupTTest, GroupUTest, GroupChi2Test]
 
     def extract_analyzer_data(self, data: ExperimentData) -> dict[str, Any]:
         analyzer_id = data.get_one_id(ABAnalyzer, ExperimentDataEnum.analysis_tables)
