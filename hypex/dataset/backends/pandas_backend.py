@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional, List
+from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional, List, Self
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -17,12 +17,22 @@ from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
 class PandasNavigation(DatasetBackendNavigation):
+    
+    def _wrap_result(self, 
+                     result: pd.DataFrame | pd.Series | Any,
+                     wrap_series: bool = False) -> Self | pd.Series | Any:
+        if isinstance(result, pd.DataFrame):
+            return self.__class__(data=result)
+        
+        if wrap_series and isinstance(result, pd.Series):
+            return self.__class__(data=result.to_frame())
+        
+        return result
 
     def _data_compression(self,
-                  data: spark.DataFrame,
-                  data_compression: Literal["downcasting", "encoding", "auto", "disable"],
-                  non_compresion_cols: List[str] | None
-    ) -> pd.DataFrame:
+                          data: spark.DataFrame,
+                          data_compression: Literal["downcasting", "encoding", "auto", "disable"],
+                          non_compresion_cols: List[str] | None) -> pd.DataFrame:
         """Compress data before convertation `spark.DataFrame` to pandas.DataFrame.
 
         Args:
@@ -218,7 +228,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Boolean DataFrame of comparison results.
         """
-        return self.data == self.__magic_determine_other(other)
+        return self._wrap_result(self.data == self.__magic_determine_other(other))
 
     def __ne__(self, other) -> Any:
         """Element-wise inequality comparison (!=).
@@ -229,7 +239,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Boolean DataFrame of comparison results.
         """
-        return self.data != self.__magic_determine_other(other)
+        return self._wrap_result(self.data != self.__magic_determine_other(other))
 
     def __le__(self, other) -> Any:
         """Element-wise less-than-or-equal comparison (<=).
@@ -240,7 +250,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Boolean DataFrame of comparison results.
         """
-        return self.data <= self.__magic_determine_other(other)
+        return self._wrap_result(self.data <= self.__magic_determine_other(other))
 
     def __lt__(self, other) -> Any:
         """Element-wise less-than comparison (<).
@@ -251,7 +261,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Boolean DataFrame of comparison results.
         """
-        return self.data < self.__magic_determine_other(other)
+        return self._wrap_result(self.data < self.__magic_determine_other(other))
 
     def __ge__(self, other) -> Any:
         """Element-wise greater-than-or-equal comparison (>=).
@@ -262,7 +272,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Boolean DataFrame of comparison results.
         """
-        return self.data >= self.__magic_determine_other(other)
+        return self._wrap_result(self.data >= self.__magic_determine_other(other))
 
     def __gt__(self, other) -> Any:
         """Element-wise greater-than comparison (>).
@@ -273,7 +283,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Boolean DataFrame of comparison results.
         """
-        return self.data > self.__magic_determine_other(other)
+        return self._wrap_result(self.data > self.__magic_determine_other(other))
 
     # Unary operations:
     def __pos__(self) -> Any:
@@ -282,7 +292,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of unary positive on underlying data.
         """
-        return +self.data
+        return self._wrap_result(+self.data)
 
     def __neg__(self) -> Any:
         """Unary negation operation (-self).
@@ -290,7 +300,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of unary negation on underlying data.
         """
-        return -self.data
+        return self._wrap_result(-self.data)
 
     def __abs__(self) -> Any:
         """Absolute value operation (abs(self)).
@@ -298,7 +308,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Element-wise absolute values.
         """
-        return abs(self.data)
+        return self._wrap_result(abs(self.data))
 
     def __invert__(self) -> Any:
         """Bitwise inversion operation (~self).
@@ -306,7 +316,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Element-wise bitwise NOT results.
         """
-        return ~self.data
+        return self._wrap_result(~self.data)
 
     def __round__(self, ndigits: int = 0) -> Any:
         """Round numeric values to specified decimal places.
@@ -317,7 +327,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Rounded values.
         """
-        return round(self.data, ndigits)
+        return self._wrap_result(round(self.data, ndigits))
 
     # Binary operations:
     def __add__(self, other) -> Any:
@@ -329,7 +339,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of addition.
         """
-        return self.data + self.__magic_determine_other(other)
+        return self._wrap_result(self.data + self.__magic_determine_other(other))
 
     def __sub__(self, other) -> Any:
         """Element-wise subtraction (self - other).
@@ -340,7 +350,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of subtraction.
         """
-        return self.data - self.__magic_determine_other(other)
+        return self._wrap_result(self.data - self.__magic_determine_other(other))
 
     def __mul__(self, other) -> Any:
         """Element-wise multiplication (self * other).
@@ -351,7 +361,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of multiplication.
         """
-        return self.data * self.__magic_determine_other(other)
+        return self._wrap_result(self.data * self.__magic_determine_other(other))
 
     def __floordiv__(self, other) -> Any:
         """Element-wise floor division (self // other).
@@ -362,7 +372,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of floor division.
         """
-        return self.data // self.__magic_determine_other(other)
+        return self._wrap_result(self.data // self.__magic_determine_other(other))
 
     def __div__(self, other) -> Any:
         """Element-wise division (self / other) - Python 2 compatibility.
@@ -373,7 +383,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of division.
         """
-        return self.data / self.__magic_determine_other(other)
+        return self._wrap_result(self.data / self.__magic_determine_other(other))
 
     def __truediv__(self, other) -> Any:
         """Element-wise true division (self / other).
@@ -384,7 +394,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of true division.
         """
-        return self.data / self.__magic_determine_other(other)
+        return self._wrap_result(self.data / self.__magic_determine_other(other))
 
     def __mod__(self, other) -> Any:
         """Element-wise modulo operation (self % other).
@@ -395,7 +405,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Remainder after division.
         """
-        return self.data % self.__magic_determine_other(other)
+        return self._wrap_result(self.data % self.__magic_determine_other(other))
 
     def __pow__(self, other) -> Any:
         """Element-wise exponentiation (self ** other).
@@ -406,7 +416,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of exponentiation.
         """
-        return self.data ** self.__magic_determine_other(other)
+        return self._wrap_result(self.data ** self.__magic_determine_other(other))
 
     def __and__(self, other) -> Any:
         """Element-wise bitwise AND operation (self & other).
@@ -417,7 +427,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of bitwise AND.
         """
-        return self.data & self.__magic_determine_other(other)
+        return self._wrap_result(self.data & self.__magic_determine_other(other))
 
     def __or__(self, other) -> Any:
         """Element-wise bitwise OR operation (self | other).
@@ -428,7 +438,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of bitwise OR.
         """
-        return self.data | self.__magic_determine_other(other)
+        return self._wrap_result(self.data | self.__magic_determine_other(other))
 
     # Right arithmetic operators:
     def __radd__(self, other) -> Any:
@@ -440,7 +450,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of addition.
         """
-        return self.__magic_determine_other(other) + self.data
+        return self._wrap_result(self.__magic_determine_other(other) + self.data)
 
     def __rsub__(self, other) -> Any:
         """Reflected subtraction (other - self).
@@ -451,7 +461,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of subtraction.
         """
-        return self.__magic_determine_other(other) - self.data
+        return self._wrap_result(self.__magic_determine_other(other) - self.data)
 
     def __rmul__(self, other) -> Any:
         """Reflected multiplication (other * self).
@@ -462,7 +472,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of multiplication.
         """
-        return self.__magic_determine_other(other) * self.data
+        return self._wrap_result(self.__magic_determine_other(other) * self.data)
 
     def __rfloordiv__(self, other) -> Any:
         """Reflected floor division (other // self).
@@ -473,7 +483,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of floor division.
         """
-        return self.__magic_determine_other(other) // self.data
+        return self._wrap_result(self.__magic_determine_other(other) // self.data)
 
     def __rdiv__(self, other) -> Any:
         """Reflected division (other / self) - Python 2 compatibility.
@@ -484,7 +494,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of division.
         """
-        return self.__magic_determine_other(other) / self.data
+        return self._wrap_result(self.__magic_determine_other(other) / self.data)
 
     def __rtruediv__(self, other) -> Any:
         """Reflected true division (other / self).
@@ -495,7 +505,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of true division.
         """
-        return self.__magic_determine_other(other) / self.data
+        return self._wrap_result(self.__magic_determine_other(other) / self.data)
 
     def __rmod__(self, other) -> Any:
         """Reflected modulo (other % self).
@@ -506,7 +516,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Remainder after division.
         """
-        return self.__magic_determine_other(other) % self.data
+        return self._wrap_result(self.__magic_determine_other(other) % self.data)
 
     def __rpow__(self, other) -> Any:
         """Reflected exponentiation (other ** self).
@@ -517,7 +527,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Result of exponentiation.
         """
-        return self.__magic_determine_other(other) ** self.data
+        return self._wrap_result(self.__magic_determine_other(other) ** self.data)
 
     def __repr__(self):
         """Return string representation of the underlying DataFrame.
@@ -525,7 +535,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             str: String representation.
         """
-        return self.data.__repr__()
+        return self._wrap_result(self.data.__repr__())
 
     def _repr_html_(self):
         """Return HTML representation for Jupyter notebook display.
@@ -533,7 +543,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             str: HTML string representation.
         """
-        return self.data._repr_html_()
+        return self._wrap_result(self.data._repr_html_())
 
     def _display_head_tail(self,
                            rows_display_limit: int,
@@ -568,12 +578,12 @@ class PandasNavigation(DatasetBackendNavigation):
                 columns=["..."]
             )
 
-            return pd.concat([head_tail.loc[:, left_cols],
-                              tmp,
-                              head_tail.loc[:, right_cols]],
-                             axis=1).replace(self.labels_dict)
+            return self._wrap_result(pd.concat([head_tail.loc[:, left_cols],
+                                     tmp,
+                                     head_tail.loc[:, right_cols]],
+                                     axis=1).replace(self.labels_dict))
         else:
-            return head_tail.replace(self.labels_dict)
+            return self._wrap_result(head_tail.replace(self.labels_dict))
 
     def get_values(
             self,
@@ -591,14 +601,14 @@ class PandasNavigation(DatasetBackendNavigation):
             otherwise list of values from selected row/column/DataFrame.
         """
         if (column is not None) and (row is not None):
-            return self.data.loc[row, column]
+            return self._wrap_result(self.data.loc[row, column])
         elif column is not None:
             result = self.data.loc[:, column]
         elif row is not None:
             result = self.data.loc[row, :]
         else:
             result = self.data
-        return result.values.tolist()
+        return self._wrap_result(result.values.tolist())
 
     def iget_values(
             self,
@@ -616,14 +626,14 @@ class PandasNavigation(DatasetBackendNavigation):
             otherwise list of values from selected row/column/DataFrame.
         """
         if (column is not None) and (row is not None):
-            return self.data.iloc[row, column]
+            return self._wrap_result(self.data.iloc[row, column])
         elif column is not None:
             result = self.data.iloc[:, column]
         elif row is not None:
             result = self.data.iloc[row, :]
         else:
             result = self.data
-        return result.values.tolist()
+        return self._wrap_result(result.values.tolist())
 
     def create_empty(
             self,
@@ -976,7 +986,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         result = self.data.apply(func, **kwargs)
         if not isinstance(result, pd.DataFrame):
             result = result.to_frame(name=single_column_name)
-        return result
+        return self._wrap_result(result)
 
     def map(self, func: Callable, **kwargs) -> pd.DataFrame:
         """Map values using element-wise function.
@@ -988,7 +998,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Mapped values.
         """
-        return self.data.map(func, **kwargs)
+        return self._wrap_result(self.data.map(func, **kwargs))
 
     def is_empty(self) -> bool:
         """Check if DataFrame is empty (no rows or columns).
@@ -1050,7 +1060,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             float or pd.DataFrame: Maximum value(s).
         """
-        return self.agg(["max"])
+        return self._wrap_result(self.agg(["max"]))
 
     def idxmax(self) -> pd.DataFrame | float:
         """Return index label(s) of maximum value(s).
@@ -1058,7 +1068,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             float or pd.DataFrame: Index label(s) of maximum value(s).
         """
-        return self.agg(["idxmax"])
+        return self._wrap_result(self.agg(["idxmax"]))
 
     def min(self) -> pd.DataFrame | float:
         """Return minimum value(s) of DataFrame.
@@ -1066,7 +1076,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             float or pd.DataFrame: Minimum value(s).
         """
-        return self.agg(["min"])
+        return self._wrap_result(self.agg(["min"]))
 
     def count(self) -> pd.DataFrame | float:
         """Count non-NA values for each column.
@@ -1074,7 +1084,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             float or pd.DataFrame: Count of non-NA values.
         """
-        return self.agg(["count"])
+        return self._wrap_result(self.agg(["count"]))
 
     def sum(self) -> pd.DataFrame | float:
         """Return sum of values.
@@ -1082,7 +1092,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             float or pd.DataFrame: Sum of values.
         """
-        return self.agg(["sum"])
+        return self._wrap_result(self.agg(["sum"]))
 
     def mean(self) -> pd.DataFrame | float:
         """Return mean of values.
@@ -1090,7 +1100,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             float or pd.DataFrame: Mean of values.
         """
-        return self.agg(["mean"])
+        return self._wrap_result(self.agg(["mean"]))
 
     def mode(
         self, numeric_only: bool = False, dropna: bool = True
@@ -1104,7 +1114,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Mode values (may have multiple rows if multimodal).
         """
-        return self.data.mode(numeric_only=numeric_only, dropna=dropna)
+        return self._wrap_result(self.data.mode(numeric_only=numeric_only, dropna=dropna))
 
     def var(
         self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
@@ -1119,7 +1129,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             float or pd.DataFrame: Variance value(s).
         """
-        return self.agg(["var"], skipna=skipna, ddof=ddof, numeric_only=numeric_only)
+        return self._wrap_result(self.agg(["var"], skipna=skipna, ddof=ddof, numeric_only=numeric_only))
 
     def log(self) -> pd.DataFrame:
         """Compute natural logarithm of all numeric values.
@@ -1128,7 +1138,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             pd.DataFrame: DataFrame with log-transformed values.
         """
         np_data = np.log(self.data.to_numpy())
-        return pd.DataFrame(np_data, columns=self.data.columns)
+        return self._wrap_result(pd.DataFrame(np_data, columns=self.data.columns))
 
     def std(self, skipna: bool = True, ddof: int = 1) -> pd.DataFrame | float:
         """Return sample standard deviation.
@@ -1140,7 +1150,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             float or pd.DataFrame: Standard deviation value(s).
         """
-        return self.agg(["std"], skipna=skipna, ddof=ddof)
+        return self._wrap_result(self.agg(["std"], skipna=skipna, ddof=ddof))
 
     def cov(self):
         """Compute pairwise covariance of columns, excluding NA/null values.
@@ -1148,7 +1158,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Covariance matrix.
         """
-        return self.data.cov(ddof=1)
+        return self._wrap_result(self.data.cov(ddof=1))
 
     def quantile(self, q: float = 0.5) -> pd.DataFrame | float:
         """Return values at the given quantile.
@@ -1161,7 +1171,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         """
         if isinstance(q, list) and len(q) > 1:
             return self.data.quantile(q=q)
-        return self.agg(func="quantile", q=q)
+        return self._wrap_result(self.agg(func="quantile", q=q))
 
     def coefficient_of_variation(self) -> pd.DataFrame | float:
         """Compute coefficient of variation (std/mean) for each column.
@@ -1174,7 +1184,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         data.index = ["cv"]
         if data.shape == (1, 1):
             return float(data.loc[data.index[0], data.columns[0]])
-        return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+        return self._wrap_result(data if isinstance(data, pd.DataFrame) else pd.DataFrame(data))
 
     def sort_index(self, ascending: bool = True, **kwargs) -> pd.DataFrame:
         """Sort DataFrame by index labels.
@@ -1186,7 +1196,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Sorted DataFrame.
         """
-        return self.data.sort_index(ascending=ascending, **kwargs)
+        return self._wrap_result(self.data.sort_index(ascending=ascending, **kwargs))
 
     def get_numeric_columns(self) -> list[str]:
         """Get list of columns with numeric dtypes.
@@ -1210,7 +1220,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Correlation matrix.
         """
-        return self.data.corr(method='pearson', numeric_only=numeric_only)
+        return self._wrap_result(self.data.corr(method='pearson', numeric_only=numeric_only))
 
     def isna(self) -> pd.DataFrame:
         """Detect missing values (NaN, None).
@@ -1218,7 +1228,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Boolean DataFrame indicating missing values.
         """
-        return self.data.isna()
+        return self._wrap_result(self.data.isna())
 
     def sort_values(
         self, by: str | list[str], ascending: bool = True, **kwargs
@@ -1233,7 +1243,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Sorted DataFrame.
         """
-        return self.data.sort_values(by=by, ascending=ascending, **kwargs)
+        return self._wrap_result(self.data.sort_values(by=by, ascending=ascending, **kwargs))
 
     def value_counts(
         self,
@@ -1253,9 +1263,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: DataFrame with value counts (reset index).
         """
-        return self.data.value_counts(
+        return self._wrap_result(self.data.value_counts(
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
-        ).reset_index()
+        ).reset_index())
 
     def fillna(
         self,
@@ -1278,13 +1288,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         """
         if method is not None:
             if method == "bfill":
-                return self.data.bfill(**kwargs)
+                return self._wrap_result(self.data.bfill(**kwargs))
             elif method == "ffill":
-                return self.data.ffill(**kwargs)
+                return self._wrap_result(self.data.ffill(**kwargs))
             else:
                 raise ValueError(f"Wrong fill method: {method}")
 
-        return self.data.fillna(value=values, **kwargs)
+        return self._wrap_result(self.data.fillna(value=values, **kwargs))
 
     def na_counts(self) -> pd.DataFrame | int:
         """Count missing values per column.
@@ -1297,7 +1307,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         data.index = ["na_counts"]
         if data.shape[0] == 1 and data.shape[1] == 1:
             return int(data.loc[data.index[0], data.columns[0]])
-        return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+        return self._wrap_result(data if isinstance(data, pd.DataFrame) else pd.DataFrame(data))
 
     def dot(self, other: PandasDataset | np.ndarray) -> pd.DataFrame:
         """Compute matrix multiplication with another DataFrame or array.
@@ -1319,7 +1329,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             )
         else:
             result = self.data.dot(other.data)
-        return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+        return self._wrap_result(result if isinstance(result, pd.DataFrame) else pd.DataFrame(result))
 
     def dropna(
         self,
@@ -1337,7 +1347,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: DataFrame with missing values removed.
         """
-        return self.data.dropna(how=how, subset=subset, axis=axis)
+        return self._wrap_result(self.data.dropna(how=how, subset=subset, axis=axis))
 
     def transpose(self, names: Sequence[str] | None = None) -> pd.DataFrame:
         """Transpose rows and columns.
@@ -1351,7 +1361,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         result = self.data.transpose()
         if names is not None:
             result.columns = names
-        return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+        return self._wrap_result(result if isinstance(result, pd.DataFrame) else pd.DataFrame(result))
 
     def sample(
         self,
@@ -1369,7 +1379,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Randomly sampled DataFrame.
         """
-        return self.data.sample(n=n, frac=frac, random_state=random_state)
+        return self._wrap_result(self.data.sample(n=n, frac=frac, random_state=random_state))
 
     def select_dtypes(
         self,
@@ -1385,7 +1395,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: DataFrame with selected columns.
         """
-        return self.data.select_dtypes(include=include, exclude=exclude)
+        return self._wrap_result(self.data.select_dtypes(include=include, exclude=exclude))
 
     def limit(self, num: int | None = None) -> Any:
         if not num:
@@ -1402,7 +1412,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Boolean DataFrame indicating membership.
         """
-        return self.data.isin(values)
+        return self._wrap_result(self.data.isin(values))
 
     def merge(
         self,
@@ -1451,7 +1461,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             left_index = True
             right_index = True
 
-        return self.data.merge(
+        return self._wrap_result(self.data.merge(
             right=right.data,
             on=on,
             left_on=left_on,
@@ -1460,7 +1470,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             right_index=right_index,
             suffixes=suffixes,
             how=how,
-        )
+        ))
 
     def drop(
         self,
@@ -1478,7 +1488,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: DataFrame with specified labels removed.
         """
-        return self.data.drop(labels=labels, axis=axis, columns=columns)
+        return self._wrap_result(self.data.drop(labels=labels, axis=axis, columns=columns))
 
     def filter(
         self,
@@ -1499,7 +1509,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         """
         if (axis == 0) and (items is None) and (column is not None):
             return self.data[self.data[column]]
-        return self.data.filter(items=items, regex=regex, axis=axis)
+        return self._wrap_result(self.data.filter(items=items, regex=regex, axis=axis))
 
     def rename(self, columns: dict[str, str]) -> pd.DataFrame:
         """Rename columns using a mapping dictionary.
@@ -1510,7 +1520,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: DataFrame with renamed columns.
         """
-        return self.data.rename(columns=columns)
+        return self._wrap_result(self.data.rename(columns=columns))
 
     def replace(
         self, to_replace: Any = None, value: Any = None, regex: bool = False
@@ -1530,8 +1540,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         elif isinstance(to_replace, pd.Series):
             to_replace = to_replace.to_list()
         elif isinstance(to_replace, dict):
-            return self.data.replace(to_replace=to_replace, regex=regex)
-        return self.data.replace(to_replace=to_replace, value=value, regex=regex)
+            return self._wrap_result(self.data.replace(to_replace=to_replace, regex=regex))
+        return self._wrap_result(self.data.replace(to_replace=to_replace, value=value, regex=regex))
 
     def reindex(self, labels: str = "", fill_value: str | None = None) -> pd.DataFrame:
         """Conform DataFrame to new index with optional fill value.
@@ -1543,7 +1553,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Reindexed DataFrame.
         """
-        return self.data.reindex(labels, fill_value=fill_value)
+        return self._wrap_result(self.data.reindex(labels, fill_value=fill_value))
 
     def list_to_columns(self, column: str) -> pd.DataFrame:
         """Expand a column containing lists into multiple columns.

@@ -63,6 +63,7 @@ class BaseComparator(Calculator, ABC):
             True if data.ds.tmp_roles or data.additional_fields.tmp_roles else False
         )
         group_field_data = data.field_data_search(roles=self.grouping_role)
+        
         target_fields_data = data.field_data_search(
             roles=(
                 (TempTargetRole() if data.ds.tmp_roles else AdditionalTargetRole())
@@ -469,6 +470,7 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = fields["group_field"]
         target_fields_data = fields["target_fields"]
         baseline_field_data = fields["baseline_field"]
+        
 
         self.key = str(
             target_fields_data.columns[0]
@@ -525,6 +527,7 @@ class GroupsComparator(BaseComparator, ABC):
                 )
                 else data.ds
             )
+            
 
             data.groups[group_field_data.columns[0]] = {
                 f"{group}": ds for group, ds in combined_data.groupby(group_field_data)
