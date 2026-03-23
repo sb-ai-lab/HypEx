@@ -133,14 +133,10 @@ class ABTest(ExperimentShell):
             executors.insert(0, CUPEDTransformer(cuped_features=cuped_features))
 
         if use_cupac:
-            from .ml import CUPACExecutor
-            from .experiments.ml import MLExperiment
-            from .splitters import CUPACDataSplitter
-            
-            ml_experiment = MLExperiment(
-                splitters=[CUPACDataSplitter()],
-                transformers=[],
-                ml_executors=[CUPACExecutor(cupac_models=cupac_models)],
+            from .experiments.cupac import CupacExperiment
+
+            ml_experiment = CupacExperiment(
+                cupac_models=cupac_models,
                 mode=cupac_mode,
                 experiment_id=experiment_id,
             )
