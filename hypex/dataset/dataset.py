@@ -128,7 +128,7 @@ class SmallDataset(DatasetBase):
 
     @index.setter
     def index(self, value):
-        self.backend.data.index = value
+        self.backend_data.data.index = value
 
     @staticmethod
     def from_dict(
@@ -147,7 +147,6 @@ class SmallDataset(DatasetBase):
             payload = {"data": data}
         else:
             payload = data
-
         return SmallDataset(data=payload, roles=roles)
 
     def sort(
@@ -476,13 +475,13 @@ class DatasetAdapter(Adapter):
         small: bool = True,
     ) -> Dataset | SmallDataset:
         roles_names = list(data.keys())
-        if any(
-            [
-                any(isinstance(i, t) for t in [int, str, float, bool])
-                for i in list(data.values())
-            ]
-        ):
-            data = [data]
+        # if any(
+        #     [
+        #         any(isinstance(i, t) for t in [int, str, float, bool])
+        #         for i in list(data.values())
+        #     ]
+        # ):
+        #     data = [data]
 
         if isinstance(roles, dict):
             result = SmallDataset.from_dict(data=data, roles=roles)

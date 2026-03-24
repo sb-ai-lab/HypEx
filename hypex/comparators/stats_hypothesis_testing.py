@@ -7,7 +7,7 @@ from scipy.stats import t as t_dist
 
 from ..dataset import ABCRole
 from ..utils.constants import NUMBER_TYPES_LIST
-from .abstract import StatsHypothesisTesting
+from .abstract import StatsHypothesisTesting, StatsComparator
 
 from typing import Any, Union
 from math import sqrt, gcd, log, ceil
@@ -108,7 +108,7 @@ class AggTTest(StatsHypothesisTesting):
 class StatsTTest(StatsComparator):
     """
     """
-    REQUERED_STATS = ["mean", "var", "count"]
+    REQUERED_STATS = ["mean", "std", "count"]
 
     def __init__(
             self, 
@@ -139,7 +139,7 @@ class StatsTTest(StatsComparator):
         **kwargs,
     ) -> dict[str, Any]:
     
-        current_variances = (baseline_stats["var"], compared_stats["var"])
+        current_variances = (baseline_stats["std"], compared_stats["std"])
         current_means = (baseline_stats["mean"], compared_stats["mean"])
         current_sizes =(baseline_stats["count"], compared_stats["count"])
         if current_variances[0] != 0 and current_variances[1] != 0:

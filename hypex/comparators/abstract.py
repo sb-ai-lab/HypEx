@@ -11,6 +11,7 @@ from ..dataset import (
     DatasetAdapter,
     ExperimentData,
     GroupingRole,
+    SmallDataset,
     InfoRole,
     PreTargetRole,
     StatisticRole,
@@ -653,21 +654,39 @@ class StatsComparator(BaseComparator, ABC):
             Nested dict ``{group_name: {column_name: {stat_name: scalar_value}}}``
             with groups in sorted order.
         """
+        def transform_stats_format(data_dict):
+            result = {}
+            
+            for col_stat, groups in data_dict.items():
+                column, stat = col_stat.split('┆')
+                
+                for group, value in groups.items():
+                    if group not in result:
+                        result[group] = {}
+                    if column not in result[group]:
+                        result[group][column] = {}
+                    
+                    result[group][column][stat] = value
+            
+            return result
+        
         stats = stats or []
         agg_ds = grouped.agg(stats)
-        raw_group_names = sorted(agg_ds.index)
-        return {
-            str(raw): {
-                col: {
-                    stat: agg_ds.get_values(
-                        row=raw, column=f"{col}{NAME_BORDER_SYMBOL}{stat}"
-                    )
-                    for stat in stats
-                }
-                for col in target_columns
-            }
-            for raw in raw_group_names
-        }
+        
+        return transform_stats_format(data_dict=agg_ds.to_dict()["data"])
+        
+        # return {
+        #     str(raw): {
+        #         col: {
+        #             stat: agg_ds.get_values(
+        #                 row=raw, column=f"{col}{NAME_BORDER_SYMBOL}{stat}"
+        #             )
+        #             for stat in stats
+        #         }
+        #         for col in target_columns
+        #     }
+        #     for raw in raw_group_names
+        # }
 
     @classmethod
     @abstractmethod
@@ -717,14 +736,17 @@ class StatsComparator(BaseComparator, ABC):
             else list(target_fields_data.columns)
         )
 
-        grouped: GroupedDataset = target_fields_data.groupby(by=group_field_data)
+        grouped: GroupedDataset = (target_fields_data
+            .merge(group_field_data, left_index=True, right_index= True)
+            .groupby(by=group_field_data.columns)
+        )
 
         # Phase 1: single agg call — all stats × all groups in ONE Spark job.
         group_col_stats = self._compute_stats(
             grouped, list(target_fields_data.columns), self.stats
         )
+        
         group_names = list(group_col_stats.keys())
-
         # Build and store flattened stats table: one Dataset per group, then append.
         stats_ds_list = [
             DatasetAdapter.to_dataset(
