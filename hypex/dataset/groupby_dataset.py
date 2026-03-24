@@ -78,6 +78,15 @@ class GroupedDataset:
                 ]
 
         if hasattr(result_data, 'columns'):
+            try:
+                if hasattr(result_data, 'isnull') and hasattr(result_data, 'drop'):
+                    null_mask = result_data.isnull().all()
+                    cols_to_drop = [col for col, is_null in null_mask.items() if is_null]
+                    if cols_to_drop:
+                        result_data = result_data.drop(columns=cols_to_drop)
+            except (AttributeError, KeyError, TypeError) as e:
+                raise type(e)(f"Could not drop fully null columns: {e}") from e
+            
             result_columns = list(result_data.columns)
             new_roles = self._get_agg_roles(result_columns)
         else:
