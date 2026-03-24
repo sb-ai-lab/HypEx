@@ -20,7 +20,7 @@ class PandasNavigation(DatasetBackendNavigation):
     
     def _wrap_result(self, 
                      result: pd.DataFrame | pd.Series | Any,
-                     wrap_series: bool = False) -> Self | pd.Series | Any:
+                     wrap_series: bool = False) -> "PandasNavigation" | pd.Series | Any:
         if isinstance(result, pd.DataFrame):
             return self.__class__(data=result)
         
@@ -156,9 +156,9 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data = self._data_compression(data, data_compression, non_compresion_cols)
         elif isinstance(data, dict):
             if "index" in data.keys():
-                self.data = pd.DataFrame(data=data["data"], index=data["index"])
+                self.data = pd.DataFrame(data=[data["data"]], index=data["index"])
             else:
-                self.data = pd.DataFrame(data=data["data"])
+                self.data = pd.DataFrame(data=[data["data"]])
         elif isinstance(data, str):
             self.data = self._read_file(data)
         else:
@@ -578,12 +578,17 @@ class PandasNavigation(DatasetBackendNavigation):
                 columns=["..."]
             )
 
-            return self._wrap_result(pd.concat([head_tail.loc[:, left_cols],
+            # return self._wrap_result(pd.concat([head_tail.loc[:, left_cols],
+            #                          tmp,
+            #                          head_tail.loc[:, right_cols]],
+            #                          axis=1).replace(self.labels_dict))
+            return pd.concat([head_tail.loc[:, left_cols],
                                      tmp,
                                      head_tail.loc[:, right_cols]],
-                                     axis=1).replace(self.labels_dict))
+                                     axis=1).replace(self.labels_dict)
         else:
-            return self._wrap_result(head_tail.replace(self.labels_dict))
+            # return self._wrap_result(head_tail.replace(self.labels_dict))
+            return head_tail.replace(self.labels_dict)
 
     def get_values(
             self,

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from ..dataset import Dataset
 from ..extensions.scipy_stats import (
-    Chi2TestExtension,
-    KSTestExtension,
-    TTestExtension,
-    UTestExtension,
+    GroupChi2TestExtension,
+    GroupKSTestExtension,
+    GroupTTestExtension,
+    GroupUTestExtension,
 )
 from ..utils.constants import NUMBER_TYPES_LIST
-from .abstract import GroupHypothesisTesting
+from .abstract import GroupHypothesisTesting, StatsComparator
 
 
 class GroupTTest(GroupHypothesisTesting):
@@ -20,10 +20,9 @@ class GroupTTest(GroupHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return TTestExtension(kwargs.get("reliability", 0.05)).calc(
+        return GroupTTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
-
 
 class GroupKSTest(GroupHypothesisTesting):
     @property
@@ -34,10 +33,9 @@ class GroupKSTest(GroupHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return KSTestExtension(kwargs.get("reliability", 0.05)).calc(
+        return GroupKSTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
-
 
 class GroupUTest(GroupHypothesisTesting):
     @property
@@ -48,7 +46,7 @@ class GroupUTest(GroupHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return UTestExtension(kwargs.get("reliability", 0.05)).calc(
+        return GroupUTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
@@ -62,6 +60,6 @@ class GroupChi2Test(GroupHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return Chi2TestExtension(reliability=kwargs.get("reliability", 0.05)).calc(
+        return GroupChi2TestExtension(reliability=kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )

@@ -70,6 +70,7 @@ class BaseComparator(Calculator, ABC):
                 if tmp_role
                 else self.target_roles
             ),
+            # roles=(TargetRole()),
             tmp_role=tmp_role,
             search_types=self.search_types,
         )

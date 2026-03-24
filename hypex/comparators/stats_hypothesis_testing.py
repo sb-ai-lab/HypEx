@@ -9,6 +9,17 @@ from ..dataset import ABCRole
 from ..utils.constants import NUMBER_TYPES_LIST
 from .abstract import StatsHypothesisTesting
 
+from typing import Any, Union
+from math import sqrt, gcd, log, ceil
+from scipy.stats import (
+    t,
+    chi2,
+    kstwo,
+    ttest_ind,
+    chi2_contingency,
+    ks_2samp,
+    _stats_py,
+)
 
 class AggTTest(StatsHypothesisTesting):
     """
@@ -93,3 +104,139 @@ class AggTTest(StatsHypothesisTesting):
             "statistic": float(t_stat),
             "pass": p_value < reliability,
         }
+
+class StatsTTest(StatsComparator):
+    """
+    """
+    REQUERED_STATS = ["mean", "var", "count"]
+
+    def __init__(
+            self, 
+            grouping_role = None, 
+            target_roles = None, 
+            reliability: float = 0.05,
+            key: Any = "", 
+    ):
+        super().__init__(
+            stats=self.REQUERED_STATS, 
+            grouping_role=grouping_role, 
+            target_roles=target_roles, 
+            key=key, 
+            calc_kwargs={"reliability": reliability}
+        )
+        self.reliability = reliability
+
+    @property
+    def search_types(self) -> list[type] | None:
+        return NUMBER_TYPES_LIST
+    
+    @classmethod
+    def _inner_function(
+        cls,
+        baseline_stats: dict[str, Any],
+        compared_stats: dict[str, Any],
+        reliability: float = 0.05,
+        **kwargs,
+    ) -> dict[str, Any]:
+    
+        current_variances = (baseline_stats["var"], compared_stats["var"])
+        current_means = (baseline_stats["mean"], compared_stats["mean"])
+        current_sizes =(baseline_stats["count"], compared_stats["count"])
+        if current_variances[0] != 0 and current_variances[1] != 0:
+            similar_var = (current_variances[0] < 2 * current_variances[1] and current_variances[0] > 0.5 * current_variances[1])
+            t_stat = cls._t_statistics(
+                            n_list=current_sizes,
+                            s_list=current_variances,
+                            mean_list=current_means,
+                            similar_var=similar_var
+                        )
+
+            de_fr = cls._degree_fredom(
+                        n_list=current_sizes,
+                        s_list=current_variances,
+                        similar_var=similar_var
+            )
+
+            p_value = t.sf(abs(t_stat), de_fr) * 2
+
+            return {
+                    "p-value": p_value,
+                    "statistic": abs(t_stat),
+                    "pass": p_value < reliability,
+                }
+        else:
+            return {
+                "p-value": None,
+                "statistic": None,
+                "pass": False,
+            }
+    
+    @staticmethod
+    def _t_statistics(n_list: tuple, 
+                      s_list: tuple, 
+                      mean_list: tuple, 
+                      similar_var: bool = True) -> float:
+        if similar_var:
+            sp = sqrt(
+                (
+                    (n_list[0] - 1) * s_list[0] + 
+                    (n_list[1] - 1) * s_list[1] 
+                ) / ( n_list[0] + n_list[1] - 2)
+            )
+            t_stat = (mean_list[0] - mean_list[1]) / (sp * sqrt(1 / n_list[0] + 1 / n_list[1]))
+        else:
+            s_delta =sqrt(s_list[0] / n_list[0] + s_list[1] / n_list[1])
+            t_stat = (mean_list[0] - mean_list[1]) / s_delta
+        
+        return t_stat
+    
+    @staticmethod
+    def _degree_fredom(n_list: tuple, 
+                       s_list: tuple = (0, 0), 
+                       similar_var: bool = True) -> Union[int, float]:
+        if similar_var:
+            return n_list[0] + n_list[1] - 2
+        else:
+            de_fr = ((s_list[0] / n_list[0] + s_list[1] / n_list[1]) ** 2) / (
+                          (s_list[0] / n_list[0]) ** 2 / (n_list[0] - 1) + (s_list[1] / n_list[1]) ** 2 / (n_list[1] - 1)
+                          )
+            return de_fr
+        
+class StatsChi2Test(StatsComparator):
+    """
+    """
+    REQUIRED_STATS = ["count"]
+
+    def __init__(
+            self, 
+            grouping_role = None, 
+            target_roles = None, 
+            reliability: float = 0.05,
+            key: Any = "", 
+    ):
+        super().__init__(
+            stats=self.REQUERED_STATS, 
+            grouping_role=grouping_role, 
+            target_roles=target_roles, 
+            key=key, 
+            calc_kwargs={"reliability": reliability}
+        )
+        self.reliability = reliability
+
+    @property
+    def search_types(self) -> list[type] | None:
+        return NUMBER_TYPES_LIST
+    
+    @classmethod
+    def _inner_function(
+        cls,
+        baseline_stats: dict[str, Any],
+        compared_stats: dict[str, Any],
+        reliability: float = 0.05,
+        **kwargs,
+    ) -> dict[str, Any]:
+        n1 = baseline_stats["count"]
+        n2 = compared_stats["count"]
+
+        print(n1)
+        print(n2)
