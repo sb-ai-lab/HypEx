@@ -44,17 +44,17 @@ class OneAAStatAnalyzer(Executor):
             for key, value in analysis_data.items()
         }
         if (
-            "mean TTest p-value" in analysis_data
-            and "mean KSTest p-value" in analysis_data
+            "mean GroupTTest p-value" in analysis_data
+            and "mean GroupKSTest p-value" in analysis_data
         ):
             analysis_data["mean test score"] = (
-                analysis_data["mean TTest p-value"]
-                + 2 * analysis_data["mean KSTest p-value"]
+                analysis_data["mean GroupTTest p-value"]
+                + 2 * analysis_data["mean GroupKSTest p-value"]
             )
             sum_weight += 3
-        if "mean Chi2Test p-value" in analysis_data:
+        if "mean GroupChi2Test p-value" in analysis_data:
             analysis_data["mean test score"] += (
-                2 * analysis_data["mean Chi2Test p-value"]
+                2 * analysis_data["mean GroupChi2Test p-value"]
             )
             sum_weight += 2
         if sum_weight:

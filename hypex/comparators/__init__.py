@@ -4,6 +4,7 @@ from .abstract import (
     GroupsComparator,
     GroupHypothesisTesting,
     StatsComparator,
+    StatsHypothesisTesting,
 )
 from .comparators import PSI, GroupDifference, GroupSizes
 from .distances import MahalanobisDistance

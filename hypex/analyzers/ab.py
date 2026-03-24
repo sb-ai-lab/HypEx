@@ -115,7 +115,7 @@ class ABAnalyzer(Executor):
                     analysis_data[f"{c} {f} {groups[i // num_groups + 1][0]}"] = (
                         value.mean()
                     )
-            if c not in ["UTest", "TTest"]:
+            if c not in ["GroupUTest", "GroupTTest"]:
                 indexes = t_data.index
                 values = t_data.data.values.tolist()
                 for idx, value in zip(indexes, values):

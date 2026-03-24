@@ -99,6 +99,7 @@ class AASplitter(Calculator):
         const_group_field: str | None = None,
         **kwargs,
     ) -> list[str]:
+        # >>>TODO: need fix in feature>>>
         if const_group_field:
             const_data = dict(data.groupby(const_group_field))
             control_data = const_data.get("control")
@@ -108,7 +109,7 @@ class AASplitter(Calculator):
                 if len(data) <= const_size
                 else (len(data)*control_size - len(const_data["control"])) / (len(data) - const_size)
             )
-        
+        # <<<TODO: need fix in feature<<<
         ds_sampled = (data
             .filter(data.select(const_group_field).isna()) if const_group_field else data
         ).sample(frac=sample_size, random_state=random_state)
@@ -134,7 +135,7 @@ class AASplitter(Calculator):
         control_data.add_column("control", {"split": StatisticRole()})
         
         for i, test_index in enumerate(test_slices):
-            test_data = ds_sampled.iloc[test_index].add_column(f"test_{1}", {"split": StatisticRole()})
+            test_data = ds_sampled.iloc[test_index].add_column(f"test_{i}", {"split": StatisticRole()})
             if i == 0:
                 ds_out = control_data.append(test_data)
             else:

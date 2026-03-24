@@ -22,12 +22,14 @@ class GroupedDataset:
                  dataset_class: type[DatasetBase], 
                  roles: dict[str, ABCRole], 
                  tmp_roles: dict[str, ABCRole], 
-                 group_cols: list[str] | None=None):
+                 group_cols: list[str] | None=None,
+                 backend_data: Any = None):
         self._groupby = backend_groupby
         self._dataset_class = dataset_class
         self.roles = roles
         self.tmp_roles = tmp_roles
         self._group_cols = group_cols if group_cols is not None else []
+        self._backend_data = backend_data
 
     def _get_agg_roles(self, 
                        result_columns: list[str]) -> dict[str, ABCRole]:
@@ -76,6 +78,15 @@ class GroupedDataset:
                 ]
 
         if hasattr(result_data, 'columns'):
+            try:
+                if hasattr(result_data, 'isnull') and hasattr(result_data, 'drop'):
+                    null_mask = result_data.isnull().all()
+                    cols_to_drop = [col for col, is_null in null_mask.items() if is_null]
+                    if cols_to_drop:
+                        result_data = result_data.drop(columns=cols_to_drop)
+            except (AttributeError, KeyError, TypeError) as e:
+                raise type(e)(f"Could not drop fully null columns: {e}") from e
+            
             result_columns = list(result_data.columns)
             new_roles = self._get_agg_roles(result_columns)
         else:
@@ -162,12 +173,14 @@ class GroupedDataset:
             result = result.to_frame('size')
         return self._dataset_class(roles={'size': StatisticRole()}, data=result)
 
-    def __iter__(self) -> Iterable[tuple[Any, DatasetBase]]:
-        if isinstance(self._groupby, list):
-            for key, data in self._groupby:
-                yield key, self._dataset_class(roles=self.roles, data=data)
-        elif hasattr(self._groupby, '__iter__'):
-            for key, group in self._groupby:
-                yield key, self._dataset_class(roles=self.roles, data=group)
-        else:
-            raise TypeError("Grouped object is not iterable")
+    def __iter__(self):
+        print(f"self._backend_data = {self._backend_data}")
+        print(f"self._group_cols = {self._group_cols}")
+
+        if self._backend_data is None or not self._group_cols:
+            raise TypeError(
+                "GroupedDataset is not iterable: backend or group_cols not set. "
+                "Use Dataset.groupby() instead of constructing GroupedDataset directly."
+            )
+        for key, group in self._backend_data.iter_groups(self._group_cols):
+            yield key, self._dataset_class(roles=self.roles, data=group)

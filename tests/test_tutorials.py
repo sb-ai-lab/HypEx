@@ -93,66 +93,66 @@ def test_aatest(aa_data):
     mapping_resume = {
         "aa-casual": pd.DataFrame(
             {
-                "TTest aa test": {0: "OK", 1: "OK"},
-                "KSTest aa test": {0: "NOT OK", 1: "OK"},
-                "TTest best split": {0: "OK", 1: "OK"},
-                "KSTest best split": {0: "OK", 1: "OK"},
+                "GroupTTest aa test": {0: "OK", 1: "OK"},
+                "GroupKSTest aa test": {0: "NOT OK", 1: "OK"},
+                "GroupTTest best split": {0: "OK", 1: "OK"},
+                "GroupKSTest best split": {0: "OK", 1: "OK"},
                 "result": {0: "OK", 1: "OK"},
             }
         ),
         "aa-rs": pd.DataFrame(
             {
-                "TTest aa test": {0: "OK", 1: "OK"},
-                "KSTest aa test": {0: "NOT OK", 1: "OK"},
-                "TTest best split": {0: "OK", 1: "OK"},
-                "KSTest best split": {0: "OK", 1: "OK"},
+                "GroupTTest aa test": {0: "OK", 1: "OK"},
+                "GroupKSTest aa test": {0: "NOT OK", 1: "OK"},
+                "GroupTTest best split": {0: "OK", 1: "OK"},
+                "GroupKSTest best split": {0: "OK", 1: "OK"},
                 "result": {0: "OK", 1: "OK"},
             }
         ),
         "aa-strat": pd.DataFrame(
             {
-                "TTest aa test": {0: "OK", 1: "NOT OK"},
-                "KSTest aa test": {0: "OK", 1: "NOT OK"},
-                "TTest best split": {0: "OK", 1: "OK"},
-                "KSTest best split": {0: "OK", 1: "OK"},
+                "GroupTTest aa test": {0: "OK", 1: "NOT OK"},
+                "GroupKSTest aa test": {0: "OK", 1: "NOT OK"},
+                "GroupTTest best split": {0: "OK", 1: "OK"},
+                "GroupKSTest best split": {0: "OK", 1: "OK"},
                 "result": {0: "OK", 1: "NOT OK"},
             }
         ),
         "aa-sample": pd.DataFrame(
             {
-                "TTest aa test": {0: "OK", 1: "OK"},
-                "KSTest aa test": {0: "OK", 1: "OK"},
-                "TTest best split": {0: "NOT OK", 1: "NOT OK"},
-                "KSTest best split": {0: "OK", 1: "OK"},
+                "GroupTTest aa test": {0: "OK", 1: "OK"},
+                "GroupKSTest aa test": {0: "OK", 1: "OK"},
+                "GroupTTest best split": {0: "NOT OK", 1: "NOT OK"},
+                "GroupKSTest best split": {0: "OK", 1: "OK"},
                 "result": {0: "OK", 1: "OK"},
             }
         ),
         "aa-cat_target": pd.DataFrame(
             {
-                "TTest aa test": ["OK", "OK", np.nan],
-                "KSTest aa test": ["NOT OK", "OK", np.nan],
-                "Chi2Test aa test": [np.nan, np.nan, "OK"],
-                "TTest best split": ["OK", "OK", np.nan],
-                "KSTest best split": ["OK", "OK", np.nan],
-                "Chi2Test best split": [np.nan, np.nan, "OK"],
+                "GroupTTest aa test": ["OK", "OK", np.nan],
+                "GroupKSTest aa test": ["NOT OK", "OK", np.nan],
+                "GroupChi2Test aa test": [np.nan, np.nan, "OK"],
+                "GroupTTest best split": ["OK", "OK", np.nan],
+                "GroupKSTest best split": ["OK", "OK", np.nan],
+                "GroupChi2Test best split": [np.nan, np.nan, "OK"],
                 "result": ["OK", "OK", "OK"],
             }
         ),
         "aa-equal_var": pd.DataFrame(
             {
-                "TTest aa test": {0: "OK", 1: "OK"},
-                "KSTest aa test": {0: "NOT OK", 1: "OK"},
-                "TTest best split": {0: "OK", 1: "OK"},
-                "KSTest best split": {0: "OK", 1: "OK"},
+                "GroupTTest aa test": {0: "OK", 1: "OK"},
+                "GroupKSTest aa test": {0: "NOT OK", 1: "OK"},
+                "GroupTTest best split": {0: "OK", 1: "OK"},
+                "GroupKSTest best split": {0: "OK", 1: "OK"},
                 "result": {0: "OK", 1: "OK"},
             }
         ),
         "aa-n": pd.DataFrame(
             {
-                "TTest aa test": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},
-                "KSTest aa test": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},
-                "TTest best split": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},
-                "KSTest best split": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},
+                "GroupTTest aa test": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},
+                "GroupKSTest aa test": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},
+                "GroupTTest best split": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},
+                "GroupKSTest best split": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},
                 "result": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},
             }
         ),
@@ -178,11 +178,11 @@ def test_abtest(ab_data):
 
     mapping_resume = {
         "ab-casual": pd.DataFrame(
-            {"TTest pass": {0: "NOT OK", 1: "NOT OK", 2: "NOT OK", 3: "NOT OK"}}
+            {"GroupTTest pass": {0: "NOT OK", 1: "NOT OK", 2: "NOT OK", 3: "NOT OK"}}
         ),
         "ab-additional": pd.DataFrame(
             {
-                "TTest pass": {
+                "GroupTTest pass": {
                     0: "NOT OK",
                     1: "NOT OK",
                     2: "NOT OK",
@@ -190,7 +190,7 @@ def test_abtest(ab_data):
                     4: 0,
                     5: 0,
                 },
-                "UTest pass": {
+                "GroupUTest pass": {
                     0: "NOT OK",
                     1: "NOT OK",
                     2: "NOT OK",
@@ -198,11 +198,11 @@ def test_abtest(ab_data):
                     4: 0,
                     5: 0,
                 },
-                "Chi2Test pass": {0: 0, 1: 0, 2: 0, 3: 0, 4: "NOT OK", 5: "NOT OK"},
+                "GroupChi2Test pass": {0: 0, 1: 0, 2: 0, 3: 0, 4: "NOT OK", 5: "NOT OK"},
             }
         ),
         "ab-n": pd.DataFrame(
-            {"TTest pass": {0: "NOT OK", 1: "NOT OK", 2: "NOT OK", 3: "NOT OK"}}
+            {"GroupTTest pass": {0: "NOT OK", 1: "NOT OK", 2: "NOT OK", 3: "NOT OK"}}
         ),
     }
 

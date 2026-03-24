@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional, List
+from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional, List, Self
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -1043,6 +1043,10 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             pd.Grouper
         """
         return self.data.groupby(by=by, observed=False, **kwargs)
+    
+    def iter_groups(self, by: list[str]):
+        for key, group in self.data.groupby(by=by, observed=False):
+            yield key, group
 
     def agg(self, func: str | list, **kwargs) -> pd.DataFrame | float:
         """Aggregate DataFrame using specified function(s).

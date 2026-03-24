@@ -632,35 +632,42 @@ class StatsComparator(BaseComparator, ABC):
         self.stats = stats
 
     @classmethod
-    def _compute_stats( #TODO: needs to be rewritten once we have a propper group_by 
-        cls, data: Dataset, stats: list[str] | None = None, **kwargs
-    ) -> dict[str, dict[str, Any]]:
+    def _compute_stats(
+        cls,
+        grouped: GroupedDataset,
+        target_columns: list[str],
+        stats: list[str] | None = None,
+        **kwargs,
+    ) -> dict[str, dict[str, dict[str, Any]]]:
         """
-        Compute the requested statistics for all target columns in one group slice.
+        Compute the requested statistics for all groups and target columns in one aggregation pass.
 
-        Called once per group with the full multi-column Dataset, returning a nested
-        dict ``{col: {stat: value}}``. Subclasses may override to use a single
-        vectorised aggregation call (e.g. a Spark ``.agg()``) across all columns.
+        Issues a single ``.agg()`` call so Spark backends can execute it as one distributed job.
 
         Args:
-            data: Multi-column Dataset slice for one group.
-            stats: List of stat names to compute (keys of STAT_FUNCTIONS).
+            grouped: GroupedDataset (result of target_fields_data.groupby(by=group_field_data)).
+            target_columns: List of target column names.
+            stats: List of stat names to compute (e.g. ["mean", "var", "count"]).
 
         Returns:
-            Nested dict ``{column_name: {stat_name: scalar_value}}``.
+            Nested dict ``{group_name: {column_name: {stat_name: scalar_value}}}``
+            with groups in sorted order.
         """
         stats = stats or []
-        result: dict[str, dict[str, Any]] = {}
-        for col in data.columns:
-            col_result: dict[str, Any] = {}
-            for stat in stats:
-                if stat not in cls.STAT_FUNCTIONS:
-                    raise ValueError(
-                        f"Unknown stat '{stat}'. Available: {list(cls.STAT_FUNCTIONS)}"
+        agg_ds = grouped.agg(stats)
+        raw_group_names = sorted(agg_ds.index)
+        return {
+            str(raw): {
+                col: {
+                    stat: agg_ds.get_values(
+                        row=raw, column=f"{col}{NAME_BORDER_SYMBOL}{stat}"
                     )
-                col_result[stat] = cls.STAT_FUNCTIONS[stat](data[[col]])
-            result[col] = col_result
-        return result
+                    for stat in stats
+                }
+                for col in target_columns
+            }
+            for raw in raw_group_names
+        }
 
     @classmethod
     @abstractmethod
@@ -713,25 +720,10 @@ class StatsComparator(BaseComparator, ABC):
         grouped: GroupedDataset = target_fields_data.groupby(by=group_field_data)
 
         # Phase 1: single agg call — all stats × all groups in ONE Spark job.
-        # List agg produces flattened columns "{col}┆{stat}" via GroupedDataset.agg.
-        agg_ds = grouped.agg(self.stats)
-
-        raw_group_names = sorted(agg_ds.index)
-        group_names = [str(g) for g in raw_group_names]
-
-        # Reconstruct nested stats dict for _inner_function (all driver-side).
-        group_col_stats: dict[str, dict[str, dict[str, Any]]] = {
-            str(raw): {
-                col: {
-                    stat: agg_ds.get_values(
-                        row=raw, column=f"{col}{NAME_BORDER_SYMBOL}{stat}"
-                    )
-                    for stat in self.stats
-                }
-                for col in target_fields_data.columns
-            }
-            for raw in raw_group_names
-        }
+        group_col_stats = self._compute_stats(
+            grouped, list(target_fields_data.columns), self.stats
+        )
+        group_names = list(group_col_stats.keys())
 
         # Build and store flattened stats table: one Dataset per group, then append.
         stats_ds_list = [
@@ -776,3 +768,33 @@ class StatsComparator(BaseComparator, ABC):
             for col in target_fields_data.columns
         ]
         return self._set_value(data, result_dataset)
+
+
+class StatsHypothesisTesting(StatsComparator, ABC):
+    """
+    StatsComparator subclass that adds a ``reliability`` parameter — the direct
+    analog of :class:`GroupHypothesisTesting` for the stats-based comparator branch.
+
+    Concrete subclasses only need to implement ``_inner_function`` and declare
+    ``REQUIRED_STATS``; the ``reliability`` value is forwarded via ``calc_kwargs``
+    so it is available inside ``_inner_function`` without extra wiring.
+    """
+
+    def __init__(
+        self,
+        stats: list[str],
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | list[ABCRole] | None = None,
+        reliability: float = 0.05,
+        key: Any = "",
+        calc_kwargs: dict[str, Any] = {},
+    ):
+        merged_kwargs = {"reliability": reliability, **calc_kwargs}
+        super().__init__(
+            stats=stats,
+            grouping_role=grouping_role,
+            target_roles=target_roles,
+            key=key,
+            calc_kwargs=merged_kwargs,
+        )
+        self.reliability = reliability
