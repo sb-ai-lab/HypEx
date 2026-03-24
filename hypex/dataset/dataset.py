@@ -147,7 +147,6 @@ class SmallDataset(DatasetBase):
             payload = {"data": data}
         else:
             payload = data
-        print(f"from_dict data = {data}")
         return SmallDataset(data=payload, roles=roles)
 
     def sort(

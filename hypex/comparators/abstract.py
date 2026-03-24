@@ -672,7 +672,6 @@ class StatsComparator(BaseComparator, ABC):
         
         stats = stats or []
         agg_ds = grouped.agg(stats)
-        print(agg_ds)
         
         return transform_stats_format(data_dict=agg_ds.to_dict()["data"])
         
@@ -748,16 +747,7 @@ class StatsComparator(BaseComparator, ABC):
         )
         
         group_names = list(group_col_stats.keys())
-        print(group_names)
         # Build and store flattened stats table: one Dataset per group, then append.
-        print([
-                {
-                    f"{stat}{NAME_BORDER_SYMBOL}{col}": col_stats[stat]
-                    for col, col_stats in col_stats_dict.items()
-                    for stat in col_stats
-                }
-            for col_stats_dict in group_col_stats.values()
-        ])
         stats_ds_list = [
             DatasetAdapter.to_dataset(
                 {
