@@ -856,8 +856,31 @@ class DatasetBase(ABC):
     def drop(self,
              labels: str | None = None,
              axis: int | None = None,
-             columns: str | Iterable[str] | None = None) -> None:
-        raise NotImplemented("The method 'drop' is not implemented for this type of Dataset")
+             columns: str | Iterable[str] | None = None) -> DatasetBase:
+        dropped_columns = []
+        
+        if columns is not None:
+            dropped_columns = Adapter.to_list(columns)
+        elif labels is not None and axis == 1:
+            dropped_columns = Adapter.to_list(labels)
+        
+        new_data = self._backend_data.drop(labels=labels, axis=axis, columns=columns)
+        
+        new_roles = {
+            column: deepcopy(role) 
+            for column, role in self.roles.items() 
+            if column not in dropped_columns and column in new_data.columns
+        }
+        
+        new_tmp_roles = {
+            column: deepcopy(role)
+            for column, role in self._tmp_roles.items()
+            if column not in dropped_columns and column in new_data.columns
+        }
+        
+        result = self.__class__(roles=new_roles, data=new_data)
+        result._tmp_roles = new_tmp_roles
+        return result
 
     def filter(self,
                items: list | None = None,
