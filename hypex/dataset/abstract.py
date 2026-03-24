@@ -143,7 +143,10 @@ class DatasetBase(ABC):
         session: spark.SparkSession | None = None,
         non_compresion_cols: list[str] | None = None,
     ) -> PandasDataset | SparkDataset:
+        print(backend)
         if backend == BackendsEnum.pandas:
+            print(f"out = {PandasDataset(data, data_compression, non_compresion_cols)}")
+            print(f"data = {data}")
             return PandasDataset(data, data_compression, non_compresion_cols)
         elif backend == BackendsEnum.spark:
             return SparkDataset(data, session)

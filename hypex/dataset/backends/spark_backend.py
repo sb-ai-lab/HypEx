@@ -939,3 +939,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             else data
         )
         return data_expanded
+    
+    def to_dict(self) -> dict:
+        if len(self.data) > 52:
+            raise OverflowError("TOO MACH")
+        return self.data.to_dict()

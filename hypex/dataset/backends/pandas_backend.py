@@ -8,6 +8,8 @@ import pandas as pd  # type: ignore
 import pyspark.sql as spark
 import pyspark.sql.functions as F
 
+import pyspark.pandas as ps
+
 from pyspark.ml.feature import StringIndexer
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType
@@ -154,7 +156,10 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data = pd.DataFrame(data)
         elif isinstance(data, spark.DataFrame):
             self.data = self._data_compression(data, data_compression, non_compresion_cols)
+        elif isinstance(data, ps.DataFrame):
+            self.data = data.to_pandas()
         elif isinstance(data, dict):
+            print(f"pandas_backend dict = {data}")
             if "index" in data.keys():
                 self.data = pd.DataFrame(data=[data["data"]], index=data["index"])
             else:
@@ -873,17 +878,18 @@ class PandasNavigation(DatasetBackendNavigation):
         return self
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert DataFrame to dict with 'data' and 'index' keys.
+        # """Convert DataFrame to dict with 'data' and 'index' keys.
 
-        Returns:
-            dict: Format {"data": {col: [values]}, "index": [index_values]}.
-        """
-        return {
-            "data": {
-                column: self.data[column].to_list() for column in self.data.columns
-            },
-            "index": list(self.index),
-        }
+        # Returns:
+        #     dict: Format {"data": {col: [values]}, "index": [index_values]}.
+        # """
+        # return {
+        #     "data": {
+        #         column: self.data[column].to_list() for column in self.data.columns
+        #     },
+        #     "index": list(self.index),
+        # }
+        return self.data.to_dict()
 
     def to_records(self) -> list[dict]:
         """Convert DataFrame to list of row-wise dictionaries.
