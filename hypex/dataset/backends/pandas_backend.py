@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional, List, Self
+from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional, List
 
 import numpy as np
 import pandas as pd  # type: ignore
