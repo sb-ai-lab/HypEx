@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized, Self
 
 import numpy as np
 import pandas as pd
 
-import pyspark.sql as spark
 from pyspark.sql import SparkSession
 from pyspark.sql import DataFrame as SparkDF
 import pyspark.sql.functions as F
@@ -16,9 +14,11 @@ from pyspark.sql.types import StructType
 
 
 import pyspark.pandas as ps
+ps.set_option('compute.ops_on_diff_frames', True)
+
 from pyspark.pandas.exceptions import PandasNotImplementedError
 
-ps.set_option('compute.ops_on_diff_frames', True)
+
         
 from ...utils import FromDictTypes, MergeOnError, ScalarType, SparkTypeMapper
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
@@ -28,7 +28,7 @@ class SparkNavigation(DatasetBackendNavigation):
     PANDAS_CONVERSION_LIMIT: int = 100_000
 
     def checkpoint(self):
-        pass
+        NotImplementedError("Method checkpoint not implemented for SparkNavigation.")
     
     def limit(self, num: int | None = None) -> Any:
         return self._wrap_result(self.data.iloc[:num])
@@ -39,12 +39,11 @@ class SparkNavigation(DatasetBackendNavigation):
             raise ValueError(f"{context}: {n} rows exceed limit {self.PANDAS_CONVERSION_LIMIT}")
         
     def _wrap_result(self, 
-                     result: ps.DataFrame | ps.Series | Any,
-                     wrap_series: bool = False) -> "SparkNavigation" | ps.Series | Any:
+                     result: ps.DataFrame | ps.Series | Any) -> "SparkNavigation" | ps.Series | Any:
         if isinstance(result, ps.DataFrame):
             return self.__class__(data=result, session=self.session)
         
-        if wrap_series and isinstance(result, ps.Series):
+        if isinstance(result, ps.Series):
             return self.__class__(data=result.to_frame(), session=self.session)
         
         return result
@@ -85,7 +84,7 @@ class SparkNavigation(DatasetBackendNavigation):
         return ps.DataFrame(spark_df)
 
     def __init__(self,
-                 data: ps.DataFrame | SparkDF | pd.DataFrame | dict[str, Any] | str | None = None,
+                 data: ps.DataFrame | pd.DataFrame | SparkDF | dict[str, Any] | str | None = None,
                  session: SparkSession | None = None):
         if isinstance(data, dict):
             if "index" in data:
@@ -480,6 +479,17 @@ class SparkNavigation(DatasetBackendNavigation):
         if not isinstance(data, ps.DataFrame):
             data = ps.DataFrame(data)
         return data
+    
+    @staticmethod
+    def concat(dfs: list[Any], **kwargs) -> Any:
+        valid_dfs = [df for df in dfs if df is not None]
+        if not valid_dfs:
+            return None
+            
+        if len(valid_dfs) == 1:
+            return valid_dfs[0]
+            
+        return ps.concat(valid_dfs, **kwargs)
 
 
 class SparkDataset(SparkNavigation, DatasetBackendCalc):
@@ -940,7 +950,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         )
         return data_expanded
     
-    def to_dict(self) -> dict:
-        if len(self.data) > 52:
-            raise OverflowError("TOO MACH")
-        return self.data.to_dict()
+    # def to_dict(self) -> dict:
+    #     if len(self.data) > 52:
+    #         raise OverflowError("TOO MACH")
+    #     return self.data.to_dict()

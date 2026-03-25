@@ -159,7 +159,6 @@ class PandasNavigation(DatasetBackendNavigation):
         elif isinstance(data, ps.DataFrame):
             self.data = data.to_pandas()
         elif isinstance(data, dict):
-            print(f"pandas_backend dict = {data}")
             if "index" in data.keys():
                 self.data = pd.DataFrame(data=[data["data"]], index=data["index"])
             else:
@@ -878,18 +877,17 @@ class PandasNavigation(DatasetBackendNavigation):
         return self
 
     def to_dict(self) -> dict[str, Any]:
-        # """Convert DataFrame to dict with 'data' and 'index' keys.
+        """Convert DataFrame to dict with 'data' and 'index' keys.
 
-        # Returns:
-        #     dict: Format {"data": {col: [values]}, "index": [index_values]}.
-        # """
-        # return {
-        #     "data": {
-        #         column: self.data[column].to_list() for column in self.data.columns
-        #     },
-        #     "index": list(self.index),
-        # }
-        return self.data.to_dict()
+        Returns:
+            dict: Format {"data": {col: [values]}, "index": [index_values]}.
+        """
+        return {
+            "data": {
+                column: self.data[column].to_list() for column in self.data.columns
+            },
+            "index": list(self.index),
+        }
 
     def to_records(self) -> list[dict]:
         """Convert DataFrame to list of row-wise dictionaries.
@@ -926,6 +924,17 @@ class PandasNavigation(DatasetBackendNavigation):
         if not isinstance(data, Iterable) or isinstance(data, str):
             data = [data]
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+    
+    @staticmethod
+    def concat(dfs: list[Any], **kwargs) -> Any:
+        valid_dfs = [df for df in dfs if df is not None]
+        if not valid_dfs:
+            return None
+            
+        if len(valid_dfs) == 1:
+            return valid_dfs[0]
+            
+        return pd.concat(valid_dfs, **kwargs)
 
 
 class PandasDataset(PandasNavigation, DatasetBackendCalc):

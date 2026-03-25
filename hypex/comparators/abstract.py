@@ -656,37 +656,25 @@ class StatsComparator(BaseComparator, ABC):
         """
         def transform_stats_format(data_dict):
             result = {}
+            stats_data = data_dict["data"]
+            groups_list = data_dict["index"]
             
-            for col_stat, groups in data_dict.items():
+            for col_stat, values_list in stats_data.items():
                 column, stat = col_stat.split('┆')
                 
-                for group, value in groups.items():
+                for i, group in enumerate(groups_list):
                     if group not in result:
                         result[group] = {}
                     if column not in result[group]:
                         result[group][column] = {}
                     
-                    result[group][column][stat] = value
-            
+                    result[group][column][stat] = values_list[i]
             return result
         
         stats = stats or []
         agg_ds = grouped.agg(stats)
         
         return transform_stats_format(data_dict=agg_ds.to_dict()["data"])
-        
-        # return {
-        #     str(raw): {
-        #         col: {
-        #             stat: agg_ds.get_values(
-        #                 row=raw, column=f"{col}{NAME_BORDER_SYMBOL}{stat}"
-        #             )
-        #             for stat in stats
-        #         }
-        #         for col in target_columns
-        #     }
-        #     for raw in raw_group_names
-        # }
 
     @classmethod
     @abstractmethod
