@@ -65,6 +65,17 @@ class GroupedDataset:
 
     def agg(self,
             func: str | dict[str, str] | list[str]) -> DatasetBase:
+        if func == "value_counts":
+            return self.value_counts()
+
+        if isinstance(func, list) and "value_counts" in func:
+            std_funcs = [f for f in func if f != "value_counts"]
+            vc_ds = self.value_counts(_add_suffix=True)
+            if not std_funcs:
+                return vc_ds
+            std_ds = self.agg(std_funcs)
+            return std_ds.add_column(vc_ds)
+
         result_data = self._execute_agg(func)
 
         if result_data is None:
@@ -166,6 +177,20 @@ class GroupedDataset:
         if cols:
             return self.agg({col: 'prod' for col in cols})
         return self.agg("prod")
+
+    def value_counts(self, *cols: str, _add_suffix: bool = False) -> DatasetBase:
+        feature_cols = list(cols) if cols else [
+            c for c in self.roles if c not in self._group_cols
+        ]
+
+        raw = self._backend_data.grouped_value_counts(self._group_cols, feature_cols)
+
+        suffix = f"{NAME_BORDER_SYMBOL}value_counts" if _add_suffix else ""
+        if suffix:
+            raw["data"] = {f"{col}{suffix}": v for col, v in raw["data"].items()}
+
+        new_roles = {col: StatisticRole() for col in raw["data"]}
+        return self._dataset_class(roles=new_roles, data=raw)
 
     def size(self) -> DatasetBase:
         result = self._groupby.size() if hasattr(self._groupby, 'size') else self.agg("count")

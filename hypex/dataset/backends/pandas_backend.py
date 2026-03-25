@@ -1054,6 +1054,26 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         for key, group in self.data.groupby(by=by, observed=False):
             yield key, group
 
+    def grouped_value_counts(self, by: list[str], feature_cols: list[str]):
+        result = {
+            col: self.data.groupby(by=by, observed=False)[col]
+                     .value_counts()
+                     .to_dict()
+            for col in feature_cols
+        }
+        # result[col] is {(group_key, val): count}; pivot to {group_key: {val: count}}
+        rows: dict = {}
+        for col, vc_dict in result.items():
+            for composite_key, count in vc_dict.items():
+                group_key = composite_key[0] if len(by) == 1 else composite_key[:len(by)]
+                val = composite_key[-1]
+                rows.setdefault(group_key, {}).setdefault(col, {})[val] = count
+
+        return {
+            "data": {col: [rows[k].get(col, {}) for k in rows] for col in feature_cols},
+            "index": list(rows.keys()),
+        }
+
     def agg(self, func: str | list, **kwargs) -> pd.DataFrame | float:
         """Aggregate DataFrame using specified function(s).
 

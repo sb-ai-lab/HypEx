@@ -538,6 +538,32 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 mask = col_mask if mask is None else mask & col_mask
             yield key, self.data[mask]
 
+    def grouped_value_counts(self, by: list[str], feature_cols: list[str]):
+        from functools import reduce
+
+        sdf = self.data.to_spark()
+        agg_sdfs = []
+        for col in feature_cols:
+            agg_sdf = (
+                sdf.groupBy(*by, col)
+                   .count()
+                   .groupBy(*by)
+                   .agg(
+                       F.map_from_entries(
+                           F.collect_list(F.struct(F.col(col), F.col("count")))
+                       ).alias(col)
+                   )
+            )
+            agg_sdfs.append(agg_sdf)
+
+        result_sdf = reduce(lambda a, b: a.join(b, on=by, how="outer"), agg_sdfs)
+        result_psdf = result_sdf.pandas_api().set_index(by[0] if len(by) == 1 else by)
+        rows = result_psdf.to_dict(orient="index")
+        return {
+            "data": {col: [rows[k][col] for k in rows] for col in feature_cols},
+            "index": list(rows.keys()),
+        }
+
     def agg(self, func: str | list, **kwargs) -> SparkDataset | float:
         subset = kwargs.pop('subset', None)
         func = func if isinstance(func, (list, dict)) else [func]
