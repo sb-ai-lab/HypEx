@@ -199,9 +199,6 @@ class GroupedDataset:
         return self._dataset_class(roles={'size': StatisticRole()}, data=result)
 
     def __iter__(self):
-        print(f"self._backend_data = {self._backend_data}")
-        print(f"self._group_cols = {self._group_cols}")
-
         if self._backend_data is None or not self._group_cols:
             raise TypeError(
                 "GroupedDataset is not iterable: backend or group_cols not set. "
