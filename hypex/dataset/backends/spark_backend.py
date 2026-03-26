@@ -7,6 +7,7 @@ from typing import Any, Callable, Iterable, Literal, Sequence, Sized, Self
 import numpy as np
 import pandas as pd
 
+from pyspark.storagelevel import StorageLevel
 from pyspark.sql import SparkSession
 from pyspark.sql import DataFrame as SparkDF
 import pyspark.sql.functions as F
@@ -211,6 +212,151 @@ class SparkNavigation(DatasetBackendNavigation):
             self.data = ps.DataFrame(self.session.createDataFrame([], schema=StructType([])))
         else:
             raise TypeError(f"Unsupported data type: {type(data)}")
+        
+        
+    def persist(self, 
+                storage_level: Literal["MEMORY_ONLY", 
+                                       "MEMORY_AND_DISK", 
+                                       "DISK_ONLY", 
+                                       "MEMORY_ONLY_SER"] = "MEMORY_AND_DISK",
+                action: Literal["count", "head", "none"] = "count"):
+        """Persist the underlying Spark DataFrame in cache with automatic materialization.
+        
+        Marks the dataset for caching in Spark's execution engine to accelerate
+        subsequent operations. Unlike Spark's native `persist()`, this method
+        optionally triggers an action to immediately materialize the cache,
+        ensuring the data is pre-computed and ready for fast access.
+        
+        Handles index preservation across pyspark.pandas ↔ Spark DataFrame conversions.
+        
+        Args:
+            storage_level (Literal): Storage strategy for cached 
+                - "MEMORY_ONLY": Store as deserialized Java objects in heap memory.
+                - "MEMORY_AND_DISK": Store in memory, spill partitions to disk if needed.
+                - "DISK_ONLY": Store partitions only on disk.
+                - "MEMORY_ONLY_SER": Store as serialized Java objects (more memory-efficient).
+                - "MEMORY_AND_DISK_SER": Serialized storage with disk spill capability.
+                - "OFF_HEAP": Store in off-heap memory (requires Tungsten).
+                Default is "MEMORY_AND_DISK" for balanced performance/reliability.
+                
+            action (Literal): Action to trigger cache materialization:
+                - "count": Execute `count()` action (fast, returns row count).
+                - "head": Execute `head(1)` action (materializes first partition).
+                - "none": Skip automatic action; cache will materialize on first action.
+                Default is "count" for reliable full materialization.
+                
+        Returns:
+            Self: Reference to self for method chaining.
+            
+        Raises:
+            ValueError: If storage_level or action parameter has invalid value.
+            
+        Note:
+            - Index is preserved across the Spark conversion cycle.
+            - MultiIndex is supported: all index levels are restored after persist.
+            - Cached data remains until `unpersist()` is called or SparkSession ends.
+            - Use `unpersist()` to manually release cached resources.
+        """            
+        storage_levels = {
+            "MEMORY_ONLY": StorageLevel.MEMORY_ONLY,
+            "MEMORY_AND_DISK": StorageLevel.MEMORY_AND_DISK,
+            "DISK_ONLY": StorageLevel.DISK_ONLY
+        }
+        
+        if storage_level not in storage_levels:
+            raise ValueError(
+                f"Invalid storage_level: '{storage_level}'. "
+                f"Valid options: {list(storage_levels.keys())}"
+            )
+        
+        if action not in ("count", "head", "none"):
+            raise ValueError(
+                f"Invalid action: '{action}'. Valid options: 'count', 'head', 'none'"
+            )
+        
+        original_index_names = self.data.index.names
+        original_index_name = original_index_names[0] if len(original_index_names) == 1 else original_index_names
+        
+        spark_df = self.data.to_spark()
+        
+        spark_df.persist(storage_levels[storage_level])
+        
+        if action == "count":
+            _ = spark_df.count()
+        elif action == "head":
+            _ = spark_df.limit(1).collect()
+        
+        self.data = ps.DataFrame(spark_df)
+        
+
+        if isinstance(original_index_name, str):
+            if original_index_name in self.data.columns:
+                self.data = self.data.set_index(original_index_name)
+        elif isinstance(original_index_name, list):
+            if all(name in self.data.columns for name in original_index_name):
+                self.data = self.data.set_index(original_index_name)
+        elif original_index_names == [None] and "index" in self.data.columns:
+            self.data = self.data.set_index("index")
+            
+        self._is_persisted_flag = True
+        self._storage_level_flag = storage_level
+        
+        return self
+    
+    def unpersist(self, blocking: bool = False):
+        """Remove the persisted dataset from Spark cache.
+        
+        Releases memory/disk resources occupied by cached data. After calling
+        this method, subsequent operations will recompute data from source.
+        
+        Args:
+            blocking (bool): If True, wait until all blocks are deleted 
+                before returning. If False (default), deletion happens 
+                asynchronously.
+                
+        Returns:
+            Self: Reference to self for method chaining.
+        """
+        if getattr(self, '_is_persisted_flag', False):
+            
+            original_index_names = self.data.index.names
+            original_index_name = original_index_names[0] if len(original_index_names) == 1 else original_index_names
+            
+            spark_df = self.data.to_spark()
+            spark_df.unpersist(blocking=blocking)
+            
+            self.data = ps.DataFrame(spark_df)
+            
+            if isinstance(original_index_name, str):
+                if original_index_name in self.data.columns:
+                    self.data = self.data.set_index(original_index_name)
+            elif isinstance(original_index_name, list):
+                if all(name in self.data.columns for name in original_index_name):
+                    self.data = self.data.set_index(original_index_name)
+            elif original_index_names == [None] and "index" in self.data.columns:
+                self.data = self.data.set_index("index")
+            
+            self._is_persisted_flag = False
+            self._storage_level_flag = None
+        
+        return self
+    
+    def is_persisted(self) -> bool:
+        """Check if the underlying Spark DataFrame is persisted in cache.
+        
+        Returns:
+            bool: True if DataFrame has non-NONE storage level.
+        """        
+        return getattr(self, '_is_persisted_flag', False)
+
+    def get_storage_level(self) -> str | None:
+        """Get the current storage level of the Spark DataFrame.
+        
+        Returns:
+            str | None: Storage level name (e.g., "MEMORY_AND_DISK") if persisted,
+                None if not persisted.
+        """        
+        return getattr(self, '_storage_level_flag', None)
 
     def __getitem__(self, 
                     item: slice | int | str | list | ps.DataFrame | ps.Series) -> "SparkNavigation" | ps.Series:

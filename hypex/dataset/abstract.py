@@ -227,6 +227,41 @@ class DatasetBase(ABC):
         
         self.loc = self.Locker(call_class=self.__class__, backend=self._backend_data, roles=self.roles)
         self.iloc = self.ILocker(call_class=self.__class__, backend=self._backend_data, roles=self.roles)
+        
+    def persist(self, 
+                storage_level: Literal["MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY", 
+                                      "MEMORY_ONLY_SER", "MEMORY_AND_DISK_SER", 
+                                      "OFF_HEAP"] = "MEMORY_AND_DISK",
+                action: Literal["count", "head", "none"] = "count"):
+        if self.backend_type == BackendsEnum.spark:
+            self._backend_data.persist(storage_level=storage_level, action=action)
+        
+        return self
+
+    def unpersist(self, blocking: bool = False):
+        if self.backend_type == BackendsEnum.spark:
+            self._backend_data.unpersist(blocking=blocking)
+        
+        return self
+    
+    def is_persisted(self) -> bool:
+        if self.backend_type == BackendsEnum.spark:
+            return self._backend_data.is_persisted()
+        return False
+
+    def get_storage_level(self) -> str | None:
+
+        if self.backend_type == BackendsEnum.spark:
+            return self._backend_data.get_storage_level()
+        return None
+
+    def get_cache_info(self) -> dict[str, Any]:
+        return {
+            "is_persisted": self.is_persisted(),
+            "storage_level": self.get_storage_level(),
+            "backend_type": self.backend_type,
+            "in_memory": True if self.backend_type == BackendsEnum.pandas else self.is_persisted(),
+        }
 
     def __repr__(self):
         n_cols = len(self.columns)
