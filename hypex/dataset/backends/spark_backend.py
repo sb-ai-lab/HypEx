@@ -1080,7 +1080,13 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         Returns:
             SparkDataset: Result with mapped values.
         """
-        return self._wrap_result(self.data.map(func, **kwargs))
+        """Map function over Series elements."""
+        if len(self.data.columns) == 1:
+            col_name = self.data.columns[0]
+            result = self.data[col_name].map(func, na_action=na_action, **kwargs)
+            return self._wrap_result(result.to_frame())
+        else:
+            return self._wrap_result(self.data.apply(func, **kwargs))
 
     def is_empty(self) -> bool:
         """Check if dataset contains no data.
