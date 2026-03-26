@@ -361,6 +361,16 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
+    def grouped_value_counts(
+        self,
+        by: list[str],
+        feature_cols: list[str],
+    ) -> Any:
+        """Return a dataframe indexed by group keys where each cell is a
+        {category: count} dict for the corresponding feature column."""
+        raise AbstractMethodError
+
+    @abstractmethod
     def na_counts(self) -> Any:
         raise AbstractMethodError
 
