@@ -864,10 +864,18 @@ class DatasetBase(ABC):
         t_data = self._backend_data.value_counts(
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
         )
-        t_roles = deepcopy(self.roles)
+        new_columns = t_data.columns if hasattr(t_data, 'columns') else list(t_data.data) 
+
+        t_roles = {
+            col_name: role 
+            for col_name, role in self.roles.items() 
+            if col_name in new_columns
+        }
+
         column_name = "proportion" if normalize else "count"
-        if column_name not in t_data.data:
+        if column_name not in new_columns:
             t_data = t_data.rename(columns={0: column_name})
+            
         t_roles[column_name] = StatisticRole()
         return self.__class__(roles=t_roles, data=t_data)
 
