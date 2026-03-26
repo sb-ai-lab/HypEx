@@ -49,67 +49,6 @@ class Dataset(DatasetBase):
 
 
 class SmallDataset(DatasetBase):
-    # class Locker:
-    #     def __init__(self, backend, roles):
-    #         self.backend = backend
-    #         self.roles = roles
-
-    #     def __getitem__(self, item) -> Dataset:
-    #         t_data = self.backend.loc(item)
-    #         return Dataset(
-    #             data=t_data,
-    #             roles={k: v for k, v in self.roles.items() if k in t_data.columns},
-    #         )
-
-    #     def __setitem__(self, item, value):
-    #         column_name = item[1]
-    #         column_data_type = self.roles[column_name].data_type
-    #         if (
-    #             column_data_type is None
-    #             or (
-    #                 isinstance(value, Iterable)
-    #                 and all(isinstance(v, column_data_type) for v in value)
-    #             )
-    #             or isinstance(value, column_data_type)
-    #         ):
-    #             if column_name not in self.backend.data.columns:
-    #                 raise KeyError("Column must be added by using add_column method.")
-    #             else:
-    #                 self.backend.data.loc[item] = value
-    #         else:
-    #             raise TypeError("Value type does not match the expected data type.")
-
-    # class ILocker:
-    #     def __init__(self, backend, roles):
-    #         self.backend = backend
-    #         self.roles = roles
-
-    #     def __getitem__(self, item) -> Dataset:
-    #         t_data = self.backend.iloc(item)
-    #         return Dataset(
-    #             data=t_data,
-    #             roles={k: v for k, v in self.roles.items() if k in t_data.columns},
-    #         )
-
-    #     def __setitem__(self, item, value):
-    #         column_index = item[1]
-    #         column_name = self.backend.data.columns[column_index]
-    #         column_data_type = self.roles[column_name].data_type
-    #         if (
-    #             column_data_type is None
-    #             or (
-    #                 isinstance(value, Iterable)
-    #                 and all(isinstance(v, column_data_type) for v in value)
-    #             )  # check for backend specific list (?)
-    #             or isinstance(value, column_data_type)
-    #         ):
-    #             if column_index >= len(self.backend.data.columns):
-    #                 raise IndexError("Column must be added by using add_column method.")
-    #             else:
-    #                 self.backend.data.iloc[item] = value
-    #         else:
-    #             raise TypeError("Value type does not match the expected data type.")
-
     def __init__(
         self,
         roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
@@ -475,14 +414,6 @@ class DatasetAdapter(Adapter):
         small: bool = True,
     ) -> Dataset | SmallDataset:
         roles_names = list(data.keys())
-        # if any(
-        #     [
-        #         any(isinstance(i, t) for t in [int, str, float, bool])
-        #         for i in list(data.values())
-        #     ]
-        # ):
-        #     data = [data]
-
         if isinstance(roles, dict):
             result = SmallDataset.from_dict(data=data, roles=roles)
         elif isinstance(roles, ABCRole):
