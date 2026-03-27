@@ -244,9 +244,10 @@ class DatasetBase(ABC):
         
         return self
     
+    @property
     def is_persisted(self) -> bool:
         if self.backend_type == BackendsEnum.spark:
-            return self._backend_data.is_persisted()
+            return self._backend_data.is_persisted
         return False
 
     def get_storage_level(self) -> str | None:

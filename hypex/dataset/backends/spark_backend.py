@@ -341,6 +341,7 @@ class SparkNavigation(DatasetBackendNavigation):
         
         return self
     
+    @property
     def is_persisted(self) -> bool:
         """Check if the underlying Spark DataFrame is persisted in cache.
         
