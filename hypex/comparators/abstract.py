@@ -653,28 +653,28 @@ class StatsComparator(BaseComparator, ABC):
         Returns:
             Nested dict ``{group_name: {column_name: {stat_name: scalar_value}}}``
             with groups in sorted order.
-        """
-        def transform_stats_format(data_dict):
-            result = {}
-            stats_data = data_dict["data"]
-            groups_list = data_dict["index"]
+        """        
+        agg_ds = grouped.agg(stats or [])
+        
+        data_dict = agg_ds.to_dict()["data"]
+        
+        stats_data = data_dict["data"]
+        groups_list = data_dict["index"]
+        
+        result = {}
+        
+        for col_stat, values_list in stats_data.items():
+            column, stat = col_stat.split('┆')
             
-            for col_stat, values_list in stats_data.items():
-                column, stat = col_stat.split('┆')
+            for i, group in enumerate(groups_list):
+                if group not in result:
+                    result[group] = {}
+                if column not in result[group]:
+                    result[group][column] = {}
                 
-                for i, group in enumerate(groups_list):
-                    if group not in result:
-                        result[group] = {}
-                    if column not in result[group]:
-                        result[group][column] = {}
-                    
-                    result[group][column][stat] = values_list[i]
-            return result
+                result[group][column][stat] = values_list[i]        
         
-        stats = stats or []
-        agg_ds = grouped.agg(stats)
-        
-        return transform_stats_format(data_dict=agg_ds.to_dict()["data"])
+        return result
 
     @classmethod
     @abstractmethod
