@@ -107,9 +107,9 @@ class AggTTest(StatsHypothesisTesting):
         p_value = float(2 * t_dist.sf(abs(t_stat), df))
 
         return {
-            "p-value": p_value,
-            "statistic": float(t_stat),
-            "pass": p_value < reliability,
+            "p-value": [p_value],
+            "statistic": [float(t_stat)],
+            "pass": [p_value < reliability],
         }
 
 class StatsTTest(StatsHypothesisTesting):
@@ -199,15 +199,15 @@ class StatsTTest(StatsHypothesisTesting):
             p_value = t_dist.sf(abs(t_stat), de_fr) * 2
 
             return {
-                    "p-value": p_value,
-                    "statistic": float(t_stat),
-                    "pass": p_value < reliability,
+                    "p-value": [p_value],
+                    "statistic": [float(t_stat)],
+                    "pass": [p_value < reliability],
                 }
         else:
             return {
-                "p-value": None,
-                "statistic": None,
-                "pass": False,
+                "p-value": [None],
+                "statistic": [None],
+                "pass": [False],
             }
     
     @staticmethod
@@ -353,7 +353,7 @@ class StatsChi2Test(StatsHypothesisTesting):
         p_value = float(2 * t_dist.sf(abs(z_stat), n1 + n2 - 2))
 
         return {
-            "p-value": p_value,
-            "statistic": float(z_stat),
-            "pass": p_value < reliability,
+            "p-value": [p_value],
+            "statistic": [float(z_stat)],
+            "pass": [p_value < reliability],
         }

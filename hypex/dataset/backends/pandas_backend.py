@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional, List, Self
+from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -34,7 +34,7 @@ class PandasNavigation(DatasetBackendNavigation):
     def _data_compression(self,
                           data: spark.DataFrame,
                           data_compression: Literal["downcasting", "encoding", "auto", "disable"],
-                          non_compresion_cols: List[str] | None) -> pd.DataFrame:
+                          non_compresion_cols: list[str] | None) -> pd.DataFrame:
         """Compress data before convertation `spark.DataFrame` to pandas.DataFrame.
 
         Args:
@@ -65,7 +65,7 @@ class PandasNavigation(DatasetBackendNavigation):
         return result.toPandas()
 
     @staticmethod
-    def _encoding(data: spark.DataFrame, categorical_columns: List[str]) -> spark.DataFrame:
+    def _encoding(data: spark.DataFrame, categorical_columns: list[str]) -> spark.DataFrame:
         """Encoding categorical features.
 
         Args:
@@ -93,7 +93,7 @@ class PandasNavigation(DatasetBackendNavigation):
                 ), labels)
 
     @staticmethod
-    def _downcasting(data: spark.DataFrame, numeric_columns: List[str]) -> spark.DataFrame:
+    def _downcasting(data: spark.DataFrame, numeric_columns: list[str]) -> spark.DataFrame:
         """Downcasting data.
 
         Args:
@@ -135,7 +135,7 @@ class PandasNavigation(DatasetBackendNavigation):
     def __init__(self,
                  data: pd.DataFrame | dict | str | pd.Series | None = None,
                  data_compression: Literal["downcasting", "encoding", "auto", "disable"] = "auto",
-                 non_compresion_cols: List[str] | None = None):
+                 non_compresion_cols: list[str] | None = None):
         """Initialize PandasNavigation with various data sources.
 
         Args:
@@ -160,9 +160,9 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data = data.to_pandas()
         elif isinstance(data, dict):
             if "index" in data.keys():
-                self.data = pd.DataFrame(data=[data["data"]], index=data["index"])
+                self.data = pd.DataFrame(data=data["data"], index=data["index"])
             else:
-                self.data = pd.DataFrame(data=[data["data"]])
+                self.data = pd.DataFrame(data=data["data"])
         elif isinstance(data, str):
             self.data = self._read_file(data)
         else:
