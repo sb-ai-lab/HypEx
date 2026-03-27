@@ -1,24 +1,20 @@
 from __future__ import annotations
 
 import math
+import numpy as np
 from typing import Any
 
 from scipy.stats import t as t_dist
 
 from ..dataset import ABCRole
-from ..utils.constants import NUMBER_TYPES_LIST
-from .abstract import StatsHypothesisTesting, StatsComparator
+from ..utils.constants import NUMBER_TYPES_LIST, CATEGORICAL_TYPES_LIST
+from .abstract import StatsHypothesisTesting
 
 from typing import Any, Union
-from math import sqrt, gcd, log, ceil
+from math import sqrt
 from scipy.stats import (
     t,
-    chi2,
-    kstwo,
-    ttest_ind,
     chi2_contingency,
-    ks_2samp,
-    _stats_py,
 )
 
 class AggTTest(StatsHypothesisTesting):
@@ -105,8 +101,20 @@ class AggTTest(StatsHypothesisTesting):
             "pass": p_value < reliability,
         }
 
-class StatsTTest(StatsComparator):
+class StatsTTest(StatsHypothesisTesting):
     """
+    Two-sample t-test operating on aggregated sufficient statistics.
+
+    Computes (mean, std, count) per group for each target column via a single
+    _compute_stats call per group, then applies Student's t-test formula analytically
+    — without requiring access to raw data.
+
+    Automatically determines whether to use pooled variance (when variances are similar)
+    or Welch's approximation (when variances differ significantly).
+
+    Output shape is identical to GroupTTest: rows indexed by compared group name, columns
+    are p-value, statistic, pass — making StatsTTest a drop-in replacement for GroupTTest
+    in pipelines where raw data transfer is expensive (e.g. Spark backend).
     """
     REQUERED_STATS = ["mean", "std", "count"]
 
@@ -202,10 +210,23 @@ class StatsTTest(StatsComparator):
                           )
             return de_fr
         
-class StatsChi2Test(StatsComparator):
+class StatsChi2Test(StatsHypothesisTesting):
     """
+    Chi-squared test of independence operating on aggregated value counts.
+
+    Computes value_counts per group for each target column via a single
+    _compute_stats call per group, then applies Pearson's chi-squared test
+    analytically — without requiring access to raw data.
+
+    Builds a contingency table from the value counts of the baseline and compared
+    groups, then tests whether the distributions of categorical values are independent
+    of group membership.
+
+    Output shape is identical to GroupTTest: rows indexed by compared group name, columns
+    are p-value, statistic, pass — making StatsChi2Test a drop-in replacement for GroupTTest
+    in pipelines where raw data transfer is expensive (e.g. Spark backend).
     """
-    REQUIRED_STATS = ["count"]
+    REQUIRED_STATS = ["value_counts"]
 
     def __init__(
             self, 
@@ -215,7 +236,7 @@ class StatsChi2Test(StatsComparator):
             key: Any = "", 
     ):
         super().__init__(
-            stats=self.REQUERED_STATS, 
+            stats=self.REQUIRED_STATS, 
             grouping_role=grouping_role, 
             target_roles=target_roles, 
             key=key, 
@@ -225,7 +246,7 @@ class StatsChi2Test(StatsComparator):
 
     @property
     def search_types(self) -> list[type] | None:
-        return NUMBER_TYPES_LIST
+        return CATEGORICAL_TYPES_LIST
     
     @classmethod
     def _inner_function(
@@ -235,8 +256,23 @@ class StatsChi2Test(StatsComparator):
         reliability: float = 0.05,
         **kwargs,
     ) -> dict[str, Any]:
-        n1 = baseline_stats["count"]
-        n2 = compared_stats["count"]
+        control_freqs = baseline_stats["value_counts"]
+        test_freqs = compared_stats["value_counts"]
 
-        print(n1)
-        print(n2)
+        full_key_set = set(control_freqs.keys()).union(set(test_freqs.keys()))
+        contingency_table = np.zeros((2, len(full_key_set)))
+        for idx, (key) in enumerate(full_key_set):
+            if key in control_freqs:
+                contingency_table[0][idx] = control_freqs[key]
+            if key in test_freqs:
+                contingency_table[1][idx] = test_freqs[key]
+        print(contingency_table)
+        
+        statistics= chi2_contingency(contingency_table, **kwargs)
+        result = {
+                "p-value": statistics[1],
+                "statistic": statistics[0],
+                "pass": statistics[1] < reliability,
+            }
+            
+        return result
