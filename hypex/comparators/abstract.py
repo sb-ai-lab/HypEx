@@ -739,7 +739,7 @@ class StatsComparator(BaseComparator, ABC):
         stats_ds_list = [
             DatasetAdapter.to_dataset(
                 {
-                    f"{stat}{NAME_BORDER_SYMBOL}{col}": col_stats[stat]
+                    f"{stat}{NAME_BORDER_SYMBOL}{col}": [col_stats[stat]]
                     for col, col_stats in col_stats_dict.items()
                     for stat in col_stats
                 },
