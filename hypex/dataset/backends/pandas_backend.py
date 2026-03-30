@@ -924,17 +924,6 @@ class PandasNavigation(DatasetBackendNavigation):
         if not isinstance(data, Iterable) or isinstance(data, str):
             data = [data]
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
-    
-    @staticmethod
-    def concat(dfs: list[Any], **kwargs) -> Any:
-        valid_dfs = [df for df in dfs if df is not None]
-        if not valid_dfs:
-            return None
-            
-        if len(valid_dfs) == 1:
-            return valid_dfs[0]
-            
-        return pd.concat(valid_dfs, **kwargs)
 
 
 class PandasDataset(PandasNavigation, DatasetBackendCalc):

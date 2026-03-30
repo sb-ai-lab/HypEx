@@ -960,27 +960,6 @@ class SparkNavigation(DatasetBackendNavigation):
         if not isinstance(data, ps.DataFrame):
             data = ps.DataFrame(data)
         return data
-    
-    @staticmethod
-    def concat(dfs: list[Any], **kwargs) -> Any:
-        """Concatenate multiple DataFrames or SparkNavigation instances.
-        
-        Args:
-            dfs (list[Any]): List of objects to concatenate (filters out None values).
-            **kwargs: Additional arguments passed to pyspark.pandas.concat.
-            
-        Returns:
-            Any: Concatenated result, or None if all inputs were None, or single
-                item if only one valid input provided.
-        """
-        valid_dfs = [df for df in dfs if df is not None]
-        if not valid_dfs:
-            return None
-            
-        if len(valid_dfs) == 1:
-            return valid_dfs[0]
-            
-        return ps.concat(valid_dfs, **kwargs)
 
 
 class SparkDataset(SparkNavigation, DatasetBackendCalc):
