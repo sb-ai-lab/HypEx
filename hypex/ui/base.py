@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import datetime
+
 
 from ..dataset import Dataset, ExperimentData
 from ..experiments.base import Experiment
 from ..reporters import Reporter
 from ..utils import ID_SPLIT_SYMBOL
 from ..utils.enums import RenameEnum
+from ..tracking import BaseTracker
 
 
 def _html_section(title: str, level: int = 2) -> str:
@@ -400,16 +403,16 @@ class ExperimentShell:
         results = shell.execute(data)
     """
 
-    def __init__(
-        self,
-        experiment: Experiment,
-        output: Output,
-        experiment_params: dict[str, Any] | None = None,
-    ):
+    def __init__(self,
+                 experiment: Experiment,
+                 output: Output,
+                 experiment_params: dict[str, Any] | None = None,
+                 tracker: "BaseTracker" | None = None):
         if experiment_params:
             experiment.set_params(experiment_params)
         self._out = output
         self._experiment = experiment
+        self._tracker = tracker
 
     @property
     def experiment(self):
@@ -419,36 +422,116 @@ class ExperimentShell:
             Experiment: The experiment configuration object.
         """
         return self._experiment
+    
+    def _get_experiment_params(self) -> dict[str, Any]:
+        """Extract all experiment parameters for logging."""
+        params = {}
+        
+        # Parameters from ExperimentShell attributes
+        for key, value in self.__dict__.items():
+            if not key.startswith('_') and self._is_json_serializable(value):
+                params[key] = self._convert_to_serializable(value)
+        
+        # Parameters from Experiment executors
+        if hasattr(self._experiment, 'executors'):
+            for executor in self._experiment.executors:
+                for key, value in executor.__dict__.items():
+                    if not key.startswith('_') and self._is_json_serializable(value):
+                        params[f"{executor.__class__.__name__}.{key}"] = self._convert_to_serializable(value)
+        
+        return params
 
-    def execute(self, data: Dataset | ExperimentData):
-        """Executes the experiment on the provided data.
+    def _is_json_serializable(self, value: Any) -> bool:
+        """Check if value is JSON serializable."""
+        if isinstance(value, (int, float, str, bool, type(None))):
+            return True
+        if isinstance(value, (list, tuple)):
+            return all(self._is_json_serializable(item) for item in value)
+        if isinstance(value, dict):
+            return all(
+                isinstance(k, str) and self._is_json_serializable(v) 
+                for k, v in value.items()
+            )
+        return False
 
-        Runs the configured experiment on the input data and formats the results
-        using the configured output handler.
+    def _convert_to_serializable(self, value: Any) -> Any:
+        """Convert value to JSON serializable format."""
+        if isinstance(value, (int, float, str, bool, type(None))):
+            return value
+        if isinstance(value, (list, tuple)):
+            return [self._convert_to_serializable(item) for item in value]
+        if isinstance(value, dict):
+            return {k: self._convert_to_serializable(v) for k, v in value.items()}
+        
+        # Convert Role objects to string representation
+        if hasattr(value, '__class__'):
+            class_name = value.__class__.__name__
+            if 'Role' in class_name:
+                return f"{class_name}({getattr(value, 'data_type', None)})"
+            return str(value)
+        
+        return str(value)
+    
+    def _log_results(self, experiment_data: ExperimentData) -> None:
+        """Log experiment results to tracker."""
+        if self._tracker is None:
+            return
+        
+        # Log metrics from resume
+        if hasattr(self._out, 'resume') and self._out.resume is not None:
+            try:
+                resume_dict = self._out.resume.to_dict()
+                metrics = {}
+                
+                # Extract numeric metrics
+                if 'data' in resume_dict and 'data' in resume_dict['data']:
+                    for key, values in resume_dict['data']['data'].items():
+                        if isinstance(values, (list, tuple)) and len(values) > 0:
+                            try:
+                                metrics[key] = float(values[0])
+                            except (ValueError, TypeError):
+                                pass
+                
+                if metrics:
+                    self._tracker.log_metrics(metrics)
+            except Exception as e:
+                print(f"Warning: Could not log resume metrics: {e}")
+        
+        # Log analysis tables as artifacts
+        # if hasattr(experiment_data, 'analysis_tables'):
+        #     for table_name, table in experiment_data.analysis_tables.items():
+        #         if isinstance(table, Dataset):
+        #             try:
+        #                 self._tracker.log_dataset(table, f"analysis_{table_name}")
+        #             except Exception as e:
+        #                 print(f"Warning: Could not log analysis table {table_name}: {e}")
 
-        Args:
-            data (Union[Dataset, ExperimentData]): Input data for the experiment.
-                Can be either a Dataset or ExperimentData instance.
-
-        Returns:
-            Output | ExperimentOutput: Formatted experiment results.
-
-        Examples
-        --------
-        .. code-block:: python
-
-            shell = ExperimentShell(experiment, output)
-            dataset = Dataset(...)  # Your input data
-            results = shell.execute(dataset)
-            print(results.resume)  # Access main output
-            print(results.cupac.variance_reductions)  # Access additional output
-        """
+    def execute(self, data: Dataset | ExperimentData) -> Output:
         if isinstance(data, Dataset):
             data = ExperimentData(data)
-        result_experiment_data = self._experiment.execute(data)
         
-        # Extract data - works for both Output and ExperimentOutput
-        self._out.extract(result_experiment_data)
+        if self._tracker:
+            run_name = f"{self._experiment.key}_{id(self)}_{datetime.now().strftime('%H%M%S')}"
+            self._tracker.start_run(run_name=run_name)
+            self._tracker.log_params(self._get_experiment_params())
+            self._tracker.log_system_info()
         
-        return self._out
+        try:
+            # Execute experiment
+            result_experiment_data = self._experiment.execute(data)
+            self._out.extract(result_experiment_data)
+            
+            if self._tracker:
+                self._log_results(result_experiment_data)
+            
+            return self._out
+            
+        except Exception as e:
+            if self._tracker:
+                self._tracker.log_error(e)
+            raise
+            
+        finally:
+            if self._tracker:
+                self._tracker.end_run()
 
