@@ -1,6 +1,5 @@
 # Files
-/*.ipynb
-*.csv
+/*.csv
 *.png
 *.pickle
 *.html
