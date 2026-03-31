@@ -227,6 +227,42 @@ class DatasetBase(ABC):
         
         self.loc = self.Locker(call_class=self.__class__, backend=self._backend_data, roles=self.roles)
         self.iloc = self.ILocker(call_class=self.__class__, backend=self._backend_data, roles=self.roles)
+        
+    def persist(self, 
+                storage_level: Literal["MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY", 
+                                      "MEMORY_ONLY_SER", "MEMORY_AND_DISK_SER", 
+                                      "OFF_HEAP"] = "MEMORY_AND_DISK",
+                action: Literal["count", "head", "none"] = "count"):
+        if self.backend_type == BackendsEnum.spark:
+            self._backend_data.persist(storage_level=storage_level, action=action)
+        
+        return self
+
+    def unpersist(self, blocking: bool = False):
+        if self.backend_type == BackendsEnum.spark:
+            self._backend_data.unpersist(blocking=blocking)
+        
+        return self
+    
+    @property
+    def is_persisted(self) -> bool:
+        if self.backend_type == BackendsEnum.spark:
+            return self._backend_data.is_persisted
+        return False
+
+    def get_storage_level(self) -> str | None:
+
+        if self.backend_type == BackendsEnum.spark:
+            return self._backend_data.get_storage_level()
+        return None
+
+    def get_cache_info(self) -> dict[str, Any]:
+        return {
+            "is_persisted": self.is_persisted(),
+            "storage_level": self.get_storage_level(),
+            "backend_type": self.backend_type,
+            "in_memory": True if self.backend_type == BackendsEnum.pandas else self.is_persisted(),
+        }
 
     def __repr__(self):
         n_cols = len(self.columns)
@@ -320,6 +356,8 @@ class DatasetBase(ABC):
                                                 cols_display_limit=self.DISPLAY_COLS,
                                                 n_cols=n_cols,
                                                 n_rows=n_rows)
+        # if hasattr(head, 'data'):
+        #     head = head.data
 
         if n_rows > self.DISPLAY_ROWS * 2:
             _tmp_tail = self._backend_data._display_head_tail(rows_display_limit=self.DISPLAY_ROWS,
@@ -327,6 +365,8 @@ class DatasetBase(ABC):
                                                          n_cols=n_cols,
                                                          n_rows=n_rows,
                                                          tail=True)
+            # if hasattr(_tmp_tail, 'data'):
+            #     _tmp_tail = _tmp_tail.data
             tail = pd.concat([pd.DataFrame([["..."] * len(head.columns)],
                                            index=["..."],
                                            columns=head.columns),
@@ -825,10 +865,18 @@ class DatasetBase(ABC):
         t_data = self._backend_data.value_counts(
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
         )
-        t_roles = deepcopy(self.roles)
+        new_columns = t_data.columns if hasattr(t_data, 'columns') else list(t_data.data) 
+
+        t_roles = {
+            col_name: role 
+            for col_name, role in self.roles.items() 
+            if col_name in new_columns
+        }
+
         column_name = "proportion" if normalize else "count"
-        if column_name not in t_data.data:
+        if column_name not in new_columns:
             t_data = t_data.rename(columns={0: column_name})
+            
         t_roles[column_name] = StatisticRole()
         return self.__class__(roles=t_roles, data=t_data)
 
@@ -856,8 +904,31 @@ class DatasetBase(ABC):
     def drop(self,
              labels: str | None = None,
              axis: int | None = None,
-             columns: str | Iterable[str] | None = None) -> None:
-        raise NotImplemented("The method 'drop' is not implemented for this type of Dataset")
+             columns: str | Iterable[str] | None = None) -> DatasetBase:
+        dropped_columns = []
+        
+        if columns is not None:
+            dropped_columns = Adapter.to_list(columns)
+        elif labels is not None and axis == 1:
+            dropped_columns = Adapter.to_list(labels)
+        
+        new_data = self._backend_data.drop(labels=labels, axis=axis, columns=columns)
+        
+        new_roles = {
+            column: deepcopy(role) 
+            for column, role in self.roles.items() 
+            if column not in dropped_columns and column in new_data.columns
+        }
+        
+        new_tmp_roles = {
+            column: deepcopy(role)
+            for column, role in self._tmp_roles.items()
+            if column not in dropped_columns and column in new_data.columns
+        }
+        
+        result = self.__class__(roles=new_roles, data=new_data)
+        result._tmp_roles = new_tmp_roles
+        return result
 
     def filter(self,
                items: list | None = None,

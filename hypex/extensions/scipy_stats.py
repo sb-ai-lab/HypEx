@@ -17,7 +17,7 @@ from ..dataset.backends import PandasDataset, SparkDataset
 from .abstract import CompareExtension
 
 
-class StatTest(CompareExtension):
+class GroupStatTest(CompareExtension):
     def __init__(
         self, test_function: Callable | None = None, reliability: float = 0.05
     ):
@@ -51,8 +51,8 @@ class StatTest(CompareExtension):
         if self.test_function is None:
             raise ValueError("test_function is needed for execution")
         one_result = self.test_function(
-            data.backend.data.values.flatten(),
-            other.backend.data.values.flatten(),
+            data.backend_data.data.values.flatten(),
+            other.backend_data.data.values.flatten(),
             **kwargs,
         )
         one_result = SmallDataset.from_dict(
@@ -87,7 +87,7 @@ class StatTest(CompareExtension):
         return one_result
 
 
-class TTestExtension(StatTest):
+class GroupTTestExtension(GroupStatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ttest_ind, reliability=reliability)
 
@@ -109,17 +109,17 @@ class TTestExtension(StatTest):
         return super()._calc_pandas(data, other, nan_policy="omit", **kwargs)
 
 
-class KSTestExtension(StatTest):
+class GroupKSTestExtension(GroupStatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(ks_2samp, reliability=reliability)
 
 
-class UTestExtension(StatTest):
+class GroupUTestExtension(GroupStatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(mannwhitneyu, reliability=reliability)
 
 
-class Chi2TestExtension(StatTest):
+class GroupChi2TestExtension(GroupStatTest):
     def __init__(self, test_function = None, reliability = 0.05):
         super().__init__(test_function, reliability)
         self.DATA_MAPPER = {
@@ -141,7 +141,7 @@ class Chi2TestExtension(StatTest):
         return counts
 
     def matrix_preparation(self, data: Dataset, other: Dataset) -> Dataset | None:
-        return self.DATA_MAPPER[type(data.backend)](data, other)
+        return self.DATA_MAPPER[type(data.backend_data)](data, other)
     
     def _pandas_prep(self, data: Dataset, other: Dataset) -> Dataset | None:
         proportion = len(data) / (len(data) + len(other))
@@ -202,7 +202,7 @@ class Chi2TestExtension(StatTest):
                 },
                 StatisticRole(),
             )
-        one_result = chi2_contingency(matrix.backend.data)
+        one_result = chi2_contingency(matrix.backend_data.data)
         return DatasetAdapter.to_dataset(
             {
                 "p-value": (
@@ -241,7 +241,7 @@ class Chi2TestExtension(StatTest):
         return one_result
 
 
-class NormCDF(StatTest):
+class NormCDF(GroupStatTest):
     def _calc_pandas(
         self, data: Dataset, other: Dataset | None = None, **kwargs
     ) -> Dataset | float:

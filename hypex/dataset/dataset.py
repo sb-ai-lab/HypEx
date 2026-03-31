@@ -49,67 +49,6 @@ class Dataset(DatasetBase):
 
 
 class SmallDataset(DatasetBase):
-    class Locker:
-        def __init__(self, backend, roles):
-            self.backend = backend
-            self.roles = roles
-
-        def __getitem__(self, item) -> Dataset:
-            t_data = self.backend.loc(item)
-            return Dataset(
-                data=t_data,
-                roles={k: v for k, v in self.roles.items() if k in t_data.columns},
-            )
-
-        def __setitem__(self, item, value):
-            column_name = item[1]
-            column_data_type = self.roles[column_name].data_type
-            if (
-                column_data_type is None
-                or (
-                    isinstance(value, Iterable)
-                    and all(isinstance(v, column_data_type) for v in value)
-                )
-                or isinstance(value, column_data_type)
-            ):
-                if column_name not in self.backend.data.columns:
-                    raise KeyError("Column must be added by using add_column method.")
-                else:
-                    self.backend.data.loc[item] = value
-            else:
-                raise TypeError("Value type does not match the expected data type.")
-
-    class ILocker:
-        def __init__(self, backend, roles):
-            self.backend = backend
-            self.roles = roles
-
-        def __getitem__(self, item) -> Dataset:
-            t_data = self.backend.iloc(item)
-            return Dataset(
-                data=t_data,
-                roles={k: v for k, v in self.roles.items() if k in t_data.columns},
-            )
-
-        def __setitem__(self, item, value):
-            column_index = item[1]
-            column_name = self.backend.data.columns[column_index]
-            column_data_type = self.roles[column_name].data_type
-            if (
-                column_data_type is None
-                or (
-                    isinstance(value, Iterable)
-                    and all(isinstance(v, column_data_type) for v in value)
-                )  # check for backend specific list (?)
-                or isinstance(value, column_data_type)
-            ):
-                if column_index >= len(self.backend.data.columns):
-                    raise IndexError("Column must be added by using add_column method.")
-                else:
-                    self.backend.data.iloc[item] = value
-            else:
-                raise TypeError("Value type does not match the expected data type.")
-
     def __init__(
         self,
         roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
@@ -119,8 +58,8 @@ class SmallDataset(DatasetBase):
         session: spark.SparkSession | None = None,
     ):
         super().__init__(roles, data, BackendsEnum.pandas, default_role, session)
-        self.loc = self.Locker(backend=self._backend, roles=self.roles)
-        self.iloc = self.ILocker(backend=self._backend, roles=self.roles)
+        self.loc = self.Locker(call_class=self.__class__, backend=self._backend_data, roles=self.roles)
+        self.iloc = self.ILocker(call_class=self.__class__, backend=self._backend_data, roles=self.roles)
 
     @property
     def index(self):
@@ -128,7 +67,7 @@ class SmallDataset(DatasetBase):
 
     @index.setter
     def index(self, value):
-        self.backend.data.index = value
+        self.backend_data.data.index = value
 
     @staticmethod
     def from_dict(
@@ -136,7 +75,10 @@ class SmallDataset(DatasetBase):
             roles: ABCRole | dict[str, ABCRole],
     ) -> SmallDataset:
         if not isinstance(roles, dict):
-            raise TypeError(f"Value {data} is not a dict type.")
+            if isinstance(roles, ABCRole):
+                roles = {col : roles for col in data.keys()}
+            else:
+                raise TypeError(f"Value {roles} is not a dict type.")
 
         if isinstance(data, dict) and "data" in data:
             payload = data
@@ -144,7 +86,6 @@ class SmallDataset(DatasetBase):
             payload = {"data": data}
         else:
             payload = data
-
         return SmallDataset(data=payload, roles=roles)
 
     def sort(
@@ -169,7 +110,7 @@ class SmallDataset(DatasetBase):
         )
 
     def idxmax(self):
-        return self._convert_data_after_agg(self._backend.idxmax())
+        return self._convert_data_after_agg(self._backend_data.idxmax())
 
     def transpose(
             self,
@@ -473,14 +414,6 @@ class DatasetAdapter(Adapter):
         small: bool = True,
     ) -> Dataset | SmallDataset:
         roles_names = list(data.keys())
-        if any(
-            [
-                any(isinstance(i, t) for t in [int, str, float, bool])
-                for i in list(data.values())
-            ]
-        ):
-            data = [data]
-
         if isinstance(roles, dict):
             result = SmallDataset.from_dict(data=data, roles=roles)
         elif isinstance(roles, ABCRole):
