@@ -162,4 +162,3 @@ lama_venv/
 temp/
 
 poetry.lock
-/DatasetTutorial.ipynb
