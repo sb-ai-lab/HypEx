@@ -9,9 +9,8 @@ from .abstract import (
 from .comparators import PSI, GroupDifference, GroupSizes
 from .distances import MahalanobisDistance
 from .hypothesis_testing import GroupChi2Test, GroupKSTest, GroupTTest, GroupUTest
-from .stats_hypothesis_testing import StatsTTest, StatsChi2Test
+from .stats_hypothesis_testing import StatsTTest, StatsChi2Test, StatsZTest
 from .power_testing import MDEBySize, PowerTesting
-from .stats_hypothesis_testing import AggTTest
 
 __all__ = [
     "AggTTest",
@@ -31,5 +30,6 @@ __all__ = [
     "GroupTTest",
     "GroupUTest",
     "StatsTTest",
-    "StatsChi2Test"
+    "StatsChi2Test",
+    "StatsZTest"
 ]
