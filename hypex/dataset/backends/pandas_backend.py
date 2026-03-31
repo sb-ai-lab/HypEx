@@ -899,17 +899,17 @@ class PandasNavigation(DatasetBackendNavigation):
         return self
 
     def to_dict(self) -> dict[str, Any]:
-        # """Convert DataFrame to dict with 'data' and 'index' keys.
+        """Convert DataFrame to dict with 'data' and 'index' keys.
 
-        # Returns:
-        #     dict: Format {"data": {col: [values]}, "index": [index_values]}.
-        # """
-        # return {
-        #     "data": {
-        #         column: self.data[column].to_list() for column in self.data.columns
-        #     },
-        #     "index": list(self.index),
-        # }
+        Returns:
+            dict: Format {"data": {col: [values]}, "index": [index_values]}.
+        """
+        return {
+            "data": {
+                column: self.data[column].to_list() for column in self.data.columns
+            },
+            "index": list(self.index),
+        }
         return self.data.to_dict()
 
     def to_records(self) -> list[dict]:

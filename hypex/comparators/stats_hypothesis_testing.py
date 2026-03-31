@@ -43,7 +43,7 @@ class StatsTTest(StatsHypothesisTesting):
             grouping_role=grouping_role, 
             target_roles=target_roles, 
             key=key, 
-            calc_kwargs={"reliability": reliability}
+            reliability=reliability
         )
         self.reliability = reliability
 
@@ -114,7 +114,7 @@ class StatsTTest(StatsHypothesisTesting):
                         similar_var=similar_var
                     )
 
-        de_fr = cls._degrees_of_fredom(
+        de_fr = cls._degrees_of_freedom(
                     n_list=current_sizes,
                     s_list=current_variances,
                     similar_var=similar_var
@@ -160,7 +160,7 @@ class StatsTTest(StatsHypothesisTesting):
         return t_stat
     
     @staticmethod
-    def _degrees_of_fredom(n_list: tuple, 
+    def _degrees_of_freedom(n_list: tuple, 
                        s_list: tuple = (0, 0), 
                        similar_var: bool = True) -> float:
         """
@@ -221,7 +221,7 @@ class StatsChi2Test(StatsHypothesisTesting):
             grouping_role=grouping_role,
             target_roles=target_roles,
             key=key,
-            calc_kwargs={"reliability": reliability}
+            reliability=reliability
         )
         self.reliability = reliability
 
