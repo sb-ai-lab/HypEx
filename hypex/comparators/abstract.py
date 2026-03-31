@@ -655,24 +655,19 @@ class StatsComparator(BaseComparator, ABC):
             with groups in sorted order.
         """        
         agg_ds = grouped.agg(stats or [])
-        
-        data_dict = agg_ds.to_dict()["data"]
-        
-        stats_data = data_dict["data"]
-        groups_list = data_dict["index"]
-        
+        data_dict = agg_ds.to_dict()["data"]        
         result = {}
         
-        for col_stat, values_list in stats_data.items():
+        for col_stat, groups in data_dict.items():
             column, stat = col_stat.split('┆')
             
-            for i, group in enumerate(groups_list):
+            for group, value in groups.items():
                 if group not in result:
                     result[group] = {}
                 if column not in result[group]:
                     result[group][column] = {}
                 
-                result[group][column][stat] = values_list[i]        
+                result[group][column][stat] = value       
         
         return result
 

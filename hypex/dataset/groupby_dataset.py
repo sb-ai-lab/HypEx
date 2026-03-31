@@ -132,6 +132,17 @@ class GroupedDataset:
         Returns:
             A new DatasetBase instance containing the aggregated data and updated roles.
         """
+        if func == "value_counts":
+            return self.value_counts()
+        
+        if isinstance(func, list) and "value_counts" in func:
+            std_funcs = [f for f in func if f != "value_counts"]
+            vc_ds = self.value_counts(_add_suffix=True)
+            if not std_funcs:
+                return vc_ds
+            std_ds = self.agg(std_funcs)
+            return std_ds.add_column(vc_ds)
+        
         result_data = self._execute_agg(func)
 
         if result_data is None:
