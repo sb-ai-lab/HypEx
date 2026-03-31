@@ -116,7 +116,7 @@ class StatsTTest(StatsHypothesisTesting):
     are p-value, statistic, pass — making StatsTTest a drop-in replacement for GroupTTest
     in pipelines where raw data transfer is expensive (e.g. Spark backend).
     """
-    REQUERED_STATS = ["mean", "std", "count"]
+    REQUIRED_STATS = ["mean", "std", "count"]
 
     def __init__(
             self, 
@@ -126,7 +126,7 @@ class StatsTTest(StatsHypothesisTesting):
             key: Any = "", 
     ):
         super().__init__(
-            stats=self.REQUERED_STATS, 
+            stats=self.REQUIRED_STATS, 
             grouping_role=grouping_role, 
             target_roles=target_roles, 
             key=key, 
@@ -146,37 +146,63 @@ class StatsTTest(StatsHypothesisTesting):
         reliability: float = 0.05,
         **kwargs,
     ) -> dict[str, Any]:
-    
-        current_variances = (baseline_stats["std"], compared_stats["std"])
-        current_means = (baseline_stats["mean"], compared_stats["mean"])
-        current_sizes =(baseline_stats["count"], compared_stats["count"])
-        if current_variances[0] != 0 and current_variances[1] != 0:
-            similar_var = (current_variances[0] < 2 * current_variances[1] and current_variances[0] > 0.5 * current_variances[1])
-            t_stat = cls._t_statistics(
-                            n_list=current_sizes,
-                            s_list=current_variances,
-                            mean_list=current_means,
-                            similar_var=similar_var
-                        )
+        """
+        Apply Student's/Welch's t-test formula to pre-aggregated group statistics.
 
-            de_fr = cls._degree_fredom(
+        Args:
+            baseline_stats: {"mean": float, "std": float, "count": int} for baseline group.
+            compared_stats: {"mean": float, "std": float, "count": int} for compared group.
+            reliability: Significance threshold for the pass flag.
+
+        Returns:
+            {"p-value": float | None, "statistic": float | None, "pass": bool | None}
+        """
+        n1 = baseline_stats["count"]
+        n2 = compared_stats["count"]
+
+        # Edge case: insufficient sample size
+        if n1 < 2 or n2 < 2:
+            return {"p-value": None, "statistic": None, "pass": None}
+
+        current_variances = (baseline_stats["std"]**2, compared_stats["std"]**2)
+        current_means = (baseline_stats["mean"], compared_stats["mean"])
+        current_sizes = (n1, n2)
+
+        # Edge case: both variances are zero
+        if current_variances[0] == 0 and current_variances[1] == 0:
+            # If variances are zero, check equality of means
+            if current_means[0] == current_means[1]:
+                return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+            else:
+                return {"p-value": 0.0, "statistic": float("inf"), "pass": False}
+
+        # Edge case: one of the variances is zero
+        if current_variances[0] == 0 or current_variances[1] == 0:
+            # Use Welch's t-test with one zero variance
+            similar_var = False
+        else:
+            similar_var = (current_variances[0] < 2 * current_variances[1] and
+                          current_variances[0] > 0.5 * current_variances[1])
+
+        t_stat = cls._t_statistics(
                         n_list=current_sizes,
                         s_list=current_variances,
+                        mean_list=current_means,
                         similar_var=similar_var
-            )
+                    )
 
-            p_value = t.sf(abs(t_stat), de_fr) * 2
+        de_fr = cls._degree_of_fredom(
+                    n_list=current_sizes,
+                    s_list=current_variances,
+                    similar_var=similar_var
+        )
 
-            return {
-                    "p-value": p_value,
-                    "statistic": abs(t_stat),
-                    "pass": p_value < reliability,
-                }
-        else:
-            return {
-                "p-value": None,
-                "statistic": None,
-                "pass": False,
+        p_value = float(2 * t.sf(abs(t_stat), de_fr))
+
+        return {
+                "p-value": p_value,
+                "statistic": float(t_stat),
+                "pass": p_value < reliability,
             }
     
     @staticmethod
@@ -199,7 +225,7 @@ class StatsTTest(StatsHypothesisTesting):
         return t_stat
     
     @staticmethod
-    def _degree_fredom(n_list: tuple, 
+    def _degree_of_fredom(n_list: tuple, 
                        s_list: tuple = (0, 0), 
                        similar_var: bool = True) -> Union[int, float]:
         if similar_var:
@@ -256,23 +282,62 @@ class StatsChi2Test(StatsHypothesisTesting):
         reliability: float = 0.05,
         **kwargs,
     ) -> dict[str, Any]:
+        """
+        Apply Pearson's chi-squared test to pre-aggregated value counts.
+
+        Args:
+            baseline_stats: {"value_counts": dict} for baseline group.
+            compared_stats: {"value_counts": dict} for compared group.
+            reliability: Significance threshold for the pass flag.
+
+        Returns:
+            {"p-value": float | None, "statistic": float | None, "pass": bool | None}
+        """
         control_freqs = baseline_stats["value_counts"]
         test_freqs = compared_stats["value_counts"]
 
+        # Edge case: empty value_counts
+        if not control_freqs and not test_freqs:
+            return {"p-value": None, "statistic": None, "pass": None}
+
+        # Edge case: one of the groups is empty
+        if not control_freqs or not test_freqs:
+            return {"p-value": None, "statistic": None, "pass": None}
+
         full_key_set = set(control_freqs.keys()).union(set(test_freqs.keys()))
+
+        # Edge case: only one category across all groups
+        if len(full_key_set) < 2:
+            return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+
         contingency_table = np.zeros((2, len(full_key_set)))
-        for idx, (key) in enumerate(full_key_set):
+        for idx, key in enumerate(full_key_set):
             if key in control_freqs:
                 contingency_table[0][idx] = control_freqs[key]
             if key in test_freqs:
                 contingency_table[1][idx] = test_freqs[key]
-        print(contingency_table)
-        
-        statistics= chi2_contingency(contingency_table, **kwargs)
-        result = {
-                "p-value": statistics[1],
-                "statistic": statistics[0],
-                "pass": statistics[1] < reliability,
-            }
-            
+
+        # Edge case: one of the rows in contingency table is empty (sum = 0)
+        if contingency_table[0].sum() == 0 or contingency_table[1].sum() == 0:
+            return {"p-value": None, "statistic": None, "pass": None}
+
+        # Edge case: column with zero sum (all zeros in the column)
+        col_sums = contingency_table.sum(axis=0)
+        if np.any(col_sums == 0):
+            non_zero_cols = col_sums > 0
+            contingency_table = contingency_table[:, non_zero_cols]
+            if contingency_table.shape[1] < 2:
+                return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+
+        try:
+            statistics = chi2_contingency(contingency_table, **kwargs)
+            result = {
+                    "p-value": float(statistics[1]),
+                    "statistic": float(statistics[0]),
+                    "pass": statistics[1] < reliability,
+                }
+        except ValueError:
+            # For example, when all values in the table are identical
+            return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+
         return result
