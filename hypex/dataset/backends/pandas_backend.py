@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional, List
+from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
 import numpy as np
 import pandas as pd  # type: ignore
 import pyspark.sql as spark
 import pyspark.sql.functions as F
+
+import pyspark.pandas as ps
 
 import pyspark.pandas as ps
 
@@ -19,10 +21,10 @@ from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
 class PandasNavigation(DatasetBackendNavigation):
-
-    def _wrap_result(
-        self, result: pd.DataFrame | pd.Series | Any, wrap_series: bool = False
-    ) -> "PandasNavigation" | pd.Series | Any:
+    
+    def _wrap_result(self, 
+                     result: pd.DataFrame | pd.Series | Any,
+                     wrap_series: bool = False) -> "PandasNavigation" | pd.Series | Any:
         if isinstance(result, pd.DataFrame):
             return self.__class__(data=result)
 
@@ -31,12 +33,10 @@ class PandasNavigation(DatasetBackendNavigation):
 
         return result
 
-    def _data_compression(
-        self,
-        data: spark.DataFrame,
-        data_compression: Literal["downcasting", "encoding", "auto", "disable"],
-        non_compresion_cols: List[str] | None,
-    ) -> pd.DataFrame:
+    def _data_compression(self,
+                          data: spark.DataFrame,
+                          data_compression: Literal["downcasting", "encoding", "auto", "disable"],
+                          non_compresion_cols: list[str] | None) -> pd.DataFrame:
         """Compress data before convertation `spark.DataFrame` to pandas.DataFrame.
 
         Args:
@@ -73,9 +73,7 @@ class PandasNavigation(DatasetBackendNavigation):
         return result.toPandas()
 
     @staticmethod
-    def _encoding(
-        data: spark.DataFrame, categorical_columns: List[str]
-    ) -> spark.DataFrame:
+    def _encoding(data: spark.DataFrame, categorical_columns: list[str]) -> spark.DataFrame:
         """Encoding categorical features.
 
         Args:
@@ -114,9 +112,7 @@ class PandasNavigation(DatasetBackendNavigation):
         )
 
     @staticmethod
-    def _downcasting(
-        data: spark.DataFrame, numeric_columns: List[str]
-    ) -> spark.DataFrame:
+    def _downcasting(data: spark.DataFrame, numeric_columns: list[str]) -> spark.DataFrame:
         """Downcasting data.
 
         Args:
@@ -154,14 +150,10 @@ class PandasNavigation(DatasetBackendNavigation):
         else:
             raise ValueError(f"Unsupported file extension {file_extension}")
 
-    def __init__(
-        self,
-        data: pd.DataFrame | dict | str | pd.Series | None = None,
-        data_compression: Literal[
-            "downcasting", "encoding", "auto", "disable"
-        ] = "auto",
-        non_compresion_cols: List[str] | None = None,
-    ):
+    def __init__(self,
+                 data: pd.DataFrame | dict | str | pd.Series | None = None,
+                 data_compression: Literal["downcasting", "encoding", "auto", "disable"] = "auto",
+                 non_compresion_cols: list[str] | None = None):
         """Initialize PandasNavigation with various data sources.
 
         Args:
@@ -181,9 +173,7 @@ class PandasNavigation(DatasetBackendNavigation):
         elif isinstance(data, pd.Series):
             self.data = pd.DataFrame(data)
         elif isinstance(data, spark.DataFrame):
-            self.data = self._data_compression(
-                data, data_compression, non_compresion_cols
-            )
+            self.data = self._data_compression(data, data_compression, non_compresion_cols)
         elif isinstance(data, ps.DataFrame):
             self.data = data.to_pandas()
         elif isinstance(data, dict):
@@ -618,9 +608,10 @@ class PandasNavigation(DatasetBackendNavigation):
             #                          tmp,
             #                          head_tail.loc[:, right_cols]],
             #                          axis=1).replace(self.labels_dict))
-            return pd.concat(
-                [head_tail.loc[:, left_cols], tmp, head_tail.loc[:, right_cols]], axis=1
-            ).replace(self.labels_dict)
+            return pd.concat([head_tail.loc[:, left_cols],
+                                     tmp,
+                                     head_tail.loc[:, right_cols]],
+                                     axis=1).replace(self.labels_dict)
         else:
             # return self._wrap_result(head_tail.replace(self.labels_dict))
             return head_tail.replace(self.labels_dict)
