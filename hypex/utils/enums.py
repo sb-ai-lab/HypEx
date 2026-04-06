@@ -50,3 +50,10 @@ class RenameEnum(enum.Enum):
     all = "all"
     columns = "columns"
     index = "index"
+
+
+@enum.unique
+class MLModeEnum(str, enum.Enum):
+    FIT_PREDICT = "fit_predict"
+    FIT = "fit"
+    PREDICT = "predict"
