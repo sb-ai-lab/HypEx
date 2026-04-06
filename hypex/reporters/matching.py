@@ -5,7 +5,7 @@ from typing import Any, ClassVar
 from ..analyzers.matching import MatchingAnalyzer
 from ..comparators import Chi2Test, KSTest, TTest
 from ..dataset import Dataset, ExperimentData
-from ..ml import FaissNearestNeighbors
+from ..ml import FaissMLExecutor
 from ..reporters.abstract import DatasetReporter, DictReporter, TestDictReporter
 from ..utils import (
     ID_SPLIT_SYMBOL,
@@ -39,8 +39,8 @@ class MatchingDictReporter(DictReporter):
     @staticmethod
     def _extract_from_additional_fields(data: ExperimentData):
         indexes_id = data.get_ids(
-            FaissNearestNeighbors, ExperimentDataEnum.additional_fields
-        )[FaissNearestNeighbors.__name__][ExperimentDataEnum.additional_fields.value]
+            FaissMLExecutor, ExperimentDataEnum.additional_fields
+        )[FaissMLExecutor.__name__][ExperimentDataEnum.additional_fields.value]
         return {
             f"indexes{ID_SPLIT_SYMBOL}{column.split(ID_SPLIT_SYMBOL)[3]}": MATCHING_INDEXES_SPLITTER_SYMBOL.join(
                 str(i)
