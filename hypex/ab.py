@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from .analyzers.ab import ABAnalyzer
 from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest, UTest
@@ -71,6 +71,10 @@ class ABTest(ExperimentShell):
         cupac_models: Optional[Union[str, List[str]]],
         cupac_mode: Optional[Union[str, MLModeEnum]],
         experiment_id: Optional[str],
+        feature_selection: Optional[
+            Union[bool, Literal["importance", "variance", "correlation", "mutual_info"]]
+        ],
+        feature_selection_params: Optional[Dict[str, Any]],
     ) -> Experiment:
         test_mapping: Dict[str, Executor] = {
             "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
@@ -141,6 +145,8 @@ class ABTest(ExperimentShell):
                 cupac_models=cupac_models,
                 mode=cupac_mode,
                 experiment_id=experiment_id,
+                feature_selection=feature_selection,
+                feature_selection_params=feature_selection_params,
             )
             executors.insert(0, ml_experiment)
 
@@ -171,18 +177,22 @@ class ABTest(ExperimentShell):
         cupac_models: Optional[Union[str, List[str]]] = None,
         cupac_mode: Optional[Literal["fit", "predict", "fit_predict"]] = None,
         experiment_id: Optional[str] = None,
+        feature_selection: Optional[
+            Union[bool, Literal["importance", "variance", "correlation", "mutual_info"]]
+        ] = None,
+        feature_selection_params: Optional[Dict[str, Any]] = None,
     ):
         """
         Args:
-            additional_tests: Statistical test(s) to run in addition to the default group difference calculation. 
-                Valid options are 't-test', 'u-test', 'chi2-test' or ABTestTypesEnum.t_test, ABTestTypesEnum.u_test, 
-                and ABTestTypesEnum.chi2_test. Can be a single test name/enum or list of test names/enums. 
+            additional_tests: Statistical test(s) to run in addition to the default group difference calculation.
+                Valid options are 't-test', 'u-test', 'chi2-test' or ABTestTypesEnum.t_test, ABTestTypesEnum.u_test,
+                and ABTestTypesEnum.chi2_test. Can be a single test name/enum or list of test names/enums.
                 Defaults to [ABTestTypesEnum.t_test].
-            multitest_method: Method to use for multiple testing correction. Valid options are 
+            multitest_method: Method to use for multiple testing correction. Valid options are
                 ABNTestMethodsEnum.bonferroni, ABNTestMethodsEnum.sidak, etc. Defaults to ABNTestMethodsEnum.holm.
             t_test_equal_var: Whether to use equal variance in t-test (optional).
             cuped_features: dict[str, str] — Dictionary {target_feature: pre_target_feature} for CUPED. Only dict is allowed.
-            cupac_models: str | list[str] — model name (e.g. 'linear', 'ridge', 'lasso', 'catboost') or list of model names to try. 
+            cupac_models: str | list[str] — model name (e.g. 'linear', 'ridge', 'lasso', 'catboost') or list of model names to try.
                 If None, all available models will be tried and the best will be selected by variance reduction.
             cupac_mode: str | None — Execution mode for CUPAC. If None, CUPAC is disabled:
                 - 'fit_predict': Train models and apply adjustment (default)
@@ -190,29 +200,38 @@ class ABTest(ExperimentShell):
                 - 'predict': Only apply adjustment using pre-trained models
             experiment_id: str | None — When cupac_mode='predict', specifies the experiment ID to load models from.
                 This is the folder name created during a previous run with mode='fit' or 'fit_predict'.
-        
+            feature_selection: Feature selection method for CUPAC. Options:
+                - None/False: No feature selection (default)
+                - True: Use "importance" method with default params
+                - "importance": Select by model feature importance
+                - "variance": Remove low-variance features
+                - "correlation": Remove highly correlated features
+                - "mutual_info": Select by mutual information with target
+            feature_selection_params: Additional params for feature selection:
+                - n_features (int|float): Number or fraction of features to keep
+                - threshold (float): Score threshold for selection
+                - importance_model (str): Model for importance method ("ridge", "catboost", "linear")
+
         Examples:
             # Standard CUPAC - train and apply in one go
             ab_test = ABTest(
                 cupac_mode='fit_predict',
                 cupac_models=['linear', 'ridge']
             )
-            
-            # Fit on virtual target with lagged features
-            ab_test_fit = ABTest(
-                cupac_mode='fit',
-                cupac_models=['linear']
+
+            # CUPAC with feature selection (keep top 10 features)
+            ab_test = ABTest(
+                cupac_mode='fit_predict',
+                feature_selection=True,
+                feature_selection_params={'n_features': 10}
             )
-            result = ab_test_fit.execute(virtual_data)
-            
-            # Apply to real target (no lagged features needed)
-            import os
-            exp_id = os.listdir('.hypex_experiments')[0]
-            ab_test_predict = ABTest(
-                cupac_mode='predict',
-                experiment_id=exp_id
+
+            # CUPAC with correlation-based feature selection
+            ab_test = ABTest(
+                cupac_mode='fit_predict',
+                feature_selection='correlation',
+                feature_selection_params={'threshold': 0.9}
             )
-            result = ab_test_predict.execute(real_data)
         """
         super().__init__(
             experiment=self._make_experiment(
@@ -222,6 +241,8 @@ class ABTest(ExperimentShell):
                 cupac_models,
                 cupac_mode,
                 experiment_id,
+                feature_selection,
+                feature_selection_params,
             ),
             output=ABOutput(),
         )
