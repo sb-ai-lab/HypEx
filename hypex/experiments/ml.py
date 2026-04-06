@@ -12,7 +12,7 @@ from ..executor.ml_executor import MLExecutor
 from ..splitters.base import MLSplitter
 from ..transformers import MLTransformer
 from ..utils.constants import DEFAULT_EXPERIMENT_DIR
-from ..utils.enums import MLMode
+from ..utils.enums import MLModeEnum
 from .artifact import ExperimentArtifact
 from .base import Experiment
 
@@ -69,7 +69,7 @@ class MLExperiment(Experiment):
         splitters: Sequence[MLSplitter] | None = None,
         transformers: Sequence[MLTransformer] | None = None,
         ml_executors: Sequence[MLExecutor] | None = None,
-        mode: str | MLMode = MLMode.FIT_PREDICT,
+        mode: str | MLModeEnum = MLModeEnum.FIT_PREDICT,
         experiment_id: Optional[str] = None,
         transformer: bool | None = None,
         key: Any = "",
@@ -112,15 +112,15 @@ class MLExperiment(Experiment):
         self.ml_executors = list(ml_executors) if ml_executors else []
         
         # Mode management
-        self.mode = MLMode(mode) if isinstance(mode, str) else mode
+        self.mode = MLModeEnum(mode) if isinstance(mode, str) else mode
         
         # Validate experiment_id usage
-        if experiment_id is not None and self.mode != MLMode.PREDICT:
+        if experiment_id is not None and self.mode != MLModeEnum.PREDICT:
             raise ValueError(
                 f"experiment_id can only be used with mode='predict', got mode='{self.mode.value}'"
             )
         
-        if self.mode == MLMode.PREDICT and experiment_id is None:
+        if self.mode == MLModeEnum.PREDICT and experiment_id is None:
             raise ValueError(
                 "experiment_id is required when mode='predict'"
             )
@@ -131,8 +131,8 @@ class MLExperiment(Experiment):
         self._loaded_artifact: Optional[ExperimentArtifact] = None
         
         # Auto-determined properties based on mode
-        self.save_models = self.mode in (MLMode.FIT, MLMode.FIT_PREDICT)
-        self.save_experiment = self.mode in (MLMode.FIT, MLMode.FIT_PREDICT)
+        self.save_models = self.mode in (MLModeEnum.FIT, MLModeEnum.FIT_PREDICT)
+        self.save_experiment = self.mode in (MLModeEnum.FIT, MLModeEnum.FIT_PREDICT)
     
     def execute(self, data: ExperimentData) -> ExperimentData:
         """
@@ -143,14 +143,14 @@ class MLExperiment(Experiment):
         2. Transform ExperimentData → MLExperimentData
         3. Configure executors for correct mode
         4. Execute splitters (prepare data structures)
-        5. Execute ML transformers (with MLMode propagation)
-        6. Execute ml_executors (with MLMode propagation)
+        5. Execute ML transformers (with MLModeEnum propagation)
+        6. Execute ml_executors (with MLModeEnum propagation)
         7. Save artifact if mode='fit' or mode='fit_predict'
         8. Transform back MLExperimentData → ExperimentData
         9. Cleanup ML artifacts from memory
         """
         # Load artifact if in predict mode
-        if self.mode == MLMode.PREDICT:
+        if self.mode == MLModeEnum.PREDICT:
             self._load_artifact()
         
         # Transform to ML data

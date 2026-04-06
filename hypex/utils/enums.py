@@ -53,7 +53,7 @@ class RenameEnum(enum.Enum):
 
 
 @enum.unique
-class MLMode(str, enum.Enum):
+class MLModeEnum(str, enum.Enum):
     FIT_PREDICT = "fit_predict"
     FIT = "fit"
     PREDICT = "predict"

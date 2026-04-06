@@ -5,7 +5,7 @@ from typing import Any
 from ..dataset import Dataset
 from ..dataset.ml_data import MLExperimentData
 from ..executor.ml_executor import MLExecutor
-from ..executor.state import MLExecutorState
+from ..executor.state import MLExecutorParams
 
 
 class MLTransformer(MLExecutor):
@@ -14,7 +14,7 @@ class MLTransformer(MLExecutor):
     def __init__(self, key: Any = "", **calc_kwargs):
         super().__init__(key=key)
         self.calc_kwargs = calc_kwargs
-        self._fitted_state: MLExecutorState | None = None
+        self._fitted_state: MLExecutorParams | None = None
 
     @property
     def _is_transformer(self):
@@ -40,7 +40,7 @@ class MLTransformer(MLExecutor):
 
     def execute_fit(self, data: MLExperimentData) -> MLExperimentData:
         fitted_params = self._fit(data.ds, **self.calc_kwargs)
-        state = MLExecutorState(
+        state = MLExecutorParams(
             executor_id=self.id,
             executor_class=self.__class__.__name__,
             fitted_params=fitted_params,

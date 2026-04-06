@@ -62,8 +62,6 @@ class ExperimentArtifact:
         # Paths
         self.metadata_file = os.path.join(base_dir, "experiment.json")
         self.ml_executors_dir = os.path.join(base_dir, "ml_executors")
-        # Legacy path for backward-compatible loading.
-        self.transformers_dir = os.path.join(base_dir, "transformers")
         self.models_dir = os.path.join(base_dir, "models")
     
     # === Factory methods ===
@@ -246,34 +244,26 @@ class ExperimentArtifact:
         Load fitted ML executor states from disk.
         
         Returns:
-            Dict of executor_id -> MLExecutorState
+            Dict of executor_id -> MLExecutorParams
         """
-        from ..executor.state import MLExecutorState
+        from ..executor.state import MLExecutorParams
 
         ml_executor_states = {}
 
-        # Prefer new path, fallback to legacy transformers path.
-        states_dir = self.ml_executors_dir
-        if not os.path.exists(states_dir):
-            states_dir = self.transformers_dir
-        if not os.path.exists(states_dir):
+        if not os.path.exists(self.ml_executors_dir):
             return ml_executor_states
 
-        for filename in os.listdir(states_dir):
+        for filename in os.listdir(self.ml_executors_dir):
             if filename.endswith('.json'):
                 executor_id = filename[:-5]
-                state_file = os.path.join(states_dir, filename)
+                state_file = os.path.join(self.ml_executors_dir, filename)
 
                 with open(state_file, 'r') as f:
                     state_dict = json.load(f)
-                state = MLExecutorState.from_dict(state_dict)
+                state = MLExecutorParams.from_dict(state_dict)
                 ml_executor_states[executor_id] = state
 
         return ml_executor_states
-
-    # Backward-compatible alias.
-    def load_transformer_states(self) -> Dict[str, Any]:
-        return self.load_ml_executor_states()
     
     def load_models(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
         """

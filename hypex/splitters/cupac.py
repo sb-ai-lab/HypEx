@@ -5,7 +5,7 @@ from typing import Any, Optional
 from ..dataset import Dataset, ExperimentData
 from ..dataset.ml_data import MLExperimentData
 from ..dataset.roles import FeatureRole, PreTargetRole, TargetRole
-from ..utils.enums import MLMode
+from ..utils.enums import MLModeEnum
 from .base import MLSplitter
 
 
@@ -49,7 +49,7 @@ class CUPACDataSplitter(MLSplitter):
     def execute(
         self,
         data: MLExperimentData,
-        mode: MLMode | None = None,
+        mode: MLModeEnum | None = None,
     ) -> MLExperimentData:
         """
         Execute CUPAC data splitting.
@@ -62,8 +62,8 @@ class CUPACDataSplitter(MLSplitter):
         Returns:
             MLExperimentData with MLData objects in .ml
         """
-        mode = MLMode.FIT_PREDICT if mode is None else mode
-        if not isinstance(mode, MLMode):
+        mode = MLModeEnum.FIT_PREDICT if mode is None else mode
+        if not isinstance(mode, MLModeEnum):
             raise ValueError(f"Unknown mode: {mode}")
 
         # CUPAC splitter is ML-only and must run inside MLExperiment.

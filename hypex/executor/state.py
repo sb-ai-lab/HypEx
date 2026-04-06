@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 
-class MLExecutorState:
+class MLExecutorParams:
     """Serializable fitted state for MLExecutor instances."""
 
     def __init__(
@@ -30,14 +30,10 @@ class MLExecutorState:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> MLExecutorState:
-        # Backward compatibility with legacy TransformerParams keys.
-        executor_id = data.get("executor_id", data.get("transformer_id"))
-        executor_class = data.get("executor_class", data.get("transformer_class"))
-
+    def from_dict(cls, data: Dict[str, Any]) -> MLExecutorParams:
         state = cls(
-            executor_id=executor_id,
-            executor_class=executor_class,
+            executor_id=data["executor_id"],
+            executor_class=data["executor_class"],
             fitted_params=data["fitted_params"],
             metadata=data.get("metadata"),
         )
@@ -46,7 +42,7 @@ class MLExecutorState:
 
     def __repr__(self) -> str:
         return (
-            f"MLExecutorState(id={self.executor_id}, "
+            f"MLExecutorParams(id={self.executor_id}, "
             f"class={self.executor_class}, "
             f"params={list(self.fitted_params.keys())})"
         )

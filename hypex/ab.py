@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Dict, List, Literal, Optional, Union
 
 from .analyzers.ab import ABAnalyzer
 from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest, UTest
@@ -11,7 +11,7 @@ from .transformers import CUPEDTransformer
 from .ui.ab import ABOutput
 from .ui.base import ExperimentShell
 from .utils import ABNTestMethodsEnum, ABTestTypesEnum
-from .utils.enums import MLMode
+from .utils.enums import MLModeEnum
 
 
 class ABTest(ExperimentShell):
@@ -63,20 +63,22 @@ class ABTest(ExperimentShell):
 
     @staticmethod
     def _make_experiment(
-        additional_tests: str | ABTestTypesEnum | list[str | ABTestTypesEnum] | None,
-        multitest_method: ABNTestMethodsEnum | str | None,
-        cuped_features: dict[str, str] | None,
-        cupac_models: str | list[str] | None,
-        cupac_mode: str | MLMode | None,
-        experiment_id: str | None,
+        additional_tests: Optional[
+            Union[str, ABTestTypesEnum, List[Union[str, ABTestTypesEnum]]]
+        ],
+        multitest_method: Optional[Union[ABNTestMethodsEnum, str]],
+        cuped_features: Optional[Dict[str, str]],
+        cupac_models: Optional[Union[str, List[str]]],
+        cupac_mode: Optional[Union[str, MLModeEnum]],
+        experiment_id: Optional[str],
     ) -> Experiment:
-        test_mapping: dict[str, Executor] = {
+        test_mapping: Dict[str, Executor] = {
             "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
             "ks-test": KSTest(compare_by="groups", grouping_role=TreatmentRole()),
             "u-test": UTest(compare_by="groups", grouping_role=TreatmentRole()),
             "chi2-test": Chi2Test(compare_by="groups", grouping_role=TreatmentRole()),
         }
-        on_role_executors: list[Executor] = [
+        on_role_executors: List[Executor] = [
             GroupDifference(grouping_role=TreatmentRole())
         ]
         additional_tests = (
@@ -113,7 +115,7 @@ class ABTest(ExperimentShell):
         use_cupac = cupac_mode is not None
 
         # Build base executors list
-        executors: list[Executor] = [
+        executors: List[Executor] = [
             GroupSizes(grouping_role=TreatmentRole()),
             OnRoleExperiment(
                 executors=on_role_executors,
@@ -146,10 +148,10 @@ class ABTest(ExperimentShell):
 
     def __init__(
         self,
-        additional_tests: (
-            str | ABTestTypesEnum | list[str | ABTestTypesEnum] | None
-        ) = None,
-        multitest_method: (
+        additional_tests: Optional[
+            Union[str, ABTestTypesEnum, List[Union[str, ABTestTypesEnum]]]
+        ] = None,
+        multitest_method: Optional[
             Literal[
                 "bonferroni",
                 "sidak",
@@ -163,13 +165,12 @@ class ABTest(ExperimentShell):
                 "fdr_tsbhy",
                 "quantile",
             ]
-            | None
-        ) = "holm",
-        t_test_equal_var: bool | None = None,
-        cuped_features: dict[str, str] | None = None,
-        cupac_models: str | list[str] | None = None,
-        cupac_mode: Literal["fit", "predict", "fit_predict"] | None = None,
-        experiment_id: str | None = None,
+        ] = "holm",
+        t_test_equal_var: Optional[bool] = None,
+        cuped_features: Optional[Dict[str, str]] = None,
+        cupac_models: Optional[Union[str, List[str]]] = None,
+        cupac_mode: Optional[Literal["fit", "predict", "fit_predict"]] = None,
+        experiment_id: Optional[str] = None,
     ):
         """
         Args:

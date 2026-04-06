@@ -5,7 +5,7 @@ from typing import Any
 
 from ..dataset import ExperimentData
 from ..dataset.ml_data import MLExperimentData
-from ..utils.enums import MLMode
+from ..utils.enums import MLModeEnum
 from .executor import Executor
 
 
@@ -22,10 +22,10 @@ class MLExecutor(Executor, ABC):
     def execute(
         self,
         data: ExperimentData,
-        mode: MLMode | None = None,
+        mode: MLModeEnum | None = None,
     ) -> ExperimentData:
-        mode = MLMode.FIT_PREDICT if mode is None else mode
-        if not isinstance(mode, MLMode):
+        mode = MLModeEnum.FIT_PREDICT if mode is None else mode
+        if not isinstance(mode, MLModeEnum):
             raise ValueError(f"Unknown mode: {mode}")
 
         if not isinstance(data, MLExperimentData):
@@ -33,11 +33,11 @@ class MLExecutor(Executor, ABC):
                 "MLExecutor must be executed with MLExperimentData and used from MLExperiment"
             )
 
-        if mode == MLMode.FIT:
+        if mode == MLModeEnum.FIT:
             return self.execute_fit(data)
-        if mode == MLMode.PREDICT:
+        if mode == MLModeEnum.PREDICT:
             return self.execute_predict(data)
-        if mode == MLMode.FIT_PREDICT:
+        if mode == MLModeEnum.FIT_PREDICT:
             return self.execute_fit_predict(data)
         raise ValueError(f"Unknown mode: {mode}")
 

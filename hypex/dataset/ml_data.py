@@ -55,7 +55,7 @@ class MLExperimentData(ExperimentData):
     - self.ml: Dict[str, MLData] - {target_name: MLData}
     - self.trained_models: Dict[str, Dict[str, MLModel]] - {executor_id: {target: MLModel}}
     - self.model_stats: Dict[str, Dict[str, ModelStats]] - {executor_id: {target: ModelStats}}
-    - self.fitted_ml_executors: Dict[str, MLExecutorState] - {executor_id: MLExecutorState}
+    - self.fitted_ml_executors: Dict[str, MLExecutorParams] - {executor_id: MLExecutorParams}
     - self.config: Dict[str, Any] - configuration
     """
     
@@ -74,7 +74,7 @@ class MLExperimentData(ExperimentData):
         self.model_stats: Dict[str, Dict[str, ModelStats]] = {}  # {executor_id: {target: ModelStats}}
         
         # Fitted ML executors (e.g. ML transformers)
-        self.fitted_ml_executors: Dict[str, MLExecutorState] = {}  # {executor_id: MLExecutorState}
+        self.fitted_ml_executors: Dict[str, MLExecutorParams] = {}  # {executor_id: MLExecutorParams}
         
         # Configuration
         self.config: Dict[str, Any] = {
@@ -222,37 +222,20 @@ class MLExperimentData(ExperimentData):
     def cleanup_ml_artifacts(self) -> None:
         """Free memory by clearing ML models (keep stats)"""
         self.trained_models.clear()
-        # model_stats остаются для анализа
     
     # === ML executor state management ===
 
-    def add_fitted_ml_executor(self, executor_id: str, state: "MLExecutorState") -> None:
+    def add_fitted_ml_executor(self, executor_id: str, state: "MLExecutorParams") -> None:
         self.fitted_ml_executors[executor_id] = state
 
-    def get_fitted_ml_executor(self, executor_id: str) -> Optional["MLExecutorState"]:
+    def get_fitted_ml_executor(self, executor_id: str) -> Optional["MLExecutorParams"]:
         return self.fitted_ml_executors.get(executor_id)
 
     def has_fitted_ml_executor(self, executor_id: str) -> bool:
         return executor_id in self.fitted_ml_executors
 
-    def get_all_fitted_ml_executors(self) -> Dict[str, "MLExecutorState"]:
+    def get_all_fitted_ml_executors(self) -> Dict[str, "MLExecutorParams"]:
         return self.fitted_ml_executors.copy()
 
     def cleanup_ml_executor_artifacts(self) -> None:
         self.fitted_ml_executors.clear()
-
-    # Backward-compatible aliases.
-    def add_fitted_transformer(self, transformer_id: str, state: "MLExecutorState") -> None:
-        self.add_fitted_ml_executor(transformer_id, state)
-
-    def get_fitted_transformer(self, transformer_id: str) -> Optional["MLExecutorState"]:
-        return self.get_fitted_ml_executor(transformer_id)
-
-    def has_fitted_transformer(self, transformer_id: str) -> bool:
-        return self.has_fitted_ml_executor(transformer_id)
-
-    def get_all_fitted_transformers(self) -> Dict[str, "MLExecutorState"]:
-        return self.get_all_fitted_ml_executors()
-
-    def cleanup_transformer_artifacts(self) -> None:
-        self.cleanup_ml_executor_artifacts()

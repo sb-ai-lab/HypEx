@@ -4,7 +4,7 @@ from typing import Any, Optional, Sequence, Union
 
 from ..ml import CUPACExecutor, ModelSelectionExecutor
 from ..splitters import CUPACDataSplitter
-from ..utils.enums import MLMode
+from ..utils.enums import MLModeEnum
 from .ml import MLExperiment
 
 
@@ -14,7 +14,7 @@ class CupacExperiment(MLExperiment):
     def __init__(
         self,
         cupac_models: Union[str, Sequence[str], None] = None,
-        mode: str | MLMode = MLMode.FIT_PREDICT,
+        mode: str | MLModeEnum = MLModeEnum.FIT_PREDICT,
         experiment_id: Optional[str] = None,
         key: Any = "",
         n_folds: int = 5,
