@@ -7,6 +7,7 @@ from .scipy_stats import (
     TTestExtension,
     UTestExtension,
 )
+from .sklearn import MutualInfoExtension
 from .statsmodels import MultiTest, MultitestQuantile
 
 __all__ = [
@@ -18,6 +19,7 @@ __all__ = [
     "KSTestExtension",
     "MultiTest",
     "MultitestQuantile",
+    "MutualInfoExtension",
     "TTestExtension",
     "UTestExtension",
 ]
