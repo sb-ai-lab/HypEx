@@ -194,15 +194,32 @@ class ExperimentArtifact:
     def _save_ml_executor_states(self) -> None:
         """
         Save fitted ML executor states.
-        
+
         Structure:
         ml_executors/
-            StandardScaler_abc123.json
+            StandardScaler_abc123.json  (JSON-serializable states)
+            FaissMLExecutor_def456.pkl  (binary states via pickle)
         """
+        import pickle
+
         for executor_id, state in self.ml_executor_states.items():
-            state_file = os.path.join(self.ml_executors_dir, f"{executor_id}.json")
-            with open(state_file, 'w') as f:
-                json.dump(state.to_dict(), f, indent=2)
+            if hasattr(state, 'to_dict'):
+                state_dict = state.to_dict()
+                # Try JSON serialization, fall back to pickle for binary objects
+                try:
+                    state_file = os.path.join(self.ml_executors_dir, f"{executor_id}.json")
+                    with open(state_file, 'w') as f:
+                        json.dump(state_dict, f, indent=2)
+                except (TypeError, ValueError):
+                    # Contains non-serializable objects, use pickle
+                    state_file = os.path.join(self.ml_executors_dir, f"{executor_id}.pkl")
+                    with open(state_file, 'wb') as f:
+                        pickle.dump(state, f)
+            else:
+                # No to_dict method, use pickle directly
+                state_file = os.path.join(self.ml_executors_dir, f"{executor_id}.pkl")
+                with open(state_file, 'wb') as f:
+                    pickle.dump(state, f)
     
     def _save_models(self) -> None:
         """
@@ -242,10 +259,11 @@ class ExperimentArtifact:
     def load_ml_executor_states(self) -> Dict[str, Any]:
         """
         Load fitted ML executor states from disk.
-        
+
         Returns:
-            Dict of executor_id -> MLExecutorParams
+            Dict of executor_id -> MLExecutorParams or pickled state
         """
+        import pickle
         from ..executor.state import MLExecutorParams
 
         ml_executor_states = {}
@@ -254,13 +272,19 @@ class ExperimentArtifact:
             return ml_executor_states
 
         for filename in os.listdir(self.ml_executors_dir):
+            state_file = os.path.join(self.ml_executors_dir, filename)
+
             if filename.endswith('.json'):
                 executor_id = filename[:-5]
-                state_file = os.path.join(self.ml_executors_dir, filename)
-
                 with open(state_file, 'r') as f:
                     state_dict = json.load(f)
                 state = MLExecutorParams.from_dict(state_dict)
+                ml_executor_states[executor_id] = state
+
+            elif filename.endswith('.pkl'):
+                executor_id = filename[:-4]
+                with open(state_file, 'rb') as f:
+                    state = pickle.load(f)
                 ml_executor_states[executor_id] = state
 
         return ml_executor_states

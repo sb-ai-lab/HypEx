@@ -10,7 +10,8 @@ from .encoders.encoders import DummyEncoder
 from .executor import Executor
 from .experiments import GroupExperiment
 from .experiments.base import Experiment, OnRoleExperiment
-from .ml.faiss import FaissNearestNeighbors
+from .experiments.ml import MLExperiment
+from .ml.faiss import FaissMLExecutor
 from .operators.operators import Bias, MatchingMetrics
 from .reporters.matching import MatchingDatasetReporter
 from .transformers import TypeCaster
@@ -147,12 +148,17 @@ class Matching(ExperimentShell):
                 dtype={int: float},
                 roles=[FeatureRole(), TargetRole()],
             ),
-            FaissNearestNeighbors(
-                grouping_role=TreatmentRole(),
-                two_sides=two_sides,
-                test_pairs=test_pairs,
-                faiss_mode=faiss_mode,
-                n_neighbors=n_neighbors,
+            MLExperiment(
+                ml_executors=[
+                    FaissMLExecutor(
+                        grouping_role=TreatmentRole(),
+                        two_sides=two_sides,
+                        test_pairs=test_pairs,
+                        faiss_mode=faiss_mode,
+                        n_neighbors=n_neighbors,
+                    ),
+                ],
+                mode="fit_predict",
             ),
         ]
         if bias_estimation:

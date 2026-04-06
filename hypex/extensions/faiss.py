@@ -51,30 +51,38 @@ class FaissExtension(MLExtension):
         self,
         data: Dataset,
         test_data: Dataset | None = None,
-        mode: Literal["auto", "fit", "predict"] | None = None,
+        mode: Literal["auto", "fit", "predict", "fit_predict"] | None = None,
         **kwargs,
     ):
         mode = mode or "auto"
         X = data.data.values
-        test = test_data.data.values
-        if mode in ["auto", "fit"]:
+
+        # Fit mode: train index on data
+        if mode in ["auto", "fit", "fit_predict"]:
             self.index = faiss.IndexFlatL2(X.shape[1])
-            if (
-                (
-                    (len(X) > 1_000_000 and self.faiss_mode == "auto")
-                    or self.faiss_mode == "fast"
-                )
-                and len(X) > 1_000
-                and len(test) > 1_000
-            ):
-                self.index = faiss.IndexIVFFlat(self.index, X.shape[1], 1000)
-                self.index.train(X)
+            if test_data is not None:
+                test = test_data.data.values
+                if (
+                    (
+                        (len(X) > 1_000_000 and self.faiss_mode == "auto")
+                        or self.faiss_mode == "fast"
+                    )
+                    and len(X) > 1_000
+                    and len(test) > 1_000
+                ):
+                    self.index = faiss.IndexIVFFlat(self.index, X.shape[1], 1000)
+                    self.index.train(X)
             self.index.add(X)
-        if mode in ["auto", "predict"]:
+
+        # Predict mode: use index to find neighbors
+        if mode in ["auto", "predict", "fit_predict"]:
             if test_data is None:
                 raise ValueError("test_data is needed for evaluation")
-            X = test_data.data.values if mode == "auto" else data.data.values
-            return self._predict(data, test_data, X)
+            # Always query using test_data (data to find neighbors for)
+            X_predict = test_data.data.values
+            return self._predict(data, test_data, X_predict)
+
+        # Fit only mode: return self
         return self
 
     def fit(self, X: Dataset, Y: Dataset | None = None, **kwargs):

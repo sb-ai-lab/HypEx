@@ -1,12 +1,12 @@
 from .cupac import CUPACExecutor
-from .faiss import FaissNearestNeighbors
+from .faiss import FaissMLExecutor
 from .model_selection import ModelSelectionExecutor
 from .models import MLModel
 from .stats import ModelStats
 
 __all__ = [
 	"CUPACExecutor",
-	"FaissNearestNeighbors",
+	"FaissMLExecutor",
 	"ModelSelectionExecutor",
 	"MLModel",
 	"ModelStats",
