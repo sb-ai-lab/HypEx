@@ -120,11 +120,6 @@ class FaissMLExecutor(MLExecutor):
         # Process results
         return self._process_results(data, compare_result, grouping_data)
 
-    def execute_fit_predict(self, data: MLExperimentData) -> MLExperimentData:
-        """Fit and predict in one step."""
-        self.execute_fit(data)
-        return self.execute_predict(data)
-
     def _predict_with_fitted_indices(
         self, fitted_indices: dict[str, FaissExtension], grouping_data: list
     ) -> dict:
