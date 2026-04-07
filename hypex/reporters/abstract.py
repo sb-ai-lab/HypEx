@@ -107,7 +107,7 @@ class TestDictReporter(DictReporter):
         def rename_passed(data: dict[str, bool]):
             return {
                 c: (
-                    ("NOT OK" if (v is True or v == "True") else "OK")
+                    ("NOT OK" if (v is not None and bool(v)) else "OK")
                     if "pass" in c
                     else v
                 )
