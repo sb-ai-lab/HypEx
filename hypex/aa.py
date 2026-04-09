@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import Any, Iterable
 
 from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
@@ -199,7 +200,17 @@ class AATest(ExperimentShell):
         random_states: Iterable[int] | None = None,
         equal_variance: bool | None = None,
         groups_sizes: list[float] | None = None,
+        **kwargs,
     ):
+        if "t_test_equal_var" in kwargs:
+            warnings.warn(
+                "t_test_equal_var is deprecated and will be removed in a future version. "
+                "Use equal_variance instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if equal_variance is None:
+                equal_variance = kwargs.pop("t_test_equal_var")
         if n_iterations is None:
             if precision_mode:
                 n_iterations = 2000

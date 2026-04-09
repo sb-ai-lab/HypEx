@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import Literal
 
 from .analyzers.ab import ABAnalyzer
@@ -148,6 +149,7 @@ class ABTest(ExperimentShell):
         cuped_features: dict[str, str] | None = None,
         cupac_models: str | list[str] | None = None,
         enable_cupac: bool = False,
+        **kwargs,
     ):
         """
         Args:
@@ -158,6 +160,15 @@ class ABTest(ExperimentShell):
             cupac_models: str | list[str] — model name (e.g. 'linear', 'ridge', 'lasso', 'catboost') or list of model names to try. If None, all available models will be tried and the best will be selected by variance reduction.
             enable_cupac: bool — Enable CUPAC variance reduction. CUPAC configuration is extracted from dataset.features_mapping.
         """
+        if "t_test_equal_var" in kwargs:
+            warnings.warn(
+                "t_test_equal_var is deprecated and will be removed in a future version. "
+                "Use equal_variance instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if equal_variance is None:
+                equal_variance = kwargs.pop("t_test_equal_var")
         super().__init__(
             experiment=self._make_experiment(
                 additional_tests,
