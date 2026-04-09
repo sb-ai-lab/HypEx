@@ -99,8 +99,8 @@ class AATest(ExperimentShell):
             experiment pipeline. Defaults to None.
         random_states (Iterable[int], optional): Random seeds to use for each iteration.
             If None, uses range(n_iterations). Defaults to None.
-        t_test_equal_var (bool, optional): If True (default), perform a standard independent 2 sample
-            test that assumes equal population variances. If False, perform Welch's t-test,
+        equal_variance (bool, optional): If True , perform a standard independent 2 sample
+            test that assumes equal population variances. If False (default), perform Welch's t-test,
             which does not assume equal population variance.
 
 
@@ -197,7 +197,7 @@ class AATest(ExperimentShell):
         sample_size: float | None = None,
         additional_params: dict[str, Any] | None = None,
         random_states: Iterable[int] | None = None,
-        t_test_equal_var: bool | None = None,
+        equal_variance: bool | None = None,
         groups_sizes: list[float] | None = None,
     ):
         if n_iterations is None:
@@ -252,7 +252,11 @@ class AATest(ExperimentShell):
             ),
             output=AAOutput(),
         )
-        if t_test_equal_var is not None:
+        if equal_variance is not None:
             self.experiment.set_params(
-                {TTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
+                {TTest: {"calc_kwargs": {"equal_var": equal_variance}}}
+            )
+        else:
+            self.experiment.set_params(
+                {TTest: {"calc_kwargs": {"equal_var": False}}}
             )
