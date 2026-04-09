@@ -144,6 +144,9 @@ More about A/B test [here](https://github.com/sb-ai-lab/HypEx/tree/master/exampl
 For more detailed information about the library and its features, visit
 our [documentation on ReadTheDocs](https://hypex.readthedocs.io/en/latest/).
 
+If you want to learn more about the architecture of HypEx, check the
+[schemes folder](https://github.com/sb-ai-lab/HypEx/tree/master/schemes).
+
 You'll find comprehensive guides and tutorials that will help you get started with HypEx, as well as detailed API
 documentation for advanced use cases.
 
