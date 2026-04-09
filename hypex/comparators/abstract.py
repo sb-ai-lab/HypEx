@@ -808,3 +808,64 @@ class StatsHypothesisTesting(StatsComparator, ABC):
             calc_kwargs=merged_kwargs,
         )
         self.reliability = reliability
+
+
+class AdaptiveHypothesisTest(BaseComparator):
+    """
+    Routes execute() to a backend-specific hypothesis test at runtime.
+
+    Subclasses declare BACKEND_MAP: {BackendsEnum -> concrete test class}.
+    The concrete class must be a subclass of either GroupHypothesisTesting or
+    StatsHypothesisTesting. Results are always stored under the adaptive
+    instance's own id, so pipeline lookups remain consistent regardless of
+    which backend is active.
+    """
+
+    BACKEND_MAP: ClassVar[dict[BackendsEnum, type[BaseComparator]]] = {}
+
+    def __init__(
+        self,
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | None = None,
+        reliability: float = 0.05,
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+        ] = "groups",
+        key: Any = "",
+    ):
+        super().__init__(grouping_role=grouping_role, target_roles=target_roles, key=key)
+        self.reliability = reliability
+        self.compare_by = compare_by
+
+    def _build_delegate(self, cls: type[BaseComparator]) -> BaseComparator:
+        """
+        Instantiate *cls* with this instance's configuration and override its
+        id to match ours so results land under the adaptive class's id.
+        """
+        if issubclass(cls, StatsHypothesisTesting):
+            instance = cls(
+                grouping_role=self.grouping_role,
+                target_roles=self.target_roles,
+                reliability=self.reliability,
+                key=self.key,
+            )
+        else:  # GroupHypothesisTesting branch
+            instance = cls(
+                compare_by=self.compare_by,
+                grouping_role=self.grouping_role,
+                target_role=self.target_roles,
+                reliability=self.reliability,
+                key=self.key,
+            )
+        # Ensure analysis_tables entries use our id, not the delegate's.
+        instance._id = self._id
+        return instance
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        backend = data.ds.backend_type
+        if backend not in self.BACKEND_MAP:
+            raise ValueError(
+                f"{type(self).__name__} has no implementation for backend {backend!r}. "
+                f"Registered: {list(self.BACKEND_MAP)}"
+            )
+        return self._build_delegate(self.BACKEND_MAP[backend]).execute(data)
