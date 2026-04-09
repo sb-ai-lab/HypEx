@@ -6,31 +6,6 @@
 ![Python versions](https://img.shields.io/badge/python-3.8_|_3.9_|_3.10_|_3.11_|_3.12-blue)
 ![Pypi downloads\month](https://img.shields.io/badge/downloads\month->20K-1E782B)
 
-# Moving to a New Architecture! ⚠️
-
-## ❗ ВАЖНОЕ ОБНОВЛЕНИЕ: HypEx переходит на новую архитектуру! ❗
-
-## 🔥 What's changing? / Что изменится?
-
-New interface! Import paths, class methods, and overall API structure will be different.
-
-Old version (0.1.10) will no longer be supported.
-
-New tutorials are available to help you migrate: Check them
-out [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials).
-
-Try the new version now by installing the beta release:
-
-```
-pip install --upgrade hypex
-```
-
-Prefer the old version? You can still use it, but it won't receive updates:
-
-```
-pip install hypex==0.1.10
-```
-
 🔗 Learn more: [Telegram Chat](t.me/hypexchat)
 
 ## Introduction
@@ -73,6 +48,12 @@ dimensionality, making the results unrepresentative.
 
 ```bash
 pip install -U hypex
+```
+
+Prefer the old version? You can still use it, but it won't receive updates:
+
+```bash
+pip install hypex==0.1.10
 ```
 
 ## Quick start
