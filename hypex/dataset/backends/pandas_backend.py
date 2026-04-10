@@ -1081,7 +1081,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         for key, group in self.data.groupby(by=by, observed=False):
             yield key, group
 
-    def grouped_value_counts(self, by: list[str], feature_cols: list[str]):
+    def grouped_value_counts(self, by: list[str], feature_cols: list[str] | None=None):
+        if feature_cols is None:
+            feature_cols = [col for col in self.data.columns if col not in set(by)]
         result = {
             col: self.data.groupby(by=by, observed=False)[col].value_counts().to_dict()
             for col in feature_cols
