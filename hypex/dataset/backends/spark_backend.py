@@ -1131,9 +1131,11 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 mask = col_mask if mask is None else mask & col_mask
             yield key, self.data[mask]
 
-    def grouped_value_counts(self, by: list[str], feature_cols: list[str]):
+    def grouped_value_counts(self, by: list[str], feature_cols: list[str] | None=None):
         from functools import reduce
-
+        
+        if feature_cols is None:
+            feature_cols = [col for col in self.data.columns if col not in set(by)]
         sdf = self.data.to_spark()
         agg_sdfs = []
         for col in feature_cols:
