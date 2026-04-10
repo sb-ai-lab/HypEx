@@ -1,5 +1,5 @@
 # Files
-*.csv
+/*.csv
 *.png
 *.pickle
 *.html
@@ -161,4 +161,3 @@ lama_venv/
 temp/
 
 poetry.lock
-/DatasetTutorial.ipynb

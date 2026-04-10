@@ -356,8 +356,6 @@ class DatasetBase(ABC):
                                                 cols_display_limit=self.DISPLAY_COLS,
                                                 n_cols=n_cols,
                                                 n_rows=n_rows)
-        # if hasattr(head, 'data'):
-        #     head = head.data
 
         if n_rows > self.DISPLAY_ROWS * 2:
             _tmp_tail = self._backend_data._display_head_tail(rows_display_limit=self.DISPLAY_ROWS,
@@ -365,8 +363,7 @@ class DatasetBase(ABC):
                                                          n_cols=n_cols,
                                                          n_rows=n_rows,
                                                          tail=True)
-            # if hasattr(_tmp_tail, 'data'):
-            #     _tmp_tail = _tmp_tail.data
+
             tail = pd.concat([pd.DataFrame([["..."] * len(head.columns)],
                                            index=["..."],
                                            columns=head.columns),
