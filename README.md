@@ -1,37 +1,11 @@
 # HypEx: Advanced Causal Inference and AB Testing Toolkit
 
-![Last release](https://img.shields.io/badge/pypi-v1.0.2-darkgreen)
+![Last release](https://img.shields.io/badge/pypi-v1.0.5-darkgreen)
 [![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/hypexchat)
-![Pypi downloads](https://img.shields.io/badge/downloads-70K-1E782B)
-![Python versions](https://img.shields.io/badge/python-3.8_|_3.9_|_3.10_|_3.11_|_3.12-blue)
+![Pypi downloads](https://img.shields.io/badge/downloads-210K-1E782B)
+![Python versions](https://img.shields.io/badge/python-3.8_|_3.9_|_3.10_|_3.11_|_3.12|_3.13_-blue)
 ![Pypi downloads\month](https://img.shields.io/badge/downloads\month->20K-1E782B)
 
-# Moving to a New Architecture! ⚠️
-
-## ❗ ВАЖНОЕ ОБНОВЛЕНИЕ: HypEx переходит на новую архитектуру! ❗
-
-## 🔥 What's changing? / Что изменится?
-
-New interface! Import paths, class methods, and overall API structure will be different.
-
-Old version (0.1.10) will no longer be supported.
-
-New tutorials are available to help you migrate: Check them
-out [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials).
-
-Try the new version now by installing the beta release:
-
-```
-pip install --upgrade hypex
-```
-
-Prefer the old version? You can still use it, but it won't receive updates:
-
-```
-pip install hypex==0.1.10
-```
-
-🔗 Learn more: [Telegram Chat](t.me/hypexchat)
 
 ## Introduction
 
@@ -73,6 +47,12 @@ dimensionality, making the results unrepresentative.
 
 ```bash
 pip install -U hypex
+```
+
+Prefer the old version? You can still use it, but it won't receive updates:
+
+```bash
+pip install hypex==0.1.10
 ```
 
 ## Quick start
@@ -163,6 +143,9 @@ More about A/B test [here](https://github.com/sb-ai-lab/HypEx/tree/master/exampl
 
 For more detailed information about the library and its features, visit
 our [documentation on ReadTheDocs](https://hypex.readthedocs.io/en/latest/).
+
+If you want to learn more about the architecture of HypEx, check the
+[schemes folder](https://github.com/sb-ai-lab/HypEx/tree/master/schemes).
 
 You'll find comprehensive guides and tutorials that will help you get started with HypEx, as well as detailed API
 documentation for advanced use cases.
