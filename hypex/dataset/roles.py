@@ -198,6 +198,12 @@ class AdditionalMatchingRole(AdditionalRole):
     _role_name: RoleNameType = "AdditionalMatching"
 
 
+class PredictionRole(ABCRole):
+    """Role for ML model predictions."""
+
+    _role_name: RoleNameType = "Prediction"
+
+
 default_roles: dict[RoleNameType, ABCRole] = {
     "info": InfoRole(),
     "default": DefaultRole(),
@@ -215,4 +221,5 @@ default_roles: dict[RoleNameType, ABCRole] = {
     "additionaltarget": AdditionalTargetRole(),
     "additionalfeature": AdditionalFeatureRole(),
     "additionalpretarget": AdditionalPreTargetRole(),
+    "prediction": PredictionRole(),
 }

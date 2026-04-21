@@ -138,7 +138,7 @@ class Calculator(Executor, ABC):
         return test_data
 
 
-class MLExecutor(Calculator, ABC):
+class MatchingExecutor(Calculator, ABC):
     def __init__(
         self,
         grouping_role: ABCRole | None = None,
@@ -157,7 +157,7 @@ class MLExecutor(Calculator, ABC):
         return group_field, target_field
 
     @abstractmethod
-    def fit(self, X: Dataset, Y: Dataset | None = None) -> MLExecutor:
+    def fit(self, X: Dataset, Y: Dataset | None = None) -> MatchingExecutor:
         raise NotImplementedError
 
     @abstractmethod
