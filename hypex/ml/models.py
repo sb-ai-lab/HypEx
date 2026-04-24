@@ -4,10 +4,10 @@ import json
 import os
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union, Callable
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
-from sklearn.model_selection import KFold
+from sklearn.model_selection import GroupKFold, KFold
 
 from ..dataset import Dataset
 from .backends.abstract import MLModelBackendBase
@@ -146,6 +146,7 @@ class MLModel:
         random_state: Optional[int] = None,
         aggregation: str = "mean",
         metric_func: Optional[Callable] = None,
+        groups: Optional[Sequence[Any]] = None,
     ) -> ModelStats:
         """
         Perform cross-validation and return aggregated ModelStats.
@@ -158,6 +159,7 @@ class MLModel:
             aggregation: 'mean', 'median', 'max' for aggregating fold stats
             metric_func: Custom metric function (y_true, y_pred) -> score
                         Default: variance_reduction
+            groups: Group labels aligned with rows for group-aware CV
         
         Returns:
             ModelStats with aggregated CV results
@@ -183,14 +185,27 @@ class MLModel:
         else:
             y_np = np.array(y_data).ravel()
         
-        kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+        if groups is not None:
+            groups_np = np.asarray(groups)
+            if groups_np.shape[0] != X_np.shape[0] or groups_np.shape[0] != y_np.shape[0]:
+                raise ValueError(
+                    "groups must be aligned with X and y row counts in cross_validate."
+                )
+            if np.unique(groups_np).shape[0] < n_folds:
+                raise ValueError(
+                    "Number of unique groups must be at least n_folds for GroupKFold."
+                )
+            split_iterator = GroupKFold(n_splits=n_folds).split(X_np, y_np, groups_np)
+        else:
+            kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+            split_iterator = kf.split(X_np)
         
         fold_scores = []
         fold_importances = []
         
         start_time = time.time()
         
-        for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X_np)):
+        for fold_idx, (train_idx, val_idx) in enumerate(split_iterator):
             # Create fold datasets
             X_train_fold = X.iloc[train_idx]
             X_val_fold = X.iloc[val_idx]

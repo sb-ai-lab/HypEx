@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from ..dataset import Dataset, ExperimentData
-from ..dataset.ml_data import MLExperimentData
+from ..dataset.ml_data import MLData, MLExperimentData
 from ..dataset.roles import FeatureRole, PreTargetRole, TargetRole
 from ..utils.enums import MLModeEnum
 from .base import MLSplitter
@@ -77,6 +77,58 @@ class CUPACDataSplitter(MLSplitter):
             raw_splits=raw_splits,
             generate_cv_folds=self.generate_cv_folds,
         )
+
+    @staticmethod
+    def _build_train_groups(data: ExperimentData, y_train_columns: list[str]) -> list:
+        """Build row-aligned group labels for training rows from lagged target columns."""
+        groups = []
+        for column_name in y_train_columns:
+            groups.extend(list(data.ds[column_name].index))
+        return groups
+
+    def build_mldata_from_splits(
+        self,
+        data: MLExperimentData,
+        raw_splits: dict[str, dict[str, list]],
+        generate_cv_folds: bool = False,
+    ) -> MLExperimentData:
+        """
+        Build MLData objects for CUPAC and attach groups created at lag parsing stage.
+
+        Group labels are derived from the original row indexes of lagged training target
+        columns, so all rows for the same user across lags share one fold group.
+        """
+        for target_name, target_splits in raw_splits.items():
+            X_train = self.aggregate_columns(data, target_splits["X_train"])
+            Y_train = self.aggregate_columns(data, [target_splits["Y_train"]])
+
+            groups = self._build_train_groups(data, target_splits["Y_train"])
+            if len(groups) != X_train.shape[0] or len(groups) != Y_train.shape[0]:
+                raise ValueError(
+                    "Invalid CUPAC grouping: groups, X_train and Y_train must have the same number of rows."
+                )
+
+            X_predict = None
+            if "X_predict" in target_splits:
+                X_predict = self.aggregate_columns(data, target_splits["X_predict"])
+
+            ml_data_obj = MLData(
+                X_train=X_train,
+                Y_train=Y_train,
+                X_predict=X_predict,
+                groups=groups,
+            )
+
+            if generate_cv_folds:
+                ml_data_obj = self.add_cv_folds_to_mldata(
+                    ml_data_obj,
+                    n_folds=self.n_folds,
+                    random_state=self.random_state,
+                )
+
+            data.add_ml_data(target_name, ml_data_obj)
+
+        return data
     
     def _prepare_splits(self, data: ExperimentData) -> dict[str, dict[str, list]]:
         """

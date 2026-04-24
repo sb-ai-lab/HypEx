@@ -30,26 +30,25 @@ class CUPEDTransformer(Transformer):
     ) -> Dataset:
         result = deepcopy(data)
         for target_feature, pre_target_feature in cuped_features.items():
-            mean_xy = (result[target_feature] * result[pre_target_feature]).mean()
-            mean_x = result[pre_target_feature].mean()
-            mean_y = result[target_feature].mean()
-            cov_xy = mean_xy - mean_x * mean_y
+            x = result[pre_target_feature]
+            y = result[target_feature]
 
-            std_y = result[target_feature].std()
-            std_x = result[pre_target_feature].std()
+            mean_x = x.mean()
+            mean_y = y.mean()
 
-            # Handle zero variance or NaN case (single observation)
-            if std_y == 0 or std_x == 0 or std_y != std_y or std_x != std_x:
+            cov_xy = ((x - mean_x) * (y - mean_y)).mean()
+            var_x = ((x - mean_x) ** 2).mean()
+
+            if var_x == 0 or var_x != var_x:
                 theta = 0
             else:
-                theta = cov_xy / (std_y * std_x)
-            pre_target_mean = result[pre_target_feature].mean()
-            new_values_ds = (
-                result[target_feature]
-                - (result[pre_target_feature] - pre_target_mean) * theta
-            )
+                theta = cov_xy / var_x
+
+            new_values_ds = y - (x - mean_x) * theta
+
             result = result.add_column(
-                data=new_values_ds, role={f"{target_feature}_cuped": TargetRole()}
+                data=new_values_ds,
+                role={f"{target_feature}_cuped": TargetRole()},
             )
         return result
 

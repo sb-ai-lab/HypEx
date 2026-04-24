@@ -78,6 +78,7 @@ class ModelSelectionExecutor(MLExecutor):
                 n_folds=self.n_folds,
                 random_state=self.random_state,
                 aggregation=self.cv_aggregation,
+                groups=ml_data_obj.groups,
             )
             if stats.variance_reduction_cv > best_score:
                 best_score = stats.variance_reduction_cv

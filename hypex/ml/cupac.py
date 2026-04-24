@@ -139,10 +139,16 @@ class CUPACExecutor(MLExecutor):
         
         # Get target and prediction as Datasets
         target_ds = data.ds[target]
-        
-        # Perform adjustment using Dataset arithmetic operations
-        # adjusted = target - prediction + prediction_mean
-        adjusted_ds = target_ds - prediction_ds["prediction"] + prediction_mean
+
+        cov_xy = ((prediction_ds - prediction_mean) * (target_ds - target_ds.mean())).mean()
+        var_x = ((prediction_ds - prediction_mean) ** 2).mean()
+
+        if var_x == 0 or var_x != var_x:
+            theta = 0
+        else:
+            theta = cov_xy / var_x
+            
+        adjusted_ds = target_ds - (prediction_ds["prediction"] - prediction_mean) * theta
         
         # Rename to cupac column
         adjusted_ds = adjusted_ds.rename({target: f"{target}_cupac"})
