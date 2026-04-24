@@ -4,7 +4,7 @@ import json
 import os
 from copy import deepcopy
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 from ..dataset import Dataset, ExperimentData
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
@@ -24,6 +24,7 @@ class MLData:
         Y_train (Dataset): Training target
         X_predict (Optional[Dataset]): Prediction features for current period
         crossval (Dict[int, Tuple[Dataset, Dataset]]): CV folds {fold_id: (X_val, Y_val)}
+        groups (Optional[Sequence[Any]]): Group labels aligned with training rows
     """
     
     def __init__(
@@ -32,17 +33,20 @@ class MLData:
         Y_train: Dataset,
         X_predict: Optional[Dataset] = None,
         crossval: Optional[Dict[int, Tuple[Dataset, Dataset]]] = None,
+        groups: Optional[Sequence[Any]] = None,
     ):
         self.X_train = X_train
         self.Y_train = Y_train
         self.X_predict = X_predict
         self.crossval = crossval or {}
+        self.groups = groups
     
     def __repr__(self) -> str:
         return (
             f"MLData(X_train={self.X_train.shape}, "
             f"Y_train={self.Y_train.shape}, "
             f"X_predict={self.X_predict.shape if self.X_predict else None}, "
+            f"n_groups={len(self.groups) if self.groups is not None else 0}, "
             f"n_folds={len(self.crossval)})"
         )
 
