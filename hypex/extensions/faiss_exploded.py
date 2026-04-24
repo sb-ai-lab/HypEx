@@ -4,6 +4,7 @@ from typing import (
     Literal,
     Iterable
 )
+from collections import OrderedDict
 
 from ..dataset import AdditionalMatchingRole, Dataset
 from .abstract import MLExtension
@@ -17,6 +18,9 @@ import pandas as pd
 import faiss
 import gc
 import os
+import builtins
+import threading
+
 
 # Spark imports
 import pyspark.sql as spark
@@ -24,7 +28,7 @@ import pyspark.pandas as ps
 ps.set_option('compute.ops_on_diff_frames', True)
 
 from pyspark.ml.feature import VectorAssembler
-from pyspark import StorageLevel, Broadcast, RDD
+from pyspark import StorageLevel, Broadcast, RDD, SparkFiles
 
 from pyspark.sql.types import (
     StructType, 
@@ -34,7 +38,10 @@ from pyspark.sql.types import (
 )
 from sklearn.cluster import MiniBatchKMeans, Birch
 
-class FaissExtention(MLExtension):
+class FaissExtension(MLExtension):
+    """
+    Faiss master-abstract and master-backend class in one instance.
+    """
 
     def __init__(
         self, n_neighbors: int = 1, faiss_mode: Literal["base", "fast", "auto"] = "auto"
@@ -54,6 +61,7 @@ class FaissExtention(MLExtension):
     ):
         raise AbstractMethodError
 
+
     def fit(self, X: Dataset, Y: Dataset | None = None, **kwargs):
         return super().calc(X, target_data=Y, mode="fit", **kwargs)
 
@@ -62,9 +70,11 @@ class FaissExtention(MLExtension):
             super().calc(X, mode="predict", **kwargs), AdditionalMatchingRole()
         )
 
-@backend_registry.registry(FaissExtention, PandasDataset)
-class PandasFaissExtension(FaissExtention):
-
+@backend_registry.register(FaissExtension, PandasDataset)
+class PandasFaissExtension(FaissExtension):
+    """
+    Faiss backend-slave class for faiss pairs matching.
+    """
     def __init__(self, n_neighbors = 1, faiss_mode = "auto"):
         super().__init__(n_neighbors, faiss_mode)
 
@@ -241,7 +251,6 @@ def  _per_partition_predict(
         from pyspark import SparkFiles
         import gc
         import builtins
-        from index_cacher import get_executor_cache
 
         cache = get_executor_cache()
             
@@ -293,9 +302,11 @@ def  _per_partition_predict(
                 for dist, nid in top:
                     yield (int(qid), nid, dist)
 
-@backend_registry.registry(FaissExtention, SparkDataset)
-class SparkFaissExtension(FaissExtention):
-
+@backend_registry.register(FaissExtension, SparkDataset)
+class SparkFaissExtension(FaissExtension):
+    """
+    Faiss backend-slave class for faiss pairs matching.
+    """
     PERSIST_POLITIC = StorageLevel.MEMORY_AND_DISK
     _SAMPLE_TARGET = 5_000_000
     # Лимит на то, сколько локальых индексов может быть одновременно загружено на драйвер
@@ -492,30 +503,28 @@ class SparkFaissExtension(FaissExtention):
         """
         Steps
         -----
-        1. Итеративно получаем сериализованные индексы с каждой партиции и
-        записывем их в файл с расширегием `.index`, которое умеет обрабатывать faiss.
+        1. iterativly get serialized indexes from each partition and 
+        save them into file with `.index` extension. This file format uses faiss;
 
-        2. Отправляем `.index` файлы на все партиции test-data, для которой ищем соседей
-        в train-data.
+        2. Send `.index` files to each test-data partitions;
 
-        3. На каждой партиции итеративно загружаем в RAM строку test-data, 
-        и для нее итеративно подгружаем файл с индексами, где ищем top_k = 
-        n_neighbors, после чего удаляем индекс из оперативной памяти.
+        3. On each partition iterativly load in RAM bacth of test data. For each such batch
+        iterativly load index files where we search local top nearest neighbors then del 
+        loaded index from RAM.
 
-        4. Результаты обернуты в `Spark.Dataframe` с схемой 
+        4. Results are wrapered with `Spark.Dataframe` using following scheme:
         (_id `LongType`, neighbor_id `LongType`, distance `FloatType`).
 
-        5. Удаление временных файлов и временной дирекятории после материализации
-        результатов в датафрейм.
+        5. Del temp files and temp directory after result-data materialization.
 
         Args
         ----
             test_data : `spark.DataFrame`
-                Данные для которых мы ищем соседей.
+                input data.
 
         Return
         ------
-            result: `RDD` результирующая таблица с индексами соседей и расстоянием до них
+            result: `RDD` resulting table with neighbors indexes and distances to them.
         """
 
         session = test_data.sparkSession
@@ -577,14 +586,28 @@ class SparkFaissExtension(FaissExtention):
         mode = mode or "auto"
         operating_data: spark.DataFrame = data._backend_data.data.to_spark(index_col='index')
         self.k = operating_data.count()
-        transformed_data = self._vectorize_data(operating_data)
+        vectorize_data = self._vectorize_data(operating_data)
 
         if mode in ["auto", "fit"]:
             fit_mode = kwargs.get("fit_mode", "sample")
             model_name = kwargs.get("model", "k-means")
-        
+            self._fit(
+                vectorize_data=vectorize_data,
+                mode=fit_mode,
+                model_name=model_name
+            )
+
         if mode in ["auto", "predict"]:
-            ...
+            if test_data is None:
+                raise ValueError("test_data is needed for evaluation")
+            if self._sharded_rdd is None:
+                raise ValueError("Index is not created yet. Call 'fit' before 'predict'.")
+            
+            test_operating_data = test_data._backend_data.data.to_spark(index_col='index')
+            vectorized_test = self._vectorize_data(test_operating_data)
+
+            # Возвращаем сырой Spark DataFrame (обёртка в Dataset произойдёт в predict())
+            return self._predict(vectorized_test)
     
     def unpersist(self) -> None:
         """
@@ -603,3 +626,107 @@ class SparkFaissExtension(FaissExtention):
         
     def __exit__(self, *_) -> None:
         self.unpersist()
+
+class CachingIndex:
+    """
+    Класс для кэширования индекса на экзекъюторе.
+    Предназначен для того, чтобы в памяти экзекъютора, при одновременном 
+    выполнении нескольких партиций не происходило ситуации, один и тот же индекс
+    train-data-ы не материализовывался несколько раз
+    """
+
+    def __init__(
+        self,
+        k: float=0.5,
+        executor_cores: int=None, 
+        overhead_memory: int=None,
+        index_bytes: int=128,
+        max_index: int=2
+    ):
+        """
+        Args
+        ----
+            k : `float`
+                доля от overhead memory, которую мы позволяем использовать для подгрузки индексов.
+
+            executor_cores : `int`
+                количество ядер на экзеъюторе.
+            
+            overhead_memory : `int`
+                оверхед экзекъютора, память вне кучи JVM.
+            
+            index_bytes : `int`
+                Размер индекса одной партиции в мегабайтах, по-умолчанию = 128 мб.
+
+            max_index : `int`
+                Колчиество индексов в памяти одновременно, если None, то вычисляется автоматически. 
+        """
+        self._index_bytes = index_bytes
+        if max_index is None:
+            if executor_cores is None and overhead_memory is None:
+                raise ValueError("executor_cores and overhead_memory cannot both be None")
+            self._max = self._max_index_calc(
+                k=k, 
+                executor_cores=executor_cores, 
+                overhead_memory=overhead_memory, 
+                index_bytes=index_bytes
+            )
+        else:
+            self._max = max_index
+        self._cache = OrderedDict()
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def _max_index_calc(
+        k: float,
+        executor_cores: int | None, 
+        overhead_memory: int | None,
+        index_bytes: int,
+    ) -> int:
+        """
+        Автоматический подбор количества индексов в кэшэ.
+        """
+        if overhead_memory is None:
+            return executor_cores
+        avalible_space = int(overhead_memory * k / index_bytes)
+        if executor_cores is None:
+            return max(1, avalible_space)
+        return max(1, min(avalible_space, executor_cores))
+    
+    def get(
+            self,
+            index_file: int
+    ):
+        """
+        Получаем индексы по заданному названию файла. Если такой файл уже обрабатывался,
+        то просто выгружаем его из словаря и двигаем в последовательности ключей в конец.
+        если такого файла нет в нашем кэше, то очищаем первый элемент и записываем в конец
+        новый индекс.
+
+        Args
+        ----
+            index_file : `str`
+                Путь до файла с индексами, который выступает ключем.
+
+        Return
+        ------
+            Возвращает FAISS индексы для заданного файла.
+        """
+        with self._lock:
+            if index_file in self._cache:
+                self._cache.move_to_end(key=index_file)
+                return self._cache[index_file]
+
+            if len(self._cache) == self._max:
+                _, evicted = self._cache.popitem(last=False)
+                del evicted
+                import gc; gc.collect()
+            
+            tmp_index = faiss.read_index(SparkFiles.get(index_file))
+            self._cache[index_file] = tmp_index
+            return tmp_index
+        
+def get_executor_cache(config_dict) -> CachingIndex:
+    if not hasattr(builtins, '_faiss_index_cache'):
+        builtins._faiss_index_cache = CachingIndex(**config_dict)
+    return builtins._faiss_index_cache
