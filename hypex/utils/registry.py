@@ -1,16 +1,17 @@
 from __future__ import annotations
-from typings import Dict, Type
-from ..dataset import Dataset
+from typing import Dict, Type
+# from ..dataset import Dataset
 
-class BackendRegistry:
+class BackendFactory:
     """
-    Backend register class.
+    Backend-factory class for automatic selection of backend-dependency class realization.
+    It selects direct realization due to input data backend.
     """
 
     def __init__(self):
         self._registry: Dict[Type, Dict[Type, Type]] = {}
     
-    def registry(self, base_cls: Type, backend_type: Type):
+    def register(self, base_cls: Type, backend_type: Type):
         """
         Decorator to register a backend-specific implementation.
         Usage: @registry.register(FaissExtention, PandasDataset)
@@ -24,12 +25,16 @@ class BackendRegistry:
         """Explicit registration without decorator (useful for dynamic loading)."""
         self._registry.setdefault(base_cls, {})[backend_type] = impl_cls
     
-    def resolve_backend(self, base_cls: Type, data: Dataset):
+    @property
+    def registry(self):
+        return self._registry
+    
+    def resolve_backend(self, base_cls: Type, data):
         """
         Get realization of class depending on data backend type.
         """
         cls_backends = self._registry.get(base_cls)
-        backend_type = type(data.backend)
+        backend_type = type(data.backend_data)
 
         if not cls_backends:
             raise NotImplementedError(f"{base_cls.__name__} doesn't exist!")
@@ -46,7 +51,7 @@ class BackendRegistry:
         return cls
 
 # Singleton
-backend_registry = BackendRegistry()
+backend_factory = BackendFactory()
 
 
     

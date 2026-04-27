@@ -10,10 +10,11 @@ from ..utils.errors import AbstractMethodError
 
 
 class Extension(ABC):
-
     @staticmethod
-    def result_to_dataset(result: Any, roles: ABCRole | dict[str, ABCRole]) -> Dataset:
-        return DatasetAdapter.to_dataset(result, roles=roles)
+    def result_to_dataset(
+        result: Any, roles: ABCRole | dict[str, ABCRole], small: bool=True
+    ) -> Dataset:
+        return DatasetAdapter.to_dataset(result, roles=roles,small=small)
 
 
 class CompareExtension(Extension, ABC):

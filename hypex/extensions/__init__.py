@@ -1,6 +1,6 @@
 from .encoders import DummyEncoderExtension
 # from .faiss import FaissExtension
-from .faiss_exploded import FaissExtension, SparkFaissExtension, PandasFaissExtension
+from .faiss import FaissExtension, SparkFaissExtension, PandasFaissExtension
 from .scipy_linalg import CholeskyExtension, InverseExtension
 # from .scipy_stats import (
 #     GroupChi2TestExtension,

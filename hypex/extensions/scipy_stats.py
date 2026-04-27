@@ -11,7 +11,7 @@ from scipy.stats import (  # type: ignore
     norm,
     ttest_ind,
 )
-from ..utils.registry import backend_registry
+from ..utils.registry import backend_factory
 
 from ..dataset import SmallDataset, Dataset, DatasetAdapter, StatisticRole
 from ..dataset.backends import PandasDataset, SparkDataset
@@ -140,25 +140,25 @@ class GroupChi2TestExtension(GroupStatTest):
         statistic, p_value, _, _ = chi2_contingency(contingency_table, **kwargs)
         return self._form_results(statistic, p_value, self.reliability)
 
-@backend_registry.register(GroupTTestExtension, PandasDataset)
+@backend_factory.register(GroupTTestExtension, PandasDataset)
 class PandasTTestExtension(PandasExtractorMixin, GroupTTestExtension):
     """
     Slave-backend class for statistical test calculation.
     """
 
-@backend_registry.register(GroupKSTestExtension, PandasDataset)
+@backend_factory.register(GroupKSTestExtension, PandasDataset)
 class PandasKSTestExtension(PandasExtractorMixin, GroupKSTestExtension):
     """
     Slave-backend class for statistical test calculation.
     """
 
-@backend_registry.register(GroupUTestExtension, PandasDataset)
+@backend_factory.register(GroupUTestExtension, PandasDataset)
 class PandasUTestExtension(PandasExtractorMixin, GroupUTestExtension):
     """
     Slave-backend class for statistical test calculation.
     """
 
-@backend_registry.register(GroupChi2TestExtension, PandasDataset)
+@backend_factory.register(GroupChi2TestExtension, PandasDataset)
 class PandasChi2TestExtension(GroupChi2TestExtension):
     """
     Slave-backend class for statistical test calculation.
@@ -197,25 +197,25 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
     
 
 
-@backend_registry.register(GroupTTestExtension, SparkDataset)
+@backend_factory.register(GroupTTestExtension, SparkDataset)
 class SparkTTestExtension(SparkExtractorMixin, GroupTTestExtension):
     """
     Slave-backend class for statistical test calculation.
     """
 
-@backend_registry.register(GroupKSTestExtension, SparkDataset)
+@backend_factory.register(GroupKSTestExtension, SparkDataset)
 class SparkKSTestExtension(SparkExtractorMixin, GroupKSTestExtension):
     """
     Slave-backend class for statistical test calculation.
     """
 
-@backend_registry.register(GroupUTestExtension, SparkDataset)
+@backend_factory.register(GroupUTestExtension, SparkDataset)
 class SparkUTestExtension(SparkExtractorMixin, GroupUTestExtension):
     """
     Slave-backend class for statistical test calculation.
     """
 
-@backend_registry.register(GroupChi2TestExtension, SparkDataset)
+@backend_factory.register(GroupChi2TestExtension, SparkDataset)
 class SparkChi2TestExtension(GroupChi2TestExtension):
     """
     Slave-backend class for statistical test calculation.

@@ -15,6 +15,7 @@ from ..executor import MLExecutor
 from ..extensions.faiss import FaissExtension
 from ..utils import ExperimentDataEnum
 from ..utils.errors import PairsNotFoundError
+from ..utils.registry import backend_factory
 
 
 class FaissNearestNeighbors(MLExecutor):
@@ -114,15 +115,19 @@ class FaissNearestNeighbors(MLExecutor):
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
         **kwargs,
     ) -> Any:
-        return FaissExtension(n_neighbors=n_neighbors or 1, faiss_mode=faiss_mode).calc(
+        
+        faiss_cls = backend_factory.resolve_backend(FaissExtension, data)
+        return faiss_cls(n_neighbors=n_neighbors or 1, faiss_mode=faiss_mode).calc(
             data=data, test_data=test_data
         )
 
     def fit(self, X: Dataset, Y: Dataset | None = None) -> MLExecutor:
-        return FaissExtension(self.n_neighbors, self.faiss_mode).fit(X=X, Y=Y)
+        faiss_cls = backend_factory.resolve_backend(FaissExtension, X)
+        return faiss_cls(self.n_neighbors, self.faiss_mode).fit(X=X, Y=Y)
 
     def predict(self, X: Dataset) -> Dataset:
-        return FaissExtension().predict(X)
+        faiss_cls = backend_factory.resolve_backend(FaissExtension, X)
+        return faiss_cls().predict(X)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field, features_fields = self._get_fields(data=data)

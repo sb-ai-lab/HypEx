@@ -8,6 +8,7 @@ from ..extensions.scipy_stats import (
     GroupUTestExtension,
 )
 from ..utils.constants import NUMBER_TYPES_LIST
+from ..utils.registry import backend_factory
 from .abstract import GroupHypothesisTesting, StatsComparator
 
 
@@ -20,7 +21,8 @@ class GroupTTest(GroupHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return GroupTTestExtension(kwargs.get("reliability", 0.05)).calc(
+        test_cls = backend_factory.resolve_backend(GroupTTestExtension, data)
+        return test_cls(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
@@ -33,7 +35,8 @@ class GroupKSTest(GroupHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return GroupKSTestExtension(kwargs.get("reliability", 0.05)).calc(
+        test_cls = backend_factory.resolve_backend(GroupKSTestExtension, data)
+        return test_cls(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
@@ -46,7 +49,8 @@ class GroupUTest(GroupHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return GroupUTestExtension(kwargs.get("reliability", 0.05)).calc(
+        test_cls = backend_factory.resolve_backend(GroupUTestExtension, data)
+        return test_cls(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
@@ -60,6 +64,7 @@ class GroupChi2Test(GroupHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return GroupChi2TestExtension(reliability=kwargs.get("reliability", 0.05)).calc(
+        test_cls = backend_factory.resolve_backend(GroupChi2TestExtension, data)
+        return test_cls(reliability=kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )

@@ -53,6 +53,7 @@ from .typings import (
     SourceDataTypes,
     SparkTypeMapper
 )
+from .registry import BackendFactory
 
 __all__ = [
     "Adapter",
@@ -99,4 +100,5 @@ __all__ = [
     "gen_control_variates_df",
     "gen_oracle_df",
     "gen_special_medicine_df",
+    "BackendFactory"
 ]
