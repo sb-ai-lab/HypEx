@@ -367,14 +367,14 @@ class ExperimentData:
 class DatasetAdapter(Adapter):
     @staticmethod
     def to_dataset(
-        data: dict | Dataset | pd.DataFrame | list | str | int | float | bool,
+        data: dict | Dataset | pd.DataFrame | spark.DataFrame | list | str | int | float | bool,
         roles: ABCRole | dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
         # Convert data based on its type
         if isinstance(data, dict):
             return DatasetAdapter.dict_to_dataset(data, roles, small)
-        elif isinstance(data, pd.DataFrame):
+        elif isinstance(data, pd.DataFrame) or isinstance(data, spark.DataFrame):
             if isinstance(roles, ABCRole):
                 raise InvalidArgumentError("roles", "dict[str, ABCRole]")
             return DatasetAdapter.frame_to_dataset(data, roles, small)
@@ -441,7 +441,8 @@ class DatasetAdapter(Adapter):
 
     @staticmethod
     def frame_to_dataset(
-        data: pd.DataFrame, roles: dict[str, ABCRole],
+        data: pd.DataFrame | spark.DataFrame, 
+        roles: dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
         if small:
