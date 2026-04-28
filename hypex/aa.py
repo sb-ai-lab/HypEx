@@ -7,6 +7,7 @@ from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
 from .comparators import GroupDifference, GroupSizes
 from .comparators.abstract import Comparator
 from .comparators.hypothesis_testing import GroupChi2Test, GroupKSTest, GroupTTest
+from .comparators.stats_hypothesis_testing import StatsTTest
 from .dataset import AdditionalTreatmentRole, TargetRole
 from .experiments.base import Experiment, OnRoleExperiment
 from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
@@ -24,12 +25,15 @@ AA_METRICS = Experiment(
         GroupSizes(grouping_role=AdditionalTreatmentRole()),
         OnRoleExperiment(
             executors=[
-                GroupDifference(
-                    compare_by="groups", grouping_role=AdditionalTreatmentRole()
-                ),
-                GroupTTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
+                # GroupDifference(
+                #     compare_by="groups", grouping_role=AdditionalTreatmentRole()
+                # ),
+                StatsTTest(grouping_role=AdditionalTreatmentRole(),
+                           target_roles=TargetRole(),
+                           reliability=0.05),
+                # GroupTTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
                 GroupKSTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
-                GroupChi2Test(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
+                # GroupChi2Test(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
             ],
             role=TargetRole(),
         ),

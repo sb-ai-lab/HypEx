@@ -8,6 +8,9 @@ from ..dataset import ABCRole, AdditionalTargetRole, ExperimentData, TempTargetR
 from ..executor import Executor
 from ..utils import ExperimentDataEnum
 
+import time
+
+
 
 class Experiment(Executor):
     def _detect_transformer(self) -> bool:
@@ -62,8 +65,14 @@ class Experiment(Executor):
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
+            start = time.perf_counter()
+            
             executor.key = self.key
             experiment_data = executor.execute(experiment_data)
+            end = time.perf_counter()
+
+            print(f"executor.key = {executor.id}; dt = {end - start:.4f}c")
+            
         return experiment_data
 
 

@@ -20,9 +20,9 @@ from ..utils import (
     ConcatBackendError,
     ConcatDataError,
     DataTypeError,
+    RoleColumnError,
     NAME_BORDER_SYMBOL,
     ScalarType,
-    RoleColumnError,
     SourceDataTypes,
 )
 from ..utils.adapter import Adapter
@@ -269,6 +269,7 @@ class DatasetBase(ABC):
         n_rows = self._backend_data.shape[0]
         df = self._build_repr(n_cols, n_rows)
         return f"{df.to_string()}\n\n{n_rows} rows × {n_cols} columns"
+        # return self.backend_data.__repr__
 
     def _repr_html_(self):
         n_cols = len(self.columns)
@@ -292,6 +293,17 @@ class DatasetBase(ABC):
         elif isinstance(item, slice):
             result = self._backend_data.__getitem__(item)
             return self.__class__(roles=self.roles, data=result)
+            
+        if isinstance(item, (pd.DataFrame, ps.DataFrame, pd.Series, ps.Series)):
+            result_data = self._backend_data.__getitem__(item)
+            res_cols = list(result_data.columns) if hasattr(result_data, 'columns') else self.columns
+            roles = {col: self.roles.get(col, InfoRole()) for col in res_cols}
+            result = self.__class__(data=result_data, roles=roles)
+            result.tmp_roles = {
+                k: v for k, v in self.tmp_roles.items() if k in result.columns
+            }
+            return result
+
         items = (
             [item] if isinstance(item, str) or not isinstance(item, Iterable) else item
         )
@@ -352,17 +364,19 @@ class DatasetBase(ABC):
                 raise TypeError("Value type does not match the expected data type.")
 
     def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
-        head = self._backend_data._display_head_tail(rows_display_limit=self.DISPLAY_ROWS,
-                                                cols_display_limit=self.DISPLAY_COLS,
-                                                n_cols=n_cols,
-                                                n_rows=n_rows)
+        head = self._backend_data._display_head_tail(
+            rows_display_limit=self.DISPLAY_ROWS,
+            cols_display_limit=self.DISPLAY_COLS,
+            n_cols=n_cols,
+            n_rows=n_rows)
 
         if n_rows > self.DISPLAY_ROWS * 2:
-            _tmp_tail = self._backend_data._display_head_tail(rows_display_limit=self.DISPLAY_ROWS,
-                                                         cols_display_limit=self.DISPLAY_COLS,
-                                                         n_cols=n_cols,
-                                                         n_rows=n_rows,
-                                                         tail=True)
+            _tmp_tail = self._backend_data._display_head_tail(
+                rows_display_limit=self.DISPLAY_ROWS,
+                cols_display_limit=self.DISPLAY_COLS,
+                n_cols=n_cols,
+                n_rows=n_rows,
+                tail=True)
 
             tail = pd.concat([pd.DataFrame([["..."] * len(head.columns)],
                                            index=["..."],
@@ -419,27 +433,43 @@ class DatasetBase(ABC):
             else deepcopy(self.roles)
         )
         return self.__class__(data=new_data, roles=new_roles)
-
-    def __binary_magic_operator(self,
-                                other: Any,
-                                func_name: str) -> Any:
-        if not any(isinstance(other, t)
-                   for t in [self.__class__, str, int, float, bool, Sequence]):
+    
+    def __binary_magic_operator(self, other: Any, func_name: str) -> Any:
+        if not any(isinstance(other, t) for t in [self.__class__, str, int, float, bool, Sequence]):
             raise DataTypeError(type(other))
-        func = getattr(self._backend_data, func_name)
-        t_roles = deepcopy(self.roles)
-        for role in t_roles.values():
-            role.data_type = None
+
+        self_raw = self.backend_data.data if hasattr(self.backend_data, 'data') else self.backend_data
+
         if isinstance(other, self.__class__):
             if type(other._backend_data) is not type(self._backend_data):
                 raise BackendTypeError(type(other._backend_data), type(self._backend_data))
-            other = other.rename(
-                {
-                    other.columns[i]: self.data.columns[i]
-                    for i in range(len(other.columns))
-                }
-            ).backend
-        return self.__class__(roles=t_roles, data=func(other), session=self.session)
+            other_raw = other.backend_data.data if hasattr(other.backend_data, 'data') else other.backend_data
+            
+            if hasattr(other_raw, 'columns') and hasattr(self_raw, 'columns'):
+                if len(other_raw.columns) == len(self_raw.columns) and list(other_raw.columns) != list(self_raw.columns):
+                    rename_map = {other_raw.columns[i]: self_raw.columns[i] for i in range(len(self_raw.columns))}
+                    other_raw = other_raw.rename(columns=rename_map)
+                if hasattr(self_raw, 'columns') and not hasattr(other_raw, 'columns'):
+                    other_raw = other_raw.to_frame()
+                    if other_raw.columns[0] != self_raw.columns[0]:
+                        other_raw.columns = self_raw.columns
+        else:
+            other_raw = other
+
+        func = getattr(self_raw, func_name)
+        result_raw = func(other_raw)
+
+        if hasattr(result_raw, 'to_frame') and not hasattr(result_raw, 'columns'):
+            col_name = result_raw.name if result_raw.name is not None else (self_raw.columns[0] if hasattr(self_raw, 'columns') else 'result')
+            result_raw = result_raw.to_frame(name=col_name)
+
+        actual_columns = list(result_raw.columns) if hasattr(result_raw, 'columns') else []
+        new_roles = {}
+        for col in actual_columns:
+            new_roles[col] = deepcopy(self.roles.get(col, self.default_role or DefaultRole()))
+            new_roles[col].data_type = None
+
+        return self.__class__(roles=new_roles, data=result_raw, session=self.session)
 
     # comparison operators:
     def __eq__(self, other: Any) -> DatasetBase:
@@ -927,13 +957,13 @@ class DatasetBase(ABC):
         result._tmp_roles = new_tmp_roles
         return result
 
-    def filter(self,
-               items: list | None = None,
-               regex: str | None = None,
-               axis: int | None = None) -> DatasetBase:
+    def filter(self, items = None, regex = None, axis = None):
         t_data = self._backend_data.filter(items=items, regex=regex, axis=axis)
         t_roles = {c: self.roles[c] for c in t_data.columns if c in self.roles.keys()}
-        return self.__class__(roles=t_roles, data=t_data)
+        
+        raw_data = t_data.data if hasattr(t_data, 'data') else t_data
+        
+        return self.__class__(roles=t_roles, data=raw_data)
 
     def select(self, columns: str | list[str]):
         columns = Adapter.to_list(columns)

@@ -21,6 +21,7 @@ from .roles import (
     IndexRole,
     InfoRole,
     PreTargetRole,
+    ReportRole,
     StatisticRole,
     StratificationRole,
     TargetRole,

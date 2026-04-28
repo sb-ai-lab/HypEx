@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Sequence, Sized
+from typing import Any, Callable, Iterable, Literal, Sequence, Sized, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -184,6 +184,8 @@ class PandasNavigation(DatasetBackendNavigation):
                 self.data = pd.DataFrame(data=wrapped)
         elif isinstance(data, str):
             self.data = self._read_file(data)
+        elif isinstance(data, list):
+            self.data = pd.DataFrame(data) if data else pd.DataFrame()
         else:
             self.data = pd.DataFrame()
 

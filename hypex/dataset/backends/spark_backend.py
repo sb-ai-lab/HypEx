@@ -216,12 +216,10 @@ class SparkNavigation(DatasetBackendNavigation):
         else:
             raise TypeError(f"Unsupported data type: {type(data)}")
         
-        
     def persist(self, 
                 storage_level: Literal["MEMORY_ONLY", 
                                        "MEMORY_AND_DISK", 
-                                       "DISK_ONLY", 
-                                       "MEMORY_ONLY_SER"] = "MEMORY_AND_DISK",
+                                       "DISK_ONLY"] = "MEMORY_AND_DISK",
                 action: Literal["count", "head", "none"] = "count"):
         """Persist the underlying Spark DataFrame in cache with automatic materialization.
         
@@ -237,9 +235,6 @@ class SparkNavigation(DatasetBackendNavigation):
                 - "MEMORY_ONLY": Store as deserialized Java objects in heap memory.
                 - "MEMORY_AND_DISK": Store in memory, spill partitions to disk if needed.
                 - "DISK_ONLY": Store partitions only on disk.
-                - "MEMORY_ONLY_SER": Store as serialized Java objects (more memory-efficient).
-                - "MEMORY_AND_DISK_SER": Serialized storage with disk spill capability.
-                - "OFF_HEAP": Store in off-heap memory (requires Tungsten).
                 Default is "MEMORY_AND_DISK" for balanced performance/reliability.
                 
             action (Literal): Action to trigger cache materialization:
@@ -263,7 +258,7 @@ class SparkNavigation(DatasetBackendNavigation):
         storage_levels = {
             "MEMORY_ONLY": StorageLevel.MEMORY_ONLY,
             "MEMORY_AND_DISK": StorageLevel.MEMORY_AND_DISK,
-            "DISK_ONLY": StorageLevel.DISK_ONLY
+            "DISK_ONLY": StorageLevel.DISK_ONLY,
         }
         
         if storage_level not in storage_levels:
@@ -280,18 +275,13 @@ class SparkNavigation(DatasetBackendNavigation):
         original_index_names = self.data.index.names
         original_index_name = original_index_names[0] if len(original_index_names) == 1 else original_index_names
         
-        spark_df = self.data.to_spark()
-        
-        spark_df.persist(storage_levels[storage_level])
+        self.data = self.data.spark.persist(storage_levels[storage_level])
         
         if action == "count":
-            _ = spark_df.count()
+            _ = self.data.count()
         elif action == "head":
-            _ = spark_df.limit(1).collect()
+            _ = self.data.head(1)
         
-        self.data = ps.DataFrame(spark_df)
-        
-
         if isinstance(original_index_name, str):
             if original_index_name in self.data.columns:
                 self.data = self.data.set_index(original_index_name)
@@ -321,14 +311,13 @@ class SparkNavigation(DatasetBackendNavigation):
             Self: Reference to self for method chaining.
         """
         if getattr(self, '_is_persisted_flag', False):
-            
             original_index_names = self.data.index.names
             original_index_name = original_index_names[0] if len(original_index_names) == 1 else original_index_names
             
-            spark_df = self.data.to_spark()
-            spark_df.unpersist(blocking=blocking)
-            
-            self.data = ps.DataFrame(spark_df)
+            if blocking:
+                self.data.to_spark().unpersist(blocking=True)
+            else:
+                self.data.spark.unpersist()
             
             if isinstance(original_index_name, str):
                 if original_index_name in self.data.columns:

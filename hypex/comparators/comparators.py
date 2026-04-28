@@ -40,7 +40,12 @@ class GroupDifference(Comparator):
         test_data = cls._check_test_data(test_data)
         control_mean = data.mean()
         test_mean = test_data.mean()
-
+        
+        if isinstance(control_mean, Dataset):
+            control_mean = control_mean.iget_values(0, 0)
+        if isinstance(test_mean, Dataset):
+            test_mean = test_mean.iget_values(0, 0)
+            
         return {
             "control mean": control_mean,
             "test mean": test_mean,
