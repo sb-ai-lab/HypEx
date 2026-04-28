@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Any
 
 import numpy as np
 
 from ..dataset import ABCRole, Dataset
 from ..utils.constants import NUMBER_TYPES_LIST
-from .abstract import Comparator
+from .abstract import Comparator, BaseComparator
 
 NUM_OF_BUCKETS = 10
 
@@ -111,3 +111,59 @@ class PSI(Comparator):
         test_data_psi = [x[1].count() / len(test_data) for x in test_data_groups]
         psi = [(y - x) * np.log(y / x) for x, y in zip(data_psi, test_data_psi)]
         return {"PSI": sum(psi)}
+
+# Master-backend classes for stat-tests
+class TTest(BaseComparator): #TODO: does it nessesary to inheritance from comparator?
+    """
+    T-test master-backend class.
+    """
+    def __init__(self, **experiment_kwargs):
+        self.experiment_kwargs: dict[str, Any] = experiment_kwargs
+    
+    @property
+    def experiment_kwargs(self):
+        return self.experiment_kwargs
+
+class Chi2Test(BaseComparator):
+    """
+    Chi-square test master-backend class.
+    """
+    def __init__(self, **experiment_kwargs):
+        self.experiment_kwargs: dict[str, Any] = experiment_kwargs
+    
+    @property
+    def experiment_kwargs(self):
+        return self.experiment_kwargs
+
+class KSTest(BaseComparator):
+    """
+    KS-test master-backend class.
+    """
+    def __init__(self, **experiment_kwargs):
+        self.experiment_kwargs: dict[str, Any] = experiment_kwargs
+    
+    @property
+    def experiment_kwargs(self):
+        return self.experiment_kwargs
+
+class UTest(BaseComparator):
+    """
+    KS-test master-backend class.
+    """
+    def __init__(self, **experiment_kwargs):
+        self.experiment_kwargs: dict[str, Any] = experiment_kwargs
+    
+    @property
+    def experiment_kwargs(self):
+        return self.experiment_kwargs
+
+class ZTest(BaseComparator):
+    """
+    Z-test masker-backend class.
+    """
+    def __init__(self, **experiment_kwargs):
+        self.experiment_kwargs: dict[str, Any] = experiment_kwargs
+    
+    @property
+    def experiment_kwargs(self):
+        return self.experiment_kwargs

@@ -6,7 +6,16 @@ from .abstract import (
     StatsComparator,
     StatsHypothesisTesting,
 )
-from .comparators import PSI, GroupDifference, GroupSizes
+from .comparators import (
+    PSI, 
+    GroupDifference, 
+    GroupSizes,
+    TTest,
+    Chi2Test,
+    KSTest,
+    UTest,
+    ZTest
+)
 from .distances import MahalanobisDistance
 from .hypothesis_testing import GroupChi2Test, GroupKSTest, GroupTTest, GroupUTest
 from .stats_hypothesis_testing import StatsTTest, StatsChi2Test, StatsZTest
@@ -31,5 +40,10 @@ __all__ = [
     "GroupUTest",
     "StatsTTest",
     "StatsChi2Test",
-    "StatsZTest"
+    "StatsZTest",
+    "TTest",
+    "Chi2Test",
+    "KSTest",
+    "UTest",
+    "ZTest"
 ]

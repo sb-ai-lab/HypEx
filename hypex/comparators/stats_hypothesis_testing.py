@@ -7,11 +7,15 @@ from typing import Any
 from scipy.stats import t as t_dist, chi2_contingency
 
 from ..dataset import ABCRole
+from ..dataset.backends import SparkDataset
 from ..utils.constants import NUMBER_TYPES_LIST, CATEGORICAL_TYPES_LIST
+from ..utils.registry import backend_factory
 from .abstract import StatsHypothesisTesting
+from .comparators import TTest, Chi2Test, ZTest
 
 from math import sqrt
 
+@backend_factory.register(TTest, SparkDataset)
 class StatsTTest(StatsHypothesisTesting):
     """
     Two-sample t-test with automatic variance homogeneity check.
@@ -181,7 +185,8 @@ class StatsTTest(StatsHypothesisTesting):
             den = ((s_list[0] / n_list[0]) ** 2 / (n_list[0] - 1) + 
                    (s_list[1] / n_list[1]) ** 2 / (n_list[1] - 1))
             return num / den
-        
+
+@backend_factory.register(Chi2Test, SparkDataset)
 class StatsChi2Test(StatsHypothesisTesting):
     """
     Chi-squared test of independence operating on aggregated value counts.
@@ -302,7 +307,8 @@ class StatsChi2Test(StatsHypothesisTesting):
             return {"p-value": 1.0, "statistic": 0.0, "pass": True}
 
         return result
-    
+
+@backend_factory.register(ZTest, SparkDataset)
 class StatsZTest(StatsHypothesisTesting):
     """
     Z-test for proportions (approximation of Chi-square for 2x2 table).

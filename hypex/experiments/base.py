@@ -7,6 +7,7 @@ from typing import Any
 from ..dataset import ABCRole, AdditionalTargetRole, ExperimentData, TempTargetRole
 from ..executor import Executor
 from ..utils import ExperimentDataEnum
+from ..utils.registry import backend_factory
 
 
 class Experiment(Executor):
@@ -62,8 +63,15 @@ class Experiment(Executor):
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
-            executor.key = self.key
-            experiment_data = executor.execute(experiment_data)
+            executor_cls = type(executor)
+            executor_dep_on_backend = backend_factory.resolve_backend(executor_cls, experiment_data.ds)
+            if executor_dep_on_backend is None:
+                cur_executer = executor
+            else:
+                executor_params = getattr(executor, 'experiment_kwargs', {})
+                cur_executer = executor_dep_on_backend(**executor_params)
+            executor.key = self.key #TODO: do we need to send here slave-backend class key?
+            experiment_data = cur_executer.execute(experiment_data)
         return experiment_data
 
 
