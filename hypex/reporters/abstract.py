@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ..dataset import Dataset, ExperimentData
+from ..dataset import Dataset, SmallDataset, ExperimentData
 from ..dataset.dataset import SmallDataset
 from ..dataset.roles import InfoRole, ReportRole, TreatmentRole
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
@@ -67,7 +67,7 @@ class DatasetReporter(OnDictReporter):
 
     @staticmethod
     def convert_to_dataset(data: dict) -> dict[str, Dataset] | Dataset:
-        return Dataset.from_dict(roles={k: ReportRole() for k in data}, data=[data])
+        return SmallDataset.from_dict(roles={k: ReportRole() for k in data}, data=data)
 
 
 class TestDictReporter(DictReporter):
@@ -130,6 +130,12 @@ class TestDictReporter(DictReporter):
                         t_values[f"{test} p-value"] = values.get("p-value")
                 result.append(t_values)
         result = [rename_passed(d) for d in result]
+        if not result:
+            return SmallDataset.from_dict(
+                {"feature": [], "group": []},
+                roles={"feature": InfoRole(), "group": TreatmentRole()}
+            )
+        
         return SmallDataset.from_dict(
             result,
             roles={"feature": InfoRole(), "group": TreatmentRole()},

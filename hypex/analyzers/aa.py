@@ -5,7 +5,8 @@ from typing import Any, ClassVar
 import numpy as np
 
 from ..comparators import GroupChi2Test, GroupKSTest, GroupTTest
-from ..dataset import Dataset, ExperimentData, StatisticRole
+from ..comparators import StatsTTest, StatsChi2Test, StatsZTest
+from ..dataset import Dataset, ExperimentData, StatisticRole, InfoRole
 from ..dataset.dataset import SmallDataset
 from ..executor import Executor
 from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
@@ -15,11 +16,12 @@ from ..utils import ID_SPLIT_SYMBOL, BackendsEnum, ExperimentDataEnum
 
 
 class OneAAStatAnalyzer(Executor):
-    def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
+    def _set_value(self, data: ExperimentData, value, key = None) -> ExperimentData:
         return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        analysis_tests: list[type] = [GroupTTest, GroupKSTest, GroupChi2Test]
+        analysis_tests: list[type] = [GroupTTest, GroupKSTest, GroupChi2Test,
+                                      StatsTTest, StatsChi2Test, StatsZTest]
         executor_ids = data.get_ids(
             analysis_tests, searched_space=ExperimentDataEnum.analysis_tables
         )
@@ -34,34 +36,39 @@ class OneAAStatAnalyzer(Executor):
                     )
                 else:
                     t_data = data.analysis_tables[analysis_ids[0]]
-                # t_data.data.index = analysis_ids
+
                 for field in ["p-value", "pass"]:
-                    analysis_data[f"mean {class_} {field}"] = t_data[field].mean()
+                    analysis_data[f"mean{ID_SPLIT_SYMBOL}{class_}{ID_SPLIT_SYMBOL}{field}{ID_SPLIT_SYMBOL}all"] = t_data[field].mean()
+
         analysis_data["mean test score"] = 0
         sum_weight = 0
         analysis_data = {
             key: (0 if np.isnan(value) else value)
             for key, value in analysis_data.items()
         }
-        if (
-            "mean GroupTTest p-value" in analysis_data
-            and "mean GroupKSTest p-value" in analysis_data
-        ):
-            analysis_data["mean test score"] = (
-                analysis_data["mean GroupTTest p-value"]
-                + 2 * analysis_data["mean GroupKSTest p-value"]
-            )
+
+        gtt_p = f"mean{ID_SPLIT_SYMBOL}GroupTTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
+        gks_p = f"mean{ID_SPLIT_SYMBOL}GroupKSTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
+        stt_p = f"mean{ID_SPLIT_SYMBOL}StatsTTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
+        chi2_p = f"mean{ID_SPLIT_SYMBOL}GroupChi2Test{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
+
+        if gtt_p in analysis_data and gks_p in analysis_data:
+            analysis_data["mean test score"] = analysis_data[gtt_p] + 2 * analysis_data[gks_p]
             sum_weight += 3
-        if "mean GroupChi2Test p-value" in analysis_data:
-            analysis_data["mean test score"] += (
-                2 * analysis_data["mean GroupChi2Test p-value"]
-            )
+
+        if stt_p in analysis_data:
+            analysis_data["mean test score"] = analysis_data[stt_p]
+            sum_weight += 3
+
+        if chi2_p in analysis_data:
+            analysis_data["mean test score"] += 2 * analysis_data[chi2_p]
             sum_weight += 2
+
         if sum_weight:
             analysis_data["mean test score"] /= sum_weight
 
         analysis_dataset = SmallDataset.from_dict(
-            [analysis_data],
+            analysis_data,
             {field: StatisticRole(float) for field in analysis_data},
         )
 
@@ -117,32 +124,46 @@ class AAScoreAnalyzer(Executor):
         if splitter_class is None:
             raise ValueError(f"{splitter_id} is not a valid splitter id")
         return splitter_class.build_from_id(splitter_id)
-
+    
     def _get_best_split(self, data, score_table, if_param_scores=None):
         if if_param_scores is not None:
             best_index = 0
         elif not self.__feature_weights:
             best_index = 0
         else:
-            # Calculate weighted p-value score
             pvalue_weight = 2 / 3
             test_score_weight = 1 / 3
+            pass_suffix = f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}all"
+            pval_suffix = f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
+            weighted_pvalues = None
 
-            def calculate_split_score(row):
-                weighted_pvalues = sum(
-                    row[key.replace("__pass__", "__p-value__")] * weight
-                    for key, weight in self.__feature_weights.items()
-                    if weight > 0
-                ) / len(self.__feature_weights)
+            for key, weight in self.__feature_weights.items():
+                if weight > 0:
+                    pval_col = key.replace(pass_suffix, pval_suffix)
+                    if pval_col in score_table.columns:
+                        col_data = score_table.select(pval_col)
+                        if weighted_pvalues is None:
+                            weighted_pvalues = col_data * weight
+                        else:
+                            weighted_pvalues = weighted_pvalues + (col_data * weight)
 
-                return (weighted_pvalues * pvalue_weight +
-                        row["mean test score"] * test_score_weight)
+            if weighted_pvalues is None:
+                weighted_pvalues = score_table.select("mean test score") * 0
+            else:
+                weighted_pvalues = weighted_pvalues / len(self.__feature_weights)
 
-            scores = score_table.apply(calculate_split_score, axis=1)
-            best_index = scores.idxmax()
+            score_col = (weighted_pvalues * pvalue_weight + 
+                        score_table.select("mean test score") * test_score_weight)
 
-        best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
-        score_dict = if_param_scores.loc[best_index, :].transpose().to_records()[0]
+            best_index = score_col.idxmax()
+            print(f"best_index = {best_index}")
+            best_split_id = score_table.loc[best_index, "splitter_id"].iget_values(row=0, column=0)
+            
+        if if_param_scores is not None:
+            score_dict = if_param_scores.loc[best_index, :].transpose().to_records()[0]
+        else:
+            score_dict = score_table.loc[best_index, :].transpose().to_records()[0]
+            
         best_score_stat = OneAADictReporter.convert_flat_dataset(score_dict)
         self.key = "best split statistics"
         result = self._set_value(data, best_score_stat)
@@ -182,7 +203,6 @@ class AAScoreAnalyzer(Executor):
             ExperimentDataEnum.analysis_tables,
         )
         score_table = data.analysis_tables[param_experiment_id]
-        score_table = score_table.dropna(axis=1, how="all")
         if_param_scores = (
             None
             if len(ifparam_experiment_id["IfParamsExperiment"]["analysis_tables"]) == 0

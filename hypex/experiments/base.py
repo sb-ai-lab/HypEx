@@ -4,10 +4,14 @@ from collections.abc import Iterable, Sequence
 from copy import deepcopy
 from typing import Any
 
-from ..dataset import ABCRole, AdditionalTargetRole, ExperimentData, TempTargetRole
+from ..dataset import ABCRole, AdditionalTargetRole, ExperimentData, TempTargetRole, Dataset
 from ..executor import Executor
 from ..utils import ExperimentDataEnum
 from ..utils.registry import backend_factory
+
+import time
+import inspect
+
 
 
 class Experiment(Executor):
@@ -59,19 +63,64 @@ class Experiment(Executor):
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
+    
+    @staticmethod
+    def _get_executor_backend(executor: Executor, ds: Dataset):
+        """
+        Class for selecting backend-dependent realization for direct executor
+        """
+        executor_cls = type(executor)
+        print(executor_cls.__name__, type(ds.backend_data))
+        backend_cls = backend_factory.resolve_backend(executor_cls, ds)
+        if backend_cls is None:
+             return executor
+        # else:
+        #     executor_params = getattr(executor, 'experiment_kwargs', {})
+        #     cur_executer = executor_dep_on_backend(**executor_params)
+        
+        # return cur_executer
+        sig = inspect.signature(backend_cls.__init__)
+        expected_params = {p.name for p in sig.parameters.values() if p.name != 'self'}
+
+        # 2. Извлекаем только те атрибуты, которые ожидаются целевым классом
+        # (используем hasattr/getattr, чтобы корректно захватить и @property, и обычные поля)
+        init_kwargs = {k: getattr(executor, k) for k in expected_params if hasattr(executor, k)}
+
+        # 3. Если целевой класс принимает **kwargs, пробрасываем calc_kwargs
+        has_var_keyword = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+        if has_var_keyword and hasattr(executor, 'calc_kwargs'):
+            init_kwargs['calc_kwargs'] = executor.calc_kwargs
+
+        # 4. Создаём бэкенд-зависимый экземпляр
+        new_executor = backend_cls(**init_kwargs)
+
+        # 5. Сохраняем ключ (он будет перезаписан в execute(), но для отладки и сериализации полезно)
+        if hasattr(executor, 'key'):
+            new_executor.key = executor.key
+
+        return new_executor
+            
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
-            executor_cls = type(executor)
-            executor_dep_on_backend = backend_factory.resolve_backend(executor_cls, experiment_data.ds)
-            if executor_dep_on_backend is None:
-                cur_executer = executor
-            else:
-                executor_params = getattr(executor, 'experiment_kwargs', {})
-                cur_executer = executor_dep_on_backend(**executor_params)
-            executor.key = self.key #TODO: do we need to send here slave-backend class key?
-            experiment_data = cur_executer.execute(experiment_data)
+            start = time.perf_counter()
+            cur_executor = self._get_executor_backend(executor, experiment_data.ds)
+            # executor_cls = type(executor)
+            # print(executor_cls.__name__, type(experiment_data.ds.backend_data))
+            # executor_dep_on_backend = backend_factory.resolve_backend(executor_cls, experiment_data.ds)
+            # if executor_dep_on_backend is None:
+            #     cur_executer = executor
+            # else:
+            #     executor_params = getattr(executor, 'experiment_kwargs', {})
+            #     cur_executer = executor_dep_on_backend(**executor_params)
+            cur_executor.key = self.key #TODO: do we need to send here slave-backend class key?
+            print(cur_executor.__class__.__name__)
+            experiment_data = cur_executor.execute(experiment_data)
+            end = time.perf_counter()
+
+            print(f"executor.key = {executor.id}; dt = {end - start:.4f}c")
+            
         return experiment_data
 
 

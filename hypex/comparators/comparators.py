@@ -40,7 +40,12 @@ class GroupDifference(Comparator):
         test_data = cls._check_test_data(test_data)
         control_mean = data.mean()
         test_mean = test_data.mean()
-
+        
+        if isinstance(control_mean, Dataset):
+            control_mean = control_mean.iget_values(0, 0)
+        if isinstance(test_mean, Dataset):
+            test_mean = test_mean.iget_values(0, 0)
+            
         return {
             "control mean": control_mean,
             "test mean": test_mean,
@@ -112,58 +117,59 @@ class PSI(Comparator):
         psi = [(y - x) * np.log(y / x) for x, y in zip(data_psi, test_data_psi)]
         return {"PSI": sum(psi)}
 
+class StatTestMasterAbstract(BaseComparator):
+    """
+    Master-abstract class for stat-tests
+    """
+    # def __init__(self, **experiment_kwargs):
+    #     self._experiment_kwargs: dict[str, Any] = experiment_kwargs
+    def __init__(
+            self,
+            grouping_role: ABCRole | None = None,
+            target_roles: ABCRole | None = None,
+            reliability: float = 0.05,
+            compare_by: Literal[
+                "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+            ] = "groups",
+            key: Any = "",
+    ):
+        super().__init__(grouping_role=grouping_role, target_roles=target_roles, key=key)
+        self.reliability = reliability
+        self.compare_by = compare_by
+    
+    @staticmethod
+    def _inner_function(data, **kwargs):
+        pass
+
+    def execute(self, data):
+        pass
+    
+    @property
+    def experiment_kwargs(self):
+        return self._experiment_kwargs
+
 # Master-backend classes for stat-tests
-class TTest(BaseComparator): #TODO: does it nessesary to inheritance from comparator?
+class TTest(StatTestMasterAbstract): #TODO: does it nessesary to inheritance from comparator?
     """
     T-test master-backend class.
     """
-    def __init__(self, **experiment_kwargs):
-        self.experiment_kwargs: dict[str, Any] = experiment_kwargs
-    
-    @property
-    def experiment_kwargs(self):
-        return self.experiment_kwargs
 
-class Chi2Test(BaseComparator):
+class Chi2Test(StatTestMasterAbstract):
     """
     Chi-square test master-backend class.
     """
-    def __init__(self, **experiment_kwargs):
-        self.experiment_kwargs: dict[str, Any] = experiment_kwargs
-    
-    @property
-    def experiment_kwargs(self):
-        return self.experiment_kwargs
 
-class KSTest(BaseComparator):
+class KSTest(StatTestMasterAbstract):
     """
     KS-test master-backend class.
     """
-    def __init__(self, **experiment_kwargs):
-        self.experiment_kwargs: dict[str, Any] = experiment_kwargs
-    
-    @property
-    def experiment_kwargs(self):
-        return self.experiment_kwargs
 
-class UTest(BaseComparator):
+class UTest(StatTestMasterAbstract):
     """
     KS-test master-backend class.
     """
-    def __init__(self, **experiment_kwargs):
-        self.experiment_kwargs: dict[str, Any] = experiment_kwargs
-    
-    @property
-    def experiment_kwargs(self):
-        return self.experiment_kwargs
 
-class ZTest(BaseComparator):
+class ZTest(StatTestMasterAbstract):
     """
     Z-test masker-backend class.
     """
-    def __init__(self, **experiment_kwargs):
-        self.experiment_kwargs: dict[str, Any] = experiment_kwargs
-    
-    @property
-    def experiment_kwargs(self):
-        return self.experiment_kwargs

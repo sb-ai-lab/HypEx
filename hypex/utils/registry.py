@@ -48,7 +48,8 @@ class BackendFactory:
         backend_type = type(data.backend_data)
 
         if not cls_backends:
-            raise NotImplementedError(f"{base_cls.__name__} doesn't exist!")
+            # raise NotImplementedError(f"{base_cls.__name__} doesn't exist!")
+            return None # no such class in factory, so base_cls is what we need
 
         cls = cls_backends.get(backend_type)
 

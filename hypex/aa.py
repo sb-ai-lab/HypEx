@@ -24,12 +24,15 @@ AA_METRICS = Experiment(
         GroupSizes(grouping_role=AdditionalTreatmentRole()),
         OnRoleExperiment(
             executors=[
-                GroupDifference(
-                    compare_by="groups", grouping_role=AdditionalTreatmentRole()
-                ),
-                TTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
-                KSTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
-                Chi2Test(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
+                # GroupDifference(
+                #     compare_by="groups", grouping_role=AdditionalTreatmentRole()
+                # ),
+                TTest(grouping_role=AdditionalTreatmentRole(),
+                           target_roles=TargetRole(),
+                           reliability=0.05),
+                # GroupTTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
+                # KSTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
+                # GroupChi2Test(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
             ],
             role=TargetRole(),
         ),
@@ -256,5 +259,5 @@ class AATest(ExperimentShell):
         )
         if t_test_equal_var is not None:
             self.experiment.set_params(
-                {GroupTTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
+                {TTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
             )

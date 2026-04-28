@@ -176,8 +176,9 @@ class IfParamsExperiment(ParamsExperiment):
         for flat_param in tqdm(self._flat_params):
             t_data = ExperimentData(data.ds)
             for executor in self.executors:
-                executor.set_params(flat_param)
-                t_data = executor.execute(t_data)
+                cur_executer = self._get_executor_backend(executor, t_data)
+                cur_executer.set_params(flat_param)
+                t_data = cur_executer.execute(t_data)
             if_result = self.stopping_criterion.execute(t_data)
             if_executor_id = if_result.get_one_id(
                 self.stopping_criterion.__class__, ExperimentDataEnum.variables
