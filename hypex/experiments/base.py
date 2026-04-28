@@ -82,19 +82,14 @@ class Experiment(Executor):
         sig = inspect.signature(backend_cls.__init__)
         expected_params = {p.name for p in sig.parameters.values() if p.name != 'self'}
 
-        # 2. Извлекаем только те атрибуты, которые ожидаются целевым классом
-        # (используем hasattr/getattr, чтобы корректно захватить и @property, и обычные поля)
         init_kwargs = {k: getattr(executor, k) for k in expected_params if hasattr(executor, k)}
 
-        # 3. Если целевой класс принимает **kwargs, пробрасываем calc_kwargs
         has_var_keyword = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
         if has_var_keyword and hasattr(executor, 'calc_kwargs'):
             init_kwargs['calc_kwargs'] = executor.calc_kwargs
 
-        # 4. Создаём бэкенд-зависимый экземпляр
         new_executor = backend_cls(**init_kwargs)
 
-        # 5. Сохраняем ключ (он будет перезаписан в execute(), но для отладки и сериализации полезно)
         if hasattr(executor, 'key'):
             new_executor.key = executor.key
 
