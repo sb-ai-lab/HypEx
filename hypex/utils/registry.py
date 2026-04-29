@@ -40,6 +40,15 @@ class BackendFactory:
     def registry(self):
         return self._registry
     
+    def rigestry_output(self):
+        """
+        Print all backend_factory structure.
+        """
+        for key, value in self._registry.items():
+            print(f"Key class - {key.__name__}:")
+            for backend, realization in value.items():
+                print(f"\tBackend - {backend.__name__} : realization - {realization.__name__}")
+    
     def resolve_backend(self, base_cls: Type, data):
         """
         Get realization of class depending on data backend type.
