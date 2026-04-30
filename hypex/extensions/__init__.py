@@ -1,13 +1,8 @@
-from .encoders import DummyEncoderExtension
-# from .faiss import FaissExtension
+from .encoders import DummyEncoderExtension, PandasDummyEncoderExtension, SparkDummyEncoderExtension
+
 from .faiss import FaissExtension, SparkFaissExtension, PandasFaissExtension
 from .scipy_linalg import CholeskyExtension, InverseExtension
-# from .scipy_stats import (
-#     GroupChi2TestExtension,
-#     GroupKSTestExtension,
-#     GroupTTestExtension,
-#     GroupUTestExtension,
-# )
+
 from .scipy_stats import (
     GroupChi2TestExtension,
     GroupKSTestExtension,
@@ -25,27 +20,15 @@ from .scipy_stats import (
 
 from .statsmodels import MultiTest, MultitestQuantile
 
-# __all__ = [
-#     "GroupChi2TestExtension",
-#     "CholeskyExtension",
-#     "DummyEncoderExtension",
-#     "FaissExtension",
-#     "InverseExtension",
-#     "GroupKSTestExtension",
-#     "MultiTest",
-#     "MultitestQuantile",
-#     "GroupTTestExtension",
-#     "GroupUTestExtension",
-# ]
 __all__ = [
     "DummyEncoderExtension",
+    "PandasDummyEncoderExtension",
+    "SparkDummyEncoderExtension",
     "FaissExtension",
     "SparkFaissExtension",
     "PandasFaissExtension",
     "CholeskyExtension",
     "InverseExtension",
-    # "PandasGroupStatTest",
-    # "SparkGroupStatTest",
     "GroupTTestExtension",
     "GroupUTestExtension",
     "GroupChi2TestExtension",

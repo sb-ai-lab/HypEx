@@ -3,7 +3,7 @@ from __future__ import annotations
 from ..dataset import Dataset
 from ..extensions.encoders import DummyEncoderExtension
 from .abstract import Encoder
-
+from ..utils.registry import backend_factory
 
 class DummyEncoder(Encoder):
     @staticmethod
@@ -12,6 +12,8 @@ class DummyEncoder(Encoder):
     ) -> Dataset:
         if not target_cols:
             return Dataset.create_empty()
-        return DummyEncoderExtension().calc(
+        
+        encoder_cls = backend_factory(DummyEncoderExtension, data)
+        return encoder_cls().calc(
             data=data, target_cols=target_cols, **kwargs
         )
