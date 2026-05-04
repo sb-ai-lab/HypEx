@@ -405,7 +405,13 @@ class GroupedDataset:
                 "Use Dataset.groupby() instead of constructing GroupedDataset directly."
             )
         for key, group in self._backend_data.iter_groups(self._group_cols):
-            yield key, self._dataset_class(roles=self.roles, data=group)
+            group_cols = set(group.columns) if hasattr(group, 'columns') else set()
+
+            filtered_roles = {
+             col: role for col, role in self.roles.items() if col in group_cols
+            }
+
+            yield key, self._dataset_class(roles=filtered_roles, data=group)
     
     def __len__(self):
         """

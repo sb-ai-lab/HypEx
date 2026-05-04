@@ -10,13 +10,14 @@ from ..dataset import (
     ABCRole,
     AdditionalFeatureRole,
     Dataset,
+    GroupedDataset,
     ExperimentData,
     FeatureRole,
     GroupingRole,
     TargetRole,
 )
 from ..executor import Calculator
-from ..extensions.scipy_linalg import CholeskyExtension, InverseExtension
+from ..extensions.scipy_linalg import UniteCovExtension, CholeskyExtension, InverseExtension
 from ..utils import ExperimentDataEnum, NotSuitableFieldError
 from ..utils.adapter import Adapter
 
@@ -36,26 +37,48 @@ class MahalanobisDistance(Calculator):
     def _execute_inner_function(
         cls,
         grouping_data,
+        tmp_roles,
         target_fields: list[str] | None = None,
         **kwargs,
     ) -> dict:
         result = {}
-        for i in range(1, len(grouping_data)):
-            result.update(
-                cls._inner_function(
-                    data=(
-                        grouping_data[0][1][target_fields]
-                        if target_fields
-                        else grouping_data[0][1]
-                    ),
-                    test_data=(
-                        grouping_data[i][1][target_fields]
-                        if target_fields
-                        else grouping_data[i][1]
-                    ),
-                    **kwargs,
+        test_data = None
+        for enum, (_, grouped_data) in enumerate(grouping_data):
+            if enum == 0:
+                test_data: Dataset = grouped_data
+                test_data.tmp_roles = tmp_roles
+            else:
+                result.update(
+                    cls._inner_function(
+                        data=(
+                            test_data[target_fields]
+                            if target_fields
+                            else test_data
+                        ),
+                        test_data=(
+                            grouped_data[target_fields]
+                            if target_fields
+                            else grouped_data
+                        ),
+                        **kwargs,
+                    )
                 )
-            )
+        # for i in range(1, len(grouping_data)):
+        #     result.update(
+        #         cls._inner_function(
+        #             data=(
+        #                 grouping_data[0][1][target_fields]
+        #                 if target_fields
+        #                 else grouping_data[0][1]
+        #             ),
+        #             test_data=(
+        #                 grouping_data[i][1][target_fields]
+        #                 if target_fields
+        #                 else grouping_data[i][1]
+        #             ),
+        #             **kwargs,
+        #         )
+        #     )
         return result
 
     def _set_value(
@@ -90,7 +113,10 @@ class MahalanobisDistance(Calculator):
         **kwargs,
     ):
         test_data = cls._check_test_data(test_data)
-        cov = (data.cov() + test_data.cov()) / 2 if test_data else data.cov()
+        # conversion to numpy is necessary to bring the backends to the same form
+        # cov = (data.cov().to_numpy() + test_data.cov().to_numpy()) / 2 if test_data else data.cov().to_numpy() 
+        cov = UniteCovExtension().calc(data, test_data)
+        # print(cov)
         cholesky = CholeskyExtension().calc(cov)
         mahalanobis_transform = InverseExtension().calc(cholesky)
         if weights is not None:
@@ -100,9 +126,20 @@ class MahalanobisDistance(Calculator):
             )
             w_matrix = np.sqrt(np.diag(w_list / w_list.sum()))
             mahalanobis_transform = mahalanobis_transform.dot(w_matrix)
-        y_control = data.dot(mahalanobis_transform.transpose())
+        
+        # Convertion from SmallDataset to Dataset with similar backend to data. 
+        # mahalanobis_transform data will be transposed during convertion to Dataset.
+        mahalanobis_transform = mahalanobis_transform.transpose()
+        mahalanobis_transform = Dataset(
+            roles=mahalanobis_transform.roles, 
+            data=mahalanobis_transform.data,
+            backend=data.backend_type,
+            session=data.session
+        )
+
+        y_control = data.dot(mahalanobis_transform) # TODO: check SparkDataset.
         if test_data:
-            y_test = test_data.dot(mahalanobis_transform.transpose())
+            y_test = test_data.dot(mahalanobis_transform)
             return {"control": y_control, "test": y_test}
         return {"control": y_control}
 
@@ -111,7 +148,7 @@ class MahalanobisDistance(Calculator):
         cls,
         data: Dataset,
         group_field: Sequence[str] | str | None = None,
-        grouping_data: list[tuple[str, Dataset]] | None = None,
+        grouping_data: GroupedDataset | None = None,
         target_fields: str | list[str] | None = None,
         weights: dict[str, float] | None = None,
         **kwargs,
@@ -121,11 +158,18 @@ class MahalanobisDistance(Calculator):
         if grouping_data is None:
             grouping_data = data.groupby(group_field)
         if len(grouping_data) > 1:
-            grouping_data[0][1].tmp_roles = data.tmp_roles
+            tmp_roles = data.tmp_roles
+            for group_col in Adapter.to_list(group_field):
+                tmp_roles.pop(group_col, None)
         else:
             raise NotSuitableFieldError(group_field, "Grouping")
+        # if len(grouping_data) > 1:
+        #     grouping_data[0][1].tmp_roles = data.tmp_roles
+        # else:
+        #     raise NotSuitableFieldError(group_field, "Grouping")
         return cls._execute_inner_function(
             grouping_data,
+            tmp_roles=tmp_roles,
             target_fields=target_fields,
             old_data=data,
             weights=weights,
