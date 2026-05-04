@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import copy
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
@@ -540,6 +541,20 @@ class SparkNavigation(DatasetBackendNavigation):
     def __rpow__(self, other: Any) -> "SparkNavigation":
         """Right-hand exponentiation (other ** self)."""
         return self._wrap_result(self.__magic_determine_other(other) ** self.data)
+
+    def __deepcopy__(self, memo):
+        """deepcopy backend data"""
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if isinstance(v, (SparkSession, SparkDF, ps.DataFrame)):
+                setattr(result, k, v)
+                memo[id(v)] = v
+            else:
+                setattr(result, k, copy.deepcopy(v, memo))
+
+        return result
 
     def __repr__(self) -> str:
         """Return string representation of the dataset."""
@@ -1119,6 +1134,13 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 col_mask = self.data[col] == row[col]
                 mask = col_mask if mask is None else mask & col_mask
             yield key, self.data[mask]
+    
+    def count_groups(self, group_cols: list[str]) -> int:
+        """Count unique combinations of group_cols"""
+        if not group_cols:
+            return 1
+        return int(len(self.data[group_cols].drop_duplicates()))
+
 
     def grouped_value_counts(self, by: list[str], feature_cols: list[str] | None=None):
         from functools import reduce

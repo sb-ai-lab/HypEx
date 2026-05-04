@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized, TYPE_CHECKING
+import copy
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -554,6 +555,16 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.__magic_determine_other(other) ** self.data)
 
+    def __deepcopy__(self, memo):
+        """deepcopy backend data"""
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            setattr(result, k, copy.deepcopy(v, memo))
+
+        return result
+
     def __repr__(self):
         """Return string representation of the underlying DataFrame.
 
@@ -1078,6 +1089,12 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             pd.Grouper
         """
         return self.data.groupby(by=by, observed=False, **kwargs)
+
+    def count_groups(self, group_cols: list[str]) -> int:
+        """Count unique combinations of group_cols"""
+        if not group_cols:
+            return 1
+        return int(self.data[group_cols].drop_duplicates().shape[0])
 
     def iter_groups(self, by: list[str]):
         for key, group in self.data.groupby(by=by, observed=False):

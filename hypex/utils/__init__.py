@@ -51,7 +51,8 @@ from .typings import (
     StratificationRoleTypes,
     TargetRoleTypes,
     SourceDataTypes,
-    SparkTypeMapper
+    SparkTypeMapper,
+    GenericManager
 )
 from .registry import BackendFactory
 
@@ -100,5 +101,6 @@ __all__ = [
     "gen_control_variates_df",
     "gen_oracle_df",
     "gen_special_medicine_df",
-    "BackendFactory"
+    "BackendFactory",
+    "GenericManager"
 ]

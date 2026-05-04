@@ -406,3 +406,11 @@ class GroupedDataset:
             )
         for key, group in self._backend_data.iter_groups(self._group_cols):
             yield key, self._dataset_class(roles=self.roles, data=group)
+    
+    def __len__(self):
+        """
+        Get number of groups in dataset.
+        """
+        if not self._group_cols:
+            return 1
+        return self._backend_data.count_groups(self._group_cols)

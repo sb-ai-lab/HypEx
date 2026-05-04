@@ -24,6 +24,7 @@ from ..utils import (
     NAME_BORDER_SYMBOL,
     ScalarType,
     SourceDataTypes,
+    GenericManager
 )
 from ..utils.adapter import Adapter
 from .groupby_dataset import GroupedDataset
@@ -364,8 +365,9 @@ class DatasetBase(ABC):
                 raise TypeError("Value type does not match the expected data type.")
 
     def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
+        display_limit = n_rows if n_rows <= self.DISPLAY_ROWS * 2 else self.DISPLAY_ROWS
         head = self._backend_data._display_head_tail(
-            rows_display_limit=self.DISPLAY_ROWS,
+            rows_display_limit=display_limit,
             cols_display_limit=self.DISPLAY_COLS,
             n_cols=n_cols,
             n_rows=n_rows)
@@ -564,6 +566,18 @@ class DatasetBase(ABC):
 
     def __rpow__(self, other: Any) -> DatasetBase:
         return self.__binary_magic_operator(other=other, func_name="__rpow__")
+    
+    def __deepcopy__(self, memo):
+        """deepcopy dataset"""
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k.startswith('_abc_'):
+                continue
+            setattr(result, k, copy.deepcopy(v, memo))
+
+        return result
 
     def search_columns(self,
                        roles: ABCRole | Iterable[ABCRole],
@@ -685,7 +699,8 @@ class DatasetBase(ABC):
         if result is None:
             return None
 
-        if isinstance(result, ScalarType):
+        # if isinstance(result, ScalarType):
+        if GenericManager.check_type(result, ScalarType):
             return result
 
         if not hasattr(result, 'columns'):
@@ -1021,7 +1036,7 @@ class DatasetBase(ABC):
     def dot(self, other: DatasetBase | ndarray) -> DatasetBase:
         return self.__class__(
             roles=deepcopy(other.roles) if isinstance(other, self.__class__) else {},
-            data=self.backend_data.dot(other.backend if isinstance(other, self.__class__) else other),
+            data=self.backend_data.dot(other.backend_data if isinstance(other, self.__class__) else other),
         )
 
     def sample(self,

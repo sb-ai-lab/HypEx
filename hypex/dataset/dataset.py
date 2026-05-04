@@ -7,6 +7,7 @@ from typing import Any, Optional
 import numpy as np
 import pandas as pd  # type: ignore
 import pyspark.sql as spark
+import pyspark.pandas as ps
 
 from ..utils import (
     ID_SPLIT_SYMBOL,
@@ -384,6 +385,18 @@ class ExperimentData:
         # if not searched_data.is_empty():
         #     searched_data.index = self.ds.index
         return searched_data
+    
+    def __deepcopy__(self, memo):
+        """deepcopy dataset"""
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k.startswith('_abc_'):
+                continue
+            setattr(result, k, deepcopy(v, memo))
+
+        return result
 
 
 class DatasetAdapter(Adapter):
@@ -396,7 +409,11 @@ class DatasetAdapter(Adapter):
         # Convert data based on its type
         if isinstance(data, dict):
             return DatasetAdapter.dict_to_dataset(data, roles, small)
-        elif isinstance(data, pd.DataFrame) or isinstance(data, spark.DataFrame):
+        elif (
+                isinstance(data, pd.DataFrame) or 
+                isinstance(data, spark.DataFrame) or 
+                isinstance(data, ps.DataFrame)
+            ):
             if isinstance(roles, ABCRole):
                 raise InvalidArgumentError("roles", "dict[str, ABCRole]")
             return DatasetAdapter.frame_to_dataset(data, roles, small)
