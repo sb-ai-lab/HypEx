@@ -366,9 +366,15 @@ class CUPACExecutor(MLExecutor):
 
                 prediction = self.calc(mode="predict", model=fitted_model, X=X_predict)
 
-                # Adjust target by removing explained variation
-                explained_variation = prediction - prediction.mean()
-                target_cupac = data.ds[target] - explained_variation
+                cov_xy = ((prediction - prediction.mean()) * (data.ds[target] - data.ds[target].mean())).mean()
+                var_x = ((prediction - prediction.mean()) ** 2).mean()
+
+                if var_x == 0 or var_x != var_x:
+                    theta = 0
+                else:
+                    theta = cov_xy / var_x
+                    
+                target_cupac = data.ds[target] - (prediction - prediction.mean()) * theta
 
                 target_cupac = target_cupac.rename({target: f"{target}_cupac"})
                 data.additional_fields = data.additional_fields.add_column(
