@@ -37,7 +37,7 @@ class PandasDummyEncoderExtension(DummyEncoderExtension):
         new_roles = copy.deepcopy(roles)
         for role in roles.values():
             role.data_type = bool
-        return DatasetAdapter.to_dataset(dummies_df, roles=new_roles)
+        return DatasetAdapter.to_dataset(dummies_df, roles=new_roles, small=False)
 
 @backend_factory.register(DummyEncoderExtension, SparkDataset)
 class SparkDummyEncoderExtension(DummyEncoderExtension):
@@ -59,4 +59,4 @@ class SparkDummyEncoderExtension(DummyEncoderExtension):
         new_roles = copy.deepcopy(roles)
         for role in roles.values():
             role.data_type = bool
-        return DatasetAdapter.to_dataset(dummies_df, roles=new_roles)
+        return DatasetAdapter.to_dataset(dummies_df, roles=new_roles, small=False)

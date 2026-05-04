@@ -13,7 +13,7 @@ class DummyEncoder(Encoder):
         if not target_cols:
             return Dataset.create_empty()
         
-        encoder_cls = backend_factory(DummyEncoderExtension, data)
-        return encoder_cls().calc(
+        encoder_cls = backend_factory.resolve_backend(DummyEncoderExtension, data)
+        return encoder_cls.calc(
             data=data, target_cols=target_cols, **kwargs
         )
