@@ -42,7 +42,7 @@ class BackendFactory:
     
     def rigestry_output(self):
         """
-        Print all backend_factory structure.
+        Print `backend_factory` structure.
         """
         for key, value in self._registry.items():
             print(f"Key class - {key.__name__}:")

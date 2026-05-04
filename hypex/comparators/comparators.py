@@ -127,13 +127,14 @@ class StatTestMasterAbstract(BaseComparator):
             self,
             grouping_role: ABCRole | None = None,
             target_roles: ABCRole | None = None,
+            baseline_role: ABCRole | None = None,
             reliability: float = 0.05,
             compare_by: Literal[
                 "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
             ] = "groups",
             key: Any = "",
     ):
-        super().__init__(grouping_role=grouping_role, target_roles=target_roles, key=key)
+        super().__init__(grouping_role=grouping_role, target_roles=target_roles, baseline_role=baseline_role, key=key)
         self.reliability = reliability
         self.compare_by = compare_by
     
@@ -149,7 +150,7 @@ class StatTestMasterAbstract(BaseComparator):
         return self._experiment_kwargs
 
 # Master-backend classes for stat-tests
-class TTest(StatTestMasterAbstract): #TODO: does it nessesary to inheritance from comparator?
+class TTest(StatTestMasterAbstract):
     """
     T-test master-backend class.
     """

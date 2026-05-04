@@ -15,11 +15,16 @@ class Extension(ABC):
         result: Any, roles: ABCRole | dict[str, ABCRole], small: bool=True
     ) -> Dataset:
         return DatasetAdapter.to_dataset(result, roles=roles,small=small)
+    
+    def calc(
+            self, data: Dataset, **kwargs
+    ):
+        raise NotImplementedError
 
 
 class CompareExtension(Extension, ABC):
     def calc(self, data: Dataset, other: Dataset | None = None, **kwargs):
-        return super().calc(data=data, other=other, **kwargs)
+        raise NotImplementedError
 
 
 class MLExtension(Extension):
