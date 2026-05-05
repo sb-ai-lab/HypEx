@@ -1260,10 +1260,14 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         result_col_prefix: str,
     ) -> spark.DataFrame:
         """
-        Multiply using broadcast join - efficient for small df2.
+        Multiply using native SQL expressions - efficient for small df2.
+
+        Each output column is a linear combination of df1 columns weighted by
+        the corresponding column of the right matrix. Catalyst whole-stage
+        codegen compiles the arithmetic to JVM bytecode, avoiding any
+        JVM↔Python serialization on the hot path.
         """
 
-        # Collect df2 as a numpy matrix (it's small enough)
         if isinstance(df2, spark.DataFrame):
             df2_data = df2.select(*df2_cols).collect()
             matrix = np.array([[row[col] for col in df2_cols] for row in df2_data])
@@ -1274,25 +1278,25 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 "The other matrix should be either Dataset or numpy array."
             )
 
-        # Create UDF for matrix multiplication
-        @F.udf(ArrayType(DoubleType()))
-        def matmul_udf(*row_values):
-            row_array = np.array(row_values)
-            result = np.dot(row_array, matrix)
-            return result.tolist()
-
-        # Apply multiplication
-        result_array_col = matmul_udf(*[F.col(c) for c in df1_cols])
-
-        # Expand array into separate columns
-        result_df = df1.withColumn("_result_array", result_array_col)
-
-        for i, col_name in enumerate(df2_cols):
-            result_df = result_df.withColumn(
-                f"{result_col_prefix}{col_name}", result_df["_result_array"][i]
+        result_exprs = {
+            f"{result_col_prefix}{col_name}": reduce(
+                lambda a, b: a + b,
+                [F.col(c) * F.lit(float(matrix[i, j])) for i, c in enumerate(df1_cols)],
             )
+            for j, col_name in enumerate(df2_cols)
+        }
 
-        return result_df.drop("_result_array")
+        select_exprs = [
+            result_exprs[c].alias(c) if c in result_exprs else F.col(c)
+            for c in df1_cols
+        ]
+        select_exprs.extend(
+            expr.alias(name)
+            for name, expr in result_exprs.items()
+            if name not in df1_cols
+        )
+
+        return df1.select(*select_exprs)
 
     @staticmethod
     def _multiply_distributed(
