@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .analyzers.aa import OneAAStatAnalyzer
 from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from .dataset import ABCRole, TargetRole, TreatmentRole, FeatureRole
