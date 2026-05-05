@@ -980,6 +980,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     
     Inherits all navigation and indexing capabilities from SparkNavigation.
     """
+    MAX_ROWS_FOR_DOT = 1000
     
     @staticmethod
     def _convert_agg_result(result: ps.Series | ps.DataFrame) -> "SparkDataset" | float:
@@ -1484,69 +1485,56 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             ValueError: If dimensions are incompatible.
             TypeError: If other is unsupported type.
         """
+        if hasattr(other, "__len__"):
+            if len(other) > self.MAX_ROWS_FOR_DOT:
+                raise ValueError(f"dot method works fine only with rows number in right matrix <= {self.MAX_ROWS_FOR_DOT}")
+        else:
+            raise TypeError("input data type should have attr `__len__`")
+        
         if isinstance(other, np.ndarray):
             if other.ndim == 1:
                 if len(other) != len(self.data.columns):
                     raise ValueError(
                         f"Vector length ({len(other)}) must match number of columns ({len(self.data.columns)})"
                     )
-                other_series = ps.Series(other, index=self.data.columns)
-                result = self.data.dot(other_series)
+                pd_other = pd.Series(other, index=self.data.columns)
+                schema = "`0` double"
             else:
-                other_df = ps.DataFrame(other)
-                if other_df.shape[0] != len(self.data.columns):
+                pd_other = pd.DataFrame(other)
+                if pd_other.shape[0] != len(self.data.columns):
                     raise ValueError(
-                        f"Matrix dimensions not aligned: {self.data.shape} dot {other_df.shape}"
+                        f"Matrix dimensions not aligned: {self.data.shape} dot {pd_other.shape}"
                     )
-                other_df.index = self.data.columns
-                result = self.data.dot(other_df)
-            return self._wrap_result(
-                result if isinstance(result, ps.DataFrame) else result.to_frame()
-            )
-
+                pd_other.index = self.data.columns
+                schema = ",".join([f"`{i}` double" for i in range(other.shape[1])])
         elif isinstance(other, pd.DataFrame):
-            other_ps = ps.DataFrame(other)
-            if other_ps.shape[0] != len(self.data.columns):
+            pd_other = other
+            schema = ",".join([f"`{name}` double" for name in pd_other.columns])
+            if pd_other.shape[0] != len(self.data.columns):
                 raise ValueError(
-                    f"Matrix dimensions not aligned: {self.data.shape} dot {other_ps.shape}"
+                    f"Matrix dimensions not aligned: {self.data.shape} dot {pd_other.shape}"
                 )
-            other_ps.index = self.data.columns
-            result = self.data.dot(other_ps)
-            return self._wrap_result(
-                result if isinstance(result, ps.DataFrame) else result.to_frame()
-            )
-
         elif isinstance(other, SparkDataset):
-            common_cols = self.data.columns.intersection(other.data.columns)
-
-            if len(common_cols) == 0:
+            pd_other = other.data.to_pandas()
+            schema = ",".join([f"`{name}` double" for name in pd_other.columns])
+            if pd_other.shape[0] != len(self.data.columns):
                 raise ValueError(
-                    f"No common columns for dot product. "
-                    f"Self columns: {self.columns}, Other columns: {other.columns}"
+                    f"Matrix dimensions not aligned: {self.data.shape} dot {pd_other.shape}"
                 )
-
-            other_subset = other.data[common_cols]
-            self_subset = self.data[common_cols]
-
-            if len(common_cols) == 1:
-                result = self_subset.iloc[:, 0].dot(other_subset.iloc[:, 0])
-                return self._wrap_result(
-                    float(result)
-                    if isinstance(result, (int, float, np.number))
-                    else result
-                )
-            else:
-                result = (self_subset * other_subset).sum()
-                return self._wrap_result(
-                    result if isinstance(result, ps.DataFrame) else result.to_frame()
-                )
-
         else:
             raise TypeError(
                 f"Unsupported type for dot: {type(other)}. "
                 f"Expected SparkDataset, np.ndarray, or pd.DataFrame"
             )
-
+        
+        result_spark = (
+            self.data.to_spark()
+            .mapInPandas(
+                lambda it: (pdf.dot(pd_other) for pdf in it),
+                schema=schema
+            )
+        )
+        return self._wrap_result(ps.DataFrame(result_spark))
 
     def dropna(self,
                how: Literal["any", "all"] = "any",
