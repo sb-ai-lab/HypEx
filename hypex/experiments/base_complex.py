@@ -6,7 +6,7 @@ from typing import Any
 
 from tqdm import tqdm
 
-from ..dataset import ABCRole, Dataset, ExperimentData, GroupingRole
+from ..dataset import ABCRole, Dataset, SmallDataset, ExperimentData, GroupingRole
 from ..executor import Executor, IfExecutor
 from ..reporters import DatasetReporter, Reporter
 from ..utils.enums import ExperimentDataEnum
@@ -36,14 +36,22 @@ class ExperimentWithReporter(Experiment):
         return result
 
     def _set_result(
-        self, data: ExperimentData, result: list[Dataset], reset_index: bool = True
+        self, data: ExperimentData, results: list[Dataset | dict], reset_index: bool = True
     ):
-        result = (
-            result[0].append(result[1:], reset_index=reset_index)
-            if len(result) > 1
-            else result[0]
-        )
-        return self._set_value(data, result)
+        print(f"[DEBUG] _set_result | self.id={self.id} | len(results)={len(results)}")
+
+        datasets: list[Dataset] = []
+        for res in results:
+            if isinstance(res, dict):
+                datasets.append(SmallDataset.from_dict(res, roles={}))
+            elif isinstance(res, (Dataset, SmallDataset)):
+                datasets.append(res)
+                
+        combined = datasets[0].append(datasets[1:], reset_index=reset_index) if len(datasets) > 1 else datasets[0]
+        
+        data.analysis_tables[self.id] = combined
+        print(f"[DEBUG] _set_result DIRECT | id={id(data)} | keys={list(data.analysis_tables.keys())}")
+        return data
 
 
 class CycledExperiment(ExperimentWithReporter):
@@ -155,7 +163,9 @@ class ParamsExperiment(ExperimentWithReporter):
                 t_data = executor.execute(t_data)
             report = self.reporter.report(t_data)
             results.append(report)
-        return self._set_result(data, results)
+        result_data = self._set_result(data, results)
+        print(f"[DEBUG] ParamsExperiment.execute | возвращаем id={id(result_data)} | keys={list(result_data.analysis_tables.keys())}")  # <<< ДОБАВЬТЕ
+        return result_data
 
 
 class IfParamsExperiment(ParamsExperiment):

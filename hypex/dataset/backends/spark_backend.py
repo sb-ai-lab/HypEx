@@ -4,6 +4,11 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
+try:
+    from typing import Self  # Python >= 3.11
+except ImportError:
+    from typing_extensions import Self  # Python < 3.11
+
 import numpy as np
 import pandas as pd
 
@@ -50,7 +55,7 @@ class SparkNavigation(DatasetBackendNavigation):
         """
         raise NotImplementedError("Method checkpoint not implemented for SparkNavigation.")
         
-    def limit(self, num: int | None = None) -> Any:
+    def limit(self, num: int | None = None) -> Self:
         """Limit the number of rows in the dataset.
         
         Args:
@@ -78,7 +83,7 @@ class SparkNavigation(DatasetBackendNavigation):
             raise ValueError(f"{context}: {n} rows exceed limit {self.PANDAS_CONVERSION_LIMIT}")
         
     def _wrap_result(self, 
-                     result: ps.DataFrame | ps.Series | Any) -> "SparkNavigation" | ps.Series | Any:
+                     result: ps.DataFrame | ps.Series | Any) -> Self | ps.Series | Any:
         """Wrap operation results to maintain consistent interface.
         
         Converts raw pyspark.pandas results back into SparkNavigation instances
@@ -220,7 +225,7 @@ class SparkNavigation(DatasetBackendNavigation):
                 storage_level: Literal["MEMORY_ONLY", 
                                        "MEMORY_AND_DISK", 
                                        "DISK_ONLY"] = "MEMORY_AND_DISK",
-                action: Literal["count", "head", "none"] = "count"):
+                action: Literal["count", "head", "none"] = "count") -> Self:
         """Persist the underlying Spark DataFrame in cache with automatic materialization.
         
         Marks the dataset for caching in Spark's execution engine to accelerate
@@ -296,7 +301,7 @@ class SparkNavigation(DatasetBackendNavigation):
         
         return self
     
-    def unpersist(self, blocking: bool = False):
+    def unpersist(self, blocking: bool = False) -> Self:
         """Remove the persisted dataset from Spark cache.
         
         Releases memory/disk resources occupied by cached data. After calling
@@ -352,7 +357,7 @@ class SparkNavigation(DatasetBackendNavigation):
         return getattr(self, '_storage_level_flag', None)
 
     def __getitem__(self, 
-                    item: slice | int | str | list | ps.DataFrame | ps.Series) -> "SparkNavigation" | ps.Series:
+                    item: slice | int | str | list | ps.DataFrame | ps.Series) -> Self | ps.Series:
         """Support indexing and column selection operations.
         
         Handles multiple indexing patterns:
@@ -399,7 +404,7 @@ class SparkNavigation(DatasetBackendNavigation):
         return len(self.data)
 
     @staticmethod
-    def __magic_determine_other(other: Any) -> Any:
+    def __magic_determine_other(other: Any) -> ps.DataFrame | Any:
         """Extract underlying data for binary operations.
         
         Helper method to handle operations between SparkNavigation instances
@@ -418,48 +423,48 @@ class SparkNavigation(DatasetBackendNavigation):
             return other
 
     # comparison operators:
-    def __eq__(self, other: Any) -> "SparkNavigation":
+    def __eq__(self, other: Any) -> Self:
         """Element-wise equality comparison."""
         return self._wrap_result(self.data == self.__magic_determine_other(other))
 
-    def __ne__(self, other: Any) -> "SparkNavigation":
+    def __ne__(self, other: Any) -> Self:
         """Element-wise inequality comparison."""
         return self._wrap_result(self.data != self.__magic_determine_other(other))
 
-    def __le__(self, other: Any) -> "SparkNavigation":
+    def __le__(self, other: Any) -> Self:
         """Element-wise less-than-or-equal comparison."""
         return self._wrap_result(self.data <= self.__magic_determine_other(other))
 
-    def __lt__(self, other: Any) -> "SparkNavigation":
+    def __lt__(self, other: Any) -> Self:
         """Element-wise less-than comparison."""
         return self._wrap_result(self.data < self.__magic_determine_other(other))
 
-    def __ge__(self, other: Any) -> "SparkNavigation":
+    def __ge__(self, other: Any) -> Self:
         """Element-wise greater-than-or-equal comparison."""
         return self._wrap_result(self.data >= self.__magic_determine_other(other))
 
-    def __gt__(self, other: Any) -> "SparkNavigation":
+    def __gt__(self, other: Any) -> Self:
         """Element-wise greater-than comparison."""
         return self._wrap_result(self.data > self.__magic_determine_other(other))
 
     # unary operations:
-    def __pos__(self) -> "SparkNavigation":
+    def __pos__(self) -> Self:
         """Unary positive operation (no-op for numeric data)."""
         return self._wrap_result(+self.data)
 
-    def __neg__(self) -> "SparkNavigation":
+    def __neg__(self) -> Self:
         """Unary negation operation."""
         return self._wrap_result(-self.data)
 
-    def __abs__(self) -> "SparkNavigation":
+    def __abs__(self) -> Self:
         """Element-wise absolute value."""
         return self._wrap_result(abs(self.data))
 
-    def __invert__(self) -> "SparkNavigation":
+    def __invert__(self) -> Self:
         """Element-wise logical NOT for boolean data."""
         return self._wrap_result(~self.data)
 
-    def __round__(self, ndigits: int = 0) -> "SparkNavigation":
+    def __round__(self, ndigits: int = 0) -> Self:
         """Round numeric values to specified decimal places.
         
         Args:
@@ -468,76 +473,76 @@ class SparkNavigation(DatasetBackendNavigation):
         return self._wrap_result(self.data.round(ndigits))
 
     # Binary operations:
-    def __add__(self, other: Any) -> "SparkNavigation":
+    def __add__(self, other: Any) -> Self:
         """Element-wise addition."""
         return self._wrap_result(self.data + self.__magic_determine_other(other))
 
-    def __sub__(self, other: Any) -> "SparkNavigation":
+    def __sub__(self, other: Any) -> Self:
         """Element-wise subtraction."""
         return self._wrap_result(self.data - self.__magic_determine_other(other))
 
-    def __mul__(self, other: Any) -> "SparkNavigation":
+    def __mul__(self, other: Any) -> Self:
         """Element-wise multiplication."""
         return self._wrap_result(self.data * self.__magic_determine_other(other))
 
-    def __floordiv__(self, other: Any) -> "SparkNavigation":
+    def __floordiv__(self, other: Any) -> Self:
         """Element-wise floor division."""
         return self._wrap_result(self.data // self.__magic_determine_other(other))
 
-    def __div__(self, other: Any) -> "SparkNavigation":
+    def __div__(self, other: Any) -> Self:
         """Element-wise division (legacy operator)."""
         return self._wrap_result(self.data / self.__magic_determine_other(other))
 
-    def __truediv__(self, other: Any) -> "SparkNavigation":
+    def __truediv__(self, other: Any) -> Self:
         """Element-wise true division."""
         return self._wrap_result(self.data / self.__magic_determine_other(other))
 
-    def __mod__(self, other: Any) -> "SparkNavigation":
+    def __mod__(self, other: Any) -> Self:
         """Element-wise modulo operation."""
         return self._wrap_result(self.data % self.__magic_determine_other(other))
 
-    def __pow__(self, other: Any) -> "SparkNavigation":
+    def __pow__(self, other: Any) -> Self:
         """Element-wise exponentiation."""
         return self._wrap_result(self.data ** self.__magic_determine_other(other))
 
-    def __and__(self, other: Any) -> "SparkNavigation":
+    def __and__(self, other: Any) -> Self:
         """Element-wise logical AND for boolean data."""
         return self._wrap_result(self.data & self.__magic_determine_other(other))
 
-    def __or__(self, other: Any) -> "SparkNavigation":
+    def __or__(self, other: Any) -> Self:
         """Element-wise logical OR for boolean data."""
         return self._wrap_result(self.data | self.__magic_determine_other(other))
 
     # Right arithmetic operators:
-    def __radd__(self, other: Any) -> "SparkNavigation":
+    def __radd__(self, other: Any) -> Self:
         """Right-hand addition (other + self)."""
         return self._wrap_result(self.__magic_determine_other(other) + self.data)
 
-    def __rsub__(self, other: Any) -> "SparkNavigation":
+    def __rsub__(self, other: Any) -> Self:
         """Right-hand subtraction (other - self)."""
         return self._wrap_result(self.__magic_determine_other(other) - self.data)
 
-    def __rmul__(self, other: Any) -> "SparkNavigation":
+    def __rmul__(self, other: Any) -> Self:
         """Right-hand multiplication (other * self)."""
         return self._wrap_result(self.__magic_determine_other(other) * self.data)
 
-    def __rfloordiv__(self, other: Any) -> "SparkNavigation":
+    def __rfloordiv__(self, other: Any) -> Self:
         """Right-hand floor division (other // self)."""
         return self._wrap_result(self.__magic_determine_other(other) // self.data)
 
-    def __rdiv__(self, other: Any) -> "SparkNavigation":
+    def __rdiv__(self, other: Any) -> Self:
         """Right-hand division (legacy operator, other / self)."""
         return self._wrap_result(self.__magic_determine_other(other) / self.data)
 
-    def __rtruediv__(self, other: Any) -> "SparkNavigation":
+    def __rtruediv__(self, other: Any) -> Self:
         """Right-hand true division (other / self)."""
         return self._wrap_result(self.__magic_determine_other(other) / self.data)
 
-    def __rmod__(self, other: Any) -> "SparkNavigation":
+    def __rmod__(self, other: Any) -> Self:
         """Right-hand modulo (other % self)."""
         return self._wrap_result(self.__magic_determine_other(other) % self.data)
 
-    def __rpow__(self, other: Any) -> "SparkNavigation":
+    def __rpow__(self, other: Any) -> Self:
         """Right-hand exponentiation (other ** self)."""
         return self._wrap_result(self.__magic_determine_other(other) ** self.data)
 
@@ -599,7 +604,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def get_values(self, 
                    row: str | None = None, 
-                   column: str | None = None) -> ScalarType | Sequence[ScalarType] | "SparkNavigation" | ps.Series:
+                   column: str | None = None) -> ScalarType | Sequence[ScalarType] | Self | ps.Series:
         """Retrieve values by label-based indexing.
         
         Args:
@@ -633,7 +638,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def iget_values(self, 
                     row: int | None = None, 
-                    column: int | None = None) -> ScalarType | Sequence[ScalarType] | "SparkNavigation" | ps.Series:
+                    column: int | None = None) -> ScalarType | Sequence[ScalarType] | Self | ps.Series:
         """Retrieve values by integer-position-based indexing.
         
         Args:
@@ -665,7 +670,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def create_empty(self, 
                      index: Iterable[Any] | None = None, 
-                     columns: Iterable[str] | None = None) -> "SparkNavigation":
+                     columns: Iterable[str] | None = None) -> Self:
         """Create a new empty SparkNavigation with specified structure.
         
         Args:
@@ -685,7 +690,7 @@ class SparkNavigation(DatasetBackendNavigation):
     def reset_index(self, 
                     drop: bool = False,
                     inplace: bool = False,
-                    **kwargs) -> "SparkNavigation" | None:
+                    **kwargs) -> Self | None:
         """Reset the index to default integer index.
         
         Args:
@@ -772,7 +777,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
     def astype(self, 
                dtype: dict[str, type], 
-               errors: Literal["raise", "ignore"] = "raise") -> "SparkNavigation":
+               errors: Literal["raise", "ignore"] = "raise") -> Self:
         """Cast columns to specified data types.
         
         Args:
@@ -858,7 +863,7 @@ class SparkNavigation(DatasetBackendNavigation):
     def append(self, 
                other: Sequence[SparkNavigation], 
                reset_index: bool = False, 
-               axis: int = 0) -> "SparkNavigation":
+               axis: int = 0) -> Self:
         """Concatenate other datasets along specified axis.
         
         Args:
@@ -925,7 +930,7 @@ class SparkNavigation(DatasetBackendNavigation):
         self._check_pandas_conversion(obj=self.data, context="to_records")
         return self.data.to_pandas().to_dict(orient="records")
 
-    def loc(self, items: Iterable[Any]) -> "SparkNavigation":
+    def loc(self, items: Iterable[Any]) -> Self:
         """Label-based selection of rows.
         
         Args:
@@ -938,7 +943,7 @@ class SparkNavigation(DatasetBackendNavigation):
         data = self.data.loc[items]
         return data
 
-    def iloc(self, items: Iterable[Any]) -> "SparkNavigation":
+    def iloc(self, items: Iterable[Any]) -> Self:
         """Integer-position-based selection of rows.
         
         Args:
@@ -967,7 +972,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     """
     
     @staticmethod
-    def _convert_agg_result(result: ps.Series | ps.DataFrame) -> "SparkDataset" | float:
+    def _convert_agg_result(result: ps.Series | ps.DataFrame) -> Self | float:
         """Convert aggregation results to appropriate return type.
         
         Handles edge case where single-value aggregations should return scalar
@@ -1011,7 +1016,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     def take(self, 
              indices: int | Sequence[int], 
-             axis: Literal["index", "columns", "rows"] | int = 0) -> "SparkDataset" | ps.Series:
+             axis: Literal["index", "columns", "rows"] | int = 0) -> Self | ps.Series:
         """Select elements at specified integer positions.
         
         Args:
@@ -1230,7 +1235,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         """
         return self._wrap_result(self.data.mode(numeric_only=numeric_only, dropna=dropna))
 
-    def std(self, skipna: bool = True, ddof: int = 1) -> "SparkDataset" | float:
+    def std(self, skipna: bool = True, ddof: int = 1) -> Self | float:
         """Compute sample standard deviation.
         
         Args:
@@ -1285,7 +1290,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         result = self.data[numeric_cols].cov()
         return self._wrap_result(result)
 
-    def quantile(self, q: float = 0.5) -> "SparkDataset" | float:
+    def quantile(self, q: float = 0.5) -> Self | float:
         """Compute quantile(s) for numeric columns.
         
         Args:
@@ -1305,7 +1310,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 return converted
             return self._wrap_result(converted)
 
-    def coefficient_of_variation(self) -> "SparkDataset" | float:
+    def coefficient_of_variation(self) -> Self | float:
         """Compute coefficient of variation (std/mean) for numeric columns.
         
         Returns:
@@ -1335,7 +1340,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         return self._wrap_result(cv_df)
 
-    def sort_index(self, ascending: bool = True, **kwargs) -> "SparkDataset":
+    def sort_index(self, ascending: bool = True, **kwargs) -> Self:
         """Sort dataset by index labels.
         
         Args:
@@ -1359,7 +1364,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]
         ]
 
-    def corr(self, numeric_only: bool = False) -> "SparkDataset" | float:
+    def corr(self, numeric_only: bool = False) -> Self | float:
         """Compute Pearson correlation matrix for numeric columns.
         
         Args:
@@ -1379,7 +1384,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             return self._wrap_result(result)
         return result
 
-    def isna(self) -> "SparkDataset":
+    def isna(self) -> Self:
         """Detect missing values.
         
         Returns:
@@ -1387,7 +1392,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         """
         return self._wrap_result(self.data.isna())
 
-    def sort_values(self, by: str | list[str], ascending: bool = True, **kwargs) -> "SparkDataset":
+    def sort_values(self, by: str | list[str], ascending: bool = True, **kwargs) -> Self:
         """Sort by values in specified column(s).
         
         Args:
@@ -1404,7 +1409,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                      normalize: bool = False,
                      sort: bool = True,
                      ascending: bool = False,
-                     dropna: bool = True) -> "SparkDataset":
+                     dropna: bool = True) -> Self:
         """Count unique values in first column.
         
         Args:
@@ -1430,7 +1435,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         return self._wrap_result(result_df)
 
-    def na_counts(self) -> "SparkDataset" | int:
+    def na_counts(self) -> Self | int:
         """Count null values per column.
         
         Returns:
@@ -1445,7 +1450,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         return self._wrap_result(data.rename(index={old_index_name: "na_counts"}))
 
-    def dot(self, other: 'SparkDataset' | np.ndarray | pd.DataFrame) -> "SparkDataset" | float:
+    def dot(self, other: 'SparkDataset' | np.ndarray | pd.DataFrame) -> Self | float:
         """Compute dot product with another dataset or array.
         
         Handles multiple input types with appropriate dimension validation.
@@ -1540,7 +1545,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         """
         return self._wrap_result(self.data.dropna(how=how, subset=subset, axis=axis))
 
-    def transpose(self, names: Sequence[str] | None = None) -> "SparkDataset":
+    def transpose(self, names: Sequence[str] | None = None) -> Self:
         """Transpose rows and columns.
         
         Args:
@@ -1613,7 +1618,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                frac: float | None = None,
                n: int | None = None,
                random_state: int | None = None,
-               method: Literal["approx", "exact"] = "exact") -> "SparkDataset":
+               method: Literal["approx", "exact"] = "exact") -> Self:
         """Generate random sample of dataset.
         
         Currently uses reproducible hash-based sampling for consistency.
@@ -1627,36 +1632,15 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         Returns:
             SparkDataset: Sampled dataset.
         """
-        
-        # if n is not None and frac is not None:
-        #     raise ValueError("Cannot specify both 'n' and 'frac'")
-
-        # spark_df = self.data.to_spark()
-
-        # if n is not None:
-        #     total = spark_df.count()
-        #     if n >= total:
-        #         return self._wrap_result(self.data)
-
-        #     if method == "exact":
-        #         sampled = spark_df.orderBy(F.rand(seed=random_state)).limit(n)
-        #     else:
-        #         frac_calc = min(1.0, n / total * 1.3)
-        #         sampled = spark_df.sample(
-        #             withReplacement=False,
-        #             fraction=frac_calc,
-        #             seed=random_state
-        #         ).limit(n)
-
-        #     return self._wrap_result(ps.DataFrame(sampled))
-
-        # return self._wrap_result(self.data.sample(frac=frac or 1.0, random_state=random_state))
-        return self._wrap_result(self._reproducible_sample(df=self.data, n=n, frac=frac or 1.0, seed=random_state))
+        return self._wrap_result(self._reproducible_sample(df=self.data, 
+                                                           n=n, 
+                                                           frac=frac or 1.0, 
+                                                           seed=random_state))
 
 
     def select_dtypes(self,
                       include: str | None = None,
-                      exclude: str | None = None) -> "SparkDataset":
+                      exclude: str | None = None) -> Self:
         """Select columns based on data type.
         
         Args:
@@ -1737,7 +1721,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def drop(self,
              labels: str | None = None,
              axis: int | None = None,
-             columns: str | Iterable[str] | None = None) -> "SparkDataset":
+             columns: str | Iterable[str] | None = None) -> Self:
         """Drop specified labels from rows or columns.
         
         Args:
@@ -1753,7 +1737,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def filter(self,
                items: list | None = None,
                regex: str | None = None,
-               axis: int | str = 0) -> "SparkDataset":
+               axis: int | str = 0) -> Self:
         """Filter columns based on labels or regex pattern.
         
         Args:
@@ -1766,7 +1750,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         """
         return self._wrap_result(self.data.filter(items=items, regex=regex, axis=axis))
 
-    def rename(self, columns: dict[str, str]) -> "SparkDataset":
+    def rename(self, columns: dict[str, str]) -> Self:
         """Rename columns using mapping dictionary.
         
         Args:
@@ -1777,7 +1761,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         """
         return self._wrap_result(self.data.rename(columns=columns))
 
-    def replace(self, to_replace: Any = None, value: Any = None, regex: bool = False) -> "SparkDataset":
+    def replace(self, to_replace: Any = None, value: Any = None, regex: bool = False) -> Self:
         """Replace values matching criteria.
         
         Args:
@@ -1838,7 +1822,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             result = self.data.fillna(value=values, **kwargs)
         return self._wrap_result(result)
 
-    def list_to_columns(self, column: str) -> "SparkDataset":
+    def list_to_columns(self, column: str) -> Self:
         """Expand list-valued column into multiple separate columns.
         
         Splits a column containing lists into separate columns for each

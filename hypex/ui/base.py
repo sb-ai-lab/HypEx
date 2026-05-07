@@ -87,7 +87,7 @@ class Output:
             result._roles = {rename_map.get(c, c): role for c, role in result._roles.items()}
             
         if mode in (RenameEnum.all, RenameEnum.index):
-            result.index = [i.replace(ID_SPLIT_SYMBOL, " ") for i in result.index]
+            result.index = [str(i).replace(ID_SPLIT_SYMBOL, " ") for i in result.index]
         return result
 
     def extract(self, experiment_data: ExperimentData):

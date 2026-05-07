@@ -63,8 +63,11 @@ class Experiment(Executor):
         return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        print(f"[DEBUG] Experiment.execute | transformer={self.transformer} | id(data)={id(data)}")
+
         experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
+            print(f"[DEBUG] Experiment.execute | запуск {executor.__class__.__name__} | id(data)={id(experiment_data)} | keys={list(experiment_data.analysis_tables.keys())}")  # <<< ДОБАВЬТЕ
             start = time.perf_counter()
             
             executor.key = self.key

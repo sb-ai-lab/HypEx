@@ -12,7 +12,7 @@ from .dataset import AdditionalTreatmentRole, TargetRole
 from .experiments.base import Experiment, OnRoleExperiment
 from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from .forks.aa import IfAAExecutor
-from .reporters import DatasetReporter
+from .reporters import DatasetReporter, DictReporter
 from .reporters.aa import OneAADictReporter
 from .splitters import AASplitter, AASplitterWithStratification
 from .ui.aa import AAOutput
@@ -25,15 +25,15 @@ AA_METRICS = Experiment(
         GroupSizes(grouping_role=AdditionalTreatmentRole()),
         OnRoleExperiment(
             executors=[
-                # GroupDifference(
-                #     compare_by="groups", grouping_role=AdditionalTreatmentRole()
-                # ),
+                GroupDifference(
+                    compare_by="groups", grouping_role=AdditionalTreatmentRole()
+                ),
                 StatsTTest(grouping_role=AdditionalTreatmentRole(),
                            target_roles=TargetRole(),
                            reliability=0.05),
                 # GroupTTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
-                GroupKSTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
-                # GroupChi2Test(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
+                # GroupKSTest(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
+                GroupChi2Test(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
             ],
             role=TargetRole(),
         ),
@@ -57,7 +57,7 @@ AA_TEST = Experiment(
                     "space": [SpaceEnum.additional],
                 },
             },
-            reporter=DatasetReporter(OneAADictReporter(front=False)),
+            reporter=DictReporter(front=False),
         ),
         AAScoreAnalyzer(),
     ],
@@ -74,7 +74,7 @@ AA_TEST_WITH_STRATIFICATION = Experiment(
                     "space": [SpaceEnum.additional],
                 },
             },
-            reporter=DatasetReporter(OneAADictReporter(front=False)),
+            reporter=DictReporter(front=False),
         ),
         AAScoreAnalyzer(),
     ],

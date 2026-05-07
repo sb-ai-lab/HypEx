@@ -55,6 +55,7 @@ class SmallDataset(DatasetBase):
         data: pd.DataFrame | str | None = None,
         default_role: ABCRole | None = None,
         session: spark.SparkSession | None = None,
+        backend: BackendsEnum | None = None, 
     ):
         if isinstance(roles, dict) and data is not None:
             columns = None
@@ -219,11 +220,9 @@ class ExperimentData:
                     if isinstance(executor_id, dict)
                     else executor_id
                 )
-                # self.additional_fields.unpersist()
                 self.additional_fields = self.additional_fields.add_column(
                     data=value, role={executor_id: role}
                 )
-                # self.additional_fields.persist()
             else:
                 rename_dict = (
                     {value.columns[0]: executor_id}
@@ -237,15 +236,15 @@ class ExperimentData:
 
         # Handle analysis tables
         elif space == ExperimentDataEnum.analysis_tables:
-            # Преобразуем Dataset в SmallDataset
+            print(f"[DEBUG] set_value ENTRY | executor_id={executor_id} | value_type={type(value).__name__}")
+
             if isinstance(value, Dataset):
                 value = value.to_small_dataset()
-            elif isinstance(value, Dataset):
-                value = SmallDataset.from_dict(value.to_dict(), roles=role)
             elif not isinstance(value, SmallDataset):
-                # Если значение не Dataset/SmallDataset, создаем SmallDataset
                 raise TypeError(f"Wrong value {value} for converting to SmallDataset")
+            print(f"[DEBUG] set_value | executor_id={executor_id} | id(data)={id(self)} | keys_before={list(self.analysis_tables.keys())}")
             self.analysis_tables[executor_id] = value
+            print(f"[DEBUG] set_value | keys_after={list(self.analysis_tables.keys())}")
 
         # Handle variables
         elif space == ExperimentDataEnum.variables:

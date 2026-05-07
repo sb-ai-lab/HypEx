@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+try:
+    from typing import Self  # Python >= 3.11
+except ImportError:
+    from typing_extensions import Self  # Python < 3.11
+
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Sequence, Sized
 from typing import Any, Literal
 
-from ...utils import UTILITY_INDEX_COL_NAME, AbstractMethodError, FromDictTypes
+from ...utils import AbstractMethodError, FromDictTypes
 
 
 class DatasetBackendNavigation(ABC):
@@ -207,13 +212,7 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def append(self, other, index: bool = False) -> Any:
-        raise AbstractMethodError
-
-    def add_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME) -> Any:
-        raise AbstractMethodError
-
-    def remove_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME) -> Any:
+    def append(self, other, reset_index: bool = False, axis: int = 0) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
@@ -268,35 +267,19 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     def agg(self, func) -> Any:
         raise AbstractMethodError
 
-    def get(
-        self,
-        key,
-        default=None,
-    ) -> Any:
+    def get(self, key, default = None) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
-    def take(
-        self,
-        indices: int | list[int],
-        axis: Literal["index", "columns", "rows"] | int = 0,
-    ) -> Any:
+    def take(self, indices: int | list[int], axis: Literal["index", "columns", "rows"] | int = 0) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
-    def get_values(
-        self,
-        row: str | None = None,
-        column: str | None = None,
-    ) -> Any:
+    def get_values(self, row: str | None = None, column: str | None = None) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
-    def iget_values(
-        self,
-        row: int | None = None,
-        column: int | None = None,
-    ) -> Any:
+    def iget_values(self, row: int | None = None, column: int | None = None) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
@@ -335,7 +318,8 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     def sort_values(self, by: str | list[str], ascending: bool = True, **kwargs) -> Any:
         raise AbstractMethodError
 
-    def std(self) -> Any:
+    @abstractmethod
+    def std(self, skipna: bool = True, ddof: int = 1) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
@@ -351,21 +335,17 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def value_counts(
-        self,
-        normalize: bool = False,
-        sort: bool = True,
-        ascending: bool = False,
-        dropna: bool = True,
-    ) -> Any:
+    def value_counts(self,
+                     normalize: bool = False,
+                     sort: bool = True,
+                     ascending: bool = False,
+                     dropna: bool = True) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
-    def grouped_value_counts(
-        self,
-        by: list[str],
-        feature_cols: list[str],
-    ) -> Any:
+    def grouped_value_counts(self,
+                             by: list[str],
+                             feature_cols: list[str]) -> Any:
         """Return a dataframe indexed by group keys where each cell is a
         {category: count} dict for the corresponding feature column."""
         raise AbstractMethodError
@@ -424,6 +404,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     ) -> Any:
         raise AbstractMethodError
 
+    @abstractmethod
     def filter(
         self,
         items: list | None = None,
@@ -433,7 +414,8 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     ) -> Any:
         raise AbstractMethodError
 
-    def fillna(self, values, method, **kwargs) -> Any:
+    @abstractmethod
+    def fillna(self, values = None, method = None, **kwargs) -> Any:
         raise AbstractMethodError
 
     @abstractmethod
