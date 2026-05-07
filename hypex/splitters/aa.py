@@ -82,11 +82,22 @@ class AASplitter(Calculator):
         )
 
         if self.save_groups:
-            # data.groups[self.id] = {
-            #     group: data.ds.loc[group_data.index]
-            #     for group, group_data in data.additional_fields.groupby(self.id)
-            # }
-            data.groups = data.additional_fields.groupby(self.id)
+            splitter_col = self._id
+            
+            unique_vals = data.additional_fields[splitter_col].unique()
+            group_keys = list(unique_vals[splitter_col].to_dict().values())
+
+            for group_key in group_keys:
+                mask = data.additional_fields[splitter_col] == group_key
+
+                group_data = data.ds[mask] 
+                
+                data.set_value(
+                    space=ExperimentDataEnum.groups,
+                    executor_id=self._id,
+                    value=group_data,
+                    key=str(group_key)
+                )
         return data
 
     @staticmethod

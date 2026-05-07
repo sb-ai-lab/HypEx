@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import warnings
-import copy
 from copy import deepcopy
 import json
 from abc import ABC
-from dataclasses import dataclass, field
-from typing import Any, Iterable, Callable, Hashable, Literal, Optional, Sequence
 from collections.abc import Iterable as IterableABC
+from dataclasses import dataclass
+from typing import Any, Iterable, Callable, Hashable, Literal, Optional, Sequence
+try:
+    from typing import Self  # Python >= 3.11
+except ImportError:
+    from typing_extensions import Self  # Python < 3.11
+
 
 import pandas as pd  # type: ignore
 from numpy import ndarray
+
 import pyspark.sql as spark
 import pyspark.pandas as ps
 
@@ -20,9 +25,8 @@ from ..utils import (
     ConcatBackendError,
     ConcatDataError,
     DataTypeError,
-    NAME_BORDER_SYMBOL,
-    ScalarType,
     RoleColumnError,
+    ScalarType,
     SourceDataTypes,
 )
 from ..utils.adapter import Adapter
@@ -158,7 +162,7 @@ class DatasetBase(ABC):
         keys = list(roles.keys())
         for column in self.columns:
             if column not in keys:
-                roles[column] = copy.deepcopy(self.default_role) or DefaultRole()
+                roles[column] = deepcopy(self.default_role) or DefaultRole()
         return roles
 
     def _set_empty_types(self,
@@ -174,7 +178,7 @@ class DatasetBase(ABC):
 
     def __init__(self,
                  roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole] | None = None,
-                 data: spark.DataFrame | pd.DataFrame | str | DatasetBase | None = None,
+                 data: spark.DataFrame | pd.DataFrame | str | Self | None = None,
                  backend: BackendsEnum | None = None,
                  default_role: ABCRole | None = None,
                  session: Optional[spark.SparkSession] = None,
@@ -184,7 +188,7 @@ class DatasetBase(ABC):
             self._backend_data = self._select_backend_from_str(data, backend, data_compression,session, non_compresion_cols)
         elif data is not None:
             if isinstance(data, DatasetBase):
-                self._backend_data = copy.deepcopy(data._backend)
+                self._backend_data = deepcopy(data._backend)
             elif isinstance(data, (PandasDataset, SparkDataset)):
                 self._backend_data = data
             elif any(isinstance(data, source_data_type)
@@ -229,9 +233,7 @@ class DatasetBase(ABC):
         self.iloc = self.ILocker(call_class=self.__class__, backend=self._backend_data, roles=self.roles)
         
     def persist(self, 
-                storage_level: Literal["MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY", 
-                                      "MEMORY_ONLY_SER", "MEMORY_AND_DISK_SER", 
-                                      "OFF_HEAP"] = "MEMORY_AND_DISK",
+                storage_level: Literal["MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"] = "MEMORY_AND_DISK",
                 action: Literal["count", "head", "none"] = "count"):
         if self.backend_type == BackendsEnum.spark:
             self._backend_data.persist(storage_level=storage_level, action=action)
@@ -269,6 +271,7 @@ class DatasetBase(ABC):
         n_rows = self._backend_data.shape[0]
         df = self._build_repr(n_cols, n_rows)
         return f"{df.to_string()}\n\n{n_rows} rows × {n_cols} columns"
+        # return self.backend_data.__repr__
 
     def _repr_html_(self):
         n_cols = len(self.columns)
@@ -286,12 +289,23 @@ class DatasetBase(ABC):
         return self._backend_data.__len__()
 
     def __getitem__(self,
-                    item: str | int | Iterable[str | int] | slice | DatasetBase) -> DatasetBase:
+                    item: str | int | Iterable[str | int] | slice | DatasetBase) -> Self:
         if isinstance(item, DatasetBase):
             item = item.data
         elif isinstance(item, slice):
             result = self._backend_data.__getitem__(item)
             return self.__class__(roles=self.roles, data=result)
+            
+        if isinstance(item, (pd.DataFrame, ps.DataFrame, pd.Series, ps.Series)):
+            result_data = self._backend_data.__getitem__(item)
+            res_cols = list(result_data.columns) if hasattr(result_data, 'columns') else self.columns
+            roles = {col: self.roles.get(col, InfoRole()) for col in res_cols}
+            result = self.__class__(data=result_data, roles=roles)
+            result.tmp_roles = {
+                k: v for k, v in self.tmp_roles.items() if k in result.columns
+            }
+            return result
+
         items = (
             [item] if isinstance(item, str) or not isinstance(item, Iterable) else item
         )
@@ -311,7 +325,7 @@ class DatasetBase(ABC):
     
     def reset_index(self,
                     drop: bool = False,
-                    **kwargs) -> DatasetBase:
+                    **kwargs) -> Self:
         kwargs['inplace'] = False
         
         new_data = self._backend_data.reset_index(drop=drop, **kwargs)
@@ -352,17 +366,19 @@ class DatasetBase(ABC):
                 raise TypeError("Value type does not match the expected data type.")
 
     def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
-        head = self._backend_data._display_head_tail(rows_display_limit=self.DISPLAY_ROWS,
-                                                cols_display_limit=self.DISPLAY_COLS,
-                                                n_cols=n_cols,
-                                                n_rows=n_rows)
+        head = self._backend_data._display_head_tail(
+            rows_display_limit=self.DISPLAY_ROWS,
+            cols_display_limit=self.DISPLAY_COLS,
+            n_cols=n_cols,
+            n_rows=n_rows)
 
         if n_rows > self.DISPLAY_ROWS * 2:
-            _tmp_tail = self._backend_data._display_head_tail(rows_display_limit=self.DISPLAY_ROWS,
-                                                         cols_display_limit=self.DISPLAY_COLS,
-                                                         n_cols=n_cols,
-                                                         n_rows=n_rows,
-                                                         tail=True)
+            _tmp_tail = self._backend_data._display_head_tail(
+                rows_display_limit=self.DISPLAY_ROWS,
+                cols_display_limit=self.DISPLAY_COLS,
+                n_cols=n_cols,
+                n_rows=n_rows,
+                tail=True)
 
             tail = pd.concat([pd.DataFrame([["..."] * len(head.columns)],
                                            index=["..."],
@@ -377,7 +393,7 @@ class DatasetBase(ABC):
                      roles: dict[str, ABCRole] | None = None,
                      index=None,
                      session=None,
-                     backend=BackendsEnum.pandas) -> DatasetBase:
+                     backend=BackendsEnum.pandas) -> Self:
         if roles is None:
             roles = {}
         index = [] if index is None else index
@@ -395,23 +411,23 @@ class DatasetBase(ABC):
             r = default_roles.get(role, role)
             if isinstance(roles[role], list):
                 for i in roles[role]:
-                    new_roles[i] = copy.deepcopy(r)
+                    new_roles[i] = deepcopy(r)
             else:
-                new_roles[roles[role]] = copy.deepcopy(r)
+                new_roles[roles[role]] = deepcopy(r)
         return new_roles or roles
     
     
 
     def get(self,
             key: Any,
-            default: Any = None) -> DatasetBase:
+            default: Any = None) -> Self:
         return self.__class__(
             data=self._backend_data.get(key, default), roles=deepcopy(self.roles)
         )
 
     def take(self,
              indices: int | list[int],
-             axis: Literal["index", "columns", "rows"] | int = 0) -> DatasetBase:
+             axis: Literal["index", "columns", "rows"] | int = 0) -> Self:
         new_data = self._backend_data.take(indices=indices, axis=axis)
         new_roles = (
             {k: deepcopy(v) for k, v in self.roles.items() if k in new_data.columns}
@@ -419,120 +435,136 @@ class DatasetBase(ABC):
             else deepcopy(self.roles)
         )
         return self.__class__(data=new_data, roles=new_roles)
-
-    def __binary_magic_operator(self,
-                                other: Any,
-                                func_name: str) -> Any:
-        if not any(isinstance(other, t)
-                   for t in [self.__class__, str, int, float, bool, Sequence]):
+    
+    def __binary_magic_operator(self, other: Any, func_name: str) -> Any:
+        if not any(isinstance(other, t) for t in [self.__class__, str, int, float, bool, Sequence]):
             raise DataTypeError(type(other))
-        func = getattr(self._backend_data, func_name)
-        t_roles = deepcopy(self.roles)
-        for role in t_roles.values():
-            role.data_type = None
+
+        self_raw = self.backend_data.data if hasattr(self.backend_data, 'data') else self.backend_data
+
         if isinstance(other, self.__class__):
             if type(other._backend_data) is not type(self._backend_data):
                 raise BackendTypeError(type(other._backend_data), type(self._backend_data))
-            other = other.rename(
-                {
-                    other.columns[i]: self.data.columns[i]
-                    for i in range(len(other.columns))
-                }
-            ).backend
-        return self.__class__(roles=t_roles, data=func(other), session=self.session)
+            other_raw = other.backend_data.data if hasattr(other.backend_data, 'data') else other.backend_data
+            
+            if hasattr(other_raw, 'columns') and hasattr(self_raw, 'columns'):
+                if len(other_raw.columns) == len(self_raw.columns) and list(other_raw.columns) != list(self_raw.columns):
+                    rename_map = {other_raw.columns[i]: self_raw.columns[i] for i in range(len(self_raw.columns))}
+                    other_raw = other_raw.rename(columns=rename_map)
+                if hasattr(self_raw, 'columns') and not hasattr(other_raw, 'columns'):
+                    other_raw = other_raw.to_frame()
+                    if other_raw.columns[0] != self_raw.columns[0]:
+                        other_raw.columns = self_raw.columns
+        else:
+            other_raw = other
+
+        func = getattr(self_raw, func_name)
+        result_raw = func(other_raw)
+
+        if hasattr(result_raw, 'to_frame') and not hasattr(result_raw, 'columns'):
+            col_name = result_raw.name if result_raw.name is not None else (self_raw.columns[0] if hasattr(self_raw, 'columns') else 'result')
+            result_raw = result_raw.to_frame(name=col_name)
+
+        actual_columns = list(result_raw.columns) if hasattr(result_raw, 'columns') else []
+        new_roles = {}
+        for col in actual_columns:
+            new_roles[col] = deepcopy(self.roles.get(col, self.default_role or DefaultRole()))
+            new_roles[col].data_type = None
+
+        return self.__class__(roles=new_roles, data=result_raw, session=self.session)
 
     # comparison operators:
-    def __eq__(self, other: Any) -> DatasetBase:
+    def __eq__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__eq__")
 
-    def __ne__(self, other: Any) -> DatasetBase:
+    def __ne__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__ne__")
 
-    def __le__(self, other: Any) -> DatasetBase:
+    def __le__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__le__")
 
-    def __lt__(self, other: Any) -> DatasetBase:
+    def __lt__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__lt__")
 
-    def __ge__(self, other: Any) -> DatasetBase:
+    def __ge__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__ge__")
 
-    def __gt__(self, other: Any) -> DatasetBase:
+    def __gt__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__gt__")
 
     # unary operators:
-    def __pos__(self) -> DatasetBase:
+    def __pos__(self) -> Self:
         return self.__class__(roles=self.roles, data=(+self._backend_data), session=self.session)
 
-    def __neg__(self) -> DatasetBase:
+    def __neg__(self) -> Self:
         return self.__class__(roles=self.roles, data=(-self._backend_data), session=self.session)
 
-    def __abs__(self) -> DatasetBase:
+    def __abs__(self) -> Self:
         return self.__class__(roles=self.roles, data=abs(self._backend_data), session=self.session)
 
-    def __invert__(self) -> DatasetBase:
+    def __invert__(self) -> Self:
         return self.__class__(roles=self.roles, data=(~self._backend_data), session=self.session)
 
-    def __round__(self, ndigits: int = 0) -> DatasetBase:
+    def __round__(self, ndigits: int = 0) -> Self:
         return self.__class__(roles=self.roles, data=round(self._backend_data, ndigits), session=self.session)
 
-    def __bool__(self) -> DatasetBase:
+    def __bool__(self) -> Self:
         return not self._backend_data.is_empty()
 
     # Binary math operators:
-    def __add__(self, other: Any) -> DatasetBase:
+    def __add__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__add__")
 
-    def __sub__(self, other: Any) -> DatasetBase:
+    def __sub__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__sub__")
 
-    def __mul__(self, other: Any) -> DatasetBase:
+    def __mul__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__mul__")
 
-    def __floordiv__(self, other: Any) -> DatasetBase:
+    def __floordiv__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__floordiv__")
 
-    def __div__(self, other: Any) -> DatasetBase:
+    def __div__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__div__")
 
-    def __truediv__(self, other: Any) -> DatasetBase:
+    def __truediv__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__truediv__")
 
-    def __mod__(self, other: Any) -> DatasetBase:
+    def __mod__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__mod__")
 
-    def __pow__(self, other: Any) -> DatasetBase:
+    def __pow__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__pow__")
 
-    def __and__(self, other: Any) -> DatasetBase:
+    def __and__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__and__")
 
-    def __or__(self, other: Any) -> DatasetBase:
+    def __or__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__or__")
 
     # Right math operators:
-    def __radd__(self, other: Any) -> DatasetBase:
+    def __radd__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__radd__")
 
-    def __rsub__(self, other: Any) -> DatasetBase:
+    def __rsub__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__rsub__")
 
-    def __rmul__(self, other: Any) -> DatasetBase:
+    def __rmul__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__rmul__")
 
-    def __rfloordiv__(self, other: Any) -> DatasetBase:
+    def __rfloordiv__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__rfloordiv__")
 
-    def __rdiv__(self, other: Any) -> DatasetBase:
+    def __rdiv__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__rdiv__")
 
-    def __rtruediv__(self, other: Any) -> DatasetBase:
+    def __rtruediv__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__rtruediv__")
 
-    def __rmod__(self, other: Any) -> DatasetBase:
+    def __rmod__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__rmod__")
 
-    def __rpow__(self, other: Any) -> DatasetBase:
+    def __rpow__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__rpow__")
 
     def search_columns(self,
@@ -650,7 +682,7 @@ class DatasetBase(ABC):
         self._set_empty_types(self._tmp_roles)
 
     def _convert_data_after_agg(self,
-                                result: Any) -> DatasetBase | ScalarType | None:
+                                result: Any) -> Self | ScalarType | None:
         if result is None:
             return None
 
@@ -701,7 +733,7 @@ class DatasetBase(ABC):
 
     def astype(self,
                dtype: dict[str, type],
-               errors: Literal["raise", "ignore"] = "raise") -> DatasetBase:
+               errors: Literal["raise", "ignore"] = "raise") -> Self:
         for col, _ in dtype.items():
             if (errors == "raise") and (col not in self.columns):
                 raise KeyError(f"Column '{col}' does not exist in the Dataset.")
@@ -719,7 +751,7 @@ class DatasetBase(ABC):
     def append(self,
                other: DatasetBase | Iterable[DatasetBase],
                reset_index=False,
-               axis: int = 0) -> DatasetBase:
+               axis: int = 0) -> Self:
         other = Adapter.to_list(other)
 
         new_roles = deepcopy(self.roles)
@@ -737,7 +769,7 @@ class DatasetBase(ABC):
               func: Callable[..., Any],
               role: dict[str, ABCRole],
               axis: int = 0,
-              **kwargs) -> DatasetBase:
+              **kwargs) -> Self:
         if self.is_empty():
             return deepcopy(self)
         tmp_data = self._backend_data.apply(
@@ -752,7 +784,7 @@ class DatasetBase(ABC):
     def map(self,
             func: Callable[..., Any],
             na_action: Any = None,
-            **kwargs) -> DatasetBase:
+            **kwargs) -> Self:
         return self.__class__(
             roles=self.roles,
             data=self._backend_data.map(func=func, na_action=na_action, **kwargs),
@@ -767,7 +799,7 @@ class DatasetBase(ABC):
     def nunique(self, dropna: bool = False) -> dict[str, int]:
         return self._backend_data.nunique(dropna)
 
-    def isin(self, values: Iterable[Any]) -> DatasetBase:
+    def isin(self, values: Iterable[Any]) -> Self:
         role: ABCRole = FilterRole()
         return self.__class__(
             roles={column: role for column in self.roles.keys()},
@@ -789,7 +821,7 @@ class DatasetBase(ABC):
     def fillna(self,
                values: ScalarType | dict[str, ScalarType] | None = None,
                method: Literal["bfill", "ffill"] | None = None,
-               **kwargs) -> DatasetBase:
+               **kwargs) -> Self:
         if values is None and method is None:
             raise ValueError("Value or filling method must be provided")
         return self.__class__(
@@ -797,29 +829,29 @@ class DatasetBase(ABC):
             data=self.backend_data.fillna(values=values, method=method, **kwargs),
         )
 
-    def mean(self) -> DatasetBase | ScalarType | None:
+    def mean(self) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.mean())
 
-    def max(self) -> DatasetBase | ScalarType | None:
+    def max(self) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.max())
 
-    def min(self) -> DatasetBase | ScalarType | None:
+    def min(self) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.min())
 
-    def count(self) -> DatasetBase | ScalarType | None:
+    def count(self) -> Self | ScalarType | None:
         if self.is_empty():
             return self.create_empty({role: InfoRole() for role in self.roles})
         return self._convert_data_after_agg(self._backend_data.count())
 
-    def sum(self) -> DatasetBase | ScalarType | None:
+    def sum(self) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.sum())
 
-    def log(self) -> DatasetBase | ScalarType | None:
+    def log(self) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.log())
 
     def mode(self,
              numeric_only: bool = False,
-             dropna: bool = True) -> DatasetBase:
+             dropna: bool = True) -> Self:
         t_data = self._backend_data.mode(numeric_only=numeric_only, dropna=dropna)
         return self.__class__(
             data=t_data, roles={role: InfoRole() for role in t_data.columns}
@@ -828,28 +860,28 @@ class DatasetBase(ABC):
     def var(self,
             skipna: bool = True,
             ddof: int = 1,
-            numeric_only: bool = False) -> DatasetBase | ScalarType | None:
+            numeric_only: bool = False) -> Self | ScalarType | None:
         return self._convert_data_after_agg(
             self._backend_data.var(skipna=skipna, ddof=ddof, numeric_only=numeric_only)
         )
 
     def agg(self,
-            func: str | list) -> DatasetBase | ScalarType | None:
+            func: str | list) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.agg(func))
 
     def std(self,
             skipna: bool = True,
-            ddof: int = 1) -> DatasetBase | ScalarType | None:
+            ddof: int = 1) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.std(skipna=skipna, ddof=ddof))
 
     def quantile(self,
-                 q: float = 0.5) -> DatasetBase | ScalarType | None:
+                 q: float = 0.5) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.quantile(q=q))
 
-    def coefficient_of_variation(self) -> DatasetBase | ScalarType | None:
+    def coefficient_of_variation(self) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.coefficient_of_variation())
 
-    def corr(self, numeric_only: bool = False) -> DatasetBase:
+    def corr(self, numeric_only: bool = False) -> Self:
         t_data = self._backend_data.corr(numeric_only=numeric_only)
         t_roles = {column: self.roles[column] for column in t_data.columns}
         return self.__class__(roles=t_roles, data=t_data)
@@ -858,7 +890,7 @@ class DatasetBase(ABC):
                      normalize: bool = False,
                      sort: bool = True,
                      ascending: bool = False,
-                     dropna: bool = True) -> DatasetBase:
+                     dropna: bool = True) -> Self:
         t_data = self._backend_data.value_counts(
             normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
         )
@@ -877,17 +909,17 @@ class DatasetBase(ABC):
         t_roles[column_name] = StatisticRole()
         return self.__class__(roles=t_roles, data=t_data)
 
-    def na_counts(self) -> DatasetBase | ScalarType | None:
+    def na_counts(self) -> Self | ScalarType | None:
         """Count NA values"""
         return self._convert_data_after_agg(self._backend_data.na_counts())
 
-    def isna(self) -> DatasetBase | ScalarType | None:
+    def isna(self) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.isna())
 
     def dropna(self,
                how: Literal["any", "all"] = "any",
                subset: str | Iterable[str] | None = None,
-               axis: Literal["index", "rows", "columns"] | int = 0) -> DatasetBase:
+               axis: Literal["index", "rows", "columns"] | int = 0) -> Self:
         new_data = self._backend_data.dropna(how=how, subset=subset, axis=axis)
 
         new_roles = (
@@ -901,7 +933,7 @@ class DatasetBase(ABC):
     def drop(self,
              labels: str | None = None,
              axis: int | None = None,
-             columns: str | Iterable[str] | None = None) -> DatasetBase:
+             columns: str | Iterable[str] | None = None) -> Self:
         dropped_columns = []
         
         if columns is not None:
@@ -927,13 +959,13 @@ class DatasetBase(ABC):
         result._tmp_roles = new_tmp_roles
         return result
 
-    def filter(self,
-               items: list | None = None,
-               regex: str | None = None,
-               axis: int | None = None) -> DatasetBase:
+    def filter(self, items = None, regex = None, axis = None):
         t_data = self._backend_data.filter(items=items, regex=regex, axis=axis)
         t_roles = {c: self.roles[c] for c in t_data.columns if c in self.roles.keys()}
-        return self.__class__(roles=t_roles, data=t_data)
+        
+        raw_data = t_data.data if hasattr(t_data, 'data') else t_data
+        
+        return self.__class__(roles=t_roles, data=raw_data)
 
     def select(self, columns: str | list[str]):
         columns = Adapter.to_list(columns)
@@ -958,7 +990,7 @@ class DatasetBase(ABC):
               left_index: bool = False,
               right_index: bool = False,
               suffixes: tuple[str, str] = ("_x", "_y"),
-              how: Literal["left", "right", "outer", "inner", "cross"] = "inner") -> DatasetBase:
+              how: Literal["left", "right", "outer", "inner", "cross"] = "inner") -> Self:
         if not isinstance(right, self.__class__):
             raise DataTypeError(type(right))
         if type(right._backend_data) is not type(self._backend_data):
@@ -996,7 +1028,7 @@ class DatasetBase(ABC):
     def sample(self,
                frac: float | None = None,
                n: int | None = None,
-               random_state: int | None = None) -> DatasetBase:
+               random_state: int | None = None) -> Self:
         return self.__class__(
             self.roles,
             data=self.backend_data.sample(frac=frac, n=n, random_state=random_state),
@@ -1008,20 +1040,20 @@ class DatasetBase(ABC):
             {column: DefaultRole() for column in t_data.columns}, data=t_data
         )
 
-    def rename(self, names: dict[str, str]) -> DatasetBase:
+    def rename(self, names: dict[str, str]) -> Self:
         roles = {names.get(column, column): role for column, role in self.roles.items()}
         return self.__class__(roles, data=self.backend_data.rename(names))
 
     def replace(self,
                 to_replace: Any = None,
                 value: Any = None,
-                regex: bool = False) -> DatasetBase:
+                regex: bool = False) -> Self:
         return self.__class__(
             self.roles,
             data=self._backend_data.replace(to_replace=to_replace, value=value, regex=regex),
         )
 
-    def list_to_columns(self, column: str) -> DatasetBase:
+    def list_to_columns(self, column: str) -> Self:
         if not pd.api.types.is_list_like(self.backend_data[column][0]):
             return self
         extended_data = self.backend_data.list_to_columns(column)
@@ -1069,7 +1101,7 @@ class DatasetBase(ABC):
 
     def _set_roles(self,
                    new_roles_map: dict[ABCRole, list[str] | str] | dict[list[str] | str] | ABCRole,
-                   temp_role: bool = False) -> DatasetBase:
+                   temp_role: bool = False) -> Self:
         if not new_roles_map:
             if not temp_role:
                 return self.roles
@@ -1086,9 +1118,9 @@ class DatasetBase(ABC):
         for role, columns in zip(roles, columns_sets):
             if isinstance(columns, list):
                 for column in columns:
-                    new_roles[column] = copy.deepcopy(role)
+                    new_roles[column] = deepcopy(role)
             else:
-                new_roles[columns] = copy.deepcopy(role)
+                new_roles[columns] = deepcopy(role)
 
         if temp_role:
             self._tmp_roles = new_roles

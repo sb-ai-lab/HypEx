@@ -4,6 +4,9 @@ from ..reporters.aa import AABestSplitReporter, AAPassedReporter
 from ..utils import ExperimentDataEnum
 from ..utils.enums import RenameEnum
 from .base import Output
+from ..reporters.abstract import TestDictReporter  # <-- Добавляем
+
+from ..reporters.aa import AATestReporter, AAPassedReporter, AABestSplitReporter
 
 
 class AAOutput(Output):
@@ -15,16 +18,18 @@ class AAOutput(Output):
     def __init__(self):
         super().__init__(
             resume_reporter=AAPassedReporter(),
-            additional_reporters={"best_split": AABestSplitReporter()},
+            additional_reporters={"best_split": AABestSplitReporter()}
         )
 
     def _extract_experiments(self, experiment_data: ExperimentData):
         id_ = experiment_data.get_one_id(
-            "ParamsExperiment", ExperimentDataEnum.analysis_tables, "AATest"
+            "ParamsExperiment", ExperimentDataEnum.analysis_tables
         )
-        self.experiments = self._replace_splitters(
-            experiment_data.analysis_tables[id_], RenameEnum.columns
-        )
+        raw_table = experiment_data.analysis_tables[id_]
+        
+        struct_dict = TestDictReporter._get_struct_dict(raw_table.data.to_dict(orient="dict"))
+        self.experiments = TestDictReporter._convert_struct_dict_to_dataset(struct_dict)
+        self.experiments = self._replace_splitters(self.experiments, RenameEnum.columns)
 
     def _extract_aa_score(self, experiment_data: ExperimentData):
         def get_analyzer_id(key: str):

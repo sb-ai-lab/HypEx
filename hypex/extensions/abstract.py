@@ -25,7 +25,7 @@ class Extension(ABC):
         raise AbstractMethodError
 
     def calc(self, data: Dataset, **kwargs):
-        return self.BACKEND_MAPPING[type(data.backend)](data=data, **kwargs)
+        return self.BACKEND_MAPPING[type(data.backend_data)](data=data, **kwargs)
 
     @staticmethod
     def result_to_dataset(result: Any, roles: ABCRole | dict[str, ABCRole]) -> Dataset:

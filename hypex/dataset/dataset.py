@@ -53,17 +53,42 @@ class SmallDataset(DatasetBase):
         self,
         roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
         data: pd.DataFrame | str | None = None,
-        # backend: BackendsEnum | None = None,
         default_role: ABCRole | None = None,
         session: spark.SparkSession | None = None,
+        backend: BackendsEnum | None = None, 
     ):
+        if isinstance(roles, dict) and data is not None:
+            columns = None
+            
+            if hasattr(data, 'columns'):
+                cols = data.columns
+                columns = cols.tolist() if hasattr(cols, 'tolist') else list(cols)
+            elif hasattr(data, 'name') and data.name is not None:
+                columns = [data.name]
+            elif isinstance(data, dict) and 'data' in data and isinstance(data['data'], dict):
+                columns = list(data['data'].keys())
+            
+            if columns:
+                new_roles = {}
+                for k, v in roles.items():
+                    if isinstance(k, int) and 0 <= k < len(columns):
+                        new_roles[columns[k]] = v
+                    elif not isinstance(k, int):
+                        new_roles[k] = v
+                roles = new_roles
+        if isinstance(data, pd.Series):
+            if data.name is None:
+                data = data.to_frame(name="value")
+            else:
+                data = data.to_frame()
+        
         super().__init__(roles, data, BackendsEnum.pandas, default_role, session)
         self.loc = self.Locker(call_class=self.__class__, backend=self._backend_data, roles=self.roles)
         self.iloc = self.ILocker(call_class=self.__class__, backend=self._backend_data, roles=self.roles)
 
     @property
     def index(self):
-        return self.backend.index
+        return self.backend_data.index
 
     @index.setter
     def index(self, value):
@@ -116,13 +141,10 @@ class SmallDataset(DatasetBase):
             self,
             roles: dict[str, ABCRole] | list[str] | None = None,
     ) -> Dataset:
-        # Get role names if provided
         roles_names: list[str | None] = (
             list(roles.keys()) or [] if isinstance(roles, dict) else roles
         )
-        # Transpose data
-        result_data = self.backend.transpose(roles_names)
-        # Create default roles if none provided
+        result_data = self.backend_data.transpose(roles_names)
         if roles is None or isinstance(roles, list):
             names = result_data.columns if roles is None else roles
             roles = {column: DefaultRole() for column in names}
@@ -138,27 +160,26 @@ class SmallDataset(DatasetBase):
 
 
 class ExperimentData:
-    def __init__(self, data: Dataset):
-        self._data = data
-        self.additional_fields = data.create_empty(index=data.index, 
-                                                   backend=data.backend_type,
-                                                   session=data.session)
+    def __init__(self, data: Dataset | SmallDataset):
+        self._data: Dataset | SmallDataset = data
+        self.additional_fields: Dataset | SmallDataset = (data
+            .create_empty(index=data.index, 
+                          backend=data.backend_type,
+                          session=data.session))
         self.variables: dict[str, dict[str, int | float]] = {}
         self.groups: dict[str, dict[str, Dataset]] = {}
-        self.analysis_tables: dict[str, SmallDataset] = {}  # Используем SmallDataset
+        self.analysis_tables: dict[str, SmallDataset] = {}
         self.id_name_mapping: dict[str, str] = {}
 
     @property
-    def ds(self):
+    def ds(self) -> Dataset | SmallDataset:
         """
         Get the base dataset.
         """
         return self._data
 
     @staticmethod
-    def create_empty(
-        roles=None, backend=BackendsEnum.pandas, index=None
-    ) -> ExperimentData:
+    def create_empty(roles=None, backend=BackendsEnum.pandas, index=None) -> ExperimentData:
         if isinstance(index, Dataset):
             index = index.index
         ds = Dataset.create_empty(backend, roles, index)
@@ -215,15 +236,15 @@ class ExperimentData:
 
         # Handle analysis tables
         elif space == ExperimentDataEnum.analysis_tables:
-            # Преобразуем Dataset в SmallDataset
+            print(f"[DEBUG] set_value ENTRY | executor_id={executor_id} | value_type={type(value).__name__}")
+
             if isinstance(value, Dataset):
                 value = value.to_small_dataset()
-            elif isinstance(value, Dataset):
-                value = SmallDataset.from_dict(value.to_dict(), roles=role)
             elif not isinstance(value, SmallDataset):
-                # Если значение не Dataset/SmallDataset, создаем SmallDataset
                 raise TypeError(f"Wrong value {value} for converting to SmallDataset")
+            print(f"[DEBUG] set_value | executor_id={executor_id} | id(data)={id(self)} | keys_before={list(self.analysis_tables.keys())}")
             self.analysis_tables[executor_id] = value
+            print(f"[DEBUG] set_value | keys_after={list(self.analysis_tables.keys())}")
 
         # Handle variables
         elif space == ExperimentDataEnum.variables:
@@ -336,7 +357,7 @@ class ExperimentData:
         self,
         roles: ABCRole | Iterable[ABCRole],
         tmp_role: bool = False,
-        search_types=None,
+        search_types = None,
     ) -> Dataset:
         searched_data: Dataset = Dataset.create_empty(index=self._data.index,
                                                       backend=self._data.backend_type,

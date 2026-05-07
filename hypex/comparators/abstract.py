@@ -7,6 +7,7 @@ from typing import Any, Callable, ClassVar, Literal
 from ..dataset import (
     ABCRole,
     AdditionalTargetRole,
+    AdditionalTreatmentRole,
     Dataset,
     DatasetAdapter,
     ExperimentData,
@@ -71,7 +72,6 @@ class BaseComparator(Calculator, ABC):
                 if tmp_role
                 else self.target_roles
             ),
-            # roles=(TargetRole()),
             tmp_role=tmp_role,
             search_types=self.search_types,
         )
@@ -103,7 +103,7 @@ class BaseComparator(Calculator, ABC):
                 result = result.append(cr_list_v[1:])
             result.index = list(compare_result.keys())
             return result
-        return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
+        return SmallDataset.from_dict(compare_result, roles)
 
 
 class GroupsComparator(BaseComparator, ABC):
@@ -177,7 +177,7 @@ class GroupsComparator(BaseComparator, ABC):
                 InfoRole(),
             )
         return result
-
+    
     @staticmethod
     def _grouping_data_split(
         grouping_data: dict[str, Dataset],
@@ -191,20 +191,25 @@ class GroupsComparator(BaseComparator, ABC):
             raise TypeError(
                 f"Grouping data must be dict of strings and datasets, but got {type(grouping_data)}"
             )
-
         compared_data = list(grouping_data.items())
         baseline_data = [compared_data.pop(0)]
+        
+        def _safe_slice(ds, cols):
+            if cols is None:
+                return ds
+            if hasattr(ds, '__getitem__'):
+                return ds[cols]
+            return ds[cols] if isinstance(cols, str) else ds[list(cols)]
+
+        baseline_cols = target_fields if compare_by == "groups" else baseline_field
         baseline_data = [
-            (
-                bucket[0],
-                bucket[1][target_fields if compare_by == "groups" else baseline_field],
-            )
+            (bucket[0], _safe_slice(bucket[1], baseline_cols))
             for bucket in baseline_data
         ]
         compared_data = [
-            (bucket[0], bucket[1][target_fields]) for bucket in compared_data
+            (bucket[0], _safe_slice(bucket[1], target_fields))
+            for bucket in compared_data
         ]
-
         return baseline_data, compared_data
 
     @staticmethod
@@ -508,6 +513,11 @@ class GroupsComparator(BaseComparator, ABC):
                 ),
             )
         else:
+            has_additional = any(
+                isinstance(data.additional_fields.roles[col], (AdditionalTargetRole, AdditionalTreatmentRole))
+                for col in data.additional_fields.columns
+            )
+            
             combined_data = (
                 data.ds.merge(
                     data.additional_fields[
@@ -515,7 +525,7 @@ class GroupsComparator(BaseComparator, ABC):
                             col
                             for col in data.additional_fields.columns
                             if isinstance(
-                                data.additional_fields.roles[col], AdditionalTargetRole
+                                data.additional_fields.roles[col], (AdditionalTargetRole, AdditionalTreatmentRole)
                             )
                         ]
                     ],
@@ -523,16 +533,12 @@ class GroupsComparator(BaseComparator, ABC):
                     right_index=True,
                     how="outer",
                 )
-                if any(
-                    isinstance(data.additional_fields.roles[col], AdditionalTargetRole)
-                    for col in data.additional_fields.columns
-                )
+                if has_additional
                 else data.ds
             )
             
-
             data.groups[group_field_data.columns[0]] = {
-                f"{group}": ds for group, ds in combined_data.groupby(group_field_data)
+                f"{group}": ds for group, ds in combined_data.groupby(group_field_data.columns[0])
             }
             grouping_data = self._split_data_to_buckets(
                 compare_by=self.compare_by,
@@ -725,7 +731,7 @@ class StatsComparator(BaseComparator, ABC):
         )
 
         grouped: GroupedDataset = (target_fields_data
-            .merge(group_field_data, left_index=True, right_index= True)
+            .merge(group_field_data, left_index=True, right_index=True)
             .groupby(by=group_field_data.columns)
         )
 
