@@ -89,6 +89,7 @@ ruff = "*"
 alive-progress = "^3.1.0"
 psutil = "^7.0.0"
 jsonschema = "^4.23.0"
+mypy = ">=1.8.0,<1.17"
 
 
 [build-system]
@@ -96,9 +97,57 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
+# Keep line length compatible with black (already set to 88)
 line-length = 88
 target-version = "py38"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "C90", "UP", "RUF", "I"]
-ignore = ["E501", "RUF003", "C901"]
+# Extended rule sets:
+# E, W     – pycodestyle (whitespace, blank lines, etc.)
+# F        – Pyflakes (syntax and logic errors)
+# C90      – mccabe (cyclomatic complexity)
+# UP       – pyupgrade (syntax modernization for the target version)
+# RUF      – ruff-specific rules (e.g., unused noqa)
+# I        – isort (import sorting)
+# SIM      – simplification of expressions (yoda conditions, unnecessary if, etc.)
+# PERF     – performance tips (especially useful for pandas/numpy)
+# PD       – pandas-vet (pandas best practices, avoid deprecated methods)
+# NPY      – numpy-specific rules (deprecated types, potential errors)
+# FA       – future annotations (from __future__ import annotations)
+# S        – bandit (basic security checks)
+# D        – pydocstyle (docstring checks, important for public APIs)
+select = [
+    "E", "W", "F", "C90", "UP", "RUF", "I",
+    "SIM", "PERF", "PD", "NPY", "FA", "S", "D"
+]
+
+# Ignored rules
+ignore = [
+    "E501",    # line length is already controlled by line-length
+    "C901",    # leave function complexity without a strict limit
+    "S101",    # assert in tests/examples is acceptable when intentional
+    "D100",    # missing module docstring – can be skipped for internal modules
+    "D104",    # missing package docstring
+    "PD901",   # `df` as a variable name is normal in data analysis
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Allow assert and skip docstring requirements in tests and notebooks
+"tests/**/*.py" = ["S101", "D"]
+"docs/**/*.py" = ["D"]
+"*.ipynb" = ["D"]
+
+[tool.ruff.lint.isort]
+# Import ordering: standard library, third-party, then HypEx
+known-first-party = ["HypEx"]
+
+[tool.ruff.lint.pydocstyle]
+# Use Google-style (or numpy) docstrings – common in the scientific community
+convention = "google"
+
+[tool.ruff.format]
+# Formatter settings, similar to black (used by default)
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
