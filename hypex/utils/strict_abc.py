@@ -280,7 +280,7 @@ class StrictABCMeta(ABCMeta):
                 if p_ann and c_ann and p.annotation != c.annotation:
                     raise TypeError(
                         f"{class_name}.{meth_name}: type annotation mismatch for '{p.name}' "
-                        f"(expected {p.annotation}, got {c.annotation})"   # <-- FIXED: c_annotation -> c.annotation
+                        f"(expected {p.annotation}, got {c.annotation})"
                     )
 
         # Return type validation (covariance)
