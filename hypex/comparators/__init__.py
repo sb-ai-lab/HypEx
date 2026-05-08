@@ -10,6 +10,7 @@ from .comparators import PSI, GroupDifference, GroupSizes
 from .distances import MahalanobisDistance
 from .hypothesis_testing import GroupChi2Test, GroupKSTest, GroupTTest, GroupUTest
 from .stats_hypothesis_testing import StatsTTest, StatsChi2Test, StatsZTest
+from .adaptive_hypothesis_testing import Chi2Test, KSTest, TTest, UTest
 from .power_testing import MDEBySize, PowerTesting
 
 __all__ = [
@@ -27,9 +28,14 @@ __all__ = [
     "PSI",
     "GroupHypothesisTesting",
     "StatsComparator",
+    "StatsHypothesisTesting",
     "GroupTTest",
     "GroupUTest",
     "StatsTTest",
     "StatsChi2Test",
-    "StatsZTest"
+    "StatsZTest",
+    "Chi2Test",
+    "KSTest",
+    "TTest",
+    "UTest"
 ]

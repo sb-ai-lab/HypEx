@@ -15,6 +15,7 @@ from .forks.aa import IfAAExecutor
 from .reporters import DatasetReporter, DictReporter
 from .reporters.aa import OneAADictReporter
 from .splitters import AASplitter, AASplitterWithStratification
+from .comparators import Chi2Test, KSTest, TTest
 from .ui.aa import AAOutput
 from .ui.base import ExperimentShell
 from .utils import SpaceEnum
@@ -92,12 +93,12 @@ class AATest(ExperimentShell):
                         GroupDifference(
                             compare_by="groups", grouping_role=AdditionalTreatmentRole()
                         ),
-                        StatsTTest(
+                        TTest(
                             grouping_role=AdditionalTreatmentRole(),
                             target_roles=TargetRole(),
                             reliability=0.05
                         ),
-                        GroupChi2Test(
+                        Chi2Test(
                             compare_by="groups", grouping_role=AdditionalTreatmentRole()
                         ),
                     ],
