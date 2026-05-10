@@ -11,13 +11,13 @@ from ..dataset import (
     ExperimentData,
     FeatureRole,
 )
-from ..executor import MLExecutor
+from ..executor.feature_ml_executor import FeatureMLExecutor
 from ..extensions.faiss import FaissExtension
 from ..utils import ExperimentDataEnum
 from ..utils.errors import PairsNotFoundError
 
 
-class FaissNearestNeighbors(MLExecutor):
+class FaissNearestNeighbors(FeatureMLExecutor):
     def __init__(
         self,
         n_neighbors: int = 1,
@@ -118,7 +118,7 @@ class FaissNearestNeighbors(MLExecutor):
             data=data, test_data=test_data
         )
 
-    def fit(self, X: Dataset, Y: Dataset | None = None) -> MLExecutor:
+    def fit(self, X: Dataset, Y: Dataset | None = None) -> FeatureMLExecutor:
         return FaissExtension(self.n_neighbors, self.faiss_mode).fit(X=X, Y=Y)
 
     def predict(self, X: Dataset) -> Dataset:
