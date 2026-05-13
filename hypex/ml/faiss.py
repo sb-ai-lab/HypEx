@@ -40,7 +40,7 @@ class FaissNearestNeighbors(MLExecutor):
 
     @classmethod
     def _set_global_match_indexes(
-        cls, local_indexes: Dataset, data: tuple(str, Dataset)
+        cls, local_indexes: Dataset, data: tuple[str, Dataset]
     ) -> list[int, list[int]]:
         if len(local_indexes) == 0:
             return local_indexes
@@ -55,6 +55,7 @@ class FaissNearestNeighbors(MLExecutor):
     def _execute_inner_function(
         cls,
         grouping_data,
+        tmp_roles, 
         target_field: str | None = None,
         n_neighbors: int | None = None,
         two_sides: bool | None = None,
@@ -62,32 +63,36 @@ class FaissNearestNeighbors(MLExecutor):
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
         **kwargs,
     ) -> dict:
+        (control_idx, _data), (test_idx, _test_data), *_ = grouping_data
+        _data.tmp_roles = tmp_roles
         if test_pairs is not True:
             test_data = cls._inner_function(
-                data=grouping_data[0][1],
-                test_data=grouping_data[1][1],
+                data=_data,
+                test_data=_test_data,
                 n_neighbors=n_neighbors or 1,
                 faiss_mode=faiss_mode,
                 **kwargs,
             )
-            test_data = cls._set_global_match_indexes(test_data, grouping_data[0])
+            # This isn't nessesary due to `IndexIDMap`
+            # test_data = cls._set_global_match_indexes(test_data, (control_idx, _data))
             if two_sides is not True:
                 return {"test": test_data}
             control_data = cls._inner_function(
-                data=grouping_data[1][1],
-                test_data=grouping_data[0][1],
+                data=_test_data,
+                test_data=_data,
                 n_neighbors=n_neighbors or 1,
                 faiss_mode=faiss_mode,
                 **kwargs,
             )
-            control_data = cls._set_global_match_indexes(control_data, grouping_data[1])
+            # This isn't nessesary due to `IndexIDMap`
+            # control_data = cls._set_global_match_indexes(control_data, (test_idx, _test_data))
             return {
                 "test": test_data,
                 "control": control_data,
             }
         data = cls._inner_function(
-            data=grouping_data[1][1],
-            test_data=grouping_data[0][1],
+            data=_test_data,
+            test_data=_data,
             n_neighbors=n_neighbors or 1,
             faiss_mode=faiss_mode,
             **kwargs,
@@ -134,7 +139,7 @@ class FaissNearestNeighbors(MLExecutor):
         if group_field[0] in data.groups:
             grouping_data = list(data.groups[group_field[0]].items())
         else:
-            grouping_data = data.ds.groupby(group_field, fields_list=features_fields)
+            grouping_data = list(data.ds[group_field + features_fields].groupby(group_field))
         distances_keys = data.get_ids(MahalanobisDistance, ExperimentDataEnum.groups)
         if len(distances_keys["MahalanobisDistance"]["groups"]) > 0:
             grouping_data = list(
@@ -153,10 +158,9 @@ class FaissNearestNeighbors(MLExecutor):
         nans = 0
 
         for result in compare_result.values():
+ 
             nans += (
-                sum(result.isna().sum().get_values(row="sum"))
-                if self.n_neighbors > 1
-                else result.isna().sum()
+                result.data.isna().sum().sum()
             )
             result = result.fillna(-1).astype({col: int for col in result.columns})
         if nans > 0:
@@ -164,35 +168,34 @@ class FaissNearestNeighbors(MLExecutor):
                 f"Faiss returned {nans} nans, which were replaced with dummy matches. Check if the data is suitable for the test.",
                 UserWarning,
             )
-        matched_indexes = Dataset.create_empty()
+        matched_indexes = Dataset.create_empty(
+            backend=data.ds.backend_type,
+            session=data.ds.session
+        )
         for res_k, res_v in compare_result.items():
             group = grouping_data[1][1] if res_k == "test" else grouping_data[0][1]
-            t_index_field = res_v.limit(len(group) - 1)
-            n_nans = (
-                t_index_field.isna().sum().get_values(row="sum")
-                if t_index_field.shape[1] > 1
-                else [t_index_field.isna().sum()]
-            )
-            if any(n_nans):
+            t_index_field = res_v.limit(len(group))
+
+            n_nans = t_index_field.data.isna().sum().sum()
+
+            if n_nans:
                 raise PairsNotFoundError
             t_index_field = t_index_field.rename(
                 {col: f"indexes_{i}" for i, col in enumerate(t_index_field.columns)}
             )
-            matched_indexes = matched_indexes.append(
-                Dataset.from_dict(
-                    data={
-                        col: t_index_field.get_values(column=col)
-                        for col in t_index_field.columns
-                    },
-                    roles={
-                        col: AdditionalMatchingRole() for col in t_index_field.columns
-                    },
-                    index=group.index,
-                )
-            ).sort()
+            t_index_field.roles = {
+                col: AdditionalMatchingRole() for col in  t_index_field.columns
+            }
+
+            # TODO: not supported in pyspark, maybe remove it or find a solution
+            # t_index_field.index = group.index 
+            matched_indexes = matched_indexes.append(t_index_field)
+
+        if matched_indexes is not None:
+            matched_indexes = matched_indexes.sort()
         if len(matched_indexes) < len(data.ds) and not self.two_sides:
             matched_indexes = matched_indexes.reindex(data.ds.index, fill_value=-1)
         elif len(matched_indexes) < len(data.ds) and self.two_sides:
             raise PairsNotFoundError
-        matched_indexes.data.to_csv("matched_indexes.csv")
+        # matched_indexes.data.to_csv("matched_indexes.csv") # TODO: needs to be removed
         return self._set_value(data, matched_indexes, key="matched")

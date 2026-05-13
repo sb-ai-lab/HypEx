@@ -116,7 +116,7 @@ class MahalanobisDistance(Calculator):
         # conversion to numpy is necessary to bring the backends to the same form
         # cov = (data.cov().to_numpy() + test_data.cov().to_numpy()) / 2 if test_data else data.cov().to_numpy() 
         cov = UniteCovExtension().calc(data, test_data)
-        # print(cov)
+    
         cholesky = CholeskyExtension().calc(cov)
         mahalanobis_transform = InverseExtension().calc(cholesky)
         if weights is not None:
@@ -127,19 +127,10 @@ class MahalanobisDistance(Calculator):
             w_matrix = np.sqrt(np.diag(w_list / w_list.sum()))
             mahalanobis_transform = mahalanobis_transform.dot(w_matrix)
         
-        # Convertion from SmallDataset to Dataset with similar backend to data. 
-        # mahalanobis_transform data will be transposed during convertion to Dataset.
-        mahalanobis_transform = mahalanobis_transform.transpose()
-        mahalanobis_transform = Dataset(
-            roles=mahalanobis_transform.roles, 
-            data=mahalanobis_transform.data,
-            backend=data.backend_type,
-            session=data.session
-        )
-
-        y_control = data.dot(mahalanobis_transform) # TODO: check SparkDataset.
+        mahalanobis_transform: Dataset = mahalanobis_transform.transpose()
+        y_control = data.dot(mahalanobis_transform.data)
         if test_data:
-            y_test = test_data.dot(mahalanobis_transform)
+            y_test = test_data.dot(mahalanobis_transform.data)
             return {"control": y_control, "test": y_test}
         return {"control": y_control}
 
@@ -163,10 +154,7 @@ class MahalanobisDistance(Calculator):
                 tmp_roles.pop(group_col, None)
         else:
             raise NotSuitableFieldError(group_field, "Grouping")
-        # if len(grouping_data) > 1:
-        #     grouping_data[0][1].tmp_roles = data.tmp_roles
-        # else:
-        #     raise NotSuitableFieldError(group_field, "Grouping")
+
         return cls._execute_inner_function(
             grouping_data,
             tmp_roles=tmp_roles,
