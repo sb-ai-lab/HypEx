@@ -4,7 +4,8 @@ This module defines data structures and roles used across the library for managi
 
 from .abstract import DatasetBase
 from .groupby_dataset import GroupedDataset
-from .dataset import Dataset, DatasetAdapter, ExperimentData, SmallDataset
+from .dataset import Dataset, DatasetAdapter, SmallDataset
+from .experiment_data import ExperimentData
 from .roles import (
     ABCRole,
     AdditionalFeatureRole,

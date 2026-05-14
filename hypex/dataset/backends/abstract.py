@@ -20,7 +20,7 @@ class DatasetBackendNavigation(ABC):
     operations required for data inspection, indexing, type handling, and
     structural modifications.
     """
-    
+
     @property
     def name(self) -> str:
         """Return a canonical name derived from the class name."""
@@ -295,7 +295,9 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def _get_column_index(self, column_name: Sequence[str] | str) -> int | Sequence[int]:
+    def _get_column_index(
+        self, column_name: Sequence[str] | str
+    ) -> int | Sequence[int]:
         """Convert column name(s) to integer position(s).
 
         Args:
@@ -308,7 +310,9 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def get_column_type(self, column_name: str | Iterable[str] | None = None) -> dict[str, type] | type | None:
+    def get_column_type(
+        self, column_name: str | Iterable[str] | None = None
+    ) -> dict[str, type] | type | None:
         """Infer Python type(s) from the dtype(s) of the column(s).
 
         Args:
@@ -324,7 +328,9 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def astype(self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise") -> Self:
+    def astype(
+        self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
+    ) -> Self:
         """Cast columns to the specified types.
 
         Args:
@@ -350,10 +356,9 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def add_column(self,
-                   data: Any,
-                   name: str | None = None,
-                   index: Sequence | None = None) -> None:
+    def add_column(
+        self, data: Any, name: str | None = None, index: Sequence | None = None
+    ) -> None:
         """Add a new column to the dataset (in‑place).
 
         Args:
@@ -414,7 +419,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
     Subclasses must implement statistical summaries, transformations,
     grouping, merging, and other high‑level operations.
     """
-    
+
     @abstractmethod
     def mean(self) -> Any:
         """Compute mean of numeric columns.
@@ -439,7 +444,9 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def var(self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False) -> Any:
+    def var(
+        self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
+    ) -> Any:
         """Compute unbiased variance.
 
         Args:
@@ -501,7 +508,11 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def take(self, indices: int | list[int], axis: Literal["index", "columns", "rows"] | int = 0) -> Any:
+    def take(
+        self,
+        indices: int | list[int],
+        axis: Literal["index", "columns", "rows"] | int = 0,
+    ) -> Any:
         """Return elements at given integer positions along an axis.
 
         Args:
@@ -687,11 +698,13 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def value_counts(self,
-                     normalize: bool = False,
-                     sort: bool = True,
-                     ascending: bool = False,
-                     dropna: bool = True) -> Any:
+    def value_counts(
+        self,
+        normalize: bool = False,
+        sort: bool = True,
+        ascending: bool = False,
+        dropna: bool = True,
+    ) -> Any:
         """Return frequency counts of unique values (computed on the first
         column by default).
 
@@ -707,9 +720,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def grouped_value_counts(self,
-                             by: list[str],
-                             feature_cols: list[str]) -> Any:
+    def grouped_value_counts(self, by: list[str], feature_cols: list[str]) -> Any:
         """Return a dataframe indexed by group keys where each cell is a
         ``{category: count}`` dict for the corresponding feature column.
 
@@ -805,15 +816,16 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def merge(self,
-              right: Any,
-              on: str | None = None,
-              left_on: str | None = None,
-              right_on: str | None = None,
-              left_index: bool = False,
-              right_index: bool = False,
-              suffixes: tuple[str, str] = ("_x", "_y"),
-              how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
+    def merge(
+        self,
+        right: Any,
+        on: str | None = None,
+        left_on: str | None = None,
+        right_on: str | None = None,
+        left_index: bool = False,
+        right_index: bool = False,
+        suffixes: tuple[str, str] = ("_x", "_y"),
+        how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> Any:
         """Merge with another dataset using database‑style joins.
 
@@ -877,10 +889,12 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def fillna(self, 
-               values: Any = None, 
-               method: Literal["bfill", "ffill"] | None = None, 
-               **kwargs) -> Any:
+    def fillna(
+        self,
+        values: Any = None,
+        method: Literal["bfill", "ffill"] | None = None,
+        **kwargs,
+    ) -> Any:
         """Fill missing values.
 
         Args:
@@ -933,10 +947,9 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def replace(self, 
-                to_replace: Any = None, 
-                value: Any = None, 
-                regex: bool = False) -> Any:
+    def replace(
+        self, to_replace: Any = None, value: Any = None, regex: bool = False
+    ) -> Any:
         """Replace values.
 
         Args:
