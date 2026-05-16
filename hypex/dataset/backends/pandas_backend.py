@@ -704,6 +704,28 @@ class PandasNavigation(DatasetBackendNavigation):
             pd.Index: DataFrame index.
         """
         return self.data.index
+    
+    @index.setter
+    def index(self, value):
+        """Set the index of the underlying DataFrame."""
+        self.data.index = value
+
+    def reset_index(self, 
+                    drop: bool = False,
+                    inplace: bool = False,
+                    **kwargs):
+        """Reset the index to default integer index.
+        
+        Args:
+            drop (bool): If True, drop the current index instead of adding as column.
+            inplace (bool): Ignored; always returns new instance for consistency.
+            **kwargs: Additional arguments passed to underlying reset_index.
+            
+        Returns:
+            New instance with reset index
+        """
+
+        return self._wrap_result(self.data.reset_index(drop=drop, **kwargs))
 
     @property
     def columns(self):
@@ -1693,6 +1715,23 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         )
 
         return data_expanded
+
+    def explode(self, column=None, ignore_index=False):
+        """
+        Transform each element of a list-like to a row.
+
+        Args
+        ----
+            column: `str` or `tuple`
+                Column to explode.
+
+        Return
+        ------  
+            DataFrame:
+                Exploded lists to rows of the subset columns; index will be duplicated for these rows.
+        """
+    
+        return self._wrap_result(self.data.explode(column=column, ignore_index=ignore_index))
 
     def checkpoint(self):
         pass

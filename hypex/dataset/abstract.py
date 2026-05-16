@@ -1142,3 +1142,13 @@ class DatasetBase(ABC):
             self._roles = new_roles
 
         return self
+
+    def explode(self, column, ignore_index=False):
+        result = self.backend_data.explode(column=column, ignore_index=ignore_index)
+        new_roles = deepcopy(self.roles)
+        new_roles[column] = type(new_roles[column])()
+
+        return self.__class__(
+            new_roles,
+            data=result
+        )

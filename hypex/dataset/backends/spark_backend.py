@@ -16,7 +16,7 @@ from pyspark.sql.types import StructType
 
 
 import pyspark.pandas as ps
-ps.set_option('compute.ops_on_diff_frames', True)
+# ps.set_option('compute.ops_on_diff_frames', True)
 
 from pyspark.pandas.exceptions import PandasNotImplementedError
 
@@ -185,7 +185,7 @@ class SparkNavigation(DatasetBackendNavigation):
             if isinstance(data, ps.DataFrame):
                 session = data.to_spark().sparkSession
             elif isinstance(data, SparkDF):
-                session = data.to_spark().sparkSession
+                session = data.sparkSession
             else:
                 raise ValueError(
                     "Session must be provided explicitly or inferred from "
@@ -697,6 +697,11 @@ class SparkNavigation(DatasetBackendNavigation):
         """Return the index of the underlying DataFrame."""
         return self.data.index
     
+    @index.setter
+    def index(self, value):
+        """Set the index of the underlying DataFrame."""
+        self.data = self.data.set_index(value)
+    
     def reset_index(self, 
                     drop: bool = False,
                     inplace: bool = False,
@@ -1199,8 +1204,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]
             ]
 
-            if len(numeric_cols) == 0:
-                return None
+            # if len(numeric_cols) == 0:
+            #     return None
 
             data_to_agg = self.data[numeric_cols]
 
@@ -1872,3 +1877,19 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             else data
         )
         return data_expanded
+
+    def explode(self, column, ignore_index=False):
+        """
+        Transform each element of a list-like to a row.
+
+        Args
+        ----
+            column: `str` or `tuple`
+                Column to explode.
+
+        Return
+        ------  
+            DataFrame:
+                Exploded lists to rows of the subset columns; index will be duplicated for these rows.
+        """
+        return self._wrap_result(self.data.explode(column=column, ignore_index=ignore_index))
