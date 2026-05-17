@@ -1,7 +1,14 @@
 from .encoders import DummyEncoderExtension, PandasDummyEncoderExtension, SparkDummyEncoderExtension
 
 from .faiss import FaissExtension, SparkFaissExtension, PandasFaissExtension
-from .scipy_linalg import UniteCovExtension, CholeskyExtension, InverseExtension
+from .scipy_linalg import (
+    UniteCovExtension, 
+    CholeskyExtension, 
+    InverseExtension,
+    LstsqExtension,
+    SparkLstsqExtension,
+    PandasLstsqExtension
+)
 
 from .scipy_stats import (
     GroupChi2TestExtension,
@@ -30,6 +37,9 @@ __all__ = [
     "UniteCovExtension",
     "CholeskyExtension",
     "InverseExtension",
+    "LstsqExtension",
+    "PandasLstsqExtension",
+    "SparkLstsqExtension",
     "GroupTTestExtension",
     "GroupUTestExtension",
     "GroupChi2TestExtension",
