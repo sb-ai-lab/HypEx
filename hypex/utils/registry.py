@@ -20,8 +20,19 @@ class BackendFactory:
         """
         Decorator to register a backend-specific implementation.
         Supports single type or iterable of types.
-        Usage: @backend_factory.register(BaseComparator, PandasDataset)
-        Usage: @backend_factory.register(BaseComparator, [PandasDataset, SparkDataset])
+
+        Usage:
+        ```python 
+            @backend_factory.register(MasterBackendClass, PandasDataset)
+            class BackendDependendClass(...):
+                ...
+        ```
+        Usage: 
+        ```python 
+            @backend_factory.register(MasterBackendClass, [PandasDataset, SparkDataset])
+            class BackendDependendClass(...):
+                ...
+        ```
         """
         def decorator(cls: Type):
             backends = backend_types if isinstance(backend_types, (list, tuple, set)) else [backend_types]
