@@ -1011,13 +1011,15 @@ class DatasetBase:
         axis: Literal["index", "rows", "columns"] | int = 0,
     ) -> Self:
         new_data = self._backend_data.dropna(how=how, subset=subset, axis=axis)
-
+        
+        if hasattr(new_data, "data"):
+            new_data = new_data.data
+            
         new_roles = (
             self.roles
             if axis == 0
             else {column: self.roles[column] for column in new_data.columns}
         )
-
         return self.__class__(roles=new_roles, data=new_data)
 
     def drop(

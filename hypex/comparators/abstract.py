@@ -254,33 +254,11 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = cls._field_validity_check(
             group_field_data, "group_field_data", "groups"
         )
-
         data_buckets = sorted(
-            target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+            target_fields_data.groupby(by=group_field_data.columns), key=lambda tup: tup[0]
         )
         baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
         compared_data = cls._split_ds_into_columns(data=data_buckets)
-
-        return baseline_data, compared_data
-
-    @classmethod
-    def _split_for_columns_mode(
-        cls,
-        baseline_field_data: Dataset,
-        target_fields_data: Dataset,
-    ) -> GroupingDataType:
-        baseline_field_data = cls._field_validity_check(
-            baseline_field_data, "baseline_field_data", "columns"
-        )
-        if len(target_fields_data.columns) == 0:
-            raise NoRequiredArgumentError(target_fields_data)
-
-        baseline_data = [(f"{baseline_field_data.columns[0]}", baseline_field_data)]
-        compared_data = [
-            (f"{column}", target_fields_data[column])
-            for column in target_fields_data.columns
-        ]
-
         return baseline_data, compared_data
 
     @classmethod
@@ -299,12 +277,10 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = cls._field_validity_check(
             group_field_data, "group_field_data", "columns_in_groups"
         )
-
-        baseline_data = baseline_field_data.groupby(by=group_field_data)
+        baseline_data = baseline_field_data.groupby(by=group_field_data.columns)
         compared_data = cls._split_ds_into_columns(
-            target_fields_data.groupby(by=group_field_data)
+            target_fields_data.groupby(by=group_field_data.columns)
         )
-
         return baseline_data, compared_data
 
     @classmethod
@@ -323,19 +299,16 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = cls._field_validity_check(
             group_field_data, "group_field_data", "cross"
         )
-
         baseline_data = [
             sorted(
-                baseline_field_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+                baseline_field_data.groupby(by=group_field_data.columns), key=lambda tup: tup[0]
             ).pop(0)
         ]
-
         compared_data = sorted(
-            target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+            target_fields_data.groupby(by=group_field_data.columns), key=lambda tup: tup[0]
         )
         compared_data.pop(0)
         compared_data = cls._split_ds_into_columns(data=compared_data)
-
         return baseline_data, compared_data
 
     @classmethod
@@ -354,18 +327,15 @@ class GroupsComparator(BaseComparator, ABC):
         target_fields_data = cls._field_validity_check(
             target_fields_data, "target_fields_data", "matched_pairs"
         )
-
-        compared_data = target_fields_data.groupby(by=group_field_data)
-        baseline_indexes = baseline_field_data.groupby(by=group_field_data)
+        compared_data = target_fields_data.groupby(by=group_field_data.columns)
+        baseline_indexes = baseline_field_data.groupby(by=group_field_data.columns)
         baseline_data = []
-
         for group in baseline_indexes:
             name = group[0]
             indexes = group[1].iget_values(column=0)
             dummy_index = target_fields_data.index[-1]
             indexes = list(map(lambda x: dummy_index if x < 0 else x, indexes))
-            baseline_data.append((name, target_fields_data.loc[indexes, :]))    #TODO: add spark backend support
-
+            baseline_data.append((name, target_fields_data.loc[indexes, :]))
         return baseline_data, compared_data
 
     @classmethod

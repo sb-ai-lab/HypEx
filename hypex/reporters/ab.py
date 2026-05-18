@@ -4,6 +4,7 @@ import warnings
 
 from ..analyzers.ab import ABAnalyzer
 from ..comparators import GroupChi2Test, GroupTTest, GroupUTest
+from ..comparators import StatsTTest, StatsChi2Test
 from ..dataset import Dataset, ExperimentData, StatisticRole
 from ..utils import ExperimentDataEnum
 from .abstract import (
@@ -12,8 +13,7 @@ from .abstract import (
 )
 
 class ABTestReporter(DatasetReporter):
-    """Phase 2: Unified AB reporter."""
-    tests: ClassVar[list] = [GroupTTest, GroupUTest, GroupChi2Test]
+    tests: ClassVar[list] = [GroupTTest, GroupUTest, GroupChi2Test, StatsTTest, StatsChi2Test]
 
     def _report(self, data: ExperimentData) -> dict[str, Any]:
         result = {}
@@ -21,10 +21,15 @@ class ABTestReporter(DatasetReporter):
         result.update(extract_group_difference(data, self.front))
         result.update(extract_tests(data, self.tests, self.front))
         result.update(extract_analyzer_data(data, ABAnalyzer))
+        
         return result
 
     def report(self, data: ExperimentData) -> dict | Dataset:
-        return self._with_front(data, front_flag=False, func=lambda d: super().report(d))
+        return self._with_front(
+            data, 
+            front_flag=False, 
+            func=lambda d: DatasetReporter.report(self, d)
+        )
 
     @staticmethod
     def report_variance_reductions(data: ExperimentData) -> Dataset | str:

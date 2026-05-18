@@ -6,8 +6,6 @@ from typing import Any
 from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
 from .comparators import GroupDifference, GroupSizes
 from .comparators.abstract import Comparator
-from .comparators.hypothesis_testing import GroupChi2Test, GroupKSTest, GroupTTest
-from .comparators.stats_hypothesis_testing import StatsTTest
 from .dataset import AdditionalTreatmentRole, TargetRole
 from .experiments.base import Experiment, OnRoleExperiment
 from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
@@ -216,5 +214,5 @@ class AATest(ExperimentShell):
         
         if t_test_equal_var is not None:
             self.experiment.set_params(
-                {GroupTTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
+                {TTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
             )

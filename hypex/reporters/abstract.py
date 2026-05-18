@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, Literal
-import warnings
 
 from ..dataset import Dataset, SmallDataset, ExperimentData
 from ..dataset.roles import InfoRole, TreatmentRole
@@ -28,6 +27,33 @@ class ResultKey:
         if len(parts) == 3:
             return cls(executor=parts[0], params_hash=parts[1], field=parts[2])
         return cls(executor=id_str, params_hash="", field=id_str)
+    
+def _normalize_value(val: Any) -> Any:
+    if val is None:
+        return None
+    if isinstance(val, (int, float, str, bool)):
+        return val
+    if isinstance(val, (list, tuple)) and len(val) > 0:
+        return _normalize_value(val[0])
+    # Dataset / SmallDataset
+    if hasattr(val, 'iget_values'):
+        try:
+            return _normalize_value(val.iget_values(0, 0))
+        except Exception:
+            pass
+    # pandas / pyspark Series
+    if hasattr(val, 'iloc') and hasattr(val, '__len__'):
+        try:
+            return _normalize_value(val.iloc[0] if len(val) > 0 else val)
+        except Exception:
+            pass
+    # numpy scalar
+    if hasattr(val, 'item'):
+        try:
+            return val.item()
+        except Exception:
+            pass
+    return val
 
 def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bool) -> dict[str, Any]:
     table = data.analysis_tables.get(comparator_id)
@@ -36,10 +62,17 @@ def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bo
     key = ResultKey.from_id(comparator_id)
     sep = " " if front else ID_SPLIT_SYMBOL
     result = {}
+    
     df = table.data
+    if hasattr(df, 'to_pandas'):
+        df = df.to_pandas()
+    elif hasattr(df, 'toPandas'):
+        df = df.toPandas()
+        
     for idx_val, row in df.iterrows():
         for col, val in row.items():
-            result[f"{key.field}{sep}{key.executor}{sep}{col}{sep}{idx_val}"] = val
+            print(f"[DEBUG] _extract_from_comparator | idx={idx_val}, col={col}, val.type={type(val).__name__}, val={val}")
+            result[f"{key.field}{sep}{key.executor}{sep}{col}{sep}{idx_val}"] = _normalize_value(val)
     return result
 
 def extract_tests(data: ExperimentData, test_classes: list[type], front: bool) -> dict[str, Any]:
@@ -68,7 +101,21 @@ def extract_group_sizes(data: ExperimentData, front: bool) -> dict[str, Any]:
 
 def extract_analyzer_data(data: ExperimentData, analyzer_class: type | str) -> dict[str, Any]:
     cid = data.get_one_id(analyzer_class, ExperimentDataEnum.analysis_tables)
-    return data.analysis_tables[cid].data.iloc[0].to_dict()
+    table = data.analysis_tables[cid]
+    if table.is_empty():
+        return {}
+        
+    row = table.data
+    if hasattr(row, 'to_pandas'):
+        row = row.to_pandas()
+    elif hasattr(row, 'toPandas'):
+        row = row.toPandas()
+        
+    if hasattr(row, 'iloc'):
+        row = row.iloc[0]
+        
+    items = row.to_dict() if hasattr(row, 'to_dict') else (row if isinstance(row, dict) else {})
+    return {col: _normalize_value(val) for col, val in items.items()}
 
 class Reporter(ABC):
     @abstractmethod
@@ -141,11 +188,31 @@ class DatasetReporter(Reporter):
     ):
         self.dict_reporter = dict_reporter or DictReporter()
         self.output_format = output_format
+        
+    @property
+    def front(self) -> bool:
+        return self.dict_reporter.front
+
+    @front.setter
+    def front(self, value: bool) -> None:
+        self.dict_reporter.front = value
+
+    def _with_front(
+        self,
+        data: ExperimentData,
+        front_flag: bool,
+        func: Callable[[ExperimentData], dict | Dataset],
+    ) -> dict | Dataset:
+        old_front = self.dict_reporter.front
+        self.dict_reporter.front = front_flag
+        try:
+            return func(data)
+        finally:
+            self.dict_reporter.front = old_front
 
     def report(self, data: ExperimentData) -> dict | Dataset:
         dict_result = self.dict_reporter.report(data)
-        print(f"[DEBUG] DatasetReporter | тип выхода={type(dict_result).__name__} | пример ключей={list(dict_result.keys())[:3]}")
-
+        
         if self.output_format == "dict":
             return dict_result
         struct_dict = TestDictReporter._get_struct_dict(dict_result)

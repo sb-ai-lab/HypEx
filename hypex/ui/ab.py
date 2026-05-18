@@ -73,10 +73,17 @@ class ABOutput(Output):
         )[1:]
         for i in self._groups:
             groups += [i] * len(ids)
-        diff = Dataset.create_empty()
-        for i in range(len(ids)):
+            
+        if not ids:
+            return None
+            
+        diff = experiment_data.analysis_tables[ids[0]]
+        for i in range(1, len(ids)):
             diff = diff.append(experiment_data.analysis_tables[ids[i]])
-            targets += [ids[i].split(ID_SPLIT_SYMBOL)[-1]]
+            
+        for cid in ids:
+            targets.append(cid.split(ID_SPLIT_SYMBOL)[-1])
+            
         return diff.add_column(groups, role={"group": StatisticRole()}).add_column(
             targets * len(self._groups), role={"feature": StatisticRole()}
         )
