@@ -16,8 +16,10 @@ from ..dataset import (
     TargetRole,
 )
 from ..extensions.scipy_stats import NormCDF
+from ..extensions.scipy_linalg import LstsqExtension
 from ..utils.enums import ExperimentDataEnum
 from ..utils.errors import NoneArgumentError
+from ..utils.registry import backend_factory
 from .abstract import GroupOperator
 
 
@@ -277,20 +279,22 @@ class Bias(GroupOperator):
             grouping_role=grouping_role, target_roles=target_roles, key=key
         )
 
-    @staticmethod
-    def calc_coefficients(X: Dataset, Y: Dataset) -> list[float]:
-        X_l = Dataset.create_empty(roles={"temp": InfoRole()}, index=X.index).fillna(1)
-        X = X_l.append(X, axis=1).data.values
-        return np.linalg.lstsq(X, Y.data.values, rcond=-1)[0][1:]
+    #TODO: make an extension
+    # @staticmethod
+    # def calc_coefficients(X: Dataset, Y: Dataset) -> list[float]:
+    #     X_l = Dataset.create_empty(roles={"temp": InfoRole()}, index=X.index).fillna(1)
+    #     X = X_l.append(X, axis=1).data.values
+    #     return np.linalg.lstsq(X, Y.data.values, rcond=-1)[0][1:]
 
     @staticmethod
     def calc_bias(
-        X: Dataset, X_matched: Dataset, coefficients: list[float]
+        X: Dataset, X_matched: Dataset, coefficients: np.ndarray[float]
     ) -> list[float]:
-        return [
-            (j - i).dot(coefficients)[0]
-            for i, j in zip(X.data.values, X_matched.data.values)
-        ]
+        # return [
+        #     (j - i).dot(coefficients)[0]
+        #     for i, j in zip(X.data.values, X_matched.data.values)
+        # ]
+        return (X - X_matched).dot(coefficients)
 
     @classmethod
     def _inner_function(
@@ -305,44 +309,60 @@ class Bias(GroupOperator):
             raise NoneArgumentError(
                 ["target_fields", "features_fields", "test_data"], "bias_estimation"
             )
-        if data[target_fields[1]].isna().sum() > 0:
+        # if data[target_fields[1]].isna().sum() > 0:
+        # TODO: fix asset to data
+        if data.data[target_fields[1]].isna().sum() > 0:
+            coef_cls = backend_factory.resolve_backend(LstsqExtension, test_data)
+            coefficients = coef_cls().calc(test_data[[target_fields[1]] + features_fields[len(features_fields) // 2 :]])
             return {
                 "test": cls.calc_bias(
                     test_data[features_fields[: len(features_fields) // 2]],
                     test_data[features_fields[len(features_fields) // 2 :]],
-                    cls.calc_coefficients(
-                        test_data[features_fields[len(features_fields) // 2 :]],
-                        test_data[target_fields[1]],
-                    ),
+                    # cls.calc_coefficients(
+                    #     test_data[features_fields[len(features_fields) // 2 :]],
+                    #     test_data[target_fields[1]],
+                    # ),
+                    coefficients,
                 )
             }
-        if test_data[target_fields[1]].isna().sum() > 0:
+        # TODO: fix asset to data
+        if test_data.data[target_fields[1]].isna().sum() > 0:
+            coef_cls = backend_factory.resolve_backend(LstsqExtension, data)
+            coefficients = coef_cls().calc(data[[target_fields[1]] + features_fields[len(features_fields) // 2 :]])
             return {
                 "control": cls.calc_bias(
                     data[features_fields[: len(features_fields) // 2]],
                     data[features_fields[len(features_fields) // 2 :]],
-                    cls.calc_coefficients(
-                        data[features_fields[len(features_fields) // 2 :]],
-                        data[target_fields[1]],
-                    ),
+                    # cls.calc_coefficients(
+                    #     data[features_fields[len(features_fields) // 2 :]],
+                    #     data[target_fields[1]],
+                    # ),
+                    coefficients,
                 )
             }
+        coef_cls = backend_factory.resolve_backend(LstsqExtension, test_data)
+        test_coefficients = coef_cls().calc(test_data[[target_fields[1]] + features_fields[len(features_fields) // 2 :]])
+
+        coef_cls = backend_factory.resolve_backend(LstsqExtension, data)
+        control_coefficients = coef_cls().calc(data[[target_fields[1]] + features_fields[len(features_fields) // 2 :]])
         return {
             "test": cls.calc_bias(
                 test_data[features_fields[: len(features_fields) // 2]],
                 test_data[features_fields[len(features_fields) // 2 :]],
-                cls.calc_coefficients(
-                    test_data[features_fields[len(features_fields) // 2 :]],
-                    test_data[target_fields[1]],
-                ),
+                # cls.calc_coefficients(
+                #     test_data[features_fields[len(features_fields) // 2 :]],
+                #     test_data[target_fields[1]],
+                # ),
+                test_coefficients,
             ),
             "control": cls.calc_bias(
                 data[features_fields[: len(features_fields) // 2]],
                 data[features_fields[len(features_fields) // 2 :]],
-                cls.calc_coefficients(
-                    data[features_fields[len(features_fields) // 2 :]],
-                    data[target_fields[1]],
-                ),
+                # cls.calc_coefficients(
+                #     data[features_fields[len(features_fields) // 2 :]],
+                #     data[target_fields[1]],
+                # ),
+                control_coefficients,
             ),
         }
 
@@ -368,40 +388,68 @@ class Bias(GroupOperator):
         if len(indexes) == 0:
             raise ValueError("No indexes were found")
         indexes = data.additional_fields[indexes]
-        indexes.index = t_data.index
-        filtered_field = indexes.drop(
-            indexes[indexes[indexes.columns[0]] == -1], axis=0
-        )
-        matched_data = Dataset({})
-        matched_data.index = filtered_field.index
+        # If we want we should use `reset_index))`
+        # indexes.index = t_data.index
+        indexes.reset_index(drop=True)
+        t_data.reset_index(drop=True)
+
+        filtered_field = indexes
+
+        # TODO: nessesity?
+        # filtered_field = indexes.drop(
+        #     indexes[indexes[indexes.columns[0]] == -1], axis=0
+        # )
+
         numeric_cols = t_data.search_columns(
             [FeatureRole(), TargetRole()], search_types=[int, float]
         )
-        for d_col in numeric_cols:
-            matched_data_col = Dataset({})
-            matched_data_col.index = filtered_field.index
-            for i, i_col in enumerate(indexes.columns):
-                index_matched_data = data.ds.loc[
-                    list(filtered_field[i_col].get_values(column=i_col))
-                ][d_col].rename(
-                    {d_col: d_col + f"_matched_{i}" for _ in data.ds.columns}
-                )
-                matched_data_col = matched_data_col.add_column(index_matched_data)
-            default_value = [t_data.roles[d_col].data_type(0)]
-            matched_data_col = matched_data_col.add_column(
-                default_value * matched_data_col.shape[0],
-                {d_col + "_matched": t_data.roles[d_col]},
-            )
-            for col in matched_data_col.columns:
-                if col != d_col + "_matched":
-                    matched_data_col[d_col + "_matched"] += matched_data_col[col]
-            matched_data = matched_data.add_column(
-                default_value * matched_data_col.shape[0],
-                {d_col + "_matched": t_data.roles[d_col]},
-            )
-            matched_data[d_col + "_matched"] = matched_data_col[d_col + "_matched"] / (
-                matched_data_col.shape[1] - 1
-            )
+
+        # matched_data = Dataset({})
+        # matched_data.index = filtered_field.index
+        # matched_data = Dataset(
+        #     data=filtered_field.reset_index().select('index').data.set_index('index'),
+        #     roles={}
+        # )
+        
+        matched_data = (
+            filtered_field
+            .apply(list, axis=1, role={'_index' : InfoRole()})
+            .explode('_index')
+            # .reset_index()
+            .merge(t_data.select(numeric_cols).reset_index(), 
+                   left_on='_index' ,right_on='index')
+            .drop(columns=['index', '_index'])
+            .reset_index()
+            .groupby(by='index')
+            .agg('mean')
+            .rename({col: col + "_matched" for col in numeric_cols})
+        )
+
+        # for d_col in numeric_cols:
+        #     matched_data_col = Dataset({})
+        #     matched_data_col.index = filtered_field.index
+        #     for i, i_col in enumerate(indexes.columns):
+        #         index_matched_data = data.ds.loc[
+        #             list(filtered_field[i_col].get_values(column=i_col))
+        #         ][d_col].rename(
+        #             {d_col: d_col + f"_matched_{i}" for _ in data.ds.columns}
+        #         )
+        #         matched_data_col = matched_data_col.add_column(index_matched_data)
+        #     default_value = [t_data.roles[d_col].data_type(0)]
+        #     matched_data_col = matched_data_col.add_column(
+        #         default_value * matched_data_col.shape[0],
+        #         {d_col + "_matched": t_data.roles[d_col]},
+        #     )
+        #     for col in matched_data_col.columns:
+        #         if col != d_col + "_matched":
+        #             matched_data_col[d_col + "_matched"] += matched_data_col[col]
+        #     matched_data = matched_data.add_column(
+        #         default_value * matched_data_col.shape[0],
+        #         {d_col + "_matched": t_data.roles[d_col]},
+        #     )
+        #     matched_data[d_col + "_matched"] = matched_data_col[d_col + "_matched"] / (
+        #         matched_data_col.shape[1] - 1
+        #     )
 
         return indexes, matched_data
 
@@ -411,14 +459,16 @@ class Bias(GroupOperator):
         if len(target_fields) < 2:
             _, matched_data = self.prepare_data(data, t_data)
             target_fields += [matched_data.search_columns(TargetRole())[0]]
-            t_data = t_data.append(matched_data.reindex(t_data.index), axis=1)
+            # t_data = t_data.append(matched_data.reindex(t_data.index), axis=1)
+            # t_data = t_data.append(matched_data, axis=1)
+            t_data = t_data.add_column(matched_data)
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
         if (
             not target_fields and data.ds.tmp_roles
         ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
-            return data
+            return data  
 
         compare_result = self.calc(
             data=t_data,

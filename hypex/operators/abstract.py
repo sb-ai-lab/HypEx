@@ -8,6 +8,7 @@ from ..dataset import (
     ABCRole,
     AdditionalTargetRole,
     Dataset,
+    GroupedDataset,
     ExperimentData,
     GroupingRole,
     TargetRole,
@@ -77,15 +78,16 @@ class GroupOperator(
         cls,
         data: Dataset,
         group_field: Sequence[str] | str | None = None,
-        grouping_data: list[tuple[str, Dataset]] | None = None,
+        grouping_data: GroupedDataset | None = None,
         target_fields: str | list[str] | None = None,
         **kwargs,
     ) -> dict:
         group_field = Adapter.to_list(group_field)
 
         if grouping_data is None:
-            grouping_data = data.groupby(group_field)
+            grouping_data = list(data.groupby(group_field))
         if len(grouping_data) > 1:
+            grouping_data = list(grouping_data)
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
             raise NotSuitableFieldError(group_field, "Grouping")
