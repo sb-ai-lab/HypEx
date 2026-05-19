@@ -14,6 +14,22 @@ from ..utils import ABNTestMethodsEnum, ExperimentDataEnum
 
 
 class ABAnalyzer(Executor):
+    """Analyzer for A/B test results with multiple testing correction support.
+
+    Aggregates statistical test results (t-test, U-test, chi-square) from
+    A/B experiments and applies multiple testing correction methods to control
+    family-wise error rate or false discovery rate. Supports both standard
+    corrections (Bonferroni, Holm, etc.) and quantile-based methods for
+    multi-group comparisons.
+
+    Attributes:
+        multitest_method: Method for multiple testing correction.
+        alpha: Significance level for hypothesis testing.
+        equal_variance: Whether to assume equal variances in quantile method.
+        quantiles: Pre-computed quantile thresholds for marginal distributions.
+        iteration_size: Number of Monte Carlo iterations for quantile estimation.
+        random_state: Random seed for reproducibility.
+    """
     def __init__(
         self,
         multitest_method: ABNTestMethodsEnum | None = None,
@@ -24,6 +40,24 @@ class ABAnalyzer(Executor):
         random_state: int | None = None,
         key: Any = "",
     ):
+        """Initializes the A/B test analyzer.
+
+        Args:
+            multitest_method: Method for multiple testing correction.
+                Options include ``bonferroni``, ``holm``, ``fdr_bh``, etc.
+                If ``None``, no correction is applied.
+            alpha: Significance level (Type I error rate) for hypothesis tests.
+                Defaults to 0.05.
+            equal_variance: Whether to assume equal variances across groups
+                when using the quantile-based correction method. Defaults to ``True``.
+            quantiles: Pre-computed critical quantile values for the marginal
+                distribution of test statistics. If ``None``, computed internally.
+            iteration_size: Number of Monte Carlo iterations for estimating
+                quantiles of the marginal distribution. Defaults to 20000.
+            random_state: Random seed for reproducibility of Monte Carlo sampling.
+                If ``None``, results may vary between runs.
+            key: Optional identifier key for storing results in experiment data.
+        """
         self.multitest_method = multitest_method
         self.alpha = alpha
         self.equal_variance = equal_variance
@@ -33,6 +67,16 @@ class ABAnalyzer(Executor):
         super().__init__(key)
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
+        """Stores a value in the experiment data's analysis tables.
+
+        Args:
+            data: The experiment data container to update.
+            value: The value (typically a ``SmallDataset``) to store.
+            key: Optional suffix to append to the executor ID for the storage key.
+
+        Returns:
+            The updated ``ExperimentData`` instance.
+        """
         return data.set_value(
             ExperimentDataEnum.analysis_tables,
             self.id + key if key else self.id,
@@ -40,6 +84,23 @@ class ABAnalyzer(Executor):
         )
 
     def execute_multitest(self, data: ExperimentData, p_values: Dataset, **kwargs):
+        """Applies multiple testing correction to aggregated p-values.
+
+        Retrieves treatment and target fields from the experiment data, then
+        applies the specified correction method if more than two groups exist.
+        For standard methods, uses ``MultiTest`` from statsmodels. For the
+        ``quantile`` method, uses simulation-based ``MultitestQuantile``.
+
+        Args:
+            data: The experiment data container with group information.
+            p_values: Dataset containing raw p-values from statistical tests.
+            **kwargs: Additional arguments passed to the correction method.
+
+        Returns:
+            Updated ``ExperimentData`` with corrected p-values stored under
+            the ``"MultiTest"`` key, or the original ``data`` if correction
+            is not applicable.
+        """
         group_field = data.ds.search_columns(TreatmentRole())[0]
         target_fields = data.ds.search_columns(TargetRole(), search_types=[int, float])
         if self.multitest_method and len(data.groups[group_field]) > 2:
@@ -80,6 +141,20 @@ class ABAnalyzer(Executor):
         return data
 
     def _add_pvalues(self, multitest_pvalues, value, field):
+        """Conditionally appends p-values for multiple testing correction.
+
+        Adds p-values to the collection only if a correction method is specified,
+        the field is ``"p-value"``, and the method is not the quantile-based approach
+        (which handles p-values differently).
+
+        Args:
+            multitest_pvalues: The accumulating dataset of p-values.
+            value: The p-value dataset or column to potentially append.
+            field: The field name being processed (e.g., ``"p-value"`` or ``"pass"``).
+
+        Returns:
+            The updated ``multitest_pvalues`` dataset.
+        """
         if (
             self.multitest_method
             and field == "p-value"
@@ -89,6 +164,27 @@ class ABAnalyzer(Executor):
         return multitest_pvalues
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """Executes the full A/B test analysis pipeline.
+
+        Aggregates results from registered statistical tests (t-test, U-test,
+        etc.), computes mean p-values and pass rates across iterations, applies
+        multiple testing correction if configured, and stores the aggregated
+        metrics in the experiment data.
+
+        The method handles:
+        1. Retrieving test results by executor class from ``ExperimentData``.
+        2. Merging results from multiple iterations or groups.
+        3. Computing aggregate statistics (mean p-value, pass rate) per test.
+        4. Applying multiple testing correction via ``execute_multitest``.
+        5. Storing the final analysis dataset in ``analysis_tables``.
+
+        Args:
+            data: The ``ExperimentData`` container with test results.
+
+        Returns:
+            Updated ``ExperimentData`` with aggregated analysis results stored
+            under the analyzer's executor ID.
+        """
         executor_ids = data.get_ids([GroupTTest, GroupUTest, StatsTTest, StatsChi2Test])
         num_groups = len(data.groups[data.ds.search_columns(TreatmentRole())[0]]) - 1
         groups = list(data.groups[data.ds.search_columns(TreatmentRole())[0]].items())
