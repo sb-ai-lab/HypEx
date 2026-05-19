@@ -338,6 +338,19 @@ class DatasetBase(ABC):
         
         return self.__class__(roles=new_roles, data=new_data)
 
+    def set_index(self, 
+                  keys, 
+                  drop=True, 
+                  **kwargs) -> DatasetBase:
+        new_data = self._backend_data.set_index(keys=keys, drop=drop, **kwargs)
+        new_roles = deepcopy(self.roles)
+
+        if drop:
+            for col in Adapter.to_list(keys):
+                del new_roles[col]
+        
+        return self.__class__(roles=new_roles, data=new_data)
+
     def __setitem__(self,
                     key: str,
                     value: Any) -> None:

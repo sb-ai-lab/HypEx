@@ -727,6 +727,27 @@ class PandasNavigation(DatasetBackendNavigation):
 
         return self._wrap_result(self.data.reset_index(drop=drop, **kwargs))
 
+    def set_index(self,
+                  keys,
+                  drop,
+                  **kwargs):
+        """
+        Set the DataFrame index (row labels) using one or more existing columns.
+
+        Args:
+            keys: label or array-like or list of labels/arrays
+
+            drop: `bool`, default True
+                Delete columns to be used as the new index.
+        """
+        if 'append' not in kwargs:
+            kwargs['append'] = False
+
+        if 'inplace' not in kwargs:
+            kwargs['inplace'] = False
+
+        return self._wrap_result(self.data.set_index(keys=keys, drop=drop, **kwargs))
+
     @property
     def columns(self):
         """Return the column labels of the DataFrame.
