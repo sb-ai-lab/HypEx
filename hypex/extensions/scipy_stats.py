@@ -4,6 +4,9 @@ import warnings
 import numpy as np
 from typing import Callable
 
+from pyspark.sql import Window
+import pyspark.sql.functions as F
+
 from scipy.stats import (  # type: ignore
     chi2_contingency,
     ks_2samp,
@@ -110,8 +113,69 @@ class GroupTTestExtension(GroupStatTest):
 
 
 class GroupKSTestExtension(GroupStatTest):
-    def __init__(self, reliability: float = 0.05):
+    def __init__(self, reliability: float = 0.05, n_bins: int = 2000):
         super().__init__(ks_2samp, reliability=reliability)
+        self.n_bins = n_bins
+
+    def _calc_spark(self, data: Dataset, other: Dataset | None = None, **kwargs) -> Dataset | float:
+        def _add_bucket_column(df):
+            width = (global_max - global_min) / self.n_bins
+            return df.withColumn(
+                "bucket",
+                F.least(
+                    F.floor((F.col(col) - global_min) / width),
+                    F.lit(self.n_bins - 1)
+                ).cast("int")
+            )
+        
+        other = self.check_data(data, other)
+        
+        df1 = data.data.to_spark()
+        df2 = other.data.to_spark()
+        col = data.columns[0]
+
+        bounds1 = df1.agg(F.min(col).alias("min1"), F.max(col).alias("max1")).collect()[0]
+        bounds2 = df2.agg(F.min(col).alias("min2"), F.max(col).alias("max2")).collect()[0]
+        global_min = min(bounds1["min1"], bounds2["min2"])
+        global_max = max(bounds1["max1"], bounds2["max2"])
+
+        n1 = df1.count()
+        n2 = df2.count()
+
+        if global_min == global_max:
+            return SmallDataset.from_dict({
+                "p-value": 1.0,
+                "statistic": 0.0,
+                "pass": 1.0 < self.reliability
+            }, StatisticRole())
+
+        hist1 = _add_bucket_column(df1).groupBy("bucket").count().withColumnRenamed("count", "c1")
+        hist2 = _add_bucket_column(df2).groupBy("bucket").count().withColumnRenamed("count", "c2")
+
+        combined = hist1.join(hist2, on="bucket", how="outer").fillna(0, subset=["c1", "c2"])
+
+        window = Window.orderBy(F.col("bucket").asc()).rowsBetween(Window.unboundedPreceding, 0)
+        cdf_data = combined.withColumn("cum1", F.sum("c1").over(window)) \
+                           .withColumn("cum2", F.sum("c2").over(window))
+
+        ks_stat_df = cdf_data.withColumn(
+            "diff", 
+            F.abs((F.col("cum1") / n1) - (F.col("cum2") / n2))
+        )
+        
+        d_stat = float(ks_stat_df.agg(F.max("diff")).collect()[0][0])
+
+        try:
+            from scipy.stats import kstwo
+            p_value = kstwo.sf(d_stat, n1, n2)
+        except Exception:
+            p_value = 0.0
+
+        return SmallDataset.from_dict({
+            "p-value": p_value,
+            "statistic": d_stat,
+            "pass": p_value < self.reliability
+        }, StatisticRole())
 
 
 class GroupUTestExtension(GroupStatTest):
