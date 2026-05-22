@@ -791,13 +791,15 @@ class PandasNavigation(DatasetBackendNavigation):
                 dtypes[k] = int
             elif pd.api.types.is_float_dtype(v):
                 dtypes[k] = float
-            elif pd.api.types.is_object_dtype(v) and pd.api.types.is_list_like(
-                self.data[column_name].iloc[0]
-            ):
-                dtypes[k] = object
+            elif pd.api.types.is_object_dtype(v):
+                if len(self.data) > 0 and pd.api.types.is_list_like(
+                    self.data[column_name].iloc[0]
+                ):
+                    dtypes[k] = object
+                else:
+                    dtypes[k] = str
             elif (
                 pd.api.types.is_string_dtype(v)
-                or pd.api.types.is_object_dtype(v)
                 or v == "category"
             ):
                 dtypes[k] = str
@@ -843,7 +845,7 @@ class PandasNavigation(DatasetBackendNavigation):
                 #     self.labels_dict.pop(column_name)
                 self.data = self.astype({column_name: type_name})
         return self
-
+    
     def add_column(
         self,
         data: Any,
@@ -851,32 +853,86 @@ class PandasNavigation(DatasetBackendNavigation):
         index: Sequence | None = None,
     ):
         """Add a new column to the DataFrame.
-
         Args:
-             Sequence of values for the new column.
+            data: Sequence of values for the new column.
             name: Column name (str) or single-element list containing name.
             index: Optional index labels for the new column. If None,
-                uses existing DataFrame index.
-
+                   uses existing DataFrame index.
         Returns:
             None: Modifies self.data in-place.
         """
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
+            
+        # 1. Преобразуем DataFrame и ndarray в 1D структуру, если колонка одна
         if isinstance(data, pd.DataFrame):
-            data = data.values
+            if data.shape[1] == 1:
+                data = data.iloc[:, 0]
+            else:
+                data = data.values
+        elif isinstance(data, pd.Series):
+            pass
+        elif isinstance(data, np.ndarray):
+            if data.ndim == 2 and data.shape[1] == 1:
+                data = data[:, 0]
         else:
             data = Adapter.to_list(data)
-        if len(self.data) != len(data):
-            if isinstance(data[0], Iterable) and len(data[0]) == 1:
-                data = data.squeeze()
-            data = pd.Series(data)
+            
+        # 2. Обработка списков (скалярный broadcast и выравнивание длин)
+        if isinstance(data, list):
+            if len(data) == 1 and len(self.data) > 1:
+                pass  # Оставляем как есть для скалярного broadcast ниже
+            elif len(self.data) != len(data):
+                if len(data) > 0 and isinstance(data[0], Iterable) and len(data[0]) == 1:
+                    data = np.squeeze(data)
+                data = pd.Series(data)
+                
+        # 3. Присваивание
         if index:
             self.data = self.data.join(
                 pd.DataFrame(data, columns=[name], index=list(index))
             )
         else:
-            self.data.loc[:, name] = data
+            if isinstance(data, list) and len(data) == 1 and len(self.data) > 1:
+                # Скалярный broadcast (например, заполнение колонки строкой "control")
+                self.data[name] = data[0]
+            else:
+                # pandas сам выровняет индексы, если data - это pd.Series
+                self.data[name] = data
+
+    # def add_column(
+    #     self,
+    #     data: Any,
+    #     name: str | list[str],
+    #     index: Sequence | None = None,
+    # ):
+    #     """Add a new column to the DataFrame.
+
+    #     Args:
+    #          Sequence of values for the new column.
+    #         name: Column name (str) or single-element list containing name.
+    #         index: Optional index labels for the new column. If None,
+    #             uses existing DataFrame index.
+
+    #     Returns:
+    #         None: Modifies self.data in-place.
+    #     """
+    #     if isinstance(name, list) and len(name) == 1:
+    #         name = name[0]
+    #     if isinstance(data, pd.DataFrame):
+    #         data = data.values
+    #     else:
+    #         data = Adapter.to_list(data)
+    #     if len(self.data) != len(data):
+    #         if isinstance(data[0], Iterable) and len(data[0]) == 1:
+    #             data = data.squeeze()
+    #         data = pd.Series(data)
+    #     if index:
+    #         self.data = self.data.join(
+    #             pd.DataFrame(data, columns=[name], index=list(index))
+    #         )
+    #     else:
+    #         self.data.loc[:, name] = data
 
     def append(self, other, reset_index: bool = False, axis: int = 0) -> pd.DataFrame:
         """Append other PandasDataset(s) to current DataFrame.
@@ -1069,11 +1125,10 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def unique(self):
         """Get unique values for each column.
-
         Returns:
-            dict: Mapping of column names to arrays of unique values.
+            dict: Mapping of column names to pandas Series of unique values.
         """
-        return {column: self.data[column].unique() for column in self.data.columns}
+        return {column: pd.Series(self.data[column].unique()) for column in self.data.columns}
 
     def nunique(self, dropna: bool = True):
         """Count number of unique values per column.

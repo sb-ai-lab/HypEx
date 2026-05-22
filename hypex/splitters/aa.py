@@ -123,7 +123,7 @@ class AASplitter(Calculator):
         # <<<TODO: need fix in feature<<<
         ds_sampled = (data
             .filter(data.select(const_group_field).isna()) if const_group_field else data
-        ).sample(frac=sample_size, random_state=random_state)
+        ).sample(frac=sample_size if sample_size is not None else 1.0, random_state=random_state)
         len_ds_sampled = len(ds_sampled)
 
         edges = []
