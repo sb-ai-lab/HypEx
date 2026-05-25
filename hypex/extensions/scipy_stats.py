@@ -248,7 +248,7 @@ class SparkChi2TestExtension(GroupChi2TestExtension):
         return contingency_table
 
 class NormCDF(GroupStatTest):
-    def _calc_pandas(
+    def calc(
         self, data: Dataset, other: Dataset | None = None, **kwargs
     ) -> Dataset | float:
         result = norm.cdf(abs(data.get_values()[0][0]))

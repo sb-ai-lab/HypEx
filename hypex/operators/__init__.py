@@ -1,3 +1,3 @@
-from .operators import SMD, Bias
+from .operators import SMD, Bias, MatchingMetrics
 
-__all__ = ["SMD", "Bias"]
+__all__ = ["SMD", "Bias", "MatchingMetrics"]

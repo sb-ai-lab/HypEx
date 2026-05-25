@@ -10,6 +10,7 @@ from ..dataset import (
     AdditionalMatchingRole,
     AdditionalTargetRole,
     Dataset,
+    SmallDataset,
     ExperimentData,
     FeatureRole,
     InfoRole,
@@ -56,36 +57,37 @@ class MatchingMetrics(GroupOperator):
             key=key,
         )
 
-    def _calc_scaled_counts(self, matches, indexes, group):
-        matches_counts = Dataset({})
-        matches_counts = matches_counts.add_column(
-            indexes.index, {"indexes": InfoRole()}
+    def _calc_scaled_counts(self, matches: Dataset, indexes: Dataset, group: str):
+        matches_indeces = indexes.reset_index().select('index')
+        matches_counts = (
+            matches
+            .apply(list, role={'indeces': InfoRole()}, axis=1)
+            .explode('indeces')
+            .value_counts()
         )
-        matches_counts = matches_counts.add_column([0], {"count": InfoRole(float)})
-        for col in matches.columns:
-            v_counts = matches[col].value_counts()
-            matches_counts = matches_counts.merge(
-                v_counts,
-                how="left",
-                left_on="indexes",
-                right_on=col,
-                suffixes=(("", col)),
-            ).drop(columns=col)
-        matches_counts.index = indexes.index
-        matches_counts = matches_counts.drop(columns="indexes").fillna(0)
-        for col in matches_counts.columns:
-            if col != "count":
-                matches_counts["count"] += matches_counts[col]
+
+        matches_counts = (
+            matches_indeces
+            .merge(left_on='index', right_on='indeces', right=matches_counts, how='left')
+            .drop(columns=['indeces'])
+            .fillna(0)
+            .set_index('index')
+        )
+        matches_counts.index.name = None
         self.__scaled_counts[group] = matches_counts["count"] / self.n_neighbors
 
     @staticmethod
-    def _calc_vars(value):
-        var = 0 if value[value.columns[0]].isna().sum() > 0 else value.var()
-        return value * 0 + var
+    def _calc_vars(value: Dataset) -> float:
+        # value.to_small_dataset().data.to_csv(f"result_{np.random.randint(0, 10, 1)}.csv")
+        var = 0 if int(value[value.columns[0]].na_counts()) > 0 else float(value.var())
+        # return value * 0 + var
+        return var
 
     @staticmethod
-    def _calc_se(var_c, var_t, scaled_counts, group=None):
-        n_c, n_t = len(var_c), len(var_t)
+    def _calc_se(
+        n_c: int, n_t: int, var_c: float, var_t: float, scaled_counts: dict[str, Dataset], group=None
+    ):
+        # n_c, n_t = len(var_c), len(var_t)
         if group is not None:
             groups = list(scaled_counts.keys())
             groups.remove(group)
@@ -118,26 +120,38 @@ class MatchingMetrics(GroupOperator):
         scaled_counts = kwargs.get("scaled_counts")
         itt = test_data[target_fields[0]] - test_data[target_fields[1]]
         itc = data[target_fields[1]] - data[target_fields[0]]
+
         bias = kwargs.get("bias", {})
         if bias and len(bias) > 0:
             if metric in ["atc", "ate"]:
-                itc -= Dataset.from_dict(
-                    {"test": bias["control"]}, roles={}, index=itc.index
-                )
+                control_bias: Dataset = bias["control"]
+                control_bias = control_bias.add_column(itc.index, {'index': InfoRole()}).set_index('index')
+                control_bias.index.name = None
+                # itc -= Dataset.from_dict(
+                #     {"test": bias["control"]}, roles={}, index=itc.index
+                # )
+                itc -= control_bias
             if metric in ["att", "ate"]:
-                itt += Dataset.from_dict(
-                    {"control": bias["test"]}, roles={}, index=itt.index
-                )
+                test_bias: Dataset = bias["test"]
+                test_bias = test_bias.add_column(itt.index, {'index': InfoRole()}).set_index('index')
+                test_bias.index.name = None
+                # itt += Dataset.from_dict(
+                #     {"control": bias["test"]}, roles={}, index=itt.index
+                # )
+                itt += test_bias
+
+        itc_len = len(itc)
+        itt_len = len(itt)
         var_t = cls._calc_vars(itc)
         var_c = cls._calc_vars(itt)
-        itt_se = cls._calc_se(var_c, var_t, scaled_counts, "control")
-        itc_se = cls._calc_se(var_t, var_c, scaled_counts, "test")
+        itt_se = cls._calc_se(itc_len, itt_len, var_c, var_t, scaled_counts, "control")
+        itc_se = cls._calc_se(itt_len, itc_len, var_t, var_c, scaled_counts, "test")
         itt = itt.mean()
         itc = itc.mean()
         p_val_itt = (
             NormCDF()
             .calc(
-                Dataset.from_dict(
+                SmallDataset.from_dict(
                     {"value": [itt / itt_se]}, roles={"value": InfoRole()}
                 )
             )
@@ -146,7 +160,7 @@ class MatchingMetrics(GroupOperator):
         p_val_itc = (
             NormCDF()
             .calc(
-                Dataset.from_dict(
+                SmallDataset.from_dict(
                     {"value": [itc / itc_se]}, roles={"value": InfoRole()}
                 )
             )
@@ -174,11 +188,11 @@ class MatchingMetrics(GroupOperator):
             }
         len_control, len_test = len(data), len(test_data)
         ate = (itt * len_test + itc * len_control) / (len_test + len_control)
-        ate_se = cls._calc_se(var_c, var_t, scaled_counts)
+        ate_se = cls._calc_se(itc_len, itt_len, var_c, var_t, scaled_counts)
         p_val_ate = (
             NormCDF()
             .calc(
-                Dataset.from_dict(
+                SmallDataset.from_dict(
                     {"value": [ate / ate_se]}, roles={"value": InfoRole()}
                 )
             )
@@ -217,9 +231,16 @@ class MatchingMetrics(GroupOperator):
         new_target = data.ds.search_columns(TargetRole())[0]
         indexes, matched_data = Bias.prepare_data(data, t_data)
         matched_data = matched_data[new_target + "_matched"]
-        grouped_data = data.ds.groupby(group_field)
-        control_indexes = indexes.loc[grouped_data[0][1].index, :]
-        test_indexes = indexes.loc[grouped_data[1][1].index, :]
+        grouped_column = data.ds[group_field].reset_index()
+        (_, control_indexes), (_, test_indexes), *_ = (
+            grouped_column
+            .merge(on='index', right=indexes.reset_index())
+            .drop(columns=['index'])
+            .groupby(group_field)
+        )
+        # grouped_data = data.ds.groupby(group_field)
+        # control_indexes = indexes.loc[grouped_data[0][1].index, :]
+        # test_indexes = indexes.loc[grouped_data[1][1].index, :]
         self._calc_scaled_counts(control_indexes, test_indexes, "test")
         self._calc_scaled_counts(test_indexes, control_indexes, "control")
 
@@ -246,7 +267,8 @@ class MatchingMetrics(GroupOperator):
                 role=AdditionalTargetRole(),
             )
             t_data = t_data.add_column(
-                matched_data.reindex(t_data.index),
+                # matched_data.reindex(t_data.index), 
+                matched_data,
                 role={target_fields[1]: TargetRole()},
             )
         self.key = str(
@@ -359,22 +381,19 @@ class Bias(GroupOperator):
         if len(indexes) == 0:
             raise ValueError("No indexes were found")
         indexes = data.additional_fields[indexes]
-        indexes.reset_index(drop=True)
-        t_data.reset_index(drop=True)
-
-        filtered_field = indexes
-
-        # TODO: nessesity?
-        # filtered_field = indexes.drop(
-        #     indexes[indexes[indexes.columns[0]] == -1], axis=0
-        # )
+        # indexes.index = t_data.index
+        indexes = indexes.add_column(t_data.index, {'index': InfoRole()}).set_index('index')
+        indexes.index.name = None
+        # filtered_field = indexes
+        # filtered_field = indexes.reset_index(drop=True)
 
         numeric_cols = t_data.search_columns(
             [FeatureRole(), TargetRole()], search_types=[int, float]
         )
         
         matched_data = (
-            filtered_field
+            indexes
+            # filtered_field
             .apply(list, axis=1, role={'_index' : InfoRole()})
             .explode('_index')
             .merge(t_data.select(numeric_cols).reset_index(), 

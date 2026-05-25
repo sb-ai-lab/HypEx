@@ -25,7 +25,7 @@ from pyspark.ml.feature import VectorAssembler
 class UniteCovExtension(Extension):
 
     def calc(
-         self, data: Dataset, test_data: Dataset | None = None   
+         self, data: Dataset, test_data: Dataset | None = None, **kwargs
     ):
         cov_data = data.data.cov().to_numpy()
         if test_data is None:
@@ -61,7 +61,10 @@ class CholeskyExtension(Extension):
         )
 
 class InverseExtension(Extension):
-    def calc(self, data: Dataset, **kwargs):
+
+    def calc(
+            self, data: Dataset, other: Dataset | None = None, **kwargs
+    ):
         """
         Calculate inverse matrix.
 
@@ -100,7 +103,9 @@ class PandasLstsqExtension(LstsqExtension):
     Slave-backend class for lstsq extension.
     """
 
-    def calc(self, data: Dataset):
+    def calc(
+            self, data: Dataset, other: Dataset | None = None, **kwargs
+    ):
         target, *features = self.get_columns(data)
         X_l = Dataset.create_empty(roles={"temp": InfoRole()}, index=data.index).fillna(1)
         X = X_l.append(data.select(features), axis=1).data.values
@@ -113,7 +118,9 @@ class SparkLstsqExtension(LstsqExtension):
     Slave-backend class for lstsq extension.
     """
 
-    def calc(self, data: SparkDataset):
+    def calc(
+            self, data: SparkDataset, other: Dataset | None = None, **kwargs
+    ):
         target, *features = self.get_columns(data)
         asembler = VectorAssembler(inputCols=features,
                                    outputCol='_features')

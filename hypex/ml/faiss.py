@@ -10,6 +10,7 @@ from ..dataset import (
     Dataset,
     ExperimentData,
     FeatureRole,
+    InfoRole,
 )
 from ..executor import MLExecutor
 from ..extensions.faiss import FaissExtension
@@ -158,7 +159,7 @@ class FaissNearestNeighbors(MLExecutor):
         nans = 0
 
         for result in compare_result.values():
- 
+            #TODO: find solution without `data` field
             nans += (
                 result.data.isna().sum().sum()
             )
@@ -172,9 +173,10 @@ class FaissNearestNeighbors(MLExecutor):
             backend=data.ds.backend_type,
             session=data.ds.session
         )
+        # matched_indexes.index.name = None
         for res_k, res_v in compare_result.items():
             group = grouping_data[1][1] if res_k == "test" else grouping_data[0][1]
-            t_index_field = res_v.limit(len(group))
+            t_index_field: Dataset = res_v.limit(len(group))
 
             n_nans = t_index_field.data.isna().sum().sum()
 
@@ -189,13 +191,13 @@ class FaissNearestNeighbors(MLExecutor):
 
             # TODO: not supported in pyspark, maybe remove it or find a solution
             # t_index_field.index = group.index 
+            t_index_field = t_index_field.add_column(group.index, {"index": InfoRole()}).set_index("index")
+            t_index_field.index.name = None
             matched_indexes = matched_indexes.append(t_index_field)
-
         if matched_indexes is not None:
             matched_indexes = matched_indexes.sort()
         if len(matched_indexes) < len(data.ds) and not self.two_sides:
             matched_indexes = matched_indexes.reindex(data.ds.index, fill_value=-1)
         elif len(matched_indexes) < len(data.ds) and self.two_sides:
             raise PairsNotFoundError
-        # matched_indexes.data.to_csv("matched_indexes.csv") # TODO: needs to be removed
         return self._set_value(data, matched_indexes, key="matched")
