@@ -4,6 +4,7 @@ import os
 import copy
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized
+from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
@@ -25,7 +26,6 @@ from pyspark.pandas.exceptions import PandasNotImplementedError
 from ...utils import FromDictTypes, MergeOnError, ScalarType, SparkTypeMapper
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
-
 class SparkNavigation(DatasetBackendNavigation):
     """Navigation interface for PySpark-backed datasets.
     
@@ -41,6 +41,26 @@ class SparkNavigation(DatasetBackendNavigation):
         session (SparkSession): Active Spark session for distributed operations.
     """
     PANDAS_CONVERSION_LIMIT: int = 100_000
+
+    @staticmethod
+    @contextmanager
+    def _ops_on_diff_frames():
+        """
+        Temporarily enable `ops_on_diff_frames` only if an active Spark session
+        exists on this process (driver). Safe inside serialized UDF closures running on executors.
+        """
+        from pyspark.sql import SparkSession
+        if SparkSession.getActiveSession() is None:
+            yield
+            return
+        
+        cur_option = ps.get_option('compute.ops_on_diff_frames')
+        ps.set_option('compute.ops_on_diff_frames', True)
+
+        try:
+            yield
+        finally:
+            ps.set_option('compute.ops_on_diff_frames', cur_option)
 
     def checkpoint(self):
         """Create a checkpoint in the Spark execution plan.
@@ -471,76 +491,94 @@ class SparkNavigation(DatasetBackendNavigation):
     # Binary operations:
     def __add__(self, other: Any) -> "SparkNavigation":
         """Element-wise addition."""
-        return self._wrap_result(self.data + self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data + self.__magic_determine_other(other))
 
     def __sub__(self, other: Any) -> "SparkNavigation":
         """Element-wise subtraction."""
-        return self._wrap_result(self.data - self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data - self.__magic_determine_other(other))
 
     def __mul__(self, other: Any) -> "SparkNavigation":
         """Element-wise multiplication."""
-        return self._wrap_result(self.data * self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data * self.__magic_determine_other(other))
 
     def __floordiv__(self, other: Any) -> "SparkNavigation":
         """Element-wise floor division."""
-        return self._wrap_result(self.data // self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data // self.__magic_determine_other(other))
 
     def __div__(self, other: Any) -> "SparkNavigation":
         """Element-wise division (legacy operator)."""
-        return self._wrap_result(self.data / self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data / self.__magic_determine_other(other))
 
     def __truediv__(self, other: Any) -> "SparkNavigation":
         """Element-wise true division."""
-        return self._wrap_result(self.data / self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data / self.__magic_determine_other(other))
 
     def __mod__(self, other: Any) -> "SparkNavigation":
         """Element-wise modulo operation."""
-        return self._wrap_result(self.data % self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data % self.__magic_determine_other(other))
 
     def __pow__(self, other: Any) -> "SparkNavigation":
         """Element-wise exponentiation."""
-        return self._wrap_result(self.data ** self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data ** self.__magic_determine_other(other))
 
     def __and__(self, other: Any) -> "SparkNavigation":
         """Element-wise logical AND for boolean data."""
-        return self._wrap_result(self.data & self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data & self.__magic_determine_other(other))
 
     def __or__(self, other: Any) -> "SparkNavigation":
         """Element-wise logical OR for boolean data."""
-        return self._wrap_result(self.data | self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data | self.__magic_determine_other(other))
 
     # Right arithmetic operators:
     def __radd__(self, other: Any) -> "SparkNavigation":
         """Right-hand addition (other + self)."""
-        return self._wrap_result(self.__magic_determine_other(other) + self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) + self.data)
 
     def __rsub__(self, other: Any) -> "SparkNavigation":
         """Right-hand subtraction (other - self)."""
-        return self._wrap_result(self.__magic_determine_other(other) - self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) - self.data)
 
     def __rmul__(self, other: Any) -> "SparkNavigation":
         """Right-hand multiplication (other * self)."""
-        return self._wrap_result(self.__magic_determine_other(other) * self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) * self.data)
 
     def __rfloordiv__(self, other: Any) -> "SparkNavigation":
         """Right-hand floor division (other // self)."""
-        return self._wrap_result(self.__magic_determine_other(other) // self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) // self.data)
 
     def __rdiv__(self, other: Any) -> "SparkNavigation":
         """Right-hand division (legacy operator, other / self)."""
-        return self._wrap_result(self.__magic_determine_other(other) / self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) / self.data)
 
     def __rtruediv__(self, other: Any) -> "SparkNavigation":
         """Right-hand true division (other / self)."""
-        return self._wrap_result(self.__magic_determine_other(other) / self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) / self.data)
 
     def __rmod__(self, other: Any) -> "SparkNavigation":
         """Right-hand modulo (other % self)."""
-        return self._wrap_result(self.__magic_determine_other(other) % self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) % self.data)
 
     def __rpow__(self, other: Any) -> "SparkNavigation":
         """Right-hand exponentiation (other ** self)."""
-        return self._wrap_result(self.__magic_determine_other(other) ** self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) ** self.data)
 
     def __deepcopy__(self, memo):
         """deepcopy backend data"""
@@ -882,6 +920,9 @@ class SparkNavigation(DatasetBackendNavigation):
         """
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
+
+        if isinstance(data, ps.Index):
+            data = data.to_frame()
         if isinstance(data, (ps.DataFrame, ps.Series)):
             if isinstance(data, ps.DataFrame) and data.shape[1] == 1:
                 data_col = data.columns[0]

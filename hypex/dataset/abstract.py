@@ -471,8 +471,11 @@ class DatasetBase(ABC):
         else:
             other_raw = other
 
-        func = getattr(self_raw, func_name)
+        # func = getattr(self_raw, func_name)
+        func = getattr(self.backend_data, func_name)
         result_raw = func(other_raw)
+
+        result_raw = result_raw.data if hasattr(result_raw, 'data') else result_raw
 
         if hasattr(result_raw, 'to_frame') and not hasattr(result_raw, 'columns'):
             col_name = result_raw.name if result_raw.name is not None else (self_raw.columns[0] if hasattr(self_raw, 'columns') else 'result')
