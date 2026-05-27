@@ -921,8 +921,8 @@ class SparkNavigation(DatasetBackendNavigation):
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
 
-        if isinstance(data, ps.Index):
-            data = data.to_frame()
+        # if isinstance(data, ps.Index):        # if isinstance(data, ps.Index):
+        #     data = data.to_frame()
         if isinstance(data, (ps.DataFrame, ps.Series)):
             if isinstance(data, ps.DataFrame) and data.shape[1] == 1:
                 data_col = data.columns[0]
