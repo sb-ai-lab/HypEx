@@ -21,7 +21,6 @@ class ABTestReporter(DatasetReporter):
         result.update(extract_group_difference(data, self.front))
         result.update(extract_tests(data, self.tests, self.front))
         result.update(extract_analyzer_data(data, ABAnalyzer))
-        
         return result
 
     def report(self, data: ExperimentData) -> dict | Dataset:
@@ -36,14 +35,25 @@ class ABTestReporter(DatasetReporter):
         variance_cols = [c for c in data.additional_fields.columns if c.endswith("_variance_reduction")]
         if not variance_cols:
             return "No variance reduction data available. Ensure CUPED or CUPAC was applied."
+        
         report_data = []
+        records = data.additional_fields.limit(1).to_records()
+        first_row = records[0] if records else {}
+        
         for col in variance_cols:
             metric_name = col.replace("_variance_reduction", "")
-            reduction_value = data.additional_fields.data[col].iloc[0]
-            report_data.append({"Transformed Metric Name": metric_name, "Variance Reduction (%)": reduction_value})
+            reduction_value = first_row.get(col)
+            report_data.append({
+                "Transformed Metric Name": metric_name, 
+                "Variance Reduction (%)": reduction_value
+            })
+        
         return Dataset.from_dict(
             data=report_data,
-            roles={"Transformed Metric Name": StatisticRole(), "Variance Reduction (%)": StatisticRole()},
+            roles={
+                "Transformed Metric Name": StatisticRole(), 
+                "Variance Reduction (%)": StatisticRole()
+            },
         ) if report_data else "No variance reduction data available."
 
 class ABDictReporter(ABTestReporter):
@@ -66,30 +76,49 @@ class CupacReporter(Reporter):
         for key in cupac_keys:
             report = data.analysis_tables[key]
             target = key.replace("_cupac_report", "")
+            
+            if isinstance(report, dict):
+                get_val = report.get
+                imp_dict = report.get("cupac_feature_importances", {})
+            else:
+                rec = report.to_records()[0] if not report.is_empty() else {}
+                get_val = rec.get
+                imp_dict = rec.get("cupac_feature_importances", {})
+
             var_data.append({
-                "target": target, "best_model": report.get("cupac_best_model"),
-                "variance_reduction_cv": report.get("cupac_variance_reduction_cv"),
-                "variance_reduction_real": report.get("cupac_variance_reduction_real"),
+                "target": target, 
+                "best_model": get_val("cupac_best_model"),
+                "variance_reduction_cv": get_val("cupac_variance_reduction_cv"),
+                "variance_reduction_real": get_val("cupac_variance_reduction_real"),
             })
-            for feat, imp in report.get("cupac_feature_importances", {}).items():
-                imp_data.append({
-                    "target": target, 
-                    "feature": feat, 
-                    "importance": imp, 
-                    "model": report.get("cupac_best_model")
-                })
+            
+            if isinstance(imp_dict, dict):
+                for feat, imp in imp_dict.items():
+                    imp_data.append({
+                        "target": target, 
+                        "feature": feat, 
+                        "importance": imp, 
+                        "model": get_val("cupac_best_model")
+                    })
 
         vr_ds = Dataset.from_dict(
             data=var_data, 
-            roles={"target": StatisticRole(), 
-                   "best_model": StatisticRole(), 
-                   "variance_reduction_cv": StatisticRole(), 
-                   "variance_reduction_real": StatisticRole()}) if var_data else None
+            roles={
+                "target": StatisticRole(), 
+                "best_model": StatisticRole(), 
+                "variance_reduction_cv": StatisticRole(), 
+                "variance_reduction_real": StatisticRole()
+            }
+        ) if var_data else None
+        
         fi_ds = Dataset.from_dict(
             data=imp_data, 
             roles={
                 "target": StatisticRole(), 
                 "feature": StatisticRole(), 
                 "importance": StatisticRole(), 
-                "model": StatisticRole()}) if imp_data else None
+                "model": StatisticRole()
+            }
+        ) if imp_data else None
+        
         return {"variance_reductions": vr_ds, "feature_importances": fi_ds}

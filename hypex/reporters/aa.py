@@ -84,26 +84,32 @@ class AAPassedReporter(Reporter):
         if best_split_table.is_empty():
             return SmallDataset.create_empty()
 
-        records = []
-        for i in range(len(best_split_table)):
-            rec = {"feature": str(best_split_table.get_values(i, "feature")),
-                   "group": str(best_split_table.get_values(i, "group"))}
+        records = best_split_table.to_records()
+        result_records = []
+        
+        for row in records:
+            rec = {
+                "feature": str(row.get("feature", "")),
+                "group": str(row.get("group", ""))
+            }
             passed = False
             for col in best_split_table.columns:
-                if col in ("feature", "group"): continue
-                val = best_split_table.get_values(i, col)
+                if col in ("feature", "group"): 
+                    continue
+                val = row.get(col)
                 rec[col] = val
-                if val in (True, 1, "True", 1.0):
+                if val in (True, 1, "True", 1.0, "OK"):
                     passed = True
             rec["result"] = "OK" if passed else "NOT OK"
-            records.append(rec)
+            result_records.append(rec)
 
         roles = {"feature": InfoRole(), "group": InfoRole(), "result": StatisticRole()}
         for col in best_split_table.columns:
             if col not in ("feature", "group"):
                 roles[col] = best_split_table.roles.get(col, StatisticRole())
 
-        result = SmallDataset.from_dict(records, roles=roles)
+        result = SmallDataset.from_dict(result_records, roles=roles)
+        
         diff_source = analyser_tables.get("best split statistics")
         if diff_source and not diff_source.is_empty():
             stats_cols = ["feature", "group", "control mean", "test mean", "difference", "difference %"]
@@ -118,8 +124,10 @@ class AAPassedReporter(Reporter):
         numeric_cols = ["control mean", "test mean", "difference", "difference %"]
         for col in numeric_cols:
             if col in result.columns:
-                try: result.data[col] = result.data[col].astype(float).round(6)
-                except Exception: pass
+                try: 
+                    result.data[col] = result.data[col].astype(float).round(6)
+                except Exception: 
+                    pass
         return result
 
     @staticmethod
@@ -127,7 +135,8 @@ class AAPassedReporter(Reporter):
         if table.is_empty() or "pass" not in table.columns:
             return SmallDataset.create_empty()
         
-        pass_dict = table.data.iloc[0]["pass"]
+        records = table.to_records()
+        pass_dict = records[0].get("pass") if records else None
         
         if not isinstance(pass_dict, dict) or not pass_dict:
             return SmallDataset.create_empty()
@@ -139,20 +148,26 @@ class AAPassedReporter(Reporter):
         if not pass_cols or table.is_empty():
             return SmallDataset.create_empty()
             
+        records = table.to_records()
         rows = []
-        for i in range(len(table)):
+        for row in records:
             row_dict = {}
-            if "feature" in table.columns:
-                row_dict["feature"] = table.data.iloc[i]["feature"]
-            if "group" in table.columns:
-                row_dict["group"] = table.data.iloc[i]["group"]
+            if "feature" in row:
+                row_dict["feature"] = row["feature"]
+            if "group" in row:
+                row_dict["group"] = row["group"]
                 
             for col in pass_cols:
-                val = table.data.iloc[i][col]
-                row_dict[col[:col.rfind("pass")-1].strip()] = bool(val)
+                val = row.get(col)
+
+                clean_col = col[:col.rfind("pass")].strip()
+                row_dict[clean_col] = bool(val) if val is not None else False
             rows.append(row_dict)
             
-        return SmallDataset.from_dict(rows[0] if rows else {}, roles={c: InfoRole() for c in rows[0]})
+        if not rows:
+            return SmallDataset.create_empty()
+            
+        return SmallDataset.from_dict(rows, roles={c: InfoRole() for c in rows[0]})
 
 class AABestSplitReporter(Reporter):
     def report(self, data: ExperimentData):
