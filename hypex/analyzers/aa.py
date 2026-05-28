@@ -5,7 +5,6 @@ import pandas as pd
 
 from ..comparators import GroupChi2Test, GroupKSTest, GroupTTest
 from ..comparators import StatsTTest, StatsChi2Test, StatsZTest
-from ..comparators import TTest, Chi2Test, KSTest, UTest
 from ..dataset import Dataset, SmallDataset, ExperimentData, StatisticRole, InfoRole
 from ..executor import Executor
 from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
@@ -49,10 +48,6 @@ class OneAAStatAnalyzer(Executor):
                     else data.analysis_tables[analysis_ids[0]]
                 )
                 
-                # ✅ Исправление: безопасное извлечение метрик
-                # class_ уже является строкой (напр. 'GroupTTest'), поэтому .__name__ не нужен.
-                # Проверка `if field in t_data.columns` предотвращает KeyError, 
-                # если тест вернул таблицу без нужных колонок или пустой датасет.
                 for field in ["p-value", "pass"]:
                     if field in t_data.columns:
                         analysis_data[
@@ -66,7 +61,6 @@ class OneAAStatAnalyzer(Executor):
         analysis_data["mean test score"] = 0
         sum_weight = 0
         
-        # Заменяем NaN на 0.0 для корректного расчёта итоговой оценки
         analysis_data = {
             key: (0 if np.isnan(value) else value)
             for key, value in analysis_data.items()
@@ -98,109 +92,6 @@ class OneAAStatAnalyzer(Executor):
                 analysis_data, {field: StatisticRole(float) for field in analysis_data}
             ),
         )
-
-    # def execute(self, data: ExperimentData) -> ExperimentData:
-    #     """Aggregates results from registered statistical tests and computes a composite score.
-    #     Calculates mean p-values and pass rates across multiple test instances, applies 
-    #     predefined weights to generate a 'mean test score', handles missing values, 
-    #     and stores the aggregated metrics.
-        
-    #     Args:
-    #         data: Experiment data containing analysis tables from various statistical tests.
-            
-    #     Returns:
-    #         Updated ExperimentData with a new SmallDataset containing aggregated metrics.
-    #     """
-    #     analysis_tests: list[type] = [
-    #         GroupTTest,
-    #         GroupKSTest,
-    #         GroupChi2Test,
-    #         StatsTTest,
-    #         StatsChi2Test,
-    #         StatsZTest,
-    #         TTest, Chi2Test 
-    #     ]
-    #     # >>> DEBUG START
-    #     print(f"[DEBUG] OneAAStatAnalyzer | All keys in analysis_tables: {list(data.analysis_tables.keys())}")
-    #     # >>> DEBUG END
-        
-    #     executor_ids = data.get_ids(
-    #         analysis_tests, searched_space=ExperimentDataEnum.analysis_tables
-    #     )
-        
-    #     # >>> DEBUG START
-    #     print(f"[DEBUG] OneAAStatAnalyzer | Found IDs: {executor_ids}")
-    #     # >>> DEBUG END
-        
-    #     analysis_data: dict[str, float] = {}
-
-    #     for class_, spaces in executor_ids.items():
-    #         analysis_ids = spaces.get("analysis_tables", [])
-            
-    #         # >>> DEBUG START
-    #         print(f"[DEBUG] OneAAStatAnalyzer | Processing {class_.__name__} | IDs to analyze: {analysis_ids}")
-    #         # >>> DEBUG END
-            
-    #         if len(analysis_ids) > 0:
-    #             t_data = (
-    #                 data.analysis_tables[analysis_ids[0]].append(
-    #                     [data.analysis_tables[k] for k in analysis_ids[1:]]
-    #                 )
-    #                 if len(analysis_ids) > 1
-    #                 else data.analysis_tables[analysis_ids[0]]
-    #             )
-                
-    #             # >>> DEBUG START
-    #             print(f"[DEBUG] OneAAStatAnalyzer | {class_.__name__} t_data columns: {list(t_data.columns)}")
-    #             print(f"[DEBUG] OneAAStatAnalyzer | {class_.__name__} t_data shape: {t_data.shape}")
-    #             if len(t_data) == 0:
-    #                 print(f"[WARNING] {class_.__name__} result is EMPTY!")
-    #             # >>> DEBUG END
-                
-    #             for field in ["p-value", "pass"]:
-    #                 # Безопасная проверка: если тест вернул пустой датасет или таблицу без нужной колонки,
-    #                 # мы не падаем с KeyError, а ставим значение по умолчанию (0.0).
-    #                 if field in t_data.columns:
-    #                     analysis_data[
-    #                         f"mean{ID_SPLIT_SYMBOL}{class_}{ID_SPLIT_SYMBOL}{field}{ID_SPLIT_SYMBOL}all"
-    #                     ] = t_data[field].mean()
-    #                 else:
-    #                     analysis_data[
-    #                         f"mean{ID_SPLIT_SYMBOL}{class_}{ID_SPLIT_SYMBOL}{field}{ID_SPLIT_SYMBOL}all"
-    #                     ] = 0.0
-
-    #     analysis_data["mean test score"] = 0
-    #     sum_weight = 0
-    #     analysis_data = {
-    #         key: (0 if np.isnan(value) else value)
-    #         for key, value in analysis_data.items()
-    #     }
-
-    #     gtt_p = f"mean{ID_SPLIT_SYMBOL}GroupTTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
-    #     gks_p = f"mean{ID_SPLIT_SYMBOL}GroupKSTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
-    #     stt_p = f"mean{ID_SPLIT_SYMBOL}StatsTTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
-    #     chi2_p = f"mean{ID_SPLIT_SYMBOL}GroupChi2Test{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
-
-    #     if gtt_p in analysis_data and gks_p in analysis_data:
-    #         analysis_data["mean test score"] = (
-    #             analysis_data[gtt_p] + 2 * analysis_data[gks_p]
-    #         )
-    #         sum_weight += 3
-    #     if stt_p in analysis_data:
-    #         analysis_data["mean test score"] = analysis_data[stt_p]
-    #         sum_weight += 3
-    #     if chi2_p in analysis_data:
-    #         analysis_data["mean test score"] += 2 * analysis_data[chi2_p]
-    #         sum_weight += 2
-    #     if sum_weight:
-    #         analysis_data["mean test score"] /= sum_weight
-
-    #     return self._set_value(
-    #         data,
-    #         SmallDataset.from_dict(
-    #             analysis_data, {field: StatisticRole(float) for field in analysis_data}
-    #         ),
-    #     )
 
 
 class AAScoreAnalyzer(Executor):
@@ -346,8 +237,6 @@ class AAScoreAnalyzer(Executor):
             )
             best_index = score_col.idxmax()
 
-        print(f"best_index = {best_index}")
-
         if "splitter_id" in score_table.columns:
             best_split_id = score_table.data.loc[best_index, "splitter_id"]
         else:
@@ -419,12 +308,6 @@ class AAScoreAnalyzer(Executor):
         Returns:
             Updated ExperimentData with AA scores and the best split applied.
         """
-        print(
-            f"[DEBUG] AAScoreAnalyzer | id={id(data)} keys={list(data.analysis_tables.keys())}"
-        )
-        # >>> DEBUG START
-        print(f"[DEBUG] AAScoreAnalyzer | All keys in analysis_tables: {list(data.analysis_tables.keys())}")
-        # >>> DEBUG END
 
         param_experiment_id = data.get_one_id(
             ParamsExperiment, ExperimentDataEnum.analysis_tables

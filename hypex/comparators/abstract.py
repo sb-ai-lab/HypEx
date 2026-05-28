@@ -96,8 +96,9 @@ class BaseComparator(Calculator, ABC):
     def _extract_dataset(
         compare_result: FromDictTypes, roles: dict[Any, ABCRole]
     ) -> Dataset:
-        if isinstance(next(iter(compare_result.values())), Dataset):
-            cr_list_v: list[Dataset] = list(compare_result.values())
+        first_val = next(iter(compare_result.values()))
+        if isinstance(first_val, (Dataset, SmallDataset)):
+            cr_list_v = list(compare_result.values())
             result = cr_list_v[0]
             if len(cr_list_v) > 1:
                 result = result.append(cr_list_v[1:])
@@ -241,7 +242,7 @@ class GroupsComparator(BaseComparator, ABC):
             )
             field_data = field_data[field_data.columns[0]]
         return field_data
-
+    
     @classmethod
     def _split_for_groups_mode(
         cls,
@@ -254,6 +255,14 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = cls._field_validity_check(
             group_field_data, "group_field_data", "groups"
         )
+        
+        group_col = group_field_data.columns[0]
+        
+        if group_col not in target_fields_data.columns:
+            target_fields_data = target_fields_data.merge(
+                group_field_data, left_index=True, right_index=True, how="left"
+            )
+
         data_buckets = sorted(
             target_fields_data.groupby(by=group_field_data.columns), key=lambda tup: tup[0]
         )
@@ -277,6 +286,13 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = cls._field_validity_check(
             group_field_data, "group_field_data", "columns_in_groups"
         )
+        
+        group_col = group_field_data.columns[0]
+        if group_col not in baseline_field_data.columns:
+            baseline_field_data = baseline_field_data.merge(group_field_data, left_index=True, right_index=True, how="left")
+        if group_col not in target_fields_data.columns:
+            target_fields_data = target_fields_data.merge(group_field_data, left_index=True, right_index=True, how="left")
+
         baseline_data = baseline_field_data.groupby(by=group_field_data.columns)
         compared_data = cls._split_ds_into_columns(
             target_fields_data.groupby(by=group_field_data.columns)
@@ -299,6 +315,13 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = cls._field_validity_check(
             group_field_data, "group_field_data", "cross"
         )
+        
+        group_col = group_field_data.columns[0]
+        if group_col not in baseline_field_data.columns:
+            baseline_field_data = baseline_field_data.merge(group_field_data, left_index=True, right_index=True, how="left")
+        if group_col not in target_fields_data.columns:
+            target_fields_data = target_fields_data.merge(group_field_data, left_index=True, right_index=True, how="left")
+
         baseline_data = [
             sorted(
                 baseline_field_data.groupby(by=group_field_data.columns), key=lambda tup: tup[0]
@@ -327,8 +350,16 @@ class GroupsComparator(BaseComparator, ABC):
         target_fields_data = cls._field_validity_check(
             target_fields_data, "target_fields_data", "matched_pairs"
         )
+        
+        group_col = group_field_data.columns[0]
+        if group_col not in baseline_field_data.columns:
+            baseline_field_data = baseline_field_data.merge(group_field_data, left_index=True, right_index=True, how="left")
+        if group_col not in target_fields_data.columns:
+            target_fields_data = target_fields_data.merge(group_field_data, left_index=True, right_index=True, how="left")
+
         compared_data = target_fields_data.groupby(by=group_field_data.columns)
         baseline_indexes = baseline_field_data.groupby(by=group_field_data.columns)
+        
         baseline_data = []
         for group in baseline_indexes:
             name = group[0]
@@ -456,7 +487,6 @@ class GroupsComparator(BaseComparator, ABC):
         )
 
         if len(target_fields_data.columns) == 0:
-            # If the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
             if data.ds.tmp_roles:
                 return data
             else:
@@ -467,7 +497,7 @@ class GroupsComparator(BaseComparator, ABC):
 
         if (
             group_field_data.columns[0] in data.groups
-        ) and self.compare_by != "matched_pairs":  # TODO: proper split between groups and columns
+        ) and self.compare_by != "matched_pairs":
             grouping_data = self._grouping_data_split(
                 grouping_data=data.groups[group_field_data.columns[0]],
                 compare_by=self.compare_by,
@@ -746,13 +776,26 @@ class StatsComparator(BaseComparator, ABC):
         ]
         if not result_ds_list:
             return data
-
+            
         result_dataset = result_ds_list[0].append(result_ds_list[1:])
-        result_dataset.index = [
-            f"{compared_name}{NAME_BORDER_SYMBOL}{col}"
-            for compared_name in group_names[1:]
-            for col in target_fields_data.columns
-        ]
+        
+        # ╔════════════════════════════════════════════════════════════════╗
+        # ║  ИСПРАВЛЕНИЕ: Выравниваем контракт индексов с GroupsComparator ║
+        # ╚════════════════════════════════════════════════════════════════╝
+        if len(target_fields_data.columns) == 1:
+            # Если колонка одна, индекс должен быть просто именем группы (как в Pandas)
+            result_dataset.index = [
+                f"{compared_name}"
+                for compared_name in group_names[1:]
+            ]
+        else:
+            # Если колонок несколько, оставляем составной индекс, чтобы не было перезаписи
+            result_dataset.index = [
+                f"{compared_name}{NAME_BORDER_SYMBOL}{col}"
+                for compared_name in group_names[1:]
+                for col in target_fields_data.columns
+            ]
+            
         return self._set_value(data, result_dataset)
 
 

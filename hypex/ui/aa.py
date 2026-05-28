@@ -4,9 +4,9 @@ from ..reporters.aa import AABestSplitReporter, AAPassedReporter
 from ..utils import ExperimentDataEnum
 from ..utils.enums import RenameEnum
 from .base import Output
-from ..reporters.abstract import TestDictReporter  # <-- Добавляем
+from ..reporters.abstract import TestDictReporter
 
-from ..reporters.aa import AATestReporter, AAPassedReporter, AABestSplitReporter
+from ..reporters.aa import AAPassedReporter, AABestSplitReporter
 
 
 class AAOutput(Output):

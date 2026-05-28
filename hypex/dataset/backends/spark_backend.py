@@ -737,10 +737,6 @@ class SparkNavigation(DatasetBackendNavigation):
         """Return list of column names."""
         return self.data.columns.tolist()
 
-    # @property
-    # def session(self):
-    #     return self.session
-
     @property
     def shape(self) -> tuple[int, int]:
         """Return tuple of (rows, columns) dimensions."""

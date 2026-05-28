@@ -72,8 +72,24 @@ class CupacReporter(Reporter):
                 "variance_reduction_real": report.get("cupac_variance_reduction_real"),
             })
             for feat, imp in report.get("cupac_feature_importances", {}).items():
-                imp_data.append({"target": target, "feature": feat, "importance": imp, "model": report.get("cupac_best_model")})
+                imp_data.append({
+                    "target": target, 
+                    "feature": feat, 
+                    "importance": imp, 
+                    "model": report.get("cupac_best_model")
+                })
 
-        vr_ds = Dataset.from_dict(data=var_data, roles={"target": StatisticRole(), "best_model": StatisticRole(), "variance_reduction_cv": StatisticRole(), "variance_reduction_real": StatisticRole()}) if var_data else None
-        fi_ds = Dataset.from_dict(data=imp_data, roles={"target": StatisticRole(), "feature": StatisticRole(), "importance": StatisticRole(), "model": StatisticRole()}) if imp_data else None
+        vr_ds = Dataset.from_dict(
+            data=var_data, 
+            roles={"target": StatisticRole(), 
+                   "best_model": StatisticRole(), 
+                   "variance_reduction_cv": StatisticRole(), 
+                   "variance_reduction_real": StatisticRole()}) if var_data else None
+        fi_ds = Dataset.from_dict(
+            data=imp_data, 
+            roles={
+                "target": StatisticRole(), 
+                "feature": StatisticRole(), 
+                "importance": StatisticRole(), 
+                "model": StatisticRole()}) if imp_data else None
         return {"variance_reductions": vr_ds, "feature_importances": fi_ds}

@@ -1,14 +1,16 @@
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, Literal
 
+import numpy as np
+
 from ..dataset import Dataset, SmallDataset, ExperimentData
 from ..dataset.roles import InfoRole, TreatmentRole
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
 from ..utils.errors import AbstractMethodError
-
 
 REPORTABLE_METRICS = frozenset({
     "pass", "p-value", "difference", "difference %", "control mean", "test mean"
@@ -27,52 +29,67 @@ class ResultKey:
         if len(parts) == 3:
             return cls(executor=parts[0], params_hash=parts[1], field=parts[2])
         return cls(executor=id_str, params_hash="", field=id_str)
-    
+
 def _normalize_value(val: Any) -> Any:
+    """
+    Приводит значения из ячеек Dataset к базовым Python-типам.
+    Работает только со скалярами и стандартными коллекциями, 
+    которые возвращает метод to_records().
+    """
     if val is None:
         return None
+        
+    # Базовые типы Python
     if isinstance(val, (int, float, str, bool)):
+        if isinstance(val, float) and np.isnan(val):
+            return None
         return val
-    if isinstance(val, (list, tuple)) and len(val) > 0:
-        return _normalize_value(val[0])
-    # Dataset / SmallDataset
-    if hasattr(val, 'iget_values'):
-        try:
-            return _normalize_value(val.iget_values(0, 0))
-        except Exception:
-            pass
-    # pandas / pyspark Series
-    if hasattr(val, 'iloc') and hasattr(val, '__len__'):
-        try:
-            return _normalize_value(val.iloc[0] if len(val) > 0 else val)
-        except Exception:
-            pass
-    # numpy scalar
+        
+    # Numpy / Pandas скаляры (np.int64, np.float64 и т.д.)
     if hasattr(val, 'item'):
         try:
-            return val.item()
-        except Exception:
+            item_val = val.item()
+            if isinstance(item_val, float) and np.isnan(item_val):
+                return None
+            return item_val
+        except (ValueError, TypeError, AttributeError):
             pass
+            
+    # Если в ячейке лежит список или массив (например, после специфичных агрегаций)
+    if isinstance(val, (list, tuple, np.ndarray)) and len(val) > 0:
+        return _normalize_value(val[0])
+        
     return val
+
+def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
+    """
+    Безопасное извлечение списка индексов без нарушения абстракции бэкенда.
+    Учитывает различия в API pandas (tolist) и pyspark.pandas (to_list).
+    """
+    index_obj = table.index
+    if hasattr(index_obj, "to_list"):
+        return index_obj.to_list()
+    if hasattr(index_obj, "tolist"):
+        return index_obj.tolist()
+    return list(index_obj)
 
 def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bool) -> dict[str, Any]:
     table = data.analysis_tables.get(comparator_id)
-    if table is None:
+    if table is None or table.is_empty():
         return {}
+        
     key = ResultKey.from_id(comparator_id)
     sep = " " if front else ID_SPLIT_SYMBOL
     result = {}
     
-    df = table.data
-    if hasattr(df, 'to_pandas'):
-        df = df.to_pandas()
-    elif hasattr(df, 'toPandas'):
-        df = df.toPandas()
-        
-    for idx_val, row in df.iterrows():
-        for col, val in row.items():
-            print(f"[DEBUG] _extract_from_comparator | idx={idx_val}, col={col}, val.type={type(val).__name__}, val={val}")
+    # Используем API Dataset: to_records() сам заботится о конвертации из Spark/Pandas
+    records = table.to_records()
+    index_values = _get_index_values(table)
+    
+    for idx_val, row_dict in zip(index_values, records):
+        for col, val in row_dict.items():
             result[f"{key.field}{sep}{key.executor}{sep}{col}{sep}{idx_val}"] = _normalize_value(val)
+            
     return result
 
 def extract_tests(data: ExperimentData, test_classes: list[type], front: bool) -> dict[str, Any]:
@@ -105,17 +122,12 @@ def extract_analyzer_data(data: ExperimentData, analyzer_class: type | str) -> d
     if table.is_empty():
         return {}
         
-    row = table.data
-    if hasattr(row, 'to_pandas'):
-        row = row.to_pandas()
-    elif hasattr(row, 'toPandas'):
-        row = row.toPandas()
+    records = table.to_records()
+    if not records:
+        return {}
         
-    if hasattr(row, 'iloc'):
-        row = row.iloc[0]
-        
-    items = row.to_dict() if hasattr(row, 'to_dict') else (row if isinstance(row, dict) else {})
-    return {col: _normalize_value(val) for col, val in items.items()}
+    row_dict = records[0]
+    return {col: _normalize_value(val) for col, val in row_dict.items()}
 
 class Reporter(ABC):
     @abstractmethod

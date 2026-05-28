@@ -864,7 +864,6 @@ class PandasNavigation(DatasetBackendNavigation):
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
             
-        # 1. Преобразуем DataFrame и ndarray в 1D структуру, если колонка одна
         if isinstance(data, pd.DataFrame):
             if data.shape[1] == 1:
                 data = data.iloc[:, 0]
@@ -878,61 +877,23 @@ class PandasNavigation(DatasetBackendNavigation):
         else:
             data = Adapter.to_list(data)
             
-        # 2. Обработка списков (скалярный broadcast и выравнивание длин)
         if isinstance(data, list):
             if len(data) == 1 and len(self.data) > 1:
-                pass  # Оставляем как есть для скалярного broadcast ниже
+                pass
             elif len(self.data) != len(data):
                 if len(data) > 0 and isinstance(data[0], Iterable) and len(data[0]) == 1:
                     data = np.squeeze(data)
                 data = pd.Series(data)
                 
-        # 3. Присваивание
         if index:
             self.data = self.data.join(
                 pd.DataFrame(data, columns=[name], index=list(index))
             )
         else:
             if isinstance(data, list) and len(data) == 1 and len(self.data) > 1:
-                # Скалярный broadcast (например, заполнение колонки строкой "control")
                 self.data[name] = data[0]
             else:
-                # pandas сам выровняет индексы, если data - это pd.Series
                 self.data[name] = data
-
-    # def add_column(
-    #     self,
-    #     data: Any,
-    #     name: str | list[str],
-    #     index: Sequence | None = None,
-    # ):
-    #     """Add a new column to the DataFrame.
-
-    #     Args:
-    #          Sequence of values for the new column.
-    #         name: Column name (str) or single-element list containing name.
-    #         index: Optional index labels for the new column. If None,
-    #             uses existing DataFrame index.
-
-    #     Returns:
-    #         None: Modifies self.data in-place.
-    #     """
-    #     if isinstance(name, list) and len(name) == 1:
-    #         name = name[0]
-    #     if isinstance(data, pd.DataFrame):
-    #         data = data.values
-    #     else:
-    #         data = Adapter.to_list(data)
-    #     if len(self.data) != len(data):
-    #         if isinstance(data[0], Iterable) and len(data[0]) == 1:
-    #             data = data.squeeze()
-    #         data = pd.Series(data)
-    #     if index:
-    #         self.data = self.data.join(
-    #             pd.DataFrame(data, columns=[name], index=list(index))
-    #         )
-    #     else:
-    #         self.data.loc[:, name] = data
 
     def append(self, other, reset_index: bool = False, axis: int = 0) -> pd.DataFrame:
         """Append other PandasDataset(s) to current DataFrame.
@@ -981,7 +942,6 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             dict: Format {"data": {col: [values]}, "index": [index_values]}.
         """
-        # return self.data.to_dict()
         return {
             "data": {
                 column: self.data[column].to_list() for column in self.data.columns

@@ -211,6 +211,11 @@ class ABAnalyzer(Executor):
                     t_data.data.index = new_index
             for f in ["p-value", "pass"]:
                 for i in range(0, len(analysis_ids), len(analysis_ids) // num_groups):
+                                        
+                    slice_start = i
+                    slice_end = i + len(analysis_ids) // num_groups                    
+                    sliced = t_data.iloc[slice_start:slice_end]
+
                     value = t_data.iloc[i : i + len(analysis_ids) // num_groups][f]
                     multitest_pvalues = self._add_pvalues(multitest_pvalues, value, f)
                     analysis_data[f"{c} {f} {groups[i // num_groups + 1][0]}"] = (

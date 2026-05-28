@@ -894,12 +894,21 @@ class DatasetBase:
         )
 
     def groupby(self, by: str | Iterable[str], **kwargs) -> GroupedDataset:
+        if isinstance(by, str):
+            by_list = [by]
+        elif hasattr(by, '__iter__'):
+            by_list = list(by)
+        else:
+            by_list = [by]
+            
+        by_arg = by_list[0] if len(by_list) == 1 else by_list
+        
         return GroupedDataset(
-            backend_groupby=self._backend_data.groupby(by=by, **kwargs),
+            backend_groupby=self._backend_data.groupby(by=by_arg, **kwargs),
             dataset_class=self.__class__,
             roles=self.roles,
             tmp_roles=self.tmp_roles,
-            group_cols=Adapter.to_list(by),
+            group_cols=by_list,
             backend_data=self._backend_data,
         )
 
