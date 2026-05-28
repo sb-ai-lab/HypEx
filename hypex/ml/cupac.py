@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any, Sequence
 
 from ..dataset.dataset import Dataset, ExperimentData
@@ -364,10 +365,10 @@ class CUPACExecutor(MLExecutor):
                 cov_xy = ((prediction - prediction.mean()) * (data.ds[target] - data.ds[target].mean())).mean()
                 var_x = ((prediction - prediction.mean()) ** 2).mean()
 
-                if var_x == 0 or var_x != var_x:
+                if var_x == 0 or math.isnan(var_x):
                     theta = 0
                 else:
-                    theta = cov_xy / var_x
+                    theta = max(0, cov_xy / var_x)
                     
                 target_cupac = data.ds[target] - (prediction - prediction.mean()) * theta
 
