@@ -58,18 +58,18 @@ class MatchingMetrics(GroupOperator):
         )
 
     def _calc_scaled_counts(self, matches: Dataset, indexes: Dataset, group: str):
-        matches_indeces = indexes.reset_index().select('index')
+        matches_indexes = indexes.reset_index().select('index')
         matches_counts = (
             matches
-            .apply(list, role={'indeces': InfoRole()}, axis=1)
-            .explode('indeces')
+            .apply(list, role={'indexes': InfoRole()}, axis=1)
+            .explode('indexes')
             .value_counts()
         )
 
         matches_counts = (
-            matches_indeces
-            .merge(left_on='index', right_on='indeces', right=matches_counts, how='left')
-            .drop(columns=['indeces'])
+            matches_indexes
+            .merge(left_on='index', right_on='indexes', right=matches_counts, how='left')
+            .drop(columns=['indexes'])
             .fillna(0)
             .set_index('index')
         )
@@ -231,13 +231,15 @@ class MatchingMetrics(GroupOperator):
         new_target = data.ds.search_columns(TargetRole())[0]
         indexes, matched_data = Bias.prepare_data(data, t_data)
         matched_data = matched_data[new_target + "_matched"]
-        grouped_column = data.ds[group_field].reset_index()
+        grouped_column = data.ds[group_field]
         (_, control_indexes), (_, test_indexes), *_ = (
             grouped_column
-            .merge(on='index', right=indexes.reset_index())
-            .drop(columns=['index'])
+            .merge(right=indexes, right_index=True, left_index=True)
+            # .drop(columns=['index'])
             .groupby(group_field)
         )
+
+        control_indexes, test_indexes = control_indexes[indexes.columns], test_indexes[indexes.columns]
         # grouped_data = data.ds.groupby(group_field)
         # control_indexes = indexes.loc[grouped_data[0][1].index, :]
         # test_indexes = indexes.loc[grouped_data[1][1].index, :]
@@ -381,9 +383,11 @@ class Bias(GroupOperator):
         if len(indexes) == 0:
             raise ValueError("No indexes were found")
         indexes = data.additional_fields[indexes]
+        # additional fields are already allignet according to index
+         
         # indexes.index = t_data.index
-        indexes = indexes.add_column(t_data.index, {'index': InfoRole()}).set_index('index')
-        indexes.index.name = None
+        # indexes = indexes.add_column(t_data.index, {'index': InfoRole()}).set_index('index')
+        # indexes.index.name = None
         # filtered_field = indexes
         # filtered_field = indexes.reset_index(drop=True)
 
@@ -396,14 +400,21 @@ class Bias(GroupOperator):
             # filtered_field
             .apply(list, axis=1, role={'_index' : InfoRole()})
             .explode('_index')
-            .merge(t_data.select(numeric_cols).reset_index(), 
-                   left_on='_index' ,right_on='index')
-            .drop(columns=['index', '_index'])
+            .merge(t_data.select(numeric_cols), 
+                   left_on='_index' ,right_index=True)
+            .drop(columns=['_index'])
             .reset_index()
+        )
+        matched_data = (
+            matched_data
+            .add_column(matched_data['index'], {'_index': InfoRole()})
             .groupby(by='index')
             .agg('mean')
             .rename({col: col + "_matched" for col in numeric_cols})
+            .set_index('_index') #grouping field will not disappear after `groupby`
         )
+        # print(matched_data)
+        matched_data.index.name = None
 
         return indexes, matched_data
 

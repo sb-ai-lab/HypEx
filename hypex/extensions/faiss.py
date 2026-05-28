@@ -301,8 +301,8 @@ def  _per_partition_predict(
             for q_idx, qid in enumerate(query_ids):
                 top = sorted(candidates[q_idx], key=lambda x: x[0])[:real_n]
                 output = [int(nid) for _, nid in top]
-                # yield (int(qid), output)
-                yield (output,)
+                yield (int(qid), output)
+                # yield (output,)
 
 @backend_factory.register(FaissExtension, SparkDataset)
 class SparkFaissExtension(FaissExtension):
@@ -314,7 +314,7 @@ class SparkFaissExtension(FaissExtension):
     # Лимит на то, сколько локальых индексов может быть одновременно загружено на драйвер
     DRIVER_INDEX_LIMIT = 5_000_000 
     PREDICT_SCHEMA = StructType([
-        # StructField("index",          LongType(),            False),
+        StructField("index",          LongType(),            False),
         StructField("index_list",     ArrayType(LongType()), False)
     ])
     CHUNK_SIZE = 512
@@ -567,7 +567,7 @@ class SparkFaissExtension(FaissExtension):
         result_df = (
             session.createDataFrame(result_rdd, schema=self.PREDICT_SCHEMA)
             .select(
-                # ['index'] + 
+                ['index'] + 
                 [F.expr(f"index_list[{i}]").alias(f"{i + 1}") for i in range(self.n_neighbors)]
             )
             .persist(self.PERSIST_POLITIC)
@@ -580,7 +580,11 @@ class SparkFaissExtension(FaissExtension):
             os.remove(f"{tmp_dir}/{file}")
         os.rmdir(tmp_dir)
 
-        return self.result_to_dataset(result=result_df, roles={}, small=False) 
+        result = self.result_to_dataset(result=result_df, roles={}, small=False).set_index('index')
+        result.index.name = None
+
+        # return self.result_to_dataset(result=result_df, roles={}, small=False) 
+        return result
 
     
     def calc(
