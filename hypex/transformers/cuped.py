@@ -43,7 +43,7 @@ class CUPEDTransformer(Transformer):
             if var_x == 0 or math.isnan(var_x):
                 theta = 0
             else:
-                theta = max(0, cov_xy / var_x)
+                theta = 0, cov_xy / var_x
 
             new_values_ds = y - (x - mean_x) * theta
 
