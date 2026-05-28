@@ -37,48 +37,48 @@ class MahalanobisDistance(Calculator):
     def _execute_inner_function(
         cls,
         grouping_data,
-        tmp_roles,
+        # tmp_roles,
         target_fields: list[str] | None = None,
         **kwargs,
     ) -> dict:
         result = {}
         test_data = None
-        for enum, (_, grouped_data) in enumerate(grouping_data):
-            if enum == 0:
-                test_data: Dataset = grouped_data
-                test_data.tmp_roles = tmp_roles
-            else:
-                result.update(
-                    cls._inner_function(
-                        data=(
-                            test_data[target_fields]
-                            if target_fields
-                            else test_data
-                        ),
-                        test_data=(
-                            grouped_data[target_fields]
-                            if target_fields
-                            else grouped_data
-                        ),
-                        **kwargs,
-                    )
+        # for enum, (_, grouped_data) in enumerate(grouping_data):
+            # if enum == 0:
+            #     test_data: Dataset = grouped_data
+            #     # test_data.tmp_roles = tmp_roles
+            # else:
+                # result.update(
+                #     cls._inner_function(
+                #         data=(
+                #             test_data[target_fields]
+                #             if target_fields
+                #             else test_data
+                #         ),
+                #         test_data=(
+                #             grouped_data[target_fields]
+                #             if target_fields
+                #             else grouped_data
+                #         ),
+                #         **kwargs,
+                #     )
+                # )
+        for i in range(1, len(grouping_data)):
+            result.update(
+                cls._inner_function(
+                    data=(
+                        grouping_data[0][1][target_fields]
+                        if target_fields
+                        else grouping_data[0][1]
+                    ),
+                    test_data=(
+                        grouping_data[i][1][target_fields]
+                        if target_fields
+                        else grouping_data[i][1]
+                    ),
+                    **kwargs,
                 )
-        # for i in range(1, len(grouping_data)):
-        #     result.update(
-        #         cls._inner_function(
-        #             data=(
-        #                 grouping_data[0][1][target_fields]
-        #                 if target_fields
-        #                 else grouping_data[0][1]
-        #             ),
-        #             test_data=(
-        #                 grouping_data[i][1][target_fields]
-        #                 if target_fields
-        #                 else grouping_data[i][1]
-        #             ),
-        #             **kwargs,
-        #         )
-        #     )
+            )
         return result
 
     def _set_value(
@@ -114,11 +114,11 @@ class MahalanobisDistance(Calculator):
     ):
         test_data = cls._check_test_data(test_data)
         # conversion to numpy is necessary to bring the backends to the same form
-        # cov = (data.cov().to_numpy() + test_data.cov().to_numpy()) / 2 if test_data else data.cov().to_numpy() 
         cov = UniteCovExtension().calc(data, test_data)
     
         cholesky = CholeskyExtension().calc(cov)
         mahalanobis_transform = InverseExtension().calc(cholesky)
+        mah_cols = mahalanobis_transform.columns
         if weights is not None:
             features = data.columns
             w_list = np.array(
@@ -128,9 +128,13 @@ class MahalanobisDistance(Calculator):
             mahalanobis_transform = mahalanobis_transform.dot(w_matrix)
         
         mahalanobis_transform: Dataset = mahalanobis_transform.transpose()
+        mahalanobis_transform = mahalanobis_transform.rename({col: new_col for col, new_col in zip(mahalanobis_transform.columns, mah_cols)})
+
         y_control = data.dot(mahalanobis_transform.data)
+        y_control = y_control.rename({col: new_col for col, new_col in zip(y_control.columns, mah_cols)})
         if test_data:
             y_test = test_data.dot(mahalanobis_transform.data)
+            y_test = y_test.rename({col: new_col for col, new_col in zip(y_test.columns, mah_cols)})
             return {"control": y_control, "test": y_test}
         return {"control": y_control}
 
@@ -147,17 +151,18 @@ class MahalanobisDistance(Calculator):
         group_field = Adapter.to_list(group_field)
 
         if grouping_data is None:
-            grouping_data = data.groupby(group_field)
+            grouping_data = list(data.groupby(group_field))
         if len(grouping_data) > 1:
-            tmp_roles = data.tmp_roles
-            for group_col in Adapter.to_list(group_field):
-                tmp_roles.pop(group_col, None)
+            grouping_data[0][1].tmp_roles = data.tmp_roles
+            # tmp_roles = data.tmp_roles
+            # for group_col in Adapter.to_list(group_field):
+            #     tmp_roles.pop(group_col, None)
         else:
             raise NotSuitableFieldError(group_field, "Grouping")
 
         return cls._execute_inner_function(
             grouping_data,
-            tmp_roles=tmp_roles,
+            # tmp_roles=tmp_roles,
             target_fields=target_fields,
             old_data=data,
             weights=weights,
