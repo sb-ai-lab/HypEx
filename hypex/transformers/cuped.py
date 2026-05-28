@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from copy import deepcopy
 from typing import Any
 
@@ -39,10 +40,10 @@ class CUPEDTransformer(Transformer):
             cov_xy = ((x - mean_x) * (y - mean_y)).mean()
             var_x = ((x - mean_x) ** 2).mean()
 
-            if var_x == 0 or var_x != var_x:
+            if var_x == 0 or math.isnan(var_x):
                 theta = 0
             else:
-                theta = cov_xy / var_x
+                theta = 0, cov_xy / var_x
 
             new_values_ds = y - (x - mean_x) * theta
 

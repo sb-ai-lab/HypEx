@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any, Sequence
 
 from ..dataset.dataset import Dataset, ExperimentData
@@ -361,10 +362,14 @@ class CUPACExecutor(MLExecutor):
 
                 prediction = self.calc(mode="predict", model=fitted_model, X=X_predict)
 
-                cov_xy = ((prediction - prediction.mean()) * (data.ds[target] - data.ds[target].mean())).mean()
+                cov_xy = np.clip(
+                    ((prediction - prediction.mean()) * (data.ds[target] - data.ds[target].mean())).mean(),
+                    -1 + 1e-25,
+                    1 - 1e-25,
+                )
                 var_x = ((prediction - prediction.mean()) ** 2).mean()
 
-                if var_x == 0 or var_x != var_x:
+                if var_x == 0 or math.isnan(var_x):
                     theta = 0
                 else:
                     theta = cov_xy / var_x
