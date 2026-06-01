@@ -38,7 +38,7 @@ class ExperimentWithReporter(Experiment):
     def _set_result(
         self, data: ExperimentData, results: list[Dataset | dict], reset_index: bool = True
     ):
-        print(f"[DEBUG] _set_result | self.id={self.id} | len(results)={len(results)}")
+        # print(f"[DEBUG] _set_result | self.id={self.id} | len(results)={len(results)}")
 
         datasets: list[Dataset] = []
         for res in results:
@@ -50,7 +50,7 @@ class ExperimentWithReporter(Experiment):
         combined = datasets[0].append(datasets[1:], reset_index=reset_index) if len(datasets) > 1 else datasets[0]
         
         data.analysis_tables[self.id] = combined
-        print(f"[DEBUG] _set_result DIRECT | id={id(data)} | keys={list(data.analysis_tables.keys())}")
+        # print(f"[DEBUG] _set_result DIRECT | id={id(data)} | keys={list(data.analysis_tables.keys())}")
         return data
 
 
@@ -164,7 +164,7 @@ class ParamsExperiment(ExperimentWithReporter):
             report = self.reporter.report(t_data)
             results.append(report)
         result_data = self._set_result(data, results)
-        print(f"[DEBUG] ParamsExperiment.execute | возвращаем id={id(result_data)} | keys={list(result_data.analysis_tables.keys())}")  # <<< ДОБАВЬТЕ
+        # print(f"[DEBUG] ParamsExperiment.execute | возвращаем id={id(result_data)} | keys={list(result_data.analysis_tables.keys())}")  # <<< ДОБАВЬТЕ
         return result_data
 
 

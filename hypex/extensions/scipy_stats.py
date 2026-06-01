@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import warnings
-import numpy as np
 from typing import Callable
+
+import numpy as np
 
 from pyspark.sql import Window
 import pyspark.sql.functions as F
@@ -13,6 +14,7 @@ from scipy.stats import (  # type: ignore
     mannwhitneyu,
     norm,
     ttest_ind,
+    kstwo
 )
 
 from ..dataset import SmallDataset, Dataset, DatasetAdapter, StatisticRole
@@ -152,21 +154,30 @@ class GroupKSTestExtension(GroupStatTest):
         hist1 = _add_bucket_column(df1).groupBy("bucket").count().withColumnRenamed("count", "c1")
         hist2 = _add_bucket_column(df2).groupBy("bucket").count().withColumnRenamed("count", "c2")
 
+        # combined = hist1.join(hist2, on="bucket", how="outer").fillna(0, subset=["c1", "c2"])
+        
+        # combined = combined.coalesce(1)
+
+        # window = Window.orderBy(F.col("bucket").asc()).rowsBetween(Window.unboundedPreceding, 0)
+        # cdf_data = combined.withColumn("cum1", F.sum("c1").over(window)) \
+        #                    .withColumn("cum2", F.sum("c2").over(window))
+
+        # ks_stat_df = cdf_data.withColumn(
+        #     "diff", 
+        #     F.abs((F.col("cum1") / n1) - (F.col("cum2") / n2))
+        # )
+        
+        # d_stat = float(ks_stat_df.agg(F.max("diff")).collect()[0][0])
+        
         combined = hist1.join(hist2, on="bucket", how="outer").fillna(0, subset=["c1", "c2"])
 
-        window = Window.orderBy(F.col("bucket").asc()).rowsBetween(Window.unboundedPreceding, 0)
-        cdf_data = combined.withColumn("cum1", F.sum("c1").over(window)) \
-                           .withColumn("cum2", F.sum("c2").over(window))
+        pdf = combined.toPandas().sort_values("bucket").reset_index(drop=True)
+        pdf["cum1"] = pdf["c1"].cumsum()
+        pdf["cum2"] = pdf["c2"].cumsum()
 
-        ks_stat_df = cdf_data.withColumn(
-            "diff", 
-            F.abs((F.col("cum1") / n1) - (F.col("cum2") / n2))
-        )
-        
-        d_stat = float(ks_stat_df.agg(F.max("diff")).collect()[0][0])
+        d_stat = float((pdf["cum1"]/n1 - pdf["cum2"]/n2).abs().max())
 
         try:
-            from scipy.stats import kstwo
             p_value = kstwo.sf(d_stat, n1, n2)
         except Exception:
             p_value = 0.0

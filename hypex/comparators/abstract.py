@@ -779,17 +779,12 @@ class StatsComparator(BaseComparator, ABC):
             
         result_dataset = result_ds_list[0].append(result_ds_list[1:])
         
-        # ╔════════════════════════════════════════════════════════════════╗
-        # ║  ИСПРАВЛЕНИЕ: Выравниваем контракт индексов с GroupsComparator ║
-        # ╚════════════════════════════════════════════════════════════════╝
         if len(target_fields_data.columns) == 1:
-            # Если колонка одна, индекс должен быть просто именем группы (как в Pandas)
             result_dataset.index = [
                 f"{compared_name}"
                 for compared_name in group_names[1:]
             ]
         else:
-            # Если колонок несколько, оставляем составной индекс, чтобы не было перезаписи
             result_dataset.index = [
                 f"{compared_name}{NAME_BORDER_SYMBOL}{col}"
                 for compared_name in group_names[1:]

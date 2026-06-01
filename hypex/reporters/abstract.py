@@ -9,6 +9,7 @@ import numpy as np
 
 from ..dataset import Dataset, SmallDataset, ExperimentData
 from ..dataset.roles import InfoRole, TreatmentRole
+from ..comparators import GroupDifference, GroupSizes
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
 from ..utils.errors import AbstractMethodError
 
@@ -18,34 +19,54 @@ REPORTABLE_METRICS = frozenset({
 
 @dataclass(frozen=True)
 class ResultKey:
-    """Safe, typed replacement for manual ID_SPLIT_SYMBOL parsing."""
+    """Dataclass representing a parsed composite identifier.
+
+    Provides a structured and type-safe alternative to manually parsing
+    IDs separated by ``ID_SPLIT_SYMBOL``.
+    """
     executor: str
     params_hash: str
     field: str
 
     @classmethod
     def from_id(cls, id_str: str) -> "ResultKey":
+        """Parse a composite ID string into a ``ResultKey`` instance.
+
+        Args:
+            id_str: The raw ID string, typically containing executor name,
+                parameter hash, and field name separated by ``ID_SPLIT_SYMBOL``.
+
+        Returns:
+            A ``ResultKey`` instance. If the string cannot be split into
+            three parts, the entire string is assigned to both ``executor``
+            and ``field``.
+        """
         parts = id_str.split(ID_SPLIT_SYMBOL)
         if len(parts) == 3:
             return cls(executor=parts[0], params_hash=parts[1], field=parts[2])
         return cls(executor=id_str, params_hash="", field=id_str)
 
 def _normalize_value(val: Any) -> Any:
-    """
-    Приводит значения из ячеек Dataset к базовым Python-типам.
-    Работает только со скалярами и стандартными коллекциями, 
-    которые возвращает метод to_records().
+    """Normalize cell values to basic Python types.
+
+    Converts numpy/pandas scalars, lists, or arrays to native Python
+    types. Replaces ``NaN`` floats with ``None`` and unwraps single-element
+    collections.
+
+    Args:
+        val: The raw value extracted from a dataset.
+
+    Returns:
+        The normalized value, or ``None`` if empty/NaN.
     """
     if val is None:
         return None
         
-    # Базовые типы Python
     if isinstance(val, (int, float, str, bool)):
         if isinstance(val, float) and np.isnan(val):
             return None
         return val
         
-    # Numpy / Pandas скаляры (np.int64, np.float64 и т.д.)
     if hasattr(val, 'item'):
         try:
             item_val = val.item()
@@ -55,16 +76,22 @@ def _normalize_value(val: Any) -> Any:
         except (ValueError, TypeError, AttributeError):
             pass
             
-    # Если в ячейке лежит список или массив (например, после специфичных агрегаций)
     if isinstance(val, (list, tuple, np.ndarray)) and len(val) > 0:
         return _normalize_value(val[0])
         
     return val
 
 def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
-    """
-    Безопасное извлечение списка индексов без нарушения абстракции бэкенда.
-    Учитывает различия в API pandas (tolist) и pyspark.pandas (to_list).
+    """Extract index values from a dataset in a backend-agnostic way.
+
+    Handles differences between pandas (``tolist``) and pyspark.pandas
+    (``to_list``) APIs.
+
+    Args:
+        table: The dataset instance.
+
+    Returns:
+        A list of index values.
     """
     index_obj = table.index
     if hasattr(index_obj, "to_list"):
@@ -74,6 +101,17 @@ def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
     return list(index_obj)
 
 def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bool) -> dict[str, Any]:
+    """Extract and flatten metrics from a comparator's analysis table.
+
+    Args:
+        data: The experiment data container.
+        comparator_id: The unique ID of the comparator in ``analysis_tables``.
+        front: If ``True``, uses spaces as separators in output keys;
+            otherwise uses ``ID_SPLIT_SYMBOL``.
+
+    Returns:
+        A flat dictionary mapping composite keys to normalized metric values.
+    """
     table = data.analysis_tables.get(comparator_id)
     if table is None or table.is_empty():
         return {}
@@ -82,7 +120,6 @@ def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bo
     sep = " " if front else ID_SPLIT_SYMBOL
     result = {}
     
-    # Используем API Dataset: to_records() сам заботится о конвертации из Spark/Pandas
     records = table.to_records()
     index_values = _get_index_values(table)
     
@@ -93,6 +130,17 @@ def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bo
     return result
 
 def extract_tests(data: ExperimentData, test_classes: list[type], front: bool) -> dict[str, Any]:
+    """Extract test outcomes (p-values and pass flags) for specified test classes.
+
+    Args:
+        data: The experiment data container.
+        test_classes: List of comparator classes to search for.
+        front: Formatting flag for the output dictionary keys.
+
+    Returns:
+        A dictionary containing only ``'pass'`` and ``'p-value'`` entries
+        for the requested tests.
+    """
     result = {}
     for cls_ in test_classes:
         ids = data.get_ids(cls_, searched_space=ExperimentDataEnum.analysis_tables)
@@ -104,7 +152,15 @@ def extract_tests(data: ExperimentData, test_classes: list[type], front: bool) -
     return result
 
 def extract_group_difference(data: ExperimentData, front: bool) -> dict[str, Any]:
-    from ..comparators import GroupDifference
+    """Extract group difference metrics (e.g., means, differences).
+
+    Args:
+        data: The experiment data container.
+        front: Formatting flag for the output dictionary keys.
+
+    Returns:
+        A dictionary of group difference results.
+    """
     ids = data.get_ids(GroupDifference)[GroupDifference.__name__][ExperimentDataEnum.analysis_tables.value]
     out = {}
     for cid in ids:
@@ -112,11 +168,28 @@ def extract_group_difference(data: ExperimentData, front: bool) -> dict[str, Any
     return out
 
 def extract_group_sizes(data: ExperimentData, front: bool) -> dict[str, Any]:
-    from ..comparators import GroupSizes
+    """Extract group size information.
+
+    Args:
+        data: The experiment data container.
+        front: Formatting flag for the output dictionary keys.
+
+    Returns:
+        A dictionary containing group sizes and their percentages.
+    """
     cid = data.get_one_id(GroupSizes, ExperimentDataEnum.analysis_tables)
     return _extract_from_comparator(data, cid, front)
 
 def extract_analyzer_data(data: ExperimentData, analyzer_class: type | str) -> dict[str, Any]:
+    """Extract aggregated metrics from a specific analyzer.
+
+    Args:
+        data: The experiment data container.
+        analyzer_class: The class or name of the analyzer to retrieve data from.
+
+    Returns:
+        A flat dictionary of the first row of the analyzer's results.
+    """
     cid = data.get_one_id(analyzer_class, ExperimentDataEnum.analysis_tables)
     table = data.analysis_tables[cid]
     if table.is_empty():
@@ -130,27 +203,75 @@ def extract_analyzer_data(data: ExperimentData, analyzer_class: type | str) -> d
     return {col: _normalize_value(val) for col, val in row_dict.items()}
 
 class Reporter(ABC):
+    """Abstract base class for all experiment reporters."""
     @abstractmethod
     def report(self, data: ExperimentData) -> Any:
+        """Generate a report from the experiment data.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            The formatted report content.
+
+        Raises:
+            AbstractMethodError: If not implemented by subclass.
+        """
         raise AbstractMethodError
 
 class DictReporter(Reporter, ABC):
-    """Base dict-producing reporter with safe front-toggle."""
+    """Base reporter that outputs results as a flat dictionary."""
     def __init__(self, front: bool = True):
+        """Initialize the dictionary reporter.
+
+        Args:
+            front: If ``True``, formats keys for front-end display (e.g.,
+                using spaces instead of symbols). Defaults to ``True``.
+        """
         self.front = front
 
     def _report(self, data: ExperimentData) -> dict[str, Any]:
+        """Internal method to build the dictionary report.
+
+        Subclasses should override this to implement specific extraction logic.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            An empty dictionary by default.
+        """
         return {}
 
     def report(self, data: ExperimentData) -> dict[str, Any]:
+        """Generate the final dictionary report.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            The formatted dictionary.
+        """
         return self._report(data)
 
 class TestDictReporter(DictReporter, ABC):
-    """Specialized for statistical tests with flattened dict->dataset conversion."""
+    """Reporter specialized for statistical tests with dict-to-dataset conversion."""
     tests: list[type] = []
 
     @staticmethod
     def _get_struct_dict(data: dict) -> dict:
+        """Convert a flat dictionary into a nested hierarchical structure.
+
+        Parses keys containing ``ID_SPLIT_SYMBOL`` to group metrics by
+        field, index, executor, and metric type.
+
+        Args:
+            data: The flat dictionary with composite keys.
+
+        Returns:
+            A nested dictionary structured as 
+            ``{field: {index: {executor: {metric: value}}}}``.
+        """
         tree = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
         for key, value in data.items():
             if ID_SPLIT_SYMBOL not in key:
@@ -162,6 +283,18 @@ class TestDictReporter(DictReporter, ABC):
 
     @staticmethod
     def _convert_struct_dict_to_dataset(data: dict) -> SmallDataset:
+        """Transform a nested dictionary into a ``SmallDataset``.
+
+        Flattens the hierarchical structure into rows, mapping metrics to
+        appropriate columns and converting boolean pass flags to strings
+        (``'OK'`` / ``'NOT OK'``).
+
+        Args:
+            data: The nested dictionary from ``_get_struct_dict``.
+
+        Returns:
+            A ``SmallDataset`` containing the structured test results.
+        """
         result = []
         for feature, groups in data.items():
             for group, tests in groups.items():
@@ -190,9 +323,18 @@ class TestDictReporter(DictReporter, ABC):
         )
 
     def extract_tests(self, data: ExperimentData) -> dict[str, Any]:
+        """Extract test results using the reporter's configured test classes and format.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            A dictionary of test results formatted according to the ``front`` flag.
+        """
         return extract_tests(data, self.tests, self.front)
 
 class DatasetReporter(Reporter):
+    """Reporter that outputs results as a structured ``Dataset`` or dictionary."""
     def __init__(
         self,
         dict_reporter: DictReporter | None = None,
@@ -203,10 +345,18 @@ class DatasetReporter(Reporter):
         
     @property
     def front(self) -> bool:
+        """Get or set the front-end formatting flag on the underlying dict reporter.
+
+        Getter returns the current boolean state. Setter updates the state.
+        """
         return self.dict_reporter.front
 
     @front.setter
     def front(self, value: bool) -> None:
+        """Get or set the front-end formatting flag on the underlying dict reporter.
+
+        Getter returns the current boolean state. Setter updates the state.
+        """
         self.dict_reporter.front = value
 
     def _with_front(
@@ -215,6 +365,19 @@ class DatasetReporter(Reporter):
         front_flag: bool,
         func: Callable[[ExperimentData], dict | Dataset],
     ) -> dict | Dataset:
+        """Temporarily override the ``front`` flag, execute a function, and restore.
+
+        Ensures the ``front`` state is always restored, even if the function
+        raises an exception.
+
+        Args:
+            data: The experiment data container.
+            front_flag: The temporary value for the ``front`` flag.
+            func: Callable to execute with the experiment data.
+
+        Returns:
+            The result of ``func``.
+        """
         old_front = self.dict_reporter.front
         self.dict_reporter.front = front_flag
         try:
@@ -223,6 +386,14 @@ class DatasetReporter(Reporter):
             self.dict_reporter.front = old_front
 
     def report(self, data: ExperimentData) -> dict | Dataset:
+        """Generate the final report in the configured format.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            The report as a dictionary or ``Dataset``, depending on ``output_format``.
+        """
         dict_result = self.dict_reporter.report(data)
         
         if self.output_format == "dict":
@@ -232,5 +403,13 @@ class DatasetReporter(Reporter):
 
     @staticmethod
     def convert_to_dataset(data: dict) -> Dataset | SmallDataset:
+        """Convert a flat dictionary report into a structured ``Dataset``.
+
+        Args:
+            data: The flat dictionary with composite keys.
+
+        Returns:
+            A ``Dataset`` or ``SmallDataset`` containing the structured results.
+        """
         struct_dict = TestDictReporter._get_struct_dict(data)
         return TestDictReporter._convert_struct_dict_to_dataset(struct_dict)

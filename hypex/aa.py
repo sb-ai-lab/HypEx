@@ -96,6 +96,10 @@ class AATest(ExperimentShell):
                             target_roles=TargetRole(),
                             reliability=0.05
                         ),
+                        KSTest(
+                            compare_by="groups", 
+                            grouping_role=AdditionalTreatmentRole()
+                        ),
                         Chi2Test(
                             compare_by="groups", grouping_role=AdditionalTreatmentRole()
                         ),

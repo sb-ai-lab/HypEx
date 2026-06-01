@@ -68,8 +68,8 @@ class OneAAStatAnalyzer(Executor):
         
         gtt_p = f"mean{ID_SPLIT_SYMBOL}GroupTTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
         gks_p = f"mean{ID_SPLIT_SYMBOL}GroupKSTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
-        stt_p = f"mean{ID_SPLIT_SYMBOL}StatsTTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
         chi2_p = f"mean{ID_SPLIT_SYMBOL}GroupChi2Test{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
+        stt_p = f"mean{ID_SPLIT_SYMBOL}StatsTTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
         
         if gtt_p in analysis_data and gks_p in analysis_data:
             analysis_data["mean test score"] = (

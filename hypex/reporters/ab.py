@@ -3,19 +3,33 @@ from typing import Any, ClassVar
 import warnings
 
 from ..analyzers.ab import ABAnalyzer
-from ..comparators import GroupChi2Test, GroupTTest, GroupUTest
+from ..comparators import GroupChi2Test, GroupTTest, GroupUTest, BaseComparator
 from ..comparators import StatsTTest, StatsChi2Test
 from ..dataset import Dataset, ExperimentData, StatisticRole
-from ..utils import ExperimentDataEnum
 from .abstract import (
     DictReporter, DatasetReporter, Reporter, 
     extract_group_difference, extract_tests, extract_analyzer_data, extract_group_sizes
 )
 
 class ABTestReporter(DatasetReporter):
-    tests: ClassVar[list] = [GroupTTest, GroupUTest, GroupChi2Test, StatsTTest, StatsChi2Test]
+    """Reporter for A/B test results.
+
+    Extracts group sizes, metric differences, statistical test outcomes,
+    and analyzer data, formatting them into a structured dataset or dictionary.
+    """
+    
+    tests: ClassVar[list[type[BaseComparator]]] = [GroupTTest, GroupUTest, GroupChi2Test, StatsTTest, StatsChi2Test]
 
     def _report(self, data: ExperimentData) -> dict[str, Any]:
+        """Construct the internal dictionary report for A/B tests.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            A dictionary containing group sizes, differences, test results,
+            and analyzer metrics.
+        """
         result = {}
         result.update(extract_group_sizes(data, self.front))
         result.update(extract_group_difference(data, self.front))
@@ -23,7 +37,18 @@ class ABTestReporter(DatasetReporter):
         result.update(extract_analyzer_data(data, ABAnalyzer))
         return result
 
-    def report(self, data: ExperimentData) -> dict | Dataset:
+    def report(self, data: ExperimentData) -> dict[str, Any] | Dataset:
+        """Generate the final A/B test report.
+
+        Ensures the ``front`` formatting flag is disabled before generating the report, 
+        then returns the result in the configured format.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            The report as a dictionary or ``Dataset``.
+        """
         return self._with_front(
             data, 
             front_flag=False, 
@@ -32,6 +57,16 @@ class ABTestReporter(DatasetReporter):
 
     @staticmethod
     def report_variance_reductions(data: ExperimentData) -> Dataset | str:
+        """Extract and format variance reduction metrics from CUPED/CUPAC.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            A ``Dataset`` with transformed metric names and variance reduction percentages, 
+            or a descriptive string if no data is available.
+        """
+        
         variance_cols = [c for c in data.additional_fields.columns if c.endswith("_variance_reduction")]
         if not variance_cols:
             return "No variance reduction data available. Ensure CUPED or CUPAC was applied."
@@ -57,17 +92,47 @@ class ABTestReporter(DatasetReporter):
         ) if report_data else "No variance reduction data available."
 
 class ABDictReporter(ABTestReporter):
-    def __init__(self, front=True):
+    """Legacy reporter wrapper for dictionary output.
+
+    Deprecated: Use ``ABTestReporter(output_format='dict')`` instead.
+    """
+    def __init__(self, front: bool = True):
+        """Initialize the legacy dictionary reporter.
+
+        Args:
+            front: If ``True``, formats keys for front-end display.
+                Defaults to ``True``.
+        """
         super().__init__(DictReporter(front=front), output_format="dict")
         warnings.warn("ABDictReporter is deprecated.", DeprecationWarning, stacklevel=2)
 
 class ABDatasetReporter(ABTestReporter):
+    """Legacy reporter wrapper for dataset output.
+
+    Deprecated: Use ``ABTestReporter()`` instead.
+    """
     def __init__(self):
+        """Initialize the legacy dataset reporter."""
         super().__init__(DictReporter(), output_format="dataset")
         warnings.warn("ABDatasetReporter is deprecated.", DeprecationWarning, stacklevel=2)
 
 class CupacReporter(Reporter):
+    """Reporter for CUPAC variance reduction results.
+
+    Extracts variance reduction metrics and feature importances from
+    CUPAC model reports stored in the experiment data.
+    """
     def report(self, data: ExperimentData) -> dict[str, Dataset | None]:
+        """Generate a CUPAC results report.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            A dictionary containing ``'variance_reductions'`` and
+            ``'feature_importances'`` as ``Dataset`` instances, or
+            ``None`` if no CUPAC data is found.
+        """
         cupac_keys = [k for k in data.analysis_tables.keys() if k.endswith("_cupac_report")]
         if not cupac_keys:
             return {"variance_reductions": None, "feature_importances": None}
