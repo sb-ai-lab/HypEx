@@ -7,6 +7,7 @@ import numpy as np
 
 from pyspark.sql import Window
 import pyspark.sql.functions as F
+from pyspark.sql import DataFrame as SparkDF
 
 from scipy.stats import (  # type: ignore
     chi2_contingency,
@@ -120,7 +121,7 @@ class GroupKSTestExtension(GroupStatTest):
         super().__init__(ks_2samp, reliability=reliability)
         self.n_bins = n_bins
 
-    def _calc_spark(self, data: Dataset, other: Dataset | None = None, **kwargs) -> Dataset | float:
+    def _calc_spark(self, data: Dataset, other: Dataset | None = None, **kwargs) -> SmallDataset | float:
         """
         Compute the two-sample Kolmogorov-Smirnov (KS) test for PySpark-backed datasets.
         
@@ -143,7 +144,9 @@ class GroupKSTestExtension(GroupStatTest):
                 - 'pass': Boolean flag indicating if p-value < self.reliability.
         """
         
-        def _add_bucket_column(df):
+        def _add_bucket_column(df: SparkDF, 
+                               global_min: int, 
+                               global_max: int) -> SparkDF:
             """
             Helper function to assign each row to a discrete histogram bin.
             Uses the global min/max to ensure both datasets share the exact same bin edges.
@@ -189,8 +192,16 @@ class GroupKSTestExtension(GroupStatTest):
             }, StatisticRole())
 
         # Compute histograms (frequency counts per bin) for both datasets
-        hist1 = _add_bucket_column(df1).groupBy("bucket").count().withColumnRenamed("count", "c1")
-        hist2 = _add_bucket_column(df2).groupBy("bucket").count().withColumnRenamed("count", "c2")
+        hist1 = (_add_bucket_column(df=df1, global_min=global_min, global_max=global_max)
+            .groupBy("bucket")
+            .count()
+            .withColumnRenamed("count", "c1")
+        )
+        hist2 = (_add_bucket_column(df=df2, global_min=global_min, global_max=global_max)
+            .groupBy("bucket")
+            .count()
+            .withColumnRenamed("count", "c2")
+        )
 
         # Outer join histograms to align bins, filling missing bins with 0 counts
         combined = hist1.join(hist2, on="bucket", how="outer").fillna(0, subset=["c1", "c2"])
