@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import numpy as np
-from typing import Any
+from typing import Any, Literal
 
 from scipy.stats import t as t_dist, chi2_contingency
 
@@ -29,7 +29,9 @@ class StatsTTest(StatsHypothesisTesting):
     def __init__(
             self, 
             grouping_role: ABCRole | None = None,
+            compare_by: Literal["groups", "matched_pairs"] = "groups",
             target_roles: ABCRole | None = None, 
+            baseline_role: ABCRole | None = None,
             reliability: float = 0.05,
             key: Any = "", 
     ):
@@ -44,8 +46,10 @@ class StatsTTest(StatsHypothesisTesting):
         """
         super().__init__(
             stats=self.REQUIRED_STATS, 
+            compare_by=compare_by,
             grouping_role=grouping_role, 
             target_roles=target_roles, 
+            baseline_role=baseline_role,
             key=key, 
             reliability=reliability
         )

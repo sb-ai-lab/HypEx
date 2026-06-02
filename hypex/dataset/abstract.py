@@ -600,8 +600,8 @@ class DatasetBase(ABC):
                        tmp_role: bool =False,
                        search_types: list[type] | None = None) -> list[str]:
         roles = roles if isinstance(roles, Iterable) else [roles]
-        # roles_for_search = self._tmp_roles if tmp_role else self.roles
-        roles_for_search = {**self.roles, **self._tmp_roles} if tmp_role else self.roles
+        roles_for_search = self._tmp_roles if tmp_role else self.roles
+        # roles_for_search = {**self.roles, **self._tmp_roles} if tmp_role else self.roles
         return [
             str(column)
             for column, role in roles_for_search.items()
