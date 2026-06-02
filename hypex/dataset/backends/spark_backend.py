@@ -1048,6 +1048,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     Inherits all navigation and indexing capabilities from SparkNavigation.
     """
     MAX_ROWS_FOR_DOT = 1000
+    INDEX_COL = "index"
     
     @staticmethod
     def _convert_agg_result(result: ps.Series | ps.DataFrame) -> "SparkDataset" | float:
@@ -1595,13 +1596,15 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             )
         
         result_spark = (
-            self.data.to_spark()
+            self.data.reset_index().to_spark()
             .mapInPandas(
-                lambda it: (pdf.dot(pd_other) for pdf in it),
-                schema=schema
+                lambda it: (pdf.drop(columns="index").dot(pd_other).assign(index=pdf["index"]) for pdf in it),
+                schema=schema + ', `index` int'
             )
         )
-        return self._wrap_result(ps.DataFrame(result_spark))
+        result_ps = ps.DataFrame(result_spark).set_index("index")
+        result_ps.index.name = None
+        return self._wrap_result(result_ps)
 
     def dropna(self,
                how: Literal["any", "all"] = "any",

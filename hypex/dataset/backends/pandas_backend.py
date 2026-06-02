@@ -1458,6 +1458,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Result of matrix multiplication.
         """
+        initial_index = self.data.index
         if isinstance(other, np.ndarray):
             other_df = pd.DataFrame(
                 data=other,
@@ -1470,7 +1471,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         else:
             result = self.data.dot(other.data)
         return self._wrap_result(
-            result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+            result.set_index(initial_index) if isinstance(result, pd.DataFrame) else pd.DataFrame(result, index=initial_index)
         )
 
     def dropna(
