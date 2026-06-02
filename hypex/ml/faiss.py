@@ -158,8 +158,10 @@ class FaissNearestNeighbors(MLExecutor):
         )
         nans = 0
 
-        for result in compare_result.values():
+        # for result in compare_result.values():
+        for group, result in compare_result.items():
             #TODO: find solution without `data` field
+            result.data.to_pandas().to_csv(f"faiss_{group}.csv")
             nans += (
                 result.data.isna().sum().sum()
             )
@@ -176,6 +178,8 @@ class FaissNearestNeighbors(MLExecutor):
         # matched_indexes.index.name = None
         for res_k, res_v in compare_result.items():
             group = grouping_data[1][1] if res_k == "test" else grouping_data[0][1]
+            # res_v has index similar to group data
+            # TODO: `limit` may be removed
             t_index_field: Dataset = res_v.limit(len(group))
 
             n_nans = t_index_field.data.isna().sum().sum()
@@ -191,8 +195,8 @@ class FaissNearestNeighbors(MLExecutor):
 
             # TODO: not supported in pyspark, maybe remove it or find a solution
             # t_index_field.index = group.index 
-            t_index_field = t_index_field.add_column(group.index, {"index": InfoRole()}).set_index("index")
-            t_index_field.index.name = None
+            # t_index_field = t_index_field.add_column(group.reset_index()['index'].sort(by='index'), {"index": InfoRole()}).set_index("index")
+            # t_index_field.index.name = None
             matched_indexes = matched_indexes.append(t_index_field)
         if matched_indexes is not None:
             matched_indexes = matched_indexes.sort()
