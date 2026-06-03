@@ -405,8 +405,8 @@ class SparkNavigation(DatasetBackendNavigation):
         if isinstance(item, ps.DataFrame):
             if len(item.columns) != 1:
                 raise ValueError("Boolean DataFrame mask must have exactly one column")
-
-            return self._wrap_result(self.data[item.iloc[:, 0]])
+            with self._ops_on_diff_frames():
+                return self._wrap_result(self.data[item.iloc[:, 0]])
         if isinstance(item, ps.Series):
             return self._wrap_result(self.data[item])
         raise KeyError("No such column or row")
