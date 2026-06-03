@@ -23,12 +23,35 @@ from ..utils.adapter import Adapter
 
 
 class MahalanobisDistance(Calculator):
+    """
+    Calculator for computing the Mahalanobis distance between groups.
+
+    This class is typically used in matching algorithms to find similar observations 
+    across treatment and control groups based on multiple features. It accounts for 
+    feature correlations by applying a linear transformation (via Cholesky decomposition 
+    of the pooled covariance matrix) and optionally applies user-defined feature weights.
+
+    Inherits from:
+        Calculator: The base class for stateless calculation executors.
+    """
     def __init__(
         self,
         grouping_role: ABCRole | None = None,
         key: Any = "",
         weights: dict[str, float] | None = None,
     ):
+        """
+        Initialize the Mahalanobis distance calculator.
+
+        Args:
+            grouping_role (ABCRole | None, optional): The role defining the grouping 
+                column (e.g., treatment assignment). Defaults to `GroupingRole()`.
+            key (Any, optional): Optional identifier for the calculator instance. 
+                Defaults to "".
+            weights (dict[str, float] | None, optional): Optional dictionary mapping 
+                feature names to their relative importance weights. If None, all 
+                features are weighted equally. Defaults to None.
+        """
         super().__init__(key=key)
         self.grouping_role = grouping_role or GroupingRole()
         self.weights = weights
@@ -41,28 +64,23 @@ class MahalanobisDistance(Calculator):
         target_fields: list[str] | None = None,
         **kwargs,
     ) -> dict:
+        """
+        Execute the inner distance calculation logic on grouped data.
+
+        Iterates through the grouped data, treating the first group as the baseline 
+        (control) and subsequent groups as compared (test) groups, applying the 
+        Mahalanobis transformation to each.
+
+        Args:
+            grouping_data: Grouped dataset containing baseline and compared data slices.
+            target_fields (list[str] | None, optional): Optional list of target field 
+                names to compute the distance on. Defaults to None.
+            **kwargs: Additional keyword arguments passed to `_inner_function`.
+
+        Returns:
+            dict: A dictionary containing the transformed "control" and "test" datasets.
+        """
         result = {}
-        test_data = None
-        # for enum, (_, grouped_data) in enumerate(grouping_data):
-            # if enum == 0:
-            #     test_data: Dataset = grouped_data
-            #     # test_data.tmp_roles = tmp_roles
-            # else:
-                # result.update(
-                #     cls._inner_function(
-                #         data=(
-                #             test_data[target_fields]
-                #             if target_fields
-                #             else test_data
-                #         ),
-                #         test_data=(
-                #             grouped_data[target_fields]
-                #             if target_fields
-                #             else grouped_data
-                #         ),
-                #         **kwargs,
-                #     )
-                # )
         for i in range(1, len(grouping_data)):
             result.update(
                 cls._inner_function(
@@ -84,6 +102,18 @@ class MahalanobisDistance(Calculator):
     def _set_value(
         self, data: ExperimentData, value: dict | None = None, key: Any = None
     ) -> ExperimentData:
+        """
+        Store the calculated distance results into the ExperimentData object.
+
+        Args:
+            data (ExperimentData): The experiment data object to update.
+            value (dict | None, optional): The dictionary of transformed datasets 
+                to store. Defaults to None.
+            key (Any, optional): Optional key for the stored value. Defaults to None.
+
+        Returns:
+            ExperimentData: The updated ExperimentData object.
+        """
         for key, value_ in value.items():
             data = data.set_value(
                 ExperimentDataEnum.groups,
@@ -94,6 +124,15 @@ class MahalanobisDistance(Calculator):
         return data
 
     def _get_fields(self, data: ExperimentData):
+        """
+        Retrieve the grouping and target fields from the experiment data.
+
+        Args:
+            data (ExperimentData): The input experiment data.
+
+        Returns:
+            tuple: A tuple containing `(group_field, target_fields)`.
+        """
         group_field = data.field_search(self.grouping_role)
         target_fields = data.field_search(
             [FeatureRole(), AdditionalFeatureRole()], search_types=self.search_types
@@ -102,6 +141,12 @@ class MahalanobisDistance(Calculator):
 
     @property
     def search_types(self) -> list[type] | None:
+        """
+        Return the allowed data types for this statistical operation.
+
+        Returns:
+            list[type]: List of numeric types supported (`int`, `float`).
+        """
         return [int, float]
 
     @classmethod
@@ -112,6 +157,26 @@ class MahalanobisDistance(Calculator):
         weights: dict[str, float] | None = None,
         **kwargs,
     ):
+        """
+        Compute the Mahalanobis transformation for the given datasets.
+
+        Calculates the pooled covariance matrix, performs Cholesky decomposition, 
+        and applies the inverse transformation to project the data into a space 
+        where the covariance is the identity matrix. Optional feature weights are 
+        applied via a diagonal matrix before the final projection.
+
+        Args:
+            data (Dataset): The baseline (control) dataset.
+            test_data (Dataset | None, optional): The compared (test) dataset. 
+                Defaults to None.
+            weights (dict[str, float] | None, optional): Feature weights dictionary. 
+                Defaults to None.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            dict: A dictionary containing the transformed "control" dataset, and 
+            optionally the "test" dataset if `test_data` was provided.
+        """
         test_data = cls._check_test_data(test_data)
         # conversion to numpy is necessary to bring the backends to the same form
         cov = UniteCovExtension().calc(data, test_data)
@@ -148,15 +213,36 @@ class MahalanobisDistance(Calculator):
         weights: dict[str, float] | None = None,
         **kwargs,
     ) -> dict:
+        """
+        Stateless entry point to calculate Mahalanobis distance.
+
+        Allows the comparator to be run outside the experiment pipeline. Pass either 
+        pre-grouped `grouping_data` or the raw `data` and `group_field` to have the 
+        data grouped here.
+
+        Args:
+            data (Dataset): The input dataset.
+            group_field (Sequence[str] | str | None, optional): Column name(s) to 
+                group by. Defaults to None.
+            grouping_data (GroupedDataset | None, optional): Pre-grouped data. 
+                Defaults to None.
+            target_fields (str | list[str] | None, optional): Target column(s) to 
+                compute distance on. Defaults to None.
+            weights (dict[str, float] | None, optional): Feature weights. Defaults to None.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            dict: Dictionary of transformed datasets grouped by the specified field.
+
+        Raises:
+            NotSuitableFieldError: If the grouping field is not suitable (e.g., only one group).
+        """
         group_field = Adapter.to_list(group_field)
 
         if grouping_data is None:
             grouping_data = list(data.groupby(group_field))
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
-            # tmp_roles = data.tmp_roles
-            # for group_col in Adapter.to_list(group_field):
-            #     tmp_roles.pop(group_col, None)
         else:
             raise NotSuitableFieldError(group_field, "Grouping")
 
@@ -170,6 +256,20 @@ class MahalanobisDistance(Calculator):
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """
+        Execute the Mahalanobis distance calculation on the given experiment data.
+
+        Retrieves the appropriate fields, handles temporary roles if necessary, and 
+        delegates the calculation to `calc`. The results are then stored back into 
+        the `ExperimentData` object.
+
+        Args:
+            data (ExperimentData): The ExperimentData to execute the calculator on.
+
+        Returns:
+            ExperimentData: The ExperimentData with the distance calculation results 
+            stored in the `groups` space.
+        """
         group_field, target_fields = self._get_fields(data=data)
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
