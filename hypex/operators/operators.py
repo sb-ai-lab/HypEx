@@ -37,6 +37,19 @@ class SMD(GroupOperator):
 
 
 class MatchingMetrics(GroupOperator):
+    """
+    Calculator for estimating treatment effects (ATT, ATC, ATE) and their 
+    statistical significance after matching.
+
+    This class computes the Individual Treatment Effect on the Treated (ITT) 
+    and Control (ITC), applies optional bias correction, and calculates the 
+    final Average Treatment Effects along with their standard errors, p-values, 
+    and confidence intervals. It also handles the calculation of scaled counts 
+    (weights) to account for multiple matches or specific matching strategies.
+
+    Inherits from:
+        GroupOperator: The base class for group-based operators in the HypEx library.
+    """
     def __init__(
         self,
         grouping_role: ABCRole | None = None,
@@ -45,6 +58,23 @@ class MatchingMetrics(GroupOperator):
         n_neighbors: int = 1,
         key: Any = "",
     ):
+        """
+        Initialize the matching metrics calculator.
+
+        Args:
+            grouping_role (ABCRole | None, optional): The role defining the grouping 
+                column. Defaults to None.
+            target_roles (ABCRole | list[ABCRole] | None, optional): The role(s) 
+                defining the target column(s). Defaults to None.
+            metric (Literal["auto", "atc", "att", "ate"] | None, optional): The type 
+                of treatment effect to estimate. "atc" = average treatment effect on 
+                controls, "att" = average treatment effect on treated, "ate" = average 
+                treatment effect, "auto" = calculates all. Defaults to "auto".
+            n_neighbors (int, optional): The number of neighbors used in the matching 
+                process, used for scaling counts. Defaults to 1.
+            key (Any, optional): Optional identifier for the operator instance. 
+                Defaults to "".
+        """
         self.metric = metric or "auto"
         self.n_neighbors = n_neighbors
         self.__scaled_counts = {}
@@ -58,6 +88,20 @@ class MatchingMetrics(GroupOperator):
         )
 
     def _calc_scaled_counts(self, matches: Dataset, indexes: Dataset, group: str):
+        """
+        Calculate the scaled counts (weights) for matched observations.
+
+        This method computes the frequency of each index in the matched dataset 
+        and scales it by the number of neighbors. This is crucial for correctly 
+        weighting observations when a single control unit is matched to multiple 
+        treatment units (or vice versa).
+
+        Args:
+            matches (Dataset): The dataset containing the matched observations.
+            indexes (Dataset): The dataset containing the original indexes of the matches.
+            group (str): The name of the group ("control" or "test") for which 
+                the scaled counts are being calculated.
+        """
         matches_indexes = indexes.reset_index().select('index')
         matches_counts = (
             matches
@@ -78,16 +122,39 @@ class MatchingMetrics(GroupOperator):
 
     @staticmethod
     def _calc_vars(value: Dataset) -> float:
-        # value.to_small_dataset().data.to_csv(f"result_{np.random.randint(0, 10, 1)}.csv")
+        """
+        Calculate the variance of a dataset, handling potential NaN values.
+
+        Args:
+            value (Dataset): The dataset for which to calculate the variance.
+
+        Returns:
+            float: The variance of the dataset. Returns 0.0 if the dataset 
+            contains any NaN values.
+        """
         var = 0 if int(value[value.columns[0]].na_counts()) > 0 else float(value.var())
-        # return value * 0 + var
         return var
 
     @staticmethod
     def _calc_se(
         n_c: int, n_t: int, var_c: float, var_t: float, scaled_counts: dict[str, Dataset], group=None
     ):
-        # n_c, n_t = len(var_c), len(var_t)
+        """
+        Calculate the standard error for the treatment effect estimates.
+
+        Args:
+            n_c (int): The number of observations in the control group.
+            n_t (int): The number of observations in the treatment group.
+            var_c (float): The variance of the control group.
+            var_t (float): The variance of the treatment group.
+            scaled_counts (dict[str, Dataset]): A dictionary containing the scaled 
+                counts (weights) for the groups.
+            group (str | None, optional): The specific group to calculate the SE for. 
+                If None, calculates the pooled SE for ATE. Defaults to None.
+
+        Returns:
+            float: The calculated standard error.
+        """
         if group is not None:
             groups = list(scaled_counts.keys())
             groups.remove(group)
@@ -112,6 +179,29 @@ class MatchingMetrics(GroupOperator):
         target_fields: list[str] | None = None,
         **kwargs,
     ) -> Any:
+        """
+        Core calculation logic for treatment effects.
+
+        Computes the Individual Treatment Effect on the Treated (ITT) and Control (ITC), 
+        applies optional bias correction, and calculates the final metrics (ATT, ATC, ATE) 
+        along with their standard errors, p-values, and 95% confidence intervals.
+
+        Args:
+            data (Dataset): The baseline (control) dataset.
+            test_data (Dataset | None, optional): The compared (treatment) dataset. 
+                Defaults to None.
+            target_fields (list[str] | None, optional): The names of the target fields 
+                to calculate effects on. Defaults to None.
+            **kwargs: Additional keyword arguments, including:
+                - `metric` (str): The type of effect to estimate ("att", "atc", "ate").
+                - `scaled_counts` (dict): Pre-calculated scaled counts for weighting.
+                - `bias` (dict | None): Optional bias correction values.
+
+        Returns:
+            Any: A dictionary containing the calculated metrics. Keys depend on the 
+            `metric` argument and include effect size, standard error, p-value, and 
+            lower/upper confidence interval bounds.
+        """
         if target_fields is None or test_data is None:
             raise NoneArgumentError(
                 ["target_fields", "test_data"], "att, atc, ate estimation"
@@ -208,6 +298,18 @@ class MatchingMetrics(GroupOperator):
     def _execute_inner_function(
         cls, grouping_data, target_fields: list[str] | None = None, **kwargs
     ) -> dict:
+        """
+        Wrapper to execute the inner function over the grouped data.
+
+        Args:
+            grouping_data: Grouped dataset containing the control and treatment slices.
+            target_fields (list[str] | None, optional): The names of the target fields. 
+                Defaults to None.
+            **kwargs: Additional keyword arguments passed to `_inner_function`.
+
+        Returns:
+            dict: The result of the `_inner_function` calculation.
+        """
         metric = kwargs.get("metric", "ate")
         if target_fields is None or len(target_fields) != 2:
             raise ValueError(
@@ -228,6 +330,21 @@ class MatchingMetrics(GroupOperator):
         t_data: Dataset,
         group_field: str,
     ) -> Dataset:
+        """
+        Prepare a new target variable by merging matched data and calculating scaled counts.
+
+        This method is used when a secondary target field needs to be constructed from 
+        the matched pairs. It aligns the matched data, calculates the scaled counts for 
+        both groups, and returns the aggregated matched dataset.
+
+        Args:
+            data (ExperimentData): The original experiment data.
+            t_data (Dataset): The dataset to be updated with the new target.
+            group_field (str): The name of the grouping field.
+
+        Returns:
+            Dataset: The prepared matched dataset with aggregated values.
+        """
         new_target = data.ds.search_columns(TargetRole())[0]
         indexes, matched_data = Bias.prepare_data(data, t_data)
         matched_data = matched_data[new_target + "_matched"]
@@ -235,20 +352,30 @@ class MatchingMetrics(GroupOperator):
         (_, control_indexes), (_, test_indexes), *_ = (
             grouped_column
             .merge(right=indexes, right_index=True, left_index=True)
-            # .drop(columns=['index'])
             .groupby(group_field)
         )
 
         control_indexes, test_indexes = control_indexes[indexes.columns], test_indexes[indexes.columns]
-        # grouped_data = data.ds.groupby(group_field)
-        # control_indexes = indexes.loc[grouped_data[0][1].index, :]
-        # test_indexes = indexes.loc[grouped_data[1][1].index, :]
         self._calc_scaled_counts(control_indexes, test_indexes, "test")
         self._calc_scaled_counts(test_indexes, control_indexes, "control")
 
         return matched_data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """
+        Main execution method for calculating matching metrics.
+
+        Orchestrates the calculation process: retrieves fields, prepares targets 
+        if necessary (e.g., when a second target is missing), calculates the metrics 
+        using the `calc` method, and stores the results in the `ExperimentData` object.
+
+        Args:
+            data (ExperimentData): The experiment data containing the matched dataset.
+
+        Returns:
+            ExperimentData: The updated ExperimentData object with the calculated 
+            matching metrics stored in the `variables` space.
+        """
         group_field, target_fields = self._get_fields(data=data)
         bias = (
             data.variables[data.get_one_id(Bias, ExperimentDataEnum.variables)]
