@@ -20,6 +20,18 @@ from ..utils.registry import backend_factory
 
 
 class FaissNearestNeighbors(MLExecutor):
+    """
+    Executor for finding nearest neighbors using the FAISS library.
+
+    This class leverages FAISS (Facebook AI Similarity Search) to perform
+    efficient k-nearest neighbors (k-NN) matching between treatment and
+    control groups. It supports one-sided or two-sided matching and can
+    operate in different performance modes (base, fast, auto) depending
+    on the dataset size and backend.
+
+    Inherits from:
+        MLExecutor: The base class for machine learning executors in the HypEx library.
+    """
     def __init__(
         self,
         n_neighbors: int = 1,
@@ -29,6 +41,25 @@ class FaissNearestNeighbors(MLExecutor):
         key: Any = "",
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
     ):
+        """
+        Initialize the FAISS nearest neighbors executor.
+
+        Args:
+            n_neighbors (int, optional): The number of nearest neighbors to find 
+                for each observation. Defaults to 1.
+            two_sides (bool, optional): If True, performs matching in both directions 
+                (treatment to control and control to treatment). Defaults to False.
+            test_pairs (bool, optional): If True, only matches test (treatment) 
+                observations to control observations. Defaults to False.
+            grouping_role (ABCRole | None, optional): The role defining the grouping 
+                column (e.g., treatment assignment). Defaults to None.
+            key (Any, optional): Optional identifier for the executor instance. 
+                Defaults to "".
+            faiss_mode (Literal["base", "fast", "auto"], optional): The FAISS execution 
+                mode. "auto" automatically selects the best index type based on data 
+                size, "fast" forces an optimized index, and "base" uses a standard 
+                flat index. Defaults to "auto".
+        """
         self.n_neighbors = n_neighbors
         self.two_sides = two_sides
         self.test_pairs = test_pairs
@@ -43,6 +74,21 @@ class FaissNearestNeighbors(MLExecutor):
     def _set_global_match_indexes(
         cls, local_indexes: Dataset, data: tuple[str, Dataset]
     ) -> list[int, list[int]]:
+        """
+        Map local group indexes to global dataset indexes.
+
+        This helper method translates the relative row indices returned by the FAISS
+        search within a specific group back to the absolute indices of the original dataset.
+
+        Args:
+            local_indexes (Dataset): The dataset containing local match indices.
+            data (tuple[str, Dataset]): A tuple containing the group name and the original
+                Dataset for that group, used to resolve the global index.
+
+        Returns:
+            list[int] | list[list[int]] | Dataset: The updated dataset or list containing 
+            global match indices. Returns the input unchanged if it is empty.
+        """
         if len(local_indexes) == 0:
             return local_indexes
         global_indexes = local_indexes
@@ -64,6 +110,26 @@ class FaissNearestNeighbors(MLExecutor):
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
         **kwargs,
     ) -> dict:
+        """
+        Execute the core matching logic on grouped data.
+
+        This class method processes the grouped data, applying the FAISS nearest neighbor
+        search based on the specified matching configuration (one-sided, two-sided, or test-only).
+
+        Args:
+            grouping_data: Grouped dataset containing the control and treatment slices.
+            tmp_roles: Temporary roles to be applied during the matching process.
+            target_field (str | None, optional): The name of the target field. Defaults to None.
+            n_neighbors (int | None, optional): Number of neighbors to match. Defaults to None.
+            two_sides (bool | None, optional): Whether to perform bidirectional matching. Defaults to None.
+            test_pairs (bool | None, optional): Whether to only match test pairs. Defaults to None.
+            faiss_mode (Literal["base", "fast", "auto"], optional): FAISS execution mode. Defaults to "auto".
+            **kwargs: Additional keyword arguments passed to the underlying FAISS extension.
+
+        Returns:
+            dict: A dictionary containing the matched datasets. Keys can be "test" and/or "control"
+            depending on the `two_sides` and `test_pairs` flags.
+        """
         (control_idx, _data), (test_idx, _test_data), *_ = grouping_data
         _data.tmp_roles = tmp_roles
         if test_pairs is not True:
@@ -121,21 +187,79 @@ class FaissNearestNeighbors(MLExecutor):
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
         **kwargs,
     ) -> Any:
-        
+        """
+        Resolve the backend-specific FAISS extension and execute the calculation.
+
+        This method acts as a bridge to the backend-specific implementation (e.g., Pandas or Spark)
+        of the FAISS algorithm.
+
+        Args:
+            data (Dataset): The baseline (control) dataset.
+            test_data (Dataset | None, optional): The compared (test) dataset. Defaults to None.
+            target_data (Dataset | None, optional): Optional target dataset. Defaults to None.
+            n_neighbors (int | None, optional): Number of neighbors to find. Defaults to None.
+            faiss_mode (Literal["base", "fast", "auto"], optional): FAISS execution mode. Defaults to "auto".
+            **kwargs: Additional keyword arguments for the backend extension.
+
+        Returns:
+            Any: The result of the nearest neighbor search from the backend-specific FAISS extension.
+        """
         faiss_cls = backend_factory.resolve_backend(FaissExtension, data)
         return faiss_cls(n_neighbors=n_neighbors or 1, faiss_mode=faiss_mode).calc(
             data=data, test_data=test_data
         )
 
     def fit(self, X: Dataset, Y: Dataset | None = None) -> MLExecutor:
+        """
+        Fit the FAISS index on the provided dataset.
+
+        Args:
+            X (Dataset): The dataset to build the FAISS index from.
+            Y (Dataset | None, optional): Optional target dataset (not typically used for FAISS indexing).
+                Defaults to None.
+
+        Returns:
+            MLExecutor: The fitted executor instance (or the backend-specific extension instance).
+        """
         faiss_cls = backend_factory.resolve_backend(FaissExtension, X)
         return faiss_cls(self.n_neighbors, self.faiss_mode).fit(X=X, Y=Y)
 
     def predict(self, X: Dataset) -> Dataset:
+        """
+        Predict the nearest neighbors for the given dataset.
+
+        Args:
+            X (Dataset): The dataset for which to find nearest neighbors.
+
+        Returns:
+            Dataset: A dataset containing the indices of the nearest neighbors.
+        """
         faiss_cls = backend_factory.resolve_backend(FaissExtension, X)
         return faiss_cls().predict(X)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """
+        Execute the FAISS nearest neighbors matching on the given experiment data.
+
+        This method orchestrates the entire matching process:
+        1. Retrieves grouping and feature fields.
+        2. Groups the data or retrieves pre-grouped data.
+        3. Calls the `calc` method to perform the FAISS search.
+        4. Handles missing values (NaNs) by replacing them with a dummy match (-1) and warns the user.
+        5. Formats the matched indices with appropriate roles and appends them to the result.
+        6. Stores the final matched indices in the `ExperimentData` object.
+
+        Args:
+            data (ExperimentData): The experiment data containing the dataset to be matched.
+
+        Returns:
+            ExperimentData: The updated ExperimentData object with the matched indices stored
+            in the `additional_fields` space.
+
+        Raises:
+            PairsNotFoundError: If the number of NaNs exceeds expectations or valid pairs cannot be found
+            when `two_sides` is True.
+        """
         group_field, features_fields = self._get_fields(data=data)
         if group_field[0] in data.groups:
             grouping_data = list(data.groups[group_field[0]].items())
@@ -179,7 +303,7 @@ class FaissNearestNeighbors(MLExecutor):
         for res_k, res_v in compare_result.items():
             group = grouping_data[1][1] if res_k == "test" else grouping_data[0][1]
             # res_v has index similar to group data
-            # TODO: `limit` may be removed
+            #`limit` may be removed
             t_index_field: Dataset = res_v.limit(len(group))
 
             n_nans = t_index_field.data.isna().sum().sum()
@@ -192,11 +316,6 @@ class FaissNearestNeighbors(MLExecutor):
             t_index_field.roles = {
                 col: AdditionalMatchingRole() for col in  t_index_field.columns
             }
-
-            # TODO: not supported in pyspark, maybe remove it or find a solution
-            # t_index_field.index = group.index 
-            # t_index_field = t_index_field.add_column(group.reset_index()['index'].sort(by='index'), {"index": InfoRole()}).set_index("index")
-            # t_index_field.index.name = None
             matched_indexes = matched_indexes.append(t_index_field)
         if matched_indexes is not None:
             matched_indexes = matched_indexes.sort()
