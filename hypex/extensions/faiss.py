@@ -45,11 +45,16 @@ class FaissExtension(MLExtension):
     """
 
     def __init__(
-        self, n_neighbors: int = 1, faiss_mode: Literal["base", "fast", "auto"] = "auto"
+        self, 
+        n_neighbors: int = 1, 
+        faiss_mode: Literal["base", "fast", "auto"] = "auto",
+        mahalonobis: Dataset = None,
     ):
         self.n_neighbors = n_neighbors
         self.faiss_mode = faiss_mode
+        self.mahalonobis = mahalonobis
         self.index = None
+        
         super().__init__()
 
     @abstractmethod
@@ -71,6 +76,7 @@ class FaissExtension(MLExtension):
             super().calc(X, mode="predict", **kwargs), AdditionalMatchingRole()
         )
 
+# TODO: add mahalonobis matrix logic into pandas realization
 @backend_factory.register(FaissExtension, PandasDataset)
 class PandasFaissExtension(FaissExtension):
     """
@@ -341,9 +347,10 @@ class SparkFaissExtension(FaissExtension):
     def __init__(
             self, 
             n_neighbors = 1, 
-            faiss_mode = "auto"
+            faiss_mode = "auto",
+            mahalonobis: Dataset = None,
     ):
-        super().__init__(n_neighbors, faiss_mode)
+        super().__init__(n_neighbors, faiss_mode, mahalonobis)
         self.seed: int = 21
 
     def _vectorize_data(
@@ -595,7 +602,11 @@ class SparkFaissExtension(FaissExtension):
             **kwargs
     ):
         mode = mode or "auto"
-        operating_data: spark.DataFrame = data._backend_data.data.to_spark(index_col='index')
+        operating_data: spark.DataFrame = (
+            data._backend_data.data.to_spark(index_col='index')
+            if self.mahalonobis is None
+            else data.dot(self.mahalonobis)._backend_data.data.to_spark(index_col='index')
+        )
         self.k = (operating_data.count())
         vectorized_data = self._vectorize_data(operating_data)
 
@@ -614,7 +625,11 @@ class SparkFaissExtension(FaissExtension):
             if self._sharded_rdd is None:
                 raise ValueError("Index is not created yet. Call 'fit' before 'predict'.")
             
-            test_operating_data = test_data._backend_data.data.to_spark(index_col='index')
+            test_operating_data = (
+                test_data._backend_data.data.to_spark(index_col='index')
+                if self.mahalonobis is None
+                else test_data.dot(self.mahalonobis)._backend_data.data.to_spark(index_col='index')
+            )
             vectorized_test = self._vectorize_data(test_operating_data)
 
             return self._predict(vectorized_test)

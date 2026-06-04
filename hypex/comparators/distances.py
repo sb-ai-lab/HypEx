@@ -60,16 +60,15 @@ class MahalanobisDistance(Calculator):
     def _execute_inner_function(
         cls,
         grouping_data,
-        # tmp_roles,
         target_fields: list[str] | None = None,
         **kwargs,
-    ) -> dict:
+    ) -> Dataset:
         """
         Execute the inner distance calculation logic on grouped data.
 
         Iterates through the grouped data, treating the first group as the baseline 
-        (control) and subsequent groups as compared (test) groups, applying the 
-        Mahalanobis transformation to each.
+        (control) and subsequent group as compared (test) group, calculating the 
+        Mahalanobis transformation matrix to both.
 
         Args:
             grouping_data: Grouped dataset containing baseline and compared data slices.
@@ -78,49 +77,52 @@ class MahalanobisDistance(Calculator):
             **kwargs: Additional keyword arguments passed to `_inner_function`.
 
         Returns:
-            dict: A dictionary containing the transformed "control" and "test" datasets.
+            Dataset:  The corr matrix Dataset to transform into Mahalanobis metric.
         """
-        result = {}
-        for i in range(1, len(grouping_data)):
-            result.update(
-                cls._inner_function(
-                    data=(
-                        grouping_data[0][1][target_fields]
-                        if target_fields
-                        else grouping_data[0][1]
-                    ),
-                    test_data=(
-                        grouping_data[i][1][target_fields]
-                        if target_fields
-                        else grouping_data[i][1]
-                    ),
-                    **kwargs,
-                )
+        if len(grouping_data) > 1:
+            return cls._inner_function(
+                data=(
+                    grouping_data[0][1][target_fields]
+                    if target_fields
+                    else grouping_data[0][1]
+                ),
+                test_data=(
+                    grouping_data[1][1][target_fields]
+                    if target_fields
+                    else grouping_data[1][1]
+                ),
+                **kwargs,
             )
-        return result
-
+        else:
+            return cls._inner_function(
+                data=(
+                    grouping_data[0][1][target_fields]
+                    if target_fields
+                    else grouping_data[0][1]
+                ),
+                test_data=None,
+                **kwargs,
+            )
+    
     def _set_value(
-        self, data: ExperimentData, value: dict | None = None, key: Any = None
+            self, data: ExperimentData, value: Dataset | None = None, key: Any = None
     ) -> ExperimentData:
         """
         Store the calculated distance results into the ExperimentData object.
 
         Args:
             data (ExperimentData): The experiment data object to update.
-            value (dict | None, optional): The dictionary of transformed datasets 
-                to store. Defaults to None.
+            value (Dataset | None, optional): The corr matrix Dataset to transform
+                into Mahalanobis metric. Defaults to None.
             key (Any, optional): Optional key for the stored value. Defaults to None.
 
         Returns:
-            ExperimentData: The updated ExperimentData object.
         """
-        for key, value_ in value.items():
-            data = data.set_value(
-                ExperimentDataEnum.groups,
-                self.id,
-                value_,
-                key=key,
-            )
+        data.set_value(
+            ExperimentDataEnum.variables,
+            self.id,
+            value,
+        )
         return data
 
     def _get_fields(self, data: ExperimentData):
@@ -156,7 +158,7 @@ class MahalanobisDistance(Calculator):
         test_data: Dataset | None = None,
         weights: dict[str, float] | None = None,
         **kwargs,
-    ):
+    ) -> Dataset:
         """
         Compute the Mahalanobis transformation for the given datasets.
 
@@ -178,7 +180,6 @@ class MahalanobisDistance(Calculator):
             optionally the "test" dataset if `test_data` was provided.
         """
         test_data = cls._check_test_data(test_data)
-        # conversion to numpy is necessary to bring the backends to the same form
         cov = UniteCovExtension().calc(data, test_data)
     
         cholesky = CholeskyExtension().calc(cov)
@@ -194,14 +195,7 @@ class MahalanobisDistance(Calculator):
         
         mahalanobis_transform: Dataset = mahalanobis_transform.transpose()
         mahalanobis_transform = mahalanobis_transform.rename({col: new_col for col, new_col in zip(mahalanobis_transform.columns, mah_cols)})
-
-        y_control = data.dot(mahalanobis_transform.data)
-        y_control = y_control.rename({col: new_col for col, new_col in zip(y_control.columns, mah_cols)})
-        if test_data:
-            y_test = test_data.dot(mahalanobis_transform.data)
-            y_test = y_test.rename({col: new_col for col, new_col in zip(y_test.columns, mah_cols)})
-            return {"control": y_control, "test": y_test}
-        return {"control": y_control}
+        return mahalanobis_transform
 
     @classmethod
     def calc(
@@ -212,7 +206,7 @@ class MahalanobisDistance(Calculator):
         target_fields: str | list[str] | None = None,
         weights: dict[str, float] | None = None,
         **kwargs,
-    ) -> dict:
+    ) -> Dataset:
         """
         Stateless entry point to calculate Mahalanobis distance.
 
@@ -289,11 +283,11 @@ class MahalanobisDistance(Calculator):
                     data.additional_fields[field],
                     role={field: TargetRole()},
                 )
-        compare_result = self.calc(
+        mahalanobis_transform = self.calc(
             data=t_data,
             group_field=group_field,
             target_fields=target_fields,
             grouping_data=grouping_data,
             weights=self.weights or None,
         )
-        return self._set_value(data, compare_result)
+        return self._set_value(data, mahalanobis_transform)

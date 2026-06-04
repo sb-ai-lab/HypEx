@@ -204,6 +204,7 @@ class FaissNearestNeighbors(MLExecutor):
         Returns:
             Any: The result of the nearest neighbor search from the backend-specific FAISS extension.
         """
+        mahalonobis = kwargs.get('mahalonobis')
         faiss_cls = backend_factory.resolve_backend(FaissExtension, data)
         return faiss_cls(n_neighbors=n_neighbors or 1, faiss_mode=faiss_mode).calc(
             data=data, test_data=test_data
@@ -265,11 +266,13 @@ class FaissNearestNeighbors(MLExecutor):
             grouping_data = list(data.groups[group_field[0]].items())
         else:
             grouping_data = list(data.ds[group_field + features_fields].groupby(group_field))
-        distances_keys = data.get_ids(MahalanobisDistance, ExperimentDataEnum.groups)
-        if len(distances_keys["MahalanobisDistance"]["groups"]) > 0:
-            grouping_data = list(
-                data.groups[distances_keys["MahalanobisDistance"]["groups"][0]].items()
-            )
+        mahalanobis = (
+            data.variables[data.get_one_id(MahalanobisDistance, ExperimentDataEnum.variables)]
+            if len(
+                data.get_ids(MahalanobisDistance, ExperimentDataEnum.variables)["MahalanobisDistance"]["variables"]
+            ) > 0
+            else None
+        )
         compare_result = self.calc(
             data=data.ds,
             group_field=group_field,
@@ -279,6 +282,7 @@ class FaissNearestNeighbors(MLExecutor):
             faiss_mode=self.faiss_mode,
             two_sides=self.two_sides,
             test_pairs=self.test_pairs,
+            mahalanobis=mahalanobis
         )
         nans = 0
 
