@@ -366,8 +366,14 @@ class CUPACExecutor(MLExecutor):
 
                 prediction = self.calc(mode="predict", model=fitted_model, X=X_predict)
 
-                # Adjust target by removing explained variation
-                explained_variation = prediction - prediction.mean()
+                # Adjust target via CUPED theta-residualization on the prediction:
+                # y - theta * (pred - E[pred]) with theta = Cov(pred, y) / Var(pred).
+                # theta scales the prediction onto the target so the adjustment is
+                # variance-optimal rather than assuming a 1:1 (theta=1) relationship.
+                theta = self.extension._cuped_theta(
+                    data.ds[target].data.iloc[:, 0], prediction.data.iloc[:, 0]
+                )
+                explained_variation = (prediction - prediction.mean()) * theta
                 target_cupac = data.ds[target] - explained_variation
 
                 target_cupac = target_cupac.rename({target: f"{target}_cupac"})

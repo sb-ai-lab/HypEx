@@ -61,31 +61,34 @@ class CupacExtension(MLExtension):
         y_values = Y_df.iloc[:, 0] if len(Y_df.columns) > 0 else Y_df
 
         kf = KFold(n_splits=self.n_folds, shuffle=True, random_state=self.random_state)
-        fold_var_reductions = []
         fold_feature_importances = []
 
         feature_names = X_df.columns.tolist()
 
+        # Collect out-of-fold predictions so the CUPED theta is estimated on
+        # predictions the model has never seen (cross-fitting), then apply a
+        # single theta-residualization on the pooled predictions.
+        y_original = y_values.to_numpy()
+        oof_pred = np.full(len(y_original), np.nan)
+
         for train_idx, val_idx in kf.split(X_df):
             X_train, X_val = X_df.iloc[train_idx], X_df.iloc[val_idx]
-            y_train, y_val = y_values.iloc[train_idx], y_values.iloc[val_idx]
+            y_train = y_values.iloc[train_idx]
 
             m = clone(model_proto)
             m.fit(X_train, y_train)
 
-            pred = m.predict(X_val)
-
-            y_original = y_val.to_numpy()
-            y_adjusted = y_original - pred + y_train.mean()
-
-            var_reduction = self._calculate_variance_reduction(y_original, y_adjusted)
-            fold_var_reductions.append(var_reduction)
+            oof_pred[val_idx] = m.predict(X_val)
 
             # Extract feature importances for this fold
             fold_importances = self._extract_fold_importances(m, model, feature_names)
             fold_feature_importances.append(fold_importances)
 
-        mean_var_reduction = float(np.nanmean(fold_var_reductions))
+        # CUPED theta-residualize on the pooled out-of-fold predictions:
+        # y - theta * (pred - E[pred]) with theta = Cov(pred, y) / Var(pred).
+        theta = self._cuped_theta(y_original, oof_pred)
+        y_adjusted = y_original - theta * (oof_pred - oof_pred.mean())
+        mean_var_reduction = self._calculate_variance_reduction(y_original, y_adjusted)
 
         # Average feature importances across folds: convert to dict with mean values
         mean_importances = {
@@ -137,6 +140,26 @@ class CupacExtension(MLExtension):
                 importances[feature_name] = float(model.feature_importances_[i])
 
         return importances
+
+    @staticmethod
+    def _cuped_theta(y, pred) -> float:
+        """Optimal CUPED coefficient theta = Cov(pred, y) / Var(pred).
+
+        This minimizes Var(y - theta * (pred - E[pred])). Returns 0.0 when the
+        prediction has no variance (constant or degenerate model), making the
+        adjustment a no-op instead of dividing by zero.
+        """
+        y = np.asarray(y, dtype=float)
+        pred = np.asarray(pred, dtype=float)
+        var_pred = pred.var()
+        # Treat the prediction as constant when its variance is negligible
+        # relative to its magnitude. An exact ``== 0`` check is unsafe: a
+        # constant array can still carry ~1e-30 of floating-point variance,
+        # which would make theta an arbitrary ratio of rounding noise.
+        scale = float((pred**2).mean())
+        if not np.isfinite(var_pred) or var_pred <= 1e-12 * scale:
+            return 0.0
+        return float(np.cov(pred, y, bias=True)[0, 1] / var_pred)
 
     @staticmethod
     def _calculate_variance_reduction(y_original, y_adjusted) -> float:
