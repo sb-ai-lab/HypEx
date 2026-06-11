@@ -228,5 +228,7 @@ class Matching(ExperimentShell):
                 weights,
                 encode_categories,
             ),
-            output=MatchingOutput(GroupExperiment if group_match else MatchingAnalyzer),
+            output=ExperimentOutput(
+                main_output=MatchingOutput(GroupExperiment if group_match else MatchingAnalyzer)
+            ),
         )
