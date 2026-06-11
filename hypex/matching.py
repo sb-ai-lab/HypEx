@@ -14,7 +14,7 @@ from .ml.faiss import FaissNearestNeighbors
 from .operators.operators import Bias, MatchingMetrics
 from .reporters.matching import MatchingDatasetReporter
 from .transformers import TypeCaster
-from .ui.base import ExperimentShell
+from .ui.base import ExperimentShell, ExperimentOutput
 from .ui.matching import MatchingOutput
 
 
