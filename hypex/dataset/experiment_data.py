@@ -65,9 +65,6 @@ class ExperimentData:
             data: The primary dataset to wrap. Must be a Dataset or SmallDataset instance.
         """
         self._data: Dataset | SmallDataset = data
-        self.additional_fields: Dataset | SmallDataset = data.create_empty(
-            index=data.index, backend=data.backend_type, session=data.session
-        )
         self.variables: dict[str, dict[str, int | float]] = {}
         self.groups: dict[str, dict[str, Dataset]] = {}
         self.analysis_tables: dict[str, SmallDataset] = {}
@@ -168,7 +165,7 @@ class ExperimentData:
         """
         exec_id_str = str(executor_id)
         if space == ExperimentDataEnum.additional_fields:
-            return exec_id_str in self.additional_fields.columns
+            return exec_id_str in self._data.columns
         if space == ExperimentDataEnum.variables:
             return exec_id_str in self.variables
         if space == ExperimentDataEnum.analysis_tables:
@@ -215,11 +212,13 @@ class ExperimentData:
 
         raise ValueError(f"Unknown space: {space}")
 
+    
     def _set_additional_fields(self, exec_id: str, value: Any, role: Any) -> Self:
         """Handle storage in the additional_fields space.
 
-        Adds columns to the auxiliary dataset, handling single-column datasets,
-        raw data sequences, and multi-column merges with index alignment.
+        Writes columns directly into self._data (the main dataset) instead of
+        a separate additional_fields dataset. The property-shim `additional_fields`
+        will provide a filtered view for backwards compatibility.
 
         Args:
             exec_id: Normalized column/identifier name.
@@ -229,24 +228,96 @@ class ExperimentData:
         Returns:
             Self for method chaining.
         """
+        normalized_role = self._normalize_role(role)
+        
         if not isinstance(value, Dataset):
-            self.additional_fields = self.additional_fields.add_column(
-                data=value, role={exec_id: role}
+            # Raw data (list, scalar, etc.) — add as a single column
+            self._data = self._data.add_column(
+                data=value, 
+                role={exec_id: normalized_role}
             )
             return self
 
         if len(value.columns) == 1:
-            normalized_role = self._normalize_role(role)
-            self.additional_fields = self.additional_fields.add_column(
-                data=value, role={exec_id: normalized_role}
+            # Single-column Dataset — extract the column and add with exec_id as name
+            self._data = self._data.add_column(
+                data=value[value.columns[0]], 
+                role={exec_id: normalized_role}
             )
             return self
 
+        # Multi-column Dataset — rename first column to exec_id and merge
         rename_dict = {value.columns[0]: exec_id}
-        self.additional_fields = self.additional_fields.merge(
-            right=value.rename(names=rename_dict), left_index=True, right_index=True
+        renamed_value = value.rename(names=rename_dict)
+        self._data = self._data.merge(
+            right=renamed_value, 
+            left_index=True, 
+            right_index=True
         )
+        # Apply the provided role to the renamed column (exec_id)
+        # Other columns keep their original roles from value.roles (via merge)
+        self._data.roles[exec_id] = normalized_role
         return self
+    
+    @property
+    def additional_fields(self) -> Dataset | SmallDataset:
+        """Backwards-compatible view of ds filtered to AdditionalRole columns.
+        
+        Returns a new Dataset containing only columns whose role is a subclass
+        of AdditionalRole. This shim enables incremental migration: writers
+        in Wave 3 can continue using data.additional_fields syntax while
+        actual storage moves to ds.
+        
+        WARNING: This is a READ-ONLY view. Writes through this property
+        will modify a copy and NOT the underlying ds.
+        """
+        additional_cols = [
+            col for col, role in self._data.roles.items()
+            if isinstance(role, AdditionalRole)
+        ]
+        if not additional_cols:
+            return self._data.create_empty(
+                index=self._data.index,
+                backend=self._data.backend_type,
+                session=self._data.session,
+            )
+        view = self._data[additional_cols]
+        view.roles = {c: self._data.roles[c] for c in additional_cols}
+        return view
+
+    def cleanup_additional(self) -> Self:
+        """Remove all columns with AdditionalRole-derived roles from ds.
+        
+        Called at the end of Output.extract() to ensure that public-facing
+        experiment results do not leak internal/synthetic columns.
+        """
+        cols_to_drop = [
+            col for col, role in self._data.roles.items()
+            if isinstance(role, AdditionalRole)
+        ]
+        if cols_to_drop:
+            self._data = self._data.drop(columns=cols_to_drop)
+        return self
+    
+    def _clean_ds_for_iteration(self) -> Dataset | SmallDataset:
+        """Return a copy of ds with AdditionalRole columns removed.
+        
+        This restores the iteration isolation that was previously provided
+        by the separate additional_fields dataset. Used by ParamsExperiment,
+        CycledExperiment, and GroupExperiment to ensure each iteration
+        starts with a clean dataset (no leftover synthetic columns from
+        previous iterations).
+        
+        Returns:
+            A new Dataset without AdditionalRole columns.
+        """
+        additional_cols = [
+            col for col, role in self._data.roles.items()
+            if isinstance(role, AdditionalRole)
+        ]
+        if not additional_cols:
+            return self._data
+        return self._data.drop(columns=additional_cols)
 
     def _set_analysis_tables(self, exec_id: str, value: Any) -> Self:
         """Handle storage in the analysis_tables space.
@@ -435,36 +506,14 @@ class ExperimentData:
         search_types: list[type] | None = None,
     ) -> list[str]:
         """Search for column names matching specified semantic roles.
-
-        Separates search into main dataset and additional fields based on
-        role type (AdditionalRole vs others).
-
-        Args:
-            roles: Role instance(s) to match.
-            tmp_role: If True, searches in temporary roles instead of permanent ones.
-            search_types: Optional list of Python types to filter roles by.
-
-        Returns:
-            List of column names matching the criteria.
+        
+        After the refactor, ALL columns live in self.ds 
+        (including AdditionalRole columns), so we search only there.
         """
         roles_list = Adapter.to_list(roles)
-        additional_roles = [r for r in roles_list if isinstance(r, AdditionalRole)]
-        data_roles = [r for r in roles_list if r not in additional_roles]
-
-        found = []
-        if data_roles:
-            found.extend(
-                self.ds.search_columns(
-                    data_roles, tmp_role=tmp_role, search_types=search_types
-                )
-            )
-        if additional_roles:
-            found.extend(
-                self.additional_fields.search_columns(
-                    additional_roles, tmp_role=tmp_role, search_types=search_types
-                )
-            )
-        return found
+        return self.ds.search_columns(
+            roles_list, tmp_role=tmp_role, search_types=search_types
+        )
 
     def field_data_search(
         self,
@@ -473,23 +522,13 @@ class ExperimentData:
         search_types: list[type] | None = None,
     ) -> Dataset:
         """Build a new dataset containing columns matching specified roles.
-
-        Extracts data from both main and additional datasets based on role
-        matching, preserving original roles in the output.
-
-        Args:
-            roles: Role instance(s) to match.
-            tmp_role: If True, searches in temporary roles.
-            search_types: Optional type filter for role matching.
-
-        Returns:
-            New Dataset instance containing only the matched columns.
+        All columns now live in self.ds.
         """
         roles_list = Adapter.to_list(roles)
         role_columns = {
-            role: self.field_search(role, tmp_role, search_types) for role in roles_list
+            role: self.field_search(role, tmp_role, search_types) 
+            for role in roles_list
         }
-
         searched = Dataset.create_empty(
             index=self._data.index,
             backend=self._data.backend_type,
@@ -497,10 +536,7 @@ class ExperimentData:
         )
         for role, cols in role_columns.items():
             for col in cols:
-                src = (
-                    self.additional_fields
-                    if isinstance(role, AdditionalRole)
-                    else self.ds
+                searched = searched.add_column(
+                    data=self.ds[col], role={col: role}
                 )
-                searched = searched.add_column(data=src[col], role={col: role})
         return searched

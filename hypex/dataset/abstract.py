@@ -642,7 +642,7 @@ class DatasetBase:
 
     def __rpow__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__rpow__")
-
+    
     def search_columns(
         self,
         roles: ABCRole | Iterable[ABCRole],
@@ -655,7 +655,7 @@ class DatasetBase:
             str(column)
             for column, role in roles_for_search.items()
             if any(
-                isinstance(r, role.__class__)
+                isinstance(role, r.__class__)
                 and (not search_types or role.data_type in search_types)
                 for r in roles
             )

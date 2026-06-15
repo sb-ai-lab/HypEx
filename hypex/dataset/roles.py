@@ -343,6 +343,10 @@ class AdditionalPreTargetRole(AdditionalRole, PreTargetRole):
 class AdditionalMatchingRole(AdditionalRole):
     """Derived role for columns storing matching indices or nearest-neighbor results."""
     _role_name: RoleNameType = "AdditionalMatching"
+    
+class AdditionalVarianceReductionRole(AdditionalRole, StatisticRole):
+    """For CUPED variance reductions."""
+    _role_name: RoleNameType = "AdditionalVarianceReduction"
 
 
 default_roles: dict[RoleNameType, ABCRole] = {
@@ -363,4 +367,5 @@ default_roles: dict[RoleNameType, ABCRole] = {
     "additionaltarget": AdditionalTargetRole(),
     "additionalfeature": AdditionalFeatureRole(),
     "additionalpretarget": AdditionalPreTargetRole(),
+    "additionalvariancereduction": AdditionalVarianceReductionRole(),
 }
