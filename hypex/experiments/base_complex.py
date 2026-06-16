@@ -38,7 +38,11 @@ class ExperimentWithReporter(Experiment):
     def _set_result(
         self, data: ExperimentData, results: list[Dataset | dict], reset_index: bool = True
     ):
+        if not isinstance(results, list):
+            results = [results]
+            
         datasets: list[Dataset] = []
+        
         for res in results:
             if isinstance(res, dict):
                 datasets.append(SmallDataset.from_dict(res, roles={}))
