@@ -306,7 +306,7 @@ class SparkNavigation(DatasetBackendNavigation):
         if action == "count":
             _ = self.data.count()
         elif action == "head":
-            _ = self.data.head(1)
+            _ = self.data.spark.frame().limit(1).collect()
 
         if isinstance(original_index_name, str):
             if original_index_name in self.data.columns:
