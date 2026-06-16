@@ -869,17 +869,15 @@ class PandasNavigation(DatasetBackendNavigation):
                 data = data.iloc[:, 0]
             else:
                 data = data.values
-        elif isinstance(data, pd.Series):
-            pass
         elif isinstance(data, np.ndarray):
             if data.ndim == 2 and data.shape[1] == 1:
                 data = data[:, 0]
-        else:
+        elif not isinstance(data, pd.Series):
             data = Adapter.to_list(data)
             
         if isinstance(data, list):
             if len(data) == 1 and len(self.data) > 1:
-                pass
+                data = pd.Series(data[0], index=self.data.index)
             elif len(self.data) != len(data):
                 if len(data) > 0 and isinstance(data[0], Iterable) and len(data[0]) == 1:
                     data = np.squeeze(data)
@@ -890,10 +888,7 @@ class PandasNavigation(DatasetBackendNavigation):
                 pd.DataFrame(data, columns=[name], index=list(index))
             )
         else:
-            if isinstance(data, list) and len(data) == 1 and len(self.data) > 1:
-                self.data[name] = data[0]
-            else:
-                self.data[name] = data
+            self.data[name] = data
 
     def append(self, other, reset_index: bool = False, axis: int = 0) -> pd.DataFrame:
         """Append other PandasDataset(s) to current DataFrame.
