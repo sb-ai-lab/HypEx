@@ -1058,7 +1058,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             SparkDataset | ps.Series: Selected data, wrapped appropriately.
         """
         if isinstance(indices, slice) and (axis == 1):
-            self._wrap_result(self.data.iloc[indices])
+            return self._wrap_result(self.data.iloc[indices])
         return self._wrap_result(self.data.take(indices=indices, axis=axis))
 
     def apply(self, func: Callable[..., Any], **kwargs) -> SparkDataset:

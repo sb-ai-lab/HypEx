@@ -133,16 +133,16 @@ class SmallDataset(DatasetBase):
         if by is None:
             return Dataset(
                 roles=self.roles,
-                data=self.backend.sort_index(ascending=ascending, **kwargs),
+                data=self._backend_data.sort_index(ascending=ascending, **kwargs),
             )
         return Dataset(
             roles=self.roles,
-            data=self.backend.sort_values(by=by, ascending=ascending, **kwargs),
+            data=self._backend_data.sort_values(by=by, ascending=ascending, **kwargs),
         )
 
     def reindex(self, labels, fill_value: Any | None = None) -> Dataset:
         return Dataset(
-            self.roles, data=self.backend.reindex(labels, fill_value=fill_value)
+            self.roles, data=self._backend_data.reindex(labels, fill_value=fill_value)
         )
 
     def idxmax(self):
