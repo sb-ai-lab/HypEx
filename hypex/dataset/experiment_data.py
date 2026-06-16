@@ -7,7 +7,6 @@ precomputed analysis tables. Supports role-based column search and ID mapping.
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterable
 from copy import deepcopy
 from typing import Any
@@ -26,8 +25,6 @@ from ..utils import (
 )
 from ..utils.adapter import Adapter
 from .roles import AdditionalRole, ABCRole
-
-logger = logging.getLogger(__name__)
 
 _SUPPORTED_SPACES = frozenset(
     {
@@ -264,24 +261,12 @@ class ExperimentData:
         Raises:
             TypeError: If value cannot be converted to SmallDataset.
         """
-        logger.debug(
-            "set_value ENTRY | executor_id=%s | value_type=%s",
-            exec_id,
-            type(value).__name__,
-        )
-        logger.debug(
-            "set_value | executor_id=%s | keys_before=%s",
-            exec_id,
-            list(self.analysis_tables.keys()),
-        )
-
         if isinstance(value, Dataset):
             value = value.to_small_dataset()
         if not isinstance(value, SmallDataset):
             raise TypeError(f"Wrong value {value} for converting to SmallDataset")
 
         self.analysis_tables[exec_id] = value
-        logger.debug("set_value | keys_after=%s", list(self.analysis_tables.keys()))
         return self
 
     def _set_variables(self, exec_id: str, value: Any, key: str | None) -> Self:
