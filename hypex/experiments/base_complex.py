@@ -100,11 +100,13 @@ class ParamsExperiment(ExperimentWithReporter):
         reporter: DatasetReporter,
         params: dict[type, dict[str, Sequence[Any]]],
         transformer: bool | None = None,
+        stopping_criterion: IfExecutor | None = None,
         key: str = "",
     ):
         super().__init__(executors, reporter, transformer, key)
         self._params = params
         self._flat_params: list[dict[type, dict[str, Any]]] = []
+        self.stopping_criterion = stopping_criterion
 
     def generate_params_hash(self) -> str:
         return f"ParamsExperiment: {self.reporter.__class__.__name__}"
@@ -144,6 +146,15 @@ class ParamsExperiment(ExperimentWithReporter):
         self._params = params
         self._update_flat_params()
 
+    def _stopping_criterion_met(self, t_data: ExperimentData) -> bool:
+        if self.stopping_criterion is None:
+            return False
+        if_result = self.stopping_criterion.execute(t_data)
+        if_executor_id = if_result.get_one_id(
+            self.stopping_criterion.__class__, ExperimentDataEnum.variables
+        )
+        return bool(if_result.variables[if_executor_id]["response"])
+
     def execute(self, data: ExperimentData) -> ExperimentData:
         results = []
         self._update_flat_params()
@@ -154,6 +165,8 @@ class ParamsExperiment(ExperimentWithReporter):
                 t_data = executor.execute(t_data)
             report = self.reporter.report(t_data)
             results.append(report)
+            if self._stopping_criterion_met(t_data):
+                break
         return self._set_result(data, results)
 
 
@@ -167,8 +180,14 @@ class IfParamsExperiment(ParamsExperiment):
         transformer: bool | None = None,
         key: str = "",
     ):
-        self.stopping_criterion = stopping_criterion
-        super().__init__(executors, reporter, params, transformer, key)
+        super().__init__(
+            executors,
+            reporter,
+            params,
+            transformer,
+            stopping_criterion=stopping_criterion,
+            key=key,
+        )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         self._update_flat_params()
