@@ -263,8 +263,6 @@ class ExperimentData:
         """
         if isinstance(value, Dataset):
             value = value.to_small_dataset()
-        if not isinstance(value, SmallDataset):
-            raise TypeError(f"Wrong value {value} for converting to SmallDataset")
 
         self.analysis_tables[exec_id] = value
         return self

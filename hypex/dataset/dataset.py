@@ -58,7 +58,6 @@ class SmallDataset(DatasetBase):
         data: pd.DataFrame | str | None = None,
         default_role: ABCRole | None = None,
         session: spark.SparkSession | None = None,
-        backend: BackendsEnum | None = None,
     ):
         if isinstance(roles, dict) and data is not None:
             columns = None
@@ -74,15 +73,21 @@ class SmallDataset(DatasetBase):
                 and isinstance(data["data"], dict)
             ):
                 columns = list(data["data"].keys())
-
+                
             if columns:
                 new_roles = {}
                 for k, v in roles.items():
-                    if isinstance(k, int) and 0 <= k < len(columns):
-                        new_roles[columns[k]] = v
-                    elif not isinstance(k, int):
+                    if isinstance(k, int):
+                        if k in columns:
+                            new_roles[k] = v
+                        elif 0 <= k < len(columns):
+                            new_roles[columns[k]] = v
+                        else:
+                            new_roles[str(k)] = v
+                    else:
                         new_roles[k] = v
                 roles = new_roles
+
         if isinstance(data, pd.Series):
             if data.name is None:
                 data = data.to_frame(name="value")
