@@ -643,6 +643,9 @@ class StatsComparator(BaseComparator, ABC):
         "max": lambda d: d.max(),
     }
 
+    # The statistics this comparator needs; concrete subclasses override it.
+    REQUIRED_STATS: ClassVar[list[str]] = []
+
     def __init__(
         self,
         stats: list[str],
@@ -732,6 +735,59 @@ class StatsComparator(BaseComparator, ABC):
         )
         return data
 
+    @classmethod
+    def calc(
+        cls,
+        target_fields_data: Dataset | None = None,
+        group_field_data: Dataset | None = None,
+        stats: list[str] | None = None,
+        group_col_stats: dict[str, dict[str, dict[str, Any]]] | None = None,
+        **kwargs,
+    ) -> dict:
+        """
+        Stateless entry point mirroring :meth:`GroupsComparator.calc`, so the
+        comparator can be run outside the experiment pipeline.
+
+        Pass either pre-aggregated ``group_col_stats`` (as produced by
+        :meth:`_compute_stats`) or the raw ``target_fields_data`` and
+        ``group_field_data`` to have the statistics aggregated here. ``stats``
+        defaults to the comparator's ``REQUIRED_STATS``, so callers normally
+        don't need to supply it.
+
+        Returns ``{f"{group}{NAME_BORDER_SYMBOL}{col}": Dataset}`` pairwise test
+        results, comparing every non-baseline group against the first group.
+        """
+        if group_col_stats is None:
+            if target_fields_data is None or group_field_data is None:
+                raise ValueError(
+                    "You should pass either group_col_stats or both "
+                    "target_fields_data and group_field_data."
+                )
+            grouped = target_fields_data.merge(
+                group_field_data, left_index=True, right_index=True
+            ).groupby(by=group_field_data.columns)
+            group_col_stats = cls._compute_stats(
+                grouped, list(target_fields_data.columns), stats or cls.REQUIRED_STATS
+            )
+
+        group_names = list(group_col_stats.keys())
+        if len(group_names) < 2:
+            return {}
+
+        baseline_name = group_names[0]
+        return {
+            f"{compared_name}{NAME_BORDER_SYMBOL}{col}": DatasetAdapter.to_dataset(
+                cls._inner_function(
+                    group_col_stats[baseline_name][col],
+                    group_col_stats[compared_name][col],
+                    **kwargs,
+                ),
+                StatisticRole(),
+            )
+            for compared_name in group_names[1:]
+            for col in group_col_stats[baseline_name]
+        }
+
     def execute(self, data: ExperimentData) -> ExperimentData:
         fields = self._get_fields_data(data)
         group_field_data = fields["group_field"]
@@ -781,21 +837,11 @@ class StatsComparator(BaseComparator, ABC):
         if len(group_names) < 2:
             return data
 
-        # Phase 2: one Dataset per (compared_group, col) pair, then append once.
-        baseline_name = group_names[0]
-        result_ds_list = [
-            DatasetAdapter.to_dataset(
-                self._inner_function(
-                    group_col_stats[baseline_name][col],
-                    group_col_stats[compared_name][col],
-                    **self.calc_kwargs,
-                ),
-                StatisticRole(),
-            )
-            for compared_name in group_names[1:]
-            for col in target_fields_data.columns
-        ]
-        if not result_ds_list:
+        # Phase 2: reuse the stateless calc on the already-aggregated stats.
+        compare_result = self.calc(
+            group_col_stats=group_col_stats, **self.calc_kwargs
+        )
+        if not compare_result:
             return data
             
         result_dataset = result_ds_list[0].append(result_ds_list[1:])

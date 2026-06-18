@@ -24,8 +24,8 @@ class StatsTTest(StatsHypothesisTesting):
 
     def __init__(
             self, 
-            grouping_role = None, 
-            target_roles = None, 
+            grouping_role: ABCRole | None = None,
+            target_roles: ABCRole | None = None, 
             reliability: float = 0.05,
             key: Any = "", 
     ):
