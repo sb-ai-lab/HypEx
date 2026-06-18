@@ -1,0 +1,876 @@
+digraph HypExInheritance {
+    rankdir=TB
+    node[shape=record, style="filled,rounded", fontsize=10]
+    edge[fontsize=9]
+    compound=true
+    
+    // Color scheme
+    // Base classes - light blue
+    // Abstract intermediate - light yellow  
+    // Concrete implementations - light green
+    // Special/Complex - light pink
+    
+    // ========== EXECUTOR HIERARCHY ==========
+    subgraph cluster_executor {
+        label="Executor Hierarchy"
+        style="dashed,rounded"
+        bgcolor="#f0f0f0"
+        
+        // ========== BASE EXECUTOR CLASSES ==========
+        subgraph cluster_base_executors {
+            label="Core Executor Classes"
+            style="filled,rounded"
+            bgcolor="#e8f4f8"
+            
+            // Base Executor
+            Executor [
+                fillcolor=lightblue
+                label="{ Executor | 
+                    + id: str\l
+                    + key: Any\l
+                    + params_hash: str\l |
+                    + execute(data): ExperimentData\l
+                    + set_params(params): void\l
+                    + _generate_id(): void\l
+                }"
+            ]
+            
+            // Calculator branch
+            Calculator [
+                fillcolor=lightyellow
+                label="{ «abstract» Calculator | |
+                    + calc(data, **kwargs): Any\l
+                    + _inner_function(data, **kwargs): Any\l
+                }"
+            ]
+            
+            // IfExecutor branch
+            IfExecutor [
+                fillcolor=lightyellow
+                label="{ IfExecutor |
+                    + if_executor: Executor\l
+                    + else_executor: Executor\l |
+                    + check_rule(data): bool\l
+                    Conditional execution\l
+                }"
+            ]
+            
+            IfAAExecutor [
+                fillcolor=lightgreen
+                label="{ IfAAExecutor |
+                    + sample_size: float\l |
+                    Checks AA test pass\l
+                }"
+            ]
+            
+            // MLExecutor branch
+            MLExecutor [
+                fillcolor=lightyellow
+                label="{ «abstract» MLExecutor |
+                    + grouping_role: ABCRole\l
+                    + target_role: ABCRole\l |
+                    + fit(X, Y): MLExecutor\l
+                    + predict(X): Dataset\l
+                    + score(X, Y): float\l
+                }"
+            ]
+        }
+        
+        // ========== COMPARATORS ==========
+        subgraph cluster_comparators {
+            label="Comparators"
+            style="filled,rounded"
+            bgcolor="#f8e8e8"
+            
+            Comparator [
+                fillcolor=lightyellow
+                label="{ «abstract» Comparator |
+                    + compare_by: str\l
+                    + grouping_role: ABCRole\l
+                    + target_roles: ABCRole\l
+                    + baseline_role: ABCRole\l |
+                    + _inner_function(data, test_data): dict\l
+                }"
+            ]
+            
+            // Basic comparators
+            subgraph cluster_basic_comparators {
+                label="Basic Metrics"
+                style="dashed"
+                
+                GroupDifference [
+                    fillcolor=lightgreen
+                    label="{ GroupDifference | |
+                        Calculates:\l
+                        • control/test mean\l
+                        • difference\l
+                        • difference %\l
+                    }"
+                ]
+                
+                GroupSizes [
+                    fillcolor=lightgreen
+                    label="{ GroupSizes | |
+                        Calculates:\l
+                        • control/test size\l
+                        • size percentages\l
+                    }"
+                ]
+                
+                PSI [
+                    fillcolor=lightgreen
+                    label="{ PSI | |
+                        Population\l
+                        Stability Index\l
+                    }"
+                ]
+                
+                MahalanobisDistance [
+                    fillcolor=lightgreen
+                    label="{ MahalanobisDistance | |
+                        Calculates Mahalanobis\l
+                        distance between groups\l
+                    }"
+                ]
+            }
+            
+            // Statistical tests
+            subgraph cluster_stat_tests {
+                label="Statistical Tests"
+                style="dashed"
+                
+                StatHypothesisTesting [
+                    fillcolor=lightyellow
+                    label="{ «abstract» StatHypothesisTesting |
+                        + reliability: float\l |
+                        Statistical tests base\l
+                    }"
+                ]
+                
+                TTest [fillcolor=lightgreen label="{ TTest | | Student's t-test }"]
+                KSTest [fillcolor=lightgreen label="{ KSTest | | Kolmogorov-Smirnov test }"]
+                UTest [fillcolor=lightgreen label="{ UTest | | Mann-Whitney U test }"]
+                Chi2Test [fillcolor=lightgreen label="{ Chi2Test | + matrix_preparation(): void\l | Chi-squared test }"]
+            }
+            
+            // Power testing
+            subgraph cluster_power_testing {
+                label="Power Analysis"
+                style="dashed"
+                
+                PowerTesting [
+                    fillcolor=lightyellow
+                    label="{ «abstract» PowerTesting |
+                        + significance: float = 0.95\l
+                        + power: float = 0.8\l |
+                        Power analysis base\l
+                    }"
+                ]
+                
+                MDEBySize [
+                    fillcolor=lightgreen
+                    label="{ MDEBySize | |
+                        Minimum Detectable Effect\l
+                        by sample size\l
+                    }"
+                ]
+            }
+        }
+        
+        // ========== SPLITTERS ==========
+        subgraph cluster_splitters {
+            label="Splitters"
+            style="filled,rounded"
+            bgcolor="#e8f8e8"
+            
+            // Note: No abstract Splitter class in actual code
+            AASplitter [
+                fillcolor=lightgreen
+                label="{ AASplitter |
+                    + control_size: float\l
+                    + random_state: int\l
+                    + sample_size: float\l
+                    + constant_key: bool\l
+                    + save_groups: bool\l |
+                    + init_from_hash(hash): void\l
+                    A/A test splitter\l
+                    Uses AdditionalTreatmentRole\l
+                }"
+            ]
+            
+            AASplitterWithStratification [
+                fillcolor=lightgreen
+                label="{ AASplitterWithStratification | |
+                    + Uses StratificationRole\l
+                    for grouped splitting\l
+                }"
+            ]
+        }
+        
+        // ========== TRANSFORMERS & ENCODERS ==========
+        subgraph cluster_transformers {
+            label="Transformers & Encoders"
+            style="filled,rounded"
+            bgcolor="#f8f8e8"
+            
+            Transformer [
+                fillcolor=lightyellow
+                label="{ «abstract» Transformer |
+                    + _is_transformer = True\l |
+                    Transforms Dataset\l
+                }"
+            ]
+            
+            Shuffle [
+                fillcolor=lightgreen
+                label="{ Shuffle |
+                    + random_state: int\l |
+                    Randomly shuffles data\l
+                }"
+            ]
+            
+            NaFiller [
+                fillcolor=lightgreen
+                label="{ NaFiller |
+                    + method: str\l
+                    + values: Any\l |
+                    Fills missing values\l
+                }"
+            ]
+            
+            CategoryAggregator [
+                fillcolor=lightgreen
+                label="{ CategoryAggregator |
+                    + threshold: int\l
+                    + new_group_name: str\l |
+                    Aggregates rare categories\l
+                }"
+            ]
+            
+            // Filters
+            ConstFilter [
+                fillcolor=lightgreen
+                label="{ ConstFilter |
+                    + threshold: float\l |
+                    Filters constant columns\l
+                }"
+            ]
+            
+            CorrFilter [
+                fillcolor=lightgreen
+                label="{ CorrFilter |
+                    + threshold: float\l
+                    + method: str\l |
+                    Filters correlated columns\l
+                }"
+            ]
+            
+            CVFilter [
+                fillcolor=lightgreen
+                label="{ CVFilter |
+                    + lower_bound: float\l
+                    + upper_bound: float\l |
+                    Coefficient of variation filter\l
+                }"
+            ]
+            
+            NanFilter [
+                fillcolor=lightgreen
+                label="{ NanFilter |
+                    + threshold: float\l |
+                    Filters columns with NaNs\l
+                }"
+            ]
+            
+            OutliersFilter [
+                fillcolor=lightgreen
+                label="{ OutliersFilter |
+                    + lower_percentile: float\l
+                    + upper_percentile: float\l |
+                    Filters outliers\l
+                }"
+            ]
+            
+            Encoder [
+                fillcolor=lightyellow
+                label="{ «abstract» Encoder |
+                    + target_roles: Sequence[str]\l |
+                    Encodes categorical data\l
+                }"
+            ]
+            
+            DummyEncoder [
+                fillcolor=lightgreen
+                label="{ DummyEncoder | |
+                    One-hot encoding\l
+                }"
+            ]
+        }
+        
+        // ========== GROUP OPERATORS ==========
+        subgraph cluster_operators {
+            label="Group Operators"
+            style="filled,rounded"
+            bgcolor="#e8e8f8"
+            
+            GroupOperator [
+                fillcolor=lightyellow
+                label="{ «abstract» GroupOperator |
+                    + grouping_role: ABCRole\l
+                    + target_roles: list[ABCRole]\l |
+                    Operations on groups\l
+                }"
+            ]
+            
+            SMD [
+                fillcolor=lightgreen
+                label="{ SMD | |
+                    Standardized\l
+                    Mean Difference\l
+                }"
+            ]
+            
+            Bias [
+                fillcolor=lightgreen
+                label="{ Bias | |
+                    + calc_coefficients(X, Y): list\l
+                    + calc_bias(X, X_matched, coef): list\l
+                    Bias estimation\l
+                }"
+            ]
+            
+            MatchingMetrics [
+                fillcolor=lightgreen
+                label="{ MatchingMetrics |
+                    + metric: str (atc/att/ate)\l |
+                    Calculates treatment effects:\l
+                    ATT, ATC, ATE metrics\l
+                }"
+            ]
+        }
+        
+        // ========== ANALYZERS ==========
+        subgraph cluster_analyzers {
+            label="Analyzers"
+            style="filled,rounded"
+            bgcolor="#f0e8f8"
+            
+            // Note: Analyzers inherit directly from Executor
+            OneAAStatAnalyzer [
+                fillcolor=lightgreen
+                label="{ OneAAStatAnalyzer | |
+                    Analyzes single\l
+                    A/A test statistics\l
+                    Inherits from Executor\l
+                }"
+            ]
+            
+            AAScoreAnalyzer [
+                fillcolor=lightgreen
+                label="{ AAScoreAnalyzer |
+                    + threshold: float\l
+                    + alpha: float\l |
+                    Scores A/A tests\l
+                    Finds best split\l
+                    Inherits from Executor\l
+                }"
+            ]
+            
+            ABAnalyzer [
+                fillcolor=lightgreen
+                label="{ ABAnalyzer |
+                    + multitest_method: ABNTestMethodsEnum\l
+                    + alpha: float\l
+                    + equal_variance: bool\l
+                    + quantiles: float\l
+                    + iteration_size: int\l |
+                    A/B test analyzer\l
+                    Multiple testing correction\l
+                    Inherits from Executor\l
+                }"
+            ]
+            
+            MatchingAnalyzer [
+                fillcolor=lightgreen
+                label="{ MatchingAnalyzer | |
+                    Analyzes matching\l
+                    quality and metrics\l
+                    Inherits from Executor\l
+                }"
+            ]
+        }
+        
+        // ========== ML EXECUTORS ==========
+        subgraph cluster_ml_executors {
+            label="ML Executors"
+            style="filled,rounded"
+            bgcolor="#f8e8f8"
+            
+            FaissNearestNeighbors [
+                fillcolor=lightgreen
+                label="{ FaissNearestNeighbors |
+                    + n_neighbors: int\l
+                    + two_sides: bool\l
+                    + test_pairs: bool\l
+                    + faiss_mode: str\l |
+                    Finds nearest neighbors\l
+                    Uses FAISS library\l
+                }"
+            ]
+        }
+    }
+    
+    // ========== EXPERIMENT HIERARCHY ==========
+    subgraph cluster_experiment {
+        label="Experiment Hierarchy"
+        style="dashed,rounded"
+        bgcolor="#f5f5f0"
+        
+        Experiment [
+            fillcolor=lightblue
+            label="{ Experiment |
+                + executors: list[Executor]\l
+                + transformer: bool\l
+                + key: str\l |
+                + execute(data): ExperimentData\l
+                + set_params(params): void\l
+                Chains executors\l
+            }"
+        ]
+        
+        OnRoleExperiment [
+            fillcolor=lightgreen
+            label="{ OnRoleExperiment |
+                + role: list[ABCRole]\l |
+                Executes on specific role\l
+            }"
+        ]
+        
+        ExperimentWithReporter [
+            fillcolor=lightyellow
+            label="{ ExperimentWithReporter |
+                + reporter: Reporter\l |
+                + one_iteration(data): Dataset\l
+                Adds reporting capability\l
+            }"
+        ]
+        
+        CycledExperiment [
+            fillcolor=lightgreen
+            label="{ CycledExperiment |
+                + n_iterations: int\l |
+                Runs n iterations\l
+            }"
+        ]
+        
+        GroupExperiment [
+            fillcolor=lightgreen
+            label="{ GroupExperiment |
+                + searching_role: ABCRole\l |
+                Runs on groups\l
+            }"
+        ]
+        
+        ParamsExperiment [
+            fillcolor=lightgreen
+            label="{ ParamsExperiment |
+                + params: dict\l
+                + flat_params: list\l |
+                Parameterized runs\l
+            }"
+        ]
+        
+        IfParamsExperiment [
+            fillcolor=lightgreen
+            label="{ IfParamsExperiment |
+                + stopping_criterion: IfExecutor\l |
+                Conditional params\l
+                with early stopping\l
+            }"
+        ]
+    }
+    
+    // ========== REPORTER HIERARCHY ==========
+    subgraph cluster_reporter {
+        label="Reporter Hierarchy"
+        style="dashed,rounded"
+        bgcolor="#f0f5f0"
+        
+        Reporter [
+            fillcolor=lightblue
+            label="{ «abstract» Reporter | |
+                + report(data): Any\l
+            }"
+        ]
+        
+        DictReporter [
+            fillcolor=lightyellow
+            label="{ «abstract» DictReporter |
+                + front: bool\l |
+                Returns dict results\l
+            }"
+        ]
+        
+        OnDictReporter [
+            fillcolor=lightyellow
+            label="{ «abstract» OnDictReporter |
+                + dict_reporter: DictReporter\l |
+                Wraps dict reporter\l
+            }"
+        ]
+        
+        DatasetReporter [
+            fillcolor=lightgreen
+            label="{ DatasetReporter | |
+                Converts dict to Dataset\l
+            }"
+        ]
+        
+        TestDictReporter [
+            fillcolor=lightyellow
+            label="{ «abstract» TestDictReporter |
+                + tests: list\l |
+                Extracts test results\l
+            }"
+        ]
+        
+        OneAADictReporter [
+            fillcolor=lightgreen
+            label="{ OneAADictReporter | |
+                Reports A/A test results\l
+            }"
+        ]
+        
+        AADatasetReporter [
+            fillcolor=lightgreen
+            label="{ AADatasetReporter | |
+                A/A results as Dataset\l
+            }"
+        ]
+        
+        ABDictReporter [
+            fillcolor=lightgreen
+            label="{ ABDictReporter | |
+                Reports A/B test results\l
+            }"
+        ]
+        
+        ABDatasetReporter [
+            fillcolor=lightgreen
+            label="{ ABDatasetReporter | |
+                A/B results as Dataset\l
+            }"
+        ]
+        
+        HomoDictReporter [
+            fillcolor=lightgreen
+            label="{ HomoDictReporter | |
+                Homogeneity test results\l
+            }"
+        ]
+        
+        HomoDatasetReporter [
+            fillcolor=lightgreen
+            label="{ HomoDatasetReporter | |
+                Homogeneity as Dataset\l
+            }"
+        ]
+        
+        AAPassedReporter [
+            fillcolor=lightgreen
+            label="{ AAPassedReporter | |
+                Reports passed A/A tests\l
+                Detects which tests passed\l
+            }"
+        ]
+        
+        AABestSplitReporter [
+            fillcolor=lightgreen
+            label="{ AABestSplitReporter | |
+                Reports best split\l
+                Adds split column to data\l
+            }"
+        ]
+        
+        MatchingDictReporter [
+            fillcolor=lightgreen
+            label="{ MatchingDictReporter |
+                + searching_class: type\l |
+                Matching results dict\l
+            }"
+        ]
+        
+        MatchingQualityDictReporter [
+            fillcolor=lightgreen
+            label="{ MatchingQualityDictReporter | |
+                Matching quality dict\l
+            }"
+        ]
+        
+        MatchingDatasetReporter [
+            fillcolor=lightgreen
+            label="{ MatchingDatasetReporter | |
+                Matching as Dataset\l
+            }"
+        ]
+        
+        MatchingQualityDatasetReporter [
+            fillcolor=lightgreen
+            label="{ MatchingQualityDatasetReporter | |
+                Quality as Dataset\l
+            }"
+        ]
+    }
+    
+    // ========== UI/OUTPUT HIERARCHY ==========
+    subgraph cluster_ui {
+        label="UI/Output Classes"
+        style="dashed,rounded"
+        bgcolor="#f5f0f5"
+        
+        Output [
+            fillcolor=lightpink
+            label="{ Output |
+                + resume: Dataset\l
+                + resume_reporter: Reporter\l
+                + additional_reporters: dict\l |
+                + extract(data): void\l
+                Formats experiment output\l
+            }"
+        ]
+        
+        AAOutput [
+            fillcolor=lightpink
+            label="{ AAOutput |
+                + best_split: Dataset\l
+                + experiments: Dataset\l
+                + aa_score: Dataset\l
+                + best_split_statistic: Dataset\l |
+                A/A test output\l
+            }"
+        ]
+        
+        ABOutput [
+            fillcolor=lightpink
+            label="{ ABOutput |
+                + multitest: Dataset | str\l
+                + sizes: Dataset\l |
+                A/B test output with\l
+                multiple testing correction\l
+            }"
+        ]
+        
+        HomoOutput [
+            fillcolor=lightpink
+            label="{ HomoOutput |
+                + resume: Dataset\l |
+                Homogeneity test output\l
+            }"
+        ]
+        
+        MatchingOutput [
+            fillcolor=lightpink
+            label="{ MatchingOutput |
+                + full_data: Dataset\l
+                + quality_results: Dataset\l
+                + indexes: Dataset\l |
+                Matching analysis output\l
+            }"
+        ]
+        
+        ExperimentShell [
+            fillcolor=lightpink
+            label="{ ExperimentShell |
+                + experiment: Experiment\l
+                + output: Output\l |
+                + execute(data): Output\l
+                UI wrapper for experiments\l
+            }"
+        ]
+        
+        AATest [
+            fillcolor=lightpink
+            label="{ AATest |
+                + precision_mode: bool\l
+                + control_size: float\l
+                + stratification: bool\l
+                + n_iterations: int\l
+                + sample_size: float\l |
+                A/A test shell\l
+                with configuration\l
+            }"
+        ]
+        
+        ABTest [
+            fillcolor=lightpink
+            label="{ ABTest |
+                + additional_tests: list[str]\l
+                + multitest_method: str\l |
+                A/B test shell with\l
+                configurable tests\l
+            }"
+        ]
+        
+        HomogeneityTest [
+            fillcolor=lightpink
+            label="{ HomogeneityTest | |
+                Homogeneity test shell\l
+                Uses predefined experiment\l
+            }"
+        ]
+        
+        Matching [
+            fillcolor=lightpink
+            label="{ Matching |
+                + group_match: bool\l
+                + distance: str\l
+                + metric: str\l
+                + bias_estimation: bool\l
+                + quality_tests: list\l |
+                Matching analysis shell\l
+            }"
+        ]
+    }
+    
+    // ========== INHERITANCE RELATIONSHIPS ==========
+    // Solid arrows for inheritance
+    Executor -> Calculator [arrowhead=empty]
+    Executor -> IfExecutor [arrowhead=empty]
+    Executor -> OneAAStatAnalyzer [arrowhead=empty]
+    Executor -> AAScoreAnalyzer [arrowhead=empty]
+    Executor -> ABAnalyzer [arrowhead=empty]
+    Executor -> MatchingAnalyzer [arrowhead=empty]
+    
+    Calculator -> Comparator [arrowhead=empty]
+    Calculator -> AASplitter [arrowhead=empty]
+    Calculator -> Transformer [arrowhead=empty]
+    Calculator -> Encoder [arrowhead=empty]
+    Calculator -> GroupOperator [arrowhead=empty]
+    Calculator -> MLExecutor [arrowhead=empty]
+    
+    Comparator -> GroupDifference [arrowhead=empty]
+    Comparator -> GroupSizes [arrowhead=empty]
+    Comparator -> PSI [arrowhead=empty]
+    Comparator -> MahalanobisDistance [arrowhead=empty]
+    Comparator -> StatHypothesisTesting [arrowhead=empty]
+    Comparator -> PowerTesting [arrowhead=empty]
+    
+    PowerTesting -> MDEBySize [arrowhead=empty]
+    
+    StatHypothesisTesting -> TTest [arrowhead=empty]
+    StatHypothesisTesting -> KSTest [arrowhead=empty]
+    StatHypothesisTesting -> UTest [arrowhead=empty]
+    StatHypothesisTesting -> Chi2Test [arrowhead=empty]
+    
+    AASplitter -> AASplitterWithStratification [arrowhead=empty]
+    
+    Transformer -> Shuffle [arrowhead=empty]
+    Transformer -> NaFiller [arrowhead=empty]
+    Transformer -> CategoryAggregator [arrowhead=empty]
+    Transformer -> ConstFilter [arrowhead=empty]
+    Transformer -> CorrFilter [arrowhead=empty]
+    Transformer -> CVFilter [arrowhead=empty]
+    Transformer -> NanFilter [arrowhead=empty]
+    Transformer -> OutliersFilter [arrowhead=empty]
+    
+    Encoder -> DummyEncoder [arrowhead=empty]
+    
+    GroupOperator -> SMD [arrowhead=empty]
+    GroupOperator -> Bias [arrowhead=empty]
+    GroupOperator -> MatchingMetrics [arrowhead=empty]
+    
+    IfExecutor -> IfAAExecutor [arrowhead=empty]
+    
+    MLExecutor -> FaissNearestNeighbors [arrowhead=empty]
+    
+    Experiment -> OnRoleExperiment [arrowhead=empty]
+    Experiment -> ExperimentWithReporter [arrowhead=empty]
+    
+    ExperimentWithReporter -> CycledExperiment [arrowhead=empty]
+    ExperimentWithReporter -> ParamsExperiment [arrowhead=empty]
+    ExperimentWithReporter -> GroupExperiment [arrowhead=empty]
+    ParamsExperiment -> IfParamsExperiment [arrowhead=empty]
+    
+    Reporter -> DictReporter [arrowhead=empty]
+    Reporter -> OnDictReporter [arrowhead=empty]
+    Reporter -> AAPassedReporter [arrowhead=empty]
+    Reporter -> AABestSplitReporter [arrowhead=empty]
+    
+    OnDictReporter -> DatasetReporter [arrowhead=empty]
+    
+    DictReporter -> TestDictReporter [arrowhead=empty]
+    DictReporter -> MatchingDictReporter [arrowhead=empty]
+    
+    TestDictReporter -> OneAADictReporter [arrowhead=empty]
+    TestDictReporter -> MatchingQualityDictReporter [arrowhead=empty]
+    
+    OneAADictReporter -> ABDictReporter [arrowhead=empty]
+    OneAADictReporter -> AADatasetReporter [arrowhead=empty]
+    OneAADictReporter -> HomoDictReporter [arrowhead=empty]
+    
+    ABDictReporter -> ABDatasetReporter [arrowhead=empty]
+    HomoDictReporter -> HomoDatasetReporter [arrowhead=empty]
+    MatchingQualityDictReporter -> MatchingQualityDatasetReporter [arrowhead=empty]
+    
+    DatasetReporter -> MatchingDatasetReporter [arrowhead=empty]
+    
+    Output -> AAOutput [arrowhead=empty]
+    Output -> ABOutput [arrowhead=empty]
+    Output -> HomoOutput [arrowhead=empty]
+    Output -> MatchingOutput [arrowhead=empty]
+    
+    ExperimentShell -> AATest [arrowhead=empty]
+    ExperimentShell -> ABTest [arrowhead=empty]
+    ExperimentShell -> HomogeneityTest [arrowhead=empty]
+    ExperimentShell -> Matching [arrowhead=empty]
+    
+    // ========== COMPOSITION/USAGE RELATIONSHIPS ==========
+    // Dashed arrows for composition/usage
+    Experiment -> Executor [style=dashed, label="uses list of", arrowhead=open]
+    ExperimentWithReporter -> Reporter [style=dashed, label="has", arrowhead=open]
+    DatasetReporter -> DictReporter [style=dashed, label="wraps", arrowhead=open]
+    OnDictReporter -> DictReporter [style=dashed, label="wraps", arrowhead=open]
+    Output -> Reporter [style=dashed, label="uses", arrowhead=open]
+    ExperimentShell -> Experiment [style=dashed, label="wraps", arrowhead=open]
+    ExperimentShell -> Output [style=dashed, label="has", arrowhead=open]
+    IfExecutor -> Executor [style=dashed, label="contains 2", arrowhead=open]
+    IfParamsExperiment -> IfExecutor [style=dashed, label="has stopping\ncriterion", arrowhead=open]
+    MatchingDatasetReporter -> MatchingDictReporter [style=dashed, label="uses", arrowhead=open]
+    FaissNearestNeighbors -> MahalanobisDistance [style=dashed, label="may use", arrowhead=open]
+    AAScoreAnalyzer -> AASplitter [style=dashed, label="rebuilds from id", arrowhead=open]
+    
+    // Main user classes usage
+    ABTest -> ABAnalyzer [style=dashed, label="uses", arrowhead=open]
+    ABTest -> OnRoleExperiment [style=dashed, label="creates", arrowhead=open]
+    HomogeneityTest -> OneAAStatAnalyzer [style=dashed, label="uses", arrowhead=open]
+    AATest -> ParamsExperiment [style=dashed, label="creates", arrowhead=open]
+    AATest -> IfParamsExperiment [style=dashed, label="may create", arrowhead=open]
+    AATest -> AAScoreAnalyzer [style=dashed, label="uses", arrowhead=open]
+    Matching -> FaissNearestNeighbors [style=dashed, label="uses", arrowhead=open]
+    Matching -> MatchingMetrics [style=dashed, label="uses", arrowhead=open]
+    Matching -> MatchingAnalyzer [style=dashed, label="uses", arrowhead=open]
+    
+    // Legend
+    subgraph cluster_legend {
+        label="Legend"
+        style="filled,rounded"
+        bgcolor="#fafafa"
+        
+        // Arrow types examples
+        node[shape=box, style=filled, fillcolor=white]
+        inherit_from [label="Parent"]
+        inherit_to [label="Child"]
+        inherit_from -> inherit_to [arrowhead=empty, label="Inheritance"]
+        
+        compose_from [label="Container"]
+        compose_to [label="Component"]
+        compose_from -> compose_to [style=dashed, arrowhead=open, label="Composition/Uses"]
+        
+        // Color coding examples
+        node[shape=record, style="filled,rounded"]
+        base_example [fillcolor=lightblue, label="{ Base Class | Foundation }"]
+        abstract_example [fillcolor=lightyellow, label="{ «abstract» Class | Template }"]
+        concrete_example [fillcolor=lightgreen, label="{ Concrete Class | Implementation }"]
+        ui_example [fillcolor=lightpink, label="{ UI/Shell Class | User Interface }"]
+    }
+}

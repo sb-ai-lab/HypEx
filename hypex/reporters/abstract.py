@@ -104,13 +104,22 @@ class TestDictReporter(DictReporter):
 
     @staticmethod
     def _convert_struct_dict_to_dataset(data: dict) -> Dataset:
+        def _is_truthy(v) -> bool:
+            """Return True iff v represents a truthy pass value.
+
+            Handles the case where transpose().to_records() stringifies booleans
+            (e.g. numpy.bool_(False) → "False"), so a plain bool() check would
+            incorrectly treat the non-empty string "False" as True.
+            """
+            if v is None:
+                return False
+            if isinstance(v, str):
+                return v.lower() == "true"
+            return bool(v)
+
         def rename_passed(data: dict[str, bool]):
             return {
-                c: (
-                    ("NOT OK" if (v is True or v == "True") else "OK")
-                    if "pass" in c
-                    else v
-                )
+                c: (("NOT OK" if _is_truthy(v) else "OK") if "pass" in c else v)
                 for c, v in data.items()
             }
 

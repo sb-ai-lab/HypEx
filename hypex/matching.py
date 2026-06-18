@@ -216,7 +216,6 @@ class Matching(ExperimentShell):
         encode_categories: bool = True,
     ):
         metric = "ate"
-
         super().__init__(
             experiment=self._make_experiment(
                 group_match,

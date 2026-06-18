@@ -65,7 +65,7 @@ class CUPACExecutor(MLExecutor):
 
         if wrong_models:
             raise ValueError(
-                f"Wrong cupac models: {wrong_models}. Available models: {list(CUPAC_MODELS.keys())}"
+                f"Wrong or not installed cupac models: {wrong_models}. Available models: {list(CUPAC_MODELS.keys())}"
             )
 
     @staticmethod
@@ -170,11 +170,16 @@ class CUPACExecutor(MLExecutor):
         # Calculate maximum lag for each target (max across target lags and cofounder feature lags)
         max_lags = {}
         for target, lags in targets.items():
-            if lags:
-                max_lag = max(lags.keys())
-                for feature in cofounders[target]:
-                    if features.get(feature):
-                        max_lag = max(max(features[feature].keys()), max_lag)
+            if not lags:
+                raise ValueError(
+                    f"Target '{target}' has no lag periods defined. "
+                    f"CUPAC requires at least one historical period. "
+                    f"Assign PreTargetRole(lag=N) to historical columns of this target."
+                )
+            max_lag = max(lags.keys())
+            for feature in cofounders[target]:
+                if features.get(feature):
+                    max_lag = max(max(features[feature].keys()), max_lag)
             max_lags[target] = max_lag
 
         # Build training and prediction structures for each target
@@ -361,15 +366,15 @@ class CUPACExecutor(MLExecutor):
 
                 prediction = self.calc(mode="predict", model=fitted_model, X=X_predict)
 
-                cov_xy = ((prediction - prediction.mean()) * (data.ds[target] - data.ds[target].mean())).mean()
-                var_x = ((prediction - prediction.mean()) ** 2).mean()
-
-                if var_x == 0 or var_x != var_x:
-                    theta = 0
-                else:
-                    theta = cov_xy / var_x
-                    
-                target_cupac = data.ds[target] - (prediction - prediction.mean()) * theta
+                # Adjust target via CUPED theta-residualization on the prediction:
+                # y - theta * (pred - E[pred]) with theta = Cov(pred, y) / Var(pred).
+                # theta scales the prediction onto the target so the adjustment is
+                # variance-optimal rather than assuming a 1:1 (theta=1) relationship.
+                theta = self.extension._cuped_theta(
+                    data.ds[target].data.iloc[:, 0], prediction.data.iloc[:, 0]
+                )
+                explained_variation = (prediction - prediction.mean()) * theta
+                target_cupac = data.ds[target] - explained_variation
 
                 target_cupac = target_cupac.rename({target: f"{target}_cupac"})
                 data.additional_fields = data.additional_fields.add_column(

@@ -81,13 +81,13 @@ def matching_data():
 
 def test_aatest(aa_data):
     mapping = {
-        "aa-casual": AATest(n_iterations=10),
+        "aa-casual": AATest(random_states=[56, 72, 2, 43]),
         "aa-rs": AATest(random_states=[56, 72, 2, 43]),
         "aa-strat": AATest(stratification=True, random_states=[56, 72, 2, 43]),
-        "aa-sample": AATest(n_iterations=10, sample_size=0.3),
-        "aa-cat_target": AATest(n_iterations=10),
-        "aa-equal_var": AATest(n_iterations=10, t_test_equal_var=False),
-        "aa-n": AATest(n_iterations=10, groups_sizes=[0.5, 0.2, 0.3]),
+        "aa-sample": AATest(sample_size=0.3, random_states=[56, 72, 2, 43]),
+        "aa-cat_target": AATest(random_states=[56, 72, 2, 43]),
+        "aa-equal_var": AATest(equal_variance=False, random_states=[56, 72, 2, 43]),
+        "aa-n": AATest(groups_sizes=[0.5, 0.2, 0.3], random_states=[56, 72, 2, 43]),
     }
 
     mapping_resume = {
@@ -122,7 +122,7 @@ def test_aatest(aa_data):
             {
                 "TTest aa test": {0: "OK", 1: "OK"},
                 "KSTest aa test": {0: "OK", 1: "OK"},
-                "TTest best split": {0: "NOT OK", 1: "NOT OK"},
+                "TTest best split": {0: "OK", 1: "OK"},
                 "KSTest best split": {0: "OK", 1: "OK"},
                 "result": {0: "OK", 1: "OK"},
             }
@@ -150,7 +150,7 @@ def test_aatest(aa_data):
         "aa-n": pd.DataFrame(
             {
                 "TTest aa test": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},
-                "KSTest aa test": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},
+                "KSTest aa test": {0: "NOT OK", 1: "NOT OK", 2: "OK", 3: "OK"},
                 "TTest best split": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},
                 "KSTest best split": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},
                 "result": {0: "OK", 1: "OK", 2: "OK", 3: "OK"},

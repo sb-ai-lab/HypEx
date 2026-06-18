@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from typing import Any, ClassVar
 
 from ..comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
@@ -20,10 +21,8 @@ class OneAADictReporter(TestDictReporter):
     @staticmethod
     def get_splitter_id(data: ExperimentData):
         for c in [AASplitter, AASplitterWithStratification]:
-            try:
+            with contextlib.suppress(NotFoundInExperimentDataError):
                 return data.get_one_id(c, ExperimentDataEnum.additional_fields)
-            except NotFoundInExperimentDataError:
-                pass  # The splitting was done by another class
 
     def extract_group_difference(self, data: ExperimentData) -> dict[str, Any]:
         group_difference_ids = data.get_ids(GroupDifference)[GroupDifference.__name__][
