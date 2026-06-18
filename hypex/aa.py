@@ -14,7 +14,7 @@ from .reporters import DatasetReporter
 from .reporters.aa import OneAADictReporter
 from .splitters import AASplitter, AASplitterWithStratification
 from .ui.aa import AAOutput
-from .ui.base import ExperimentShell, ExperimentOutput
+from .ui.base import ExperimentOutput, ExperimentShell
 from .utils import SpaceEnum
 
 AA_METRICS = Experiment(
@@ -102,6 +102,13 @@ class AATest(ExperimentShell):
         t_test_equal_var (bool, optional): If True (default), perform a standard independent 2 sample
             test that assumes equal population variances. If False, perform Welch's t-test,
             which does not assume equal population variance.
+        early_stopping (bool, optional): If True, stop iterating as soon as the first
+            "clean" split is found - one where no test flags a difference on any feature
+            (all features show OK). The remaining iterations are skipped, so the run is
+            faster but the aggregate per-feature AA score (the empirical type-1 error over
+            all iterations) is no longer meaningful and should not be read as a homogeneity
+            guarantee. If no clean split is found within ``n_iterations``, the full run is
+            kept and the best available split is selected. Defaults to False.
 
 
     Examples
@@ -199,6 +206,7 @@ class AATest(ExperimentShell):
         random_states: Iterable[int] | None = None,
         t_test_equal_var: bool | None = None,
         groups_sizes: list[float] | None = None,
+        early_stopping: bool = False,
     ):
         if n_iterations is None:
             if precision_mode:
@@ -219,6 +227,9 @@ class AATest(ExperimentShell):
                     groups_sizes,
                 ),
                 reporter=DatasetReporter(OneAADictReporter(front=False)),
+                stopping_criterion=(
+                    IfAAExecutor(all_features_passed=True) if early_stopping else None
+                ),
             )
         ]
         if sample_size:
@@ -245,7 +256,7 @@ class AATest(ExperimentShell):
                 )
             )
         experiment_params.append(AAScoreAnalyzer())
-        
+
         super().__init__(
             experiment=Experiment(
                 experiment_params,
