@@ -269,6 +269,26 @@ class GroupsComparator(BaseComparator, ABC):
         baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
         compared_data = cls._split_ds_into_columns(data=data_buckets)
         return baseline_data, compared_data
+    
+    @classmethod
+    def _split_for_columns_mode(
+        cls,
+        baseline_field_data: Dataset,
+        target_fields_data: Dataset,
+    ) -> GroupingDataType:
+        baseline_field_data = cls._field_validity_check(
+            baseline_field_data, "baseline_field_data", "columns"
+        )
+        if len(target_fields_data.columns) == 0:
+            raise NoRequiredArgumentError(target_fields_data)
+
+        baseline_data = [(f"{baseline_field_data.columns[0]}", baseline_field_data)]
+        compared_data = [
+            (f"{column}", target_fields_data[column])
+            for column in target_fields_data.columns
+        ]
+
+        return baseline_data, compared_data
 
     @classmethod
     def _split_for_columns_in_groups_mode(
@@ -460,6 +480,7 @@ class GroupsComparator(BaseComparator, ABC):
             compare_by=compare_by,
             **kwargs,
         )
+            
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         """

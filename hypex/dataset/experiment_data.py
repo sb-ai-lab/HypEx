@@ -140,8 +140,7 @@ class ExperimentData:
     @staticmethod
     def _parse_id_for_search(id_str: str) -> tuple[str, str | None]:
         """Safely parse composite ID strings using the configured split symbol.
-
-        Uses str.partition() to avoid index errors when the separator is absent.
+        Extracts the first part (class name) and the last part (key).
 
         Args:
             id_str: ID string potentially containing the split symbol.
@@ -149,8 +148,10 @@ class ExperimentData:
         Returns:
             Tuple of (prefix, suffix). Suffix is None if the split symbol is not found.
         """
-        prefix, sep, suffix = id_str.partition(ID_SPLIT_SYMBOL)
-        return prefix, suffix if sep else None
+        parts = id_str.split(ID_SPLIT_SYMBOL)
+        prefix = parts[0]
+        suffix = parts[-1] if len(parts) > 1 else None
+        return prefix, suffix
 
     def check_hash(self, executor_id: int | str, space: ExperimentDataEnum) -> bool:
         """Check if an executor ID exists in a specified data space.
