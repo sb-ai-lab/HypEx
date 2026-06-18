@@ -25,7 +25,7 @@ from ..utils import (
     NotFoundInExperimentDataError,
 )
 from ..utils.adapter import Adapter
-from .roles import AdditionalRole, ABCRole
+from .roles import AdditionalRole, ABCRole, DefaultRole
 
 logger = logging.getLogger(__name__)
 
@@ -246,17 +246,21 @@ class ExperimentData:
             )
             return self
 
-        # Multi-column Dataset — rename first column to exec_id and merge
-        rename_dict = {value.columns[0]: exec_id}
+        # Multi-column Dataset — rename all columns to avoid naming collisions
+        rename_dict = {col: f"{exec_id}_{col}" for col in value.columns}
         renamed_value = value.rename(names=rename_dict)
         self._data = self._data.merge(
-            right=renamed_value, 
-            left_index=True, 
+            right=renamed_value,
+            left_index=True,
             right_index=True
         )
-        # Apply the provided role to the renamed column (exec_id)
-        # Other columns keep their original roles from value.roles (via merge)
-        self._data.roles[exec_id] = normalized_role
+        # Apply roles: the first column gets the normalized_role, others keep their original roles
+        for i, col in enumerate(value.columns):
+            new_col_name = f"{exec_id}_{col}"
+            if i == 0:
+                self._data.roles[new_col_name] = normalized_role
+            else:
+                self._data.roles[new_col_name] = value.roles.get(col, DefaultRole())
         return self
     
     @property
