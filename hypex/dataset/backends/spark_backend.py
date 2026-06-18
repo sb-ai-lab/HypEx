@@ -1574,6 +1574,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                         f"Matrix dimensions not aligned: {self.data.shape} dot {pd_other.shape}"
                     )
                 pd_other.index = self.data.columns
+                pd_other.columns = [str(i) for i in range(other.shape[1])]
                 schema = ",".join([f"`{i}` double" for i in range(other.shape[1])])
         elif isinstance(other, pd.DataFrame):
             pd_other = other

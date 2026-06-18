@@ -18,6 +18,7 @@ class DummyEncoder(Encoder):
         Encoder: The base abstract class for all data encoders in the HypEx library.
     
     Example:
+    
         >>> # Typically used internally by the preprocessing pipeline
         >>> encoder = DummyEncoder(target_roles="category_column")
         >>> encoded_data = encoder.execute(experiment_data)

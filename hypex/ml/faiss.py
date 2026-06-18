@@ -206,7 +206,7 @@ class FaissNearestNeighbors(MLExecutor):
         """
         mahalonobis = kwargs.get('mahalonobis')
         faiss_cls = backend_factory.resolve_backend(FaissExtension, data)
-        return faiss_cls(n_neighbors=n_neighbors or 1, faiss_mode=faiss_mode).calc(
+        return faiss_cls(n_neighbors=n_neighbors or 1, faiss_mode=faiss_mode, mahalonobis=mahalonobis).calc(
             data=data, test_data=test_data
         )
 
@@ -289,7 +289,7 @@ class FaissNearestNeighbors(MLExecutor):
         # for result in compare_result.values():
         for group, result in compare_result.items():
             #TODO: find solution without `data` field
-            result.data.to_pandas().to_csv(f"faiss_{group}.csv")
+            # result.data.to_pandas().to_csv(f"faiss_{group}.csv")
             nans += (
                 result.data.isna().sum().sum()
             )

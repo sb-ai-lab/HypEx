@@ -209,7 +209,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         if isinstance(item, (slice, int)):
             return self.data.iloc[item]
-        if isinstance(item, (str, list)):
+        if isinstance(item, (str, list, pd.Index)):
             return self.data[item]
         if isinstance(item, pd.DataFrame):
             if len(item.columns) == 1:
@@ -1462,9 +1462,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         if isinstance(other, np.ndarray):
             other_df = pd.DataFrame(
                 data=other,
-                columns=self.columns if other.shape[1] == self.shape[1] else None,
+                index=self.columns if other.shape[0] == self.shape[1] else None,
             )
-            result = self.data.dot(other_df.T)
+            result = self.data.dot(other_df)
             result.columns = (
                 self.columns if other.shape[1] == self.shape[1] else result.columns
             )

@@ -42,6 +42,7 @@ class Encoder(Calculator):
     def _inner_function(data: Dataset, **kwargs) -> Dataset:
         raise AbstractMethodError
 
+    #TODO: reassing from `additional_fields` to `ds`
     def _set_value(
         self, data: ExperimentData, value: Dataset, key=None
     ) -> ExperimentData:

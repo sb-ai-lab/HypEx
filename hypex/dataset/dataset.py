@@ -519,7 +519,7 @@ class DatasetAdapter(Adapter):
     ) -> Dataset | SmallDataset:
         columns = range(data.shape[1]) if len(roles) == 0 else list(roles.keys())
         data = pd.DataFrame(data=data, columns=columns)
-        result = SmallDataset(
+        result = Dataset(
             roles=roles,
             data=data,
         )

@@ -202,6 +202,9 @@ class AdditionalPreTargetRole(AdditionalRole, PreTargetRole):
 class AdditionalMatchingRole(AdditionalRole):
     _role_name: RoleNameType = "AdditionalMatching"
 
+class AdditionalStatisticRole(AdditionalRole, StatisticRole):
+    _role_name: RoleNameType = "AdditionalStatistic"
+
 
 default_roles: dict[RoleNameType, ABCRole] = {
     "info": InfoRole(),

@@ -20,6 +20,7 @@ import gc
 import os
 import builtins
 import threading
+import uuid
 
 
 # Spark imports
@@ -43,7 +44,6 @@ class FaissExtension(MLExtension):
     """
     Faiss master-abstract and master-backend class in one instance.
     """
-
     def __init__(
         self, 
         n_neighbors: int = 1, 
@@ -82,8 +82,15 @@ class PandasFaissExtension(FaissExtension):
     """
     Faiss backend-slave class for faiss pairs matching.
     """
-    def __init__(self, n_neighbors = 1, faiss_mode = "auto"):
-        super().__init__(n_neighbors, faiss_mode)
+    def __init__(self, n_neighbors = 1, faiss_mode = "auto", mahalonobis: Dataset = None,):
+        super().__init__(n_neighbors, faiss_mode, mahalonobis)
+
+    @staticmethod
+    def _mahalonobis_transform(data: Dataset, mahalonobis: Dataset | None) -> Dataset:
+        if mahalonobis is None:
+            return data
+        else:
+            return data.dot(mahalonobis)
 
     @staticmethod
     def _prepare_indexes(index: np.ndarray, dist: np.ndarray, k: int):
@@ -122,25 +129,27 @@ class PandasFaissExtension(FaissExtension):
 
     def _fit(
             self, 
-            X: np.ndarray, 
-            test: np.ndarray
+            data: Dataset,
+            test_data: Dataset
     ) -> None:
         """
         """
-        self.index = faiss.IndexFlatL2(X.shape[1])
+        X = self._mahalonobis_transform(data, self.mahalonobis).data.values
+        self.index = faiss.IndexIDMap(faiss.IndexFlatL2(X.shape[1]))
         if (
             (
                 (len(X) > 1_000_000 and self.faiss_mode == "auto")
                 or self.faiss_mode == "fast"
             )
             and len(X) > 1_000
-            and len(test) > 1_000
+            and len(test_data) > 1_000
         ):
             m = 4 # heuristic
             n_clusters = np.sqrt(len(X) / m)
-            self.index = faiss.IndexIVFFlat(self.index, X.shape[1], n_clusters)
-            self.index.train(X)
-        self.index.add(X)
+            _index = faiss.IndexIVFFlat(self.index, X.shape[1], n_clusters)
+            _index.train(X)
+            self.index = faiss.IndexIDMap(_index)
+        self.index.add_with_ids(X, data.index.tolist())
         
     def calc(
             self, 
@@ -150,17 +159,21 @@ class PandasFaissExtension(FaissExtension):
             **kwargs
     ):
         mode = mode or "auto"
-        X = data.data.values
-        test = test_data.data.values
+        # X = self._mahalonobis_transform(data, self.mahalonobis).data.values
+        # test = test_data.data.values
         if mode in ["auto", "fit"]:
-            self._fit(X, test)
+            # self._fit(X, test)
+            self._fit(data, test_data)
         if mode in ["auto", "predict"]:
             if test_data is None:
                 raise ValueError("test_data is needed for evaluation")
             if self.index is None:
                 raise ValueError("index is not created yet. Raise 'fit' before 'predict'.")
 
-            X = test_data.data.values if mode == "auto" else data.data.values
+            X = (
+                self._mahalonobis_transform(test_data, self.mahalonobis).data.values if mode == "auto" 
+                else self._mahalonobis_transform(data, self.mahalonobis).data.values
+            )
             return self._predict(data, test_data, X)
         return self
 
@@ -536,15 +549,16 @@ class SparkFaissExtension(FaissExtension):
         ------
             result: `RDD` resulting table with neighbors indexes and distances to them.
         """
-
         session = test_data.sparkSession
-        tmp_dir = "__partition_indexes"
+        tmp_dir = f"__partition_indexes"
         os.makedirs(tmp_dir, exist_ok=True) 
         index_files_list = []
+        
 
         for partition_index, shard in enumerate(self._sharded_rdd.toLocalIterator()):
             partition_indexes = faiss.deserialize_index(shard)
-            index_file_name = f"__{partition_index}_partition_index.index"
+            run_id = uuid.uuid1().hex[:8]
+            index_file_name = f"__{partition_index}_partition_index_{run_id}.index"
             faiss.write_index(
                 partition_indexes,
                 f"./{tmp_dir}/{index_file_name}" 

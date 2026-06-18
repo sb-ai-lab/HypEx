@@ -33,7 +33,7 @@ class GroupOperator(
 
     @property
     def search_types(self):
-        return None
+        return [int, float]
 
     @classmethod
     @abstractmethod

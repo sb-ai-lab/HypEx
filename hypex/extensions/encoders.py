@@ -10,6 +10,7 @@ from ..dataset.backends import PandasDataset, SparkDataset
 from .abstract import Extension
 
 from ..utils.registry import backend_factory
+from ..utils import Adapter
 
 # TODO: needs to be removed due to migration to ml module.
 class DummyEncoderExtension(Extension):
@@ -27,6 +28,7 @@ class PandasDummyEncoderExtension(DummyEncoderExtension):
     ):
         dummies_df = pd.get_dummies(
             data=data[target_cols].data, drop_first=True, dtype=int
+            # data=data.data, columns=Adapter.to_list(target_cols), drop_first=True, dtype=int # af -> ds variant
         )
         # Setting roles to the dummies in additional fields based on the original
         # roles by searching based on the part of the dummy column name
@@ -50,6 +52,7 @@ class SparkDummyEncoderExtension(DummyEncoderExtension):
     ):
         dummies_df = ps.get_dummies(
             data=data[target_cols].data, drop_first=True, dtype=int
+            # data=data.data, columns=Adapter.to_list(target_cols), drop_first=True, dtype=int # af -> ds variant
         )
 
         roles = {

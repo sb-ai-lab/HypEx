@@ -15,9 +15,11 @@ from ..dataset import (
     FeatureRole,
     InfoRole,
     TargetRole,
+    AdditionalStatisticRole
 )
 from ..extensions.scipy_stats import NormCDF
 from ..extensions.scipy_linalg import LstsqExtension
+from ..utils import ID_SPLIT_SYMBOL
 from ..utils.enums import ExperimentDataEnum
 from ..utils.errors import NoneArgumentError
 from ..utils.registry import backend_factory
@@ -214,20 +216,10 @@ class MatchingMetrics(GroupOperator):
         bias = kwargs.get("bias", {})
         if bias and len(bias) > 0:
             if metric in ["atc", "ate"]:
-                control_bias: Dataset = bias["control"]
-                control_bias = control_bias.add_column(itc.index, {'index': InfoRole()}).set_index('index')
-                control_bias.index.name = None
-                # itc -= Dataset.from_dict(
-                #     {"test": bias["control"]}, roles={}, index=itc.index
-                # )
+                control_bias = bias["control"]
                 itc -= control_bias
             if metric in ["att", "ate"]:
-                test_bias: Dataset = bias["test"]
-                test_bias = test_bias.add_column(itt.index, {'index': InfoRole()}).set_index('index')
-                test_bias.index.name = None
-                # itt += Dataset.from_dict(
-                #     {"control": bias["test"]}, roles={}, index=itt.index
-                # )
+                test_bias = bias["test"]
                 itt += test_bias
 
         itc_len = len(itc)
@@ -361,6 +353,7 @@ class MatchingMetrics(GroupOperator):
 
         return matched_data
 
+    # TODO: fix bias, as now it is in `additional_fields` not in `variables`
     def execute(self, data: ExperimentData) -> ExperimentData:
         """
         Main execution method for calculating matching metrics.
@@ -377,14 +370,21 @@ class MatchingMetrics(GroupOperator):
             matching metrics stored in the `variables` space.
         """
         group_field, target_fields = self._get_fields(data=data)
-        bias = (
-            data.variables[data.get_one_id(Bias, ExperimentDataEnum.variables)]
-            if len(
-                data.get_ids(Bias, ExperimentDataEnum.variables)["Bias"]["variables"]
+        bias = data.field_search(AdditionalStatisticRole())
+        if len(bias) > 0:
+            bias_groups = list(
+                data.ds[group_field]
+                .merge(right=data.additional_fields[bias], left_index=True, right_index=True)
+                .groupby(group_field)
             )
-            > 0
-            else None
-        )
+            bias = {
+                "control": bias_groups[0][1][bias],
+                "test": bias_groups[1][1][bias]
+            }
+
+        else:
+            bias = None
+            
         t_data = deepcopy(data.ds)
         if len(target_fields) != 2:
             matched_data = self._prepare_new_target(data, t_data, group_field)
@@ -420,20 +420,154 @@ class MatchingMetrics(GroupOperator):
 
 
 class Bias(GroupOperator):
+    """
+    Calculator for estimating selection bias after matching.
+
+    This operator quantifies the residual bias between treatment and control
+    groups that remains after the matching procedure. It uses a linear
+    regression model (via ``LstsqExtension``) trained on the matched sample
+    to predict the counterfactual outcome, then computes the difference
+    between the observed and predicted values.
+
+    The bias is defined as:
+        - For treatment group:  bias_t = E[Y(0) | T=1] - E[Y(0) | T=0]
+        - For control group:    bias_c = E[Y(1) | T=1] - E[Y(1) | T=0]
+
+    where Y(0) and Y(1) are potential outcomes under control and treatment,
+    and T is the treatment assignment indicator.
+
+    The computation proceeds as follows:
+        1. For each group, fit a linear model: target ~ features
+           using the matched observations as the training signal.
+        2. Compute the matched (counterfactual) features by averaging
+           over the matched pairs for each observation.
+        3. Estimate bias as: (X - X_matched) · coefficients,
+           where X are the original features and X_matched are the
+           pair-averaged features.
+
+    The operator automatically handles cases where one group lacks
+    matched observations (e.g., one-sided matching) by computing bias
+    only for the group with available matched data.
+
+    Inherits from:
+        GroupOperator: The base class for group-based operators in the HypEx library.
+
+    Examples:
+        ```python
+            # Typically used internally by the Matching pipeline
+            from hypex.operators import Bias
+            from hypex.dataset import TreatmentRole, TargetRole
+
+            bias_calc = Bias(
+                grouping_role=TreatmentRole(),
+                target_roles=[TargetRole()],
+            )
+            result = bias_calc.execute(experiment_data)
+        ```
+    Args:
+        grouping_role (ABCRole | None, optional): The role defining the
+            treatment assignment column (e.g., ``TreatmentRole()``).
+            Defaults to None, which falls back to ``GroupingRole()``.
+        target_roles (list[ABCRole] | None, optional): The role(s) defining
+            the target outcome column(s) for which bias should be estimated.
+            Defaults to None, which falls back to ``TargetRole()``.
+        key (Any, optional): Optional identifier for the operator instance.
+            Defaults to "".
+
+    Attributes:
+        calc_bias (staticmethod): Core computation that applies the dot
+            product between feature differences and regression coefficients.
+        prepare_data (staticmethod): Helper that constructs the matched
+            dataset by exploding match indices and aggregating features.
+
+    See Also:
+        MatchingMetrics: The operator that uses the bias estimates to
+            compute bias-corrected treatment effects (ATT, ATC, ATE).
+        LstsqExtension: The backend-agnostic least-squares solver used
+            to fit the regression coefficients.
+    """
     def __init__(
         self,
         grouping_role: ABCRole | None = None,
         target_roles: list[ABCRole] | None = None,
         key: Any = "",
     ):
+        """
+        Initialize the Bias calculator.
+
+        Args:
+            grouping_role (ABCRole | None, optional): The role defining the
+                treatment assignment column. Defaults to None.
+            target_roles (list[ABCRole] | None, optional): The role(s) defining
+                the target outcome column(s). Defaults to None.
+            key (Any, optional): Optional identifier for the operator instance.
+                Defaults to "".
+        """
         super().__init__(
             grouping_role=grouping_role, target_roles=target_roles, key=key
         )
+    
+    def _set_value(
+            self, data: ExperimentData, value: Dataset, key=None
+    ) -> ExperimentData:
+        """
+        Store the calculated bias values into the ExperimentData object.
 
+        This method saves the bias estimates as additional fields in the
+        ExperimentData, making them available for downstream operators
+        (e.g., MatchingMetrics) to apply bias correction.
+
+        Args:
+            data (ExperimentData): The experiment data object to update.
+            value (Dataset): The dataset containing bias estimates for
+                treatment and/or control groups.
+            key (Any, optional): Optional key for the stored value.
+                Defaults to None.
+
+        Returns:
+            ExperimentData: The updated experiment data with bias values
+                stored in the ``additional_fields`` space.
+        """
+        return data.set_value(
+            space=ExperimentDataEnum.additional_fields,
+            executor_id=self.id,
+            value=value,
+            role=value.roles,
+        )
+    
     @staticmethod
     def calc_bias(
         X: Dataset, X_matched: Dataset, coefficients: np.ndarray[float]
     ) -> list[float]:
+        """
+        Calculate bias as the dot product of feature differences and coefficients.
+
+        Computes the residual bias by projecting the difference between
+        original features (X) and matched (counterfactual) features
+        (X_matched) onto the regression coefficients.
+
+        The formula is: bias = (X - X_matched) · coefficients
+
+        Args:
+            X (Dataset): The original feature values for the group.
+            X_matched (Dataset): The matched (counterfactual) feature values,
+                typically computed by averaging over matched pairs.
+            coefficients (np.ndarray[float]): The regression coefficients
+                from the least-squares fit of target ~ features.
+
+        Returns:
+            list[float]: A list (or Dataset) containing the bias estimate
+                for each observation in the group.
+
+        Examples:
+            ```python
+                bias = Bias.calc_bias(
+                    X=treatment_features,
+                    X_matched=matched_features,
+                    coefficients=regression_coefs
+                )
+            ```
+        """
         return (X - X_matched).dot(coefficients)
 
     @classmethod
@@ -445,6 +579,39 @@ class Bias(GroupOperator):
         features_fields: list[str] | None = None,
         **kwargs,
     ) -> dict:
+        """
+        Core calculation logic for bias estimation.
+
+        Fits a linear regression model (target ~ features) for each group
+        using the matched observations, then computes the bias as the
+        difference between original and matched features projected onto
+        the regression coefficients.
+
+        The method handles three scenarios:
+            1. Only control group has matched data → compute bias for control
+            2. Only treatment group has matched data → compute bias for treatment
+            3. Both groups have matched data → compute bias for both
+
+        Args:
+            data (Dataset): The baseline (control) dataset.
+            test_data (Dataset | None, optional): The compared (treatment) dataset.
+                Defaults to None.
+            target_fields (list[str] | None, optional): Names of the target fields.
+                The first element is the original target, the second is the
+                matched target. Defaults to None.
+            features_fields (list[str] | None, optional): Names of the feature fields.
+                The first half are original features, the second half are
+                matched features. Defaults to None.
+            **kwargs: Additional keyword arguments (currently unused).
+
+        Returns:
+            dict: A dictionary with keys "test" and/or "control" mapping to
+                the bias estimates (Dataset) for each group.
+
+        Raises:
+            NoneArgumentError: If any of the required arguments (target_fields,
+                features_fields, test_data) are None.
+        """
         if target_fields is None or features_fields is None or test_data is None:
             raise NoneArgumentError(
                 ["target_fields", "features_fields", "test_data"], "bias_estimation"
@@ -496,6 +663,25 @@ class Bias(GroupOperator):
         features_fields: list[str] | None = None,
         **kwargs,
     ) -> dict:
+        """
+        Execute the inner bias calculation on grouped data.
+
+        This classmethod serves as a wrapper that unpacks the grouped data
+        and delegates to ``_inner_function``.
+
+        Args:
+            grouping_data: Grouped dataset containing the control and treatment slices.
+                Expected format: [(control_name, control_data), (test_name, test_data)]
+            target_fields (list[str] | None, optional): Names of the target fields.
+                Defaults to None.
+            features_fields (list[str] | None, optional): Names of the feature fields.
+                Defaults to None.
+            **kwargs: Additional keyword arguments passed to ``_inner_function``.
+
+        Returns:
+            dict: The result of the ``_inner_function`` calculation, containing
+                bias estimates for treatment and/or control groups.
+        """
         return cls._inner_function(
             grouping_data[0][1],
             test_data=grouping_data[1][1],
@@ -506,17 +692,44 @@ class Bias(GroupOperator):
 
     @staticmethod
     def prepare_data(data: ExperimentData, t_data: Dataset) -> Dataset:
+        """
+        Prepare matched data by aggregating features over matched pairs.
+
+        This method constructs the counterfactual (matched) features by:
+            1. Retrieving match indices from additional fields
+            2. Exploding the indices to create one row per match
+            3. Merging with the original data to get matched feature values
+            4. Grouping by original index and computing the mean of matched features
+
+        The result is a dataset where each observation has its matched
+        (counterfactual) feature values, computed as the average over all
+        its matches.
+
+        Args:
+            data (ExperimentData): The experiment data containing match indices
+                in the ``additional_fields`` space.
+            t_data (Dataset): The original dataset with features and targets.
+
+        Returns:
+            tuple[Dataset, Dataset]: A tuple containing:
+                - indexes: The original match indices dataset
+                - matched_data: The dataset with matched features, where each
+                  column is suffixed with "_matched"
+
+        Raises:
+            ValueError: If no match indices are found in the additional fields.
+
+        Examples:
+            ```python
+                indexes, matched_data = Bias.prepare_data(experiment_data, original_data)
+                # matched_data contains columns like "feat1_matched", "feat2_matched"
+            ```
+        """
         indexes = data.field_search(AdditionalMatchingRole())
         if len(indexes) == 0:
             raise ValueError("No indexes were found")
         indexes = data.additional_fields[indexes]
         # additional fields are already allignet according to index
-         
-        # indexes.index = t_data.index
-        # indexes = indexes.add_column(t_data.index, {'index': InfoRole()}).set_index('index')
-        # indexes.index.name = None
-        # filtered_field = indexes
-        # filtered_field = indexes.reset_index(drop=True)
 
         numeric_cols = t_data.search_columns(
             [FeatureRole(), TargetRole()], search_types=[int, float]
@@ -524,7 +737,6 @@ class Bias(GroupOperator):
         
         matched_data = (
             indexes
-            # filtered_field
             .apply(list, axis=1, role={'_index' : InfoRole()})
             .explode('_index')
             .merge(t_data.select(numeric_cols), 
@@ -538,14 +750,44 @@ class Bias(GroupOperator):
             .groupby(by='index')
             .agg('mean')
             .rename({col: col + "_matched" for col in numeric_cols})
-            .set_index('_index') #grouping field will not disappear after `groupby`
+            .set_index('_index')
         )
-        # print(matched_data)
         matched_data.index.name = None
 
         return indexes, matched_data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """
+        Execute the bias estimation on the given experiment data.
+
+        This method orchestrates the entire bias calculation process:
+            1. Retrieves grouping and target fields
+            2. Prepares matched data if necessary (when second target is missing)
+            3. Computes bias estimates for treatment and/or control groups
+            4. Stores the results in the ExperimentData object
+
+        The bias estimates are stored as additional fields with the role
+        ``AdditionalStatisticRole``, making them available for downstream
+        operators (e.g., ``MatchingMetrics``) to apply bias correction.
+
+        Args:
+            data (ExperimentData): The experiment data containing the matched
+                dataset and match indices.
+
+        Returns:
+            ExperimentData: The updated ExperimentData object with bias estimates
+                stored in the ``additional_fields`` space.
+
+        Examples:
+            ```python
+                bias_calc = Bias(
+                    grouping_role=TreatmentRole(),
+                    target_roles=[TargetRole()]
+                )
+                result_data = bias_calc.execute(experiment_data)
+                # Bias estimates are now in result_data.additional_fields
+            ```
+        """
         group_field, target_fields = self._get_fields(data)
         t_data = deepcopy(data.ds)
         if len(target_fields) < 2:
@@ -568,4 +810,13 @@ class Bias(GroupOperator):
                 FeatureRole(), search_types=[int, float]
             ),
         )
-        return self._set_value(data, compare_result)
+        bais_ds = Dataset.create_empty(
+            backend=data.ds.backend_type,
+            session=data.ds.session
+        )
+        for bais_res in compare_result.values():
+            bais_ds = bais_ds.append(bais_res)
+        
+        bais_ds = bais_ds.rename({f"{col}": col for col in bais_ds.columns})
+        bais_ds.roles = {col: AdditionalStatisticRole() for col in bais_res.columns}
+        return self._set_value(data, bais_ds)
