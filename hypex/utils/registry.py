@@ -7,6 +7,10 @@ from typing import (
 )
 # from ..dataset import Dataset
 
+"""
+Factory — это паттерн проектирования, который используется для создания объектов 
+без указания конкретных классов объектов. 
+"""
 class BackendFactory:
     """
     Backend-factory class for automatic selection of backend-dependency class realization.
@@ -62,7 +66,32 @@ class BackendFactory:
     
     def resolve_backend(self, base_cls: Type, data):
         """
-        Get realization of class depending on data backend type.
+        Resolve and return the backend-specific implementation class for a given base class.
+
+        This method inspects the backend type of the provided ``data`` (e.g., ``PandasDataset``
+        or ``SparkDataset``) and looks up the corresponding registered subclass for the
+        specified ``base_cls`` in the factory registry.
+
+        Args:
+            base_cls (Type): The master or abstract base class to resolve 
+                (e.g., ``FaissExtension``, ``DummyEncoderExtension``).
+            data (Dataset): The dataset instance. Its underlying backend type 
+                (``type(data.backend_data)``) is used as the lookup key in the registry.
+
+        Returns:
+            Type | None: The backend-specific subclass if a match is found in the registry. 
+            Returns ``None`` if the ``base_cls`` has no registered backends, indicating 
+            that the base class itself should be used as a fallback.
+
+        Example:
+            ```python
+                # Assuming 'data' is backed by Pandas
+                backend_cls = backend_factory.resolve_backend(FaissExtension, data)
+                
+                # backend_cls will resolve to PandasFaissExtension
+                if backend_cls is not None:
+                    instance = backend_cls(n_neighbors=5)
+            ```
         """
         cls_backends = self._registry.get(base_cls)
         backend_type = type(data.backend_data)
@@ -72,14 +101,6 @@ class BackendFactory:
             return None # no such class in factory, so base_cls is what we need
 
         cls = cls_backends.get(backend_type)
-
-        # TODO: deside how to work with cases when there are no realizations for that backend
-        # if not cls:
-        #     supported = [b.__name__ for b in cls_backends.keys()]
-        #     raise NotImplementedError(
-        #         f"{base_cls.__name__} does not support {backend_type.__name__}. "
-        #         f"Available backends: {', '.join(supported)}"
-        #     )
 
         return cls
 
