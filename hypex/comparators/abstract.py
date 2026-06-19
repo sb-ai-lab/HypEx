@@ -837,11 +837,21 @@ class StatsComparator(BaseComparator, ABC):
         if len(group_names) < 2:
             return data
 
-        # Phase 2: reuse the stateless calc on the already-aggregated stats.
-        compare_result = self.calc(
-            group_col_stats=group_col_stats, **self.calc_kwargs
-        )
-        if not compare_result:
+        # Phase 2: one Dataset per (compared_group, col) pair, then append once.
+        baseline_name = group_names[0]
+        result_ds_list = [
+            DatasetAdapter.to_dataset(
+                self._inner_function(
+                    group_col_stats[baseline_name][col],
+                    group_col_stats[compared_name][col],
+                    **self.calc_kwargs,
+                ),
+                StatisticRole(),
+            )
+            for compared_name in group_names[1:]
+            for col in target_fields_data.columns
+        ]
+        if not result_ds_list:
             return data
             
         result_dataset = result_ds_list[0].append(result_ds_list[1:])
