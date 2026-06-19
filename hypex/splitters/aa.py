@@ -73,6 +73,7 @@ class AASplitter(Calculator):
             self._key = value
             self._generate_id()
 
+    
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         data = data.set_value(
             ExperimentDataEnum.additional_fields,
@@ -80,18 +81,13 @@ class AASplitter(Calculator):
             value,
             role=AdditionalTreatmentRole(),
         )
-
         if self.save_groups:
             splitter_col = self._id
-            
-            unique_vals = data.additional_fields[splitter_col].unique()
+            unique_vals = data.ds[splitter_col].unique()
             group_keys = list(unique_vals[splitter_col].to_dict().values())
-
             for group_key in group_keys:
-                mask = data.additional_fields[splitter_col] == group_key
-
-                group_data = data.ds[mask] 
-                
+                mask = data.ds[splitter_col] == group_key
+                group_data = data.ds[mask]
                 data.set_value(
                     space=ExperimentDataEnum.groups,
                     executor_id=self._id,

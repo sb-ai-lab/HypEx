@@ -27,7 +27,7 @@ class ExperimentWithReporter(Experiment):
     def one_iteration(
         self, data: ExperimentData, key: str = "", set_key_as_index: bool = False
     ):
-        t_data = ExperimentData(data.ds)
+        t_data = ExperimentData(data._clean_ds_for_iteration())
         self.key = key
         t_data = super().execute(t_data)
         result = self.reporter.report(t_data)
@@ -94,11 +94,12 @@ class GroupExperiment(ExperimentWithReporter):
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field = data.ds.search_columns(self.searching_role)
+        clean_ds = data._clean_ds_for_iteration()
         result: list[Dataset] = [
             self.one_iteration(
                 ExperimentData(group_data), str(group[0]), set_key_as_index=True
             )
-            for group, group_data in tqdm(data.ds.groupby(group_field))
+            for group, group_data in tqdm(clean_ds.groupby(group_field))
         ]
         return self._set_result(data, result, reset_index=False)
 
@@ -157,11 +158,14 @@ class ParamsExperiment(ExperimentWithReporter):
     def execute(self, data: ExperimentData) -> ExperimentData:
         results = []
         self._update_flat_params()
+                
         for flat_param in tqdm(self._flat_params):
-            t_data = ExperimentData(data.ds)
+            t_data = ExperimentData(data._clean_ds_for_iteration())
             for executor in self.executors:
                 executor.set_params(flat_param)
-                t_data = executor.execute(t_data)
+                t_data = executor.execute(t_data)    
+            
+            
             report = self.reporter.report(t_data)
             results.append(report)
         result_data = self._set_result(data, results)
@@ -184,10 +188,11 @@ class IfParamsExperiment(ParamsExperiment):
     def execute(self, data: ExperimentData) -> ExperimentData:
         self._update_flat_params()
         for flat_param in tqdm(self._flat_params):
-            t_data = ExperimentData(data.ds)
+            t_data = ExperimentData(data._clean_ds_for_iteration())
             for executor in self.executors:
                 executor.set_params(flat_param)
-                t_data = executor.execute(t_data)
+                t_data = executor.execute(t_data)        
+                
             if_result = self.stopping_criterion.execute(t_data)
             if_executor_id = if_result.get_one_id(
                 self.stopping_criterion.__class__, ExperimentDataEnum.variables
