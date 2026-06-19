@@ -3,7 +3,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from ..dataset.dataset import Dataset, ExperimentData
+from ..dataset.dataset import Dataset
+from ..dataset.experiment_data import ExperimentData
 from ..dataset.roles import ABCRole, FeatureRole
 from .abstract import Transformer
 

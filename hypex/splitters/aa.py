@@ -73,6 +73,7 @@ class AASplitter(Calculator):
             self._key = value
             self._generate_id()
 
+    
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         data = data.set_value(
             ExperimentDataEnum.additional_fields,
@@ -80,13 +81,19 @@ class AASplitter(Calculator):
             value,
             role=AdditionalTreatmentRole(),
         )
-
         if self.save_groups:
-            # data.groups[self.id] = {
-            #     group: data.ds.loc[group_data.index]
-            #     for group, group_data in data.additional_fields.groupby(self.id)
-            # }
-            data.groups = data.additional_fields.groupby(self.id)
+            splitter_col = self._id
+            unique_vals = data.ds[splitter_col].unique()
+            group_keys = list(unique_vals[splitter_col].to_dict().values())
+            for group_key in group_keys:
+                mask = data.ds[splitter_col] == group_key
+                group_data = data.ds[mask]
+                data.set_value(
+                    space=ExperimentDataEnum.groups,
+                    executor_id=self._id,
+                    value=group_data,
+                    key=str(group_key)
+                )
         return data
 
     @staticmethod
@@ -112,7 +119,7 @@ class AASplitter(Calculator):
         # <<<TODO: need fix in feature<<<
         ds_sampled = (data
             .filter(data.select(const_group_field).isna()) if const_group_field else data
-        ).sample(frac=sample_size, random_state=random_state)
+        ).sample(frac=sample_size if sample_size is not None else 1.0, random_state=random_state)
         len_ds_sampled = len(ds_sampled)
 
         edges = []

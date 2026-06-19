@@ -45,7 +45,6 @@ class StatsTTest(StatsHypothesisTesting):
             key=key, 
             reliability=reliability
         )
-        self.reliability = reliability
 
     @property
     def search_types(self) -> list[type] | None:
@@ -122,11 +121,9 @@ class StatsTTest(StatsHypothesisTesting):
 
         p_value = float(2 * t_dist.sf(abs(t_stat), de_fr))
 
-        return {
-                "p-value": p_value,
+        return {"p-value": p_value,
                 "statistic": float(t_stat),
-                "pass": p_value < reliability,
-            }
+                "pass": p_value < reliability,}
     
     @staticmethod
     def _t_statistics(n_list: tuple, 
@@ -308,7 +305,6 @@ class StatsZTest(StatsHypothesisTesting):
     Z-test for proportions (approximation of Chi-square for 2x2 table).
     Compares conversion rates between baseline and compared groups.
     
-    ⚠️ ONLY for BINARY data (0/1, success/failure, conversion).
     For continuous metrics (revenue, spends) use AggTTest instead.
     """
     REQUIRED_STATS = ["count", "sum"]

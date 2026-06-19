@@ -1,182 +1,284 @@
 from __future__ import annotations
-
 from typing import Any, ClassVar
+import warnings
 
-from ..comparators import GroupChi2Test, GroupDifference, GroupSizes, GroupKSTest, GroupTTest
+from ..comparators import GroupChi2Test, GroupDifference, GroupKSTest, GroupTTest, StatsTTest, BaseComparator
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..dataset.dataset import SmallDataset
 from ..splitters import AASplitter, AASplitterWithStratification
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, NotFoundInExperimentDataError
-from .abstract import Reporter, TestDictReporter
+from .abstract import (
+    DictReporter, DatasetReporter, Reporter, 
+    extract_group_difference, extract_tests, extract_analyzer_data
+)
 
+class AATestReporter(DatasetReporter):
+    """Reporter for A/A test results.
 
-class OneAADictReporter(TestDictReporter):
-    tests: ClassVar[list] = [GroupTTest, GroupKSTest, GroupChi2Test]
+    Extracts group differences, statistical test outcomes, and analyzer metadata,
+    formatting them into a structured dataset or dictionary.
+    """
+    tests: ClassVar[list[type[BaseComparator]]] = [GroupTTest, GroupKSTest, GroupChi2Test, StatsTTest]
+
+    def __init__(self, 
+                 dict_reporter: DictReporter | None = None, 
+                 output_format: str = "dataset"):
+        """Initialize the A/A test reporter.
+
+        Args:
+            dict_reporter: A ``DictReporter`` instance to handle dictionary formatting.
+                If ``None``, a default ``DictReporter`` is created.
+            output_format: The desired output format. Must be ``'dict'`` or ``'dataset'``.
+        """
+        if dict_reporter is None:
+            dict_reporter = DictReporter()
+        super().__init__(dict_reporter, output_format)
 
     @staticmethod
-    def convert_flat_dataset(data: dict) -> SmallDataset:
-        struct_dict = OneAADictReporter._get_struct_dict(data)
-        return OneAADictReporter._convert_struct_dict_to_dataset(struct_dict)
+    def get_splitter_id(data: ExperimentData) -> str | None:
+        """Retrieve the identifier of the splitter used in the experiment.
 
-    @staticmethod
-    def get_splitter_id(data: ExperimentData):
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            The ID of the ``AASplitter`` or ``AASplitterWithStratification`` instance, 
+            or ``None`` if no splitter is found.
+        """
         for c in [AASplitter, AASplitterWithStratification]:
             try:
                 return data.get_one_id(c, ExperimentDataEnum.additional_fields)
             except NotFoundInExperimentDataError:
-                pass  # The splitting was done by another class
+                pass
 
-    def extract_group_difference(self, data: ExperimentData) -> dict[str, Any]:
-        group_difference_ids = data.get_ids(GroupDifference)[GroupDifference.__name__][
-            ExperimentDataEnum.analysis_tables.value
-        ]
-        return self._extract_from_comparators(data, group_difference_ids)
+    def _build_dict_report(self, data: ExperimentData) -> dict[str, Any]:
+        """Construct a dictionary report containing A/A test metrics.
 
-    def extract_group_sizes(self, data: ExperimentData) -> dict[str, Any]:
-        group_sizes_id = data.get_one_id(GroupSizes, ExperimentDataEnum.analysis_tables)
-        return self._extract_from_comparators(data, [group_sizes_id])
+        Args:
+            data: The experiment data container.
 
-    def extract_analyzer_data(self, data: ExperimentData) -> dict[str, Any]:
-        analyzer_id = data.get_one_id(
-            "OneAAStatAnalyzer", ExperimentDataEnum.analysis_tables
-        )
-        return self.extract_from_one_row_dataset(data.analysis_tables[analyzer_id])
-
-    def extract_data_from_analysis_tables(self, data: ExperimentData) -> dict[str, Any]:
-        result = {}
-        result.update(self.extract_group_difference(data))
-        # result.update(self.extract_group_sizes(data))
-        result.update(self.extract_tests(data))
-        result.update(self.extract_analyzer_data(data))
-        if self.front:
-            result = self.rename_passed(result)
+        Returns:
+            A dictionary with splitter ID, group differences, test results, and analyzer data.
+        """
+        result = {"splitter_id": self.get_splitter_id(data)}
+        front_flag = self.dict_reporter.front
+        result.update(extract_group_difference(data, front_flag))
+        result.update(extract_tests(data, self.tests, front_flag))
+        result.update(extract_analyzer_data(data, "OneAAStatAnalyzer"))
         return result
 
-    def report(self, data: ExperimentData) -> dict[str, Any]:
-        result = {
-            "splitter_id": self.get_splitter_id(data),
-        }
-        result.update(self.extract_data_from_analysis_tables(data))
-        return result
+    def report(self, data: ExperimentData) -> dict[str, Any] | Dataset:
+        """Generate the final A/A test report.
 
+        Args:
+            data: The experiment data container.
 
-class AADatasetReporter(OneAADictReporter):
-    def report(self, data: ExperimentData):
-        front_buffer = self.front
-        self.front = False
-        dict_report = super().report(data)
-        self.front = front_buffer
-        return self.convert_flat_dataset(dict_report)
+        Returns:
+            The report as a dictionary or ``Dataset``, depending on the configured ``output_format``.
+        """
+        prev = self.dict_reporter.front
+        self.dict_reporter.front = False
+        try:
+            dict_result = self._build_dict_report(data)
+            if self.output_format == "dict":
+                return dict_result
+            return self.convert_to_dataset(dict_result)
+        finally:
+            self.dict_reporter.front = prev
+
+class OneAADictReporter(AATestReporter):
+    """Legacy reporter wrapper for dictionary output.
+
+    Deprecated: Use ``AATestReporter(output_format='dict')`` instead.
+    """
+    def __init__(self, front: bool = True):
+        """Initialize the legacy dictionary reporter.
+
+        Args:
+            front: If ``True``, formats keys for front-end display.
+            Defaults to ``True``.
+        """
+        super().__init__(dict_reporter=DictReporter(front=front), output_format="dict")
+        warnings.warn("OneAADictReporter is deprecated. Use AATestReporter(output_format='dict')", 
+                      DeprecationWarning, 
+                      stacklevel=2)
+
+    @staticmethod
+    def convert_flat_dataset(data: dict[str, Any]) -> SmallDataset:
+        """Convert a flat dictionary representation into a ``SmallDataset``.
+
+        Args:
+            data: The flat dictionary to convert.
+
+        Returns:
+            A ``SmallDataset`` instance containing the structured data.
+        """
+        return AATestReporter.convert_to_dataset(data)
+
+class AADatasetReporter(AATestReporter):
+    """Legacy reporter wrapper for dataset output.
+
+    Deprecated: Use ``AATestReporter()`` instead.
+    """
+    def __init__(self):
+        """Initialize the legacy dataset reporter."""
+        super().__init__(dict_reporter=DictReporter(), output_format="dataset")
+        warnings.warn("AADatasetReporter is deprecated. Use AATestReporter()", 
+                      DeprecationWarning, 
+                      stacklevel=2)
 
 
 class AAPassedReporter(Reporter):
-    @staticmethod
-    def _reformat_aa_score_table(table: Dataset) -> Dataset:
-        result = {}
-        for ind in table.index:
-            splitted_index = ind.split(ID_SPLIT_SYMBOL)
-            row_index = f"{splitted_index[0]}{ID_SPLIT_SYMBOL}{splitted_index[-1]}"
-            value = table.get_values(ind, "pass")
-            if row_index not in result:
-                result[row_index] = {splitted_index[1]: value}
-            else:
-                result[row_index][splitted_index[1]] = value
-        result = Dataset.from_dict(result, roles={}).transpose() * 1
-        return result
+    """Reporter for A/A test pass/fail results.
 
-    @staticmethod
-    def _reformat_best_split_table(table: Dataset) -> Dataset:
-        passed = table.loc[:, [c for c in table.columns if (c.endswith("pass"))]]
-        new_index = table.apply(
-            lambda x: f"{x['feature']}{ID_SPLIT_SYMBOL}{x['group']}",
-            {"index": InfoRole()},
-            axis=1,
-        )
-        passed.index = new_index.get_values(column="index")
-        passed = passed.rename(
-            names={c: c[: c.rfind("pass") - 1] for c in passed.columns}
-        )
-        passed = passed.replace("OK", 1).replace("NOT OK", 0)
-        passed = passed.astype({c: int for c in passed.columns}, errors="ignore")
-        return passed
-
-    def _detect_pass(self, analyzer_tables: dict[str, Dataset]):
-        score_table = self._reformat_aa_score_table(analyzer_tables["aa score"])
-        best_split_table = self._reformat_best_split_table(
-            analyzer_tables["best split statistics"]
-        )
-        resume_table = score_table * best_split_table
-        resume_table = resume_table.apply(
-            lambda x: "OK" if x.sum() > 0 else "NOT OK",
-            axis=1,
-            role={"result": StatisticRole()},
-        )
-        result = score_table.merge(
-            best_split_table,
-            suffixes=(" aa test", " best split"),
-            left_index=True,
-            right_index=True,
-        )
-        result = result.merge(resume_table, left_index=True, right_index=True)
-        result.roles = {c: r.__class__(str) for c, r in result.roles.items()}
-        result = (
-            result.replace(0, "NOT OK")
-            .replace(1, "OK")
-            .replace("0", "NOT OK")
-            .replace("1", "OK")
-        )
-        splitted_index = [str(i).split(ID_SPLIT_SYMBOL) for i in result.index]
-        result.add_column([i[0] for i in splitted_index], role={"feature": InfoRole()})
-        result.add_column([i[1] for i in splitted_index], role={"group": InfoRole()})
-        result.index = range(len(splitted_index))
-        return result
-
+    Aggregates test pass statuses, reformats boolean indicators, 
+    and merges statistical differences (mean, p-value, etc.) into a final summary table.
+    """
     def report(self, data: ExperimentData) -> Dataset:
-        analyser_ids = data.get_ids(
-            "AAScoreAnalyzer", ExperimentDataEnum.analysis_tables
-        )
+        """Generate a report summarizing A/A test pass/fail outcomes.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            A ``Dataset`` containing pass/fail statuses, statistical metrics,
+            and an overall result flag, or ``None`` if the required analyzer data is missing or empty.
+        """
+        analyser_ids = data.get_ids("AAScoreAnalyzer", ExperimentDataEnum.analysis_tables)
         analyser_tables = {
-            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1 :]: data.analysis_tables[id_]
-            for id_ in analyser_ids["AAScoreAnalyzer"][
-                ExperimentDataEnum.analysis_tables.value
-            ]
+            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1:]: data.analysis_tables[id_]
+            for id_ in analyser_ids["AAScoreAnalyzer"][ExperimentDataEnum.analysis_tables.value]
         }
-        if not analyser_tables["aa score"]:
-            print("AA test cannot be performed as none of the analyzers passed")
+        if not analyser_tables.get("aa score") or analyser_tables["aa score"].is_empty():
             return None
-        result = self._detect_pass(analyser_tables)
-        stats_cols = [
-            "feature",
-            "group",
-            "control mean",
-            "test mean",
-            "difference",
-            "difference %",
-        ]
-        differences = analyser_tables["best split statistics"].loc[
-            :,
-            [
-                col
-                for col in stats_cols
-                if col in analyser_tables["best split statistics"].columns
-            ],
-        ]
-        result = result.merge(differences, on=["feature", "group"], how="left")
-        result = result[
-            ["feature", "group"]
-            + [c for c in result.columns if c not in ["feature", "group"]]
-        ]
+
+        best_split_table = self._reformat_bool_split(analyser_tables["best split statistics"])
+
+        if best_split_table.is_empty():
+            return SmallDataset.create_empty()
+
+        records = best_split_table.to_records()
+        result_records = []
+        
+        for row in records:
+            rec = {
+                "feature": str(row.get("feature", "")),
+                "group": str(row.get("group", ""))
+            }
+            passed = False
+            for col in best_split_table.columns:
+                if col in ("feature", "group"): 
+                    continue
+                val = row.get(col)
+                rec[col] = val
+                if val in (True, 1, "True", 1.0, "OK"):
+                    passed = True
+            rec["result"] = "OK" if passed else "NOT OK"
+            result_records.append(rec)
+
+        roles = {"feature": InfoRole(), "group": InfoRole(), "result": StatisticRole()}
+        for col in best_split_table.columns:
+            if col not in ("feature", "group"):
+                roles[col] = best_split_table.roles.get(col, StatisticRole())
+
+        result = SmallDataset.from_dict(result_records, roles=roles)
+        
+        diff_source = analyser_tables.get("best split statistics")
+        if diff_source and not diff_source.is_empty():
+            stats_cols = ["feature", "group", "control mean", "test mean", "difference", "difference %"]
+            available = [c for c in stats_cols if c in diff_source.columns]
+            if available:
+                differences = diff_source.select(available)
+                try:
+                    result = result.merge(differences, on=["feature", "group"], how="left")
+                except Exception:
+                    pass
+
         numeric_cols = ["control mean", "test mean", "difference", "difference %"]
         for col in numeric_cols:
-            result.data[col] = result.data[col].astype(float).round(6)
+            if col in result.columns:
+                try: 
+                    result.data[col] = result.data[col].astype(float).round(6)
+                except Exception: 
+                    pass
         return result
 
+    @staticmethod
+    def _reformat_bool(table: SmallDataset) -> SmallDataset:
+        """Extract and reformat pass/fail statuses from a raw results table.
+
+        Args:
+            table: The raw dataset containing a 'pass' column with nested dictionaries.
+
+        Returns:
+            A ``SmallDataset`` with reformatted pass/fail statuses, 
+            or an empty ``SmallDataset`` if the input is invalid or empty.
+        """
+        if table.is_empty() or "pass" not in table.columns:
+            return SmallDataset.create_empty()
+        
+        records = table.to_records()
+        pass_dict = records[0].get("pass") if records else None
+        
+        if not isinstance(pass_dict, dict) or not pass_dict:
+            return SmallDataset.create_empty()
+        return SmallDataset.from_dict(pass_dict, roles={k: InfoRole() for k in pass_dict})
+
+    @staticmethod
+    def _reformat_bool_split(table: SmallDataset) -> SmallDataset:
+        """Extract and reformat split-specific pass/fail statuses.
+
+        Args:
+            table: The raw dataset containing columns ending with 'pass'.
+
+        Returns:
+            A ``SmallDataset`` with cleaned boolean pass/fail values per split,
+            or an empty ``SmallDataset`` if no relevant columns are found.
+        """
+        pass_cols = [c for c in table.columns if c.endswith("pass")]
+        if not pass_cols or table.is_empty():
+            return SmallDataset.create_empty()
+            
+        records = table.to_records()
+        rows = []
+        for row in records:
+            row_dict = {}
+            if "feature" in row:
+                row_dict["feature"] = row["feature"]
+            if "group" in row:
+                row_dict["group"] = row["group"]
+                
+            for col in pass_cols:
+                val = row.get(col)
+
+                clean_col = col[:col.rfind("pass")].strip()
+                row_dict[clean_col] = bool(val) if val is not None else False
+            rows.append(row_dict)
+            
+        if not rows:
+            return SmallDataset.create_empty()
+            
+        return SmallDataset.from_dict(rows, roles={c: InfoRole() for c in rows[0]})
 
 class AABestSplitReporter(Reporter):
-    def report(self, data: ExperimentData):
-        best_split_id = next(
-            (c for c in data.additional_fields.columns if c.endswith("best")), []
-        )
-        markers = data.additional_fields.loc[:, best_split_id]
-        markers = markers.rename({markers.columns[0]: "split"})
+    """Reporter that attaches best split markers to the dataset.
+
+    Identifies the optimal data split and merges its identifier back into
+    the primary dataset for downstream analysis.
+    """
+    def report(self, data: ExperimentData) -> Dataset:
+        """Merge the best split identifier into the main dataset.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            The original dataset merged with a 'split' column indicating the
+            best split configuration.
+        """
+        best_split_id = next((c for c in data.additional_fields.columns if c.endswith("best")), None)
+        if best_split_id is None:
+            return data.ds
+        markers = data.additional_fields.select([best_split_id])
+        markers = markers.rename({best_split_id: "split"})
         return data.ds.merge(markers, left_index=True, right_index=True)

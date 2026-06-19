@@ -7,6 +7,7 @@ from typing import Any, Callable, ClassVar, Literal
 from ..dataset import (
     ABCRole,
     AdditionalTargetRole,
+    AdditionalTreatmentRole,
     Dataset,
     DatasetAdapter,
     ExperimentData,
@@ -71,7 +72,6 @@ class BaseComparator(Calculator, ABC):
                 if tmp_role
                 else self.target_roles
             ),
-            # roles=(TargetRole()),
             tmp_role=tmp_role,
             search_types=self.search_types,
         )
@@ -96,14 +96,15 @@ class BaseComparator(Calculator, ABC):
     def _extract_dataset(
         compare_result: FromDictTypes, roles: dict[Any, ABCRole]
     ) -> Dataset:
-        if isinstance(next(iter(compare_result.values())), Dataset):
-            cr_list_v: list[Dataset] = list(compare_result.values())
+        first_val = next(iter(compare_result.values()))
+        if isinstance(first_val, (Dataset, SmallDataset)):
+            cr_list_v = list(compare_result.values())
             result = cr_list_v[0]
             if len(cr_list_v) > 1:
                 result = result.append(cr_list_v[1:])
             result.index = list(compare_result.keys())
             return result
-        return Dataset.from_dict(compare_result, roles, BackendsEnum.pandas)
+        return SmallDataset.from_dict(compare_result, roles)
 
 
 class GroupsComparator(BaseComparator, ABC):
@@ -177,7 +178,7 @@ class GroupsComparator(BaseComparator, ABC):
                 InfoRole(),
             )
         return result
-
+    
     @staticmethod
     def _grouping_data_split(
         grouping_data: dict[str, Dataset],
@@ -191,20 +192,25 @@ class GroupsComparator(BaseComparator, ABC):
             raise TypeError(
                 f"Grouping data must be dict of strings and datasets, but got {type(grouping_data)}"
             )
-
         compared_data = list(grouping_data.items())
         baseline_data = [compared_data.pop(0)]
+        
+        def _safe_slice(ds, cols):
+            if cols is None:
+                return ds
+            if hasattr(ds, '__getitem__'):
+                return ds[cols]
+            return ds[cols] if isinstance(cols, str) else ds[list(cols)]
+
+        baseline_cols = target_fields if compare_by == "groups" else baseline_field
         baseline_data = [
-            (
-                bucket[0],
-                bucket[1][target_fields if compare_by == "groups" else baseline_field],
-            )
+            (bucket[0], _safe_slice(bucket[1], baseline_cols))
             for bucket in baseline_data
         ]
         compared_data = [
-            (bucket[0], bucket[1][target_fields]) for bucket in compared_data
+            (bucket[0], _safe_slice(bucket[1], target_fields))
+            for bucket in compared_data
         ]
-
         return baseline_data, compared_data
 
     @staticmethod
@@ -236,7 +242,7 @@ class GroupsComparator(BaseComparator, ABC):
             )
             field_data = field_data[field_data.columns[0]]
         return field_data
-
+    
     @classmethod
     def _split_for_groups_mode(
         cls,
@@ -249,15 +255,21 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = cls._field_validity_check(
             group_field_data, "group_field_data", "groups"
         )
+        
+        group_col = group_field_data.columns[0]
+        
+        if group_col not in target_fields_data.columns:
+            target_fields_data = target_fields_data.merge(
+                group_field_data, left_index=True, right_index=True, how="left"
+            )
 
         data_buckets = sorted(
-            target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+            target_fields_data.groupby(by=group_field_data.columns), key=lambda tup: tup[0]
         )
         baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
         compared_data = cls._split_ds_into_columns(data=data_buckets)
-
         return baseline_data, compared_data
-
+    
     @classmethod
     def _split_for_columns_mode(
         cls,
@@ -294,12 +306,17 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = cls._field_validity_check(
             group_field_data, "group_field_data", "columns_in_groups"
         )
+        
+        group_col = group_field_data.columns[0]
+        if group_col not in baseline_field_data.columns:
+            baseline_field_data = baseline_field_data.merge(group_field_data, left_index=True, right_index=True, how="left")
+        if group_col not in target_fields_data.columns:
+            target_fields_data = target_fields_data.merge(group_field_data, left_index=True, right_index=True, how="left")
 
-        baseline_data = baseline_field_data.groupby(by=group_field_data)
+        baseline_data = baseline_field_data.groupby(by=group_field_data.columns)
         compared_data = cls._split_ds_into_columns(
-            target_fields_data.groupby(by=group_field_data)
+            target_fields_data.groupby(by=group_field_data.columns)
         )
-
         return baseline_data, compared_data
 
     @classmethod
@@ -318,19 +335,23 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = cls._field_validity_check(
             group_field_data, "group_field_data", "cross"
         )
+        
+        group_col = group_field_data.columns[0]
+        if group_col not in baseline_field_data.columns:
+            baseline_field_data = baseline_field_data.merge(group_field_data, left_index=True, right_index=True, how="left")
+        if group_col not in target_fields_data.columns:
+            target_fields_data = target_fields_data.merge(group_field_data, left_index=True, right_index=True, how="left")
 
         baseline_data = [
             sorted(
-                baseline_field_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+                baseline_field_data.groupby(by=group_field_data.columns), key=lambda tup: tup[0]
             ).pop(0)
         ]
-
         compared_data = sorted(
-            target_fields_data.groupby(by=group_field_data), key=lambda tup: tup[0]
+            target_fields_data.groupby(by=group_field_data.columns), key=lambda tup: tup[0]
         )
         compared_data.pop(0)
         compared_data = cls._split_ds_into_columns(data=compared_data)
-
         return baseline_data, compared_data
 
     @classmethod
@@ -349,18 +370,23 @@ class GroupsComparator(BaseComparator, ABC):
         target_fields_data = cls._field_validity_check(
             target_fields_data, "target_fields_data", "matched_pairs"
         )
+        
+        group_col = group_field_data.columns[0]
+        if group_col not in baseline_field_data.columns:
+            baseline_field_data = baseline_field_data.merge(group_field_data, left_index=True, right_index=True, how="left")
+        if group_col not in target_fields_data.columns:
+            target_fields_data = target_fields_data.merge(group_field_data, left_index=True, right_index=True, how="left")
 
-        compared_data = target_fields_data.groupby(by=group_field_data)
-        baseline_indexes = baseline_field_data.groupby(by=group_field_data)
+        compared_data = target_fields_data.groupby(by=group_field_data.columns)
+        baseline_indexes = baseline_field_data.groupby(by=group_field_data.columns)
+        
         baseline_data = []
-
         for group in baseline_indexes:
             name = group[0]
             indexes = group[1].iget_values(column=0)
             dummy_index = target_fields_data.index[-1]
             indexes = list(map(lambda x: dummy_index if x < 0 else x, indexes))
-            baseline_data.append((name, target_fields_data.loc[indexes, :]))    #TODO: add spark backend support
-
+            baseline_data.append((name, target_fields_data.loc[indexes, :]))
         return baseline_data, compared_data
 
     @classmethod
@@ -454,6 +480,7 @@ class GroupsComparator(BaseComparator, ABC):
             compare_by=compare_by,
             **kwargs,
         )
+            
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         """
@@ -481,7 +508,6 @@ class GroupsComparator(BaseComparator, ABC):
         )
 
         if len(target_fields_data.columns) == 0:
-            # If the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
             if data.ds.tmp_roles:
                 return data
             else:
@@ -492,7 +518,7 @@ class GroupsComparator(BaseComparator, ABC):
 
         if (
             group_field_data.columns[0] in data.groups
-        ) and self.compare_by != "matched_pairs":  # TODO: proper split between groups and columns
+        ) and self.compare_by != "matched_pairs":
             grouping_data = self._grouping_data_split(
                 grouping_data=data.groups[group_field_data.columns[0]],
                 compare_by=self.compare_by,
@@ -508,6 +534,11 @@ class GroupsComparator(BaseComparator, ABC):
                 ),
             )
         else:
+            has_additional = any(
+                isinstance(data.additional_fields.roles[col], (AdditionalTargetRole, AdditionalTreatmentRole))
+                for col in data.additional_fields.columns
+            )
+            
             combined_data = (
                 data.ds.merge(
                     data.additional_fields[
@@ -515,7 +546,7 @@ class GroupsComparator(BaseComparator, ABC):
                             col
                             for col in data.additional_fields.columns
                             if isinstance(
-                                data.additional_fields.roles[col], AdditionalTargetRole
+                                data.additional_fields.roles[col], (AdditionalTargetRole, AdditionalTreatmentRole)
                             )
                         ]
                     ],
@@ -523,16 +554,12 @@ class GroupsComparator(BaseComparator, ABC):
                     right_index=True,
                     how="outer",
                 )
-                if any(
-                    isinstance(data.additional_fields.roles[col], AdditionalTargetRole)
-                    for col in data.additional_fields.columns
-                )
+                if has_additional
                 else data.ds
             )
             
-
             data.groups[group_field_data.columns[0]] = {
-                f"{group}": ds for group, ds in combined_data.groupby(group_field_data)
+                f"{group}": ds for group, ds in combined_data.groupby(group_field_data.columns[0])
             }
             grouping_data = self._split_data_to_buckets(
                 compare_by=self.compare_by,
@@ -781,7 +808,7 @@ class StatsComparator(BaseComparator, ABC):
         )
 
         grouped: GroupedDataset = (target_fields_data
-            .merge(group_field_data, left_index=True, right_index= True)
+            .merge(group_field_data, left_index=True, right_index=True)
             .groupby(by=group_field_data.columns)
         )
 
@@ -816,10 +843,21 @@ class StatsComparator(BaseComparator, ABC):
         )
         if not compare_result:
             return data
-
-        result_dataset = self._extract_dataset(
-            compare_result, {key: StatisticRole() for key in compare_result}
-        )
+            
+        result_dataset = result_ds_list[0].append(result_ds_list[1:])
+        
+        if len(target_fields_data.columns) == 1:
+            result_dataset.index = [
+                f"{compared_name}"
+                for compared_name in group_names[1:]
+            ]
+        else:
+            result_dataset.index = [
+                f"{compared_name}{NAME_BORDER_SYMBOL}{col}"
+                for compared_name in group_names[1:]
+                for col in target_fields_data.columns
+            ]
+            
         return self._set_value(data, result_dataset)
 
 
@@ -851,3 +889,69 @@ class StatsHypothesisTesting(StatsComparator, ABC):
             calc_kwargs=merged_kwargs,
         )
         self.reliability = reliability
+        
+        
+    
+class AdaptiveHypothesisTest(BaseComparator):
+    """
+    Routes execute() to a backend-specific hypothesis test at runtime.
+
+    Subclasses declare BACKEND_MAP: {BackendsEnum -> concrete test class}.
+    The concrete class must be a subclass of either GroupHypothesisTesting or
+    StatsHypothesisTesting. Results are always stored under the adaptive
+    instance's own id, so pipeline lookups remain consistent regardless of
+    which backend is active.
+    """
+
+    BACKEND_MAP: ClassVar[dict[BackendsEnum, type[BaseComparator]]] = {}
+
+    def __init__(
+        self,
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | None = None,
+        reliability: float = 0.05,
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+        ] = "groups",
+        key: Any = "",
+    ):
+        super().__init__(grouping_role=grouping_role, target_roles=target_roles, key=key)
+        self.reliability = reliability
+        self.compare_by = compare_by
+
+    def _build_delegate(self, cls: type[BaseComparator]) -> BaseComparator:
+        """
+        Instantiate *cls* with this instance's configuration and override its
+        id to match ours so results land under the adaptive class's id.
+        """
+        if issubclass(cls, StatsHypothesisTesting):
+            instance = cls(
+                grouping_role=self.grouping_role,
+                target_roles=self.target_roles,
+                reliability=self.reliability,
+                key=self.key,
+            )
+        else:  # GroupHypothesisTesting branch
+            instance = cls(
+                compare_by=self.compare_by,
+                grouping_role=self.grouping_role,
+                target_role=self.target_roles,
+                reliability=self.reliability,
+                key=self.key,
+            )
+        # Ensure analysis_tables entries use our id, not the delegate's.
+        instance._id = self._id
+        return instance
+    
+    @staticmethod
+    def _inner_function(data, **kwargs):
+        raise NotImplementedError("Use execute() for adaptive tests.")
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        backend = data.ds.backend_type
+        if backend not in self.BACKEND_MAP:
+            raise ValueError(
+                f"{type(self).__name__} has no implementation for backend {backend!r}. "
+                f"Registered: {list(self.BACKEND_MAP)}"
+            )
+        return self._build_delegate(self.BACKEND_MAP[backend]).execute(data)
