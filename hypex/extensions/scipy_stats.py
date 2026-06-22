@@ -111,120 +111,7 @@ class GroupKSTestExtension(GroupStatTest):
     """
     test_function = staticmethod(ks_2samp)
     default_kwargs = {}
-    def __init__(self, reliability: float = 0.05, n_bins: int = 2000): super().__init__(self.test_function, reliability)
-        # self.n_bins = n_bins
-
-    # def _calc_spark(self, data: Dataset, other: Dataset | None = None, **kwargs) -> SmallDataset | float:
-    #     """
-    #     Compute the two-sample Kolmogorov-Smirnov (KS) test for PySpark-backed datasets.
-        
-    #     This method approximates the continuous KS test by discretizing the data into 
-    #     a fixed number of histogram bins (`self.n_bins`) across the global range of 
-    #     both datasets. It then computes the Empirical Cumulative Distribution Functions 
-    #     (ECDFs) for both groups and finds the maximum absolute difference (D-statistic).
-    #     Finally, it calculates the p-value using the asymptotic Kolmogorov distribution 
-    #     (`kstwobign`) with Stephens' correction for finite sample sizes.
-
-    #     Args:
-    #         data (Dataset): The baseline dataset. Must contain exactly one numeric column.
-    #         other (Dataset | None): The comparison dataset. Must contain exactly one numeric column.
-    #         **kwargs: Additional keyword arguments (ignored in this implementation).
-
-    #     Returns:
-    #         Dataset | float: A SmallDataset containing the following fields:
-    #             - 'p-value': The calculated p-value (float or None).
-    #             - 'statistic': The KS D-statistic (float or None).
-    #             - 'pass': Boolean flag indicating if p-value < self.reliability.
-    #     """
-        
-    #     def _add_bucket_column(df: SparkDF, 
-    #                            global_min: int, 
-    #                            global_max: int) -> SparkDF:
-    #         """
-    #         Helper function to assign each row to a discrete histogram bin.
-    #         Uses the global min/max to ensure both datasets share the exact same bin edges.
-    #         """
-    #         width = (global_max - global_min) / self.n_bins
-    #         return df.withColumn(
-    #             "bucket",
-    #             F.least(
-    #                 F.floor((F.col(col) - global_min) / width),
-    #                 F.lit(self.n_bins - 1)  # Cap at the last bin to handle the max value edge case
-    #             ).cast("int")
-    #         )
-
-    #     # Validate inputs and ensure both datasets are single-column and compatible
-    #     other = self.check_data(data, other)
-    #     df1 = data.data.to_spark()
-    #     df2 = other.data.to_spark()
-    #     col = data.columns[0]
-
-    #     # Get sample sizes
-    #     n1 = df1.count()
-    #     n2 = df2.count()
-        
-    #     # Edge case: one or both datasets are empty
-    #     if n1 == 0 or n2 == 0:
-    #         return SmallDataset.from_dict({
-    #             "p-value": None, "statistic": None, "pass": None
-    #         }, StatisticRole())
-
-    #     # Compute global minimum and maximum across both datasets to define common bin edges
-    #     bounds1 = df1.agg(F.min(col).alias("min1"), F.max(col).alias("max1")).collect()[0]
-    #     bounds2 = df2.agg(F.min(col).alias("min2"), F.max(col).alias("max2")).collect()[0]
-
-    #     global_min = min(bounds1["min1"], bounds2["min2"])
-    #     global_max = max(bounds1["max1"], bounds2["max2"])
-
-    #     # Edge case: all values in both datasets are identical (zero variance)
-    #     if global_min == global_max:
-    #         return SmallDataset.from_dict({
-    #             "p-value": 1.0,
-    #             "statistic": 0.0,
-    #             "pass": 1.0 < self.reliability
-    #         }, StatisticRole())
-
-    #     # Compute histograms (frequency counts per bin) for both datasets
-    #     hist1 = (_add_bucket_column(df=df1, global_min=global_min, global_max=global_max)
-    #         .groupBy("bucket")
-    #         .count()
-    #         .withColumnRenamed("count", "c1")
-    #     )
-    #     hist2 = (_add_bucket_column(df=df2, global_min=global_min, global_max=global_max)
-    #         .groupBy("bucket")
-    #         .count()
-    #         .withColumnRenamed("count", "c2")
-    #     )
-
-    #     # Outer join histograms to align bins, filling missing bins with 0 counts
-    #     combined = hist1.join(hist2, on="bucket", how="outer").fillna(0, subset=["c1", "c2"])
-        
-    #     # Convert to Pandas for efficient cumulative sum (ECDF calculation).
-    #     # Note: The number of rows here is at most `self.n_bins`, so it safely fits in driver memory.
-    #     pdf = combined.toPandas().sort_values("bucket").reset_index(drop=True)
-    #     pdf["cum1"] = pdf["c1"].cumsum()
-    #     pdf["cum2"] = pdf["c2"].cumsum()
-        
-    #     # Calculate the KS statistic: maximum absolute difference between the two ECDFs
-    #     d_stat = float((pdf["cum1"]/n1 - pdf["cum2"]/n2).abs().max())
-
-    #     try:
-    #         # Calculate effective sample size for the asymptotic distribution
-    #         en = np.sqrt(n1 * n2 / (n1 + n2))
-            
-    #         # Apply Stephens' correction (1970) for better accuracy with finite samples.
-    #         # This is the exact formula used internally by scipy.stats.ks_2samp for large samples.
-    #         p_value = float(kstwobign.sf((en + 0.12 + 0.11 / en) * d_stat))
-    #     except Exception:
-    #         # Fallback to 0.0 if the statistical function fails (e.g., due to extreme values)
-    #         p_value = 0.0
-
-    #     # Return the results as a standardized SmallDataset
-    #     return SmallDataset.from_dict({
-    #         "p-value": p_value,
-    #         "statistic": d_stat,
-    #         "pass": p_value < self.reliability
-    #     }, StatisticRole())
+    def __init__(self, reliability: float = 0.05): super().__init__(self.test_function, reliability)
 
 class GroupUTestExtension(GroupStatTest):
     """
@@ -328,6 +215,121 @@ class SparkKSTestExtension(SparkExtractorMixin, GroupKSTestExtension):
     """
     Slave-backend class for statistical test calculation.
     """
+    def __init__(self, reliability = 0.05, n_bins: int = 1000):
+        super().__init__(reliability)
+        self.n_bins = n_bins
+
+    def calc(self, data: Dataset, other: Dataset | None = None, **kwargs) -> SmallDataset | float:
+        """
+        Compute the two-sample Kolmogorov-Smirnov (KS) test for PySpark-backed datasets.
+        
+        This method approximates the continuous KS test by discretizing the data into 
+        a fixed number of histogram bins (`self.n_bins`) across the global range of 
+        both datasets. It then computes the Empirical Cumulative Distribution Functions 
+        (ECDFs) for both groups and finds the maximum absolute difference (D-statistic).
+        Finally, it calculates the p-value using the asymptotic Kolmogorov distribution 
+        (`kstwobign`) with Stephens' correction for finite sample sizes.
+
+        Args:
+            data (Dataset): The baseline dataset. Must contain exactly one numeric column.
+            other (Dataset | None): The comparison dataset. Must contain exactly one numeric column.
+            **kwargs: Additional keyword arguments (ignored in this implementation).
+
+        Returns:
+            Dataset | float: A SmallDataset containing the following fields:
+                - 'p-value': The calculated p-value (float or None).
+                - 'statistic': The KS D-statistic (float or None).
+                - 'pass': Boolean flag indicating if p-value < self.reliability.
+        """
+        
+        def _add_bucket_column(df: SparkDF, 
+                               global_min: int, 
+                               global_max: int) -> SparkDF:
+            """
+            Helper function to assign each row to a discrete histogram bin.
+            Uses the global min/max to ensure both datasets share the exact same bin edges.
+            """
+            width = (global_max - global_min) / self.n_bins
+            return df.withColumn(
+                "bucket",
+                F.least(
+                    F.floor((F.col(col) - global_min) / width),
+                    F.lit(self.n_bins - 1)  # Cap at the last bin to handle the max value edge case
+                ).cast("int")
+            )
+
+        # Validate inputs and ensure both datasets are single-column and compatible
+        other = self.check_data(data, other)
+        df1 = data.data.to_spark()
+        df2 = other.data.to_spark()
+        col = data.columns[0]
+
+        # Get sample sizes
+        n1 = df1.count()
+        n2 = df2.count()
+        
+        # Edge case: one or both datasets are empty
+        if n1 == 0 or n2 == 0:
+            return SmallDataset.from_dict({
+                "p-value": None, "statistic": None, "pass": None
+            }, StatisticRole())
+
+        # Compute global minimum and maximum across both datasets to define common bin edges
+        bounds1 = df1.agg(F.min(col).alias("min1"), F.max(col).alias("max1")).collect()[0]
+        bounds2 = df2.agg(F.min(col).alias("min2"), F.max(col).alias("max2")).collect()[0]
+
+        global_min = min(bounds1["min1"], bounds2["min2"])
+        global_max = max(bounds1["max1"], bounds2["max2"])
+
+        # Edge case: all values in both datasets are identical (zero variance)
+        if global_min == global_max:
+            return SmallDataset.from_dict({
+                "p-value": 1.0,
+                "statistic": 0.0,
+                "pass": 1.0 < self.reliability
+            }, StatisticRole())
+
+        # Compute histograms (frequency counts per bin) for both datasets
+        hist1 = (_add_bucket_column(df=df1, global_min=global_min, global_max=global_max)
+            .groupBy("bucket")
+            .count()
+            .withColumnRenamed("count", "c1")
+        )
+        hist2 = (_add_bucket_column(df=df2, global_min=global_min, global_max=global_max)
+            .groupBy("bucket")
+            .count()
+            .withColumnRenamed("count", "c2")
+        )
+
+        # Outer join histograms to align bins, filling missing bins with 0 counts
+        combined = hist1.join(hist2, on="bucket", how="outer").fillna(0, subset=["c1", "c2"])
+        
+        # Convert to Pandas for efficient cumulative sum (ECDF calculation).
+        # Note: The number of rows here is at most `self.n_bins`, so it safely fits in driver memory.
+        pdf = combined.toPandas().sort_values("bucket").reset_index(drop=True)
+        pdf["cum1"] = pdf["c1"].cumsum()
+        pdf["cum2"] = pdf["c2"].cumsum()
+        
+        # Calculate the KS statistic: maximum absolute difference between the two ECDFs
+        d_stat = float((pdf["cum1"]/n1 - pdf["cum2"]/n2).abs().max())
+
+        try:
+            # Calculate effective sample size for the asymptotic distribution
+            en = np.sqrt(n1 * n2 / (n1 + n2))
+            
+            # Apply Stephens' correction (1970) for better accuracy with finite samples.
+            # This is the exact formula used internally by scipy.stats.ks_2samp for large samples.
+            p_value = float(kstwobign.sf((en + 0.12 + 0.11 / en) * d_stat))
+        except Exception:
+            # Fallback to 0.0 if the statistical function fails (e.g., due to extreme values)
+            p_value = 0.0
+
+        # Return the results as a standardized SmallDataset
+        return SmallDataset.from_dict({
+            "p-value": p_value,
+            "statistic": d_stat,
+            "pass": p_value < self.reliability
+        }, StatisticRole())
 
 @backend_factory.register(GroupUTestExtension, SparkDataset)
 class SparkUTestExtension(SparkExtractorMixin, GroupUTestExtension):
