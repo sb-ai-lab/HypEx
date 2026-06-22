@@ -9,6 +9,7 @@ from ..dataset import (
     ABCRole,
     AdditionalMatchingRole,
     AdditionalTargetRole,
+    AdditionalFeatureRole,
     Dataset,
     SmallDataset,
     ExperimentData,
@@ -732,7 +733,11 @@ class Bias(GroupOperator):
         # additional fields are already allignet according to index
 
         numeric_cols = t_data.search_columns(
-            [FeatureRole(), TargetRole()], search_types=[int, float]
+            roles=[
+                FeatureRole(), TargetRole(), 
+                AdditionalTargetRole(), AdditionalFeatureRole()
+            ], 
+            search_types=[int, float]
         )
         
         matched_data = (
@@ -743,14 +748,9 @@ class Bias(GroupOperator):
                    left_on='_index' ,right_index=True)
             .drop(columns=['_index'])
             .reset_index()
-        )
-        matched_data = (
-            matched_data
-            .add_column(matched_data['index'], {'_index': InfoRole()})
             .groupby(by='index')
             .agg('mean')
             .rename({col: col + "_matched" for col in numeric_cols})
-            .set_index('_index')
         )
         matched_data.index.name = None
 
