@@ -354,7 +354,6 @@ class MatchingMetrics(GroupOperator):
 
         return matched_data
 
-    # TODO: fix bias, as now it is in `additional_fields` not in `variables`
     def execute(self, data: ExperimentData) -> ExperimentData:
         """
         Main execution method for calculating matching metrics.
@@ -389,6 +388,7 @@ class MatchingMetrics(GroupOperator):
         t_data = deepcopy(data.ds)
         if len(target_fields) != 2:
             matched_data = self._prepare_new_target(data, t_data, group_field)
+            matched_data.persist()
             target_fields += [matched_data.search_columns(TargetRole())[0]]
             data.set_value(
                 ExperimentDataEnum.additional_fields,
@@ -401,6 +401,8 @@ class MatchingMetrics(GroupOperator):
                 matched_data,
                 role={target_fields[1]: TargetRole()},
             )
+            storage_level = data.ds.get_storage_level()
+            t_data.persist(storage_level=storage_level, action="none")
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
@@ -417,6 +419,8 @@ class MatchingMetrics(GroupOperator):
             bias_estimation=bias,
             scaled_counts=self.__scaled_counts,
         )
+        if len(target_fields) != 2:
+            t_data.unpersist()
         return self._set_value(data, compare_result)
 
 

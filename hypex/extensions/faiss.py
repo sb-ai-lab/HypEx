@@ -772,7 +772,13 @@ class SparkFaissExtension(FaissExtension):
         )
         self._sharded_rdd.count()
     
-    def _predict(self, test_data: spark.DataFrame):
+    def _predict(
+            self, 
+            test_data: spark.DataFrame, 
+            storage_level: Literal[
+                    "MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY",
+            ] | None
+        ):
         """
         Perform distributed nearest-neighbor search across Spark partitions.
 
@@ -789,6 +795,9 @@ class SparkFaissExtension(FaissExtension):
         Args:
             test_data (spark.DataFrame): Input DataFrame with the ``_features``
                 vector column containing query vectors.
+
+            storage_level (Literal): Storage strategy for cached. Use similar option 
+                as input `data`.
 
         Returns:
             Dataset: A Dataset containing the matched neighbor indices, indexed
@@ -838,18 +847,22 @@ class SparkFaissExtension(FaissExtension):
                 ['index'] + 
                 [F.expr(f"index_list[{i}]").alias(f"{i + 1}") for i in range(self.n_neighbors)]
             )
-            .persist(self.PERSIST_POLITIC)
+            # .persist(self.PERSIST_POLITIC)
         )
-        result_df.count()
-        
+        # result_df.count()
+        result = self.result_to_dataset(result=result_df, roles={}, small=False).set_index('index')
+        result.index.name = None
+
+        storage_level = storage_level or "MEMORY_AND_DISK"
+        result.persist(storage_level=storage_level, action="count")
+
         # Удаляем все созданные промежуточные файлы
         tmp_files = os.listdir(tmp_dir)
         for file in tmp_files:
             os.remove(f"{tmp_dir}/{file}")
         os.rmdir(tmp_dir)
 
-        result = self.result_to_dataset(result=result_df, roles={}, small=False).set_index('index')
-        result.index.name = None
+        
 
         # return self.result_to_dataset(result=result_df, roles={}, small=False) 
         return result
@@ -920,7 +933,7 @@ class SparkFaissExtension(FaissExtension):
             )
             vectorized_test = self._vectorize_data(test_operating_data)
 
-            return self._predict(vectorized_test)
+            return self._predict(vectorized_test, data.get_storage_level())
     
     def unpersist(self) -> None:
         """
