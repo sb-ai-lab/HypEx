@@ -821,6 +821,6 @@ class Bias(GroupOperator):
         for bais_res in compare_result.values():
             bais_ds = bais_ds.append(bais_res)
         
-        bais_ds = bais_ds.rename({f"{col}": col for col in bais_ds.columns})
-        bais_ds.roles = {col: AdditionalStatisticRole() for col in bais_res.columns}
+        bais_ds = bais_ds.rename({col: f"{col}" for col in bais_ds.columns})
+        bais_ds.roles = {col: AdditionalStatisticRole() for col in bais_ds.columns}
         return self._set_value(data, bais_ds)

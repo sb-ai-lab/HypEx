@@ -272,7 +272,10 @@ class PandasFaissExtension(FaissExtension):
             ]
         else:
             indexes = self._prepare_indexes(indexes, dist, self.n_neighbors)
-        return self.result_to_dataset(result=indexes, roles={})
+        result = self.result_to_dataset(result=indexes, roles={}).set_index(test_data.index, drop=False)
+        result.index.name = None
+        
+        return result
 
     def _fit(
             self, 
