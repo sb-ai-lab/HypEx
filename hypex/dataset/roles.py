@@ -150,6 +150,21 @@ class InfoRole(ABCRole):
     """Semantic role for auxiliary or informational columns not used in statistical analysis."""
     _role_name: RoleNameType = "Info"
 
+class DisableRole(ABCRole):
+    """Semantic role for columns that have been "disabled" after preprocessing."""
+    _role_name: RoleNameType = "Disable"
+
+    def __init__(self, initial_role: ABCRole | None = None, data_type = None):
+        super().__init__(
+            initial_role.data_type 
+            if initial_role 
+            else data_type
+        )
+        self._initial_role = initial_role
+
+    @property
+    def initial_role(self):
+        return self._initial_role
 
 class StratificationRole(ABCRole):
     """Semantic role for columns used to stratify data during sampling or splitting.

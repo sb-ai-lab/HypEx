@@ -24,7 +24,7 @@ from ..utils import (
     NotFoundInExperimentDataError,
 )
 from ..utils.adapter import Adapter
-from .roles import AdditionalRole, ABCRole, DefaultRole
+from .roles import AdditionalRole, ABCRole, DefaultRole, DisableRole
 
 _SUPPORTED_SPACES = frozenset(
     {
@@ -297,8 +297,16 @@ class ExperimentData:
             col for col, role in self._data.roles.items()
             if isinstance(role, AdditionalRole)
         ]
+        cols_to_enable = self._data.search_columns(DisableRole())
         if cols_to_drop:
             self._data = self._data.drop(columns=cols_to_drop)
+        
+        if cols_to_enable:
+            self._data = self._data.replace_roles(
+                new_roles_map={
+                    col: self._data.roles[col].initial_role for col in cols_to_enable
+                }
+            )
         return self
     
     def _clean_ds_for_iteration(self) -> Dataset | SmallDataset:

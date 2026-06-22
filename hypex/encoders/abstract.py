@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from ..dataset import Dataset, ExperimentData, FeatureRole
+from ..dataset import Dataset, ExperimentData, FeatureRole, DisableRole
 from ..executor import Calculator
 from ..utils import (
     NAME_BORDER_SYMBOL,
@@ -42,7 +42,6 @@ class Encoder(Calculator):
     def _inner_function(data: Dataset, **kwargs) -> Dataset:
         raise AbstractMethodError
 
-    #TODO: reassing from `additional_fields` to `ds`
     def _set_value(
         self, data: ExperimentData, value: Dataset, key=None
     ) -> ExperimentData:
@@ -52,6 +51,12 @@ class Encoder(Calculator):
             value=value,
             role=value.roles,
         )
+    
+    @staticmethod
+    def _disable_target_cols(data: ExperimentData, target_cols: list[str]) -> ExperimentData:
+        disable_roles = {col:  DisableRole(initial_role=data.ds.roles[col]) for col in target_cols}
+        data.ds.replace_roles(new_roles_map=disable_roles)
+        return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         target_cols = data.ds.search_columns(
@@ -59,8 +64,12 @@ class Encoder(Calculator):
         )
         if not target_cols:
             return data
+        
+        result = self.calc(data=data.ds, target_cols=target_cols)
+        data = self._disable_target_cols(data, target_cols)
+
         return self._set_value(
             data=data,
-            value=self.calc(data=data.ds, target_cols=target_cols),
+            value=result,
             key=self.key,
         )
