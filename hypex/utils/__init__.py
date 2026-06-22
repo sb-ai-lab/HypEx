@@ -56,6 +56,8 @@ from .typings import (
 )
 from .registry import BackendFactory
 
+from .strict_abc import StrictABCMeta, StrictABC
+
 __all__ = [
     "Adapter",
     "ID_SPLIT_SYMBOL",
@@ -103,4 +105,6 @@ __all__ = [
     "gen_special_medicine_df",
     "BackendFactory",
     "GenericManager"
+    "StrictABCMeta", 
+    "StrictABC"
 ]

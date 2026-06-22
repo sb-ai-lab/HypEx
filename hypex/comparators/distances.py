@@ -122,6 +122,7 @@ class MahalanobisDistance(Calculator):
             ExperimentDataEnum.variables,
             self.id,
             value,
+            self.key
         )
         return data
 

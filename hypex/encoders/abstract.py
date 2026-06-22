@@ -48,7 +48,7 @@ class Encoder(Calculator):
     ) -> ExperimentData:
         return data.set_value(
             space=ExperimentDataEnum.additional_fields,
-            executor_id=self._ids_to_names(value.columns),
+            executor_id=self.id,
             value=value,
             role=value.roles,
         )

@@ -814,6 +814,8 @@ class SparkFaissExtension(FaissExtension):
             del partition_indexes   # ← explicit release
             gc.collect()
         
+        self._sharded_rdd.unpersist()
+        self._sharded_rdd = None
         # session.sparkContext.addPyFile("index_cacher.py")
         bc_index_files_list = session.sparkContext.broadcast(index_files_list)
         bc_n_neighbors = session.sparkContext.broadcast(self.n_neighbors)
