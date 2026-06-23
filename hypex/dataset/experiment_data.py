@@ -24,7 +24,7 @@ from ..utils import (
     NotFoundInExperimentDataError,
 )
 from ..utils.adapter import Adapter
-from .roles import AdditionalRole, ABCRole, DefaultRole, DisableRole
+from .roles import AdditionalRole, ABCRole, DefaultRole, DisabledRole
 
 _SUPPORTED_SPACES = frozenset(
     {
@@ -301,12 +301,12 @@ class ExperimentData:
         """
         if self._data.is_persisted:
             self._data.unpersist()
-            
+
         cols_to_drop = [
             col for col, role in self._data.roles.items()
             if isinstance(role, AdditionalRole)
         ]
-        cols_to_enable = self._data.search_columns(DisableRole())
+        cols_to_enable = self._data.search_columns(DisabledRole())
         if cols_to_drop:
             self._data = self._data.drop(columns=cols_to_drop)
         

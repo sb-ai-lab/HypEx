@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
-from ..dataset import Dataset, ExperimentData, FeatureRole, DisableRole
+from ..dataset import Dataset, ExperimentData, FeatureRole, DisabledRole
 from ..executor import Calculator
 from ..utils import (
     NAME_BORDER_SYMBOL,
@@ -179,7 +179,7 @@ class Encoder(Calculator):
         Returns:
             ExperimentData: The experiment data with updated roles.
         """
-        disable_roles = {col:  DisableRole(initial_role=data.ds.roles[col]) for col in target_cols}
+        disable_roles = {col:  DisabledRole(initial_role=data.ds.roles[col]) for col in target_cols}
         data.ds.replace_roles(new_roles_map=disable_roles)
         return data
 

@@ -150,7 +150,7 @@ class InfoRole(ABCRole):
     """Semantic role for auxiliary or informational columns not used in statistical analysis."""
     _role_name: RoleNameType = "Info"
 
-class DisableRole(ABCRole):
+class DisabledRole(ABCRole):
     """Semantic role for columns that have been "disabled" after preprocessing."""
     _role_name: RoleNameType = "Disable"
 
