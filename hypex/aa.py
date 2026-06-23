@@ -14,7 +14,6 @@ from .forks.aa import IfAAExecutor
 from .reporters import DatasetReporter, DictReporter
 from .reporters.aa import OneAADictReporter
 from .splitters import AASplitter, AASplitterWithStratification
-from .comparators import Chi2Test, KSTest, TTest
 from .ui.aa import AAOutput
 from .ui.base import ExperimentShell
 from .utils import SpaceEnum

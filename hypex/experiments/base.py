@@ -70,15 +70,10 @@ class Experiment(Executor):
         Class for selecting backend-dependent realization for direct executor
         """
         executor_cls = type(executor)
-        # print(executor_cls.__name__, type(ds.backend_data))
         backend_cls = backend_factory.resolve_backend(executor_cls, ds)
         if backend_cls is None:
              return executor
-        # else:
-        #     executor_params = getattr(executor, 'experiment_kwargs', {})
-        #     cur_executer = executor_dep_on_backend(**executor_params)
-        
-        # return cur_executer
+
         sig = inspect.signature(backend_cls.__init__)
         expected_params = {p.name for p in sig.parameters.values() if p.name != 'self'}
 
@@ -97,17 +92,11 @@ class Experiment(Executor):
             
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        experiment_data = deepcopy(data) if self.transformer else data # TODO: fix `deepcopy` issue 
-        # experiment_data = data
+        experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
-            start = time.perf_counter()
             cur_executor = self._get_executor_backend(executor, experiment_data.ds)
-            cur_executor.key = self.key #TODO: do we need to send here slave-backend class key?
-            print(cur_executor.__class__.__name__)
+            cur_executor.key = self.key 
             experiment_data = cur_executor.execute(experiment_data)
-            end = time.perf_counter()
-
-            print(f"executor.key = {executor.id}; dt = {end - start:.4f}c")
             
         return experiment_data
 
