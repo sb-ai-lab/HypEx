@@ -15,13 +15,9 @@ from .scipy_stats import (
     GroupKSTestExtension,
     GroupTTestExtension,
     GroupUTestExtension,
-    PandasTTestExtension,
     PandasKSTestExtension,
-    PandasUTestExtension,
     PandasChi2TestExtension,
-    SparkTTestExtension,
     SparkKSTestExtension,
-    SparkUTestExtension,
     SparkChi2TestExtension
 )
 
@@ -44,13 +40,9 @@ __all__ = [
     "GroupUTestExtension",
     "GroupChi2TestExtension",
     "GroupKSTestExtension",
-    "PandasTTestExtension",
     "PandasKSTestExtension",
-    "PandasUTestExtension",
     "PandasChi2TestExtension",
-    "SparkTTestExtension",
     "SparkKSTestExtension",
-    "SparkUTestExtension",
     "SparkChi2TestExtension",
     "MultiTest",
     "MultitestQuantile",

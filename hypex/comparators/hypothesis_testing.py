@@ -23,8 +23,7 @@ class GroupTTest(GroupHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        test_cls = backend_factory.resolve_backend(GroupTTestExtension, data)
-        return test_cls(kwargs.get("reliability", 0.05)).calc(
+        return GroupTTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
@@ -53,8 +52,8 @@ class GroupUTest(GroupHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        test_cls = backend_factory.resolve_backend(GroupUTestExtension, data)
-        return test_cls(kwargs.get("reliability", 0.05)).calc(
+        # test_cls = backend_factory.resolve_backend(GroupUTestExtension, data)
+        return GroupUTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 

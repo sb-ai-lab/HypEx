@@ -1068,6 +1068,12 @@ class SparkNavigation(DatasetBackendNavigation):
             data = ps.DataFrame(data)
         return data
 
+    def to_numpy(self) -> np.ndarray:
+        """
+        This method is extraordinary and used to collect all data on driver.
+        It should only be used with a small amount of data.
+        """
+        return self.data.to_spark().rdd.flatMap(lambda row: row).collect()
 
 class SparkDataset(SparkNavigation, DatasetBackendCalc):
     """Calculation-focused interface for PySpark-backed datasets.
@@ -1245,7 +1251,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         """Count unique combinations of group_cols"""
         if not group_cols:
             return 1
-        return int(len(self.data[group_cols].drop_duplicates()))
+        return int(self.data[group_cols].nunique())
 
 
     def grouped_value_counts(self, by: list[str], feature_cols: list[str] | None=None):

@@ -849,6 +849,12 @@ class DatasetBase:
                 type(other._backend_data), type(self._backend_data)
             )
 
+    def _to_numpy(self):
+        """
+        This method is extraordinary and regular user shouldn't use it.
+        """
+        return self._backend_data.to_numpy()
+
     def astype(
         self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> Self:
@@ -1218,9 +1224,6 @@ class DatasetBase:
             },
             "data": self._backend_data.to_dict(),
         }
-
-    def to_numpy(self) -> ndarray:
-        return self._backend_data.to_numpy()
 
     def to_records(self) -> Any:
         return self._backend_data.to_records()

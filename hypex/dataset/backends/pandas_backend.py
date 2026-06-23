@@ -1033,6 +1033,12 @@ class PandasNavigation(DatasetBackendNavigation):
         if not isinstance(data, Iterable) or isinstance(data, str):
             data = [data]
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+    
+    def to_numpy(self) -> np.ndarray:
+        """
+        This method is extraordinary and used to collect into numpy array.
+        """
+        return self.data.values.flatten()
 
 
 class PandasDataset(PandasNavigation, DatasetBackendCalc):
@@ -1166,7 +1172,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         """Count unique combinations of group_cols"""
         if not group_cols:
             return 1
-        return int(self.data[group_cols].drop_duplicates().shape[0])
+        return int(self.data[group_cols].nunique())
 
     def iter_groups(self, by: list[str]):
         for key, group in self.data.groupby(by=by, observed=False):

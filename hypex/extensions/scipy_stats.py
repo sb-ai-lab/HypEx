@@ -24,23 +24,6 @@ from ..dataset import SmallDataset, Dataset, DatasetAdapter, StatisticRole
 from ..dataset.backends import PandasDataset, SparkDataset
 from .abstract import CompareExtension
 
-class PandasExtractorMixin:
-    """
-    Pandas mixin for data extraction.
-    """
-    def _extract_arrays(self, data: Dataset, other: Dataset) -> tuple[Sequence]:
-        return data.data.values.flatten(), other.data.values.flatten() 
-
-class SparkExtractorMixin:
-    """
-    Spark mixin for data extraction.
-    """
-    def _extract_arrays(self, data: Dataset, other: Dataset) -> tuple[Sequence]:
-        return (
-            data.data.to_spark().rdd.flatMap(lambda row: row).collect(), 
-            other.data.to_spark().rdd.flatMap(lambda row: row).collect()
-        )
-
 class GroupStatTest(CompareExtension):
     """
     Master-abstract class for statistic test calculation.
@@ -91,9 +74,8 @@ class GroupStatTest(CompareExtension):
         other = self.check_data(data, other)
         if self.test_function is None:
             raise ValueError("test_function is needed for execution")
-        data, other = self._extract_arrays(data, other)
         res = self.test_function(
-            data, other, **self.default_kwargs, **kwargs
+            data._to_numpy(), other._to_numpy(), **self.default_kwargs, **kwargs
         )
         return self._form_results(res[1], res[0], self.reliability)
 
@@ -102,24 +84,27 @@ class GroupTTestExtension(GroupStatTest):
     Master-backend class for statistic test calculation.
     """
     test_function = staticmethod(ttest_ind)
-    default_kwargs = {"nan_policy": "omit", "equal_var": False}
-    def __init__(self, reliability: float = 0.05): super().__init__(self.test_function, reliability)
+    def __init__(self, reliability: float = 0.05): 
+        super().__init__(self.test_function, reliability)
+        self.default_kwargs = {"nan_policy": "omit", "equal_var": False}
 
 class GroupKSTestExtension(GroupStatTest):
     """
     Master-backend class for statistic test calculation.
     """
     test_function = staticmethod(ks_2samp)
-    default_kwargs = {}
-    def __init__(self, reliability: float = 0.05): super().__init__(self.test_function, reliability)
+    def __init__(self, reliability: float = 0.05): 
+        super().__init__(self.test_function, reliability)
+        self.default_kwargs = {}
 
 class GroupUTestExtension(GroupStatTest):
     """
     Master-backend class for statistic test calculation.
     """
     test_function = staticmethod(mannwhitneyu)
-    default_kwargs = {"nan_policy": "omit"}
-    def __init__(self, reliability: float = 0.05): super().__init__(self.test_function, reliability)
+    def __init__(self, reliability: float = 0.05): 
+        super().__init__(self.test_function, reliability)
+        self.default_kwargs = {"nan_policy": "omit"}
 
 class GroupChi2TestExtension(GroupStatTest):
     """
@@ -144,23 +129,11 @@ class GroupChi2TestExtension(GroupStatTest):
                 },
                 StatisticRole(),
             )
-        statistic, p_value, _, _ = chi2_contingency(contingency_table, **kwargs)
+        statistic, p_value, *_ = chi2_contingency(contingency_table, **kwargs)
         return self._form_results(statistic, p_value, self.reliability)
 
-@backend_factory.register(GroupTTestExtension, PandasDataset)
-class PandasTTestExtension(PandasExtractorMixin, GroupTTestExtension):
-    """
-    Slave-backend class for statistical test calculation.
-    """
-
 @backend_factory.register(GroupKSTestExtension, PandasDataset)
-class PandasKSTestExtension(PandasExtractorMixin, GroupKSTestExtension):
-    """
-    Slave-backend class for statistical test calculation.
-    """
-
-@backend_factory.register(GroupUTestExtension, PandasDataset)
-class PandasUTestExtension(PandasExtractorMixin, GroupUTestExtension):
+class PandasKSTestExtension(GroupKSTestExtension):
     """
     Slave-backend class for statistical test calculation.
     """
@@ -201,17 +174,9 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
         return data_vc.merge(other_vc, on=counted_data.columns[0])[
             ["count_x", "count_y"]
         ].fillna(0)
-    
-
-
-@backend_factory.register(GroupTTestExtension, SparkDataset)
-class SparkTTestExtension(SparkExtractorMixin, GroupTTestExtension):
-    """
-    Slave-backend class for statistical test calculation.
-    """
 
 @backend_factory.register(GroupKSTestExtension, SparkDataset)
-class SparkKSTestExtension(SparkExtractorMixin, GroupKSTestExtension):
+class SparkKSTestExtension(GroupKSTestExtension):
     """
     Slave-backend class for statistical test calculation.
     """
@@ -330,12 +295,6 @@ class SparkKSTestExtension(SparkExtractorMixin, GroupKSTestExtension):
             "statistic": d_stat,
             "pass": p_value < self.reliability
         }, StatisticRole())
-
-@backend_factory.register(GroupUTestExtension, SparkDataset)
-class SparkUTestExtension(SparkExtractorMixin, GroupUTestExtension):
-    """
-    Slave-backend class for statistical test calculation.
-    """
 
 @backend_factory.register(GroupChi2TestExtension, SparkDataset)
 class SparkChi2TestExtension(GroupChi2TestExtension):

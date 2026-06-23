@@ -207,11 +207,13 @@ class StatsChi2Test(StatsHypothesisTesting):
     REQUIRED_STATS = ["value_counts"]
 
     def __init__(
-            self,
+            self, 
             grouping_role: ABCRole | None = None,
-            target_roles: ABCRole | None = None,
+            compare_by: Literal["groups", "matched_pairs"] = "groups",
+            target_roles: ABCRole | None = None, 
+            baseline_role: ABCRole | None = None,
             reliability: float = 0.05,
-            key: Any = "",
+            key: Any = "", 
     ):
         """
         Initialize StatsChi2Test with roles and reliability.
@@ -224,8 +226,10 @@ class StatsChi2Test(StatsHypothesisTesting):
         """
         super().__init__(
             stats=self.REQUIRED_STATS,
+            compare_by=compare_by,
             grouping_role=grouping_role,
             target_roles=target_roles,
+            baseline_role=baseline_role,
             key=key,
             reliability=reliability
         )
@@ -319,11 +323,15 @@ class StatsZTest(StatsHypothesisTesting):
     """
     REQUIRED_STATS = ["count", "sum"]
 
-    def __init__(self, 
-                 grouping_role: ABCRole | None = None, 
-                 target_roles: ABCRole | None = None, 
-                 reliability: float = 0.05,
-                 key: Any = ""):
+    def __init__(
+            self, 
+            grouping_role: ABCRole | None = None,
+            compare_by: Literal["groups", "matched_pairs"] = "groups",
+            target_roles: ABCRole | None = None, 
+            baseline_role: ABCRole | None = None,
+            reliability: float = 0.05,
+            key: Any = "", 
+    ):
         """
         Initialize Chi2Test (Z-test for proportions) with roles and reliability.
 
@@ -335,8 +343,10 @@ class StatsZTest(StatsHypothesisTesting):
         """
         super().__init__(
             stats=self.REQUIRED_STATS, 
+            compare_by=compare_by,
             grouping_role=grouping_role, 
             target_roles=target_roles, 
+            baseline_role=baseline_role,
             key=key, 
             reliability=reliability
         )
