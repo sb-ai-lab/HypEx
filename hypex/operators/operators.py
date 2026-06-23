@@ -135,8 +135,7 @@ class MatchingMetrics(GroupOperator):
             float: The variance of the dataset. Returns 0.0 if the dataset 
             contains any NaN values.
         """
-        var = 0 if int(value[value.columns[0]].na_counts()) > 0 else float(value.var())
-        return var
+        return 0 if int(value[value.columns[0]].na_counts()) > 0 else float(value.var())
 
     @staticmethod
     def _calc_se(
