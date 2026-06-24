@@ -208,7 +208,6 @@ class Encoder(Calculator):
         if not target_cols:
             return data
         result = self.calc(data=data.ds, target_cols=target_cols)
-        data = self._disable_target_cols(data, target_cols)
         return self._set_value(
             data=data,
             value=result,
