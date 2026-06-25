@@ -40,6 +40,7 @@ from .roles import (
     FilterRole,
     InfoRole,
     StatisticRole,
+    AdditionalRole,
     default_roles,
 )
 
@@ -685,16 +686,29 @@ class DatasetBase:
                        search_types: list[type] | None = None) -> list[str]:
         roles = roles if isinstance(roles, Iterable) else [roles]
         roles_for_search = self._tmp_roles if tmp_role else self.roles
-        # roles_for_search = {**self.roles, **self._tmp_roles} if tmp_role else self.roles
-        return [
-            str(column)
-            for column, role in roles_for_search.items()
-            if any(
-                isinstance(role, r.__class__)
-                and (not search_types or role.data_type in search_types)
-                for r in roles
-            )
-        ]
+        additional = any(isinstance(role, AdditionalRole) for role in roles)
+        if additional:
+            return [
+                str(column)
+                for column, role in roles_for_search.items()
+                if any(
+                    isinstance(role, r.__class__)
+                    and (not search_types or role.data_type in search_types)
+                    for r in roles
+                )
+            ]
+        else:
+            return [
+                str(column)
+                for column, role in roles_for_search.items()
+                if any(
+                    isinstance(role, r.__class__)
+                    and not isinstance(role, AdditionalRole)
+                    and (not search_types or role.data_type in search_types)
+                    for r in roles
+                )
+            ]
+            
 
     def search_columns_by_type(self, search_types: list[type] | type) -> list[str]:
         search_types = (
