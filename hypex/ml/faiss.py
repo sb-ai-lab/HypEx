@@ -286,12 +286,10 @@ class FaissNearestNeighbors(MLExecutor):
         )
         nans = 0
 
-        # for result in compare_result.values():
         for group, result in compare_result.items():
-            #TODO: find solution without `data` field
-            # result.data.to_pandas().to_csv(f"faiss_{group}.csv")
             nans += (
-                result.data.isna().sum().sum()
+                # TODO: find more elegant solution
+                sum(result.isna().nunique().values()) - len(result.columns)
             )
             result = result.fillna(-1).astype({col: int for col in result.columns})
         if nans > 0:
@@ -310,7 +308,8 @@ class FaissNearestNeighbors(MLExecutor):
             #`limit` may be removed
             t_index_field: Dataset = res_v.limit(len(group))
 
-            n_nans = t_index_field.data.isna().sum().sum()
+            # TODO: Similar comment as abobe: find more elegant solution
+            n_nans = sum(t_index_field.isna().nunique().values()) - len(t_index_field.columns)
 
             if n_nans:
                 raise PairsNotFoundError
