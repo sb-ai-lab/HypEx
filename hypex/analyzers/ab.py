@@ -107,11 +107,12 @@ class ABAnalyzer(Executor):
             if len(analysis_ids) < len(t_data):
                 analysis_ids *= num_groups
             t_data.data.index = analysis_ids
+            step = len(analysis_ids) // num_groups
             for f in ["p-value", "pass"]:
-                for i in range(0, len(analysis_ids), len(analysis_ids) // num_groups):
-                    value = t_data.iloc[i : i + len(analysis_ids) // num_groups][f]
+                for i in range(0, len(analysis_ids), step):
+                    value = t_data.iloc[i: i + step][f]
                     multitest_pvalues = self._add_pvalues(multitest_pvalues, value, f)
-                    analysis_data[f"{c} {f} {groups[i // num_groups + 1][0]}"] = (
+                    analysis_data[f"{c} {f} {groups[i // step + 1][0]}"] = (
                         value.mean()
                     )
             if c not in ["UTest", "TTest"]:
