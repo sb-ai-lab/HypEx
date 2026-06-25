@@ -1,5 +1,7 @@
 """CUPAC-specific reporters for extracting variance reductions and feature importances."""
 
+from __future__ import annotations
+
 from ..comparators import GroupDifference
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..utils import ExperimentDataEnum, ID_SPLIT_SYMBOL

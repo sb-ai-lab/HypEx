@@ -1,5 +1,7 @@
 """CUPED output class for variance reduction results."""
 
+from __future__ import annotations
+
 from ..dataset import Dataset, ExperimentData
 from ..reporters.cuped import CupedReporter
 from .base import Output

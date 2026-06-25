@@ -1,5 +1,7 @@
 """CUPED-specific reporter for extracting variance reduction metrics."""
 
+from __future__ import annotations
+
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from . import Reporter
 
