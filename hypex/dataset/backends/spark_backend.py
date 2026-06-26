@@ -249,6 +249,8 @@ class SparkNavigation(DatasetBackendNavigation):
             self.data = ps.DataFrame(spark_df)
         elif isinstance(data, str):
             self.data = self._read_file(data, self.session)
+        elif isinstance(data, SparkDataset):
+            self.data = data.data
         elif data is None:
             self.data = ps.DataFrame(
                 self.session.createDataFrame([], schema=StructType([]))

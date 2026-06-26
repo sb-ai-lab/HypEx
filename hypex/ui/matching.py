@@ -10,6 +10,7 @@ from ..dataset import (
 )
 from ..reporters.matching import MatchingReporter, MatchingQualityReporter
 from .base import Output
+from ..utils.adapter import Adapter
 
 
 class MatchingOutput(Output):
@@ -72,7 +73,7 @@ class MatchingOutput(Output):
             
             # Получаем значения индексов и оригинальные индексы строк
             idx_values = t_indexes[col].get_values()
-            orig_indices = list(t_indexes.index)
+            orig_indices = Adapter.to_list(t_indexes.index) 
             
             valid_orig_indices = []
             valid_matched_indices = []

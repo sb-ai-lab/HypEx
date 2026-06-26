@@ -203,6 +203,8 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data = self._read_file(data)
         elif isinstance(data, list):
             self.data = pd.DataFrame(data) if data else pd.DataFrame()
+        elif isinstance(data, PandasDataset):
+            self.data = data.data
         else:
             self.data = pd.DataFrame()
 
