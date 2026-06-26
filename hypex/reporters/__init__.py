@@ -11,10 +11,8 @@ __all__ = [
     "ABTestReporter", "CupacReporter",
     "HomogeneityReporter",
     "MatchingReporter", "MatchingQualityReporter",
-    # Backwards compat
+    # Backwards compat (только те, что реально существуют в других модулях)
     "OneAADictReporter", "AADatasetReporter",
     "ABDictReporter", "ABDatasetReporter",
     "HomoDictReporter", "HomoDatasetReporter",
-    "MatchingDictReporter", "MatchingQualityDictReporter",
-    "MatchingDatasetReporter", "MatchingQualityDatasetReporter"
 ]

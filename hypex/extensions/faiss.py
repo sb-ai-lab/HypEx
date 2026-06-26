@@ -314,7 +314,7 @@ class PandasFaissExtension(FaissExtension):
             _index = faiss.IndexIVFFlat(self.index, X.shape[1], n_clusters)
             _index.train(X)
             self.index = faiss.IndexIDMap(_index)
-        self.index.add_with_ids(X, data.index.tolist())
+        self.index.add_with_ids(X, np.asarray(data.index, dtype=np.int64))
         
     def calc(
             self, 

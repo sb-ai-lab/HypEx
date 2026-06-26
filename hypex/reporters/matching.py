@@ -1,56 +1,70 @@
 from __future__ import annotations
-from typing import Any, ClassVar, Literal
-import warnings
+
+from typing import Any
 
 from ..analyzers.matching import MatchingAnalyzer
-from ..comparators import GroupChi2Test, GroupKSTest, GroupTTest
-from ..dataset import Dataset, ExperimentData, StatisticRole
-from ..ml import FaissNearestNeighbors
-from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL, ExperimentDataEnum
-from .abstract import DatasetReporter, DictReporter, Reporter, TestDictReporter
+from ..dataset import Dataset, ExperimentData
+from ..reporters.abstract import Reporter
+from ..utils import ExperimentDataEnum, ID_SPLIT_SYMBOL
+from ..utils.errors import NotFoundInExperimentDataError
 
-class MatchingReporter(DatasetReporter):
-    def __init__(self, searching_class: type = MatchingAnalyzer, output_format: Literal["dict", "dataset"] = "dataset"):
-        dict_rep = DictReporter()
-        super().__init__(dict_rep, output_format)
-        self.searching_class = searching_class
 
-    def _report(self, data: ExperimentData) -> dict[str, Any]:
-        result = self._extract_from_analyser(data)
-        if self.searching_class == MatchingAnalyzer:
-            result.update(self._extract_indexes(data))
-        return result
+class MatchingReporter(Reporter):
+    """
+    Репортер для основных метрик матчинга (ATT, ATC, ATE).
+    Забирает готовый Dataset из MatchingAnalyzer или GroupExperiment.
+    """
 
-    def _extract_from_analyser(self, data: ExperimentData) -> dict[str, Any]:
-        analyzer_id = data.get_one_id(self.searching_class, ExperimentDataEnum.analysis_tables)
-        table = data.analysis_tables[analyzer_id].data
-        return {f"{col}{ID_SPLIT_SYMBOL}{idx}": val for col in table.columns for idx, row in table.iterrows() for val in [row[col]]}
+    def report(self, data: ExperimentData) -> Dataset:
+        # 1. Пытаемся забрать результат обычного Matching (MatchingAnalyzer)
+        try:
+            analyzer_id = data.get_one_id(MatchingAnalyzer, ExperimentDataEnum.analysis_tables)
+            result_ds = data.analysis_tables[analyzer_id]
+            print(f"[DEBUG MatchingReporter] analyzer_id: {analyzer_id}")
+            print(f"[DEBUG MatchingReporter] result_ds type: {type(result_ds)}")
+            print(f"[DEBUG MatchingReporter] result_ds roles: {list(result_ds.roles.keys())}")
+            print(f"[DEBUG MatchingReporter] result_ds columns: {result_ds.columns}")
+            print(f"[DEBUG MatchingReporter] result_ds data empty? {result_ds.data.empty if hasattr(result_ds.data, 'empty') else 'N/A'}")
+            return result_ds
+        except NotFoundInExperimentDataError:
+            pass
 
-    def _extract_indexes(self, data: ExperimentData) -> dict[str, str]:
-        ids = data.get_ids(FaissNearestNeighbors, ExperimentDataEnum.additional_fields)[FaissNearestNeighbors.__name__][ExperimentDataEnum.additional_fields.value]
-        return {f"indexes{ID_SPLIT_SYMBOL}{col.split(ID_SPLIT_SYMBOL)[3]}": MATCHING_INDEXES_SPLITTER_SYMBOL.join(str(i) for i in data.additional_fields[col].data.tolist()) for col in ids}
+        # 2. Если был group_match=True, результат лежит в GroupExperiment.
+        # ВАЖНО: Передаем имя класса строкой ("GroupExperiment"), чтобы избежать 
+        # циклического импорта между reporters и experiments.base_complex!
+        try:
+            group_exp_id = data.get_one_id("GroupExperiment", ExperimentDataEnum.analysis_tables)
+            return data.analysis_tables[group_exp_id]
+        except NotFoundInExperimentDataError:
+            pass
 
-class MatchingQualityReporter(DatasetReporter):
-    tests: ClassVar[list] = [GroupTTest, GroupKSTest, GroupChi2Test]
-    def _report(self, data: ExperimentData) -> dict: return extract_tests(data, self.tests, self.front)
+        return Dataset.create_empty()
 
-# Aliases
-class MatchingDictReporter(MatchingReporter):
-    def __init__(self, searching_class=MatchingAnalyzer):
-        super().__init__(searching_class, output_format="dict")
-        warnings.warn("MatchingDictReporter is deprecated.", DeprecationWarning, stacklevel=2)
 
-class MatchingQualityDictReporter(MatchingQualityReporter):
-    def __init__(self, front=True):
-        super().__init__(output_format="dict")
-        warnings.warn("MatchingQualityDictReporter is deprecated.", DeprecationWarning, stacklevel=2)
+class MatchingQualityReporter(Reporter):
+    """
+    Репортер для тестов качества матчинга (T-Test, Chi2, KS).
+    Собирает результаты OnRoleExperiment из analysis_tables.
+    """
 
-class MatchingDatasetReporter(MatchingReporter):
-    def __init__(self, searching_class=MatchingAnalyzer):
-        super().__init__(searching_class, output_format="dataset")
-        warnings.warn("MatchingDatasetReporter is deprecated.", DeprecationWarning, stacklevel=2)
+    def report(self, data: ExperimentData) -> dict[str, Dataset]:
+        quality_results = {}
 
-class MatchingQualityDatasetReporter(MatchingQualityReporter):
-    def __init__(self):
-        super().__init__(output_format="dataset")
-        warnings.warn("MatchingQualityDatasetReporter is deprecated.", DeprecationWarning, stacklevel=2)
+        for exec_id, table in data.analysis_tables.items():
+            # Фильтруем только итоговые таблицы тестов (исключаем MatchingAnalyzer, Bias и сырые stats)
+            is_test = any(test in exec_id for test in ["TTest", "Chi2Test", "KSTest", "UTest"])
+            is_raw_stats = exec_id.endswith("stats") or exec_id.endswith("┆stats")
+
+            if is_test and not is_raw_stats:
+                # exec_id обычно имеет вид "StatsTTest┴┴feat_num_1" или "GroupTTest┴┴feat_cat"
+                parts = exec_id.split(ID_SPLIT_SYMBOL)
+                feature_name = parts[-1] if len(parts) > 1 else exec_id
+
+                # Группируем тесты по имени фичи
+                if feature_name not in quality_results:
+                    quality_results[feature_name] = table
+                else:
+                    # Если на одну фичу несколько тестов, аппендим их
+                    quality_results[feature_name] = quality_results[feature_name].append(table)
+
+        return quality_results

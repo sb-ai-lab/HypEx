@@ -418,6 +418,9 @@ class MatchingMetrics(GroupOperator):
             bias_estimation=bias,
             scaled_counts=self.__scaled_counts,
         )
+        print(f"[DEBUG MatchingMetrics] compare_result type: {type(compare_result)}")
+        print(f"[DEBUG MatchingMetrics] compare_result keys/shape: {compare_result.keys() if isinstance(compare_result, dict) else getattr(compare_result, 'shape', 'N/A')}")
+        print(f"[DEBUG MatchingMetrics] compare_result content: {compare_result}")
         if len(target_fields) != 2:
             t_data.unpersist()
         return self._set_value(data, compare_result)

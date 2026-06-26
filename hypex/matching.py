@@ -12,7 +12,7 @@ from .experiments import GroupExperiment
 from .experiments.base import Experiment, OnRoleExperiment
 from .ml.faiss import FaissNearestNeighbors
 from .operators.operators import Bias, MatchingMetrics
-from .reporters.matching import MatchingDatasetReporter
+from .reporters.matching import MatchingReporter
 from .transformers import TypeCaster
 from .ui.base import ExperimentShell
 from .ui.matching import MatchingOutput
@@ -192,7 +192,7 @@ class Matching(ExperimentShell):
             if not group_match
             else GroupExperiment(
                 executors=executors,
-                reporter=MatchingDatasetReporter(),
+                reporter=MatchingReporter(),
             )
         )
 

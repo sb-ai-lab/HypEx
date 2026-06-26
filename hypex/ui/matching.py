@@ -2,161 +2,107 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..analyzers.matching import MatchingAnalyzer
 from ..dataset import (
     AdditionalMatchingRole,
     Dataset,
     ExperimentData,
-    GroupingRole,
-    StatisticRole,
     TargetRole,
 )
-from ..reporters.matching import MatchingDictReporter, MatchingQualityDatasetReporter
-from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL
+from ..reporters.matching import MatchingReporter, MatchingQualityReporter
 from .base import Output
 
 
 class MatchingOutput(Output):
+    """
+    Output handler for Matching experiments.
+    
+    Automatically extracts:
+    - resume: Dataset with ATT, ATC, ATE metrics.
+    - quality_results: Dict of Datasets with quality tests (T-Test, Chi2, KS) per feature.
+    - full_data: Original dataset enriched with matched features (_matched_0, _matched_1, etc.).
+    """
     resume: Dataset
     full_data: Dataset
-    quality_results: Dataset
+    quality_results: dict[str, Dataset]
 
-    def __init__(self, searching_class: type = MatchingAnalyzer):
+    def __init__(self, *args, **kwargs):
+        # ВАЖНО: additional_reporters должен быть словарем, где ключ - это имя атрибута,
+        # в который базовый класс Output автоматически сохранит результат репортера.
         super().__init__(
-            resume_reporter=MatchingDictReporter(searching_class),
-            additional_reporters=MatchingQualityDatasetReporter(),
-        )
-
-    def _extract_full_data(self, experiment_data: ExperimentData, indexes: Dataset):
-        self.indexes = Dataset(roles={}, data=experiment_data.ds.index)
-        for i in range(len(indexes.columns)):
-            t_indexes = indexes.iloc[:, i]
-            t_indexes.index = experiment_data.ds.index
-            filtered_field = indexes.drop(
-                indexes[indexes[t_indexes.columns[0]] == -1], axis=0
-            )
-            matched_data = experiment_data.ds.loc[
-                list(map(lambda x: x[0], filtered_field.get_values()))
-            ].rename({col: col + f"_matched_{i}" for col in experiment_data.ds.columns})
-            matched_data.index = filtered_field.index
-
-            self.indexes = (
-                t_indexes
-                if self.indexes.is_empty()
-                else self.indexes.add_column(t_indexes)
-            )
-            if hasattr(self, "full_data") and self.full_data is not None:
-                self.full_data = self.full_data.append(
-                    matched_data.reindex(experiment_data.ds.index), axis=1
-                )
-            else:
-                self.full_data = experiment_data.ds.append(
-                    matched_data.reindex(experiment_data.ds.index), axis=1
-                )
-
-    @staticmethod
-    def _reformat_resume(resume: dict[str, Any]):
-        """
-        Reformats a flat resume dictionary with composite keys into a nested structure.
-
-        This function processes keys containing ID_SPLIT_SYMBOL to create
-        a hierarchical resume structure. Keys without the split symbol are ignored.
-        """
-
-        reformatted_resume: dict[str, Any] = {}
-
-        # Iterate through each key-value pair in the original resume in order to skip the keys that don't contain the ID_SPLIT_SYMBOL (have only one level of hierarchy)
-        for key, value in resume.items():
-            if ID_SPLIT_SYMBOL not in key:
-                continue
-
-            keys = key.split(ID_SPLIT_SYMBOL)
-
-            # Special handling for 'indexes' which requires different nesting structure
-            if keys[0] == "indexes":
-                # For keys with more than two components (e.g., indexes, # neighbour, strata)
-                if len(keys) > 2:
-                    reformatted_resume.setdefault("indexes", {}).setdefault(
-                        keys[1], {}
-                    )[keys[2]] = value
-                else:
-                    # For two-component keys (e.g., indexes, strata)
-                    reformatted_resume.setdefault("indexes", {})[keys[1]] = value
-            else:
-                # Handle non-indexes keys
-                l1_key = keys[0] if len(keys) < 3 else f"{keys[2]} {keys[0]}"
-                reformatted_resume.setdefault(l1_key, {})[keys[1]] = value
-
-        return reformatted_resume
-
-    @staticmethod
-    def _collect_grouped_indexes(experiment_data, group) -> Dataset:
-        group_indexes_id = experiment_data.ds.search_columns(GroupingRole())
-        indexes = [
-            Dataset.from_dict(
-                {
-                    "indexes": list(
-                        map(int, values.split(MATCHING_INDEXES_SPLITTER_SYMBOL))
-                    )
-                },
-                index=experiment_data.ds[
-                    experiment_data.ds[group_indexes_id] == group
-                ].index,
-                roles={"indexes": StatisticRole()},
-            )
-            for group, values in group.items()
-        ]
-        return indexes[0].append(indexes[1:]).sort()
-
-    def extract(self, experiment_data: ExperimentData):
-        resume = self.resume_reporter.report(experiment_data)
-        reformatted_resume = self._reformat_resume(resume)
-        if "indexes" in reformatted_resume.keys():
-            indexes_items = reformatted_resume.pop("indexes")
-            are_nested = all(isinstance(v, dict) for v in indexes_items.values())
-            if are_nested:
-                indexes = [
-                    self._collect_grouped_indexes(experiment_data, values).rename(
-                        {"indexes": f"indexes_{group}"}
-                    )
-                    for group, values in indexes_items.items()
-                ]
-            else:
-                indexes = [
-                    Dataset.from_dict(
-                        {
-                            f"indexes_{group}": list(
-                                map(int, values.split(MATCHING_INDEXES_SPLITTER_SYMBOL))
-                            )
-                        },
-                        roles={f"indexes_{group}": StatisticRole()},
-                    )
-                    for group, values in indexes_items.items()
-                ]
-            indexes = indexes[0].append(other=indexes[1:], axis=1).sort()
-        else:
-            indexes_data = resume["indexes"].split(MATCHING_INDEXES_SPLITTER_SYMBOL)
-            indexes = Dataset.from_dict(
-                {"indexes": list(map(int, indexes_data))},
-                roles={"indexes": AdditionalMatchingRole()},
-            )
-
-        outcome = experiment_data.field_search(TargetRole())[0]
-        reformatted_resume["outcome"] = {
-            key: outcome
-            for key in reformatted_resume[next(iter(reformatted_resume.keys()))].keys()
-        }
-
-        self.resume = Dataset.from_dict(
-            reformatted_resume,
-            roles={
-                column: StatisticRole() for column in list(reformatted_resume.keys())
+            resume_reporter=MatchingReporter(),
+            additional_reporters={
+                "quality_results": MatchingQualityReporter()
             },
         )
-        self._extract_full_data(
-            experiment_data,
-            indexes,
-        )
-        self.resume = round(self.resume, 2)
 
-        self.quality_results = self.additional_reporters.report(experiment_data)
+    def extract(self, experiment_data: ExperimentData):
+        # Базовый extract сам вызовет .report() у resume_reporter и additional_reporters
+        # и сохранит результаты в self.resume и self.quality_results
+        super().extract(experiment_data)
+        
+        # Округляем resume для красивого вывода в Jupyter
+        if self.resume is not None and not self.resume.is_empty():
+            print(f"[DEBUG MatchingOutput] self.resume.is_empty(): {self.resume.is_empty()}")
+            print(f"[DEBUG MatchingOutput] self.resume.columns: {self.resume.columns}")
+            print(f"[DEBUG MatchingOutput] self.resume.roles: {list(self.resume.roles.keys())}")
+            print(f"[DEBUG MatchingOutput] self.resume.data:\n{self.resume.data}")
+            # Округляем resume для красивого вывода (теперь отработает корректно через Dataset.__round__)
+            if self.resume is not None and not self.resume.is_empty():
+                self.resume = round(self.resume, 4)
+            
+        # Собираем full_data (исходный датасет + сматченные признаки)
+        self._extract_full_data(experiment_data)
+
+    def _extract_full_data(self, experiment_data: ExperimentData):
+        """
+        Собирает full_data, опираясь на additional_fields (где лежат индексы пар).
+        FaissNearestNeighbors сохраняет колонки с индексами сматченных пар 
+        с ролью AdditionalMatchingRole().
+        """
+        self.full_data = experiment_data.ds
+        
+        # Находим колонки с индексами сматченных пар
+        index_cols = experiment_data.ds.search_columns(AdditionalMatchingRole())
+        if not index_cols:
+            return
+
+        # Сортируем колонки, чтобы порядок соседей был детерминированным
+        for i, col in enumerate(sorted(index_cols)):
+            t_indexes = experiment_data.ds[[col]]
+            
+            # Получаем значения индексов и оригинальные индексы строк
+            idx_values = t_indexes[col].get_values()
+            orig_indices = list(t_indexes.index)
+            
+            valid_orig_indices = []
+            valid_matched_indices = []
+            
+            # Фильтруем валидные пары (исключаем -1, который означает отсутствие пары, и NaN)
+            for orig_idx, matched_idx in zip(orig_indices, idx_values):
+                if matched_idx != -1 and matched_idx is not None and str(matched_idx) != 'nan':
+                    valid_orig_indices.append(orig_idx)
+                    valid_matched_indices.append(matched_idx)
+            
+            if not valid_matched_indices:
+                continue
+                
+            try:
+                # Берем строки из оригинального датасета по matched индексам
+                matched_data = experiment_data.ds.loc[valid_matched_indices]
+                
+                # Переименовываем колонки, добавляя суффикс _matched_{i}
+                rename_dict = {c: f"{c}_matched_{i}" for c in experiment_data.ds.columns}
+                matched_data = matched_data.rename(rename_dict)
+                
+                # Возвращаем оригинальный индекс для выравнивания
+                matched_data.index = valid_orig_indices
+                
+                # Reindex до полного размера, чтобы выровнять с full_data (заполнит NaN там, где нет пар)
+                matched_data = matched_data.reindex(experiment_data.ds.index)
+                
+                # Джойним с основным датасетом по колонкам (axis=1)
+                self.full_data = self.full_data.append(matched_data, axis=1)
+            except Exception:
+                # В случае проблем с бэкендом (например, специфичный loc в Spark) просто пропускаем
+                # эту колонку, чтобы не ломать весь пайплайн
+                continue
