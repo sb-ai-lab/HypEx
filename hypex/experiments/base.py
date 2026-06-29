@@ -91,13 +91,17 @@ class Experiment(Executor):
         return new_executor
             
 
-    def execute(self, data: ExperimentData) -> ExperimentData:
+    def execute(self, data: ExperimentData, logg_file: str | None = None) -> ExperimentData:
         experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
+            start = time.perf_counter()
             cur_executor = self._get_executor_backend(executor, experiment_data.ds)
             cur_executor.key = self.key 
             experiment_data = cur_executor.execute(experiment_data)
-            
+            end = time.perf_counter()
+            if logg_file is not None:
+                with open(logg_file, "a") as f:
+                    f.write(f"{type(cur_executor)}: {end - start} sec\n")
         return experiment_data
 
 
