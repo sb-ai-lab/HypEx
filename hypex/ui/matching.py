@@ -14,19 +14,33 @@ from ..utils.adapter import Adapter
 
 
 class MatchingOutput(Output):
-    """
-    Output handler for Matching experiments.
-    
-    Automatically extracts:
-    - resume: Dataset with ATT, ATC, ATE metrics.
-    - quality_results: Dict of Datasets with quality tests (T-Test, Chi2, KS) per feature.
-    - full_data: Original dataset enriched with matched features (_matched_0, _matched_1, etc.).
+    """Output handler for Matching experiments.
+
+    Automatically extracts and formats the results of a matching pipeline,
+    including core treatment effect metrics, quality test results, and the
+    fully enriched dataset with matched pairs.
+
+    Attributes:
+        resume: A Dataset containing the core matching metrics (ATT, ATC, ATE).
+        full_data: The original dataset enriched with matched features
+            (e.g., columns suffixed with ``_matched_0``, ``_matched_1``).
+        quality_results: A dictionary mapping feature names to Datasets
+            containing quality test results (T-Test, Chi2, KS) per feature.
     """
     resume: Dataset
     full_data: Dataset
     quality_results: dict[str, Dataset]
 
     def __init__(self, *args, **kwargs):
+        """Initializes the MatchingOutput handler.
+
+        Configures the output with a ``MatchingReporter`` for the main resume
+        and a ``MatchingQualityReporter`` for the quality tests.
+
+        Args:
+            *args: Positional arguments passed to the base ``Output`` class.
+            **kwargs: Keyword arguments passed to the base ``Output`` class.
+        """
         super().__init__(
             resume_reporter=MatchingReporter(),
             additional_reporters={
@@ -35,6 +49,15 @@ class MatchingOutput(Output):
         )
 
     def extract(self, experiment_data: ExperimentData):
+        """Extracts and formats all matching experiment results.
+
+        Calls the base extraction logic, rounds the main resume metrics to
+        4 decimal places, and enriches the original dataset with matched pairs.
+
+        Args:
+            experiment_data: The experiment data container holding the results
+                of the matching pipeline.
+        """
         super().extract(experiment_data)
         
         if self.resume is not None and not self.resume.is_empty():
@@ -44,10 +67,17 @@ class MatchingOutput(Output):
         self._extract_full_data(experiment_data)
 
     def _extract_full_data(self, experiment_data: ExperimentData):
-        """
-        Собирает full_data, опираясь на additional_fields (где лежат индексы пар).
-        FaissNearestNeighbors сохраняет колонки с индексами сматченных пар 
-        с ролью AdditionalMatchingRole().
+        """Enriches the original dataset with matched pair data.
+
+        Retrieves the match indices stored in the additional fields (where
+        ``FaissNearestNeighbors`` saves the matched pair indices with the
+        ``AdditionalMatchingRole``) and appends the corresponding matched
+        rows to the main dataset. Matched columns are suffixed with their
+        match index (e.g., ``_matched_0``).
+
+        Args:
+            experiment_data: The experiment data container holding the match
+                indices and the original dataset.
         """
         self.full_data = experiment_data.ds
         

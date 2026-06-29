@@ -10,12 +10,26 @@ from ..utils.errors import NotFoundInExperimentDataError
 
 
 class MatchingReporter(Reporter):
-    """
-    Репортер для основных метрик матчинга (ATT, ATC, ATE).
-    Забирает готовый Dataset из MatchingAnalyzer или GroupExperiment.
+    """Reporter for core matching metrics (ATT, ATC, ATE).
+
+    Retrieves the pre-computed Dataset from either MatchingAnalyzer
+    or GroupExperiment.
     """
 
     def report(self, data: ExperimentData) -> Dataset:
+        """Generate the main matching metrics report.
+
+        Attempts to retrieve the results from MatchingAnalyzer first.
+        If not found, falls back to GroupExperiment. Returns an empty
+        Dataset if neither is present.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            A Dataset containing the matching metrics, or an empty
+            Dataset if no matching results are found.
+        """
         try:
             analyzer_id = data.get_one_id(MatchingAnalyzer, ExperimentDataEnum.analysis_tables)
             result_ds = data.analysis_tables[analyzer_id]
@@ -33,12 +47,24 @@ class MatchingReporter(Reporter):
 
 
 class MatchingQualityReporter(Reporter):
-    """
-    Репортер для тестов качества матчинга (T-Test, Chi2, KS).
-    Собирает результаты OnRoleExperiment из analysis_tables.
+    """Reporter for matching quality tests (T-Test, Chi2, KS).
+
+    Aggregates the results of OnRoleExperiment from the analysis tables.
     """
 
     def report(self, data: ExperimentData) -> dict[str, Dataset]:
+        """Generate the matching quality tests report.
+
+        Extracts statistical test outcomes from the analysis tables,
+        filters out raw statistics, and groups the results by feature name.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            A dictionary mapping feature names to their corresponding
+            quality test result Datasets.
+        """
         test_set_for_report = frozenset(["TTest", "Chi2Test", "KSTest", "UTest"])
         quality_results = {}
 
