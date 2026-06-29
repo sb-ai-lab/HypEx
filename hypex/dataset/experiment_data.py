@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from copy import deepcopy
-from typing import Any
+from typing import Any, Literal
 
 try:
     from typing import Self  # Python >= 3.11
@@ -66,6 +66,8 @@ class ExperimentData:
         self.groups: dict[str, dict[str, Dataset]] = {}
         self.analysis_tables: dict[str, SmallDataset] = {}
         self.id_name_mapping: dict[str, str] = {}
+
+        self._initial_cols = deepcopy(self._data.columns)
 
     @property
     def ds(self) -> Dataset | SmallDataset:
@@ -509,14 +511,21 @@ class ExperimentData:
         roles: ABCRole | Iterable[ABCRole],
         tmp_role: bool = False,
         search_types: list[type] | None = None,
+        space: Literal["all", "ds", "additional_fields"] = "all",
     ) -> list[str]:
         """Search for column names matching specified semantic roles.
         
         After the refactor, ALL columns live in self.ds 
         (including AdditionalRole columns), so we search only there.
         """
+        space_dict = {
+            "all": self.ds,
+            "ds": self.ds[self._initial_cols],
+            "additional_fields": self.additional_fields,
+        }
+        search_space = space_dict[space]
         roles_list = Adapter.to_list(roles)
-        return self.ds.search_columns(
+        return search_space.search_columns(
             roles_list, tmp_role=tmp_role, search_types=search_types
         )
 
@@ -525,13 +534,14 @@ class ExperimentData:
         roles: ABCRole | Iterable[ABCRole],
         tmp_role: bool = False,
         search_types: list[type] | None = None,
+        space: Literal["all", "ds", "additional_fields"] = "all",
     ) -> Dataset:
         """Build a new dataset containing columns matching specified roles.
         All columns now live in self.ds.
         """
         roles_list = Adapter.to_list(roles)
         role_columns = {
-            role: self.field_search(role, tmp_role, search_types) 
+            role: self.field_search(role, tmp_role, search_types, space) 
             for role in roles_list
         }
         searched = Dataset.create_empty(

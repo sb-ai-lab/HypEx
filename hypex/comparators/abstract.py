@@ -373,12 +373,8 @@ class GroupsComparator(BaseComparator, ABC):
             target_fields_data, "target_fields_data", "matched_pairs"
         )
 
-        # compared_data = target_fields_data.merge(group_field_data, left_index=True, right_index=True).groupby(by=group_field_data.columns)
         baseline_indexes = baseline_field_data.merge(group_field_data, left_index=True, right_index=True).groupby(by=group_field_data.columns[0])
         baseline_data = []
-
-
-        # TODO: КОСТЫЛЬ!!!! ИСПРАВИТЬ!!!!
         compared_data = []
         for group, indexes in group_field_data.reset_index().groupby(group_field_data.columns[0]):
             compared_data.append((group, target_fields_data.loc[indexes.iget_values(column=0), :]))
