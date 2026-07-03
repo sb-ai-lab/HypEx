@@ -3,7 +3,7 @@ from __future__ import annotations
 from ..utils import BackendsEnum
 from .abstract import AdaptiveHypothesisTest
 from .hypothesis_testing import GroupChi2Test, GroupKSTest, GroupTTest, GroupUTest
-from .stats_hypothesis_testing import StatsTTest, StatsChi2Test
+from .stats_hypothesis_testing import StatsTTest, StatsChi2Test, StatsKSTest
 
 
 class TTest(AdaptiveHypothesisTest):
@@ -37,13 +37,13 @@ class Chi2Test(AdaptiveHypothesisTest):
 class KSTest(AdaptiveHypothesisTest):
     """
     Backend-adaptive Kolmogorov-Smirnov test.
-
-    Uses GroupKSTest for all backends (no aggregated-stats version available).
+    Pandas → GroupKSTest (raw-data scipy ks_2samp).
+    Spark  → StatsKSTest (histogram-based, single groupBy per target).
     """
 
     BACKEND_MAP = {
         BackendsEnum.pandas: GroupKSTest,
-        BackendsEnum.spark: GroupKSTest,
+        BackendsEnum.spark: StatsKSTest,
     }
 
 

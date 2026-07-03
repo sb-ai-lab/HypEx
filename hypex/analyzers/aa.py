@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from ..comparators import GroupChi2Test, GroupKSTest, GroupTTest
-from ..comparators import StatsTTest, StatsChi2Test, StatsZTest
+from ..comparators import StatsTTest, StatsChi2Test, StatsZTest, StatsKSTest
 from ..dataset import Dataset, SmallDataset, ExperimentData, StatisticRole, InfoRole
 from ..executor import Executor
 from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
@@ -29,6 +29,7 @@ class OneAAStatAnalyzer(Executor):
             StatsTTest,
             StatsChi2Test,
             StatsZTest,
+            StatsKSTest,
         ]
         
         executor_ids = data.get_ids(
@@ -60,29 +61,50 @@ class OneAAStatAnalyzer(Executor):
 
         analysis_data["mean test score"] = 0
         sum_weight = 0
-        
+
+        # NaN cleanup
         analysis_data = {
             key: (0 if np.isnan(value) else value)
             for key, value in analysis_data.items()
         }
-        
+
+        # Keys for searching
         gtt_p = f"mean{ID_SPLIT_SYMBOL}GroupTTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
         gks_p = f"mean{ID_SPLIT_SYMBOL}GroupKSTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
         chi2_p = f"mean{ID_SPLIT_SYMBOL}GroupChi2Test{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
         stt_p = f"mean{ID_SPLIT_SYMBOL}StatsTTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
-        
-        if gtt_p in analysis_data and gks_p in analysis_data:
-            analysis_data["mean test score"] = (
-                analysis_data[gtt_p] + 2 * analysis_data[gks_p]
-            )
-            sum_weight += 3
+        sks_p = f"mean{ID_SPLIT_SYMBOL}StatsKSTest{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
+        schi2_p = f"mean{ID_SPLIT_SYMBOL}StatsChi2Test{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}all"
+
+        # ── T-test (weight = 1) ─────────────────────────────────────────
+        # StatsTTest (Spark) takes priority over GroupTTest (Pandas)
         if stt_p in analysis_data:
-            analysis_data["mean test score"] = analysis_data[stt_p]
-            sum_weight += 3
-        if chi2_p in analysis_data:
+            analysis_data["mean test score"] += analysis_data[stt_p]
+            sum_weight += 1
+        elif gtt_p in analysis_data:
+            analysis_data["mean test score"] += analysis_data[gtt_p]
+            sum_weight += 1
+
+        # ── KS-test (weight = 2) ────────────────────────────────────────
+        # KS-test checks the equality of distributions as a whole, so
+        # it gets a larger weight than the t-test (which only looks at means)
+        if sks_p in analysis_data:
+            analysis_data["mean test score"] += 2 * analysis_data[sks_p]
+            sum_weight += 2
+        elif gks_p in analysis_data:
+            analysis_data["mean test score"] += 2 * analysis_data[gks_p]
+            sum_weight += 2
+
+        # ── Chi2-test (weight = 2) ──────────────────────────────────────
+        # For categorical targets. StatsChi2Test takes priority.
+        if schi2_p in analysis_data:
+            analysis_data["mean test score"] += 2 * analysis_data[schi2_p]
+            sum_weight += 2
+        elif chi2_p in analysis_data:
             analysis_data["mean test score"] += 2 * analysis_data[chi2_p]
             sum_weight += 2
-            
+
+        # ── Normalization ─────────────────────────────────────────────
         if sum_weight:
             analysis_data["mean test score"] /= sum_weight
             

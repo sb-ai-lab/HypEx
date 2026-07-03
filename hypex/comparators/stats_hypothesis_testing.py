@@ -6,8 +6,10 @@ from typing import Any
 
 from scipy.stats import t as t_dist, chi2_contingency
 
-from ..dataset import ABCRole
+from ..dataset import ABCRole, DatasetAdapter
+from ..utils import NoColumnsError, BackendsEnum
 from ..utils.constants import NUMBER_TYPES_LIST, CATEGORICAL_TYPES_LIST
+from ..dataset.roles import StatisticRole
 from .abstract import StatsHypothesisTesting
 
 from math import sqrt
@@ -395,3 +397,287 @@ class StatsZTest(StatsHypothesisTesting):
             "statistic": [float(z_stat)],
             "pass": [p_value < reliability],
         }
+        
+class StatsKSTest(StatsHypothesisTesting):
+    """
+    Kolmogorov-Smirnov test operating on aggregated histograms.
+    
+    Phase 1 (Spark): computes per-group histograms in a single groupBy job
+    per target column, plus one global min/max job for all columns.
+    Phase 2: computes the KS D-statistic and p-value from the histograms
+    on the driver (at most n_bins rows per group — always fits in memory).
+    
+    For Pandas backend, delegates to GroupKSTest (scipy ks_2samp) since
+    the overhead of binning small data exceeds the benefit.
+    """
+    REQUIRED_STATS = ["histogram", "count"]
+
+    def __init__(
+        self,
+        n_bins: int = 2000,
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | None = None,
+        reliability: float = 0.05,
+        key: Any = "",
+    ):
+        super().__init__(
+            stats=self.REQUIRED_STATS,
+            grouping_role=grouping_role,
+            target_roles=target_roles,
+            key=key,
+            reliability=reliability,
+        )
+        self.n_bins = n_bins
+
+    @property
+    def search_types(self) -> list[type] | None:
+        return NUMBER_TYPES_LIST
+
+    @classmethod
+    def _compute_stats(cls, grouped, target_columns, stats=None, **kwargs):
+        """Not used — all aggregation happens in execute()."""
+        raise NotImplementedError(
+            "StatsKSTest uses custom execute() logic. "
+            "Do not call _compute_stats directly."
+        )
+
+    @classmethod
+    def _inner_function(
+        cls,
+        baseline_stats: dict[str, Any],
+        compared_stats: dict[str, Any],
+        reliability: float = 0.05,
+        **kwargs,
+    ) -> dict[str, Any]:
+        """
+        Compute KS D-statistic and p-value from two pre-aggregated histograms.
+        
+        Args:
+            baseline_stats: {"histogram": {bucket_id: count}, "count": int}
+            compared_stats: {"histogram": {bucket_id: count}, "count": int}
+            reliability: Significance threshold for the pass flag.
+            
+        Returns:
+            {"p-value": float, "statistic": float, "pass": bool}
+        """
+        hist1 = baseline_stats.get("histogram", {})
+        hist2 = compared_stats.get("histogram", {})
+        n1 = baseline_stats.get("count", 0)
+        n2 = compared_stats.get("count", 0)
+
+        # Edge case: one or both groups are empty
+        if n1 == 0 or n2 == 0:
+            return {"p-value": None, "statistic": None, "pass": None}
+
+        # Merge all bucket keys and sort to compute ECDF in order
+        all_buckets = sorted(set(hist1.keys()) | set(hist2.keys()))
+
+        # Edge case: no data in either histogram
+        if len(all_buckets) == 0:
+            return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+
+        # Compute ECDF and find maximum absolute difference (D-statistic)
+        cum1 = 0
+        cum2 = 0
+        d_stat = 0.0
+
+        for bucket in all_buckets:
+            cum1 += hist1.get(bucket, 0)
+            cum2 += hist2.get(bucket, 0)
+            diff = abs(cum1 / n1 - cum2 / n2)
+            if diff > d_stat:
+                d_stat = diff
+
+        d_stat = float(d_stat)
+
+        # Edge case: identical distributions
+        if d_stat == 0.0:
+            return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+
+        # Compute p-value using asymptotic Kolmogorov distribution
+        # with Stephens' (1970) finite-sample correction
+        try:
+            en = np.sqrt(n1 * n2 / (n1 + n2))
+            p_value = float(kstwobign.sf((en + 0.12 + 0.11 / en) * d_stat))
+        except Exception:
+            p_value = 0.0
+
+        return {
+            "p-value": p_value,
+            "statistic": d_stat,
+            "pass": p_value < reliability,
+        }
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        """
+        Main entry point. Routes to Spark-optimized or Pandas-fallback path.
+        """
+        fields = self._get_fields_data(data)
+        group_field_data = fields["group_field"]
+        target_fields_data = fields["target_fields"]
+
+        if len(target_fields_data.columns) == 0:
+            if data.ds.tmp_roles:
+                return data
+            raise NoColumnsError(TargetRole().role_name)
+
+        if len(group_field_data.columns) != 1:
+            raise NotSuitableFieldError(group_field_data, "Grouping")
+
+        self.key = str(
+            target_fields_data.columns[0]
+            if len(target_fields_data.columns) == 1
+            else list(target_fields_data.columns)
+        )
+
+        if data.ds.backend_type == BackendsEnum.spark:
+            return self._execute_spark(
+                data,
+                group_col=group_field_data.columns[0],
+                target_cols=list(target_fields_data.columns),
+            )
+        else:
+            # Pandas fallback: scipy ks_2samp is faster for small data
+            from .hypothesis_testing import GroupKSTest
+            delegate = GroupKSTest(
+                compare_by="groups",
+                grouping_role=self.grouping_role,
+                target_role=self.target_roles,
+                reliability=self.reliability,
+                key=self.key,
+            )
+            delegate._id = self._id  # Preserve ID for pipeline lookups
+            return delegate.execute(data)
+
+    def _execute_spark(
+        self,
+        data: ExperimentData,
+        group_col: str,
+        target_cols: list[str],
+    ) -> ExperimentData:
+        """
+        Spark-optimized KS test: 1 global bounds job + 1 histogram job per target.
+        
+        Total Spark jobs: 1 + len(target_cols)
+        (vs ~7 * len(target_cols) in the naive GroupKSTest approach)
+        """
+        import pyspark.sql.functions as F
+        from ..utils import NAME_BORDER_SYMBOL
+
+        # Select only needed columns to minimize shuffle
+        all_cols = [group_col] + target_cols
+        sdf = data.ds[all_cols].data.to_spark()
+
+        # ── Job 1: Global min/max for ALL target columns at once ──
+        agg_exprs = []
+        for col in target_cols:
+            agg_exprs.extend([
+                F.min(F.col(col)).alias(f"{col}┆min"),
+                F.max(F.col(col)).alias(f"{col}┆max"),
+            ])
+        bounds_row = sdf.agg(*agg_exprs).collect()[0]
+
+        # ── Per-column: compute histograms via groupBy(group, bucket) ──
+        all_group_stats: dict[str, dict[str, dict]] = {}
+
+        for col in target_cols:
+            col_min = bounds_row[f"{col}┆min"]
+            col_max = bounds_row[f"{col}┆max"]
+
+            # Get per-group counts (needed for ECDF normalization)
+            count_df = (
+                sdf.filter(F.col(col).isNotNull())
+                .groupBy(group_col)
+                .count()
+                .collect()
+            )
+            group_counts = {row[group_col]: row["count"] for row in count_df}
+
+            # Edge case: all values are NULL or identical (zero variance)
+            if col_min is None or col_max is None or col_min == col_max:
+                for grp, cnt in group_counts.items():
+                    all_group_stats.setdefault(grp, {})[col] = {
+                        "histogram": {0: cnt} if cnt > 0 else {},
+                        "count": cnt,
+                    }
+                continue
+
+            width = (col_max - col_min) / self.n_bins
+
+            # ── Job 2..N: One groupBy per target column ──
+            sdf_with_bucket = sdf.withColumn(
+                "_bucket",
+                F.least(
+                    F.floor((F.col(col) - F.lit(col_min)) / F.lit(width)),
+                    F.lit(self.n_bins - 1),
+                ).cast("int"),
+            )
+
+            hist_rows = (
+                sdf_with_bucket
+                .filter(F.col(col).isNotNull())
+                .groupBy(group_col, "_bucket")
+                .count()
+                .collect()
+            )
+
+            # Assemble histograms per group
+            for row in hist_rows:
+                grp = row[group_col]
+                bucket = int(row["_bucket"])
+                count = row["count"]
+
+                all_group_stats.setdefault(grp, {}).setdefault(col, {
+                    "histogram": {},
+                    "count": group_counts.get(grp, 0),
+                })
+                all_group_stats[grp][col]["histogram"][bucket] = count
+
+            # Ensure groups with all-NULL values still appear
+            for grp, cnt in group_counts.items():
+                if grp not in all_group_stats:
+                    all_group_stats[grp] = {}
+                if col not in all_group_stats[grp]:
+                    all_group_stats[grp][col] = {"histogram": {}, "count": cnt}
+
+        # ── Phase 2: Compute KS statistics on the driver ──
+        group_names = sorted(all_group_stats.keys(), key=str)
+
+        if len(group_names) < 2:
+            return data
+
+        baseline_name = group_names[0]
+        result_ds_list = []
+
+        for compared_name in group_names[1:]:
+            for col in target_cols:
+                b_stats = all_group_stats.get(baseline_name, {}).get(
+                    col, {"histogram": {}, "count": 0}
+                )
+                c_stats = all_group_stats.get(compared_name, {}).get(
+                    col, {"histogram": {}, "count": 0}
+                )
+
+                result = self._inner_function(
+                    b_stats, c_stats, reliability=self.reliability,
+                )
+                result_ds_list.append(
+                    DatasetAdapter.to_dataset(result, StatisticRole())
+                )
+
+        if not result_ds_list:
+            return data
+
+        result_dataset = result_ds_list[0].append(result_ds_list[1:])
+
+        # Set index: group name (single target) or group┆column (multi target)
+        if len(target_cols) == 1:
+            result_dataset.index = [str(name) for name in group_names[1:]]
+        else:
+            result_dataset.index = [
+                f"{compared_name}{NAME_BORDER_SYMBOL}{col}"
+                for compared_name in group_names[1:]
+                for col in target_cols
+            ]
+
+        return self._set_value(data, result_dataset)
