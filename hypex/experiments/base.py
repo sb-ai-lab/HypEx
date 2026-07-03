@@ -101,7 +101,7 @@ class Experiment(Executor):
             end = time.perf_counter()
             if logg_file is not None:
                 with open(logg_file, "a") as f:
-                    f.write(f"{type(cur_executor)}: {end - start} sec\n")
+                    f.write(f"{type(cur_executor).__name__}: {end - start} sec\n")
         return experiment_data
 
 
