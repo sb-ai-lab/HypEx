@@ -110,7 +110,7 @@ class MatchingMetrics(GroupOperator):
             matches
             .apply(list, role={'indexes': InfoRole()}, axis=1)
             .explode('indexes')
-            .value_counts()
+            .value_counts(sort=False)
         )
 
         matches_counts = (
@@ -122,57 +122,47 @@ class MatchingMetrics(GroupOperator):
         )
         matches_counts.index.name = None
         self.__scaled_counts[group] = matches_counts["count"] / self.n_neighbors
-
-    @staticmethod
-    def _calc_vars(value: Dataset) -> float:
-        """
-        Calculate the variance of a dataset, handling potential NaN values.
-
-        Args:
-            value (Dataset): The dataset for which to calculate the variance.
-
-        Returns:
-            float: The variance of the dataset. Returns 0.0 if the dataset 
-            contains any NaN values.
-        """
-        return 0 if int(value[value.columns[0]].na_counts()) > 0 else float(value.var())
-
+    
     @staticmethod
     def _calc_se(
-        n_c: int, n_t: int, var_c: float, var_t: float, scaled_counts: dict[str, Dataset], group=None
-    ):
+        n_c: int, n_t: int, var_c: float, var_t: float, w_c: float, w_t: float
+    ) -> float:
         """
         Calculate the standard error for the treatment effect estimates.
-
-        Args:
-            n_c (int): The number of observations in the control group.
-            n_t (int): The number of observations in the treatment group.
-            var_c (float): The variance of the control group.
-            var_t (float): The variance of the treatment group.
-            scaled_counts (dict[str, Dataset]): A dictionary containing the scaled 
-                counts (weights) for the groups.
-            group (str | None, optional): The specific group to calculate the SE for. 
-                If None, calculates the pooled SE for ATE. Defaults to None.
-
         Returns:
             float: The calculated standard error.
         """
-        if group is not None:
-            groups = list(scaled_counts.keys())
-            groups.remove(group)
-            group_other = groups[0]
-            weights_c = scaled_counts[group_other] * 0 + 1
-            weights_t = scaled_counts[group] * n_t / n_c
-        else:
-            n = n_c + n_t
-            weights_c = (n_c / n) * (scaled_counts["test"] + 1)
-            weights_t = (n_t / n) * (scaled_counts["control"] + 1)
+        return np.sqrt(w_c * var_c / n_c ** 2 + w_t * var_t / n_t ** 2)
 
-        return np.sqrt(
-            (weights_t**2 * var_t).sum() / n_t**2
-            + (weights_c**2 * var_c).sum() / n_c**2
+    @staticmethod
+    def _calc_weights(
+        scaled_counts: dict[str, Dataset]
+    ) -> dict[str, dict[str, float]]:
+        weights: dict[str, dict[str, float]] = {}
+        for group, sc in scaled_counts.items():
+            if not sc.is_persisted:
+                sc.persist()
+            sum_ = sc.sum()
+            squared_sum = (sc**2).sum()
+
+            weights[group] = {"sum": sum_, "sq_sum": squared_sum}
+            sc.unpersist()
+        return weights
+    
+    @staticmethod
+    def _calc_p_value(
+            x: float
+    ) -> float:
+        return (
+            NormCDF()
+            .calc(
+                SmallDataset.from_dict(
+                    {"value": [x]}, roles={"value": InfoRole()}
+                )
+            )
+            .get_values()[0][0]
         )
-
+         
     @classmethod
     def _inner_function(
         cls,
@@ -210,44 +200,42 @@ class MatchingMetrics(GroupOperator):
             )
         metric = kwargs.get("metric", "ate")
         scaled_counts = kwargs.get("scaled_counts")
-        itt = test_data[target_fields[0]] - test_data[target_fields[1]]
-        itc = data[target_fields[1]] - data[target_fields[0]]
+        itt: Dataset = test_data[target_fields[0]] - test_data[target_fields[1]]
+        itc: Dataset = data[target_fields[1]] - data[target_fields[0]]
 
         bias = kwargs.get("bias", {})
         if bias and len(bias) > 0:
             if metric in ["atc", "ate"]:
-                control_bias = bias["control"]
-                itc -= control_bias
+                itc -= bias["control"]
             if metric in ["att", "ate"]:
-                test_bias = bias["test"]
-                itt += test_bias
+                itt += bias["test"]
 
-        itc_len = len(itc)
-        itt_len = len(itt)
-        var_t = cls._calc_vars(itc)
-        var_c = cls._calc_vars(itt)
-        itt_se = cls._calc_se(itc_len, itt_len, var_c, var_t, scaled_counts, "control")
-        itc_se = cls._calc_se(itt_len, itc_len, var_t, var_c, scaled_counts, "test")
-        itt = itt.mean()
-        itc = itc.mean()
-        p_val_itt = (
-            NormCDF()
-            .calc(
-                SmallDataset.from_dict(
-                    {"value": [itt / itt_se]}, roles={"value": InfoRole()}
-                )
-            )
-            .get_values()[0][0]
+        # TODO: now we wish that no `nan` values will appear in target columns 
+        # But just in case fill all nans by zero. The `nan` fix should be more accurate
+        itt_stats = itt.fillna(0).agg(["count", "mean", "std"]).to_dict()["data"]
+        itc_stats = itc.fillna(0).agg(["count", "mean", "std"]).to_dict()["data"]
+
+        itc_c, itc_mean, var_c = itc_stats["data"][itc.columns[0]]
+        itt_c, itt_mean, var_t = itt_stats["data"][itt.columns[0]]
+        var_c, var_t = var_c ** 2, var_t ** 2
+
+        weights = cls._calc_weights(scaled_counts)
+
+        itt_se = cls._calc_se(
+            n_c=itc_c, n_t=itt_c, var_c=var_c, var_t=var_t, 
+            w_c=itt_c,
+            w_t=(itt_c / itc_c) ** 2 * weights["test"]["sq_sum"]
         )
-        p_val_itc = (
-            NormCDF()
-            .calc(
-                SmallDataset.from_dict(
-                    {"value": [itc / itc_se]}, roles={"value": InfoRole()}
-                )
-            )
-            .get_values()[0][0]
+        itc_se = cls._calc_se(
+            n_c=itt_c, n_t=itc_c, var_c=var_t, var_t=var_c,
+            w_c=(itc_c / itt_c) ** 2 * weights["control"]["sq_sum"],
+            w_t=itt_c
         )
+        itt: float = itt_mean
+        itc: float = itc_mean
+        p_val_itt = cls._calc_p_value(itt / itt_se)
+        p_val_itc = cls._calc_p_value(itc / itc_se)
+
         if metric == "atc":
             return {
                 "ATC": [
@@ -268,18 +256,15 @@ class MatchingMetrics(GroupOperator):
                     itt + 1.96 * itt_se,
                 ]
             }
-        len_control, len_test = len(data), len(test_data)
+        len_control, len_test = itc_c, itt_c
         ate = (itt * len_test + itc * len_control) / (len_test + len_control)
-        ate_se = cls._calc_se(itc_len, itt_len, var_c, var_t, scaled_counts)
-        p_val_ate = (
-            NormCDF()
-            .calc(
-                SmallDataset.from_dict(
-                    {"value": [ate / ate_se]}, roles={"value": InfoRole()}
-                )
-            )
-            .get_values()[0][0]
+        ate_se = cls._calc_se(
+            n_c=itc_c + itt_c, n_t=itc_c + itt_c, var_c=var_c, var_t=var_t,
+            w_c=itc_c + 2 * weights["control"]["sum"] + weights["control"]["sq_sum"],
+            w_t=itt_c + 2 * weights["test"]["sum"] + weights["test"]["sq_sum"]
         )
+        p_val_ate = cls._calc_p_value(ate / ate_se)
+
         return {
             "ATT": [itt, itt_se, p_val_itt, itt - 1.96 * itt_se, itt + 1.96 * itt_se],
             "ATC": [itc, itc_se, p_val_itc, itc - 1.96 * itc_se, itc + 1.96 * itc_se],
@@ -419,7 +404,8 @@ class MatchingMetrics(GroupOperator):
             scaled_counts=self.__scaled_counts,
         )
         if len(target_fields) != 2:
-            t_data.unpersist()
+            if t_data.is_persisted:
+                t_data.unpersist()
         return self._set_value(data, compare_result)
 
 
