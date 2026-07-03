@@ -428,7 +428,8 @@ def _spark_partition_fit(
     ids = np.array(ids, dtype=np.int64)
     vectors = np.array(vectors, dtype=np.float32)
 
-    index_with_ids = faiss.IndexIDMap(index)
+    index_copy = faiss.clone_index(index)
+    index_with_ids = faiss.IndexIDMap(index_copy)
     index_with_ids.add_with_ids(vectors, ids)
 
     yield faiss.serialize_index(index_with_ids)
@@ -810,67 +811,68 @@ class SparkFaissExtension(FaissExtension):
         """
         session = test_data.sparkSession
         
-        # tmp_dir = f"__partition_indexes"
-        # os.makedirs(tmp_dir, exist_ok=True) 
-        tmp_dir = tempfile.mkdtemp(dir=".")
+        dir_id = uuid.uuid1().hex[:8]
+        tmp_dir = f"__partition_indexes{dir_id}"
+        os.makedirs(tmp_dir, exist_ok=True) 
+        # tmp_dir = tempfile.mkdtemp()
         result = Dataset.create_empty(session=session)
-        try:
-            index_files_list = []
-            
+        
+        index_files_list = []
+        
 
-            for partition_index, shard in enumerate(self._sharded_rdd.toLocalIterator()):
-                partition_indexes = faiss.deserialize_index(shard)
-                run_id = uuid.uuid1().hex[:8]
-                index_file_name = f"__{partition_index}_partition_index_{run_id}.index"
-                faiss.write_index(
-                    partition_indexes,
-                    f"{tmp_dir}/{index_file_name}" 
-                )    
-                session.sparkContext.addFile(f"{tmp_dir}/{index_file_name}")
-                index_files_list.append(index_file_name)
+        for partition_index, shard in enumerate(self._sharded_rdd.toLocalIterator()):
+            partition_indexes = faiss.deserialize_index(shard)
+            run_id = uuid.uuid1().hex[:8]
+            index_file_name = f"__{partition_index}_partition_index_{run_id}.index"
+            faiss.write_index(
+                partition_indexes,
+                f"{tmp_dir}/{index_file_name}" 
+            )    
+            session.sparkContext.addFile(f"{tmp_dir}/{index_file_name}")
+            index_files_list.append(index_file_name)
 
-                del partition_indexes   # ← explicit release
-                gc.collect()
-            
-            self._sharded_rdd.unpersist()
-            self._sharded_rdd = None
-            # session.sparkContext.addPyFile("index_cacher.py")
-            bc_index_files_list = session.sparkContext.broadcast(index_files_list)
-            bc_n_neighbors = session.sparkContext.broadcast(self.n_neighbors)
-            bc_chunk_size = session.sparkContext.broadcast(self.CHUNK_SIZE)
-            bc_k = session.sparkContext.broadcast(self.k)
+            del partition_indexes   # ← explicit release
+            gc.collect()
+        
+        self._sharded_rdd.unpersist()
+        self._sharded_rdd = None
+        # session.sparkContext.addPyFile("index_cacher.py")
+        bc_index_files_list = session.sparkContext.broadcast(index_files_list)
+        bc_n_neighbors = session.sparkContext.broadcast(self.n_neighbors)
+        bc_chunk_size = session.sparkContext.broadcast(self.CHUNK_SIZE)
+        bc_k = session.sparkContext.broadcast(self.k)
 
-            result_rdd = test_data.rdd.mapPartitions(lambda it:
-                                            _per_partition_predict(
-                                            it, 
-                                            bc_n_neighbors=bc_n_neighbors, 
-                                            bc_index_files_list=bc_index_files_list,
-                                            bc_chunk_size=bc_chunk_size,
-                                            bc_k=bc_k
-                )
+        result_rdd = test_data.rdd.mapPartitions(lambda it:
+                                        _per_partition_predict(
+                                        it, 
+                                        bc_n_neighbors=bc_n_neighbors, 
+                                        bc_index_files_list=bc_index_files_list,
+                                        bc_chunk_size=bc_chunk_size,
+                                        bc_k=bc_k
             )
+        )
 
-            result_df = (
-                session.createDataFrame(result_rdd, schema=self.PREDICT_SCHEMA)
-                .select(
-                    ['index'] + 
-                    [F.expr(f"index_list[{i}]").alias(f"{i + 1}") for i in range(self.n_neighbors)]
-                )
-                # .persist(self.PERSIST_POLITIC)
+        result_df = (
+            session.createDataFrame(result_rdd, schema=self.PREDICT_SCHEMA)
+            .select(
+                ['index'] + 
+                [F.expr(f"index_list[{i}]").alias(f"{i + 1}") for i in range(self.n_neighbors)]
             )
-            # result_df.count()
-            result = self.result_to_dataset(result=result_df, roles={}, small=False).set_index('index')
-            result.index.name = None
+            # .persist(self.PERSIST_POLITIC)
+        )
+        # result_df.count()
+        result = self.result_to_dataset(result=result_df, roles={}, small=False).set_index('index')
+        result.index.name = None
 
-            storage_level = storage_level or "MEMORY_AND_DISK"
-            result.persist(storage_level=storage_level, action="count")
-        finally:
-            # Удаляем все созданные промежуточные файлы
-            # tmp_files = os.listdir(tmp_dir)
-            # for file in tmp_files:
-            #     os.remove(f"{tmp_dir}/{file}")
-            # os.rmdir(tmp_dir)
-            shutil.rmtree(tmp_dir)
+        storage_level = storage_level or "MEMORY_AND_DISK"
+        result.persist(storage_level=storage_level, action="count")
+    
+        # Удаляем все созданные промежуточные файлы
+        # tmp_files = os.listdir(tmp_dir)
+        # for file in tmp_files:
+        #     os.remove(f"{tmp_dir}/{file}")
+        # os.rmdir(tmp_dir)
+        # shutil.rmtree(tmp_dir)
 
         return result
 
@@ -950,12 +952,14 @@ class SparkFaissExtension(FaissExtension):
         memory and disk. Should be called when the extension is no longer needed
         to avoid resource leaks in long-running Spark applications.
         """
-        if self._clustered_data is not None:
-            self._clustered_data.unpersist()
+        clustered = getattr(self, '_clustered_data', None)
+        if clustered is not None:
+            clustered.unpersist()
             self._clustered_data = None
             
-        if self._sharded_rdd is not None:
-            self._sharded_rdd.unpersist()
+        sharded = getattr(self, '_sharded_rdd', None)
+        if sharded is not None:
+            sharded.unpersist()
             self._sharded_rdd = None
     
     def __enter__(self) -> "SparkFaissExtension":
@@ -963,6 +967,15 @@ class SparkFaissExtension(FaissExtension):
         
     def __del__(self, *_) -> None:
         self.unpersist()
+
+# class FaissIndexStorage:
+
+#     def __init__(self):
+#         pass
+
+#     def _check_file_system(self):
+#         ...
+
 
 # TODO: Проверить, нужна ли вообще эта фича?
 class CachingIndex:
