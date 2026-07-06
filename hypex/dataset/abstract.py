@@ -382,10 +382,11 @@ class DatasetBase:
             self.data[key] = value
         else:
             column_data_type = self.roles[key].data_type
+            from collections.abc import Iterable as IterableABC
             if (
                 column_data_type is None
                 or (
-                    isinstance(value, Iterable)
+                    isinstance(value, IterableABC)
                     and all(isinstance(v, column_data_type) for v in value)
                 )
                 or isinstance(value, column_data_type)
@@ -649,7 +650,8 @@ class DatasetBase:
         tmp_role: bool = False,
         search_types: list[type] | None = None,
     ) -> list[str]:
-        roles = roles if isinstance(roles, Iterable) else [roles]
+        from collections.abc import Iterable as IterableABC
+        roles = roles if isinstance(roles, IterableABC) else [roles]
         roles_for_search = self._tmp_roles if tmp_role else self.roles
         return [
             str(column)
@@ -662,8 +664,9 @@ class DatasetBase:
         ]
 
     def search_columns_by_type(self, search_types: list[type] | type) -> list[str]:
+        from collections.abc import Iterable as IterableABC
         search_types = (
-            search_types if isinstance(search_types, Iterable) else [search_types]
+            search_types if isinstance(search_types, IterableABC) else [search_types]
         )
         return [
             str(column)
@@ -764,7 +767,8 @@ class DatasetBase:
         if result is None:
             return None
 
-        if isinstance(result, ScalarType):
+        _scalar_types = getattr(ScalarType, "__args__", (ScalarType,))
+        if isinstance(result, _scalar_types):
             return result
 
         if not hasattr(result, "columns"):

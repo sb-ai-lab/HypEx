@@ -805,7 +805,8 @@ class PandasNavigation(DatasetBackendNavigation):
                 dtypes[k] = str
             elif pd.api.types.is_bool_dtype(v):
                 dtypes[k] = bool
-        if isinstance(column_name, Iterable):
+        from collections.abc import Iterable as IterableABC
+        if isinstance(column_name, IterableABC):
             return dtypes
         else:
             if column_name in dtypes:
@@ -1307,7 +1308,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             list[str]: Names of numeric columns.
         """
-        return self.data.select_dtypes(include=ScalarType).columns.tolist()
+        _scalar_types = getattr(ScalarType, "__args__", (ScalarType,))
+        return self.data.select_dtypes(include=list(_scalar_types)).columns.tolist()
 
     def corr(
         self,
