@@ -22,6 +22,12 @@ from .scipy_stats import (
 )
 
 from .statsmodels import MultiTest, MultitestQuantile
+from .bias import BiasExtension, PandasBisaExtesion, SparkBisaExtesion
+from .matching_metric import (
+    MatchingMetricsExtension, 
+    PandasMatchingMetricsExtension, 
+    SparkMatchingMetricsExtension
+)
 
 __all__ = [
     "DummyEncoderExtension",
@@ -46,4 +52,10 @@ __all__ = [
     "SparkChi2TestExtension",
     "MultiTest",
     "MultitestQuantile",
+    "BiasExtension",
+    "PandasBisaExtesion",
+    "SparkBisaExtesion",
+    "MatchingMetricsExtension", 
+    "PandasMatchingMetricsExtension", 
+    "SparkMatchingMetricsExtension",
 ]
