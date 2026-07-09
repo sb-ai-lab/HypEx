@@ -70,6 +70,10 @@ class ExperimentData:
         self._initial_cols = deepcopy(self._data.columns)
 
     @property
+    def initial_ds(self) -> Dataset | SmallDataset:
+        return self._data[self._initial_cols]
+
+    @property
     def ds(self) -> Dataset | SmallDataset:
         """Get the primary dataset.
 
@@ -232,20 +236,17 @@ class ExperimentData:
 
         storage_level = self._data.get_storage_level() or "MEMORY_AND_DISK"
         was_persisted = self._data.is_persisted
-
-        if was_persisted:
-            self._data.unpersist()
         
         if not isinstance(value, Dataset):
             # Raw data (list, scalar, etc.) — add as a single column
-            self._data = self._data.add_column(
+            new_data = self._data.add_column(
                 data=value, 
                 role={exec_id: normalized_role}
             )
             # return self
         elif len(value.columns) == 1:
             # Single-column Dataset — extract the column and add with exec_id as name
-            self._data = self._data.add_column(
+            new_data = self._data.add_column(
                 data=value[value.columns[0]], 
                 role={exec_id: normalized_role}
             )
@@ -254,7 +255,7 @@ class ExperimentData:
             # Multi-column Dataset — rename all columns to avoid naming collisions
             rename_dict = {col: f"{exec_id}_{col}" for col in value.columns}
             renamed_value = value.rename(names=rename_dict)
-            self._data = self._data.merge(
+            new_data = self._data.merge(
                 right=renamed_value,
                 left_index=True,
                 right_index=True
@@ -263,10 +264,13 @@ class ExperimentData:
             for i, col in enumerate(value.columns):
                 new_col_name = f"{exec_id}_{col}"
                 if i == 0:
-                    self._data.roles[new_col_name] = normalized_role
+                    new_data.roles[new_col_name] = normalized_role
                 else:
-                    self._data.roles[new_col_name] = value.roles.get(col, DefaultRole())
-        self._data.persist(storage_level=storage_level, action="none")
+                    new_data.roles[new_col_name] = value.roles.get(col, DefaultRole())
+        new_data.persist(storage_level=storage_level, action="none")
+        if was_persisted:
+            self._data.unpersist()
+        self._data = new_data
         return self
     
     @property
@@ -281,10 +285,11 @@ class ExperimentData:
         WARNING: This is a READ-ONLY view. Writes through this property
         will modify a copy and NOT the underlying ds.
         """
-        additional_cols = [
-            col for col, role in self._data.roles.items()
-            if isinstance(role, AdditionalRole)
-        ]
+        # additional_cols = [
+        #     col for col, role in self._data.roles.items()
+        #     if isinstance(role, AdditionalRole)
+        # ]
+        additional_cols = list(set(self._data.columns) - set(self._initial_cols))
         if not additional_cols:
             return self._data.create_empty(
                 index=self._data.index,
