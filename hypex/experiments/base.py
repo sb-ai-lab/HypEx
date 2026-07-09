@@ -6,7 +6,7 @@ from typing import Any
 
 from ..dataset import ABCRole, AdditionalTargetRole, ExperimentData, TempTargetRole, Dataset
 from ..executor import Executor
-from ..utils import ExperimentDataEnum
+from ..utils import ExperimentDataEnum, HypExLogger
 from ..utils.registry import backend_factory
 
 import time
@@ -50,6 +50,13 @@ class Experiment(Executor):
         )
         super().__init__(key)
 
+        # Создаем логгер для эксперимента
+        self.logger = HypExLogger(
+            name="hypex.experiment",
+            level="INFO",
+            log_file="experiment.log" 
+        )
+
     def set_params(self, params: dict[str, Any] | dict[type, dict[str, Any]]) -> None:
         if isinstance(next(iter(params)), str):
             super().set_params(params)
@@ -91,17 +98,29 @@ class Experiment(Executor):
         return new_executor
             
 
-    def execute(self, data: ExperimentData, logg_file: str | None = None) -> ExperimentData:
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        # Логируем информацию о Spark-сессии
+        self.logger.log_spark_info()
+
         experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
-            start = time.perf_counter()
-            cur_executor = self._get_executor_backend(executor, experiment_data.ds)
-            cur_executor.key = self.key 
-            experiment_data = cur_executor.execute(experiment_data)
-            end = time.perf_counter()
-            if logg_file is not None:
-                with open(logg_file, "a") as f:
-                    f.write(f"{type(cur_executor).__name__}: {end - start} sec\n")
+            # start = time.perf_counter()
+            # cur_executor = self._get_executor_backend(executor, experiment_data.ds)
+            # cur_executor.key = self.key 
+            # experiment_data = cur_executor.execute(experiment_data)
+            # # end = time.perf_counter()
+            # # if logg_file is not None:
+            # #     with open(logg_file, "a") as f:
+            # #         f.write(f"{type(cur_executor).__name__}: {end - start} sec\n")
+            
+            with self.logger.process(
+                name=executor.__class__.__name__,
+                backend=experiment_data.ds.backend_type.value,
+                log_spark=False  # можно включить для детального логирования Spark-процессов
+            ):
+                cur_executor = self._get_executor_backend(executor, experiment_data.ds)
+                cur_executor.key = self.key
+                experiment_data = cur_executor.execute(experiment_data)
         return experiment_data
 
 

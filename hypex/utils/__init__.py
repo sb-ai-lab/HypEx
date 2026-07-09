@@ -55,7 +55,7 @@ from .typings import (
     GenericManager
 )
 from .registry import BackendFactory
-
+from .logger import HypExLogger, ProcessContext
 from .strict_abc import StrictABCMeta, StrictABC
 
 __all__ = [
@@ -106,5 +106,7 @@ __all__ = [
     "BackendFactory",
     "GenericManager"
     "StrictABCMeta", 
-    "StrictABC"
+    "StrictABC",
+    "HypExLogger", 
+    "ProcessContext",
 ]
