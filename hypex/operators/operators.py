@@ -4,28 +4,20 @@ from copy import deepcopy
 from typing import Any, Literal
 
 import numpy as np
+import time
 
 from ..dataset import (
     ABCRole,
-    AdditionalMatchingRole,
     AdditionalTargetRole,
-    AdditionalFeatureRole,
     Dataset,
-    SmallDataset,
     ExperimentData,
-    FeatureRole,
-    InfoRole,
     TargetRole,
     AdditionalStatisticRole
 )
-from ..extensions.scipy_stats import NormCDF
-from ..extensions.scipy_linalg import LstsqExtension
-from ..utils import ID_SPLIT_SYMBOL
+from ..extensions import BiasExtension, MatchingMetricsExtension
 from ..utils.enums import ExperimentDataEnum
-from ..utils.errors import NoneArgumentError
 from ..utils.registry import backend_factory
 from .abstract import GroupOperator
-
 
 class SMD(GroupOperator):
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -37,7 +29,6 @@ class SMD(GroupOperator):
     ) -> Any:
         test_data = cls._check_test_data(test_data=test_data)
         return (data.mean() + test_data.mean()) / data.std()
-
 
 class MatchingMetrics(GroupOperator):
     """
@@ -80,7 +71,6 @@ class MatchingMetrics(GroupOperator):
         """
         self.metric = metric or "auto"
         self.n_neighbors = n_neighbors
-        self.__scaled_counts = {}
         target_roles = target_roles or TargetRole()
         super().__init__(
             grouping_role=grouping_role,
@@ -89,79 +79,10 @@ class MatchingMetrics(GroupOperator):
             ),
             key=key,
         )
-
-    def _calc_scaled_counts(self, matches: Dataset, indexes: Dataset, group: str):
-        """
-        Calculate the scaled counts (weights) for matched observations.
-
-        This method computes the frequency of each index in the matched dataset 
-        and scales it by the number of neighbors. This is crucial for correctly 
-        weighting observations when a single control unit is matched to multiple 
-        treatment units (or vice versa).
-
-        Args:
-            matches (Dataset): The dataset containing the matched observations.
-            indexes (Dataset): The dataset containing the original indexes of the matches.
-            group (str): The name of the group ("control" or "test") for which 
-                the scaled counts are being calculated.
-        """
-        matches_indexes = indexes.reset_index().select('index')
-        matches_counts = (
-            matches
-            .apply(list, role={'indexes': InfoRole()}, axis=1)
-            .explode('indexes')
-            .value_counts(sort=False)
-        )
-
-        matches_counts = (
-            matches_indexes
-            .merge(left_on='index', right_on='indexes', right=matches_counts, how='left')
-            .drop(columns=['indexes'])
-            .fillna(0)
-            .set_index('index')
-        )
-        matches_counts.index.name = None
-        self.__scaled_counts[group] = matches_counts["count"] / self.n_neighbors
     
-    @staticmethod
-    def _calc_se(
-        n_c: int, n_t: int, var_c: float, var_t: float, w_c: float, w_t: float
-    ) -> float:
-        """
-        Calculate the standard error for the treatment effect estimates.
-        Returns:
-            float: The calculated standard error.
-        """
-        return np.sqrt(w_c * var_c / n_c ** 2 + w_t * var_t / n_t ** 2)
-
-    @staticmethod
-    def _calc_weights(
-        scaled_counts: dict[str, Dataset]
-    ) -> dict[str, dict[str, float]]:
-        weights: dict[str, dict[str, float]] = {}
-        for group, sc in scaled_counts.items():
-            if not sc.is_persisted:
-                sc.persist()
-            sum_ = sc.sum()
-            squared_sum = (sc**2).sum()
-
-            weights[group] = {"sum": sum_, "sq_sum": squared_sum}
-            sc.unpersist()
-        return weights
-    
-    @staticmethod
-    def _calc_p_value(
-            x: float
-    ) -> float:
-        return (
-            NormCDF()
-            .calc(
-                SmallDataset.from_dict(
-                    {"value": [x]}, roles={"value": InfoRole()}
-                )
-            )
-            .get_values()[0][0]
-        )
+    def _write_log(file: str, result: str, time: str, mode: str = "a"):
+        with open(file, mode) as f:
+            f.write(result + ": " + time + "\n")
          
     @classmethod
     def _inner_function(
@@ -171,172 +92,13 @@ class MatchingMetrics(GroupOperator):
         target_fields: list[str] | None = None,
         **kwargs,
     ) -> Any:
-        """
-        Core calculation logic for treatment effects.
-
-        Computes the Individual Treatment Effect on the Treated (ITT) and Control (ITC), 
-        applies optional bias correction, and calculates the final metrics (ATT, ATC, ATE) 
-        along with their standard errors, p-values, and 95% confidence intervals.
-
-        Args:
-            data (Dataset): The baseline (control) dataset.
-            test_data (Dataset | None, optional): The compared (treatment) dataset. 
-                Defaults to None.
-            target_fields (list[str] | None, optional): The names of the target fields 
-                to calculate effects on. Defaults to None.
-            **kwargs: Additional keyword arguments, including:
-                - `metric` (str): The type of effect to estimate ("att", "atc", "ate").
-                - `scaled_counts` (dict): Pre-calculated scaled counts for weighting.
-                - `bias` (dict | None): Optional bias correction values.
-
-        Returns:
-            Any: A dictionary containing the calculated metrics. Keys depend on the 
-            `metric` argument and include effect size, standard error, p-value, and 
-            lower/upper confidence interval bounds.
-        """
-        if target_fields is None or test_data is None:
-            raise NoneArgumentError(
-                ["target_fields", "test_data"], "att, atc, ate estimation"
-            )
-        metric = kwargs.get("metric", "ate")
-        scaled_counts = kwargs.get("scaled_counts")
-        itt: Dataset = test_data[target_fields[0]] - test_data[target_fields[1]]
-        itc: Dataset = data[target_fields[1]] - data[target_fields[0]]
-
-        bias = kwargs.get("bias", {})
-        if bias and len(bias) > 0:
-            if metric in ["atc", "ate"]:
-                itc -= bias["control"]
-            if metric in ["att", "ate"]:
-                itt += bias["test"]
-
-        # TODO: now we wish that no `nan` values will appear in target columns 
-        # But just in case fill all nans by zero. The `nan` fix should be more accurate
-        itt_stats = itt.fillna(0).agg(["count", "mean", "std"]).to_dict()["data"]
-        itc_stats = itc.fillna(0).agg(["count", "mean", "std"]).to_dict()["data"]
-
-        itc_c, itc_mean, var_c = itc_stats["data"][itc.columns[0]]
-        itt_c, itt_mean, var_t = itt_stats["data"][itt.columns[0]]
-        var_c, var_t = var_c ** 2, var_t ** 2
-
-        weights = cls._calc_weights(scaled_counts)
-
-        itt_se = cls._calc_se(
-            n_c=itc_c, n_t=itt_c, var_c=var_c, var_t=var_t, 
-            w_c=itt_c,
-            w_t=(itt_c / itc_c) ** 2 * weights["test"]["sq_sum"]
-        )
-        itc_se = cls._calc_se(
-            n_c=itt_c, n_t=itc_c, var_c=var_t, var_t=var_c,
-            w_c=(itc_c / itt_c) ** 2 * weights["control"]["sq_sum"],
-            w_t=itt_c
-        )
-        itt: float = itt_mean
-        itc: float = itc_mean
-        p_val_itt = cls._calc_p_value(itt / itt_se)
-        p_val_itc = cls._calc_p_value(itc / itc_se)
-
-        if metric == "atc":
-            return {
-                "ATC": [
-                    itc,
-                    itc_se,
-                    p_val_itc,
-                    itc - 1.96 * itc_se,
-                    itc + 1.96 * itc_se,
-                ]
-            }
-        if metric == "att":
-            return {
-                "ATT": [
-                    itt,
-                    itt_se,
-                    p_val_itt,
-                    itt - 1.96 * itt_se,
-                    itt + 1.96 * itt_se,
-                ]
-            }
-        len_control, len_test = itc_c, itt_c
-        ate = (itt * len_test + itc * len_control) / (len_test + len_control)
-        ate_se = cls._calc_se(
-            n_c=itc_c + itt_c, n_t=itc_c + itt_c, var_c=var_c, var_t=var_t,
-            w_c=itc_c + 2 * weights["control"]["sum"] + weights["control"]["sq_sum"],
-            w_t=itt_c + 2 * weights["test"]["sum"] + weights["test"]["sq_sum"]
-        )
-        p_val_ate = cls._calc_p_value(ate / ate_se)
-
-        return {
-            "ATT": [itt, itt_se, p_val_itt, itt - 1.96 * itt_se, itt + 1.96 * itt_se],
-            "ATC": [itc, itc_se, p_val_itc, itc - 1.96 * itc_se, itc + 1.96 * itc_se],
-            "ATE": [ate, ate_se, p_val_ate, ate - 1.96 * ate_se, ate + 1.96 * ate_se],
-        }
+        pass
 
     @classmethod
     def _execute_inner_function(
         cls, grouping_data, target_fields: list[str] | None = None, **kwargs
     ) -> dict:
-        """
-        Wrapper to execute the inner function over the grouped data.
-
-        Args:
-            grouping_data: Grouped dataset containing the control and treatment slices.
-            target_fields (list[str] | None, optional): The names of the target fields. 
-                Defaults to None.
-            **kwargs: Additional keyword arguments passed to `_inner_function`.
-
-        Returns:
-            dict: The result of the `_inner_function` calculation.
-        """
-        metric = kwargs.get("metric", "ate")
-        if target_fields is None or len(target_fields) != 2:
-            raise ValueError(
-                f"This operator works with 2 targets, but got {len(target_fields) if target_fields else None}"
-            )
-        return cls._inner_function(
-            data=grouping_data[0][1],
-            test_data=grouping_data[1][1],
-            target_fields=target_fields,
-            metric=metric,
-            bias=kwargs.get("bias_estimation", None),
-            scaled_counts=kwargs.get("scaled_counts"),
-        )
-
-    def _prepare_new_target(
-        self,
-        data: ExperimentData,
-        t_data: Dataset,
-        group_field: str,
-    ) -> Dataset:
-        """
-        Prepare a new target variable by merging matched data and calculating scaled counts.
-
-        This method is used when a secondary target field needs to be constructed from 
-        the matched pairs. It aligns the matched data, calculates the scaled counts for 
-        both groups, and returns the aggregated matched dataset.
-
-        Args:
-            data (ExperimentData): The original experiment data.
-            t_data (Dataset): The dataset to be updated with the new target.
-            group_field (str): The name of the grouping field.
-
-        Returns:
-            Dataset: The prepared matched dataset with aggregated values.
-        """
-        new_target = data.ds.search_columns(TargetRole())[0]
-        indexes, matched_data = Bias.prepare_data(data, t_data)
-        matched_data = matched_data[new_target + "_matched"]
-        grouped_column = data.ds[group_field]
-        (_, control_indexes), (_, test_indexes), *_ = (
-            grouped_column
-            .merge(right=indexes, right_index=True, left_index=True)
-            .groupby(group_field)
-        )
-
-        control_indexes, test_indexes = control_indexes[indexes.columns], test_indexes[indexes.columns]
-        self._calc_scaled_counts(control_indexes, test_indexes, "test")
-        self._calc_scaled_counts(test_indexes, control_indexes, "control")
-
-        return matched_data
+        pass
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         """
@@ -354,60 +116,18 @@ class MatchingMetrics(GroupOperator):
             matching metrics stored in the `variables` space.
         """
         group_field, target_fields = self._get_fields(data=data)
-        bias = data.field_search(AdditionalStatisticRole())
-        if len(bias) > 0:
-            bias_groups = list(
-                data.ds[group_field]
-                .merge(right=data.additional_fields[bias], left_index=True, right_index=True)
-                .groupby(group_field)
-            )
-            bias = {
-                "control": bias_groups[0][1][bias],
-                "test": bias_groups[1][1][bias]
-            }
-
-        else:
-            bias = None
-            
-        t_data = deepcopy(data.ds)
-        if len(target_fields) != 2:
-            matched_data = self._prepare_new_target(data, t_data, group_field)
-            matched_data.persist()
-            target_fields += [matched_data.search_columns(TargetRole())[0]]
-            data.set_value(
-                ExperimentDataEnum.additional_fields,
-                self.id,
-                matched_data,
-                role=AdditionalTargetRole(),
-            )
-            t_data = t_data.add_column(
-                # matched_data.reindex(t_data.index), 
-                matched_data,
-                role={target_fields[1]: TargetRole()},
-            )
-            storage_level = data.ds.get_storage_level()
-            t_data.persist(storage_level=storage_level, action="none")
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
         if (
-            not target_fields and data.ds.tmp_roles
+            not target_fields and data.initial_ds.tmp_roles
         ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
             return data
 
-        compare_result = self.calc(
-            data=t_data,
-            group_field=group_field,
-            target_fields=target_fields,
-            metric=self.metric,
-            bias_estimation=bias,
-            scaled_counts=self.__scaled_counts,
-        )
-        if len(target_fields) != 2:
-            if t_data.is_persisted:
-                t_data.unpersist()
+        cls = backend_factory.resolve_backend(MatchingMetricsExtension, data.ds)
+        compare_result = cls(self.grouping_role, self.target_roles, self.metric, self.n_neighbors).calc(data.ds)
+        
         return self._set_value(data, compare_result)
-
 
 class Bias(GroupOperator):
     """
@@ -524,41 +244,6 @@ class Bias(GroupOperator):
             value=value,
             role=value.roles,
         )
-    
-    @staticmethod
-    def calc_bias(
-        X: Dataset, X_matched: Dataset, coefficients: np.ndarray[float]
-    ) -> list[float]:
-        """
-        Calculate bias as the dot product of feature differences and coefficients.
-
-        Computes the residual bias by projecting the difference between
-        original features (X) and matched (counterfactual) features
-        (X_matched) onto the regression coefficients.
-
-        The formula is: bias = (X - X_matched) · coefficients
-
-        Args:
-            X (Dataset): The original feature values for the group.
-            X_matched (Dataset): The matched (counterfactual) feature values,
-                typically computed by averaging over matched pairs.
-            coefficients (np.ndarray[float]): The regression coefficients
-                from the least-squares fit of target ~ features.
-
-        Returns:
-            list[float]: A list (or Dataset) containing the bias estimate
-                for each observation in the group.
-
-        Examples:
-            ```python
-                bias = Bias.calc_bias(
-                    X=treatment_features,
-                    X_matched=matched_features,
-                    coefficients=regression_coefs
-                )
-            ```
-        """
-        return (X - X_matched).dot(coefficients)
 
     @classmethod
     def _inner_function(
@@ -569,81 +254,7 @@ class Bias(GroupOperator):
         features_fields: list[str] | None = None,
         **kwargs,
     ) -> dict:
-        """
-        Core calculation logic for bias estimation.
-
-        Fits a linear regression model (target ~ features) for each group
-        using the matched observations, then computes the bias as the
-        difference between original and matched features projected onto
-        the regression coefficients.
-
-        The method handles three scenarios:
-            1. Only control group has matched data → compute bias for control
-            2. Only treatment group has matched data → compute bias for treatment
-            3. Both groups have matched data → compute bias for both
-
-        Args:
-            data (Dataset): The baseline (control) dataset.
-            test_data (Dataset | None, optional): The compared (treatment) dataset.
-                Defaults to None.
-            target_fields (list[str] | None, optional): Names of the target fields.
-                The first element is the original target, the second is the
-                matched target. Defaults to None.
-            features_fields (list[str] | None, optional): Names of the feature fields.
-                The first half are original features, the second half are
-                matched features. Defaults to None.
-            **kwargs: Additional keyword arguments (currently unused).
-
-        Returns:
-            dict: A dictionary with keys "test" and/or "control" mapping to
-                the bias estimates (Dataset) for each group.
-
-        Raises:
-            NoneArgumentError: If any of the required arguments (target_fields,
-                features_fields, test_data) are None.
-        """
-        if target_fields is None or features_fields is None or test_data is None:
-            raise NoneArgumentError(
-                ["target_fields", "features_fields", "test_data"], "bias_estimation"
-            )
-        if data[target_fields[1]].na_counts() > 0:
-            coef_cls = backend_factory.resolve_backend(LstsqExtension, test_data)
-            coefficients = coef_cls().calc(test_data[[target_fields[1]] + features_fields[len(features_fields) // 2 :]])
-            return {
-                "test": cls.calc_bias(
-                    test_data[features_fields[: len(features_fields) // 2]],
-                    test_data[features_fields[len(features_fields) // 2 :]],
-                    coefficients,
-                )
-            }
-        
-        if test_data[target_fields[1]].na_counts() > 0:
-            coef_cls = backend_factory.resolve_backend(LstsqExtension, data)
-            coefficients = coef_cls().calc(data[[target_fields[1]] + features_fields[len(features_fields) // 2 :]])
-            return {
-                "control": cls.calc_bias(
-                    data[features_fields[: len(features_fields) // 2]],
-                    data[features_fields[len(features_fields) // 2 :]],
-                    coefficients,
-                )
-            }
-        coef_cls = backend_factory.resolve_backend(LstsqExtension, test_data)
-        test_coefficients = coef_cls().calc(test_data[[target_fields[1]] + features_fields[len(features_fields) // 2 :]])
-
-        coef_cls = backend_factory.resolve_backend(LstsqExtension, data)
-        control_coefficients = coef_cls().calc(data[[target_fields[1]] + features_fields[len(features_fields) // 2 :]])
-        return {
-            "test": cls.calc_bias(
-                test_data[features_fields[: len(features_fields) // 2]],
-                test_data[features_fields[len(features_fields) // 2 :]],
-                test_coefficients,
-            ),
-            "control": cls.calc_bias(
-                data[features_fields[: len(features_fields) // 2]],
-                data[features_fields[len(features_fields) // 2 :]],
-                control_coefficients,
-            ),
-        }
+        pass
 
     @classmethod
     def _execute_inner_function(
@@ -653,97 +264,7 @@ class Bias(GroupOperator):
         features_fields: list[str] | None = None,
         **kwargs,
     ) -> dict:
-        """
-        Execute the inner bias calculation on grouped data.
-
-        This classmethod serves as a wrapper that unpacks the grouped data
-        and delegates to ``_inner_function``.
-
-        Args:
-            grouping_data: Grouped dataset containing the control and treatment slices.
-                Expected format: [(control_name, control_data), (test_name, test_data)]
-            target_fields (list[str] | None, optional): Names of the target fields.
-                Defaults to None.
-            features_fields (list[str] | None, optional): Names of the feature fields.
-                Defaults to None.
-            **kwargs: Additional keyword arguments passed to ``_inner_function``.
-
-        Returns:
-            dict: The result of the ``_inner_function`` calculation, containing
-                bias estimates for treatment and/or control groups.
-        """
-        return cls._inner_function(
-            grouping_data[0][1],
-            test_data=grouping_data[1][1],
-            target_fields=target_fields,
-            features_fields=features_fields,
-            **kwargs,
-        )
-
-    @staticmethod
-    def prepare_data(data: ExperimentData, t_data: Dataset) -> Dataset:
-        """
-        Prepare matched data by aggregating features over matched pairs.
-
-        This method constructs the counterfactual (matched) features by:
-            1. Retrieving match indices from additional fields
-            2. Exploding the indices to create one row per match
-            3. Merging with the original data to get matched feature values
-            4. Grouping by original index and computing the mean of matched features
-
-        The result is a dataset where each observation has its matched
-        (counterfactual) feature values, computed as the average over all
-        its matches.
-
-        Args:
-            data (ExperimentData): The experiment data containing match indices
-                in the ``additional_fields`` space.
-            t_data (Dataset): The original dataset with features and targets.
-
-        Returns:
-            tuple[Dataset, Dataset]: A tuple containing:
-                - indexes: The original match indices dataset
-                - matched_data: The dataset with matched features, where each
-                  column is suffixed with "_matched"
-
-        Raises:
-            ValueError: If no match indices are found in the additional fields.
-
-        Examples:
-            ```python
-                indexes, matched_data = Bias.prepare_data(experiment_data, original_data)
-                # matched_data contains columns like "feat1_matched", "feat2_matched"
-            ```
-        """
-        indexes = data.field_search(AdditionalMatchingRole())
-        if len(indexes) == 0:
-            raise ValueError("No indexes were found")
-        indexes = data.additional_fields[indexes]
-        # additional fields are already allignet according to index
-
-        numeric_cols = t_data.search_columns(
-            roles=[
-                FeatureRole(), TargetRole(), 
-                AdditionalTargetRole(), AdditionalFeatureRole()
-            ], 
-            search_types=[int, float]
-        )
-        
-        matched_data = (
-            indexes
-            .apply(list, axis=1, role={'_index' : InfoRole()})
-            .explode('_index')
-            .merge(t_data.select(numeric_cols), 
-                   left_on='_index' ,right_index=True)
-            .drop(columns=['_index'])
-            .reset_index()
-            .groupby(by='index')
-            .agg('mean')
-            .rename({col: col + "_matched" for col in numeric_cols})
-        )
-        matched_data.index.name = None
-
-        return indexes, matched_data
+        pass
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         """
@@ -778,34 +299,20 @@ class Bias(GroupOperator):
             ```
         """
         group_field, target_fields = self._get_fields(data)
-        t_data = deepcopy(data.ds)
-        if len(target_fields) < 2:
-            _, matched_data = self.prepare_data(data, t_data)
-            target_fields += [matched_data.search_columns(TargetRole())[0]]
-            t_data = t_data.add_column(matched_data)
+        
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
         if (
-            not target_fields and data.ds.tmp_roles
+            not target_fields and data.initial_ds.tmp_roles
         ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
             return data  
+        cls = backend_factory.resolve_backend(BiasExtension, data.ds)
+        compare_result: Dataset = cls(self.grouping_role, self.target_roles).calc(data.ds)
+        compare_result.roles["bias"] = AdditionalStatisticRole()
+        compare_result.roles["matched_target"] = AdditionalTargetRole()
 
-        compare_result = self.calc(
-            data=t_data,
-            group_field=group_field,
-            target_fields=target_fields,
-            features_fields=t_data.search_columns(
-                FeatureRole(), search_types=[int, float]
-            ),
-        )
-        bais_ds = Dataset.create_empty(
-            backend=data.ds.backend_type,
-            session=data.ds.session
-        )
-        for bais_res in compare_result.values():
-            bais_ds = bais_ds.append(bais_res)
-        
-        bais_ds = bais_ds.rename({col: f"{col}" for col in bais_ds.columns})
-        bais_ds.roles = {col: AdditionalStatisticRole() for col in bais_ds.columns}
-        return self._set_value(data, bais_ds)
+        output = self._set_value(data, compare_result)
+        if compare_result.is_persisted:
+            compare_result.unpersist()
+        return output
