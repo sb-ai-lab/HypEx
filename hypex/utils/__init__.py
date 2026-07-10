@@ -57,6 +57,7 @@ from .typings import (
 from .registry import BackendFactory
 from .logger import HypExLogger, ProcessContext
 from .strict_abc import StrictABCMeta, StrictABC
+from .spark_config import SparkSessionCalculator
 
 __all__ = [
     "Adapter",
@@ -109,4 +110,5 @@ __all__ = [
     "StrictABC",
     "HypExLogger", 
     "ProcessContext",
+    "SparkSessionCalculator",
 ]
