@@ -7,6 +7,11 @@ from .scipy_stats import (
     GroupTTestExtension,
     GroupUTestExtension,
 )
+from .stats_hypothesis_testing import (   # ← НОВОЕ
+    StatsAggregationExtension,
+    StatsKSTestExtension,
+    StatsChi2TestExtension,
+)
 from .statsmodels import MultiTest, MultitestQuantile
 
 __all__ = [
@@ -20,4 +25,7 @@ __all__ = [
     "MultitestQuantile",
     "GroupTTestExtension",
     "GroupUTestExtension",
+    "StatsAggregationExtension",
+    "StatsKSTestExtension",
+    "StatsChi2TestExtension",
 ]

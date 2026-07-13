@@ -47,17 +47,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
     PANDAS_CONVERSION_LIMIT: int = 100_000
 
-    def checkpoint(self):
-        """Create a checkpoint in the Spark execution plan.
-
-        Raises:
-            NotImplementedError: This method is not implemented for SparkNavigation.
-                Use Spark-specific checkpointing mechanisms instead.
-        """
-        raise NotImplementedError(
-            "Method checkpoint not implemented for SparkNavigation."
-        )
-
+    
     def limit(self, num: int | None = None) -> Self:
         """Limit the number of rows in the dataset.
 
@@ -380,6 +370,25 @@ class SparkNavigation(DatasetBackendNavigation):
                 None if not persisted.
         """
         return getattr(self, "_storage_level_flag", None)
+    
+    def checkpoint(self, eager: bool = True) -> Self:
+        """Truncates the computation graph (lineage) by creating a local checkpoint.
+        
+        Uses ``local_checkpoint`` via the Spark accessor to materialize the 
+        DataFrame and break the lineage chain. This is critical for iterative 
+        algorithms (loops) to prevent exponential DAG growth and performance 
+        degradation in Spark.
+        
+        Args:
+            eager: If ``True``, the checkpoint is executed eagerly, immediately
+                materializing the DataFrame. If ``False``, the checkpoint is
+                deferred until the next action. Defaults to ``True``.
+                
+        Returns:
+            The dataset instance itself (``Self``) to allow method chaining.
+        """
+        self.data = self.data.spark.local_checkpoint(eager=eager)
+        return self
 
     def __getitem__(
         self, item: slice | int | str | list | ps.DataFrame | ps.Series

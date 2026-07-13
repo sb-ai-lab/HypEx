@@ -46,7 +46,7 @@ from .roles import (
 class DatasetBase:
     DISPLAY_ROWS = 5
     DISPLAY_COLS = 10
-
+    
     @dataclass
     class Locker:
         call_class: Any
@@ -271,7 +271,7 @@ class DatasetBase:
             self._backend_data.unpersist(blocking=blocking)
 
         return self
-
+    
     @property
     def is_persisted(self) -> bool:
         if self.backend_type == BackendsEnum.spark:
@@ -293,6 +293,25 @@ class DatasetBase:
             if self.backend_type == BackendsEnum.pandas
             else self.is_persisted(),
         }
+        
+    def checkpoint(self, eager: bool = True) -> Self:
+        """Breaks the computation graph (Lineage) for the Spark backend.
+        
+        For the Pandas backend, this method acts as a no-op. It is critical
+        for iterative processes (e.g., A/A and A/B tests) to prevent
+        exponential slowdowns caused by the growth of the DAG in Spark.
+        
+        Args:
+            eager: If ``True``, the checkpoint is executed eagerly,
+                immediately materializing the DataFrame. If ``False``,
+                the checkpoint is deferred until the next action.
+                Defaults to ``True``.
+                
+        Returns:
+            The dataset instance itself (``Self``) to allow method chaining.
+        """
+        self._backend_data.checkpoint(eager=eager)
+        return self
 
     def __repr__(self):
         n_cols = len(self.columns)

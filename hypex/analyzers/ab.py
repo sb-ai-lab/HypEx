@@ -9,7 +9,7 @@ from ..dataset import Dataset, ExperimentData, StatisticRole, TargetRole, Treatm
 from ..dataset.dataset import SmallDataset
 from ..experiments.base import Executor
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
-from ..utils import ABNTestMethodsEnum, ExperimentDataEnum
+from ..utils import ABNTestMethodsEnum, ExperimentDataEnum, timeit
 
 
 
@@ -163,6 +163,7 @@ class ABAnalyzer(Executor):
             multitest_pvalues = multitest_pvalues.append(value)
         return multitest_pvalues
 
+    @timeit(level="ANALYZER", prefix="AB_ANALYZER")
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Executes the full A/B test analysis pipeline.
 

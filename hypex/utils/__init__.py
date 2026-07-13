@@ -56,6 +56,8 @@ from .typings import (
 
 from .strict_abc import StrictABCMeta, StrictABC
 
+from .profiling import timeit, enable_profiling, disable_profiling, ProfilingContext
+
 __all__ = [
     "Adapter",
     "ID_SPLIT_SYMBOL",
@@ -102,5 +104,9 @@ __all__ = [
     "gen_oracle_df",
     "gen_special_medicine_df",
     "StrictABCMeta", 
-    "StrictABC"
+    "StrictABC",
+    "timeit", 
+    "enable_profiling", 
+    "disable_profiling", 
+    "ProfilingContext"
 ]

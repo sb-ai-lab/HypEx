@@ -9,7 +9,7 @@ from ..dataset import Dataset, SmallDataset, ExperimentData, StatisticRole, Info
 from ..executor import Executor
 from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from ..splitters import AASplitter, AASplitterWithStratification
-from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
+from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, timeit
 
 
 class OneAAStatAnalyzer(Executor):
@@ -21,6 +21,7 @@ class OneAAStatAnalyzer(Executor):
         """Stores the aggregated metrics in the experiment data container."""
         return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
     
+    @timeit(level="ANALYZER", prefix="AA_STAT")
     def execute(self, data: ExperimentData) -> ExperimentData:
         analysis_tests: list[type] = [
             GroupTTest,
@@ -319,6 +320,7 @@ class AAScoreAnalyzer(Executor):
         best_split = self._get_best_split(data, score_table, if_param_scores)
         return self._set_best_split(best_split["data"], best_split["best_split_id"])
 
+    @timeit(level="ANALYZER", prefix="AA_SCORE")
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Executes the full A/A scoring and split selection pipeline.
         Retrieves experiment results, computes AA scores, identifies the optimal split,

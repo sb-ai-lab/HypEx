@@ -10,6 +10,7 @@ from ..dataset import ABCRole, Dataset, SmallDataset, ExperimentData, GroupingRo
 from ..executor import Executor, IfExecutor
 from ..reporters import DatasetReporter, Reporter
 from ..utils.enums import ExperimentDataEnum
+from ..utils import timeit
 from .base import Experiment
 
 
@@ -70,6 +71,7 @@ class CycledExperiment(ExperimentWithReporter):
     def generate_params_hash(self) -> str:
         return f"{self.reporter.__class__.__name__} x {self.n_iterations}"
 
+    @timeit(level="PIPELINE", prefix="CYCLED")
     def execute(self, data: ExperimentData) -> ExperimentData:
         result: list[Dataset] = [
             self.one_iteration(data, str(i)) for i in tqdm(range(self.n_iterations))
@@ -155,6 +157,7 @@ class ParamsExperiment(ExperimentWithReporter):
         self._params = params
         self._update_flat_params()
 
+    @timeit(level="PIPELINE", prefix="PARAMS")
     def execute(self, data: ExperimentData) -> ExperimentData:
         results = []
         self._update_flat_params()

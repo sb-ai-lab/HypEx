@@ -15,7 +15,7 @@ from ..dataset import (
 )
 from ..dataset.roles import ConstGroupRole, IndexRole
 from ..executor import Calculator
-from ..utils import ExperimentDataEnum, BackendsEnum
+from ..utils import ExperimentDataEnum, BackendsEnum, timeit
 
 
 class AASplitter(Calculator):
@@ -150,6 +150,7 @@ class AASplitter(Calculator):
         
         return ds_out["split"]
 
+    @timeit(level="SPLIT", prefix="SPLITTER")
     def execute(self, data: ExperimentData) -> ExperimentData:
         const_group_fields = data.ds.search_columns(ConstGroupRole())
         const_group_fields = (
@@ -192,8 +193,13 @@ class AASplitterWithStratification(AASplitter):
             index.extend(list(group_data.index))
         return Dataset.from_dict(result, index=index, roles={"split": TreatmentRole()})
 
+    @timeit(level="SPLIT", prefix="SPLITTER_STRAT")
     def execute(self, data: ExperimentData) -> ExperimentData:
         grouping_fields = data.ds.search_columns(StratificationRole())
+        
+        if data.ds.backend_type == BackendsEnum.spark and not data.ds.is_persisted:
+            data.ds.persist(storage_level="MEMORY_AND_DISK", action="count")
+
         result = self.calc(
             data.ds,
             random_state=self.random_state,
@@ -201,6 +207,13 @@ class AASplitterWithStratification(AASplitter):
             grouping_fields=grouping_fields,
             groups_sizes=self.groups_sizes,
         )
+        
         if isinstance(result, Dataset):
             result = result.replace_roles({"split": AdditionalTreatmentRole()})
-        return self._set_value(data, result)
+        
+        data = self._set_value(data, result)
+
+        if data.ds.backend_type == BackendsEnum.spark:
+            data.ds.checkpoint(eager=True)
+
+        return data
