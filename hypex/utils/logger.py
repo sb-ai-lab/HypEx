@@ -151,6 +151,67 @@ class HypExLogger:
             return decorator
         return decorator(func)
     
+    def log_methods(
+        self,
+        log_args: bool = True,
+        log_result: bool = False,
+        exclude: Optional[list[str]] = None,
+        private: bool = False,
+        static: bool = False,  # <-- Новая опция для статических методов и методов класса
+    ) -> Callable:
+        """Декоратор для класса, который автоматически логирует вызовы его методов.
+        
+        Args:
+            log_args: Логировать ли аргументы методов
+            log_result: Логировать ли результаты методов
+            exclude: Список имен методов, которые нужно исключить из логирования
+            private: Логгировать ли приватные методы (начинающиеся с '_')
+            static: Логгировать ли методы, декорированные как @staticmethod и @classmethod
+            
+        Returns:
+            Декоратор для класса
+        """
+        def wrapper(cls):
+            exclude_set = set(exclude or [])
+            
+            for attr_name, attr_value in vars(cls).items():
+                if attr_name in exclude_set:
+                    continue
+                
+                # Проверяем, является ли атрибут вызываемым или дескриптором метода
+                is_callable = callable(attr_value)
+                is_static = isinstance(attr_value, staticmethod)
+                is_classmethod = isinstance(attr_value, classmethod)
+                
+                if is_callable or is_static or is_classmethod:
+                    is_private = attr_name.startswith('_')
+                    
+                    # Если метод приватный, но флаг private=False, пропускаем его
+                    # (Также рекомендуется пропускать магические методы __dunder__, 
+                    # чтобы не логировать __init__, __str__ и т.д., если это не нужно)
+                    is_dunder = attr_name.startswith('__') and attr_name.endswith('__')
+                    if (is_private and not private) or (is_dunder and not private):
+                        continue
+                    
+                    # Извлекаем саму функцию для корректного обертывания
+                    if is_static:
+                        func_to_wrap = attr_value.__func__
+                        wrapped_func = self(func_to_wrap, log_args=log_args, log_result=log_result)
+                        setattr(cls, attr_name, staticmethod(wrapped_func))
+                        
+                    elif is_classmethod:
+                        func_to_wrap = attr_value.__func__
+                        wrapped_func = self(func_to_wrap, log_args=log_args, log_result=log_result)
+                        setattr(cls, attr_name, classmethod(wrapped_func))
+                        
+                    else:
+                        # Обычный метод или функция
+                        wrapped_func = self(attr_value, log_args=log_args, log_result=log_result)
+                        setattr(cls, attr_name, wrapped_func)
+                        
+            return cls
+        return wrapper
+    
     def process(
         self,
         name: str,
@@ -320,3 +381,9 @@ class ProcessContext:
         
         _current_process.reset(self._token)
         return False
+
+logger = HypExLogger(
+    name="hypex.experiment",
+    level="INFO",
+    log_file="experiment.log" 
+)
