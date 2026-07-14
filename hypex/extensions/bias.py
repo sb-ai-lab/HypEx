@@ -22,6 +22,7 @@ from ..dataset import (
 from ..dataset.backends import PandasDataset, SparkDataset
 from ..utils.registry import backend_factory
 from ..utils import Adapter
+from ..utils.logger import logger
 
 class BiasExtension(Extension):
     def __init__(
@@ -107,6 +108,7 @@ class PandasBisaExtesion(BiasExtension):
 
         return indexes, matched_data
 
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 @backend_factory.register(BiasExtension, SparkDataset)
 class SparkBisaExtesion(BiasExtension):
     PERSIST_POLITIC = StorageLevel.MEMORY_AND_DISK
@@ -163,24 +165,37 @@ class SparkBisaExtesion(BiasExtension):
         )
         features = [col + "_matched" for col in self.features]
         asembler = VectorAssembler(inputCols=features, outputCol='_features')
-        transformed_data = asembler.transform(data)
         lr = LinearRegression(
             featuresCol='_features', 
             labelCol=self.target_field + "_matched", 
             regParam=0.01
         )
+        data = data.repartition(F.col(self.group_field))
 
-        fit_data_1 = transformed_data.filter(F.col(self.group_field) == group_1)
-        fit_data_2 = transformed_data.filter(F.col(self.group_field) == group_2)
-        # TODO: Are these persists nessesary?
+        fit_data_1 = data.filter(F.col(self.group_field) == group_1)
+        fit_data_1 = asembler.transform(fit_data_1)
         fit_data_1.persist()
-        fit_data_2.persist()
-
         model_1 = lr.fit(fit_data_1)
-        model_2 = lr.fit(fit_data_2)
-
         fit_data_1.unpersist()
+
+        fit_data_2 = data.filter(F.col(self.group_field) == group_2)
+        fit_data_2 = asembler.transform(fit_data_2)
+        fit_data_2.persist()
+        model_2 = lr.fit(fit_data_2)
         fit_data_2.unpersist()
+
+        # transformed_data = asembler.transform(data)
+        # fit_data_1 = transformed_data.filter(F.col(self.group_field) == group_1)
+        # fit_data_2 = transformed_data.filter(F.col(self.group_field) == group_2)
+        # # TODO: Are these persists nessesary?
+        # fit_data_1.persist()
+        # fit_data_2.persist()
+
+        # model_1 = lr.fit(fit_data_1)
+        # model_2 = lr.fit(fit_data_2)
+
+        # fit_data_1.unpersist()
+        # fit_data_2.unpersist()
 
         weights_1 = model_1.coefficients.toArray()
         weights_2 = model_2.coefficients.toArray()
@@ -249,6 +264,7 @@ class SparkBisaExtesion(BiasExtension):
         initial_data: SparkDF = data[numeric_cols + [self.group_field]].data.to_spark(index_col='initial_index')
         initial_data = initial_data.join(matched_data, on='initial_index')
         initial_data.persist(self.PERSIST_POLITIC)
+        initial_data.count()
 
         coefficients_1, coefficients_2  = self._calc_coefs(initial_data)
         final_data = self._calc_bias(initial_data, coefficients_1, coefficients_2)

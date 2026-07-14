@@ -27,6 +27,9 @@ from ..dataset import (
     InfoRole
 )
 
+# TODO: logger
+from ..utils.logger import logger
+
 
 class MatchingMetricsExtension(Extension):
     PERSIST_POLITIC = StorageLevel.MEMORY_AND_DISK
@@ -217,7 +220,7 @@ class MatchingMetricsExtension(Extension):
 class PandasMatchingMetricsExtension(MatchingMetricsExtension):
     """
     """
-
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 @backend_factory.register(MatchingMetricsExtension, SparkDataset)
 class SparkMatchingMetricsExtension(MatchingMetricsExtension):
     """
