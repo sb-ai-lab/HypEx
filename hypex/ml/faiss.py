@@ -321,7 +321,8 @@ class FaissNearestNeighbors(MLExecutor):
             }
             matched_indexes = matched_indexes.append(t_index_field)
         if matched_indexes is not None:
-            matched_indexes = matched_indexes.sort()
+            # matched_indexes = matched_indexes.sort()
+            pass
         if len(matched_indexes) < len(data.ds) and not self.two_sides:
             matched_indexes = matched_indexes.reindex(data.ds.index, fill_value=-1)
         elif len(matched_indexes) < len(data.ds) and self.two_sides:
