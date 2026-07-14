@@ -203,26 +203,46 @@ class OnRoleExperiment(Experiment):
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Execute the pipeline for every column matching the configured role.
 
-        1. Searches ``data`` for columns matching ``self.role``.
-        2. Splits ``self.executors`` into vector and iterative groups.
-        3. Runs all vector executors in a single pass using ``tmp_roles``
-           covering every target column.
-        4. Runs each iterative executor once per target column, setting
-           ``tmp_roles`` to the current column before each invocation.
-        5. Restores the original executor list before returning.
+        This method iterates over all columns in the dataset that match the
+        roles specified in ``self.role`` (e.g., :class:`~hypex.dataset.TargetRole`).
+        To optimize performance, especially on Spark backends, executors are
+        split into two groups:
+
+        1. **Vector executors**: Subclasses of :class:`StatsComparator` or
+           :class:`StatsHypothesisTesting`. These can process all target columns
+           in a single pass by setting ``tmp_roles`` for all targets simultaneously.
+           
+        2. **Iterative executors**: All other executors (including 
+           :class:`AdaptiveHypothesisTest` like TTest/KSTest on Pandas backend,
+           which delegate to non-vectorized group tests). These are executed
+           in a loop, once per target column, to ensure compatibility with
+           single-column input requirements.
+
+        The method ensures that ``tmp_roles`` are correctly set and cleared
+        for each execution phase to isolate column processing.
 
         Args:
             data: The experiment data container to process.
 
         Returns:
-            The experiment data after all per-role executions have
-            completed. If no columns match the role, the input is
-            returned unchanged.
+            The experiment data after all per-role executions have completed.
+            If no columns match the specified roles, the input data is returned
+            unchanged.
+
+        Example:
+            .. code-block:: python
+
+                # Execute TTest and GroupDifference for all TargetRole columns
+                exp = OnRoleExperiment(
+                    executors=[TTest(), GroupDifference()],
+                    role=TargetRole()
+                )
+                result_data = exp.execute(experiment_data)
         """
         target_fields = data.field_search(self.role)
         if not target_fields:
             return data
-
+        
         from ..comparators.abstract import StatsComparator, StatsHypothesisTesting
         from ..comparators.adaptive_hypothesis_testing import AdaptiveHypothesisTest
         
@@ -230,13 +250,22 @@ class OnRoleExperiment(Experiment):
         iterative_executors = []
         
         for ex in self.executors:
-            if isinstance(ex, (StatsComparator, StatsHypothesisTesting, AdaptiveHypothesisTest)):
+            # StatsComparator and StatsHypothesisTesting are truly vectorized (work on aggregated stats)
+            if isinstance(ex, (StatsComparator, StatsHypothesisTesting)):
                 vector_executors.append(ex)
+            # AdaptiveHypothesisTest is tricky: 
+            # On Spark it becomes StatsHypothesisTesting (vectorized).
+            # On Pandas it becomes GroupHypothesisTesting (NOT vectorized, requires single column).
+            # So we should treat AdaptiveHypothesisTest as iterative to be safe for Pandas,
+            # OR check backend. But simpler is to just make them iterative unless they are Stats-based.
+            elif isinstance(ex, AdaptiveHypothesisTest):
+                iterative_executors.append(ex)
             else:
                 iterative_executors.append(ex)
-                
+
         original_executors = self.executors
         
+        # Vector executors execution (only true StatsComparators)
         if vector_executors:
             tmp_roles_dict = {}
             for field in target_fields:
@@ -244,13 +273,14 @@ class OnRoleExperiment(Experiment):
                     tmp_roles_dict[field] = TempTargetRole()
                 elif data.additional_fields and field in data.additional_fields.columns:
                     tmp_roles_dict[field] = AdditionalTargetRole()
-                    
+            
             if tmp_roles_dict:
                 data.ds.tmp_roles = tmp_roles_dict
                 self.executors = vector_executors
                 data = super().execute(data)
                 data.ds.tmp_roles = {}
 
+        # Iterative executors execution (one by one)
         if iterative_executors:
             self.executors = iterative_executors
             for field in target_fields:
@@ -258,9 +288,12 @@ class OnRoleExperiment(Experiment):
                     data.ds.tmp_roles = {field: TempTargetRole()}
                 elif data.additional_fields and field in data.additional_fields.columns:
                     data.additional_fields.tmp_roles = {field: AdditionalTargetRole()}
-                data = super().execute(data)
-                data.ds.tmp_roles = {}
-                data.additional_fields.tmp_roles = {}
                 
+                data = super().execute(data)
+                
+                data.ds.tmp_roles = {}
+                if data.additional_fields:
+                    data.additional_fields.tmp_roles = {}
+
         self.executors = original_executors
         return data
