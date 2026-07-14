@@ -1,17 +1,36 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Any
 
 import numpy as np
 
 from ..dataset import ABCRole, Dataset
 from ..utils.constants import NUMBER_TYPES_LIST
-from .abstract import Comparator
+from .abstract import Comparator, StatsComparator
 
 NUM_OF_BUCKETS = 10
 
 
-class GroupDifference(Comparator):
+class GroupDifference(StatsComparator):
+    """Comparator for calculating the difference in means between groups.
+
+    Computes absolute and percentage differences between baseline and compared
+    group means using pre-aggregated statistics. Inherits from StatsComparator
+    to leverage vectorized Spark aggregation instead of iterative raw-data
+    processing, significantly reducing execution time and DAG lineage size.
+
+    Attributes:
+        REQUIRED_STATS: List of statistics required for computation (["mean"]).
+        compare_by: Comparison mode identifier. Retained for backward
+            compatibility with the previous GroupsComparator interface.
+
+    Example:
+        >>> diff = GroupDifference(grouping_role=TreatmentRole())
+        >>> result = diff.execute(experiment_data)
+    """
+
+    REQUIRED_STATS = ["mean"]
+
     def __init__(
         self,
         compare_by: Literal[
@@ -20,43 +39,105 @@ class GroupDifference(Comparator):
         grouping_role: ABCRole | None = None,
         target_roles: ABCRole | list[ABCRole] | None = None,
     ):
+        """Initializes the GroupDifference comparator.
+
+        Args:
+            compare_by: Comparison mode. Only "groups" is functionally used
+                by StatsComparator; other values are kept for API compatibility.
+                Defaults to "groups".
+            grouping_role: Role identifying the column to split data into
+                baseline and treatment groups. Defaults to GroupingRole().
+            target_roles: Role(s) identifying numeric columns for which to
+                compute mean differences. Defaults to TargetRole().
+        """
         super().__init__(
-            compare_by=compare_by,
+            stats=self.REQUIRED_STATS,
             grouping_role=grouping_role,
             target_roles=target_roles,
         )
+        self.compare_by = compare_by
 
     @property
     def search_types(self) -> list[type] | None:
+        """Returns the list of data types eligible for mean comparison.
+
+        Returns:
+            List containing int and float types, as mean difference
+            is only meaningful for numeric columns.
+        """
         return NUMBER_TYPES_LIST
 
     @classmethod
     def _inner_function(
         cls,
-        data: Dataset,
-        test_data: Dataset | None = None,
+        baseline_stats: dict[str, Any],
+        compared_stats: dict[str, Any],
         **kwargs,
     ) -> dict:
-        test_data = cls._check_test_data(test_data)
-        control_mean = data.mean()
-        test_mean = test_data.mean()
-        
-        if isinstance(control_mean, Dataset):
-            control_mean = control_mean.iget_values(0, 0)
-        if isinstance(test_mean, Dataset):
-            test_mean = test_mean.iget_values(0, 0)
-            
+        """Computes mean difference metrics from pre-aggregated statistics.
+
+        Calculates the absolute difference and percentage change between
+        baseline and compared group means. Handles edge cases where means
+        are missing or the baseline mean is zero.
+
+        Args:
+            baseline_stats: Aggregated statistics dict for the baseline group.
+                Must contain a "mean" key.
+            compared_stats: Aggregated statistics dict for the compared group.
+                Must contain a "mean" key.
+            **kwargs: Additional keyword arguments (unused).
+
+        Returns:
+            Dictionary with keys:
+                - "control mean": Baseline group mean.
+                - "test mean": Compared group mean.
+                - "difference": Absolute difference (test - control).
+                - "difference %": Percentage change relative to control.
+                  Returns None if control mean is zero or either mean is missing.
+        """
+        control_mean = baseline_stats.get("mean")
+        test_mean = compared_stats.get("mean")
+
+        if control_mean is None or test_mean is None:
+            return {
+                "control mean": control_mean,
+                "test mean": test_mean,
+                "difference": None,
+                "difference %": None,
+            }
+
+        difference = test_mean - control_mean
+        difference_pct = (
+            (test_mean / control_mean - 1) * 100 if control_mean != 0 else None
+        )
+
         return {
             "control mean": control_mean,
             "test mean": test_mean,
-            "difference": test_mean - control_mean,
-            "difference %": (
-                (test_mean / control_mean - 1) * 100 if control_mean != 0 else None
-            ),
+            "difference": difference,
+            "difference %": difference_pct,
         }
 
 
-class GroupSizes(Comparator):
+class GroupSizes(StatsComparator):
+    """Comparator for calculating group sizes and their proportions.
+
+    Computes absolute counts and percentage shares for baseline and compared
+    groups using pre-aggregated count statistics. Uses the grouping column
+    itself as the target to avoid unnecessary scanning of all target columns.
+
+    Attributes:
+        REQUIRED_STATS: List of statistics required for computation (["count"]).
+        compare_by: Comparison mode identifier. Retained for backward
+            compatibility with the previous GroupsComparator interface.
+
+    Example:
+        >>> sizes = GroupSizes(grouping_role=TreatmentRole())
+        >>> result = sizes.execute(experiment_data)
+    """
+
+    REQUIRED_STATS = ["count"]
+
     def __init__(
         self,
         compare_by: Literal[
@@ -64,24 +145,62 @@ class GroupSizes(Comparator):
         ] = "groups",
         grouping_role: ABCRole | None = None,
     ):
+        """Initializes the GroupSizes comparator.
+
+        Sets target_roles to grouping_role so that only the grouping column
+        is scanned for count aggregation, avoiding redundant processing of
+        all target columns.
+
+        Args:
+            compare_by: Comparison mode. Only "groups" is functionally used
+                by StatsComparator; other values are kept for API compatibility.
+                Defaults to "groups".
+            grouping_role: Role identifying the column defining group
+                membership. Also used as the target for count aggregation.
+                Defaults to GroupingRole().
+        """
         super().__init__(
-            compare_by=compare_by,
+            stats=self.REQUIRED_STATS,
             grouping_role=grouping_role,
             target_roles=grouping_role,
         )
+        self.compare_by = compare_by
 
     @classmethod
     def _inner_function(
-        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
+        cls,
+        baseline_stats: dict[str, Any],
+        compared_stats: dict[str, Any],
+        **kwargs,
     ) -> dict:
-        size_a = len(data)
-        size_b = len(test_data) if isinstance(test_data, Dataset) else 0
+        """Computes group size metrics from pre-aggregated count statistics.
+
+        Calculates absolute sizes and percentage shares for baseline and
+        compared groups. Returns 0.0 for percentages when total size is zero.
+
+        Args:
+            baseline_stats: Aggregated statistics dict for the baseline group.
+                Must contain a "count" key.
+            compared_stats: Aggregated statistics dict for the compared group.
+                Must contain a "count" key.
+            **kwargs: Additional keyword arguments (unused).
+
+        Returns:
+            Dictionary with keys:
+                - "control size": Number of observations in the baseline group.
+                - "test size": Number of observations in the compared group.
+                - "control size %": Baseline share of total observations.
+                - "test size %": Compared share of total observations.
+        """
+        size_a = baseline_stats.get("count", 0)
+        size_b = compared_stats.get("count", 0)
+        total = size_a + size_b
 
         return {
             "control size": size_a,
             "test size": size_b,
-            "control size %": (size_a / (size_a + size_b)) * 100,
-            "test size %": (size_b / (size_a + size_b)) * 100,
+            "control size %": (size_a / total) * 100 if total > 0 else 0.0,
+            "test size %": (size_b / total) * 100 if total > 0 else 0.0,
         }
 
 

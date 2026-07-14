@@ -164,10 +164,12 @@ class AASplitter(Calculator):
             const_group_field=const_group_fields,
             groups_sizes=self.groups_sizes,
         )
-        return self._set_value(
-            data,
-            result,
-        )
+        data = self._set_value(data, result)
+        
+        if data.ds.backend_type == BackendsEnum.spark:
+            data.ds.checkpoint(eager=True)
+            
+        return data
 
 
 class AASplitterWithStratification(AASplitter):
