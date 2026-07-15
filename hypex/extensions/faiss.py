@@ -26,6 +26,7 @@ import threading
 import uuid
 import tempfile
 import shutil
+import fsspec
 
 
 # Spark imports
@@ -1058,7 +1059,97 @@ def get_executor_cache() -> CachingIndex:
     return builtins._faiss_index_cache
 
 
+class FaissIndexStorage:
+    """
+    Файловый менеджер для хранения индексов Faiss.
+    Автоматически определяет наличие распределенной ФС (HDFS, S3) через конфиг Spark.
+    В локальном режиме использует пересылку байтов и SparkFiles.
+    """
 
+    def __init__(self, session: spark.SparkSession = None):
+        self.session = session
+        self.use_distributed_fs = False
+        self.base_dir = None
+        self._local_tmp_dir = None
+        
+        if session:
+            try:
+                default_fs = session.conf.get("fs.defaultFS", "file:///")
+                # Если ФС не локальная, используем fsspec
+                if not default_fs.startswith("file:"):
+                    self.use_distributed_fs = True
+                    self.base_dir = f"{default_fs.rstrip('/')}/tmp/faiss_indexes_{uuid.uuid1().hex[:8]}"
+            except Exception:
+                pass
+            
+            # В локальном режиме создаем временную папку на драйвере
+            if not self.use_distributed_fs:
+                self._local_tmp_dir = f"__partition_indexes_{uuid.uuid1().hex[:8]}"
+                os.makedirs(self._local_tmp_dir, exist_ok=True)
+
+    def __getstate__(self):
+        """Исключаем SparkSession из сериализации при broadcast на экзекуторы."""
+        state = self.__dict__.copy()
+        if 'session' in state:
+            del state['session']
+        return state
+
+    def save_index(self, index_bytes: bytes) -> any:
+        """
+        Вызывается на экзекуторе во время fit.
+        Возвращает URI (str) если работаем с HDFS/S3, иначе возвращает байты.
+        """
+        if self.use_distributed_fs:
+            uri = f"{self.base_dir}/index_{uuid.uuid1().hex}.bin"
+            with fsspec.open(uri, 'wb') as f:
+                f.write(index_bytes)
+            return uri
+        else:
+            return index_bytes
+
+    def register_index_on_driver(self, reference: any) -> str:
+        """
+        Вызывается на драйвере во время predict.
+        Если reference - это байты (локальный режим), сохраняет в файл и возвращает имя файла.
+        Если reference - это URI (распределенный режим), просто возвращает URI.
+        """
+        if isinstance(reference, str) and self.use_distributed_fs:
+            return reference
+        else:
+            file_name = f"__partition_index_{uuid.uuid1().hex}.index"
+            file_path = f"{self._local_tmp_dir}/{file_name}"
+            with open(file_path, 'wb') as f:
+                f.write(reference)
+            self.session.sparkContext.addFile(file_path)
+            return file_name
+
+    def load_index(self, reference: str):
+        """
+        Вызывается на экзекуторе во время predict (внутри CachingIndex).
+        """
+        if self.use_distributed_fs:
+            with fsspec.open(reference, 'rb') as f:
+                bytes_data = f.read()
+            return faiss.deserialize_index(bytes_data)
+        else:
+            from pyspark import SparkFiles
+            return faiss.read_index(SparkFiles.get(reference))
+
+    def cleanup(self):
+        """Очистка ресурсов"""
+        if self.use_distributed_fs and self.base_dir:
+            try:
+                protocol = self.base_dir.split("://")[0]
+                fs = fsspec.filesystem(protocol)
+                fs.rm(self.base_dir, recursive=True)
+            except Exception:
+                pass
+        
+        if self._local_tmp_dir and os.path.exists(self._local_tmp_dir):
+            try:
+                shutil.rmtree(self._local_tmp_dir)
+            except Exception:
+                pass
 # @backend_factory.register(FaissExtension, SparkDataset)
 # class SparkFaissExtension(FaissExtension):
 #     """
