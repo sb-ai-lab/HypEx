@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import pyspark.sql.functions as F
 
 from pyspark.sql import DataFrame as SparkDF
@@ -74,39 +75,126 @@ class BiasExtension(Extension):
         )
         return neighbors_cols, numeric_cols
 
-# TODO: pandas approach should be realized sonner
 @backend_factory.register(BiasExtension, PandasDataset)
 class PandasBisaExtesion(BiasExtension):
     @staticmethod
     def _prepare_data(
-        data: Dataset, 
-        neighbors_cols: list[str] | str, 
+        data: Dataset,
+        neighbors_cols: list[str] | str,
         numeric_cols: list[str] | str
-    ):
-        # Nothing changes in pandas approach 
-        # TODO: realize in 'clear' pandas
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         neighbors_cols = Adapter.to_list(neighbors_cols)
         numeric_cols = Adapter.to_list(numeric_cols)
         
-        t_data = data[numeric_cols]
-        indexes = data[neighbors_cols]
-        # additional fields are already allignet according to index
-
-        matched_data = (
-            indexes
-            .apply(list, axis=1, role={'_index' : InfoRole()})
-            .explode('_index')
-            .merge(t_data, 
-                   left_on='_index' ,right_index=True)
-            .drop(columns=['_index'])
-            .reset_index()
-            .groupby(by='index')
-            .agg('mean')
-            .rename({col: col + "_matched" for col in numeric_cols})
-        )
-        matched_data.index.name = None
-
+        t_data = data[numeric_cols].data
+        indexes = data[neighbors_cols].data
+        
+        # Melt the neighbor indexes to long format
+        melted = indexes.stack().reset_index()
+        melted.columns = ['initial_index', 'neighbor_col', 'match_index']
+        melted = melted.dropna(subset=['match_index'])
+        
+        # Fetch the features of the matched units
+        matched_features = t_data.loc[melted['match_index']].copy()
+        matched_features.index = melted['initial_index'].values
+        
+        # Group by original index and calculate mean
+        matched_data = matched_features.groupby(level=0).mean()
+        matched_data = matched_data.rename(columns={col: f"{col}_matched" for col in numeric_cols})
+        
         return indexes, matched_data
+
+    def _calc_coefs(self, data: pd.DataFrame) -> np.ndarray:
+        group_1, group_2, *_ = data[self.group_field].unique()
+        
+        features = [col + "_matched" for col in self.features]
+        target = self.target_field + "_matched"
+        
+        def _get_weights(group_data: pd.DataFrame) -> np.ndarray:
+            X = group_data[features].values
+            y = group_data[target].values
+            
+            # Добавляем столбец единиц для интерсепта (аналогично LstsqExtension)
+            X_with_intercept = np.c_[np.ones(X.shape[0]), X]
+            
+            # Решаем задачу МНК (метод наименьших квадратов)
+            weights, _, _, _ = np.linalg.lstsq(X_with_intercept, y, rcond=None)
+            
+            # Отбрасываем первый вес (интерсепт), возвращаем только коэффициенты при фичах
+            return weights[1:]
+
+        # Group 1
+        fit_data_1 = data[data[self.group_field] == group_1]
+        weights_1 = _get_weights(fit_data_1)
+        
+        # Group 2
+        fit_data_2 = data[data[self.group_field] == group_2]
+        weights_2 = _get_weights(fit_data_2)
+        
+        return np.array([weights_1, weights_2])
+
+    def _calc_bias(
+        self,
+        data: pd.DataFrame,
+        coefficients_1: np.ndarray,
+        coefficients_2: np.ndarray
+    ) -> pd.DataFrame:
+        group_1, group_2, *_ = data[self.group_field].unique()
+        
+        bias = np.zeros(len(data))
+        
+        mask_1 = data[self.group_field] == group_1
+        mask_2 = data[self.group_field] == group_2
+        
+        features = self.features
+        matched_features = [col + "_matched" for col in features]
+        
+        # Calculate bias for group 1
+        if mask_1.any():
+            diff_1 = data.loc[mask_1, features].values - data.loc[mask_1, matched_features].values
+            bias[mask_1] = np.dot(diff_1, coefficients_1)
+            
+        # Calculate bias for group 2
+        if mask_2.any():
+            diff_2 = data.loc[mask_2, features].values - data.loc[mask_2, matched_features].values
+            bias[mask_2] = np.dot(diff_2, coefficients_2)
+            
+        final_data = pd.DataFrame({
+            "index": data.index,
+            "bias": bias,
+            "matched_target": data[self.target_field + "_matched"].values
+        })
+        final_data.set_index("index", inplace=True)
+        
+        return final_data
+
+    def calc(self, data: Dataset, **kwargs) -> Dataset:
+        self._set_columns(data)
+        neighbors_cols, numeric_cols = self._extract_info(data)
+        
+        self.features = [
+            col for col in numeric_cols 
+            if col != self.group_field and col != self.target_field
+        ]
+        
+        indexes, matched_data = self._prepare_data(
+            data=data,
+            neighbors_cols=neighbors_cols,
+            numeric_cols=numeric_cols
+        )
+        
+        initial_data = data[numeric_cols + [self.group_field]].data
+        initial_data = initial_data.join(matched_data, how='left')
+        
+        coefficients_1, coefficients_2 = self._calc_coefs(initial_data)
+        final_data = self._calc_bias(initial_data, coefficients_1, coefficients_2)
+        
+        final_dataset = Dataset(
+            roles={"bias": InfoRole(), "matched_target": InfoRole()}, 
+            data=final_data
+        )
+        
+        return final_dataset
 
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 @backend_factory.register(BiasExtension, SparkDataset)
@@ -183,19 +271,6 @@ class SparkBisaExtesion(BiasExtension):
         fit_data_2.persist()
         model_2 = lr.fit(fit_data_2)
         fit_data_2.unpersist()
-
-        # transformed_data = asembler.transform(data)
-        # fit_data_1 = transformed_data.filter(F.col(self.group_field) == group_1)
-        # fit_data_2 = transformed_data.filter(F.col(self.group_field) == group_2)
-        # # TODO: Are these persists nessesary?
-        # fit_data_1.persist()
-        # fit_data_2.persist()
-
-        # model_1 = lr.fit(fit_data_1)
-        # model_2 = lr.fit(fit_data_2)
-
-        # fit_data_1.unpersist()
-        # fit_data_2.unpersist()
 
         weights_1 = model_1.coefficients.toArray()
         weights_2 = model_2.coefficients.toArray()
