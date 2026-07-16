@@ -12,11 +12,13 @@ except ImportError:
 import numpy as np
 import pandas as pd
 
-from pyspark.storagelevel import StorageLevel
 from pyspark.sql import SparkSession
 from pyspark.sql import DataFrame as SparkDF
 import pyspark.sql.functions as F
 from pyspark.sql.types import StructType
+
+from pyspark.pandas.internal import InternalFrame
+from pyspark.storagelevel import StorageLevel
 
 
 import pyspark.pandas as ps
@@ -882,20 +884,102 @@ class SparkNavigation(DatasetBackendNavigation):
         """
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
+        
         if isinstance(data, (ps.DataFrame, ps.Series)):
-            if isinstance(data, ps.DataFrame) and data.shape[1] == 1:
-                data_col = data.columns[0]
-                data_tmp = data
-                if name != data_col:
-                    data_tmp[name] = data_tmp[data_col]
-                    data_tmp = data_tmp.drop(columns=[data_col])
-                self.data = self.data.join(data_tmp)
+            if isinstance(data, ps.DataFrame):
+                if len(data.columns) == 1:
+                    data_col_name = data.columns[0]
+                    if name != data_col_name:
+                        data_tmp = data.rename(columns={data_col_name: name})
+                    else:
+                        data_tmp = data
+                    
+                    self.data = self.data.join(data_tmp, how="left")
+                    return
+            
+            elif isinstance(data, ps.Series):
+                data_df = data.to_frame(name=name)
+                self.data = self.data.join(data_df, how="left")
                 return
-            self.data = self.data.join(data)
-            return
-
+        
         self.data[name] = data
 
+    def random_split_labels(
+        self,
+        edges: list[int],
+        labels: list[str],
+        random_state: int | None = None,
+        frac: float = 1.0,
+        name: str = "split",
+    ) -> ps.DataFrame:
+        """
+        Creates a split column using distributed indexing instead of sorting/taking.
+        This avoids OOM errors associated with TakeOrderedAndProjectExec on large datasets.
+        
+        Args:
+            edges: Cumulative upper bounds for each label (e.g., [50M, 100M]).
+            labels: List of label strings corresponding to edges.
+            random_state: Seed for shuffling.
+            frac: Fraction of data to label (rest will be null).
+            name: Name of the resulting column.
+            
+        Returns:
+            pyspark.pandas DataFrame with original index and the new 'name' column.
+        """
+        seed = random_state if random_state is not None else 42
+        
+        # 1. Reset index to expose index columns for hashing/joining
+        df_with_index = self.data.reset_index()
+        index_cols = df_with_index.columns[: self.data.index.nlevels]
+        
+        # 2. Project only index columns to minimize shuffle data
+        sdf = df_with_index[list(index_cols)].to_spark()
+        
+        # 3. Create a shuffle key based on hash of index + seed
+        # Using abs(hash()) ensures positive integers for sorting
+        hash_cols = [F.col(c) for c in index_cols]
+        sdf = sdf.withColumn("_shuffle_key", F.abs(F.hash(*hash_cols, F.lit(seed))))
+        
+        # 4. Sort by shuffle key (distributed sort)
+        # Tie-break by index columns to ensure determinism
+        sdf = sdf.orderBy("_shuffle_key", *index_cols)
+        
+        # 5. Attach distributed sequence number (zipWithIndex equivalent)
+        # This is crucial: it assigns row numbers 0..N across partitions without collecting
+        try:
+            # pyspark.pandas internal API for distributed sequence
+            sdf = InternalFrame.attach_distributed_sequence_column(sdf, "_seq")
+        except AttributeError:
+            # Fallback for older versions or if internal API changes:
+            # Use monotonically_increasing_id is NOT stable after sort.
+            # We must use zipWithIndex on RDD then convert back, which is heavier but safe.
+            rdd = sdf.rdd.zipWithIndex()
+            schema = sdf.schema.add("_seq", "long")
+            sdf = self.session.createDataFrame(rdd, schema)
+            
+        # 6. Assign labels based on sequence ranges
+        # edges are cumulative: [edge1, edge2, ...]
+        # rows 0..edge1-1 get labels[0], edge1..edge2-1 get labels[1], etc.
+        
+        case_expr = F.when(F.col("_seq") < edges[0], F.lit(labels[0]))
+        for i in range(1, len(edges)):
+            case_expr = case_expr.when(F.col("_seq") < edges[i], F.lit(labels[i]))
+        
+        # Rows beyond the last edge (if frac < 1) or just to be safe
+        case_expr = case_expr.otherwise(F.lit(None))
+        
+        sdf = sdf.withColumn(name, case_expr)
+        
+        # 7. Filter out unlabeled rows (if frac < 1) and drop helper columns
+        sdf = sdf.filter(F.col(name).isNotNull()).drop("_shuffle_key", "_seq")
+        
+        # 8. Convert back to pyspark.pandas DataFrame preserving index
+        # pandas_api() automatically handles the index columns if they are present
+        ps_result = sdf.pandas_api(index_col=list(index_cols))
+        
+        return ps_result    
+        
+        
     def append(
         self, other: Sequence[SparkNavigation], reset_index: bool = False, axis: int = 0
     ) -> Self:

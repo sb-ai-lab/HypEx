@@ -1497,6 +1497,38 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return self._wrap_result(
             self.data.sample(n=n, frac=frac, random_state=random_state)
         )
+        
+    def random_split_labels(
+        self,
+        edges: list[int],
+        labels: list[str],
+        random_state: int | None = None,
+        frac: float = 1.0,
+        name: str = "split",
+    ) -> pd.DataFrame:
+        """
+        Pandas implementation of random_split_labels.
+        Uses standard sample and positional assignment.
+        """
+        # 1. Sample the data
+        sampled_df = self.data.sample(frac=frac, random_state=random_state)
+        
+        # 2. Prepare labels array
+        n_sampled = len(sampled_df)
+        label_array = np.empty(n_sampled, dtype=object)
+        label_array[:] = None # Default to None for safety
+        
+        prev_edge = 0
+        for i, edge in enumerate(edges):
+            current_edge = min(edge, n_sampled)
+            if i < len(labels):
+                label_array[prev_edge:current_edge] = labels[i]
+            prev_edge = current_edge
+            
+        # 3. Create result DataFrame with original index
+        result_df = pd.DataFrame({name: label_array}, index=sampled_df.index)
+        
+        return result_df
 
     def select_dtypes(
         self,

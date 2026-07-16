@@ -1165,6 +1165,53 @@ class DatasetBase:
             self.roles,
             data=self.backend_data.sample(frac=frac, n=n, random_state=random_state),
         )
+        
+    def random_split_labels(
+        self,
+        edges: list[int],
+        labels: list[str],
+        random_state: int | None = None,
+        frac: float = 1.0,
+        name: str = "split",
+    ) -> Self:
+        """
+        Splits data into labeled groups using a scalable distributed algorithm.
+        
+        For Spark backend: Uses hash-based shuffling and distributed indexing (zipWithIndex)
+        to avoid OOM errors associated with sorting and taking top-N rows.
+        
+        For Pandas backend: Uses standard sampling and positional labeling.
+
+        Args:
+            edges: Cumulative upper bounds for each label (e.g., [50M, 100M]).
+            labels: List of label strings corresponding to edges.
+            random_state: Seed for reproducibility.
+            frac: Fraction of data to label (rest will be null if < 1.0).
+            name: Name of the resulting column.
+
+        Returns:
+            A new Dataset instance containing the original index and the new 'name' column.
+        """
+        # Delegate to the backend implementation
+        # The backend method returns a ps.DataFrame or pd.DataFrame with the index preserved
+        result_df = self._backend_data.random_split_labels(
+            edges=edges,
+            labels=labels,
+            random_state=random_state,
+            frac=frac,
+            name=name,
+        )
+        
+        # Wrap the result back into a Dataset
+        # Note: The result only has the index and the 'name' column.
+        # Roles should be minimal here, usually just InfoRole or StatisticRole for the split column.
+        from .roles import InfoRole
+        
+        return self.__class__(
+            roles={name: InfoRole()}, 
+            data=result_df,
+            session=self.session if hasattr(self, 'session') else None
+        )
 
     def cov(self) -> DatasetBase:
         t_data = self.backend_data.cov()
