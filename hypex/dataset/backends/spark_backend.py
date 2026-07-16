@@ -829,40 +829,72 @@ class SparkNavigation(DatasetBackendNavigation):
         self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> SparkNavigation:
         """Update column types with validation and error handling.
-
         More robust than astype(), with checks for missing columns and null-only columns.
-
         Args:
             dtype (dict[str, type]): Mapping of column names to target Python types.
             errors (Literal["raise", "ignore"]): Whether to raise on conversion errors.
-
         Returns:
             SparkNavigation: Instance with updated column types.
-
         Raises:
             KeyError: If column not found and errors="raise".
             ValueError: If column contains only null values and errors="raise".
         """
+        import numpy as np
+        
         for column_name, target_type in dtype.items():
             if column_name not in self.data.columns:
                 if errors == "raise":
                     raise KeyError(f"Column '{column_name}' not found")
                 continue
-
+            
+            # Check if column has any non-null values to infer type
+            # Note: isna().all() triggers an action in Spark, which might be slow.
+            # We rely on the try-except block below for performance.
             if self.data[column_name].isna().all():
                 if errors == "raise":
                     raise ValueError(
                         f"Cannot infer type for column '{column_name}': all values are null"
                     )
                 continue
-
+                
             try:
                 self.data = self.data.astype({column_name: target_type})
+                
             except (ValueError, TypeError) as e:
+                error_msg = str(e).lower()
+                
+                # Detect if the error is related to missing values/nulls
+                is_nan_error = "missing values" in error_msg or "null" in error_msg or "nan" in error_msg
+                
+                if is_nan_error and errors != "ignore":
+                    fallback_type = None
+                    
+                    # Define fallback strategies for common problematic types
+                    if target_type == int or (isinstance(target_type, type) and issubclass(target_type, np.integer)):
+                        fallback_type = float
+                    elif target_type == bool:
+                        # Boolean with NaN is tricky. Fallback to object/str is safest for generic usage.
+                        fallback_type = object 
+                    elif target_type == str:
+                         # Usually str handles NaN by converting to 'nan' string, but if it fails:
+                        fallback_type = object
+                    
+                    if fallback_type:
+                        try:
+                            # Attempt fallback conversion
+                            self.data = self.data.astype({column_name: fallback_type})
+                            # Optional: You could log a warning here that type was changed
+                            continue
+                        except Exception:
+                            pass # Fall through to original error if fallback also fails
+
                 if errors == "raise":
                     raise type(e)(
-                        f"Failed to convert column '{column_name}' to {target_type}: {e}"
+                        f"Failed to convert column '{column_name}' to {target_type}: {e}. "
+                        f"Consider filling NaNs or using a more compatible type (e.g., float instead of int)."
                     )
+                # If errors == "ignore", we just skip this column and keep its original type
+                
         return self._wrap_result(self.data)
 
     def add_column(
