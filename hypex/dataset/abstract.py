@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+import copy
 from copy import deepcopy
 import json
 from abc import ABC
@@ -20,6 +21,8 @@ from numpy import ndarray
 import pyspark.sql as spark
 import pyspark.pandas as ps
 
+from .backends import PandasDataset, SparkDataset
+from .groupby_dataset import GroupedDataset
 from ..utils import (
     BackendsEnum,
     BackendTypeError,
@@ -31,8 +34,6 @@ from ..utils import (
     SourceDataTypes,
 )
 from ..utils.adapter import Adapter
-from .groupby_dataset import GroupedDataset
-from .backends import PandasDataset, SparkDataset
 from .roles import (
     ABCRole,
     DefaultRole,
@@ -46,6 +47,84 @@ from .roles import (
 class DatasetBase:
     DISPLAY_ROWS = 5
     DISPLAY_COLS = 10
+    
+    def __deepcopy__(self, memo: dict) -> "DatasetBase":
+        """Create a deep copy of the Dataset instance.
+
+        This method overrides the standard deepcopy behavior to handle
+        backend-specific constraints, particularly for Spark. Since
+        ``SparkSession`` and underlying RDDs cannot be pickled or deep-copied
+        by Python's standard library, this implementation creates a new
+        dataset instance that shares the same backend reference for Spark
+        (which is safe due to Spark's immutable DataFrame lineage) while
+        performing a true deep copy for Pandas backends.
+
+        Args:
+            memo: A dictionary used by the copy module to track objects
+                already copied during the current copying pass.
+
+        Returns:
+            A new instance of the dataset class with copied roles and
+            appropriate backend handling.
+        """
+        # 1. Create a new instance without calling __init__
+        cls = self.__class__
+        new_obj = cls.__new__(cls)
+
+        # 2. Deep copy metadata and roles
+        # Roles are simple objects/dicts, so standard deepcopy works fine.
+        new_obj._roles = copy.deepcopy(self._roles, memo)
+        new_obj._tmp_roles = copy.deepcopy(self._tmp_roles, memo)
+        new_obj.default_role = copy.deepcopy(self.default_role, memo)
+
+        # 3. Handle the backend data specifically
+        # We access _backend_data directly as it is initialized in __init__.
+        # Using getattr with a default is safer than hasattr for linters.
+        backend_data = getattr(self, "_backend_data", None)
+        
+        if backend_data is not None:
+            if self.backend_type == BackendsEnum.spark:
+                # For Spark, we do NOT deep copy the backend object.
+                # Spark DataFrames are immutable transformations of an RDD.
+                # Copying the reference is safe and efficient. 
+                # Deep copying would attempt to pickle the SparkSession, causing errors.
+                new_obj._backend_data = backend_data
+            else:
+                # For Pandas, we perform a full deep copy of the DataFrame
+                # to ensure complete isolation between the original and the copy.
+                new_obj._backend_data = copy.deepcopy(backend_data, memo)
+        else:
+            new_obj._backend_data = None
+
+        # 4. Re-initialize helper accessors (loc/iloc)
+        # These objects hold references to the backend and roles.
+        # Since we have a new roles dict and potentially a new backend (Pandas),
+        # we must create new Locker instances.
+        if hasattr(self, "loc"):
+            # Check if the class defines these helper classes
+            locker_class = getattr(cls, "Locker", None)
+            ilocker_class = getattr(cls, "ILocker", None)
+
+            if locker_class and ilocker_class:
+                new_obj.loc = locker_class(
+                    call_class=cls,
+                    backend=new_obj._backend_data,
+                    roles=new_obj._roles
+                )
+                new_obj.iloc = ilocker_class(
+                    call_class=cls,
+                    backend=new_obj._backend_data,
+                    roles=new_obj._roles
+                )
+            else:
+                # Fallback if helpers are not defined in the class structure
+                new_obj.loc = None
+                new_obj.iloc = None
+        else:
+            new_obj.loc = None
+            new_obj.iloc = None
+
+        return new_obj
     
     @dataclass
     class Locker:

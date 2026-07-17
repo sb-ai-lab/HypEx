@@ -4,6 +4,8 @@ import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Callable, ClassVar, Literal
 
+import numpy as np
+
 from ..dataset import (
     ABCRole,
     AdditionalTargetRole,
@@ -165,15 +167,30 @@ class GroupsComparator(BaseComparator, ABC):
     ) -> dict:
         result = {}
         for i in range(len(compared_data)):
+            bl_dataset = baseline_data[0 if len(baseline_data) == 1 else i][1]
+            cmp_dataset = compared_data[i][1]
+            
             res_name = (
                 compared_data[i][0]
                 if compare_by == "groups"
                 else f"{compared_data[i][0]}{NAME_BORDER_SYMBOL}{compared_data[i][1].columns[0]}"
             )
+            
+            if len(bl_dataset) == 0 or len(cmp_dataset) == 0:
+                result[res_name] = SmallDataset.from_dict(
+                    {
+                        "p-value": [np.nan],
+                        "statistic": [np.nan],
+                        "pass": [False],
+                    },
+                    StatisticRole(),
+                )
+                continue
+            
             result[res_name] = DatasetAdapter.to_dataset(
                 cls._inner_function(
-                    baseline_data[0 if len(baseline_data) == 1 else i][1],
-                    compared_data[i][1],
+                    bl_dataset,
+                    cmp_dataset,
                     **kwargs,
                 ),
                 InfoRole(),
@@ -485,24 +502,10 @@ class GroupsComparator(BaseComparator, ABC):
 
     @timeit(level="COMPARATOR", prefix="GROUPS")
     def execute(self, data: ExperimentData) -> ExperimentData:
-        """
-        Execute the comparator on the given data.
-
-        The comparator will split the data into a baseline and a comparison
-        dataset based on the compare_by argument. Then it will calculate
-        statistics comparing the baseline and comparison datasets.
-
-        :param data: The ExperimentData to execute the comparator on
-        :type data: ExperimentData
-        :return: The ExperimentData with the comparison results
-        :rtype: ExperimentData
-        """
         fields = self._get_fields_data(data)
         group_field_data = fields["group_field"]
         target_fields_data = fields["target_fields"]
         baseline_field_data = fields["baseline_field"]
-        
-
         self.key = str(
             target_fields_data.columns[0]
             if len(target_fields_data.columns) == 1
@@ -559,6 +562,18 @@ class GroupsComparator(BaseComparator, ABC):
                 if has_additional
                 else data.ds
             )
+            
+            group_col_name = group_field_data.columns[0]
+            if group_col_name in combined_data.columns:
+                inner_df = combined_data.data if hasattr(combined_data, 'data') else combined_data.backend_data.data
+                initial_len = len(inner_df)
+                inner_df = inner_df.dropna(subset=[group_col_name])
+                dropped = initial_len - len(inner_df)
+                if dropped > 0:
+                    combined_data = type(combined_data)(
+                        data=inner_df,
+                        roles={c: combined_data.roles.get(c, InfoRole()) for c in inner_df.columns},
+                    )
             
             data.groups[group_field_data.columns[0]] = {
                 f"{group}": ds for group, ds in combined_data.groupby(group_field_data.columns[0])

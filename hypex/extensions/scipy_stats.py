@@ -4,6 +4,7 @@ import warnings
 from typing import Callable
 
 import numpy as np
+import pandas as pd
 
 from pyspark.sql import Window
 import pyspark.sql.functions as F
@@ -57,11 +58,31 @@ class GroupStatTest(CompareExtension):
         other = self.check_data(data, other)
         if self.test_function is None:
             raise ValueError("test_function is needed for execution")
+        
+        arr1 = data.backend_data.data.values.flatten()
+        arr2 = other.backend_data.data.values.flatten()
+        
+        clean_arr1 = arr1[~pd.isna(arr1)]
+        clean_arr2 = arr2[~pd.isna(arr2)]
+        
+        if len(clean_arr1) == 0 or len(clean_arr2) == 0:
+            return SmallDataset.from_dict(
+                {
+                    "p-value": [np.nan],
+                    "statistic": [np.nan],
+                    "pass": [False],
+                },
+                StatisticRole(),
+            )
+        
+        kwargs.pop("nan_policy", None)
+        
         one_result = self.test_function(
-            data.backend_data.data.values.flatten(),
-            other.backend_data.data.values.flatten(),
+            clean_arr1,
+            clean_arr2,
             **kwargs,
         )
+        
         one_result = SmallDataset.from_dict(
             {
                 "p-value": one_result.pvalue,

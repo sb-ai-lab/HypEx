@@ -86,6 +86,8 @@ class AASplitter(Calculator):
             unique_vals = data.ds[splitter_col].unique()
             group_keys = list(unique_vals[splitter_col].to_dict().values())
             for group_key in group_keys:
+                if group_key is None:
+                    continue
                 mask = data.ds[splitter_col] == group_key
                 group_data = data.ds[mask]
                 data.set_value(
@@ -192,10 +194,8 @@ class AASplitter(Calculator):
             groups_sizes=self.groups_sizes,
         )
         data = self._set_value(data, result)
-        
         if data.ds.backend_type == BackendsEnum.spark:
             data.ds.checkpoint(eager=True)
-            
         return data
 
 

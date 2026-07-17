@@ -1498,6 +1498,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             self.data.sample(n=n, frac=frac, random_state=random_state)
         )
         
+
     def random_split_labels(
         self,
         edges: list[int],
@@ -1508,27 +1509,32 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     ) -> pd.DataFrame:
         """
         Pandas implementation of random_split_labels.
-        Uses standard sample and positional assignment.
+        Returns a DataFrame with the SAME SIZE as the original data.
+        Sampled rows get labels, non-sampled rows get NaN.
         """
-        # 1. Sample the data
+        # 1. Sample the data (preserves original index)
         sampled_df = self.data.sample(frac=frac, random_state=random_state)
         
-        # 2. Prepare labels array
+        # 2. Prepare labels array for sampled rows
         n_sampled = len(sampled_df)
         label_array = np.empty(n_sampled, dtype=object)
-        label_array[:] = None # Default to None for safety
-        
+        label_array[:] = None
         prev_edge = 0
         for i, edge in enumerate(edges):
             current_edge = min(edge, n_sampled)
             if i < len(labels):
                 label_array[prev_edge:current_edge] = labels[i]
             prev_edge = current_edge
-            
-        # 3. Create result DataFrame with original index
-        result_df = pd.DataFrame({name: label_array}, index=sampled_df.index)
         
-        return result_df
+        # 3. Create result DataFrame with ORIGINAL size, NaN for non-sampled
+        full_labels = pd.Series(np.nan, index=self.data.index, name=name)
+        
+        # Fill labels ONLY for sampled rows (by index alignment)
+        for pos, orig_idx in enumerate(sampled_df.index):
+            if pos < len(label_array):
+                full_labels.at[orig_idx] = label_array[pos]
+        
+        return pd.DataFrame({name: full_labels})
 
     def select_dtypes(
         self,

@@ -1003,7 +1003,7 @@ class SparkNavigation(DatasetBackendNavigation):
         sdf = sdf.withColumn(name, case_expr)
         
         # 7. Filter out unlabeled rows (if frac < 1) and drop helper columns
-        sdf = sdf.filter(F.col(name).isNotNull()).drop("_shuffle_key", "_seq")
+        sdf = sdf.drop("_shuffle_key", "_seq")
         
         # 8. Convert back to pyspark.pandas DataFrame preserving index
         # pandas_api() automatically handles the index columns if they are present
