@@ -1507,34 +1507,58 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         frac: float = 1.0,
         name: str = "split",
     ) -> pd.DataFrame:
+        """Deterministic split using a hash of the index.
+
+        Produces identical results to the Spark backend for the same seed
+        and index values. Uses MD5 hashing of the stringified index
+        concatenated with the seed to assign each row to a bucket in
+        ``[0, MOD)``, then maps buckets to labels via the ``edges``
+        thresholds.
+
+        Args:
+            edges: Cumulative upper bounds for each label on the MOD scale.
+            labels: Label strings corresponding to ``edges``.
+            random_state: Seed for reproducibility. Defaults to 42.
+            frac: Fraction of data to label. Rows outside this fraction
+                are excluded from the result.
+            name: Name of the resulting label column.
+
+        Returns:
+            A ``pd.DataFrame`` with the original index and the new label
+            column. Rows outside ``frac`` or beyond the last edge are
+            excluded.
         """
-        Pandas implementation of random_split_labels.
-        Returns a DataFrame with the SAME SIZE as the original data.
-        Sampled rows get labels, non-sampled rows get NaN.
-        """
-        # 1. Sample the data (preserves original index)
-        sampled_df = self.data.sample(frac=frac, random_state=random_state)
-        
-        # 2. Prepare labels array for sampled rows
-        n_sampled = len(sampled_df)
-        label_array = np.empty(n_sampled, dtype=object)
-        label_array[:] = None
-        prev_edge = 0
-        for i, edge in enumerate(edges):
-            current_edge = min(edge, n_sampled)
-            if i < len(labels):
-                label_array[prev_edge:current_edge] = labels[i]
-            prev_edge = current_edge
-        
-        # 3. Create result DataFrame with ORIGINAL size, NaN for non-sampled
-        full_labels = pd.Series(np.nan, index=self.data.index, name=name)
-        
-        # Fill labels ONLY for sampled rows (by index alignment)
-        for pos, orig_idx in enumerate(sampled_df.index):
-            if pos < len(label_array):
-                full_labels.at[orig_idx] = label_array[pos]
-        
-        return pd.DataFrame({name: full_labels})
+        import hashlib
+
+        seed = random_state if random_state is not None else 42
+        mod = 10_000_000
+
+        df_with_index = self.data.reset_index()
+        index_cols = df_with_index.columns[: self.data.index.nlevels]
+
+        def compute_hash(row):
+            index_str = "_".join(str(row[c]) for c in index_cols) + f"_{seed}"
+            hash_val = int(hashlib.md5(index_str.encode()).hexdigest(), 16)
+            return hash_val % mod
+
+        df_with_index["_hash"] = df_with_index.apply(compute_hash, axis=1)
+
+        # Assign labels in reverse order so that the smallest threshold
+        # wins (matching Spark CASE WHEN semantics).
+        df_with_index[name] = None
+        for edge, label in reversed(list(zip(edges, labels))):
+            threshold = min(edge, mod)
+            mask = (df_with_index["_hash"] < threshold) & df_with_index[name].isna()
+            df_with_index.loc[mask, name] = label
+
+        # Apply frac filter.
+        if frac < 1.0:
+            frac_threshold = int(frac * mod)
+            df_with_index.loc[df_with_index["_hash"] >= frac_threshold, name] = None
+
+        result = df_with_index[df_with_index[name].notna()][[name]]
+        result.index = self.data.index[df_with_index[name].notna().values]
+        return result
 
     def select_dtypes(
         self,

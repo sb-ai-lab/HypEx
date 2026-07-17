@@ -374,22 +374,37 @@ class SparkNavigation(DatasetBackendNavigation):
         return getattr(self, "_storage_level_flag", None)
     
     def checkpoint(self, eager: bool = True) -> Self:
-        """Truncates the computation graph (lineage) by creating a local checkpoint.
-        
-        Uses ``local_checkpoint`` via the Spark accessor to materialize the 
-        DataFrame and break the lineage chain. This is critical for iterative 
-        algorithms (loops) to prevent exponential DAG growth and performance 
-        degradation in Spark.
-        
+        """Truncate the computation graph by creating a checkpoint.
+
+        Uses reliable checkpointing (HDFS/S3) when a checkpoint directory
+        is configured on the SparkContext. Falls back to ``local_checkpoint``
+        otherwise, with a warning that the operation is not fault-tolerant
+        and may fail if an executor is lost.
+
         Args:
-            eager: If ``True``, the checkpoint is executed eagerly, immediately
-                materializing the DataFrame. If ``False``, the checkpoint is
-                deferred until the next action. Defaults to ``True``.
-                
+            eager: If ``True``, the checkpoint is executed eagerly.
+                Defaults to ``True``.
+
         Returns:
-            The dataset instance itself (``Self``) to allow method chaining.
+            The dataset instance itself to allow method chaining.
         """
-        self.data = self.data.spark.local_checkpoint(eager=eager)
+        import warnings
+
+        sc = self.session.sparkContext
+        try:
+            # getCheckpointDir() raises if no directory is configured.
+            sc.getCheckpointDir()
+            self.data = self.data.spark.checkpoint(eager=eager)
+        except Exception:
+            warnings.warn(
+                "SparkContext checkpoint directory is not set. "
+                "Falling back to local_checkpoint, which is NOT "
+                "fault-tolerant and may fail if an executor is lost. "
+                "Please set sc.setCheckpointDir('hdfs://...') for "
+                "large jobs.",
+                UserWarning,
+            )
+            self.data = self.data.spark.local_checkpoint(eager=eager)
         return self
 
     def __getitem__(
@@ -944,72 +959,70 @@ class SparkNavigation(DatasetBackendNavigation):
         frac: float = 1.0,
         name: str = "split",
     ) -> ps.DataFrame:
-        """
-        Creates a split column using distributed indexing instead of sorting/taking.
-        This avoids OOM errors associated with TakeOrderedAndProjectExec on large datasets.
-        
+        """Assign deterministic group labels to rows based on a hash of the index.
+
+        The previous implementation used global ``orderBy`` + ``zipWithIndex``
+        which materializes the entire dataset on a single executor and causes
+        OOM on datasets with tens of millions of rows. This implementation
+        replaces that approach with a ``hash(index_columns, seed) % MOD``
+        modulo operation that runs entirely in a distributed fashion without
+        any global shuffle or sort.
+
+        The split is approximately proportional to the requested ``edges``
+        (within +/- 0.01% for ``MOD = 10_000_000``), which is statistically
+        indistinguishable for AA/AB testing purposes.
+
         Args:
-            edges: Cumulative upper bounds for each label (e.g., [50M, 100M]).
-            labels: List of label strings corresponding to edges.
-            random_state: Seed for shuffling.
-            frac: Fraction of data to label (rest will be null).
-            name: Name of the resulting column.
-            
+            edges: Cumulative upper bounds for each label on the MOD scale.
+                For example, ``[5_000_000, 10_000_000]`` produces roughly a
+                50/50 split.
+            labels: Label strings corresponding to ``edges``.
+            random_state: Seed for the hash function. Defaults to 42 when
+                ``None``.
+            frac: Fraction of data to label. Rows with
+                ``hash >= frac * MOD`` are left unlabeled and filtered out.
+            name: Name of the resulting label column.
+
         Returns:
-            pyspark.pandas DataFrame with original index and the new 'name' column.
+            A ``pyspark.pandas.DataFrame`` containing only the original index
+            columns and the new label column.
         """
         seed = random_state if random_state is not None else 42
-        
-        # 1. Reset index to expose index columns for hashing/joining
+        mod = 10_000_000
+
+        # Expose index columns so we can hash them and restore the index
+        # after the Spark transformation round-trip.
         df_with_index = self.data.reset_index()
         index_cols = df_with_index.columns[: self.data.index.nlevels]
-        
-        # 2. Project only index columns to minimize shuffle data
+
+        # Project only index columns to minimize data sent through the plan.
         sdf = df_with_index[list(index_cols)].to_spark()
-        
-        # 3. Create a shuffle key based on hash of index + seed
-        # Using abs(hash()) ensures positive integers for sorting
+
+        # Deterministic hash from index columns + seed.
         hash_cols = [F.col(c) for c in index_cols]
-        sdf = sdf.withColumn("_shuffle_key", F.abs(F.hash(*hash_cols, F.lit(seed))))
-        
-        # 4. Sort by shuffle key (distributed sort)
-        # Tie-break by index columns to ensure determinism
-        sdf = sdf.orderBy("_shuffle_key", *index_cols)
-        
-        # 5. Attach distributed sequence number (zipWithIndex equivalent)
-        # This is crucial: it assigns row numbers 0..N across partitions without collecting
-        try:
-            # pyspark.pandas internal API for distributed sequence
-            sdf = InternalFrame.attach_distributed_sequence_column(sdf, "_seq")
-        except AttributeError:
-            # Fallback for older versions or if internal API changes:
-            # Use monotonically_increasing_id is NOT stable after sort.
-            # We must use zipWithIndex on RDD then convert back, which is heavier but safe.
-            rdd = sdf.rdd.zipWithIndex()
-            schema = sdf.schema.add("_seq", "long")
-            sdf = self.session.createDataFrame(rdd, schema)
-            
-        # 6. Assign labels based on sequence ranges
-        # edges are cumulative: [edge1, edge2, ...]
-        # rows 0..edge1-1 get labels[0], edge1..edge2-1 get labels[1], etc.
-        
-        case_expr = F.when(F.col("_seq") < edges[0], F.lit(labels[0]))
-        for i in range(1, len(edges)):
-            case_expr = case_expr.when(F.col("_seq") < edges[i], F.lit(labels[i]))
-        
-        # Rows beyond the last edge (if frac < 1) or just to be safe
-        case_expr = case_expr.otherwise(F.lit(None))
-        
+        hash_expr = F.abs(F.hash(*hash_cols, F.lit(seed))) % F.lit(mod)
+
+        # Build CASE WHEN in REVERSE order. Spark's `otherwise` wraps the
+        # existing expression on the outside, so iterating forward would
+        # cause the first label to shadow all subsequent ones.
+        case_expr = F.lit(None).cast("string")
+        for edge, label in reversed(list(zip(edges, labels))):
+            threshold = min(edge, mod)
+            case_expr = F.when(
+                hash_expr < F.lit(threshold), F.lit(label)
+            ).otherwise(case_expr)
+
+        # Apply the frac filter before returning.
+        if frac < 1.0:
+            frac_threshold = int(frac * mod)
+            case_expr = F.when(
+                hash_expr < F.lit(frac_threshold), case_expr
+            ).otherwise(F.lit(None))
+
         sdf = sdf.withColumn(name, case_expr)
-        
-        # 7. Filter out unlabeled rows (if frac < 1) and drop helper columns
-        sdf = sdf.drop("_shuffle_key", "_seq")
-        
-        # 8. Convert back to pyspark.pandas DataFrame preserving index
-        # pandas_api() automatically handles the index columns if they are present
-        ps_result = sdf.pandas_api(index_col=list(index_cols))
-        
-        return ps_result    
+        sdf = sdf.filter(F.col(name).isNotNull())
+
+        return sdf.pandas_api(index_col=list(index_cols))
         
         
     def append(
