@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 
 from pyspark import StorageLevel
 from pyspark.sql import (
@@ -39,25 +40,16 @@ class MatchingMetricsExtension(Extension):
             target_roles: ABCRole | list[ABCRole],
             metric: Literal["auto", "atc", "att", "ate"],
             n_neighbors: int,
-            # bias_field: str | None = None
         ):
         super().__init__()
         self.grouping_role = grouping_role
         self.target_roles = target_roles
         self.metric = metric
         self.n_neighbors = n_neighbors
-        # self.bias_field = bias_field
         
         self.new_target_field = None
         self.neighbors_cols = None
 
-    def _calc_scaled_counts(
-            self, 
-            indexes, 
-            match_idx_cols: list[str] | str, 
-            # origin_idx_col: str
-    ):
-        raise NotImplementedError
     
     def _calc_stats_and_weights(self, data):
         raise NotADirectoryError
@@ -213,13 +205,104 @@ class MatchingMetricsExtension(Extension):
 
         stats_itc, stats_itt = self._calc_stats_and_weights(new_data)
         return self._calc_metrics(stats_itc, stats_itt)
-
-        
+  
 
 @backend_factory.register(MatchingMetricsExtension, PandasDataset)
 class PandasMatchingMetricsExtension(MatchingMetricsExtension):
-    """
-    """
+    
+    @staticmethod
+    def _prepare_data(
+        data: Dataset, 
+        neighbors_cols: list[str] | str, 
+        numeric_cols: list[str] | str
+    ) -> pd.DataFrame:
+        neighbors_cols = Adapter.to_list(neighbors_cols)
+        numeric_cols = Adapter.to_list(numeric_cols)
+        
+        t_data = data[numeric_cols].data
+        indexes = data[neighbors_cols].data
+        
+        # "expand" the neighbor indexes from a wide format to a long one
+        melted = indexes.stack().reset_index()
+        melted.columns = ['initial_index', 'neighbor_col', 'match_index']
+        
+        # adjusting the features of our neighbors according to their indexes
+        matched_features = t_data.loc[melted['match_index']].copy()
+        matched_features.index = melted['initial_index'].values
+        
+        # calc mean by initial index
+        matched_data = matched_features.groupby(level=0).mean()
+        matched_data = matched_data.rename(columns={col: f"{col}_matched" for col in numeric_cols})
+        
+        # add zero bias if Bias extension didn't execute
+        matched_data['bias'] = 0.0
+        
+        return matched_data
+
+    @staticmethod
+    def _calc_scaled_counts(
+        data: pd.DataFrame,
+        match_idx_cols: str | list[str],
+        n_neighbors: int
+    ) -> pd.Series:
+        match_idx_cols = Adapter.to_list(match_idx_cols)
+        
+        all_neighbors = pd.Series(
+            data[match_idx_cols].values.flatten()
+        )
+        
+        scaled_counts = all_neighbors.value_counts() / n_neighbors
+        scaled_counts.name = "scaled_counts"
+        return scaled_counts
+
+    def _calc_stats_and_weights(self, data: Dataset) -> tuple[dict[str, float], dict[str, float]]: 
+        new_data: pd.DataFrame = data.data.copy()
+        scaled_counts = self._calc_scaled_counts(new_data, self.neighbors_cols, self.n_neighbors)
+        
+        group_1, group_2, *_ = new_data[self.group_field].unique()
+        
+        # Individual Treatment effect (_it) vectorized calc using numpy!
+        _it = np.zeros(len(new_data))
+        
+        mask_1 = new_data[self.group_field] == group_1
+        mask_2 = new_data[self.group_field] == group_2
+        
+        target_vals = new_data[self.target_field].values
+        new_target_vals = new_data[self.new_target_field].values
+        bias_vals = new_data[self.bias_field].values
+        
+        # control (group_1): target - matched_target - bias
+        _it[mask_1] = target_vals[mask_1] - new_target_vals[mask_1] - bias_vals[mask_1]
+        # test (group_2): target - matched_target + bias
+        _it[mask_2] = target_vals[mask_2] - new_target_vals[mask_2] + bias_vals[mask_2]
+        
+        new_data['_it'] = _it
+        
+        new_data = new_data.join(scaled_counts, how='left')
+        new_data['scaled_counts'] = new_data['scaled_counts'].fillna(0)
+        
+
+        stats = (
+            new_data
+            .groupby(self.group_field)
+            .agg(
+                count=('_it', 'count'),
+                mean=('_it', 'mean'),
+                var=('_it', 'var'),
+                sum=('scaled_counts', 'sum'),
+                sq_sum=('scaled_counts', lambda x: (x ** 2).sum())
+            )
+            .reset_index()
+        )
+
+        stats_dict_1 = stats[stats[self.group_field] == group_1].iloc[0].to_dict()
+        stats_dict_1.pop(self.group_field, None) 
+        
+        stats_dict_2 = stats[stats[self.group_field] == group_2].iloc[0].to_dict()
+        stats_dict_2.pop(self.group_field, None)
+        
+        return stats_dict_1, stats_dict_2
+        
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 @backend_factory.register(MatchingMetricsExtension, SparkDataset)
 class SparkMatchingMetricsExtension(MatchingMetricsExtension):
@@ -274,7 +357,7 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
         ) 
 
     def _calc_stats_and_weights(self, data: Dataset) -> tuple[dict[str, float]]:
-        new_data = data.data.to_spark(index_col='index')
+        new_data: SparkDF = data.data.to_spark(index_col='index')
         scaled_counts = self._calc_scaled_counts(new_data, self.neighbors_cols, self.n_neighbors) 
         scaled_counts.persist(self.PERSIST_POLITIC)
         # First group is `control`, second one is `test`
@@ -303,7 +386,8 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
                 )
                 .otherwise(0)
             )
-            .join(scaled_counts, on='index')
+            .join(scaled_counts, on='index', how='left')
+            .fillna(0)
             .groupBy(self.group_field)
             .agg(
                 F.count('_it').alias('count'),
@@ -314,16 +398,7 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
             )
             .toPandas()
         )
-        # stats_dict_1 = {
-        #     key: value[0] 
-        #     for key, value in 
-        #     stats.loc[stats[self.group_field == group_1]].to_dict().items()
-        # }
-        # stats_dict_2 = {
-        #     key: value[0] 
-        #     for key, value in 
-        #     stats.loc[stats[self.group_field == group_2]].to_dict().items()
-        # }
+
         stats_dict_1 = stats[stats[self.group_field] == group_1].iloc[0].to_dict()
         # Del group column
         stats_dict_1.pop(self.group_field, None) 
