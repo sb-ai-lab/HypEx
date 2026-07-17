@@ -33,6 +33,20 @@ from ..utils.logger import logger
 
 
 class MatchingMetricsExtension(Extension):
+    """Base class for estimating treatment effects (ATT, ATC, ATE) and their 
+    statistical significance after matching.
+    
+    Computes the Individual Treatment Effect on the Treated (ITT) and Control (ITC), 
+    applies optional bias correction, and calculates the final Average Treatment 
+    Effects along with their standard errors, p-values, and confidence intervals.
+    
+    Attributes:
+        PERSIST_POLITIC: Default Spark storage level for intermediate data.
+        grouping_role: Role identifying the treatment assignment column.
+        target_roles: Role(s) identifying the target outcome column(s).
+        metric: The type of treatment effect to estimate ('atc', 'att', 'ate', or 'auto').
+        n_neighbors: Number of neighbors used in the matching process (for weight scaling).
+    """
     PERSIST_POLITIC = StorageLevel.MEMORY_AND_DISK
     def __init__(
             self,
@@ -41,6 +55,14 @@ class MatchingMetricsExtension(Extension):
             metric: Literal["auto", "atc", "att", "ate"],
             n_neighbors: int,
         ):
+        """Initialize the MatchingMetricsExtension.
+        
+        Args:
+            grouping_role: Role defining the treatment/control grouping column.
+            target_roles: Role(s) defining the target outcome column(s).
+            metric: Treatment effect type ('atc', 'att', 'ate', or 'auto' for all).
+            n_neighbors: Number of matched neighbors per observation.
+        """
         super().__init__()
         self.grouping_role = grouping_role
         self.target_roles = target_roles
@@ -52,9 +74,18 @@ class MatchingMetricsExtension(Extension):
 
     
     def _calc_stats_and_weights(self, data):
+        """Compute group statistics and neighbor weights (backend-specific)."""
         raise NotADirectoryError
     
     def prepare_data(self, data: Dataset) -> Dataset:
+        """Generate matched target values if bias estimation was skipped.
+        
+        Args:
+            data: The input dataset.
+            
+        Returns:
+            A Dataset containing the aggregated matched target values.
+        """
         neighbors_cols, _, _, _ = self._extract_info(data)
         matched_data = self._prepare_data(
             data = data,
@@ -73,10 +104,23 @@ class MatchingMetricsExtension(Extension):
         neighbors_cols: list[str] | str, 
         numeric_cols: list[str] | str
     ):
+        """Aggregate matched features/targets (backend-specific)."""
         raise NotImplementedError
     
     @staticmethod
     def _extract_info(data: Dataset) -> tuple[Dataset, list[str], list[str]]:
+        """Extract neighbor indices, numeric columns, bias, and new target columns.
+        
+        Args:
+            data: The dataset containing matching results.
+            
+        Returns:
+            A tuple containing:
+                - List of neighbor index columns.
+                - List of numeric columns.
+                - Name of the bias column (or None if not present).
+                - Name of the new (matched) target column (or None if not present).
+        """
         neighbors_cols = data.search_columns(AdditionalMatchingRole())
         if len(neighbors_cols) == 0:
             raise ValueError("No indexes were found")
@@ -92,6 +136,7 @@ class MatchingMetricsExtension(Extension):
         return neighbors_cols, numeric_cols, bias_col, new_target_col
     
     def _set_columns(self, data: Dataset) -> list[str]:
+        """Resolve and store target and group field names."""
         self.target_field = data.search_columns(self.target_roles)[0]
         self.group_field = data.search_columns(self.grouping_role)[0]
     
@@ -99,12 +144,33 @@ class MatchingMetricsExtension(Extension):
     def _calc_se(
         n_c: int, n_t: int, var_c: float, var_t: float, w_c: float, w_t: float
     ) -> float:
+        """Calculate the standard error of the treatment effect estimate.
+        
+        Args:
+            n_c: Sample size of the control group.
+            n_t: Sample size of the treatment group.
+            var_c: Variance of the individual treatment effect in control.
+            var_t: Variance of the individual treatment effect in treatment.
+            w_c: Sum of squared weights for the control group.
+            w_t: Sum of squared weights for the treatment group.
+            
+        Returns:
+            The computed standard error.
+        """
         return np.sqrt(w_c * var_c / n_c ** 2 + w_t * var_t / n_t ** 2)
     
     @staticmethod
     def _calc_p_value(
             x: float
     ) -> float:
+        """Calculate a two-sided p-value from a z-score using the normal CDF.
+        
+        Args:
+            x: The z-score (estimate / standard error).
+            
+        Returns:
+            The two-sided p-value.
+        """
         return (
             NormCDF()
             .calc(
@@ -120,6 +186,16 @@ class MatchingMetricsExtension(Extension):
             stats_itc: dict[str, float], 
             stats_itt: dict[str, float]
     ) -> dict[str, float]:
+        """Compute final ATT, ATC, and ATE metrics with confidence intervals.
+        
+        Args:
+            stats_itc: Aggregated statistics for the Individual Treatment effect on Control.
+            stats_itt: Aggregated statistics for the Individual Treatment effect on Treated.
+            
+        Returns:
+            A dictionary mapping metric names ('ATT', 'ATC', 'ATE') to lists 
+            containing [Estimate, Standard Error, P-value, CI Lower, CI Upper].
+        """
         itt_se = self._calc_se(
             n_c=stats_itc['count'], n_t=stats_itt['count'], 
             var_c=stats_itc['var'], var_t=stats_itt['var'], 
@@ -184,6 +260,18 @@ class MatchingMetricsExtension(Extension):
         }
     
     def calc(self, data: Dataset, **kwargs):
+        """Execute the full matching metrics pipeline.
+        
+        Resolves columns, prepares matched targets if bias correction is missing, 
+        calculates weights and statistics, and returns the final treatment effects.
+        
+        Args:
+            data: The input dataset containing matched indices, features, and targets.
+            **kwargs: Additional arguments (ignored).
+            
+        Returns:
+            A dictionary of computed treatment effects (ATT, ATC, ATE).
+        """
         self._set_columns(data)
         neighbors_cols, numeric_cols, bias_col, new_target_col = self._extract_info(data)
         if bias_col is None:
@@ -209,13 +297,28 @@ class MatchingMetricsExtension(Extension):
 
 @backend_factory.register(MatchingMetricsExtension, PandasDataset)
 class PandasMatchingMetricsExtension(MatchingMetricsExtension):
+    """Pandas backend implementation for matching metrics calculation.
     
+    Uses vectorized NumPy operations and Pandas aggregations to efficiently 
+    compute individual treatment effects, neighbor weights, and group statistics 
+    in local memory.
+    """
     @staticmethod
     def _prepare_data(
         data: Dataset, 
         neighbors_cols: list[str] | str, 
         numeric_cols: list[str] | str
     ) -> pd.DataFrame:
+        """Aggregate matched targets using Pandas.
+        
+        Args:
+            data: The input dataset.
+            neighbors_cols: Columns containing neighbor indices.
+            numeric_cols: Numeric columns to aggregate.
+            
+        Returns:
+            A DataFrame with aggregated matched targets and a default zero bias column.
+        """
         neighbors_cols = Adapter.to_list(neighbors_cols)
         numeric_cols = Adapter.to_list(numeric_cols)
         
@@ -245,6 +348,20 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         match_idx_cols: str | list[str],
         n_neighbors: int
     ) -> pd.Series:
+        """Calculate scaled frequency counts of matched neighbors.
+        
+        Flattens the neighbor index columns, counts occurrences, and scales 
+        by the number of neighbors to derive observation weights.
+        
+        Args:
+            data: DataFrame containing neighbor index columns.
+            match_idx_cols: List of columns containing neighbor indices.
+            n_neighbors: The number of neighbors per observation.
+            
+        Returns:
+            A Pandas Series where the index is the neighbor ID and the value 
+            is the scaled weight.
+        """
         match_idx_cols = Adapter.to_list(match_idx_cols)
         
         all_neighbors = pd.Series(
@@ -256,6 +373,19 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         return scaled_counts
 
     def _calc_stats_and_weights(self, data: Dataset) -> tuple[dict[str, float], dict[str, float]]: 
+        """Compute individual treatment effects and group statistics using Pandas.
+        
+        Calculates the Individual Treatment effect (_it) vectorized via NumPy masks, 
+        joins with neighbor weights, and aggregates statistics (mean, variance, sum) 
+        per group.
+        
+        Args:
+            data: The dataset containing targets, matched targets, bias, and groups.
+            
+        Returns:
+            A tuple of two dictionaries containing statistics for group 1 (control) 
+            and group 2 (treatment).
+        """
         new_data: pd.DataFrame = data.data.copy()
         scaled_counts = self._calc_scaled_counts(new_data, self.neighbors_cols, self.n_neighbors)
         
@@ -307,14 +437,27 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
 @backend_factory.register(MatchingMetricsExtension, SparkDataset)
 class SparkMatchingMetricsExtension(MatchingMetricsExtension):
     """
+    Spark backend implementation for distributed matching metrics calculation.
+    
+    Uses Spark SQL functions and distributed aggregations to compute treatment 
+    effects and weights across large datasets partitioned by the grouping column.
     """
-
     @staticmethod
     def _prepare_data(
         data: Dataset, 
         neighbors_cols: list[str] | str, 
         numeric_cols: list[str] | str
     ) -> SparkDF:
+        """Aggregate matched targets using PySpark.
+        
+        Args:
+            data: The input dataset.
+            neighbors_cols: Columns containing neighbor indices.
+            numeric_cols: Numeric columns to aggregate.
+            
+        Returns:
+            A SparkDF with aggregated matched targets and a default zero bias column.
+        """
         neighbors_cols = Adapter.to_list(neighbors_cols)
         numeric_cols = Adapter.to_list(numeric_cols)
         
@@ -345,6 +488,16 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
             match_idx_cols: str | list[str], 
             n_neighbors: int
     ) -> SparkDF:
+        """Calculate scaled frequency counts of matched neighbors using Spark.
+        
+        Args:
+            data: SparkDF containing neighbor index columns.
+            match_idx_cols: List of columns containing neighbor indices.
+            n_neighbors: The number of neighbors per observation.
+            
+        Returns:
+            A SparkDF with 'index' (neighbor ID) and 'scaled_counts' columns.
+        """
         match_idx_cols = Adapter.to_list(match_idx_cols)
         return (
             data
@@ -357,6 +510,18 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
         ) 
 
     def _calc_stats_and_weights(self, data: Dataset) -> tuple[dict[str, float]]:
+        """Compute individual treatment effects and group statistics using PySpark.
+        
+        Calculates the Individual Treatment effect (_it) using Spark SQL conditional 
+        expressions, joins with neighbor weights, and aggregates statistics per group.
+        
+        Args:
+            data: The dataset containing targets, matched targets, bias, and groups.
+            
+        Returns:
+            A tuple of two dictionaries containing statistics for group 1 (control) 
+            and group 2 (treatment).
+        """
         new_data: SparkDF = data.data.to_spark(index_col='index')
         scaled_counts = self._calc_scaled_counts(new_data, self.neighbors_cols, self.n_neighbors) 
         scaled_counts.persist(self.PERSIST_POLITIC)
