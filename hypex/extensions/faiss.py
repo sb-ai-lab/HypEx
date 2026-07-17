@@ -398,7 +398,8 @@ def _partition_load(partition_iter: Iterable, batch_size: int):
 
 def _spark_partition_fit(
     iterator: Iterable, 
-    bc_index: Broadcast
+    bc_index: Broadcast,
+    bc_storage: Broadcast
 ):
     """
     Build a local FAISS index on each Spark partition.
@@ -421,6 +422,7 @@ def _spark_partition_fit(
     import numpy as np
 
     index = bc_index.value
+    storage = bc_storage.value
     ids, vectors = [], []
     for row in iterator:
         ids.append(row["index"])
@@ -436,14 +438,16 @@ def _spark_partition_fit(
     index_with_ids = faiss.IndexIDMap(index_copy)
     index_with_ids.add_with_ids(vectors, ids)
 
-    yield faiss.serialize_index(index_with_ids)
+    byte_array = faiss.serialize_index(index_with_ids)
+    yield storage.save_index(byte_array)
 
 def  _per_partition_predict(
     shard_iter: Iterable,
     bc_n_neighbors: Broadcast,
-    bc_index_files_list: Broadcast,
+    bc_references: Broadcast,
     bc_chunk_size: Broadcast,
-    bc_k: Broadcast
+    bc_k: Broadcast,
+    bc_storage: Broadcast
 ):
     """
     Perform distributed nearest-neighbor search on each Spark partition.
@@ -458,7 +462,7 @@ def  _per_partition_predict(
         shard_iter (Iterable): Iterator over partition rows. Each row must
             contain ``index`` (long) and ``_features`` (vector) columns.
         bc_n_neighbors (Broadcast): Number of nearest neighbors to return.
-        bc_index_files_list (Broadcast): List of serialized index file names
+        bc_references (Broadcast): List of serialized index file names
             distributed via ``SparkFiles``.
         bc_chunk_size (Broadcast): Number of query rows to process per batch.
         bc_k (Broadcast): Number of IVF clusters (used to set ``nprobe``).
@@ -476,8 +480,9 @@ def  _per_partition_predict(
     cache = get_executor_cache()
         
     real_n = bc_n_neighbors.value
-    index_files = bc_index_files_list.value
+    references = bc_references.value
     chunk_size = bc_chunk_size.value
+    storage = bc_storage.value
 
     def iter_chunk(it: Iterable, chunk_size: int):
         chunk = []
@@ -503,8 +508,8 @@ def  _per_partition_predict(
         gc.collect()        
 
         candidates = [[] for _ in range(len(query_ids))]
-        for index_file in index_files:
-            tmp_index = cache.get(index_file, nprobe=min(real_n, bc_k.value))
+        for ref in references:
+            tmp_index = cache.get(ref, storage, nprobe=min(real_n, bc_k.value))
             # tmp_index.nprobe = real_n
             # tmp_index.nprobe = min(real_n * 2, bc_k.value)
             k = min(real_n, tmp_index.ntotal)
@@ -606,6 +611,7 @@ class SparkFaissExtension(FaissExtension):
         """
         super().__init__(n_neighbors, faiss_mode, mahalonobis)
         self.seed: int = 21
+        self.storage: FaissIndexStorage | None = None
 
     def _vectorize_data(
             self, 
@@ -732,6 +738,7 @@ class SparkFaissExtension(FaissExtension):
             ValueError: If ``mode`` is not "sample" or "full".
         """
         session = vectorized_data.sparkSession
+        self.storage = FaissIndexStorage(session)
         m = 4 # heuristic
         self.k = int(np.sqrt(vectorized_data.count() / m))
 
@@ -769,6 +776,7 @@ class SparkFaissExtension(FaissExtension):
         self.index.nprobe = min(self.n_neighbors * 2, self.k)
 
         bc_index = session.sparkContext.broadcast(self.index)
+        bc_storage = session.sparkContext.broadcast(self.storage)
         del self.index
         self.index = None
         gc.collect()
@@ -778,7 +786,7 @@ class SparkFaissExtension(FaissExtension):
             vectorized_data
             .select(*features)
             .rdd
-            .mapPartitions(lambda it: _spark_partition_fit(it, bc_index))
+            .mapPartitions(lambda it: _spark_partition_fit(it, bc_index, bc_storage))
             .persist(self.PERSIST_POLITIC)
         )
         self._sharded_rdd.count()
@@ -815,45 +823,49 @@ class SparkFaissExtension(FaissExtension):
                 by the original row index.
         """
         session = test_data.sparkSession
+        index_references = self.storage.collect_and_register(self._sharded_rdd)
+
+
+        # dir_id = uuid.uuid1().hex[:8]
+        # tmp_dir = f"__partition_indexes{dir_id}"
+        # os.makedirs(tmp_dir, exist_ok=True) 
+        # # tmp_dir = tempfile.mkdtemp()
+        # result = Dataset.create_empty(session=session)
         
-        dir_id = uuid.uuid1().hex[:8]
-        tmp_dir = f"__partition_indexes{dir_id}"
-        os.makedirs(tmp_dir, exist_ok=True) 
-        # tmp_dir = tempfile.mkdtemp()
-        result = Dataset.create_empty(session=session)
-        
-        index_files_list = []
+        # index_files_list = []
         
 
-        for partition_index, shard in enumerate(self._sharded_rdd.toLocalIterator()):
-            partition_indexes = faiss.deserialize_index(shard)
-            run_id = uuid.uuid1().hex[:8]
-            index_file_name = f"__{partition_index}_partition_index_{run_id}.index"
-            faiss.write_index(
-                partition_indexes,
-                f"{tmp_dir}/{index_file_name}" 
-            )    
-            session.sparkContext.addFile(f"{tmp_dir}/{index_file_name}")
-            index_files_list.append(index_file_name)
+        # for partition_index, shard in enumerate(self._sharded_rdd.toLocalIterator()):
+        #     partition_indexes = faiss.deserialize_index(shard)
+        #     run_id = uuid.uuid1().hex[:8]
+        #     index_file_name = f"__{partition_index}_partition_index_{run_id}.index"
+        #     faiss.write_index(
+        #         partition_indexes,
+        #         f"{tmp_dir}/{index_file_name}" 
+        #     )    
+        #     session.sparkContext.addFile(f"{tmp_dir}/{index_file_name}")
+        #     index_files_list.append(index_file_name)
 
-            del partition_indexes   # ← explicit release
-            gc.collect()
+        #     del partition_indexes   # ← explicit release
+        #     gc.collect()
         
         self._sharded_rdd.unpersist()
         self._sharded_rdd = None
         # session.sparkContext.addPyFile("index_cacher.py")
-        bc_index_files_list = session.sparkContext.broadcast(index_files_list)
+        bc_index_references = session.sparkContext.broadcast(index_references)
         bc_n_neighbors = session.sparkContext.broadcast(self.n_neighbors)
         bc_chunk_size = session.sparkContext.broadcast(self.CHUNK_SIZE)
         bc_k = session.sparkContext.broadcast(self.k)
+        bc_storage = session.sparkContext.broadcast(self.storage)
 
         result_rdd = test_data.rdd.mapPartitions(lambda it:
                                         _per_partition_predict(
                                         it, 
                                         bc_n_neighbors=bc_n_neighbors, 
-                                        bc_index_files_list=bc_index_files_list,
+                                        bc_references=bc_index_references,
                                         bc_chunk_size=bc_chunk_size,
-                                        bc_k=bc_k
+                                        bc_k=bc_k,
+                                        bc_storage=bc_storage
             )
         )
 
@@ -972,16 +984,7 @@ class SparkFaissExtension(FaissExtension):
         
     def __del__(self, *_) -> None:
         self.unpersist()
-
-# class FaissIndexStorage:
-
-#     def __init__(self):
-#         pass
-
-#     def _check_file_system(self):
-#         ...
-
-
+        
 # TODO: Проверить, нужна ли вообще эта фича?
 class CachingIndex:
     """
@@ -1019,7 +1022,8 @@ class CachingIndex:
     
     def get(
             self,
-            index_file: int,
+            reference: int,
+            storage: FaissIndexStorage,
             nprobe: int
     ):
         """
@@ -1038,19 +1042,19 @@ class CachingIndex:
             Возвращает FAISS индексы для заданного файла.
         """
         with self._lock:
-            if index_file in self._cache:
-                self._cache.move_to_end(key=index_file)
-                return self._cache[index_file]
+            if reference in self._cache:
+                self._cache.move_to_end(key=reference)
+                return self._cache[reference]
 
             if len(self._cache) == self._max:
                 _, evicted = self._cache.popitem(last=False)
                 del evicted
                 import gc; gc.collect()
             
-            tmp_index = faiss.read_index(SparkFiles.get(index_file))
+            tmp_index = storage.load_index(reference)
             inner = faiss.downcast_index(tmp_index.index)
             inner.nprobe = nprobe  
-            self._cache[index_file] = tmp_index
+            self._cache[reference] = tmp_index
             return tmp_index
         
 def get_executor_cache() -> CachingIndex:
@@ -1107,21 +1111,30 @@ class FaissIndexStorage:
         else:
             return index_bytes
 
-    def register_index_on_driver(self, reference: any) -> str:
+    def collect_and_register(self, rdd: RDD) -> list[str]:
         """
         Вызывается на драйвере во время predict.
-        Если reference - это байты (локальный режим), сохраняет в файл и возвращает имя файла.
-        Если reference - это URI (распределенный режим), просто возвращает URI.
+        Безопасно собирает ссылки/байты с экзекуторов.
         """
-        if isinstance(reference, str) and self.use_distributed_fs:
-            return reference
+        references = []
+        
+        if self.use_distributed_fs:
+            # Безопасно собираем строки (URI) - они весят мало
+            raw_references = rdd.collect()
+            references = raw_references
         else:
-            file_name = f"__partition_index_{uuid.uuid1().hex}.index"
-            file_path = f"{self._local_tmp_dir}/{file_name}"
-            with open(file_path, 'wb') as f:
-                f.write(reference)
-            self.session.sparkContext.addFile(file_path)
-            return file_name
+            # Итеративно забираем байты, чтобы не словить OOM на драйвере
+            for shard_bytes in rdd.toLocalIterator():
+                file_name = f"__partition_index_{uuid.uuid1().hex}.index"
+                file_path = f"{self._local_tmp_dir}/{file_name}"
+                
+                with open(file_path, 'wb') as f:
+                    f.write(shard_bytes)
+                    
+                self.session.sparkContext.addFile(file_path)
+                references.append(file_name)
+                
+        return references
 
     def load_index(self, reference: str):
         """
@@ -1150,158 +1163,3 @@ class FaissIndexStorage:
                 shutil.rmtree(self._local_tmp_dir)
             except Exception:
                 pass
-# @backend_factory.register(FaissExtension, SparkDataset)
-# class SparkFaissExtension(FaissExtension):
-#     """
-#     Улучшенная версия SparkFaissExtension с broadcast байтов вместо файлов.
-#     """
-#     PERSIST_POLITIC = StorageLevel.MEMORY_AND_DISK
-#     _SAMPLE_TARGET = 5_000_000
-#     DRIVER_INDEX_LIMIT = 5_000_000 
-#     PREDICT_SCHEMA = StructType([
-#         StructField("index", LongType(), False),
-#         StructField("index_list", ArrayType(LongType()), False)
-#     ])
-#     CHUNK_SIZE = 512
-
-#     # ... (CLUSTERING_METHODS_MAPPER без изменений)
-
-#     def __init__(self, n_neighbors=1, faiss_mode="auto", mahalonobis: Dataset = None):
-#         super().__init__(n_neighbors, faiss_mode, mahalonobis)
-#         self.seed: int = 21
-        
-#         # Явная инициализация
-#         self._sharded_rdd = None
-#         self._clustered_data = None
-#         self._clustering_model = None
-#         self._index_bytes_list = None  # для broadcast
-
-#     # _vectorize_data, _prefit, _fit — оставляем как есть (или с мелкими доработками)
-
-#     def _predict(self, test_data: spark.DataFrame, storage_level=None):
-#         """Улучшенная predict с broadcast байтов индексов."""
-#         session = test_data.sparkSession
-#         result = Dataset.create_empty(session=session)
-        
-#         try:
-#             # 1. Собираем сериализованные индексы как bytes
-#             index_bytes_list = []
-#             for shard in self._sharded_rdd.toLocalIterator():
-#                 index_obj = faiss.deserialize_index(shard)
-#                 index_bytes = faiss.serialize_index(index_obj)
-#                 index_bytes_list.append(index_bytes)
-#                 del index_obj
-#                 gc.collect()
-
-#             # 2. Broadcast списка байтов (более надёжно, чем файлы)
-#             bc_index_bytes = session.sparkContext.broadcast(index_bytes_list)
-#             bc_n_neighbors = session.sparkContext.broadcast(self.n_neighbors)
-#             bc_chunk_size = session.sparkContext.broadcast(self.CHUNK_SIZE)
-#             bc_k = session.sparkContext.broadcast(getattr(self, 'k', 100))
-
-#             # 3. Очищаем sharded_rdd
-#             if self._sharded_rdd is not None:
-#                 self._sharded_rdd.unpersist()
-#                 self._sharded_rdd = None
-
-#             # 4. Выполняем поиск
-#             result_rdd = test_data.rdd.mapPartitions(
-#                 lambda it: _per_partition_predict_bytes(
-#                     it,
-#                     bc_n_neighbors=bc_n_neighbors,
-#                     bc_index_bytes=bc_index_bytes,
-#                     bc_chunk_size=bc_chunk_size,
-#                     bc_k=bc_k
-#                 )
-#             )
-
-#             result_df = session.createDataFrame(result_rdd, schema=self.PREDICT_SCHEMA).select(
-#                 ['index'] + 
-#                 [F.expr(f"index_list[{i}]").alias(f"{i + 1}") for i in range(self.n_neighbors)]
-#             )
-
-#             result = self.result_to_dataset(result=result_df, roles={}, small=False).set_index('index')
-#             result.index.name = None
-
-#             storage_level = storage_level or "MEMORY_AND_DISK"
-#             result.persist(storage_level=storage_level, action="count")
-            
-#             return result
-
-#         finally:
-#             # Очистка broadcast
-#             if 'bc_index_bytes' in locals():
-#                 bc_index_bytes.unpersist()
-#                 bc_index_bytes = None
-
-#     # ... calc метод без изменений (или с логированием)
-
-#     def unpersist(self) -> None:
-#         """Безопасный release."""
-#         for attr in ['_clustered_data', '_sharded_rdd']:
-#             obj = getattr(self, attr, None)
-#             if obj is not None:
-#                 try:
-#                     obj.unpersist()
-#                 except:
-#                     pass
-#                 setattr(self, attr, None)
-
-#     def __del__(self, *_):
-#         self.unpersist()
-
-
-# def _per_partition_predict_bytes(
-#     shard_iter: Iterable,
-#     bc_n_neighbors: Broadcast,
-#     bc_index_bytes: Broadcast,
-#     bc_chunk_size: Broadcast,
-#     bc_k: Broadcast
-# ):
-#     """Версия predict, работающая с broadcast байтов вместо файлов."""
-#     import faiss
-#     import numpy as np
-#     import gc
-
-#     cache = get_executor_cache()
-#     real_n = bc_n_neighbors.value
-#     index_bytes_list = bc_index_bytes.value
-#     chunk_size = bc_chunk_size.value
-
-#     def iter_chunk(it, size):
-#         chunk = []
-#         for row in it:
-#             chunk.append(row)
-#             if len(chunk) >= size:
-#                 yield chunk
-#                 chunk = []
-#         if chunk:
-#             yield chunk
-
-#     for chunk in iter_chunk(shard_iter, chunk_size):
-#         if not chunk:
-#             continue
-#         query_ids = np.array([r["index"] for r in chunk], dtype=np.int64)
-#         batch = np.array([list(r["_features"]) for r in chunk], dtype=np.float32)
-#         del chunk
-#         gc.collect()
-
-#         candidates = [[] for _ in range(len(query_ids))]
-        
-#         for idx_bytes in index_bytes_list:
-#             tmp_index = faiss.deserialize_index(idx_bytes)
-#             k = min(real_n, tmp_index.ntotal)
-#             dists, nids = tmp_index.search(batch, k)
-#             del tmp_index
-#             gc.collect()
-
-#             for q_idx in range(len(query_ids)):
-#                 for rank in range(k):
-#                     nid = int(nids[q_idx, rank])
-#                     if nid >= 0:
-#                         candidates[q_idx].append((float(dists[q_idx, rank]), nid))
-
-#         for q_idx, qid in enumerate(query_ids):
-#             top = sorted(candidates[q_idx], key=lambda x: x[0])[:real_n]
-#             output = [int(nid) for _, nid in top]
-#             yield (int(qid), output)
