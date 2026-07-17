@@ -511,28 +511,92 @@ class ExperimentData:
             roles_list, tmp_role=tmp_role, search_types=search_types
         )
 
+    # def field_data_search(
+    #     self,
+    #     roles: ABCRole | Iterable[ABCRole],
+    #     tmp_role: bool = False,
+    #     search_types: list[type] | None = None,
+    # ) -> Dataset:
+    #     """Build a new dataset containing columns matching specified roles.
+    #     All columns now live in self.ds.
+    #     """
+    #     roles_list = Adapter.to_list(roles)
+    #     role_columns = {
+    #         role: self.field_search(role, tmp_role, search_types) 
+    #         for role in roles_list
+    #     }
+    #     searched = Dataset.create_empty(
+    #         index=self._data.index,
+    #         backend=self._data.backend_type,
+    #         session=self._data.session,
+    #     )
+    #     for role, cols in role_columns.items():
+    #         for col in cols:
+    #             searched = searched.add_column(
+    #                 data=self.ds[col], role={col: role}
+    #             )
+    #     return searched
+    
     def field_data_search(
         self,
         roles: ABCRole | Iterable[ABCRole],
         tmp_role: bool = False,
         search_types: list[type] | None = None,
     ) -> Dataset:
-        """Build a new dataset containing columns matching specified roles.
-        All columns now live in self.ds.
+        """Build a new dataset containing only columns that match the specified roles.
+
+        Instead of creating an empty dataset with the full 60M-row index
+        (which forces a ``toPandas()`` call on the driver and triggers
+        executor checkpoint reads), this method performs a pure column
+        projection via ``self._data[cols]``. This is an O(1) Spark
+        transformation that never materializes the index and never reads
+        from local_checkpoint.
+
+        Args:
+            roles: A single role or iterable of roles to search for.
+            tmp_role: Whether to search in temporary roles instead of
+                permanent ones. Defaults to ``False``.
+            search_types: Optional list of Python types to additionally
+                filter columns by.
+
+        Returns:
+            A new ``Dataset`` containing only the matched columns with
+            the requested roles applied. Returns an empty dataset (without
+            materialized index) if no columns match.
         """
         roles_list = Adapter.to_list(roles)
         role_columns = {
-            role: self.field_search(role, tmp_role, search_types) 
+            role: self.field_search(role, tmp_role, search_types)
             for role in roles_list
         }
-        searched = Dataset.create_empty(
-            index=self._data.index,
-            backend=self._data.backend_type,
-            session=self._data.session,
-        )
-        for role, cols in role_columns.items():
-            for col in cols:
-                searched = searched.add_column(
-                    data=self.ds[col], role={col: role}
-                )
-        return searched
+
+        # Collect unique columns preserving first-seen order and map each
+        # column to the role that requested it.
+        cols: list[str] = []
+        new_roles: dict[str, ABCRole] = {}
+        for role, found_cols in role_columns.items():
+            for col in found_cols:
+                if col not in cols:
+                    cols.append(col)
+                    new_roles[col] = role
+
+        if not cols:
+            # Return a truly empty dataset WITHOUT evaluating the 60M index.
+            # Passing index=None prevents SparkNavigation.create_empty from
+            # calling ps.DataFrame(index=...) which triggers toPandas().
+            return Dataset.create_empty(
+                roles={},
+                backend=self._data.backend_type,
+                session=self._data.session,
+            )
+
+        # Pure column projection: a lazy Spark transformation that does not
+        # trigger any action, does not read from checkpoint, and does not
+        # ship the index to the driver.
+        subset_ds = self._data[cols]
+
+        # Apply the requested roles to the projected subset.
+        for col, role in new_roles.items():
+            subset_ds.roles[col] = role
+
+        return subset_ds

@@ -194,8 +194,10 @@ class AASplitter(Calculator):
             groups_sizes=self.groups_sizes,
         )
         data = self._set_value(data, result)
-        if data.ds.backend_type == BackendsEnum.spark:
-            data.ds.checkpoint(eager=True)
+        
+        # if data.ds.backend_type == BackendsEnum.spark:
+        #     data.ds.checkpoint(eager=True)
+        
         return data
 
 
@@ -276,7 +278,7 @@ class AASplitterWithStratification(AASplitter):
         
         data = self._set_value(data, result)
 
-        if data.ds.backend_type == BackendsEnum.spark:
-            data.ds.checkpoint(eager=True)
+        # if data.ds.backend_type == BackendsEnum.spark:
+        #     data.ds.checkpoint(eager=True)
 
         return data
