@@ -292,7 +292,7 @@ class PandasBisaExtesion(BiasExtension):
             if col != self.group_field and col != self.target_field
         ]
         
-        indexes, matched_data = self._prepare_data(
+        _, matched_data = self._prepare_data(
             data=data,
             neighbors_cols=neighbors_cols,
             numeric_cols=numeric_cols
@@ -321,9 +321,16 @@ class SparkBisaExtesion(BiasExtension):
     large-scale datasets partitioned by the grouping column.
     
     Attributes:
-        PERSIST_POLITIC: Default storage level for caching intermediate DataFrames.
+        STORAGE_DICT: dict with storages that are used in HypEx 
+        for caching Datasets.
     """
     PERSIST_POLITIC = StorageLevel.MEMORY_AND_DISK
+
+    STORAGE_DICT = {
+        "MEMORY_ONLY": StorageLevel.MEMORY_ONLY,
+        "MEMORY_AND_DISK": StorageLevel.MEMORY_AND_DISK,
+        "DISK_ONLY": StorageLevel.DISK_ONLY,
+    }
 
     @staticmethod
     def _prepare_data(
@@ -518,9 +525,12 @@ class SparkBisaExtesion(BiasExtension):
             neighbors_cols=neighbors_cols,
             numeric_cols=numeric_cols
         )
+        matched_data.persist(self.STORAGE_DICT[storage_level])
+        matched_data.count()
+
         initial_data: SparkDF = data[numeric_cols + [self.group_field]].data.to_spark(index_col='initial_index')
         initial_data = initial_data.join(matched_data, on='initial_index')
-        initial_data.persist(self.PERSIST_POLITIC)
+        initial_data.persist(self.STORAGE_DICT[storage_level])
         initial_data.count()
 
         coefficients_1, coefficients_2  = self._calc_coefs(initial_data)
@@ -530,5 +540,6 @@ class SparkBisaExtesion(BiasExtension):
 
         final_dataset.persist(storage_level)
         initial_data.unpersist()
+        matched_data.unpersist()
 
         return final_dataset
