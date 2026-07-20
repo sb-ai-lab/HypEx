@@ -510,7 +510,7 @@ class SparkBisaExtesion(BiasExtension):
         neighbors_cols, numeric_cols = self._extract_info(data)
         self.features = [
                 col for col in numeric_cols 
-                if col != self.group_field and col != self.group_field
+                if col != self.group_field and col != self.target_field
         ]
 
         matched_data = self._prepare_data(
