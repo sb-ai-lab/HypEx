@@ -28,6 +28,7 @@ from pyspark.pandas.exceptions import PandasNotImplementedError
 
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType, SparkTypeMapper
+from ...config import DatasetConfig
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 class SparkNavigation(DatasetBackendNavigation):
@@ -104,9 +105,9 @@ class SparkNavigation(DatasetBackendNavigation):
             ValueError: If the object contains more rows than PANDAS_CONVERSION_LIMIT.
         """
         n: int = obj.__len__()
-        if n > self.PANDAS_CONVERSION_LIMIT:
+        if n > DatasetConfig.SPARK_PANDAS_CONVERSION_LIMIT:
             raise ValueError(
-                f"{context}: {n} rows exceed limit {self.PANDAS_CONVERSION_LIMIT}"
+                f"{context}: {n} rows exceed limit {DatasetConfig.SPARK_PANDAS_CONVERSION_LIMIT}"
             )
 
     def _wrap_result(
@@ -1083,10 +1084,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     science operations while leveraging Spark's distributed computing capabilities.
 
     Inherits all navigation and indexing capabilities from SparkNavigation.
-    """
-    MAX_ROWS_FOR_DOT = 1000
-    INDEX_COL = "index"
-    
+    """  
     @staticmethod
     def _convert_agg_result(result: ps.Series | ps.DataFrame) -> Self | float:
         """Convert aggregation results to appropriate return type.
@@ -1609,8 +1607,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             TypeError: If other is unsupported type.
         """
         if hasattr(other, "__len__"):
-            if len(other) > self.MAX_ROWS_FOR_DOT:
-                raise ValueError(f"dot method works fine only with rows number in right matrix <= {self.MAX_ROWS_FOR_DOT}")
+            if len(other) > DatasetConfig.SPARK_MAX_ROWS_FOR_DOT:
+                raise ValueError(f"dot method works fine only with rows number in right matrix <= {DatasetConfig.SPARK_MAX_ROWS_FOR_DOT}")
         else:
             raise TypeError("input data type should have attr `__len__`")
         

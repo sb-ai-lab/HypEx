@@ -31,6 +31,7 @@ from ..utils import (
     SourceDataTypes,
     GenericManager
 )
+from ..config import DatasetConfig
 from ..utils.adapter import Adapter
 from .groupby_dataset import GroupedDataset
 from .backends import PandasDataset, SparkDataset
@@ -45,9 +46,6 @@ from .roles import (
 
 
 class DatasetBase:
-    DISPLAY_ROWS = 5
-    DISPLAY_COLS = 10
-
     @dataclass
     class Locker:
         call_class: Any
@@ -411,17 +409,17 @@ class DatasetBase:
                 raise TypeError("Value type does not match the expected data type.")
 
     def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
-        display_limit = n_rows if n_rows <= self.DISPLAY_ROWS * 2 else self.DISPLAY_ROWS
+        display_limit = n_rows if n_rows <= DatasetConfig.DISPLAY_ROWS * 2 else DatasetConfig.DISPLAY_ROWS
         head = self._backend_data._display_head_tail(
             rows_display_limit=display_limit,
-            cols_display_limit=self.DISPLAY_COLS,
+            cols_display_limit=DatasetConfig.DISPLAY_COLS,
             n_cols=n_cols,
             n_rows=n_rows)
 
-        if n_rows > self.DISPLAY_ROWS * 2:
+        if n_rows > DatasetConfig.DISPLAY_ROWS * 2:
             _tmp_tail = self._backend_data._display_head_tail(
-                rows_display_limit=self.DISPLAY_ROWS,
-                cols_display_limit=self.DISPLAY_COLS,
+                rows_display_limit=DatasetConfig.DISPLAY_ROWS,
+                cols_display_limit=DatasetConfig.DISPLAY_COLS,
                 n_cols=n_cols,
                 n_rows=n_rows,
                 tail=True)
