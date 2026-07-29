@@ -324,7 +324,6 @@ class SparkBisaExtesion(BiasExtension):
         STORAGE_DICT: dict with storages that are used in HypEx 
         for caching Datasets.
     """
-    PERSIST_POLITIC = StorageLevel.MEMORY_AND_DISK
 
     STORAGE_DICT = {
         "MEMORY_ONLY": StorageLevel.MEMORY_ONLY,
