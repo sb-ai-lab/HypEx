@@ -2,16 +2,18 @@ from __future__ import annotations
 
 from typing import (
     Literal,
-    Iterable
+    Iterable,
 )
-from collections import OrderedDict
-
-from ..dataset import AdditionalMatchingRole, Dataset
-from .abstract import MLExtension
 from abc import abstractmethod
+
+from .abstract import MLExtension
+
+from ..config import MatchingConfig
 from ..utils.errors import AbstractMethodError
 from ..utils.registry import backend_factory
+from ..utils.index_utils import FaissIndexStorage, CachingIndex
 from ..dataset.backends import PandasDataset, SparkDataset
+from ..dataset import AdditionalMatchingRole, Dataset
 
 #TODO: Logger
 from ..utils.logger import logger
@@ -20,23 +22,15 @@ import numpy as np
 import pandas as pd
 import faiss
 import gc
-import os
 import builtins
-import threading
-import uuid
-import tempfile
-import shutil
-import fsspec
 
 
 # Spark imports
 import pyspark.sql as spark
-import pyspark.pandas as ps
 import pyspark.sql.functions as F
-# ps.set_option('compute.ops_on_diff_frames', True)
 
 from pyspark.ml.feature import VectorAssembler
-from pyspark import StorageLevel, Broadcast, RDD, SparkFiles
+from pyspark import Broadcast
 
 from pyspark.sql.types import (
     StructType, 
@@ -438,8 +432,9 @@ def _spark_partition_fit(
     index_with_ids = faiss.IndexIDMap(index_copy)
     index_with_ids.add_with_ids(vectors, ids)
 
-    byte_array = faiss.serialize_index(index_with_ids)
-    yield storage.save_index(byte_array)
+    # byte_array = faiss.serialize_index(index_with_ids)
+    # yield storage.save_index(byte_array)
+    yield storage.save_index(index_with_ids)
 
 def  _per_partition_predict(
     shard_iter: Iterable,
@@ -565,15 +560,11 @@ class SparkFaissExtension(FaissExtension):
     See Also:
         CachingIndex: Executor-side LRU cache for FAISS indexes.
     """
-    PERSIST_POLITIC = StorageLevel.MEMORY_AND_DISK
-    _SAMPLE_TARGET = 5_000_000
     # Лимит на то, сколько локальых индексов может быть одновременно загружено на драйвер
-    DRIVER_INDEX_LIMIT = 5_000_000 
     PREDICT_SCHEMA = StructType([
         StructField("index",          LongType(),            False),
         StructField("index_list",     ArrayType(LongType()), False)
     ])
-    CHUNK_SIZE = 2048
     CLUSTERING_METHODS_MAPPER = {
         "k-means": {
             "model": MiniBatchKMeans,
@@ -592,7 +583,6 @@ class SparkFaissExtension(FaissExtension):
             }
         }
     }
-    
 
     def __init__(
             self, 
@@ -672,7 +662,7 @@ class SparkFaissExtension(FaissExtension):
         model_params["n_clusters"] = self.k 
         model = model_cls(**model_params)
 
-        batch_size = self.DRIVER_INDEX_LIMIT
+        batch_size = MatchingConfig.FAISS_DRIVER_INDEX_LIMIT
         np_batch = None
 
         for batch in (
@@ -744,7 +734,7 @@ class SparkFaissExtension(FaissExtension):
 
         if mode =="sample":
             data_size = vectorized_data.count()
-            frac = min(self._SAMPLE_TARGET / max(data_size, 1), 1.0)
+            frac = min(MatchingConfig.FAISS_SAMPLE_TARGET / max(data_size, 1), 1.0)
             sample_rows = (
                             vectorized_data
                             .sample(fraction=frac, seed=self.seed)
@@ -787,7 +777,7 @@ class SparkFaissExtension(FaissExtension):
             .select(*features)
             .rdd
             .mapPartitions(lambda it: _spark_partition_fit(it, bc_index, bc_storage))
-            .persist(self.PERSIST_POLITIC)
+            .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
         )
         self._sharded_rdd.count()
     
@@ -854,7 +844,7 @@ class SparkFaissExtension(FaissExtension):
         # session.sparkContext.addPyFile("index_cacher.py")
         bc_index_references = session.sparkContext.broadcast(index_references)
         bc_n_neighbors = session.sparkContext.broadcast(self.n_neighbors)
-        bc_chunk_size = session.sparkContext.broadcast(self.CHUNK_SIZE)
+        bc_chunk_size = session.sparkContext.broadcast(MatchingConfig.FAISS_CHUNK_SIZE)
         bc_k = session.sparkContext.broadcast(self.k)
         bc_storage = session.sparkContext.broadcast(self.storage)
 
@@ -875,7 +865,7 @@ class SparkFaissExtension(FaissExtension):
                 ['index'] + 
                 [F.expr(f"index_list[{i}]").alias(f"{i + 1}") for i in range(self.n_neighbors)]
             )
-            # .persist(self.PERSIST_POLITIC)
+            # .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
         )
         # result_df.count()
         result = self.result_to_dataset(result=result_df, roles={}, small=False).set_index('index')
@@ -984,182 +974,8 @@ class SparkFaissExtension(FaissExtension):
         
     def __del__(self, *_) -> None:
         self.unpersist()
-        
-# TODO: Проверить, нужна ли вообще эта фича?
-class CachingIndex:
-    """
-    Класс для кэширования индекса на экзекъюторе.
-    Предназначен для того, чтобы в памяти экзекъютора, при одновременном 
-    выполнении нескольких партиций не происходило ситуации, один и тот же индекс
-    train-data-ы не материализовывался несколько раз
-    """
 
-    def __init__(
-        self,
-        max_index: int=2
-    ):
-        """
-        Args
-        ----
-            k : `float`
-                доля от overhead memory, которую мы позволяем использовать для подгрузки индексов.
-
-            executor_cores : `int`
-                количество ядер на экзеъюторе.
-            
-            overhead_memory : `int`
-                оверхед экзекъютора, память вне кучи JVM.
-            
-            index_bytes : `int`
-                Размер индекса одной партиции в мегабайтах, по-умолчанию = 128 мб.
-
-            max_index : `int`
-                Колчиество индексов в памяти одновременно, если None, то вычисляется автоматически. 
-        """        
-        self._max = max_index
-        self._cache = OrderedDict()
-        self._lock = threading.Lock()
-    
-    def get(
-            self,
-            reference: int,
-            storage: FaissIndexStorage,
-            nprobe: int
-    ):
-        """
-        Получаем индексы по заданному названию файла. Если такой файл уже обрабатывался,
-        то просто выгружаем его из словаря и двигаем в последовательности ключей в конец.
-        если такого файла нет в нашем кэше, то очищаем первый элемент и записываем в конец
-        новый индекс.
-
-        Args
-        ----
-            index_file : `str`
-                Путь до файла с индексами, который выступает ключем.
-
-        Return
-        ------
-            Возвращает FAISS индексы для заданного файла.
-        """
-        with self._lock:
-            if reference in self._cache:
-                self._cache.move_to_end(key=reference)
-                return self._cache[reference]
-
-            if len(self._cache) == self._max:
-                _, evicted = self._cache.popitem(last=False)
-                del evicted
-                import gc; gc.collect()
-            
-            tmp_index = storage.load_index(reference)
-            inner = faiss.downcast_index(tmp_index.index)
-            inner.nprobe = nprobe  
-            self._cache[reference] = tmp_index
-            return tmp_index
-        
 def get_executor_cache() -> CachingIndex:
-    if not hasattr(builtins, '_faiss_index_cache'):
+    if not hasattr(builtins, "_faiss_index_cache"):
         builtins._faiss_index_cache = CachingIndex()
     return builtins._faiss_index_cache
-
-
-class FaissIndexStorage:
-    """
-    Файловый менеджер для хранения индексов Faiss.
-    Автоматически определяет наличие распределенной ФС (HDFS, S3) через конфиг Spark.
-    В локальном режиме использует пересылку байтов и SparkFiles.
-    """
-
-    def __init__(self, session: spark.SparkSession = None):
-        self.session = session
-        self.use_distributed_fs = False
-        self.base_dir = None
-        self._local_tmp_dir = None
-        
-        if session:
-            try:
-                default_fs = session.conf.get("fs.defaultFS", "file:///")
-                # Если ФС не локальная, используем fsspec
-                if not default_fs.startswith("file:"):
-                    self.use_distributed_fs = True
-                    self.base_dir = f"{default_fs.rstrip('/')}/tmp/faiss_indexes_{uuid.uuid1().hex[:8]}"
-            except Exception:
-                pass
-            
-            # В локальном режиме создаем временную папку на драйвере
-            if not self.use_distributed_fs:
-                self._local_tmp_dir = f"__partition_indexes_{uuid.uuid1().hex[:8]}"
-                os.makedirs(self._local_tmp_dir, exist_ok=True)
-
-    def __getstate__(self):
-        """Исключаем SparkSession из сериализации при broadcast на экзекуторы."""
-        state = self.__dict__.copy()
-        if 'session' in state:
-            del state['session']
-        return state
-
-    def save_index(self, index_bytes: bytes) -> any:
-        """
-        Вызывается на экзекуторе во время fit.
-        Возвращает URI (str) если работаем с HDFS/S3, иначе возвращает байты.
-        """
-        if self.use_distributed_fs:
-            uri = f"{self.base_dir}/index_{uuid.uuid1().hex}.bin"
-            with fsspec.open(uri, 'wb') as f:
-                f.write(index_bytes)
-            return uri
-        else:
-            return index_bytes
-
-    def collect_and_register(self, rdd: RDD) -> list[str]:
-        """
-        Вызывается на драйвере во время predict.
-        Безопасно собирает ссылки/байты с экзекуторов.
-        """
-        references = []
-        
-        if self.use_distributed_fs:
-            # Безопасно собираем строки (URI) - они весят мало
-            raw_references = rdd.collect()
-            references = raw_references
-        else:
-            # Итеративно забираем байты, чтобы не словить OOM на драйвере
-            for shard_bytes in rdd.toLocalIterator():
-                file_name = f"__partition_index_{uuid.uuid1().hex}.index"
-                file_path = f"{self._local_tmp_dir}/{file_name}"
-                
-                with open(file_path, 'wb') as f:
-                    f.write(shard_bytes)
-                    
-                self.session.sparkContext.addFile(file_path)
-                references.append(file_name)
-                
-        return references
-
-    def load_index(self, reference: str):
-        """
-        Вызывается на экзекуторе во время predict (внутри CachingIndex).
-        """
-        if self.use_distributed_fs:
-            with fsspec.open(reference, 'rb') as f:
-                bytes_data = f.read()
-            return faiss.deserialize_index(bytes_data)
-        else:
-            from pyspark import SparkFiles
-            return faiss.read_index(SparkFiles.get(reference))
-
-    def cleanup(self):
-        """Очистка ресурсов"""
-        if self.use_distributed_fs and self.base_dir:
-            try:
-                protocol = self.base_dir.split("://")[0]
-                fs = fsspec.filesystem(protocol)
-                fs.rm(self.base_dir, recursive=True)
-            except Exception:
-                pass
-        
-        if self._local_tmp_dir and os.path.exists(self._local_tmp_dir):
-            try:
-                shutil.rmtree(self._local_tmp_dir)
-            except Exception:
-                pass
