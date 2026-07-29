@@ -58,6 +58,7 @@ from .registry import BackendFactory
 from .logger import HypExLogger, ProcessContext, logger
 from .strict_abc import StrictABCMeta, StrictABC
 from .spark_config import SparkSessionCalculator
+from .index_utils import FaissIndexStorage, CachingIndex
 
 __all__ = [
     "Adapter",
@@ -111,5 +112,7 @@ __all__ = [
     "HypExLogger", 
     "ProcessContext",
     "SparkSessionCalculator",
-    "logger"
+    "logger",
+    "FaissIndexStorage",
+    "CachingIndex",
 ]
