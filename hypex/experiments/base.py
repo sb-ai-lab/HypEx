@@ -7,6 +7,7 @@ from typing import Any
 from ..dataset import ABCRole, AdditionalTargetRole, ExperimentData, TempTargetRole
 from ..executor import Executor
 from ..utils import ExperimentDataEnum, timeit
+from ..utils import BackendsEnum
 
 import time
 
@@ -248,6 +249,7 @@ class OnRoleExperiment(Experiment):
         
         vector_executors = []
         iterative_executors = []
+        _backend = data.ds.backend_type
         
         for ex in self.executors:
             # StatsComparator and StatsHypothesisTesting are truly vectorized (work on aggregated stats)
@@ -259,7 +261,10 @@ class OnRoleExperiment(Experiment):
             # So we should treat AdaptiveHypothesisTest as iterative to be safe for Pandas,
             # OR check backend. But simpler is to just make them iterative unless they are Stats-based.
             elif isinstance(ex, AdaptiveHypothesisTest):
-                iterative_executors.append(ex)
+                if _backend == BackendsEnum.spark:
+                    vector_executors.append(ex)
+                else:
+                    iterative_executors.append(ex)
             else:
                 iterative_executors.append(ex)
 

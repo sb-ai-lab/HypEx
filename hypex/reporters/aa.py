@@ -2,7 +2,12 @@ from __future__ import annotations
 from typing import Any, ClassVar
 import warnings
 
-from ..comparators import GroupChi2Test, GroupDifference, GroupKSTest, GroupTTest, StatsTTest, BaseComparator
+from ..comparators import (
+    GroupChi2Test, GroupDifference, GroupKSTest, GroupTTest,
+    StatsTTest, StatsKSTest, StatsChi2Test, BaseComparator
+)
+from ..comparators.adaptive_hypothesis_testing import TTest, KSTest, Chi2Test, UTest
+
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..dataset.dataset import SmallDataset
 from ..splitters import AASplitter, AASplitterWithStratification
@@ -18,7 +23,11 @@ class AATestReporter(DatasetReporter):
     Extracts group differences, statistical test outcomes, and analyzer metadata,
     formatting them into a structured dataset or dictionary.
     """
-    tests: ClassVar[list[type[BaseComparator]]] = [GroupTTest, GroupKSTest, GroupChi2Test, StatsTTest]
+    tests: ClassVar[list[type[BaseComparator]]] = [
+        GroupTTest, GroupKSTest, GroupChi2Test,
+        StatsTTest, StatsKSTest, StatsChi2Test,
+        TTest, KSTest, Chi2Test, UTest,         
+    ]
 
     def __init__(self, 
                  dict_reporter: DictReporter | None = None, 
