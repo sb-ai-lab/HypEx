@@ -363,166 +363,166 @@ class PandasFaissExtension(FaissExtension):
 # Global functions for PySpark partition logic
 # ---------------------------------------------------------------------------
 
-def _partition_load(partition_iter: Iterable, batch_size: int):
-    """
-    Load batches of feature vectors from a Spark partition iterator.
+# def _partition_load(partition_iter: Iterable, batch_size: int):
+#     """
+#     Load batches of feature vectors from a Spark partition iterator.
 
-    Reads rows from the partition in chunks of ``batch_size`` and yields
-    each batch as a list of feature vectors. Used during the iterative
-    prefit phase to train clustering models on the driver without loading
-    the entire dataset at once.
+#     Reads rows from the partition in chunks of ``batch_size`` and yields
+#     each batch as a list of feature vectors. Used during the iterative
+#     prefit phase to train clustering models on the driver without loading
+#     the entire dataset at once.
 
-    Args:
-        partition_iter (Iterable): Iterator over partition rows. Each row
-            is expected to have a ``_features`` column containing the
-            feature vector.
-        batch_size (int): Number of rows to accumulate per batch.
+#     Args:
+#         partition_iter (Iterable): Iterator over partition rows. Each row
+#             is expected to have a ``_features`` column containing the
+#             feature vector.
+#         batch_size (int): Number of rows to accumulate per batch.
 
-    Yields:
-        list: A batch of feature vectors (each element is a list of floats).
-    """
-    batch = []
-    for row in partition_iter:
-        batch.append(list(row["_features"]))
-        if len(batch) >= batch_size:
-            yield batch
-            batch = []
-    if batch:
-        yield batch
+#     Yields:
+#         list: A batch of feature vectors (each element is a list of floats).
+#     """
+#     batch = []
+#     for row in partition_iter:
+#         batch.append(list(row["_features"]))
+#         if len(batch) >= batch_size:
+#             yield batch
+#             batch = []
+#     if batch:
+#         yield batch
 
-def _spark_partition_fit(
-    iterator: Iterable, 
-    bc_index: Broadcast,
-    bc_storage: Broadcast
-):
-    """
-    Build a local FAISS index on each Spark partition.
+# def _spark_partition_fit(
+#     iterator: Iterable, 
+#     bc_index: Broadcast,
+#     bc_storage: Broadcast
+# ):
+#     """
+#     Build a local FAISS index on each Spark partition.
 
-    Receives a pre-trained IVF quantizer via broadcast, adds the partition's
-    vectors to a local ``IndexIDMap`` wrapper, and yields the serialized
-    index. Each partition produces one serialized index file that is later
-    used during the distributed predict phase.
+#     Receives a pre-trained IVF quantizer via broadcast, adds the partition's
+#     vectors to a local ``IndexIDMap`` wrapper, and yields the serialized
+#     index. Each partition produces one serialized index file that is later
+#     used during the distributed predict phase.
 
-    Args:
-        iterator (Iterable): Iterator over partition rows. Each row must
-            contain ``index`` (long) and ``_features`` (vector) columns.
-        bc_index (Broadcast): Broadcasted pre-trained FAISS index (quantizer).
+#     Args:
+#         iterator (Iterable): Iterator over partition rows. Each row must
+#             contain ``index`` (long) and ``_features`` (vector) columns.
+#         bc_index (Broadcast): Broadcasted pre-trained FAISS index (quantizer).
 
-    Yields:
-        bytes: Serialized FAISS index for the partition, produced by
-            ``faiss.serialize_index``.
-    """
-    import faiss
-    import numpy as np
+#     Yields:
+#         bytes: Serialized FAISS index for the partition, produced by
+#             ``faiss.serialize_index``.
+#     """
+#     import faiss
+#     import numpy as np
 
-    index = bc_index.value
-    storage = bc_storage.value
-    ids, vectors = [], []
-    for row in iterator:
-        ids.append(row["index"])
-        vectors.append(list(row['_features']))
+#     index = bc_index.value
+#     storage = bc_storage.value
+#     ids, vectors = [], []
+#     for row in iterator:
+#         ids.append(row["index"])
+#         vectors.append(list(row['_features']))
     
-    if not ids:
-        return # for empty partition
+#     if not ids:
+#         return # for empty partition
 
-    ids = np.array(ids, dtype=np.int64)
-    vectors = np.array(vectors, dtype=np.float32)
+#     ids = np.array(ids, dtype=np.int64)
+#     vectors = np.array(vectors, dtype=np.float32)
 
-    index_copy = faiss.clone_index(index)
-    index_with_ids = faiss.IndexIDMap(index_copy)
-    index_with_ids.add_with_ids(vectors, ids)
+#     index_copy = faiss.clone_index(index)
+#     index_with_ids = faiss.IndexIDMap(index_copy)
+#     index_with_ids.add_with_ids(vectors, ids)
 
-    # byte_array = faiss.serialize_index(index_with_ids)
-    # yield storage.save_index(byte_array)
-    yield storage.save_index(index_with_ids)
+#     # byte_array = faiss.serialize_index(index_with_ids)
+#     # yield storage.save_index(byte_array)
+#     yield storage.save_index(index_with_ids)
 
-def  _per_partition_predict(
-    shard_iter: Iterable,
-    bc_n_neighbors: Broadcast,
-    bc_references: Broadcast,
-    bc_chunk_size: Broadcast,
-    bc_k: Broadcast,
-    bc_storage: Broadcast
-):
-    """
-    Perform distributed nearest-neighbor search on each Spark partition.
+# def  _per_partition_predict(
+#     shard_iter: Iterable,
+#     bc_n_neighbors: Broadcast,
+#     bc_references: Broadcast,
+#     bc_chunk_size: Broadcast,
+#     bc_k: Broadcast,
+#     bc_storage: Broadcast
+# ):
+#     """
+#     Perform distributed nearest-neighbor search on each Spark partition.
 
-    For each chunk of query vectors in the partition, iteratively loads
-    serialized FAISS indexes from the driver-distributed files, searches
-    for the top-k nearest neighbors, and aggregates candidates across all
-    partition indexes. The final top-``n_neighbors`` results are yielded
-    as ``(query_id, [neighbor_ids])`` tuples.
+#     For each chunk of query vectors in the partition, iteratively loads
+#     serialized FAISS indexes from the driver-distributed files, searches
+#     for the top-k nearest neighbors, and aggregates candidates across all
+#     partition indexes. The final top-``n_neighbors`` results are yielded
+#     as ``(query_id, [neighbor_ids])`` tuples.
 
-    Args:
-        shard_iter (Iterable): Iterator over partition rows. Each row must
-            contain ``index`` (long) and ``_features`` (vector) columns.
-        bc_n_neighbors (Broadcast): Number of nearest neighbors to return.
-        bc_references (Broadcast): List of serialized index file names
-            distributed via ``SparkFiles``.
-        bc_chunk_size (Broadcast): Number of query rows to process per batch.
-        bc_k (Broadcast): Number of IVF clusters (used to set ``nprobe``).
+#     Args:
+#         shard_iter (Iterable): Iterator over partition rows. Each row must
+#             contain ``index`` (long) and ``_features`` (vector) columns.
+#         bc_n_neighbors (Broadcast): Number of nearest neighbors to return.
+#         bc_references (Broadcast): List of serialized index file names
+#             distributed via ``SparkFiles``.
+#         bc_chunk_size (Broadcast): Number of query rows to process per batch.
+#         bc_k (Broadcast): Number of IVF clusters (used to set ``nprobe``).
 
-    Yields:
-        tuple: ``(int(query_id), list[int(neighbor_ids)])`` for each query
-            vector in the partition.
-    """
-    import faiss
-    import numpy as np
-    from pyspark import SparkFiles
-    import gc
-    import builtins
+#     Yields:
+#         tuple: ``(int(query_id), list[int(neighbor_ids)])`` for each query
+#             vector in the partition.
+#     """
+#     import faiss
+#     import numpy as np
+#     from pyspark import SparkFiles
+#     import gc
+#     import builtins
 
-    cache = get_executor_cache()
+#     cache = get_executor_cache()
         
-    real_n = bc_n_neighbors.value
-    references = bc_references.value
-    chunk_size = bc_chunk_size.value
-    storage = bc_storage.value
+#     real_n = bc_n_neighbors.value
+#     references = bc_references.value
+#     chunk_size = bc_chunk_size.value
+#     storage = bc_storage.value
 
-    def iter_chunk(it: Iterable, chunk_size: int):
-        chunk = []
-        amount = 0
-        for row in it:
-            chunk.append(row)
-            amount += 1
+#     def iter_chunk(it: Iterable, chunk_size: int):
+#         chunk = []
+#         amount = 0
+#         for row in it:
+#             chunk.append(row)
+#             amount += 1
 
-            if amount >= chunk_size:
-                amount = 0
-                yield chunk
-                chunk =[]
+#             if amount >= chunk_size:
+#                 amount = 0
+#                 yield chunk
+#                 chunk =[]
             
-        if chunk:
-            yield chunk
+#         if chunk:
+#             yield chunk
     
-    for chunk in iter_chunk(shard_iter, chunk_size):
-        if not chunk:
-            return
-        query_ids = np.array([r["index"] for r in chunk], dtype=np.int64)
-        batch = np.array([list(r["_features"]) for r in chunk], dtype=np.float32)  # (Q, d)
-        del chunk
-        gc.collect()        
+#     for chunk in iter_chunk(shard_iter, chunk_size):
+#         if not chunk:
+#             return
+#         query_ids = np.array([r["index"] for r in chunk], dtype=np.int64)
+#         batch = np.array([list(r["_features"]) for r in chunk], dtype=np.float32)  # (Q, d)
+#         del chunk
+#         gc.collect()        
 
-        candidates = [[] for _ in range(len(query_ids))]
-        for ref in references:
-            tmp_index = cache.get(ref, storage, nprobe=min(real_n, bc_k.value))
-            # tmp_index.nprobe = real_n
-            # tmp_index.nprobe = min(real_n * 2, bc_k.value)
-            k = min(real_n, tmp_index.ntotal)
-            dists, nids = tmp_index.search(batch, k)   # (Q, k)
-            del tmp_index
-            gc.collect()
+#         candidates = [[] for _ in range(len(query_ids))]
+#         for ref in references:
+#             tmp_index = cache.get(ref, storage, nprobe=min(real_n, bc_k.value))
+#             # tmp_index.nprobe = real_n
+#             # tmp_index.nprobe = min(real_n * 2, bc_k.value)
+#             k = min(real_n, tmp_index.ntotal)
+#             dists, nids = tmp_index.search(batch, k)   # (Q, k)
+#             del tmp_index
+#             gc.collect()
 
-            for q_idx in range(len(query_ids)):
-                for rank in range(k):
-                    nid = int(nids[q_idx, rank])
-                    if nid >= 0:
-                        candidates[q_idx].append((float(dists[q_idx, rank]), nid))
+#             for q_idx in range(len(query_ids)):
+#                 for rank in range(k):
+#                     nid = int(nids[q_idx, rank])
+#                     if nid >= 0:
+#                         candidates[q_idx].append((float(dists[q_idx, rank]), nid))
 
-        for q_idx, qid in enumerate(query_ids):
-            top = sorted(candidates[q_idx], key=lambda x: x[0])[:real_n]
-            output = [int(nid) for _, nid in top]
-            yield (int(qid), output)
-            # yield (output,)
+#         for q_idx, qid in enumerate(query_ids):
+#             top = sorted(candidates[q_idx], key=lambda x: x[0])[:real_n]
+#             output = [int(nid) for _, nid in top]
+#             yield (int(qid), output)
+#             # yield (output,)
 
 @logger.log_methods(log_args=False, log_result=False, private=True)
 @backend_factory.register(FaissExtension, SparkDataset)
@@ -602,6 +602,7 @@ class SparkFaissExtension(FaissExtension):
         super().__init__(n_neighbors, faiss_mode, mahalonobis)
         self.seed: int = 21
         self.storage: FaissIndexStorage | None = None
+        self._data_size: int | None = None
 
     def _vectorize_data(
             self, 
@@ -657,6 +658,34 @@ class SparkFaissExtension(FaissExtension):
             model_name (str): Name of the clustering algorithm to use.
                 Must be a key in ``CLUSTERING_METHODS_MAPPER`` (e.g., "k-means", "birch").
         """
+
+        def _partition_load(partition_iter: Iterable, batch_size: int):
+            """
+            Load batches of feature vectors from a Spark partition iterator.
+
+            Reads rows from the partition in chunks of ``batch_size`` and yields
+            each batch as a list of feature vectors. Used during the iterative
+            prefit phase to train clustering models on the driver without loading
+            the entire dataset at once.
+
+            Args:
+                partition_iter (Iterable): Iterator over partition rows. Each row
+                    is expected to have a ``_features`` column containing the
+                    feature vector.
+                batch_size (int): Number of rows to accumulate per batch.
+
+            Yields:
+                list: A batch of feature vectors (each element is a list of floats).
+            """
+            batch = []
+            for row in partition_iter:
+                batch.append(list(row["_features"]))
+                if len(batch) >= batch_size:
+                    yield batch
+                    batch = []
+            if batch:
+                yield batch
+
         model_dict = self.CLUSTERING_METHODS_MAPPER[model_name]
         model_cls, model_params = model_dict["model"], model_dict["params"]
         model_params["n_clusters"] = self.k 
@@ -727,14 +756,58 @@ class SparkFaissExtension(FaissExtension):
         Raises:
             ValueError: If ``mode`` is not "sample" or "full".
         """
+        def _spark_partition_fit(
+            iterator: Iterable, 
+            bc_index: Broadcast,
+            bc_storage: Broadcast
+        ):
+            """
+            Build a local FAISS index on each Spark partition.
+
+            Receives a pre-trained IVF quantizer via broadcast, adds the partition's
+            vectors to a local ``IndexIDMap`` wrapper, and yields the serialized
+            index. Each partition produces one serialized index file that is later
+            used during the distributed predict phase.
+
+            Args:
+                iterator (Iterable): Iterator over partition rows. Each row must
+                    contain ``index`` (long) and ``_features`` (vector) columns.
+                bc_index (Broadcast): Broadcasted pre-trained FAISS index (quantizer).
+
+            Yields:
+                bytes: Serialized FAISS index for the partition, produced by
+                    ``faiss.serialize_index``.
+            """
+            import faiss
+            import numpy as np
+
+            index = bc_index.value
+            storage = bc_storage.value
+            ids, vectors = [], []
+            for row in iterator:
+                ids.append(row["index"])
+                vectors.append(list(row['_features']))
+            
+            if not ids:
+                return # for empty partition
+
+            ids = np.array(ids, dtype=np.int64)
+            vectors = np.array(vectors, dtype=np.float32)
+
+            index_copy = faiss.clone_index(index)
+            index_with_ids = faiss.IndexIDMap(index_copy)
+            index_with_ids.add_with_ids(vectors, ids)
+
+            yield storage.save_index(index_with_ids)
+
         session = vectorized_data.sparkSession
         self.storage = FaissIndexStorage(session)
+        self._data_size = self._data_size or vectorized_data.count()
         m = 4 # heuristic
-        self.k = int(np.sqrt(vectorized_data.count() / m))
+        self.k = int(np.sqrt(self._data_size / m))
 
         if mode =="sample":
-            data_size = vectorized_data.count()
-            frac = min(MatchingConfig.FAISS_SAMPLE_TARGET / max(data_size, 1), 1.0)
+            frac = min(MatchingConfig.FAISS_SAMPLE_TARGET / max(self._data_size, 1), 1.0)
             sample_rows = (
                             vectorized_data
                             .sample(fraction=frac, seed=self.seed)
@@ -812,36 +885,96 @@ class SparkFaissExtension(FaissExtension):
             Dataset: A Dataset containing the matched neighbor indices, indexed
                 by the original row index.
         """
+        def  _per_partition_predict(
+            shard_iter: Iterable,
+            bc_n_neighbors: Broadcast,
+            bc_references: Broadcast,
+            bc_chunk_size: Broadcast,
+            bc_k: Broadcast,
+            bc_storage: Broadcast
+        ):
+            """
+            Perform distributed nearest-neighbor search on each Spark partition.
+
+            For each chunk of query vectors in the partition, iteratively loads
+            serialized FAISS indexes from the driver-distributed files, searches
+            for the top-k nearest neighbors, and aggregates candidates across all
+            partition indexes. The final top-``n_neighbors`` results are yielded
+            as ``(query_id, [neighbor_ids])`` tuples.
+
+            Args:
+                shard_iter (Iterable): Iterator over partition rows. Each row must
+                    contain ``index`` (long) and ``_features`` (vector) columns.
+                bc_n_neighbors (Broadcast): Number of nearest neighbors to return.
+                bc_references (Broadcast): List of serialized index file names
+                    distributed via ``SparkFiles``.
+                bc_chunk_size (Broadcast): Number of query rows to process per batch.
+                bc_k (Broadcast): Number of IVF clusters (used to set ``nprobe``).
+
+            Yields:
+                tuple: ``(int(query_id), list[int(neighbor_ids)])`` for each query
+                    vector in the partition.
+            """
+            import faiss
+            import numpy as np
+            from pyspark import SparkFiles
+            import gc
+            import builtins
+
+            cache = get_executor_cache()
+                
+            real_n = bc_n_neighbors.value
+            references = bc_references.value
+            chunk_size = bc_chunk_size.value
+            storage = bc_storage.value
+
+            def iter_chunk(it: Iterable, chunk_size: int):
+                chunk = []
+                amount = 0
+                for row in it:
+                    chunk.append(row)
+                    amount += 1
+
+                    if amount >= chunk_size:
+                        amount = 0
+                        yield chunk
+                        chunk =[]
+                    
+                if chunk:
+                    yield chunk
+            
+            for chunk in iter_chunk(shard_iter, chunk_size):
+                if not chunk:
+                    return
+                query_ids = np.array([r["index"] for r in chunk], dtype=np.int64)
+                batch = np.array([list(r["_features"]) for r in chunk], dtype=np.float32)  # (Q, d)
+                del chunk
+                # gc.collect() # TODO: detect time decr when gc.collect disabled       
+
+                candidates = [[] for _ in range(len(query_ids))]
+                for ref in references:
+                    tmp_index = cache.get(ref, storage, nprobe=min(real_n, bc_k.value))
+                    k = min(real_n, tmp_index.ntotal)
+                    dists, nids = tmp_index.search(batch, k)   # (Q, k)
+                    del tmp_index
+                    # gc.collect() # TODO: detect time decr when gc.collect disabled
+
+                    for q_idx in range(len(query_ids)):
+                        for rank in range(k):
+                            nid = int(nids[q_idx, rank])
+                            if nid >= 0:
+                                candidates[q_idx].append((float(dists[q_idx, rank]), nid))
+
+                for q_idx, qid in enumerate(query_ids):
+                    top = sorted(candidates[q_idx], key=lambda x: x[0])[:real_n]
+                    output = [int(nid) for _, nid in top]
+                    yield (int(qid), output)
+                    
         session = test_data.sparkSession
         index_references = self.storage.collect_and_register(self._sharded_rdd)
-
-
-        # dir_id = uuid.uuid1().hex[:8]
-        # tmp_dir = f"__partition_indexes{dir_id}"
-        # os.makedirs(tmp_dir, exist_ok=True) 
-        # # tmp_dir = tempfile.mkdtemp()
-        # result = Dataset.create_empty(session=session)
-        
-        # index_files_list = []
-        
-
-        # for partition_index, shard in enumerate(self._sharded_rdd.toLocalIterator()):
-        #     partition_indexes = faiss.deserialize_index(shard)
-        #     run_id = uuid.uuid1().hex[:8]
-        #     index_file_name = f"__{partition_index}_partition_index_{run_id}.index"
-        #     faiss.write_index(
-        #         partition_indexes,
-        #         f"{tmp_dir}/{index_file_name}" 
-        #     )    
-        #     session.sparkContext.addFile(f"{tmp_dir}/{index_file_name}")
-        #     index_files_list.append(index_file_name)
-
-        #     del partition_indexes   # ← explicit release
-        #     gc.collect()
         
         self._sharded_rdd.unpersist()
         self._sharded_rdd = None
-        # session.sparkContext.addPyFile("index_cacher.py")
         bc_index_references = session.sparkContext.broadcast(index_references)
         bc_n_neighbors = session.sparkContext.broadcast(self.n_neighbors)
         bc_chunk_size = session.sparkContext.broadcast(MatchingConfig.FAISS_CHUNK_SIZE)
@@ -865,21 +998,12 @@ class SparkFaissExtension(FaissExtension):
                 ['index'] + 
                 [F.expr(f"index_list[{i}]").alias(f"{i + 1}") for i in range(self.n_neighbors)]
             )
-            # .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
         )
-        # result_df.count()
         result = self.result_to_dataset(result=result_df, roles={}, small=False).set_index('index')
         result.index.name = None
 
         storage_level = storage_level or "MEMORY_AND_DISK"
         result.persist(storage_level=storage_level, action="count")
-    
-        # Удаляем все созданные промежуточные файлы
-        # tmp_files = os.listdir(tmp_dir)
-        # for file in tmp_files:
-        #     os.remove(f"{tmp_dir}/{file}")
-        # os.rmdir(tmp_dir)
-        # shutil.rmtree(tmp_dir)
 
         return result
 
@@ -924,7 +1048,8 @@ class SparkFaissExtension(FaissExtension):
             if self.mahalonobis is None
             else data.dot(self.mahalonobis)._backend_data.data.to_spark(index_col='index')
         )
-        self.k = (operating_data.count())
+        # self.k = (operating_data.count())
+        self._data_size = operating_data.count()
         vectorized_data = self._vectorize_data(operating_data)
 
         if mode in ["auto", "fit"]:
