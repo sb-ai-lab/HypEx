@@ -287,10 +287,7 @@ class FaissNearestNeighbors(MLExecutor):
         nans = 0
 
         for group, result in compare_result.items():
-            nans += (
-                # TODO: find more elegant solution
-                sum(result.isna().nunique().values()) - len(result.columns)
-            )
+            nans += sum(result.count_nulls().values())
             result = result.fillna(-1).astype({col: int for col in result.columns})
         if nans > 0:
             warn(
@@ -301,15 +298,15 @@ class FaissNearestNeighbors(MLExecutor):
             backend=data.ds.backend_type,
             session=data.ds.session
         )
-        # matched_indexes.index.name = None
         for res_k, res_v in compare_result.items():
             group = grouping_data[1][1] if res_k == "test" else grouping_data[0][1]
             # res_v has index similar to group data
             #`limit` may be removed
-            t_index_field: Dataset = res_v.limit(len(group))
+            t_index_field: Dataset = res_v
 
             # TODO: Similar comment as abobe: find more elegant solution
-            n_nans = sum(t_index_field.isna().nunique().values()) - len(t_index_field.columns)
+            n_nans = sum(t_index_field.count_nulls().values())
+            # n_nans = sum(t_index_field.isna().nunique().values()) - len(t_index_field.columns)
 
             if n_nans:
                 raise PairsNotFoundError

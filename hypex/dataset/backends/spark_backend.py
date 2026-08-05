@@ -1591,6 +1591,20 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         return self._wrap_result(data.rename(index={old_index_name: "na_counts"}))
 
+    def count_nulls(self) -> dict[str, int]:
+        sp_df = self.data.to_spark()
+        cols = sp_df.columns
+        nulls_row = (
+            sp_df.select(
+                *[
+                    F.count(F.when(F.col(col).isNull() | F.isnan(col), 1))
+                    for col in cols
+                ]
+            )
+            .first()
+        )
+        return {cols[idx]: nulls_row[idx] for idx in range(len(cols))}
+
     def dot(self, other: "SparkDataset" | np.ndarray | pd.DataFrame) -> Self | float:
         """Compute dot product with another dataset or array.
 

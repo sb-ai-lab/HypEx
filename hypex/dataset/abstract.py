@@ -1049,6 +1049,9 @@ class DatasetBase:
         """Count NA values"""
         return self._convert_data_after_agg(self._backend_data.na_counts())
 
+    def count_nulls(self) -> dict[str, int]:
+        return self._backend_data.count_nulls()
+
     def isna(self) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.isna())
 

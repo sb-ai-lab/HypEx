@@ -1484,6 +1484,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
         )
 
+    def count_nulls(self) -> dict[str, int]:
+        return self.data.isna().sum().to_dict()
+
     def dot(self, other: PandasDataset | np.ndarray) -> pd.DataFrame:
         """Compute matrix multiplication with another DataFrame or array.
 
