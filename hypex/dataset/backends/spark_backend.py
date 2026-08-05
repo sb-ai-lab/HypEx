@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import warnings
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
@@ -989,6 +990,17 @@ class SparkNavigation(DatasetBackendNavigation):
         """
         seed = random_state if random_state is not None else 42
         mod = 10_000_000
+        
+        if edges and edges[-1] < mod * 0.5:
+            warnings.warn(
+                f"edges={edges} look like absolute row counts, not MOD-scaled values. "
+                f"Expected last edge ≈ {mod}. Auto-scaling.",
+                UserWarning,
+                stacklevel=2,
+            )
+            n_sampled_approx = edges[-1]
+            edges = [int(e / n_sampled_approx * mod) for e in edges]
+            edges[-1] = mod
 
         # Expose index columns so we can hash them and restore the index
         # after the Spark transformation round-trip.

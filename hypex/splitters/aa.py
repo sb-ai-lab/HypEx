@@ -132,36 +132,24 @@ class AASplitter(Calculator):
         # Calculate edges for labels
         labels = ["control"]
         edges = []
-        
+
+        MOD = 10_000_000
+
         if groups_sizes:
-            # Validate groups_sizes sum to approx 1.0 or handle normalization
-            # Assuming groups_sizes defines proportions for Control, Test1, Test2...
-            # The first group is control, rest are tests.
-            # groups_sizes example: [0.5, 0.25, 0.25]
-            
-            # Normalize if needed, but assuming user provides valid proportions
-            current_edge = 0
-            for i, size_prop in enumerate(groups_sizes):
-                if i == 0:
-                    labels.append("control") # Actually labels[0] is control
-                else:
-                    labels.append(f"test_{i-1}")
-                
-                current_edge += int(n_sampled * size_prop)
-                edges.append(current_edge)
-            
-            # Ensure last edge matches n_sampled exactly to avoid off-by-one
-            if edges:
-                edges[-1] = n_sampled
-                
-            # Adjust labels list to match edges logic above
-            # Re-building labels properly:
             labels = ["control"] + [f"test_{i}" for i in range(len(groups_sizes) - 1)]
-            
+            edges = []
+            cumulative = 0.0
+            for i, size_prop in enumerate(groups_sizes):
+                cumulative += size_prop
+                edges.append(int(cumulative * MOD))
+
+            edges[-1] = MOD
         else:
-            # Default A/A split: Control vs Test
             n_control = int(n_sampled * control_size)
-            edges = [n_control, n_sampled]
+            edges = [
+                int((n_control / n_sampled) * MOD) if n_sampled > 0 else 0,
+                MOD,
+            ]
             labels = ["control", "test"]
 
         # Call the new backend method

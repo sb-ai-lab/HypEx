@@ -185,7 +185,7 @@ class StatsTTest(StatsHypothesisTesting):
                 + (s_list[1] / n_list[1]) ** 2 / (n_list[1] - 1)
             )
             return num / den
-        
+
 class StatsChi2Test(StatsHypothesisTesting):
     """Chi-squared test of independence on aggregated value counts.
     
@@ -205,7 +205,7 @@ class StatsChi2Test(StatsHypothesisTesting):
         key: Any = "",
     ):
         """Initializes the stats-based chi-squared test.
-        
+
         Args:
             grouping_role: Role used to identify the grouping column.
             target_roles: Role(s) used to identify target columns.
@@ -224,7 +224,7 @@ class StatsChi2Test(StatsHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         """Returns the expected data types for target columns.
-        
+
         Returns:
             A list containing ``str``, since the chi-squared test
             operates on categorical data.
@@ -270,82 +270,57 @@ class StatsChi2Test(StatsHypothesisTesting):
             return super().execute(data)
 
     @timeit(level="SPARK", prefix="CHI2_SPARK")
-    def _execute_spark(
-        self,
-        data,
-        group_col: str,
-        target_cols: list[str],
-    ):
-        """Runs the Spark-optimized chi-squared test via Unpivot.
-        
-        Performs all value counts in a single Spark Job by first
-        unpivoting all target columns with ``F.explode``. Then emulates
-        per-column storage by setting ``self.key = str(col)`` for each
-        target and saving a separate ``SmallDataset``.
-        
+    def _execute_spark(self, data, group_col: str, target_cols: list[str]):
+        """Executes the chi-squared test using the Spark-optimized path.
+
+        Delegates value-count aggregation to ``StatsChi2TestExtension``, which
+        unpivots all target columns via ``F.explode`` and computes category
+        frequencies in a single ``groupBy().count()`` Spark job.  Results are
+        then assembled per target column so that reporters and UI components
+        can parse them identically to the Pandas path.
+
+        The method performs the following steps:
+
+        1. Computes per-group value counts for every target column in one
+        Spark job via ``StatsChi2TestExtension.calc()``.
+        2. Fills missing ``(group, column)`` entries with empty value-count
+        dicts to guarantee a uniform structure.
+        3. If fewer than two groups are present, stores empty results for
+        each target column and returns early.
+        4. For each target column, runs ``_inner_function`` pairwise
+        (baseline vs. each compared group) and appends the results into
+        a single ``SmallDataset`` whose index is set to the compared
+        group names.
+        5. Stores the per-column result under ``self.key`` in
+        ``analysis_tables``.
+
         Args:
-            data: The ``ExperimentData`` container.
-            group_col: Name of the grouping column.
-            target_cols: List of target column names to test.
-        
+            data: The ``ExperimentData`` container holding the datasets.
+            group_col: Name of the column that defines group membership.
+            target_cols: List of categorical target column names to test.
+
         Returns:
-            The updated ``ExperimentData`` with per-column results stored.
+            The updated ``ExperimentData`` with chi-squared test results
+            stored in ``analysis_tables`` under per-column keys.
         """
-        import pyspark.sql.functions as F
+        from ..extensions.stats_hypothesis_testing import StatsChi2TestExtension
 
-        sdf = data.ds[[group_col] + target_cols].data.to_spark()
+        subset = data.ds[[group_col] + target_cols]
 
-        unpivoted = sdf.select(
-            group_col,
-            F.explode(
-                F.array(
-                    [
-                        F.struct(
-                            F.lit(col).alias("column_name"),
-                            F.col(col).alias("value"),
-                        )
-                        for col in target_cols
-                    ]
-                )
-            ).alias("data"),
-        ).select(
-            group_col,
-            F.col("data.column_name").alias("column_name"),
-            F.col("data.value").alias("value"),
+        ext = StatsChi2TestExtension(reliability=self.reliability)
+        all_group_stats = ext.calc(
+            data=subset,
+            group_col=group_col,
+            target_cols=target_cols,
         )
 
-        value_counts_rows = (
-            unpivoted.filter(F.col("value").isNotNull())
-            .groupBy(group_col, "column_name", "value")
-            .count()
-            .collect()
-        )
+        group_names_set = set(all_group_stats.keys())
 
-        all_group_stats: dict[str, dict[str, dict]] = {}
-        for row in value_counts_rows:
-            grp = row[group_col]
-            col = row["column_name"]
-            val = row["value"]
-            cnt = row["count"]
-            all_group_stats.setdefault(grp, {}).setdefault(
-                col, {"value_counts": {}}
-            )
-            all_group_stats[grp][col]["value_counts"][val] = cnt
-
-        all_groups = set()
-        for grp_stats in all_group_stats.values():
-            all_groups.update(grp_stats.keys())
-        group_rows = (
-            sdf.select(group_col).distinct().collect()
-        )
-        for row in group_rows:
-            grp = row[group_col]
-            all_group_stats.setdefault(grp, {})
+        for grp in group_names_set:
             for col in target_cols:
                 all_group_stats[grp].setdefault(col, {"value_counts": {}})
 
         group_names = sorted(all_group_stats.keys(), key=str)
-
         if len(group_names) < 2:
             for col in target_cols:
                 self.key = str(col)
@@ -353,10 +328,8 @@ class StatsChi2Test(StatsHypothesisTesting):
             return data
 
         baseline_name = group_names[0]
-
         for col in target_cols:
             self.key = str(col)
-
             col_results = []
             for compared_name in group_names[1:]:
                 b_stats = all_group_stats.get(baseline_name, {}).get(
@@ -371,7 +344,6 @@ class StatsChi2Test(StatsHypothesisTesting):
                 col_results.append(
                     DatasetAdapter.to_dataset(result, StatisticRole())
                 )
-
             if col_results:
                 result_dataset = col_results[0].append(col_results[1:])
                 result_dataset.index = [str(g) for g in group_names[1:]]
@@ -669,107 +641,57 @@ class StatsKSTest(StatsHypothesisTesting):
             delegate._id = self._id  # Preserve ID for pipeline lookups
             return delegate.execute(data)
 
-    def _execute_spark(
-        self,
-        data,
-        group_col: str,
-        target_cols: list[str],
-    ):
-        """Runs the Spark-optimized KS test with result emulation.
-        
-        Total Spark Jobs: 1 (global bounds) + 2 * ``len(target_cols)``
-        (counts per group + histogram per group for each column).
-        
-        Emulates per-column storage by setting ``self.key = str(col)``
-        for each target and saving a separate ``SmallDataset`` via
-        ``_set_value()``.
-        
+    @timeit(level="SPARK", prefix="KS_SPARK")
+    def _execute_spark(self, data, group_col: str, target_cols: list[str]):
+        """Executes the Kolmogorov-Smirnov test using the Spark-optimized path.
+
+        Delegates histogram aggregation to ``StatsKSTestExtension``, which
+        computes per-group histograms for all target columns in a fixed
+        number of Spark jobs (global bounds → counts → bucket histograms).
+        The KS statistic and p-value are then calculated from the
+        pre-aggregated histograms via ``_inner_function``.
+
+        The method performs the following steps:
+
+        1. Computes per-group histograms and observation counts for every
+        target column via ``StatsKSTestExtension.calc()``.
+        2. If fewer than two groups are present, stores empty results for
+        each target column and returns early.
+        3. For each target column, runs ``_inner_function`` pairwise
+        (baseline vs. each compared group) and appends the results into
+        a single ``SmallDataset`` whose index is set to the compared
+        group names.
+        4. Stores the per-column result under ``self.key`` in
+        ``analysis_tables``.
+
+        Note:
+            ``self.key`` is temporarily set to the current column name
+            during the per-column loop so that each result is stored under
+            the correct identifier.  After the loop, ``self.key`` is
+            restored to the full list of target columns (or the single
+            column name).
+
         Args:
-            data: The ``ExperimentData`` container.
-            group_col: Name of the grouping column.
-            target_cols: List of target column names to test.
-        
+            data: The ``ExperimentData`` container holding the datasets.
+            group_col: Name of the column that defines group membership.
+            target_cols: List of numeric target column names to test.
+
         Returns:
-            The updated ``ExperimentData`` with per-column results stored.
+            The updated ``ExperimentData`` with KS test results stored in
+            ``analysis_tables`` under per-column keys.
         """
-        
-        import pyspark.sql.functions as F
+        from ..extensions.stats_hypothesis_testing import StatsKSTestExtension
 
-        all_cols = [group_col] + target_cols
-        sdf = data.ds[all_cols].data.to_spark()
+        subset = data.ds[[group_col] + target_cols]
 
-        agg_exprs = []
-        for col in target_cols:
-            agg_exprs.extend(
-                [
-                    F.min(F.col(col)).alias(f"{col}┆min"),
-                    F.max(F.col(col)).alias(f"{col}┆max"),
-                ]
-            )
-        bounds_row = sdf.agg(*agg_exprs).collect()[0]
-
-        all_group_stats: dict[str, dict[str, dict]] = {}
-
-        for col in target_cols:
-            col_min = bounds_row[f"{col}┆min"]
-            col_max = bounds_row[f"{col}┆max"]
-
-            # Counts per group
-            count_df = (
-                sdf.filter(F.col(col).isNotNull())
-                .groupBy(group_col)
-                .count()
-                .collect()
-            )
-            group_counts = {row[group_col]: row["count"] for row in count_df}
-
-            # Edge case: all values are NULL or identical
-            if col_min is None or col_max is None or col_min == col_max:
-                for grp, cnt in group_counts.items():
-                    all_group_stats.setdefault(grp, {})[col] = {
-                        "histogram": {0: cnt} if cnt > 0 else {},
-                        "count": cnt,
-                    }
-                continue
-
-            width = (col_max - col_min) / self.n_bins
-
-            sdf_with_bucket = sdf.withColumn(
-                "_bucket",
-                F.least(
-                    F.floor((F.col(col) - F.lit(col_min)) / F.lit(width)),
-                    F.lit(self.n_bins - 1),
-                ).cast("int"),
-            )
-
-            hist_rows = (
-                sdf_with_bucket.filter(F.col(col).isNotNull())
-                .groupBy(group_col, "_bucket")
-                .count()
-                .collect()
-            )
-
-            for row in hist_rows:
-                grp = row[group_col]
-                bucket = int(row["_bucket"])
-                count = row["count"]
-                all_group_stats.setdefault(grp, {}).setdefault(
-                    col,
-                    {
-                        "histogram": {},
-                        "count": group_counts.get(grp, 0),
-                    },
-                )
-                all_group_stats[grp][col]["histogram"][bucket] = count
-
-            for grp, cnt in group_counts.items():
-                if grp not in all_group_stats:
-                    all_group_stats[grp] = {}
-                if col not in all_group_stats[grp]:
-                    all_group_stats[grp][col] = {"histogram": {}, "count": cnt}
+        ext = StatsKSTestExtension(n_bins=self.n_bins, reliability=self.reliability)
+        all_group_stats = ext.calc(
+            data=subset,
+            group_col=group_col,
+            target_cols=target_cols,
+        )
 
         group_names = sorted(all_group_stats.keys(), key=str)
-
         if len(group_names) < 2:
             for col in target_cols:
                 self.key = str(col)
@@ -777,10 +699,8 @@ class StatsKSTest(StatsHypothesisTesting):
             return data
 
         baseline_name = group_names[0]
-
         for col in target_cols:
             self.key = str(col)
-
             col_results = []
             for compared_name in group_names[1:]:
                 b_stats = all_group_stats.get(baseline_name, {}).get(
@@ -795,7 +715,6 @@ class StatsKSTest(StatsHypothesisTesting):
                 col_results.append(
                     DatasetAdapter.to_dataset(result, StatisticRole())
                 )
-
             if col_results:
                 result_dataset = col_results[0].append(col_results[1:])
                 result_dataset.index = [str(g) for g in group_names[1:]]

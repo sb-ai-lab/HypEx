@@ -5,6 +5,8 @@ try:
 except ImportError:
     from typing_extensions import Self  # Python < 3.11
 
+import warnings
+
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized, TYPE_CHECKING
 
@@ -1532,6 +1534,17 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
         seed = random_state if random_state is not None else 42
         mod = 10_000_000
+        
+        if edges and edges[-1] < mod * 0.5:
+            warnings.warn(
+                f"edges={edges} look like absolute row counts, not MOD-scaled values. "
+                f"Expected last edge ≈ {mod}. Auto-scaling.",
+                UserWarning,
+                stacklevel=2,
+            )
+            n_sampled_approx = edges[-1]
+            edges = [int(e / n_sampled_approx * mod) for e in edges]
+            edges[-1] = mod
 
         df_with_index = self.data.reset_index()
         index_cols = df_with_index.columns[: self.data.index.nlevels]
@@ -1546,7 +1559,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         # Assign labels in reverse order so that the smallest threshold
         # wins (matching Spark CASE WHEN semantics).
         df_with_index[name] = None
-        for edge, label in reversed(list(zip(edges, labels))):
+        for edge, label in list(zip(edges, labels)):
             threshold = min(edge, mod)
             mask = (df_with_index["_hash"] < threshold) & df_with_index[name].isna()
             df_with_index.loc[mask, name] = label
