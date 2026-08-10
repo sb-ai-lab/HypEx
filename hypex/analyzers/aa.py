@@ -1,11 +1,20 @@
 from __future__ import annotations
+
 from typing import Any, ClassVar
+
 import numpy as np
 import pandas as pd
 
-from ..comparators import GroupChi2Test, GroupKSTest, GroupTTest
-from ..comparators import StatsTTest, StatsChi2Test, StatsZTest, StatsKSTest
-from ..dataset import Dataset, SmallDataset, ExperimentData, StatisticRole, InfoRole
+from ..comparators import (
+    GroupChi2Test,
+    GroupKSTest,
+    GroupTTest,
+    StatsChi2Test,
+    StatsKSTest,
+    StatsTTest,
+    StatsZTest,
+)
+from ..dataset import Dataset, ExperimentData, InfoRole, SmallDataset, StatisticRole
 from ..executor import Executor
 from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from ..splitters import AASplitter, AASplitterWithStratification
@@ -17,10 +26,11 @@ class OneAAStatAnalyzer(Executor):
     Computes average p-values, pass rates, and a weighted composite quality score
     to evaluate the overall consistency of data splitting configurations.
     """
+
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         """Stores the aggregated metrics in the experiment data container."""
         return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
-    
+
     @timeit(level="ANALYZER", prefix="AA_STAT")
     def execute(self, data: ExperimentData) -> ExperimentData:
         analysis_tests: list[type] = [
@@ -32,15 +42,15 @@ class OneAAStatAnalyzer(Executor):
             StatsZTest,
             StatsKSTest,
         ]
-        
+
         executor_ids = data.get_ids(
             analysis_tests, searched_space=ExperimentDataEnum.analysis_tables
         )
-        
+
         analysis_data: dict[str, float] = {}
         for class_, spaces in executor_ids.items():
             analysis_ids = spaces.get("analysis_tables", [])
-            
+
             if len(analysis_ids) > 0:
                 t_data = (
                     data.analysis_tables[analysis_ids[0]].append(
@@ -49,7 +59,7 @@ class OneAAStatAnalyzer(Executor):
                     if len(analysis_ids) > 1
                     else data.analysis_tables[analysis_ids[0]]
                 )
-                
+
                 for field in ["p-value", "pass"]:
                     if field in t_data.columns:
                         analysis_data[
@@ -108,7 +118,7 @@ class OneAAStatAnalyzer(Executor):
         # ── Normalization ─────────────────────────────────────────────
         if sum_weight:
             analysis_data["mean test score"] /= sum_weight
-            
+
         return self._set_value(
             data,
             SmallDataset.from_dict(
@@ -128,7 +138,7 @@ class AAScoreAnalyzer(Executor):
 
     def __init__(self, alpha: float = 0.05, key: str = ""):
         """Initializes the A/A score analyzer.
-        
+
         Args:
             alpha: Target significance level for hypothesis testing. Defaults to 0.05.
             key: Optional identifier key for storing results in experiment data.
@@ -155,11 +165,11 @@ class AAScoreAnalyzer(Executor):
         """Calculates test pass rates and assigns reliability weights.
         Computes the proportion of passed iterations for each test, derives a weight 
         based on its proximity to the target alpha, and records scores/pass flags.
-        
+
         Args:
             data: The experiment data container.
             score_table: Dataset containing aggregated test results and pass statuses.
-            
+
         Returns:
             Updated ExperimentData with computed AA scores and pass thresholds.
         """
@@ -190,13 +200,13 @@ class AAScoreAnalyzer(Executor):
 
     def build_splitter_from_id(self, splitter_id: str):
         """Reconstructs a splitter instance from its serialized identifier.
-        
+
         Args:
             splitter_id: String identifier containing the splitter class name and parameters.
-            
+
         Returns:
             An instantiated splitter object ready for execution.
-            
+
         Raises:
             ValueError: If the identifier does not match any registered splitter class.
         """
@@ -211,12 +221,12 @@ class AAScoreAnalyzer(Executor):
         """Identifies the optimal data split based on weighted statistical metrics.
         Calculates a composite score using weighted p-values (2/3 weight) and mean test 
         scores (1/3 weight) to determine the best-performing split configuration.
-        
+
         Args:
             data: The experiment data container.
             score_table: Dataset containing metrics for all evaluated splits.
             if_param_scores: Optional dataset for conditional parameter scoring.
-            
+
         Returns:
             Dictionary containing 'best_split_id' (str) and 'data' (SmallDataset with stats).
         """
@@ -283,11 +293,11 @@ class AAScoreAnalyzer(Executor):
         self, data: ExperimentData, best_splitter_id: str
     ) -> ExperimentData:
         """Saves the optimal splitter configuration and executes it.
-        
+
         Args:
             data: The experiment data container.
             best_splitter_id: Identifier of the best-performing split configuration.
-            
+
         Returns:
             Updated ExperimentData with the best splitter applied.
         """
@@ -308,12 +318,12 @@ class AAScoreAnalyzer(Executor):
         if_param_scores: Dataset | None = None,
     ) -> ExperimentData:
         """Orchestrates the identification and application of the best split.
-        
+
         Args:
             data: The experiment data container.
             score_table: Dataset with metrics for all evaluated splits.
             if_param_scores: Optional conditional parameter scoring dataset.
-            
+
         Returns:
             Updated ExperimentData after applying the best split configuration.
         """
@@ -325,10 +335,10 @@ class AAScoreAnalyzer(Executor):
         """Executes the full A/A scoring and split selection pipeline.
         Retrieves experiment results, computes AA scores, identifies the optimal split,
         and configures the best splitter for downstream execution.
-        
+
         Args:
             data: Experiment data containing parameter experiment results.
-            
+
         Returns:
             Updated ExperimentData with AA scores and the best split applied.
         """

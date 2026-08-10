@@ -3,14 +3,12 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from ..comparators import GroupTTest, GroupUTest
-from ..comparators import StatsTTest, StatsChi2Test
+from ..comparators import GroupTTest, GroupUTest, StatsChi2Test, StatsTTest
 from ..dataset import Dataset, ExperimentData, StatisticRole, TargetRole, TreatmentRole
 from ..dataset.dataset import SmallDataset
 from ..experiments.base import Executor
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
 from ..utils import ABNTestMethodsEnum, ExperimentDataEnum, timeit
-
 
 
 class ABAnalyzer(Executor):
@@ -198,7 +196,7 @@ class ABAnalyzer(Executor):
             t_data = deepcopy(data.analysis_tables[analysis_ids[0]])
             for aid in analysis_ids[1:]:
                 t_data = t_data.append(data.analysis_tables[aid])
-            
+
             if len(t_data) > 0:
                 current_index_len = len(t_data.data.index) if hasattr(t_data.data, 'index') else 0
                 if current_index_len != len(t_data):
@@ -212,9 +210,9 @@ class ABAnalyzer(Executor):
                     t_data.data.index = new_index
             for f in ["p-value", "pass"]:
                 for i in range(0, len(analysis_ids), len(analysis_ids) // num_groups):
-                                        
+
                     slice_start = i
-                    slice_end = i + len(analysis_ids) // num_groups                    
+                    slice_end = i + len(analysis_ids) // num_groups
                     sliced = t_data.iloc[slice_start:slice_end]
 
                     value = t_data.iloc[i : i + len(analysis_ids) // num_groups][f]
@@ -222,18 +220,18 @@ class ABAnalyzer(Executor):
                     analysis_data[f"{c} {f} {groups[i // num_groups + 1][0]}"] = (
                         value.mean()
                     )
-            
+
             for f in ["p-value", "pass"]:
                 if f not in t_data.columns:
                     continue
                 col_data = t_data[f]
                 valid_col = col_data.dropna()
-                
+
                 if valid_col.is_empty():
                     continue
-                    
+
                 multitest_pvalues = self._add_pvalues(multitest_pvalues, valid_col, f)
-                
+
                 mean_val = valid_col.mean()
                 if hasattr(mean_val, 'iget_values'):
                     mean_val = mean_val.iget_values(0, 0)

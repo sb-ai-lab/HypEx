@@ -14,14 +14,13 @@ from ..dataset import (
     DatasetAdapter,
     ExperimentData,
     GroupingRole,
-    SmallDataset,
     InfoRole,
     PreTargetRole,
+    SmallDataset,
     StatisticRole,
     TargetRole,
     TempTargetRole,
 )
-from ..dataset.abstract import GroupedDataset
 from ..executor import Calculator
 from ..utils import (
     NAME_BORDER_SYMBOL,
@@ -29,7 +28,7 @@ from ..utils import (
     ExperimentDataEnum,
     FromDictTypes,
     GroupingDataType,
-    timeit
+    timeit,
 )
 from ..utils.errors import (
     AbstractMethodError,
@@ -68,7 +67,7 @@ class BaseComparator(Calculator, ABC):
             True if data.ds.tmp_roles or data.additional_fields.tmp_roles else False
         )
         group_field_data = data.field_data_search(roles=self.grouping_role)
-        
+
         target_fields_data = data.field_data_search(
             roles=(
                 (TempTargetRole() if data.ds.tmp_roles else AdditionalTargetRole())
@@ -169,13 +168,13 @@ class GroupsComparator(BaseComparator, ABC):
         for i in range(len(compared_data)):
             bl_dataset = baseline_data[0 if len(baseline_data) == 1 else i][1]
             cmp_dataset = compared_data[i][1]
-            
+
             res_name = (
                 compared_data[i][0]
                 if compare_by == "groups"
                 else f"{compared_data[i][0]}{NAME_BORDER_SYMBOL}{compared_data[i][1].columns[0]}"
             )
-            
+
             if len(bl_dataset) == 0 or len(cmp_dataset) == 0:
                 result[res_name] = SmallDataset.from_dict(
                     {
@@ -186,7 +185,7 @@ class GroupsComparator(BaseComparator, ABC):
                     StatisticRole(),
                 )
                 continue
-            
+
             result[res_name] = DatasetAdapter.to_dataset(
                 cls._inner_function(
                     bl_dataset,
@@ -196,7 +195,7 @@ class GroupsComparator(BaseComparator, ABC):
                 InfoRole(),
             )
         return result
-    
+
     @staticmethod
     def _grouping_data_split(
         grouping_data: dict[str, Dataset],
@@ -206,19 +205,19 @@ class GroupsComparator(BaseComparator, ABC):
         target_fields: list[str],
         baseline_field: str | None = None,
     ) -> GroupingDataType:
-        if not isinstance(grouping_data, dict):
-            raise TypeError(
-                f"Grouping data must be dict of strings and datasets, but got {type(grouping_data)}"
-            )
-        compared_data = list(grouping_data.items())
-        baseline_data = [compared_data.pop(0)]
-        
         def _safe_slice(ds, cols):
             if cols is None:
                 return ds
             if hasattr(ds, '__getitem__'):
                 return ds[cols]
             return ds[cols] if isinstance(cols, str) else ds[list(cols)]
+
+        if not isinstance(grouping_data, dict):
+            raise TypeError(
+                f"Grouping data must be dict of strings and datasets, but got {type(grouping_data)}"
+            )
+        compared_data = list(grouping_data.items())
+        baseline_data = [compared_data.pop(0)]
 
         baseline_cols = target_fields if compare_by == "groups" else baseline_field
         baseline_data = [
@@ -260,7 +259,7 @@ class GroupsComparator(BaseComparator, ABC):
             )
             field_data = field_data[field_data.columns[0]]
         return field_data
-    
+
     @classmethod
     def _split_for_groups_mode(
         cls,
@@ -273,9 +272,9 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = cls._field_validity_check(
             group_field_data, "group_field_data", "groups"
         )
-        
+
         group_col = group_field_data.columns[0]
-        
+
         if group_col not in target_fields_data.columns:
             target_fields_data = target_fields_data.merge(
                 group_field_data, left_index=True, right_index=True, how="left"
@@ -287,7 +286,7 @@ class GroupsComparator(BaseComparator, ABC):
         baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
         compared_data = cls._split_ds_into_columns(data=data_buckets)
         return baseline_data, compared_data
-    
+
     @classmethod
     def _split_for_columns_mode(
         cls,
@@ -324,7 +323,7 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = cls._field_validity_check(
             group_field_data, "group_field_data", "columns_in_groups"
         )
-        
+
         group_col = group_field_data.columns[0]
         if group_col not in baseline_field_data.columns:
             baseline_field_data = baseline_field_data.merge(group_field_data, left_index=True, right_index=True, how="left")
@@ -353,7 +352,7 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = cls._field_validity_check(
             group_field_data, "group_field_data", "cross"
         )
-        
+
         group_col = group_field_data.columns[0]
         if group_col not in baseline_field_data.columns:
             baseline_field_data = baseline_field_data.merge(group_field_data, left_index=True, right_index=True, how="left")
@@ -388,7 +387,7 @@ class GroupsComparator(BaseComparator, ABC):
         target_fields_data = cls._field_validity_check(
             target_fields_data, "target_fields_data", "matched_pairs"
         )
-        
+
         group_col = group_field_data.columns[0]
         if group_col not in baseline_field_data.columns:
             baseline_field_data = baseline_field_data.merge(group_field_data, left_index=True, right_index=True, how="left")
@@ -397,7 +396,7 @@ class GroupsComparator(BaseComparator, ABC):
 
         compared_data = target_fields_data.groupby(by=group_field_data.columns)
         baseline_indexes = baseline_field_data.groupby(by=group_field_data.columns)
-        
+
         baseline_data = []
         for group in baseline_indexes:
             name = group[0]
@@ -498,7 +497,6 @@ class GroupsComparator(BaseComparator, ABC):
             compare_by=compare_by,
             **kwargs,
         )
-            
 
     @timeit(level="COMPARATOR", prefix="GROUPS")
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -543,7 +541,7 @@ class GroupsComparator(BaseComparator, ABC):
                 isinstance(data.additional_fields.roles[col], (AdditionalTargetRole, AdditionalTreatmentRole))
                 for col in data.additional_fields.columns
             )
-            
+
             combined_data = (
                 data.ds.merge(
                     data.additional_fields[
@@ -562,7 +560,7 @@ class GroupsComparator(BaseComparator, ABC):
                 if has_additional
                 else data.ds
             )
-            
+
             group_col_name = group_field_data.columns[0]
             if group_col_name in combined_data.columns:
                 inner_df = combined_data.data if hasattr(combined_data, 'data') else combined_data.backend_data.data
@@ -574,7 +572,7 @@ class GroupsComparator(BaseComparator, ABC):
                         data=inner_df,
                         roles={c: combined_data.roles.get(c, InfoRole()) for c in inner_df.columns},
                     )
-            
+
             data.groups[group_field_data.columns[0]] = {
                 f"{group}": ds for group, ds in combined_data.groupby(group_field_data.columns[0])
             }
@@ -631,7 +629,7 @@ class GroupHypothesisTesting(GroupsComparator, ABC):
 
 class StatsComparator(BaseComparator, ABC):
     """Two-phase comparator that operates on aggregated statistics instead of raw data.
-    
+
     Phase 1 — Aggregate: `_compute_stats()` delegates to StatsAggregationExtension.
     Phase 2 — Compare: `_inner_function()` receives the per-column stats dicts of two
     groups (baseline vs compared) and returns the test result for that column.
@@ -645,7 +643,7 @@ class StatsComparator(BaseComparator, ABC):
         "min": lambda d: d.min(),
         "max": lambda d: d.max(),
     }
-    
+
     REQUIRED_STATS: ClassVar[list[str]] = []
 
     def __init__(
@@ -675,19 +673,19 @@ class StatsComparator(BaseComparator, ABC):
         **kwargs,
     ) -> dict[str, dict[str, dict[str, Any]]]:
         """Computes aggregated statistics for the specified groups and columns.
-        
+
         Args:
             data: The dataset to aggregate.
             group_cols: List of column names to group by.
             target_columns: List of target column names to compute stats for.
             stats: List of statistical functions to apply. Defaults to REQUIRED_STATS.
             **kwargs: Additional arguments for the aggregation extension.
-            
+
         Returns:
             A nested dictionary mapping group names to target columns to stat values.
         """
         from ..extensions.stats_hypothesis_testing import StatsAggregationExtension
-        
+
         stats = stats or cls.REQUIRED_STATS
         ext = StatsAggregationExtension()
         return ext.calc(
@@ -706,15 +704,15 @@ class StatsComparator(BaseComparator, ABC):
         **kwargs,
     ) -> dict[str, Any]:
         """Computes the comparison metric using aggregated statistics.
-        
+
         Args:
             baseline_stats: Dictionary of aggregated stats for the baseline group.
             compared_stats: Dictionary of aggregated stats for the compared group.
             **kwargs: Additional keyword arguments for the specific test.
-            
+
         Returns:
             A dictionary containing the computed test results (e.g., p-value, statistic).
-            
+
         Raises:
             AbstractMethodError: If not implemented by a subclass.
         """
@@ -746,14 +744,14 @@ class StatsComparator(BaseComparator, ABC):
             c for c in group_field_data.columns if c not in target_fields_data.columns
         ]
         merged_data = data.ds[all_cols]
-        
+
         group_col_stats = self._compute_stats(
             data=merged_data,
             group_cols=list(group_field_data.columns),
             target_columns=list(target_fields_data.columns),
             stats=self.stats,
         )
-        
+
         group_names = list(group_col_stats.keys())
 
         if len(group_names) < 2:
@@ -770,7 +768,7 @@ class StatsComparator(BaseComparator, ABC):
                 stats_data_dict[f"{stat}{NAME_BORDER_SYMBOL}{col}"] = [
                     group_col_stats[g][col][stat] for g in group_names
                 ]
-            
+
             stats_dataset = DatasetAdapter.to_dataset(stats_data_dict, StatisticRole())
             stats_dataset.index = group_names
             data = self._set_stats_value(data, stats_dataset)
@@ -784,12 +782,12 @@ class StatsComparator(BaseComparator, ABC):
                     **self.calc_kwargs,
                 )
                 col_results.append(DatasetAdapter.to_dataset(res, StatisticRole()))
-            
+
             if col_results:
                 result_dataset = col_results[0].append(col_results[1:])
                 result_dataset.index = [str(g) for g in group_names[1:]]
                 data = self._set_value(data, result_dataset)
-                
+
         self.key = str(
             target_fields_data.columns[0] 
             if len(target_fields_data.columns) == 1 
@@ -826,9 +824,8 @@ class StatsHypothesisTesting(StatsComparator, ABC):
             calc_kwargs=merged_kwargs,
         )
         self.reliability = reliability
-        
-        
-    
+
+
 class AdaptiveHypothesisTest(BaseComparator):
     """
     Routes execute() to a backend-specific hypothesis test at runtime.
@@ -879,7 +876,7 @@ class AdaptiveHypothesisTest(BaseComparator):
         # Ensure analysis_tables entries use our id, not the delegate's.
         instance._id = self._id
         return instance
-    
+
     @staticmethod
     def _inner_function(data, **kwargs):
         raise NotImplementedError("Use execute() for adaptive tests.")
