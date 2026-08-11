@@ -309,7 +309,8 @@ class PandasFaissExtension(FaissExtension):
         ):
             m = 4 # heuristic
             n_clusters = np.sqrt(len(X) / m)
-            _index = faiss.IndexIVFFlat(self.index, X.shape[1], n_clusters)
+            nlist = min(n_clusters, max(1, X.shape[0] // 39)) 
+            _index = faiss.IndexIVFFlat(self.index, X.shape[1], nlist)
             _index.train(X)
             self.index = faiss.IndexIDMap(_index)
         self.index.add_with_ids(X, data.index.tolist())
@@ -798,6 +799,10 @@ class SparkFaissExtension(FaissExtension):
             index_with_ids = faiss.IndexIDMap(index_copy)
             index_with_ids.add_with_ids(vectors, ids)
 
+            # TODO: `bias` optimization
+            # inner_index = faiss.downcast_index(index_with_ids.index)
+            # inner_index.make_direct_map()
+
             yield storage.save_index(index_with_ids)
 
         session = vectorized_data.sparkSession
@@ -1004,6 +1009,7 @@ class SparkFaissExtension(FaissExtension):
 
         storage_level = storage_level or "MEMORY_AND_DISK"
         result.persist(storage_level=storage_level, action="count")
+        result.checkpoint(eager=True)
 
         return result
 

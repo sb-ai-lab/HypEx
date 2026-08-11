@@ -293,6 +293,25 @@ class DatasetBase:
             else self.is_persisted(),
         }
 
+    def checkpoint(self, eager: bool = True) -> Self:
+        """
+        Breaks the computation graph (Lineage) for the Spark backend.
+        For the Pandas backend, this method acts as a no-op. It is critical
+        for iterative processes (e.g., A/A and A/B tests) to prevent
+        exponential slowdowns caused by the growth of the DAG in Spark.
+
+        Args:
+            eager: If ``True``, the checkpoint is executed eagerly,
+                immediately materializing the DataFrame. If ``False``,
+                the checkpoint is deferred until the next action.
+                Defaults to ``True``.
+
+        Returns:
+            The dataset instance itself (``Self``) to allow method chaining.
+        """
+        self._backend_data.checkpoint(eager=eager)
+        return self
+
     def __repr__(self):
         n_cols = len(self.columns)
         n_rows = self._backend_data.shape[0]

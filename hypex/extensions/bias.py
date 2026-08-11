@@ -335,7 +335,8 @@ class SparkBisaExtesion(BiasExtension):
     def _prepare_data(
         data: Dataset, 
         neighbors_cols: list[str] | str, 
-        numeric_cols: list[str] | str
+        numeric_cols: list[str] | str,
+        storage_level: str | None = None,
     ) -> SparkDF:
         """Prepare matched features for bias estimation using PySpark.
         
@@ -353,10 +354,17 @@ class SparkBisaExtesion(BiasExtension):
         """
         neighbors_cols = Adapter.to_list(neighbors_cols)
         numeric_cols = Adapter.to_list(numeric_cols)
+        storage_level = storage_level or "MEMORY_AND_DISK"
         
         t_data: SparkDF = data[numeric_cols].data.to_spark(index_col='index')
         indexes: SparkDF = data[neighbors_cols].data.to_spark(index_col='index')
         working_columns = [col for col in indexes.columns if col != 'index']
+
+        t_data.persist(SparkBisaExtesion.STORAGE_DICT[storage_level])
+        indexes.persist(SparkBisaExtesion.STORAGE_DICT[storage_level])
+
+        t_data.count()
+        indexes.count()
 
         matched_data = (
             indexes.select(
@@ -371,6 +379,19 @@ class SparkBisaExtesion(BiasExtension):
                 ]
             )
         )
+
+        matched_data.persist(SparkBisaExtesion.STORAGE_DICT[storage_level])
+        matched_data.count()
+
+        sc = matched_data.sparkSession.sparkContext
+        chekpoint_dir = sc.getCheckpointDir()
+        if chekpoint_dir is None:
+            matched_data.localCheckpoint(eager=True)
+        else:
+            matched_data.checkpoint(eager=True)
+
+        t_data.unpersist()
+        indexes.unpersist()
 
         return matched_data
     
@@ -524,8 +545,8 @@ class SparkBisaExtesion(BiasExtension):
             neighbors_cols=neighbors_cols,
             numeric_cols=numeric_cols
         )
-        matched_data.persist(self.STORAGE_DICT[storage_level])
-        matched_data.count()
+        # matched_data.persist(self.STORAGE_DICT[storage_level])
+        # matched_data.count()
 
         initial_data: SparkDF = data[numeric_cols + [self.group_field]].data.to_spark(index_col='initial_index')
         initial_data = initial_data.join(matched_data, on='initial_index')
@@ -538,6 +559,8 @@ class SparkBisaExtesion(BiasExtension):
         final_dataset.index.name = None
 
         final_dataset.persist(storage_level)
+        final_dataset.checkpoint(eager=True)
+
         initial_data.unpersist()
         matched_data.unpersist()
 

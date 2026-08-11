@@ -294,7 +294,7 @@ class FaissNearestNeighbors(MLExecutor):
                 f"Faiss returned {nans} nans, which were replaced with dummy matches. Check if the data is suitable for the test.",
                 UserWarning,
             )
-        matched_indexes = Dataset.create_empty(
+        matched_indexes: Dataset = Dataset.create_empty(
             backend=data.ds.backend_type,
             session=data.ds.session
         )
@@ -317,9 +317,7 @@ class FaissNearestNeighbors(MLExecutor):
                 col: AdditionalMatchingRole() for col in  t_index_field.columns
             }
             matched_indexes = matched_indexes.append(t_index_field)
-        if matched_indexes is not None:
-            # matched_indexes = matched_indexes.sort()
-            pass
+        matched_indexes.checkpoint(eager=True)
         if len(matched_indexes) < len(data.ds) and not self.two_sides:
             matched_indexes = matched_indexes.reindex(data.ds.index, fill_value=-1)
         elif len(matched_indexes) < len(data.ds) and self.two_sides:
@@ -328,5 +326,6 @@ class FaissNearestNeighbors(MLExecutor):
         # unpersist `contol` and `test` indexes as they are
         # already persisted in `ds` using  `_set_value`
         for res_v in compare_result.values():
-            res_v.unpersist()
+            if res_v.is_persisted:
+                res_v.unpersist()
         return result

@@ -68,16 +68,38 @@ class SparkNavigation(DatasetBackendNavigation):
         finally:
             ps.set_option('compute.ops_on_diff_frames', cur_option)
 
-    def checkpoint(self):
-        """Create a checkpoint in the Spark execution plan.
+    def checkpoint(self, eager: bool = True) -> Self:
+        """Truncate the computation graph by creating a checkpoint.
 
-        Raises:
-            NotImplementedError: This method is not implemented for SparkNavigation.
-                Use Spark-specific checkpointing mechanisms instead.
+        Uses reliable checkpointing (HDFS/S3) when a checkpoint directory
+        is configured on the SparkContext. Falls back to ``local_checkpoint``
+        otherwise, with a warning that the operation is not fault-tolerant
+        and may fail if an executor is lost.
+
+        Args:
+            eager: If ``True``, the checkpoint is executed eagerly.
+                Defaults to ``True``.
+
+        Returns:
+            The dataset instance itself to allow method chaining.
         """
-        raise NotImplementedError(
-            "Method checkpoint not implemented for SparkNavigation."
-        )
+        import warnings
+
+        sc = self.session.sparkContext
+        checkpoin_dir = sc.getCheckpointDir()
+        if checkpoin_dir is not None:            
+            self.data = self.data.spark.checkpoint(eager=eager)
+        else:
+            warnings.warn(
+                "SparkContext checkpoint directory is not set. "
+                "Falling back to local_checkpoint, which is NOT "
+                "fault-tolerant and may fail if an executor is lost. "
+                "Please set sc.setCheckpointDir('hdfs://...') for "
+                "large jobs.",
+                UserWarning,
+            )
+            self.data = self.data.spark.local_checkpoint(eager=eager)
+        return self
 
     def limit(self, num: int | None = None) -> Self:
         """Limit the number of rows in the dataset.
@@ -365,10 +387,11 @@ class SparkNavigation(DatasetBackendNavigation):
                 else original_index_names
             )
 
-            if blocking:
-                self.data.to_spark().unpersist(blocking=True)
-            else:
-                self.data.spark.unpersist()
+            # if blocking:
+            #     self.data.to_spark().unpersist(blocking=True)
+            # else:
+            #     self.data.spark.unpersist()
+            self.data.to_spark().unpersist(blocking=blocking)
 
             if isinstance(original_index_name, str):
                 if original_index_name in self.data.columns:

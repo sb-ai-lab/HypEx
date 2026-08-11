@@ -1788,4 +1788,14 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return self._wrap_result(self.data.explode(column=column, ignore_index=ignore_index))
 
     def checkpoint(self):
+        """Breaks the computation graph (Lineage) to prevent exponential slowdowns.
+        For the Spark backend, this method materializes the DataFrame to truncate
+        the lineage graph. For the Pandas backend, this method acts as a no-op
+        since Pandas does not suffer from the same lineage growth issues.
+        The signature is kept identical to the Spark backend for API consistency.
+ 
+        Args:
+            eager: If ``True``, the checkpoint is executed eagerly. This parameter
+                is ignored for the Pandas backend. Defaults to ``True``.
+        """
         pass
