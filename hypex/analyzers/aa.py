@@ -19,6 +19,7 @@ from ..executor import Executor
 from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from ..splitters import AASplitter, AASplitterWithStratification
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, timeit
+from ..utils.constants import normalize_test_name
 
 
 class OneAAStatAnalyzer(Executor):
@@ -163,40 +164,63 @@ class AAScoreAnalyzer(Executor):
         self, data: ExperimentData, score_table: Dataset
     ) -> ExperimentData:
         """Calculates test pass rates and assigns reliability weights.
-        Computes the proportion of passed iterations for each test, derives a weight 
-        based on its proximity to the target alpha, and records scores/pass flags.
 
-        Args:
-            data: The experiment data container.
-            score_table: Dataset containing aggregated test results and pass statuses.
-
-        Returns:
-            Updated ExperimentData with computed AA scores and pass thresholds.
+        Now produces per-feature per-group rows matching the legacy format:
+            index = "{feature} {TestName} {group}"
+            columns = score, pass
         """
         self.__feature_weights = {}
         pass_cols = [c for c in score_table.columns if "pass" in c.lower()]
 
+        aa_rows: list[dict] = []
+
         for col in pass_cols:
-            test_name = (
-                col.split(" pass")[0].strip()
-                if ID_SPLIT_SYMBOL not in col
-                else col.split(ID_SPLIT_SYMBOL)[1]
-            )
+            # --- parse feature / test_name / group from column name ---
+            if ID_SPLIT_SYMBOL in col:
+                parts = col.split(ID_SPLIT_SYMBOL)
+                if len(parts) >= 4:
+                    feature = parts[0]
+                    raw_test = parts[1]
+                    group = parts[3]
+                elif len(parts) == 3:
+                    feature = parts[0]
+                    raw_test = parts[1]
+                    group = ""
+                else:
+                    continue
+            else:
+                # flat format: "{TestName} pass"
+                raw_test = col.split(" pass")[0].strip()
+                feature = ""
+                group = ""
+
+            test_name = normalize_test_name(raw_test)
 
             col_data = score_table[col]
             passed = sum(
-                1 for v in col_data if str(v).strip().upper() in ["OK", "TRUE", "1"]
+                1 for v in col_data if str(v).strip().upper() in ("OK", "TRUE", "1")
             )
-            pass_rate = passed / len(col_data) if len(col_data) > 0 else 0
-            self.__feature_weights[test_name] = 1 - abs(self.alpha - pass_rate)
+            pass_rate = passed / len(col_data) if len(col_data) > 0 else 0.0
+            weight = 1 - abs(self.alpha - pass_rate)
 
-        flat_row = {}
-        for test_name, weight in self.__feature_weights.items():
-            flat_row[f"{test_name} score"] = weight
-            flat_row[f"{test_name} pass"] = weight >= self.threshold
+            index_label = f"{feature} {test_name} {group}".strip()
+            self.__feature_weights[index_label] = weight
+
+            aa_rows.append(
+                {"_idx": index_label, "score": weight, "pass": weight >= self.threshold}
+            )
+
+        if aa_rows:
+            df = pd.DataFrame(aa_rows).set_index("_idx")
+            result_ds = SmallDataset(
+                roles={"score": StatisticRole(), "pass": StatisticRole()},
+                data=df,
+            )
+        else:
+            result_ds = SmallDataset.from_dict([{}], roles={})
 
         self.key = "aa score"
-        return self._set_value(data, SmallDataset.from_dict([flat_row], roles={}))
+        return self._set_value(data, result_ds)
 
     def build_splitter_from_id(self, splitter_id: str):
         """Reconstructs a splitter instance from its serialized identifier.
@@ -240,13 +264,22 @@ class AAScoreAnalyzer(Executor):
             weighted_pvalues = None
 
             pval_cols = [c for c in score_table.columns if "p-value" in c.lower()]
+
             for col in pval_cols:
-                test_name = (
-                    col.split(" p-value")[0].strip()
-                    if " " in col
-                    else col.split(ID_SPLIT_SYMBOL)[1]
-                )
-                weight = self.__feature_weights.get(test_name, 0)
+                if ID_SPLIT_SYMBOL in col:
+                    parts = col.split(ID_SPLIT_SYMBOL)
+                    raw_test = parts[1] if len(parts) > 1 else col
+                    feature = parts[0] if len(parts) > 0 else ""
+                    group = parts[3] if len(parts) > 3 else ""
+                else:
+                    raw_test = col.split(" p-value")[0].strip()
+                    feature = ""
+                    group = ""
+                test_name = normalize_test_name(raw_test)
+                lookup_key = f"{feature} {test_name} {group}".strip()
+                weight = self.__feature_weights.get(lookup_key, 0)
+                if weight == 0:
+                    weight = self.__feature_weights.get(test_name, 0)
                 if weight > 0:
                     col_data = score_table.data[col].astype(float)
                     weighted_pvalues = (
