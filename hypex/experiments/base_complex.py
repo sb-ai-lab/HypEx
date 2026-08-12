@@ -188,6 +188,7 @@ class IfParamsExperiment(ParamsExperiment):
         self.stopping_criterion = stopping_criterion
         super().__init__(executors, reporter, params, transformer, key)
 
+    @timeit(level="PIPELINE", prefix="PARAMS")
     def execute(self, data: ExperimentData) -> ExperimentData:
         self._update_flat_params()
         for flat_param in tqdm(self._flat_params):

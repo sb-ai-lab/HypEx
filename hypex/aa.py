@@ -124,7 +124,7 @@ class AATest(ExperimentShell):
             ParamsExperiment(
                 executors=[base_experiment],
                 params=params,
-                reporter=DatasetReporter(OneAADictReporter(front=False)),
+                reporter=DatasetReporter(OneAADictReporter(front=False), single_row=True),
             )
         ]
         

@@ -1,21 +1,33 @@
 from __future__ import annotations
-from typing import Any, ClassVar
+
 import warnings
+from typing import Any, ClassVar
 
 from ..comparators import (
-    GroupChi2Test, GroupDifference, GroupKSTest, GroupTTest,
-    StatsTTest, StatsKSTest, StatsChi2Test, BaseComparator
+    BaseComparator,
+    GroupChi2Test,
+    GroupDifference,
+    GroupKSTest,
+    GroupTTest,
+    StatsChi2Test,
+    StatsKSTest,
+    StatsTTest,
 )
-from ..comparators.adaptive_hypothesis_testing import TTest, KSTest, Chi2Test, UTest
-
+from ..comparators.adaptive_hypothesis_testing import Chi2Test, KSTest, TTest, UTest
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..dataset.dataset import SmallDataset
 from ..splitters import AASplitter, AASplitterWithStratification
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, NotFoundInExperimentDataError
+from ..utils.constants import NAME_BORDER_SYMBOL, _parse_metric_col, normalize_test_name
 from .abstract import (
-    DictReporter, DatasetReporter, Reporter, 
-    extract_group_difference, extract_tests, extract_analyzer_data
+    DatasetReporter,
+    DictReporter,
+    Reporter,
+    extract_analyzer_data,
+    extract_group_difference,
+    extract_tests,
 )
+
 
 class AATestReporter(DatasetReporter):
     """Reporter for A/A test results.
@@ -26,7 +38,7 @@ class AATestReporter(DatasetReporter):
     tests: ClassVar[list[type[BaseComparator]]] = [
         GroupTTest, GroupKSTest, GroupChi2Test,
         StatsTTest, StatsKSTest, StatsChi2Test,
-        TTest, KSTest, Chi2Test, UTest,         
+        TTest, KSTest, Chi2Test, UTest
     ]
 
     def __init__(self, 
@@ -138,107 +150,101 @@ class AADatasetReporter(AATestReporter):
 
 
 class AAPassedReporter(Reporter):
-    """Reporter for A/A test pass/fail results.
-
-    Produces the legacy resume format:
-        feature | group | TTest aa test | KSTest aa test | TTest best split |
-        KSTest best split | result | control mean | test mean | difference | difference %
-    """
-
     def report(self, data: ExperimentData) -> Dataset:
-        analyser_ids = data.get_ids(
-            "AAScoreAnalyzer", ExperimentDataEnum.analysis_tables
-        )
+        analyser_ids = data.get_ids("AAScoreAnalyzer", ExperimentDataEnum.analysis_tables)
         analyser_tables = {
-            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1 :]: data.analysis_tables[id_]
-            for id_ in analyser_ids["AAScoreAnalyzer"][
-                ExperimentDataEnum.analysis_tables.value
-            ]
+            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1:]: data.analysis_tables[id_]
+            for id_ in analyser_ids["AAScoreAnalyzer"][ExperimentDataEnum.analysis_tables.value]
         }
-
         if not analyser_tables.get("aa score") or analyser_tables["aa score"].is_empty():
-            return None
+            return SmallDataset.create_empty()
 
         aa_score = analyser_tables["aa score"]
         best_split_stats = analyser_tables.get("best split statistics")
-
         if best_split_stats is None or best_split_stats.is_empty():
             return SmallDataset.create_empty()
 
-        # --- collect test display names from aa_score index ---
-        # index labels look like "pre_spends TTest test_1"
         test_names_ordered: list[str] = []
         seen: set[str] = set()
         for idx_label in aa_score.index:
             parts = str(idx_label).split()
-            # parts: [feature, TestName, group] or [TestName, group]
-            if len(parts) >= 2:
-                tn = parts[-2] if len(parts) >= 3 else parts[0]
-                if tn not in seen:
-                    seen.add(tn)
-                    test_names_ordered.append(tn)
+            if len(parts) >= 3:
+                tn = parts[-2]
+            elif len(parts) == 2:
+                tn = parts[0]
+            elif len(parts) == 1:
+                tn = parts[0]
+            else:
+                continue
+            if tn not in seen:
+                seen.add(tn)
+                test_names_ordered.append(tn)
 
-        # --- build rows ---
         records = best_split_stats.to_records()
         result_records: list[dict] = []
 
         for row in records:
-            feature = row.get("feature", "")
-            group = row.get("group", "")
-            rec: dict = {"feature": feature, "group": group}
+            feature_groups: set[tuple[str, str]] = set()
+            for k in row.keys():
+                if NAME_BORDER_SYMBOL in k:
+                    continue
+                feature, test, metric, group = _parse_metric_col(k)
+                if feature and feature != "mean":
+                    feature_groups.add((feature, group))
 
-            # aa test columns (from aa_score)
-            for tn in test_names_ordered:
-                idx_key = f"{feature} {tn} {group}"
-                try:
-                    pass_val = aa_score.loc[idx_key, "pass"]
-                    rec[f"{tn} aa test"] = "OK" if pass_val else "NOT OK"
-                except Exception:
-                    rec[f"{tn} aa test"] = None
+            for feature, group in sorted(feature_groups):
+                rec: dict = {"feature": feature, "group": group}
 
-            # best split columns
-            for tn in test_names_ordered:
-                pass_col = f"{tn} pass"
-                # search in row keys (may have normalized or raw name)
-                val = None
-                for k, v in row.items():
-                    if k.lower().endswith("pass") and normalize_test_name(
-                        k[: k.lower().rfind("pass")].strip()
-                    ) == tn:
-                        val = v
-                        break
-                if val is not None:
-                    rec[f"{tn} best split"] = (
-                        "OK"
-                        if str(val).strip().upper() in ("OK", "TRUE", "1")
-                        else "NOT OK"
-                    )
-                else:
-                    rec[f"{tn} best split"] = None
+                # aa test columns
+                for tn in test_names_ordered:
+                    idx_key = f"{feature} {tn} {group}".strip()
+                    try:
+                        pass_val = aa_score.loc[idx_key, "pass"]
+                        if hasattr(pass_val, 'iget_values'):
+                            pass_val = pass_val.iget_values(0, 0)
+                        rec[f"{tn} aa test"] = "OK" if pass_val else "NOT OK"
+                    except Exception:
+                        rec[f"{tn} aa test"] = None
 
-            # result column
-            all_ok = all(
-                rec.get(f"{tn} best split") != "NOT OK"
-                for tn in test_names_ordered
-                if rec.get(f"{tn} best split") is not None
-            )
-            rec["result"] = "OK" if all_ok else "NOT OK"
+                # best split columns
+                for tn in test_names_ordered:
+                    val = None
+                    for k, v in row.items():
+                        f, t, m, g = _parse_metric_col(k)
+                        if f == feature and normalize_test_name(t) == tn and m == "pass" and g == group:
+                            val = v
+                            break
+                    if val is not None:
+                        rec[f"{tn} best split"] = (
+                            "OK" if str(val).strip().upper() in ("OK", "TRUE", "1") else "NOT OK"
+                        )
+                    else:
+                        rec[f"{tn} best split"] = None
 
-            # numeric columns
-            for nc in ("control mean", "test mean", "difference", "difference %"):
-                rec[nc] = row.get(nc)
+                # result
+                all_ok = all(
+                    rec.get(f"{tn} best split") != "NOT OK"
+                    for tn in test_names_ordered
+                    if rec.get(f"{tn} best split") is not None
+                )
+                rec["result"] = "OK" if all_ok else "NOT OK"
 
-            result_records.append(rec)
+                for metric_name in ("control mean", "test mean", "difference", "difference %"):
+                    val = None
+                    for k, v in row.items():
+                        f, t, m, g = _parse_metric_col(k)
+                        if f == feature and t == "GroupDifference" and m == metric_name and g == group:
+                            val = v
+                            break
+                    rec[metric_name] = val
 
-        roles = {
-            "feature": InfoRole(),
-            "group": InfoRole(),
-            "result": StatisticRole(),
-        }
-        for c in result_records[0]:
-            if c not in roles:
-                roles[c] = StatisticRole()
+                result_records.append(rec)
 
+        roles: dict = {"feature": InfoRole(), "group": InfoRole(), "result": StatisticRole()}
+        if result_records:
+            for c in result_records[0]:
+                if c not in roles:
+                    roles[c] = StatisticRole()
         return SmallDataset.from_dict(result_records, roles=roles)
 
 

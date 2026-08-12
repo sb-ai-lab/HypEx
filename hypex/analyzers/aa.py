@@ -14,12 +14,15 @@ from ..comparators import (
     StatsTTest,
     StatsZTest,
 )
+from ..comparators.adaptive_hypothesis_testing import Chi2Test as AdaptiveChi2Test
+from ..comparators.adaptive_hypothesis_testing import KSTest as AdaptiveKSTest
+from ..comparators.adaptive_hypothesis_testing import TTest as AdaptiveTTest
 from ..dataset import Dataset, ExperimentData, InfoRole, SmallDataset, StatisticRole
 from ..executor import Executor
 from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from ..splitters import AASplitter, AASplitterWithStratification
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, timeit
-from ..utils.constants import normalize_test_name
+from ..utils.constants import NAME_BORDER_SYMBOL, _parse_metric_col, normalize_test_name
 
 
 class OneAAStatAnalyzer(Executor):
@@ -42,6 +45,9 @@ class OneAAStatAnalyzer(Executor):
             StatsChi2Test,
             StatsZTest,
             StatsKSTest,
+            AdaptiveTTest,
+            AdaptiveKSTest,
+            AdaptiveChi2Test,
         ]
 
         executor_ids = data.get_ids(
@@ -160,62 +166,38 @@ class AAScoreAnalyzer(Executor):
             value=value,
         )
 
-    def _analyze_aa_score(
-        self, data: ExperimentData, score_table: Dataset
-    ) -> ExperimentData:
-        """Calculates test pass rates and assigns reliability weights.
-
-        Now produces per-feature per-group rows matching the legacy format:
-            index = "{feature} {TestName} {group}"
-            columns = score, pass
-        """
+    def _analyze_aa_score(self, data: ExperimentData, score_table: Dataset) -> ExperimentData:
         self.__feature_weights = {}
         pass_cols = [c for c in score_table.columns if "pass" in c.lower()]
-
         aa_rows: list[dict] = []
 
         for col in pass_cols:
-            # --- parse feature / test_name / group from column name ---
-            if ID_SPLIT_SYMBOL in col:
-                parts = col.split(ID_SPLIT_SYMBOL)
-                if len(parts) >= 4:
-                    feature = parts[0]
-                    raw_test = parts[1]
-                    group = parts[3]
-                elif len(parts) == 3:
-                    feature = parts[0]
-                    raw_test = parts[1]
-                    group = ""
+            feature, raw_test, metric, group = _parse_metric_col(col)
+            if not raw_test:
+                # fallback: ID_SPLIT_SYMBOL format
+                if ID_SPLIT_SYMBOL in col:
+                    parts = col.split(ID_SPLIT_SYMBOL)
+                    if len(parts) >= 4:
+                        feature, raw_test, group = parts[0], parts[1], parts[3]
+                    else:
+                        continue
                 else:
                     continue
-            else:
-                # flat format: "{TestName} pass"
-                raw_test = col.split(" pass")[0].strip()
-                feature = ""
-                group = ""
 
             test_name = normalize_test_name(raw_test)
-
             col_data = score_table[col]
             passed = sum(
                 1 for v in col_data if str(v).strip().upper() in ("OK", "TRUE", "1")
             )
             pass_rate = passed / len(col_data) if len(col_data) > 0 else 0.0
             weight = 1 - abs(self.alpha - pass_rate)
-
             index_label = f"{feature} {test_name} {group}".strip()
             self.__feature_weights[index_label] = weight
-
-            aa_rows.append(
-                {"_idx": index_label, "score": weight, "pass": weight >= self.threshold}
-            )
+            aa_rows.append({"_idx": index_label, "score": weight, "pass": weight >= self.threshold})
 
         if aa_rows:
             df = pd.DataFrame(aa_rows).set_index("_idx")
-            result_ds = SmallDataset(
-                roles={"score": StatisticRole(), "pass": StatisticRole()},
-                data=df,
-            )
+            result_ds = SmallDataset(roles={"score": StatisticRole(), "pass": StatisticRole()}, data=df)
         else:
             result_ds = SmallDataset.from_dict([{}], roles={})
 
@@ -242,18 +224,6 @@ class AAScoreAnalyzer(Executor):
         return splitter_class.build_from_id(splitter_id)
 
     def _get_best_split(self, data, score_table, if_param_scores=None):
-        """Identifies the optimal data split based on weighted statistical metrics.
-        Calculates a composite score using weighted p-values (2/3 weight) and mean test 
-        scores (1/3 weight) to determine the best-performing split configuration.
-
-        Args:
-            data: The experiment data container.
-            score_table: Dataset containing metrics for all evaluated splits.
-            if_param_scores: Optional dataset for conditional parameter scoring.
-
-        Returns:
-            Dictionary containing 'best_split_id' (str) and 'data' (SmallDataset with stats).
-        """
         if if_param_scores is not None:
             best_index = 0
         elif not self.__feature_weights:
@@ -264,17 +234,17 @@ class AAScoreAnalyzer(Executor):
             weighted_pvalues = None
 
             pval_cols = [c for c in score_table.columns if "p-value" in c.lower()]
-
             for col in pval_cols:
-                if ID_SPLIT_SYMBOL in col:
-                    parts = col.split(ID_SPLIT_SYMBOL)
-                    raw_test = parts[1] if len(parts) > 1 else col
-                    feature = parts[0] if len(parts) > 0 else ""
-                    group = parts[3] if len(parts) > 3 else ""
-                else:
-                    raw_test = col.split(" p-value")[0].strip()
-                    feature = ""
-                    group = ""
+                feature, raw_test, metric, group = _parse_metric_col(col)
+                if not raw_test:
+                    if ID_SPLIT_SYMBOL in col:
+                        parts = col.split(ID_SPLIT_SYMBOL)
+                        raw_test = parts[1] if len(parts) > 1 else col
+                        feature = parts[0] if len(parts) > 0 else ""
+                        group = parts[3] if len(parts) > 3 else ""
+                    else:
+                        continue
+
                 test_name = normalize_test_name(raw_test)
                 lookup_key = f"{feature} {test_name} {group}".strip()
                 weight = self.__feature_weights.get(lookup_key, 0)
@@ -293,31 +263,26 @@ class AAScoreAnalyzer(Executor):
             else:
                 weighted_pvalues = weighted_pvalues / len(self.__feature_weights)
 
-            mean_test_score = (
-                score_table["mean test score"]
-                if "mean test score" in score_table.columns
-                else 0.0
-            )
-            score_col = (
-                weighted_pvalues * pvalue_weight + mean_test_score * test_score_weight
-            )
+            # mean_test_score — скаляр из колонки, а не Dataset
+            if "mean test score" in score_table.columns:
+                mts_col = score_table.data["mean test score"].astype(float)
+                mean_test_score = mts_col  # Series той же длины, что и weighted_pvalues
+            else:
+                mean_test_score = 0.0
+
+            score_col = weighted_pvalues * pvalue_weight + mean_test_score * test_score_weight
             best_index = score_col.idxmax()
 
         if "splitter_id" in score_table.columns:
             best_split_id = score_table.data.loc[best_index, "splitter_id"]
         else:
-            best_split_id = (
-                f"AASplitter{ID_SPLIT_SYMBOL}rs {int(best_index)}{ID_SPLIT_SYMBOL}"
-            )
+            best_split_id = f"AASplitter{ID_SPLIT_SYMBOL}rs {int(best_index)}{ID_SPLIT_SYMBOL}"
 
         row_df = score_table.data.iloc[[best_index]]
         best_score_stat = SmallDataset(
-            roles={
-                col: score_table.roles.get(col, InfoRole()) for col in row_df.columns
-            },
+            roles={col: score_table.roles.get(col, InfoRole()) for col in row_df.columns},
             data=row_df,
         )
-
         self.key = "best split statistics"
         result = self._set_value(data, best_score_stat)
         return {"best_split_id": best_split_id, "data": result}
@@ -392,3 +357,38 @@ class AAScoreAnalyzer(Executor):
         )
         data = self._analyze_aa_score(data, score_table)
         return self._analyze_best_split(data, score_table, if_param_scores)
+
+    @staticmethod
+    def _parse_metric_col(col: str) -> tuple[str, str, str]:
+        """Parse a metric column name → (feature, raw_test, group).
+        """
+        if ID_SPLIT_SYMBOL in col:
+            parts = col.split(ID_SPLIT_SYMBOL)
+            if len(parts) >= 4:
+                return parts[0], parts[1], parts[3]
+            if len(parts) == 3:
+                return parts[0], parts[1], ""
+            return "", "", ""
+
+        # space-separated
+        parts = col.split()
+        # "{feature} {Test} pass {group}"  |  "{feature} {Test} p-value {group}"
+        for kw_idx, kw in enumerate(parts):
+            if kw.lower() in ("pass", "p-value"):
+                if kw_idx >= 2:
+                    return parts[0], parts[1], " ".join(parts[kw_idx + 1:])
+                if kw_idx == 1:
+                    return "", parts[0], " ".join(parts[kw_idx + 1:])
+                break
+            if kw.lower() in ("control", "test") and kw_idx + 1 < len(parts) and parts[kw_idx + 1].lower() == "mean":
+                if kw_idx >= 2:
+                    return parts[0], parts[1], " ".join(parts[kw_idx + 2:])
+                break
+            if kw.lower() == "difference":
+                if kw_idx >= 2:
+                    return parts[0], parts[1], " ".join(parts[kw_idx + 2:])
+                break
+        # fallback: "{Test} pass"
+        if len(parts) == 2 and parts[1].lower() == "pass":
+            return "", parts[0], ""
+        return "", "", ""

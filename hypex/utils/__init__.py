@@ -6,7 +6,8 @@ from .constants import (
     NUMBER_TYPES_LIST,
     UTILITY_COL_SYMBOL,
     UTILITY_INDEX_COL_NAME,
-    UTILITY_PHYSICAL_INDEX_COL_NAME
+    UTILITY_PHYSICAL_INDEX_COL_NAME,
+    _parse_metric_col,
 )
 from .enums import (
     ABNTestMethodsEnum,
@@ -108,5 +109,6 @@ __all__ = [
     "timeit", 
     "enable_profiling", 
     "disable_profiling", 
-    "ProfilingContext"
+    "ProfilingContext",
+    "_parse_metric_col"
 ]

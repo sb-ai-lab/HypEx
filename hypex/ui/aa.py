@@ -7,6 +7,7 @@ from ..utils.constants import (
     ID_SPLIT_SYMBOL,
     TEST_NAME_NORMALIZATION,
     normalize_test_name,
+    NAME_BORDER_SYMBOL
 )
 from ..utils.enums import RenameEnum
 from .base import Output
@@ -23,37 +24,29 @@ class AAOutput(Output):
             resume_reporter=AAPassedReporter(),
             additional_reporters={"best_split": AABestSplitReporter()}
         ) 
+
     def _extract_experiments(self, experiment_data: ExperimentData):
-        id_ = experiment_data.get_one_id(
-            "ParamsExperiment", ExperimentDataEnum.analysis_tables
-        )
+        id_ = experiment_data.get_one_id("ParamsExperiment", ExperimentDataEnum.analysis_tables)
         raw_table = experiment_data.analysis_tables[id_]
+        pdf = raw_table.data  # pd.DataFrame, shape=(n_iterations, n_cols)
 
-        # raw_table is a SmallDataset where each row = one iteration,
-        # columns are like "pre_spends┆StatsTTest┆pass┆test_1", "splitter_id", etc.
-        pdf = raw_table.data  # pd.DataFrame
-
-        # Build the legacy-format experiments table directly
         result_rows = []
         for row_idx in range(len(pdf)):
             row: dict = {}
             for col in pdf.columns:
                 val = pdf.iloc[row_idx].get(col)
-                if ID_SPLIT_SYMBOL in str(col):
-                    # "feature┆Executor┆metric┆group" → "feature Executor metric group"
-                    parts = str(col).split(ID_SPLIT_SYMBOL)
-                    if len(parts) >= 4:
-                        feature, executor, metric, group = parts[0], parts[1], parts[2], parts[3]
-                        norm_executor = normalize_test_name(executor)
-                        new_col = f"{feature} {norm_executor} {metric} {group}"
-                    elif len(parts) == 3:
-                        feature, executor, metric = parts
-                        norm_executor = normalize_test_name(executor)
-                        new_col = f"{feature} {norm_executor} {metric}"
-                    else:
-                        new_col = str(col).replace(ID_SPLIT_SYMBOL, " ")
+                col_str = str(col)
+                if NAME_BORDER_SYMBOL in col_str:
+                    continue
+                if ID_SPLIT_SYMBOL in col_str:
+                    parts = col_str.split(ID_SPLIT_SYMBOL)
+                    norm_parts = [normalize_test_name(p) for p in parts]
+                    new_col = " ".join(norm_parts)
                 else:
-                    new_col = str(col)
+                    new_col = col_str
+                    for raw_name, norm_name in TEST_NAME_NORMALIZATION.items():
+                        if raw_name != norm_name:
+                            new_col = new_col.replace(raw_name, norm_name)
                 row[new_col] = val
             result_rows.append(row)
 
