@@ -6,6 +6,7 @@ from typing import Any
 from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
 from .comparators import GroupDifference, GroupSizes
 from .comparators.abstract import Comparator
+from .comparators import Chi2Test, KSTest, TTest
 from .dataset import AdditionalTreatmentRole, TargetRole
 from .experiments.base import Experiment, OnRoleExperiment
 from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
@@ -13,7 +14,6 @@ from .forks.aa import IfAAExecutor
 from .reporters import DatasetReporter, DictReporter
 from .reporters.aa import OneAADictReporter
 from .splitters import AASplitter, AASplitterWithStratification
-from .comparators import Chi2Test, KSTest, TTest
 from .ui.aa import AAOutput
 from .ui.base import ExperimentShell
 from .utils import SpaceEnum

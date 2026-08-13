@@ -150,6 +150,21 @@ class InfoRole(ABCRole):
     """Semantic role for auxiliary or informational columns not used in statistical analysis."""
     _role_name: RoleNameType = "Info"
 
+class DisabledRole(ABCRole):
+    """Semantic role for columns that have been "disabled" after preprocessing."""
+    _role_name: RoleNameType = "Disable"
+
+    def __init__(self, initial_role: ABCRole | None = None, data_type = None):
+        super().__init__(
+            initial_role.data_type 
+            if initial_role 
+            else data_type
+        )
+        self._initial_role = initial_role
+
+    @property
+    def initial_role(self):
+        return self._initial_role
 
 class StratificationRole(ABCRole):
     """Semantic role for columns used to stratify data during sampling or splitting.
@@ -332,7 +347,7 @@ class AdditionalTargetRole(AdditionalRole, TargetRole):
 
 class AdditionalFeatureRole(AdditionalRole, FeatureRole):
     """Derived role for supplementary or engineered predictor columns."""
-    _role_name: RoleNameType = "AdditionalTarget"
+    _role_name: RoleNameType = "AdditionalFeature"
 
 
 class AdditionalPreTargetRole(AdditionalRole, PreTargetRole):
@@ -347,6 +362,9 @@ class AdditionalMatchingRole(AdditionalRole):
 class AdditionalVarianceReductionRole(AdditionalRole, StatisticRole):
     """For CUPED variance reductions."""
     _role_name: RoleNameType = "AdditionalVarianceReduction"
+
+class AdditionalStatisticRole(AdditionalRole, StatisticRole):
+    _role_name: RoleNameType = "AdditionalStatistic"
 
 
 default_roles: dict[RoleNameType, ABCRole] = {

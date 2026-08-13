@@ -51,8 +51,10 @@ from .typings import (
     StratificationRoleTypes,
     TargetRoleTypes,
     SourceDataTypes,
-    SparkTypeMapper
+    SparkTypeMapper,
+    GenericManager
 )
+from .registry import BackendFactory
 
 from .strict_abc import StrictABCMeta, StrictABC
 
@@ -101,6 +103,8 @@ __all__ = [
     "gen_control_variates_df",
     "gen_oracle_df",
     "gen_special_medicine_df",
+    "BackendFactory",
+    "GenericManager"
     "StrictABCMeta", 
     "StrictABC"
 ]

@@ -8,6 +8,7 @@ from ..dataset import (
     ABCRole,
     AdditionalMatchingRole,
     Dataset,
+    GroupedDataset,
     ExperimentData,
     FeatureRole,
     GroupingRole,
@@ -187,19 +188,23 @@ class MLExecutor(Calculator, ABC):
     def _execute_inner_function(
         cls,
         grouping_data,
+        tmp_roles,
         target_field: str | None = None,
         **kwargs,
     ) -> Any:
+        (_, _data), (_, _test_data), *_ = grouping_data
+        _data.tmp_roles = tmp_roles
+
         if target_field:
             return cls._inner_function(
-                data=grouping_data[0][1].drop(target_field),
-                target_data=grouping_data[0][1][target_field],
-                test_data=grouping_data[1][1].drop(target_field),
+                data=_data.drop(target_field),
+                target_data=_data[target_field],
+                test_data=_test_data.drop(target_field),
                 **kwargs,
             )
         return cls._inner_function(
-            data=grouping_data[0][1],
-            test_data=grouping_data[1][1],
+            data=_data,
+            test_data=_test_data,
             **kwargs,
         )
 
@@ -221,7 +226,8 @@ class MLExecutor(Calculator, ABC):
         cls,
         data: Dataset,
         group_field: Sequence[str] | str | None = None,
-        grouping_data: list[tuple[str, Dataset]] | None = None,
+        # grouping_data: list[tuple[str, Dataset]] | None = None,
+        grouping_data: GroupedDataset | None = None, 
         target_field: str | list[str] | None = None,
         features_fields: str | list[str] | None = None,
         **kwargs,
@@ -229,13 +235,14 @@ class MLExecutor(Calculator, ABC):
         group_field = Adapter.to_list(group_field)
         features_fields = Adapter.to_list(features_fields)
         if grouping_data is None:
-            grouping_data = data.groupby(group_field, fields_list=features_fields)
+            grouping_data = data[group_field + features_fields].groupby(group_field)
         if len(grouping_data) > 1:
-            grouping_data[0][1].tmp_roles = data.tmp_roles
+            # grouping_data[0][1].tmp_roles = data.tmp_roles
+            tmp_roles = data.tmp_roles
         else:
             raise NotSuitableFieldError(group_field, "Grouping")
         result = cls._execute_inner_function(
-            grouping_data, target_field=target_field, **kwargs
+            grouping_data, tmp_roles, target_field=target_field, **kwargs
         )
         return result
 

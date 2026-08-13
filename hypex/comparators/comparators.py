@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Any
 
 import numpy as np
 
 from ..dataset import ABCRole, Dataset
 from ..utils.constants import NUMBER_TYPES_LIST
-from .abstract import Comparator
+from .abstract import Comparator, BaseComparator
 
 NUM_OF_BUCKETS = 10
 
@@ -116,3 +116,61 @@ class PSI(Comparator):
         test_data_psi = [x[1].count() / len(test_data) for x in test_data_groups]
         psi = [(y - x) * np.log(y / x) for x, y in zip(data_psi, test_data_psi)]
         return {"PSI": sum(psi)}
+
+class StatTestMasterAbstract(BaseComparator):
+    """
+    Master-abstract class for stat-tests
+    """
+    # def __init__(self, **experiment_kwargs):
+    #     self._experiment_kwargs: dict[str, Any] = experiment_kwargs
+    def __init__(
+            self,
+            grouping_role: ABCRole | None = None,
+            target_roles: ABCRole | None = None,
+            baseline_role: ABCRole | None = None,
+            reliability: float = 0.05,
+            compare_by: Literal[
+                "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+            ] = "groups",
+            key: Any = "",
+    ):
+        super().__init__(grouping_role=grouping_role, target_roles=target_roles, baseline_role=baseline_role, key=key)
+        self.reliability = reliability
+        self.compare_by = compare_by
+    
+    @staticmethod
+    def _inner_function(data, **kwargs):
+        pass
+
+    def execute(self, data):
+        pass
+    
+    @property
+    def experiment_kwargs(self):
+        return self._experiment_kwargs
+
+# Master-backend classes for stat-tests
+class TTest(StatTestMasterAbstract):
+    """
+    T-test master-backend class.
+    """
+
+class Chi2Test(StatTestMasterAbstract):
+    """
+    Chi-square test master-backend class.
+    """
+
+class KSTest(StatTestMasterAbstract):
+    """
+    KS-test master-backend class.
+    """
+
+class UTest(StatTestMasterAbstract):
+    """
+    KS-test master-backend class.
+    """
+
+class ZTest(StatTestMasterAbstract):
+    """
+    Z-test masker-backend class.
+    """

@@ -4,11 +4,13 @@ from collections.abc import Iterable, Sequence
 from copy import deepcopy
 from typing import Any
 
-from ..dataset import ABCRole, AdditionalTargetRole, ExperimentData, TempTargetRole
+from ..dataset import ABCRole, AdditionalTargetRole, ExperimentData, TempTargetRole, Dataset
 from ..executor import Executor
 from ..utils import ExperimentDataEnum
+from ..utils.registry import backend_factory
 
 import time
+import inspect
 
 
 
@@ -61,15 +63,40 @@ class Experiment(Executor):
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
         return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
+    
+    @staticmethod
+    def _get_executor_backend(executor: Executor, ds: Dataset):
+        """
+        Class for selecting backend-dependent realization for direct executor
+        """
+        executor_cls = type(executor)
+        backend_cls = backend_factory.resolve_backend(executor_cls, ds)
+        if backend_cls is None:
+             return executor
+
+        sig = inspect.signature(backend_cls.__init__)
+        expected_params = {p.name for p in sig.parameters.values() if p.name != 'self'}
+
+        init_kwargs = {k: getattr(executor, k) for k in expected_params if hasattr(executor, k)}
+
+        has_var_keyword = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+        if has_var_keyword and hasattr(executor, 'calc_kwargs'):
+            init_kwargs['calc_kwargs'] = executor.calc_kwargs
+
+        new_executor = backend_cls(**init_kwargs)
+
+        if hasattr(executor, 'key'):
+            new_executor.key = executor.key
+
+        return new_executor
+            
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
-            start = time.perf_counter()
-            
-            executor.key = self.key
-            experiment_data = executor.execute(experiment_data)
-            end = time.perf_counter()
+            cur_executor = self._get_executor_backend(executor, experiment_data.ds)
+            cur_executor.key = self.key 
+            experiment_data = cur_executor.execute(experiment_data)
             
         return experiment_data
 

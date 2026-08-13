@@ -15,7 +15,8 @@ class MultiTest(Extension):
         self.alpha = alpha
         super().__init__()
 
-    def _calc_pandas(self, data: Dataset, **kwargs):
+    # def _calc_pandas(self, data: Dataset, **kwargs):
+    def calc(self, data: Dataset, **kwargs):
         p_values = data.data.values.flatten()
         new_pvalues = multipletests(
             p_values, method=self.method.value, alpha=self.alpha, **kwargs
@@ -49,7 +50,8 @@ class MultitestQuantile(Extension):
         self.random_state = random_state
         super().__init__()
 
-    def _calc_pandas(self, data: Dataset, **kwargs):
+    # def _calc_pandas(self, data: Dataset, **kwargs):
+    def calc(self, data: Dataset, **kwargs):
         group_field = kwargs.get("group_field")
         target_field = kwargs.get("target_field")
         quantiles = kwargs.get("quantiles")

@@ -2,16 +2,20 @@ from __future__ import annotations
 
 import math
 import numpy as np
-from typing import Any
+from typing import Any, Literal
 
 from scipy.stats import t as t_dist, chi2_contingency
 
 from ..dataset import ABCRole
+from ..dataset.backends import SparkDataset
 from ..utils.constants import NUMBER_TYPES_LIST, CATEGORICAL_TYPES_LIST
+from ..utils.registry import backend_factory
 from .abstract import StatsHypothesisTesting
+from .comparators import TTest, Chi2Test, ZTest
 
 from math import sqrt
 
+@backend_factory.register(TTest, SparkDataset)
 class StatsTTest(StatsHypothesisTesting):
     """
     Two-sample t-test with automatic variance homogeneity check.
@@ -25,7 +29,9 @@ class StatsTTest(StatsHypothesisTesting):
     def __init__(
             self, 
             grouping_role: ABCRole | None = None,
+            compare_by: Literal["groups", "matched_pairs"] = "groups",
             target_roles: ABCRole | None = None, 
+            baseline_role: ABCRole | None = None,
             reliability: float = 0.05,
             key: Any = "", 
     ):
@@ -40,8 +46,10 @@ class StatsTTest(StatsHypothesisTesting):
         """
         super().__init__(
             stats=self.REQUIRED_STATS, 
+            compare_by=compare_by,
             grouping_role=grouping_role, 
             target_roles=target_roles, 
+            baseline_role=baseline_role,
             key=key, 
             reliability=reliability
         )
@@ -178,7 +186,8 @@ class StatsTTest(StatsHypothesisTesting):
             den = ((s_list[0] / n_list[0]) ** 2 / (n_list[0] - 1) + 
                    (s_list[1] / n_list[1]) ** 2 / (n_list[1] - 1))
             return num / den
-        
+
+@backend_factory.register(Chi2Test, SparkDataset)
 class StatsChi2Test(StatsHypothesisTesting):
     """
     Chi-squared test of independence operating on aggregated value counts.
@@ -198,11 +207,13 @@ class StatsChi2Test(StatsHypothesisTesting):
     REQUIRED_STATS = ["value_counts"]
 
     def __init__(
-            self,
+            self, 
             grouping_role: ABCRole | None = None,
-            target_roles: ABCRole | None = None,
+            compare_by: Literal["groups", "matched_pairs"] = "groups",
+            target_roles: ABCRole | None = None, 
+            baseline_role: ABCRole | None = None,
             reliability: float = 0.05,
-            key: Any = "",
+            key: Any = "", 
     ):
         """
         Initialize StatsChi2Test with roles and reliability.
@@ -215,8 +226,10 @@ class StatsChi2Test(StatsHypothesisTesting):
         """
         super().__init__(
             stats=self.REQUIRED_STATS,
+            compare_by=compare_by,
             grouping_role=grouping_role,
             target_roles=target_roles,
+            baseline_role=baseline_role,
             key=key,
             reliability=reliability
         )
@@ -299,7 +312,8 @@ class StatsChi2Test(StatsHypothesisTesting):
             return {"p-value": 1.0, "statistic": 0.0, "pass": True}
 
         return result
-    
+
+@backend_factory.register(ZTest, SparkDataset)
 class StatsZTest(StatsHypothesisTesting):
     """
     Z-test for proportions (approximation of Chi-square for 2x2 table).
@@ -309,11 +323,15 @@ class StatsZTest(StatsHypothesisTesting):
     """
     REQUIRED_STATS = ["count", "sum"]
 
-    def __init__(self, 
-                 grouping_role: ABCRole | None = None, 
-                 target_roles: ABCRole | None = None, 
-                 reliability: float = 0.05,
-                 key: Any = ""):
+    def __init__(
+            self, 
+            grouping_role: ABCRole | None = None,
+            compare_by: Literal["groups", "matched_pairs"] = "groups",
+            target_roles: ABCRole | None = None, 
+            baseline_role: ABCRole | None = None,
+            reliability: float = 0.05,
+            key: Any = "", 
+    ):
         """
         Initialize Chi2Test (Z-test for proportions) with roles and reliability.
 
@@ -325,8 +343,10 @@ class StatsZTest(StatsHypothesisTesting):
         """
         super().__init__(
             stats=self.REQUIRED_STATS, 
+            compare_by=compare_by,
             grouping_role=grouping_role, 
             target_roles=target_roles, 
+            baseline_role=baseline_role,
             key=key, 
             reliability=reliability
         )

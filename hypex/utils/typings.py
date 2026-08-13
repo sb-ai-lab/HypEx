@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import typing
 from types import MappingProxyType
 from typing import (
     TYPE_CHECKING,
@@ -12,7 +13,9 @@ from typing import (
     Tuple,
     TypeVar,
     Type,
-    Union
+    Union,
+    get_args,
+    get_origin
 )
 from pyspark.sql.types import (
     DataType,
@@ -71,6 +74,66 @@ DecoratedType = TypeVar("DecoratedType", bound=Union[Callable[..., Any], propert
 DocstringInheritDecorator = Callable[[DecoratedType], DecoratedType]
 
 SetParamsDictTypes = Union[Dict[str, Any], Dict[type, Dict[str, Any]]]
+
+class GenericManager:
+
+    TYPE_MAP ={
+        typing.List: list,
+        typing.Dict: dict,
+        typing.Set: set, 
+        typing.Tuple: tuple,
+        typing.FrozenSet: frozenset 
+    }
+
+    @staticmethod
+    def check_type(obj: object, type_hint: Any, strict: bool=False) -> bool:
+        """
+        Check object type. Supports parametric jenerics.
+        Works from python 3.8+.
+
+        Args
+        ----
+            obj: `object`
+                object for type check;
+
+            type_hint: `Any`
+                type_hint;
+            
+            strict: `bool`
+                If `True` checks recurentli all types.
+                If `False` (by default), checks only external type.
+        """
+
+        origin = get_origin(type_hint)
+        args = get_args(type_hint)
+
+        # no generic
+        if origin is None:
+            if type_hint is Any:
+                return True
+            try:
+                return isinstance(obj, type_hint)
+            except TypeError:
+                return False
+
+        # Union ot Optional type
+        if origin is Union:
+            return any(GenericManager.check_type(obj, arg, strict) for arg in args)
+        
+        # type correction for python types
+        base_type = origin
+        if hasattr(base_type, '__origin__'):
+            base_type = base_type.__origin__
+
+        base_type = GenericManager.TYPE_MAP.get(base_type, base_type)
+
+        if not isinstance(obj, base_type):
+            return False
+        
+        if not strict or not args:
+            return True
+
+        return True
 
 class SparkTypeMapper:
     _SPARK_TO_PY: MappingProxyType[type[DataType], type] = MappingProxyType({

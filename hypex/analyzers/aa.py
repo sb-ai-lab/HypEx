@@ -183,7 +183,7 @@ class AAScoreAnalyzer(Executor):
         if splitter_class is None:
             raise ValueError(f"{splitter_id} is not a valid splitter id")
         return splitter_class.build_from_id(splitter_id)
-
+    
     def _get_best_split(self, data, score_table, if_param_scores=None):
         """Identifies the optimal data split based on weighted statistical metrics.
         Calculates a composite score using weighted p-values (2/3 weight) and mean test 

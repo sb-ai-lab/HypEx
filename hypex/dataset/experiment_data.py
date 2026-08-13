@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from copy import deepcopy
-from typing import Any
+from typing import Any, Literal
 
 try:
     from typing import Self  # Python >= 3.11
@@ -24,7 +24,7 @@ from ..utils import (
     NotFoundInExperimentDataError,
 )
 from ..utils.adapter import Adapter
-from .roles import AdditionalRole, ABCRole, DefaultRole
+from .roles import AdditionalRole, ABCRole, DefaultRole, DisabledRole
 
 _SUPPORTED_SPACES = frozenset(
     {
@@ -66,6 +66,8 @@ class ExperimentData:
         self.groups: dict[str, dict[str, Dataset]] = {}
         self.analysis_tables: dict[str, SmallDataset] = {}
         self.id_name_mapping: dict[str, str] = {}
+
+        self._initial_cols = deepcopy(self._data.columns)
 
     @property
     def ds(self) -> Dataset | SmallDataset:
@@ -227,6 +229,12 @@ class ExperimentData:
             Self for method chaining.
         """
         normalized_role = self._normalize_role(role)
+
+        storage_level = self._data.get_storage_level() or "MEMORY_AND_DISK"
+        was_persisted = self._data.is_persisted
+
+        if was_persisted:
+            self._data.unpersist()
         
         if not isinstance(value, Dataset):
             # Raw data (list, scalar, etc.) — add as a single column
@@ -234,31 +242,31 @@ class ExperimentData:
                 data=value, 
                 role={exec_id: normalized_role}
             )
-            return self
-
-        if len(value.columns) == 1:
+            # return self
+        elif len(value.columns) == 1:
             # Single-column Dataset — extract the column and add with exec_id as name
             self._data = self._data.add_column(
                 data=value[value.columns[0]], 
                 role={exec_id: normalized_role}
             )
-            return self
-
-        # Multi-column Dataset — rename all columns to avoid naming collisions
-        rename_dict = {col: f"{exec_id}_{col}" for col in value.columns}
-        renamed_value = value.rename(names=rename_dict)
-        self._data = self._data.merge(
-            right=renamed_value,
-            left_index=True,
-            right_index=True
-        )
-        # Apply roles: the first column gets the normalized_role, others keep their original roles
-        for i, col in enumerate(value.columns):
-            new_col_name = f"{exec_id}_{col}"
-            if i == 0:
-                self._data.roles[new_col_name] = normalized_role
-            else:
-                self._data.roles[new_col_name] = value.roles.get(col, DefaultRole())
+            # return self
+        else:
+            # Multi-column Dataset — rename all columns to avoid naming collisions
+            rename_dict = {col: f"{exec_id}_{col}" for col in value.columns}
+            renamed_value = value.rename(names=rename_dict)
+            self._data = self._data.merge(
+                right=renamed_value,
+                left_index=True,
+                right_index=True
+            )
+            # Apply roles: the first column gets the normalized_role, others keep their original roles
+            for i, col in enumerate(value.columns):
+                new_col_name = f"{exec_id}_{col}"
+                if i == 0:
+                    self._data.roles[new_col_name] = normalized_role
+                else:
+                    self._data.roles[new_col_name] = value.roles.get(col, DefaultRole())
+        self._data.persist(storage_level=storage_level, action="none")
         return self
     
     @property
@@ -293,12 +301,23 @@ class ExperimentData:
         Called at the end of Output.extract() to ensure that public-facing
         experiment results do not leak internal/synthetic columns.
         """
+        if self._data.is_persisted:
+            self._data.unpersist()
+
         cols_to_drop = [
             col for col, role in self._data.roles.items()
             if isinstance(role, AdditionalRole)
         ]
+        cols_to_enable = self._data.search_columns(DisabledRole())
         if cols_to_drop:
             self._data = self._data.drop(columns=cols_to_drop)
+        
+        if cols_to_enable:
+            self._data = self._data.replace_roles(
+                new_roles_map={
+                    col: self._data.roles[col].initial_role for col in cols_to_enable
+                }
+            )
         return self
     
     def _clean_ds_for_iteration(self) -> Dataset | SmallDataset:
@@ -492,14 +511,21 @@ class ExperimentData:
         roles: ABCRole | Iterable[ABCRole],
         tmp_role: bool = False,
         search_types: list[type] | None = None,
+        space: Literal["all", "ds", "additional_fields"] = "all",
     ) -> list[str]:
         """Search for column names matching specified semantic roles.
         
         After the refactor, ALL columns live in self.ds 
         (including AdditionalRole columns), so we search only there.
         """
+        space_dict = {
+            "all": self.ds,
+            "ds": self.ds[self._initial_cols],
+            "additional_fields": self.additional_fields,
+        }
+        search_space = space_dict[space]
         roles_list = Adapter.to_list(roles)
-        return self.ds.search_columns(
+        return search_space.search_columns(
             roles_list, tmp_role=tmp_role, search_types=search_types
         )
 
@@ -508,13 +534,14 @@ class ExperimentData:
         roles: ABCRole | Iterable[ABCRole],
         tmp_role: bool = False,
         search_types: list[type] | None = None,
+        space: Literal["all", "ds", "additional_fields"] = "all",
     ) -> Dataset:
         """Build a new dataset containing columns matching specified roles.
         All columns now live in self.ds.
         """
         roles_list = Adapter.to_list(roles)
         role_columns = {
-            role: self.field_search(role, tmp_role, search_types) 
+            role: self.field_search(role, tmp_role, search_types, space) 
             for role in roles_list
         }
         searched = Dataset.create_empty(

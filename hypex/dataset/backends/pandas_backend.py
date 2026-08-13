@@ -7,6 +7,7 @@ except ImportError:
 
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized, TYPE_CHECKING
+import copy
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -224,7 +225,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         if isinstance(item, (slice, int)):
             return self.data.iloc[item]
-        if isinstance(item, (str, list)):
+        if isinstance(item, (str, list, pd.Index)):
             return self.data[item]
         if isinstance(item, pd.DataFrame):
             if len(item.columns) == 1:
@@ -570,6 +571,16 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.__magic_determine_other(other) ** self.data)
 
+    def __deepcopy__(self, memo):
+        """deepcopy backend data"""
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            setattr(result, k, copy.deepcopy(v, memo))
+
+        return result
+
     def __repr__(self):
         """Return string representation of the underlying DataFrame.
 
@@ -706,6 +717,49 @@ class PandasNavigation(DatasetBackendNavigation):
             pd.Index: DataFrame index.
         """
         return self.data.index
+    
+    @index.setter
+    def index(self, value):
+        """Set the index of the underlying DataFrame."""
+        self.data.index = value
+
+    def reset_index(self, 
+                    drop: bool = False,
+                    inplace: bool = False,
+                    **kwargs):
+        """Reset the index to default integer index.
+        
+        Args:
+            drop (bool): If True, drop the current index instead of adding as column.
+            inplace (bool): Ignored; always returns new instance for consistency.
+            **kwargs: Additional arguments passed to underlying reset_index.
+            
+        Returns:
+            New instance with reset index
+        """
+
+        return self._wrap_result(self.data.reset_index(drop=drop, **kwargs))
+
+    def set_index(self,
+                  keys,
+                  drop,
+                  **kwargs):
+        """
+        Set the DataFrame index (row labels) using one or more existing columns.
+
+        Args:
+            keys: label or array-like or list of labels/arrays
+
+            drop: `bool`, default True
+                Delete columns to be used as the new index.
+        """
+        if 'append' not in kwargs:
+            kwargs['append'] = False
+
+        if 'inplace' not in kwargs:
+            kwargs['inplace'] = False
+
+        return self._wrap_result(self.data.set_index(keys=keys, drop=drop, **kwargs))
 
     @property
     def columns(self):
@@ -979,6 +1033,12 @@ class PandasNavigation(DatasetBackendNavigation):
         if not isinstance(data, Iterable) or isinstance(data, str):
             data = [data]
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+    
+    def to_numpy(self) -> np.ndarray:
+        """
+        This method is extraordinary and used to collect into numpy array.
+        """
+        return self.data.values.flatten()
 
 
 class PandasDataset(PandasNavigation, DatasetBackendCalc):
@@ -1107,6 +1167,12 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             pd.Grouper
         """
         return self.data.groupby(by=by, observed=False, **kwargs)
+
+    def count_groups(self, group_cols: list[str]) -> int:
+        """Count unique combinations of group_cols"""
+        if not group_cols:
+            return 1
+        return int(self.data[group_cols].nunique())
 
     def iter_groups(self, by: list[str]):
         for key, group in self.data.groupby(by=by, observed=False):
@@ -1427,19 +1493,20 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Result of matrix multiplication.
         """
+        initial_index = self.data.index
         if isinstance(other, np.ndarray):
             other_df = pd.DataFrame(
                 data=other,
-                columns=self.columns if other.shape[1] == self.shape[1] else None,
+                index=self.columns if other.shape[0] == self.shape[1] else None,
             )
-            result = self.data.dot(other_df.T)
+            result = self.data.dot(other_df)
             result.columns = (
                 self.columns if other.shape[1] == self.shape[1] else result.columns
             )
         else:
             result = self.data.dot(other.data)
         return self._wrap_result(
-            result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+            result.set_index(initial_index) if isinstance(result, pd.DataFrame) else pd.DataFrame(result, index=initial_index)
         )
 
     def dropna(
@@ -1699,6 +1766,23 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         )
 
         return data_expanded
+
+    def explode(self, column=None, ignore_index=False):
+        """
+        Transform each element of a list-like to a row.
+
+        Args
+        ----
+            column: `str` or `tuple`
+                Column to explode.
+
+        Return
+        ------  
+            DataFrame:
+                Exploded lists to rows of the subset columns; index will be duplicated for these rows.
+        """
+    
+        return self._wrap_result(self.data.explode(column=column, ignore_index=ignore_index))
 
     def checkpoint(self):
         pass
