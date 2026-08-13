@@ -144,6 +144,17 @@ class ConstGroupRole(ABCRole):
     _role_name: RoleNameType = "ConstGroup"
 
 
+class MaximizationRole(ABCRole):
+    """Metric the best split must maximize.
+
+    A column with this role is not a target: it is not tested for homogeneity
+    between the groups, only its group means are computed, so that the best split
+    can be chosen by the highest one.
+    """
+
+    _role_name: RoleNameType = "Maximization"
+
+
 # ___________________________________________________________________________________________
 class TempRole(ABCRole):
     _role_name: RoleNameType = "Temp"
@@ -210,6 +221,7 @@ default_roles: dict[RoleNameType, ABCRole] = {
     "statistic": StatisticRole(),
     "filter": FilterRole(),
     "constgroup": ConstGroupRole(),
+    "maximization": MaximizationRole(),
     "additionaltreatment": AdditionalTreatmentRole(),
     "additionalgrouping": AdditionalGroupingRole(),
     "additionaltarget": AdditionalTargetRole(),

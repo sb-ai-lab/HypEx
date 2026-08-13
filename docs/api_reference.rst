@@ -187,6 +187,7 @@ without hard-coding column names.
    dataset.PreTargetRole
    dataset.StatisticRole
    dataset.StratificationRole
+   dataset.MaximizationRole
    dataset.FilterRole
    dataset.AdditionalTargetRole
    dataset.AdditionalFeatureRole

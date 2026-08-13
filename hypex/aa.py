@@ -7,7 +7,7 @@ from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
 from .comparators import GroupDifference, GroupSizes
 from .comparators.abstract import Comparator
 from .comparators.hypothesis_testing import Chi2Test, KSTest, TTest
-from .dataset import AdditionalTreatmentRole, TargetRole
+from .dataset import AdditionalTreatmentRole, MaximizationRole, TargetRole
 from .experiments.base import Experiment, OnRoleExperiment
 from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from .forks.aa import IfAAExecutor
@@ -31,6 +31,16 @@ AA_METRICS = Experiment(
                 Chi2Test(compare_by="groups", grouping_role=AdditionalTreatmentRole()),
             ],
             role=TargetRole(),
+        ),
+        # the metric to maximize is not tested for homogeneity, only its group
+        # means are needed in order to compare the splits by it
+        OnRoleExperiment(
+            executors=[
+                GroupDifference(
+                    compare_by="groups", grouping_role=AdditionalTreatmentRole()
+                ),
+            ],
+            role=MaximizationRole(),
         ),
         OneAAStatAnalyzer(),
     ]
@@ -109,7 +119,18 @@ class AATest(ExperimentShell):
             faster but the aggregate per-feature AA score (the empirical type-1 error over
             all iterations) is no longer meaningful and should not be read as a homogeneity
             guarantee. If no clean split is found within ``n_iterations``, the full run is
-            kept and the best available split is selected. Defaults to False.
+            kept and the best available split is selected. Together with a metric tagged
+            for maximization it leaves a single candidate to choose from, so the metric
+            is effectively not maximized. Defaults to False.
+        maximize_group (str, optional): Group in which the metric tagged with
+            ``MaximizationRole`` must be as high as possible, as labeled by the splitter
+            ("control", "test_1", ...). The best split is then chosen among the
+            iterations where no test flagged a difference on any feature: of those the
+            one with the highest mean of the metric in this group wins. The metric is
+            never tested for homogeneity itself. If no iteration is homogeneous on all
+            features, selection falls back to the best split by homogeneity. Required
+            whenever a column carries MaximizationRole, and meaningless without one.
+            Defaults to None.
 
 
     Examples
@@ -118,6 +139,12 @@ class AATest(ExperimentShell):
 
         # Basic A/A test with default parameters
         aa_test = AATest()
+        results = aa_test.execute(data)
+
+        # Of the homogeneous splits, take the one with the highest AR in control.
+        # AR is tagged in the data, so it is maximized but not tested for homogeneity:
+        # Dataset(roles={..., "AR": MaximizationRole()}, data=df)
+        aa_test = AATest(n_iterations=2000, maximize_group="control")
         results = aa_test.execute(data)
 
         # High precision A/A test with stratification
@@ -208,6 +235,7 @@ class AATest(ExperimentShell):
         equal_variance: bool | None = None,
         groups_sizes: list[float] | None = None,
         early_stopping: bool = False,
+        maximize_group: str | None = None,
         **kwargs,
     ):
         if "t_test_equal_var" in kwargs:
@@ -230,12 +258,12 @@ class AATest(ExperimentShell):
                     [ONE_AA_TEST_WITH_STRATIFICATION if stratification else ONE_AA_TEST]
                 ),
                 params=self._prepare_params(
-                    n_iterations,
-                    control_size,
-                    random_states,
-                    sample_size,
-                    additional_params,
-                    groups_sizes,
+                    n_iterations=n_iterations,
+                    control_size=control_size,
+                    random_states=random_states,
+                    sample_size=sample_size,
+                    additional_params=additional_params,
+                    groups_sizes=groups_sizes,
                 ),
                 reporter=DatasetReporter(OneAADictReporter(front=False)),
                 stopping_criterion=(
@@ -256,17 +284,17 @@ class AATest(ExperimentShell):
                         ]
                     ),
                     params=self._prepare_params(
-                        n_iterations,
-                        control_size,
-                        random_states,
-                        additional_params,
-                        groups_sizes,
+                        n_iterations=n_iterations,
+                        control_size=control_size,
+                        random_states=random_states,
+                        additional_params=additional_params,
+                        groups_sizes=groups_sizes,
                     ),
                     reporter=DatasetReporter(OneAADictReporter(front=False)),
                     stopping_criterion=IfAAExecutor(sample_size=sample_size),
                 )
             )
-        experiment_params.append(AAScoreAnalyzer())
+        experiment_params.append(AAScoreAnalyzer(maximize_group=maximize_group))
         super().__init__(
             experiment=Experiment(
                 experiment_params,

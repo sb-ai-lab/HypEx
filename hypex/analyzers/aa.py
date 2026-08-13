@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import warnings
 from typing import Any, ClassVar
 
 import numpy as np
 
-from ..comparators import Chi2Test, KSTest, TTest
-from ..dataset import Dataset, ExperimentData, StatisticRole
+from ..comparators import Chi2Test, GroupDifference, KSTest, TTest
+from ..dataset import Dataset, ExperimentData, MaximizationRole, StatisticRole
 from ..executor import Executor
 from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from ..reporters.aa import OneAADictReporter
@@ -73,14 +74,42 @@ class OneAAStatAnalyzer(Executor):
 
 
 class AAScoreAnalyzer(Executor):
+    """Scores the A/A iterations and picks the best split among them.
+
+    By default the best split is the one with the highest homogeneity score. If a
+    column carries ``MaximizationRole`` and ``maximize_group`` is set, the split is
+    instead chosen among the iterations where no test flagged a difference on any
+    feature: of those the one with the highest mean of the tagged metric in
+    ``maximize_group`` wins. The metric itself is never tested for homogeneity.
+
+    Args:
+        alpha (float, optional): Significance level the per-feature A/A scores are
+            compared against. Defaults to 0.05.
+        key (str, optional): Executor key. Defaults to "".
+        maximize_group (str, optional): Group the metric is maximized in, as labeled
+            by the splitter ("control", "test_1", ...). Required whenever a column
+            carries MaximizationRole, and meaningless without one. Defaults to None.
+    """
+
     AA_SPLITER_CLASS_MAPPING: ClassVar[dict] = {
         class_.__name__: class_ for class_ in [AASplitter, AASplitterWithStratification]
     }
+    PASS_COLUMN_MARKER: ClassVar[str] = f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}"
+    P_VALUE_COLUMN_MARKER: ClassVar[str] = f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}"
+    GROUP_DIFFERENCE_MARKER: ClassVar[str] = (
+        f"{ID_SPLIT_SYMBOL}{GroupDifference.__name__}{ID_SPLIT_SYMBOL}"
+    )
 
     # TODO: rename alpha
-    def __init__(self, alpha: float = 0.05, key: str = ""):
+    def __init__(
+        self,
+        alpha: float = 0.05,
+        key: str = "",
+        maximize_group: str | None = None,
+    ):
         super().__init__(key=key)
         self.alpha = alpha
+        self.maximize_group = maximize_group
         self.__feature_weights = {}
         self.threshold = 1 - (self.alpha * 1.2)
 
@@ -97,11 +126,10 @@ class AAScoreAnalyzer(Executor):
     def _analyze_aa_score(
         self, data: ExperimentData, score_table: Dataset
     ) -> ExperimentData:
-        search_flag = f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}"
         self.__feature_weights = {
             column: 1 - abs(self.alpha - score_table.loc[:, column].mean())
             for column in score_table.columns
-            if search_flag in column
+            if self.PASS_COLUMN_MARKER in column
         }
         aa_scores = {
             class_.replace(f"{ID_SPLIT_SYMBOL}pass", ""): value
@@ -114,6 +142,112 @@ class AAScoreAnalyzer(Executor):
         self.key = "aa score"
         return self._set_value(data, result)
 
+    @staticmethod
+    def _is_flagged(value: Any) -> bool:
+        """Whether a test flagged a difference, i.e. its "pass" value is truthy.
+
+        A test that could not be computed (a missing value) is not a flag. Values
+        may arrive as strings, so bare bool() is not enough: it would read both
+        "False" and nan as a flag.
+        """
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return value.lower() == "true"
+        if isinstance(value, float) and np.isnan(value):
+            return False
+        return bool(value)
+
+    def _find_maximized_metric_column(self, score_table: Dataset, metric: str) -> str:
+        """Finds the column to maximize: mean of the metric in maximize_group."""
+        if self.maximize_group == "control":
+            # control mean is repeated for every test group, so any of them fits
+            prefix = (
+                f"{metric}{self.GROUP_DIFFERENCE_MARKER}control mean{ID_SPLIT_SYMBOL}"
+            )
+            found = [c for c in score_table.columns if c.startswith(prefix)]
+        else:
+            column = (
+                f"{metric}{self.GROUP_DIFFERENCE_MARKER}"
+                f"test mean{ID_SPLIT_SYMBOL}{self.maximize_group}"
+            )
+            found = [column] if column in score_table.columns else []
+        if len(found) == 0:
+            groups = {"control"}
+            for column in score_table.columns:
+                if self.GROUP_DIFFERENCE_MARKER in column:
+                    groups.add(column[column.rfind(ID_SPLIT_SYMBOL) + 1 :])
+            raise ValueError(
+                f"Mean of {metric} in group {self.maximize_group} is not found in the "
+                f"A/A score table. Groups available: {sorted(groups)}. Note that only "
+                f"a numeric metric can be maximized."
+            )
+        return found[0]
+
+    def _resolve_metric_to_maximize(self, data: ExperimentData) -> str | None:
+        """The column tagged for maximization, if maximization is configured at all.
+
+        The metric (a column with MaximizationRole) and the group to maximize it in
+        are two halves of one setting: either both are given, or neither is.
+        """
+        metric_fields = data.ds.search_columns(MaximizationRole())
+        role_name = MaximizationRole().role_name
+        if len(metric_fields) == 0:
+            if self.maximize_group is not None:
+                raise ValueError(
+                    f"Group {self.maximize_group} is set to be maximized, but no "
+                    f"column carries the {role_name} role, so there is no metric to "
+                    f"maximize in it."
+                )
+            return None
+        if self.maximize_group is None:
+            raise ValueError(
+                f"Column {metric_fields[0]} carries the {role_name} role, but the "
+                f"group to maximize it in is not set. Pass maximize_group "
+                f"('control', 'test_1', ...)."
+            )
+        if len(metric_fields) > 1:
+            warnings.warn(
+                f"Only one metric can be maximized, but {len(metric_fields)} columns "
+                f"carry the {role_name} role: {metric_fields}. {metric_fields[0]} "
+                f"will be used.",
+                stacklevel=2,
+            )
+        return metric_fields[0]
+
+    def _get_best_index_by_metric(
+        self, data: ExperimentData, score_table: Dataset
+    ) -> float | None:
+        """Index of the homogeneous split with the highest metric in the given group.
+
+        Only the iterations where no test flagged a difference on any feature take
+        part in the comparison. Returns None if there is nothing to maximize or if
+        no iteration is homogeneous.
+        """
+        metric = self._resolve_metric_to_maximize(data)
+        if metric is None:
+            return None
+        maximized_column = self._find_maximized_metric_column(score_table, metric)
+        pass_columns = [c for c in score_table.columns if self.PASS_COLUMN_MARKER in c]
+
+        def is_homogeneous(row) -> bool:
+            return not any(self._is_flagged(row[column]) for column in pass_columns)
+
+        metric_scores = score_table.apply(
+            lambda x: x[maximized_column] if is_homogeneous(x) else -np.inf,
+            axis=1,
+            role={"metric score": StatisticRole()},
+        )
+        if metric_scores.max() == -np.inf:
+            warnings.warn(
+                f"No split is homogeneous on all features, so the mean of {metric} "
+                f"in group {self.maximize_group} cannot be maximized. Falling back "
+                f"to the best split by homogeneity.",
+                stacklevel=2,
+            )
+            return None
+        return metric_scores.idxmax()
+
     def build_splitter_from_id(self, splitter_id: str):
         splitter_class = self.AA_SPLITER_CLASS_MAPPING.get(
             splitter_id[: splitter_id.find(ID_SPLIT_SYMBOL)]
@@ -121,6 +255,46 @@ class AAScoreAnalyzer(Executor):
         if splitter_class is None:
             raise ValueError(f"{splitter_id} is not a valid splitter id")
         return splitter_class.build_from_id(splitter_id)
+
+    def _get_best_index_by_homogeneity(self, score_table: Dataset) -> float | int:
+        """Index of the split with the highest homogeneity score."""
+        if len(self.__feature_weights) < 1:
+            return 0
+        aa_split_scores = score_table.apply(
+            lambda x: (
+                (
+                    (
+                        (
+                            sum(
+                                x[
+                                    key.replace(
+                                        self.PASS_COLUMN_MARKER,
+                                        self.P_VALUE_COLUMN_MARKER,
+                                    )
+                                ]
+                                * value
+                                for key, value in self.__feature_weights.items()
+                                if (isinstance(value, float) and value > 0)
+                                and (
+                                    key.replace(
+                                        self.PASS_COLUMN_MARKER,
+                                        self.P_VALUE_COLUMN_MARKER,
+                                    )
+                                    in x["splitter_id"]
+                                )
+                            )
+                            / len(self.__feature_weights)
+                        )
+                        * 2
+                    )
+                    / 3
+                )
+                + x["mean test score"] / 3
+            ),
+            axis=1,
+            role={"aa split score": StatisticRole()},
+        )
+        return aa_split_scores.idxmax()
 
     def _get_best_split(
         self,
@@ -130,44 +304,9 @@ class AAScoreAnalyzer(Executor):
     ) -> dict[str, Any]:
         # TODO: add split_scores in ExperimentData
         if if_param_scores is None:
-            if len(self.__feature_weights) < 1:
-                best_index = 0
-            else:
-                aa_split_scores = score_table.apply(
-                    lambda x: (
-                        (
-                            (
-                                (
-                                    sum(
-                                        x[
-                                            key.replace(
-                                                f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}",
-                                                f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}",
-                                            )
-                                        ]
-                                        * value
-                                        for key, value in self.__feature_weights.items()
-                                        if (isinstance(value, float) and value > 0)
-                                        and (
-                                            key.replace(
-                                                f"{ID_SPLIT_SYMBOL}pass{ID_SPLIT_SYMBOL}",
-                                                f"{ID_SPLIT_SYMBOL}p-value{ID_SPLIT_SYMBOL}",
-                                            )
-                                            in x["splitter_id"]
-                                        )
-                                    )
-                                    / len(self.__feature_weights)
-                                )
-                                * 2
-                            )
-                            / 3
-                        )
-                        + x["mean test score"] / 3
-                    ),
-                    axis=1,
-                    role={"aa split score": StatisticRole()},
-                )
-                best_index = aa_split_scores.idxmax()
+            best_index = self._get_best_index_by_metric(data, score_table)
+            if best_index is None:
+                best_index = self._get_best_index_by_homogeneity(score_table)
             best_split_id = score_table.loc[best_index, "splitter_id"].get_values(0, 0)
             score_dict = score_table.loc[best_index, :].transpose().to_records()[0]
         else:
