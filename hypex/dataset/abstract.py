@@ -32,6 +32,7 @@ from ..utils import (
     RoleColumnError,
     ScalarType,
     SourceDataTypes,
+    GenericManager
 )
 from ..utils.adapter import Adapter
 from .roles import (
@@ -47,85 +48,7 @@ from .roles import (
 class DatasetBase:
     DISPLAY_ROWS = 5
     DISPLAY_COLS = 10
-    
-    def __deepcopy__(self, memo: dict) -> "DatasetBase":
-        """Create a deep copy of the Dataset instance.
 
-        This method overrides the standard deepcopy behavior to handle
-        backend-specific constraints, particularly for Spark. Since
-        ``SparkSession`` and underlying RDDs cannot be pickled or deep-copied
-        by Python's standard library, this implementation creates a new
-        dataset instance that shares the same backend reference for Spark
-        (which is safe due to Spark's immutable DataFrame lineage) while
-        performing a true deep copy for Pandas backends.
-
-        Args:
-            memo: A dictionary used by the copy module to track objects
-                already copied during the current copying pass.
-
-        Returns:
-            A new instance of the dataset class with copied roles and
-            appropriate backend handling.
-        """
-        # 1. Create a new instance without calling __init__
-        cls = self.__class__
-        new_obj = cls.__new__(cls)
-
-        # 2. Deep copy metadata and roles
-        # Roles are simple objects/dicts, so standard deepcopy works fine.
-        new_obj._roles = copy.deepcopy(self._roles, memo)
-        new_obj._tmp_roles = copy.deepcopy(self._tmp_roles, memo)
-        new_obj.default_role = copy.deepcopy(self.default_role, memo)
-
-        # 3. Handle the backend data specifically
-        # We access _backend_data directly as it is initialized in __init__.
-        # Using getattr with a default is safer than hasattr for linters.
-        backend_data = getattr(self, "_backend_data", None)
-        
-        if backend_data is not None:
-            if self.backend_type == BackendsEnum.spark:
-                # For Spark, we do NOT deep copy the backend object.
-                # Spark DataFrames are immutable transformations of an RDD.
-                # Copying the reference is safe and efficient. 
-                # Deep copying would attempt to pickle the SparkSession, causing errors.
-                new_obj._backend_data = backend_data
-            else:
-                # For Pandas, we perform a full deep copy of the DataFrame
-                # to ensure complete isolation between the original and the copy.
-                new_obj._backend_data = copy.deepcopy(backend_data, memo)
-        else:
-            new_obj._backend_data = None
-
-        # 4. Re-initialize helper accessors (loc/iloc)
-        # These objects hold references to the backend and roles.
-        # Since we have a new roles dict and potentially a new backend (Pandas),
-        # we must create new Locker instances.
-        if hasattr(self, "loc"):
-            # Check if the class defines these helper classes
-            locker_class = getattr(cls, "Locker", None)
-            ilocker_class = getattr(cls, "ILocker", None)
-
-            if locker_class and ilocker_class:
-                new_obj.loc = locker_class(
-                    call_class=cls,
-                    backend=new_obj._backend_data,
-                    roles=new_obj._roles
-                )
-                new_obj.iloc = ilocker_class(
-                    call_class=cls,
-                    backend=new_obj._backend_data,
-                    roles=new_obj._roles
-                )
-            else:
-                # Fallback if helpers are not defined in the class structure
-                new_obj.loc = None
-                new_obj.iloc = None
-        else:
-            new_obj.loc = None
-            new_obj.iloc = None
-
-        return new_obj
-    
     @dataclass
     class Locker:
         call_class: Any
@@ -350,7 +273,7 @@ class DatasetBase:
             self._backend_data.unpersist(blocking=blocking)
 
         return self
-    
+
     @property
     def is_persisted(self) -> bool:
         if self.backend_type == BackendsEnum.spark:
@@ -372,20 +295,20 @@ class DatasetBase:
             if self.backend_type == BackendsEnum.pandas
             else self.is_persisted(),
         }
-        
+
     def checkpoint(self, eager: bool = True) -> Self:
         """Breaks the computation graph (Lineage) for the Spark backend.
-        
+
         For the Pandas backend, this method acts as a no-op. It is critical
         for iterative processes (e.g., A/A and A/B tests) to prevent
         exponential slowdowns caused by the growth of the DAG in Spark.
-        
+
         Args:
             eager: If ``True``, the checkpoint is executed eagerly,
                 immediately materializing the DataFrame. If ``False``,
                 the checkpoint is deferred until the next action.
                 Defaults to ``True``.
-                
+
         Returns:
             The dataset instance itself (``Self``) to allow method chaining.
         """
@@ -468,7 +391,22 @@ class DatasetBase:
 
         return self.__class__(roles=new_roles, data=new_data)
 
-    def __setitem__(self, key: str, value: Any) -> None:
+    def set_index(self,
+                  keys,
+                  drop=True,
+                  **kwargs) -> DatasetBase:
+        new_data = self._backend_data.set_index(keys=keys, drop=drop, **kwargs)
+        new_roles = deepcopy(self.roles)
+
+        if drop:
+            for col in Adapter.to_list(keys):
+                del new_roles[col]
+
+        return self.__class__(roles=new_roles, data=new_data)
+
+    def __setitem__(self,
+                    key: str,
+                    value: Any) -> None:
         if isinstance(value, DatasetBase):
             value = value.iselect(0).data
         if key not in self.columns and isinstance(key, str):
@@ -494,12 +432,12 @@ class DatasetBase:
                 raise TypeError("Value type does not match the expected data type.")
 
     def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
+        display_limit = n_rows if n_rows <= self.DISPLAY_ROWS * 2 else self.DISPLAY_ROWS
         head = self._backend_data._display_head_tail(
-            rows_display_limit=self.DISPLAY_ROWS,
+            rows_display_limit=display_limit,
             cols_display_limit=self.DISPLAY_COLS,
             n_cols=n_cols,
-            n_rows=n_rows,
-        )
+            n_rows=n_rows)
 
         if n_rows > self.DISPLAY_ROWS * 2:
             _tmp_tail = self._backend_data._display_head_tail(
@@ -507,8 +445,7 @@ class DatasetBase:
                 cols_display_limit=self.DISPLAY_COLS,
                 n_cols=n_cols,
                 n_rows=n_rows,
-                tail=True,
-            )
+                tail=True)
 
             tail = pd.concat(
                 [
@@ -613,19 +550,28 @@ class DatasetBase:
         else:
             other_raw = other
 
-        func = getattr(self_raw, func_name)
+        # func = getattr(self_raw, func_name)
+        func = getattr(self.backend_data, func_name)
         result_raw = func(other_raw)
 
-        if hasattr(result_raw, "to_frame") and not hasattr(result_raw, "columns"):
+        result_raw = (
+            result_raw.data
+            if hasattr(result_raw, 'data')
+            else result_raw
+        )
+
+        if hasattr(result_raw, 'to_frame') and not hasattr(result_raw, 'columns'):
             col_name = (
                 result_raw.name
                 if result_raw.name is not None
-                else (self_raw.columns[0] if hasattr(self_raw, "columns") else "result")
+                else (self_raw.columns[0] if hasattr(self_raw, 'columns') else 'result')
             )
             result_raw = result_raw.to_frame(name=col_name)
 
         actual_columns = (
-            list(result_raw.columns) if hasattr(result_raw, "columns") else []
+            list(result_raw.columns)
+            if hasattr(result_raw, 'columns')
+            else []
         )
         new_roles = {}
         for col in actual_columns:
@@ -742,12 +688,22 @@ class DatasetBase:
     def __rpow__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__rpow__")
     
-    def search_columns(
-        self,
-        roles: ABCRole | Iterable[ABCRole],
-        tmp_role: bool = False,
-        search_types: list[type] | None = None,
-    ) -> list[str]:
+    def __deepcopy__(self, memo):
+        """deepcopy dataset"""
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k.startswith('_abc_'):
+                continue
+            setattr(result, k, deepcopy(v, memo))
+
+        return result
+
+    def search_columns(self,
+                       roles: ABCRole | Iterable[ABCRole],
+                       tmp_role: bool =False,
+                       search_types: list[type] | None = None) -> list[str]:
         from collections.abc import Iterable as IterableABC
         roles = roles if isinstance(roles, IterableABC) else [roles]
         roles_for_search = self._tmp_roles if tmp_role else self.roles
@@ -865,8 +821,8 @@ class DatasetBase:
         if result is None:
             return None
 
-        _scalar_types = getattr(ScalarType, "__args__", (ScalarType,))
-        if isinstance(result, _scalar_types):
+        # if isinstance(result, ScalarType):
+        if GenericManager.check_type(result, ScalarType):
             return result
 
         if not hasattr(result, "columns"):
@@ -914,6 +870,12 @@ class DatasetBase:
             raise ConcatBackendError(
                 type(other._backend_data), type(self._backend_data)
             )
+
+    def _to_numpy(self):
+        """
+        This method is extraordinary and regular user shouldn't use it.
+        """
+        return self._backend_data.to_numpy()
 
     def astype(
         self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
@@ -1230,7 +1192,7 @@ class DatasetBase:
         return self.__class__(
             roles=deepcopy(other.roles) if isinstance(other, self.__class__) else {},
             data=self.backend_data.dot(
-                other.backend if isinstance(other, self.__class__) else other
+                other.backend_data if isinstance(other, self.__class__) else other
             ),
         )
 
@@ -1244,7 +1206,7 @@ class DatasetBase:
             self.roles,
             data=self.backend_data.sample(frac=frac, n=n, random_state=random_state),
         )
-        
+
     def random_split_labels(
         self,
         edges: list[int],
@@ -1255,10 +1217,10 @@ class DatasetBase:
     ) -> Self:
         """
         Splits data into labeled groups using a scalable distributed algorithm.
-        
+
         For Spark backend: Uses hash-based shuffling and distributed indexing (zipWithIndex)
         to avoid OOM errors associated with sorting and taking top-N rows.
-        
+
         For Pandas backend: Uses standard sampling and positional labeling.
 
         Args:
@@ -1280,14 +1242,14 @@ class DatasetBase:
             frac=frac,
             name=name,
         )
-        
+
         # Wrap the result back into a Dataset
         # Note: The result only has the index and the 'name' column.
         # Roles should be minimal here, usually just InfoRole or StatisticRole for the split column.
         from .roles import InfoRole
-        
+
         return self.__class__(
-            roles={name: InfoRole()}, 
+            roles={name: InfoRole()},
             data=result_df,
             session=self.session if hasattr(self, 'session') else None
         )
@@ -1385,3 +1347,13 @@ class DatasetBase:
             self._roles = new_roles
 
         return self
+
+    def explode(self, column, ignore_index=False):
+        result = self.backend_data.explode(column=column, ignore_index=ignore_index)
+        new_roles = deepcopy(self.roles)
+        new_roles[column] = type(new_roles[column])()
+
+        return self.__class__(
+            new_roles,
+            data=result
+        )

@@ -3,6 +3,7 @@
 Скрипт для сбора всех .py файлов проекта в один текстовый файл.
 Требует Python 3.9+ (встроенные дженерики list, set, tuple).
 """
+from __future__ import annotations
 import argparse
 import os
 import sys

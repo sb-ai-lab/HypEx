@@ -4,12 +4,14 @@ from collections.abc import Iterable, Sequence
 from copy import deepcopy
 from typing import Any
 
-from ..dataset import ABCRole, AdditionalTargetRole, ExperimentData, TempTargetRole
+from ..dataset import ABCRole, AdditionalTargetRole, ExperimentData, TempTargetRole, Dataset
 from ..executor import Executor
 from ..utils import ExperimentDataEnum, timeit
 from ..utils import BackendsEnum
+from ..utils.registry import backend_factory
 
 import time
+import inspect
 
 
 
@@ -133,6 +135,33 @@ class Experiment(Executor):
         """
         return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
 
+    @staticmethod
+    def _get_executor_backend(executor: Executor, ds: Dataset):
+        """
+        Class for selecting backend-dependent realization for direct executor
+        """
+        executor_cls = type(executor)
+        backend_cls = backend_factory.resolve_backend(executor_cls, ds)
+        if backend_cls is None:
+             return executor
+
+        sig = inspect.signature(backend_cls.__init__)
+        expected_params = {p.name for p in sig.parameters.values() if p.name != 'self'}
+
+        init_kwargs = {k: getattr(executor, k) for k in expected_params if hasattr(executor, k)}
+
+        has_var_keyword = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+        if has_var_keyword and hasattr(executor, 'calc_kwargs'):
+            init_kwargs['calc_kwargs'] = executor.calc_kwargs
+
+        new_executor = backend_cls(**init_kwargs)
+
+        if hasattr(executor, 'key'):
+            new_executor.key = executor.key
+
+        return new_executor
+
+
     @timeit(level="PIPELINE", prefix="EXPERIMENT")
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Run the full executor pipeline on the given experiment data.
@@ -150,11 +179,9 @@ class Experiment(Executor):
         """
         experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
-            start = time.perf_counter()
-            
-            executor.key = self.key
-            experiment_data = executor.execute(experiment_data)
-            end = time.perf_counter()
+            cur_executor = self._get_executor_backend(executor, experiment_data.ds)
+            cur_executor.key = self.key
+            experiment_data = cur_executor.execute(experiment_data)
             
         return experiment_data
 
@@ -212,8 +239,8 @@ class OnRoleExperiment(Experiment):
         1. **Vector executors**: Subclasses of :class:`StatsComparator` or
            :class:`StatsHypothesisTesting`. These can process all target columns
            in a single pass by setting ``tmp_roles`` for all targets simultaneously.
-           
-        2. **Iterative executors**: All other executors (including 
+
+        2. **Iterative executors**: All other executors (including
            :class:`AdaptiveHypothesisTest` like TTest/KSTest on Pandas backend,
            which delegate to non-vectorized group tests). These are executed
            in a loop, once per target column, to ensure compatibility with
@@ -243,19 +270,19 @@ class OnRoleExperiment(Experiment):
         target_fields = data.field_search(self.role)
         if not target_fields:
             return data
-        
+
         from ..comparators.abstract import StatsComparator, StatsHypothesisTesting
         from ..comparators.adaptive_hypothesis_testing import AdaptiveHypothesisTest
-        
+
         vector_executors = []
         iterative_executors = []
         _backend = data.ds.backend_type
-        
+
         for ex in self.executors:
             # StatsComparator and StatsHypothesisTesting are truly vectorized (work on aggregated stats)
             if isinstance(ex, (StatsComparator, StatsHypothesisTesting)):
                 vector_executors.append(ex)
-            # AdaptiveHypothesisTest is tricky: 
+            # AdaptiveHypothesisTest is tricky:
             # On Spark it becomes StatsHypothesisTesting (vectorized).
             # On Pandas it becomes GroupHypothesisTesting (NOT vectorized, requires single column).
             # So we should treat AdaptiveHypothesisTest as iterative to be safe for Pandas,
@@ -269,7 +296,7 @@ class OnRoleExperiment(Experiment):
                 iterative_executors.append(ex)
 
         original_executors = self.executors
-        
+
         # Vector executors execution (only true StatsComparators)
         if vector_executors:
             tmp_roles_dict = {}
@@ -278,7 +305,7 @@ class OnRoleExperiment(Experiment):
                     tmp_roles_dict[field] = TempTargetRole()
                 elif data.additional_fields and field in data.additional_fields.columns:
                     tmp_roles_dict[field] = AdditionalTargetRole()
-            
+
             if tmp_roles_dict:
                 data.ds.tmp_roles = tmp_roles_dict
                 self.executors = vector_executors
@@ -293,9 +320,9 @@ class OnRoleExperiment(Experiment):
                     data.ds.tmp_roles = {field: TempTargetRole()}
                 elif data.additional_fields and field in data.additional_fields.columns:
                     data.additional_fields.tmp_roles = {field: AdditionalTargetRole()}
-                
+
                 data = super().execute(data)
-                
+
                 data.ds.tmp_roles = {}
                 if data.additional_fields:
                     data.additional_fields.tmp_roles = {}

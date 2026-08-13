@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import pandas as pd  # type: ignore
 import pyspark.sql as spark
+import pyspark.pandas as ps
 
 from ..utils import (
     ID_SPLIT_SYMBOL,
@@ -48,6 +49,22 @@ class Dataset(DatasetBase):
             roles=self.roles,
             data=self.data,
             default_role=self.default_role,
+        )
+    
+    def sort(
+        self,
+        by: MultiFieldKeyTypes | None = None,
+        ascending: bool = True,
+        **kwargs,
+    ):
+        if by is None:
+            return Dataset(
+                roles=self.roles,
+                data=self.backend_data.sort_index(ascending=ascending, **kwargs),
+            )
+        return Dataset(
+            roles=self.roles,
+            data=self.backend_data.sort_values(by=by, ascending=ascending, **kwargs),
         )
 
 
@@ -179,14 +196,18 @@ class SmallDataset(DatasetBase):
 class DatasetAdapter(Adapter):
     @staticmethod
     def to_dataset(
-        data: dict | Dataset | pd.DataFrame | list | str | int | float | bool,
+        data: dict | Dataset | pd.DataFrame | spark.DataFrame | list | str | int | float | bool,
         roles: ABCRole | dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
         # Convert data based on its type
         if isinstance(data, dict):
             return DatasetAdapter.dict_to_dataset(data, roles, small)
-        elif isinstance(data, pd.DataFrame):
+        elif (
+                isinstance(data, pd.DataFrame) or 
+                isinstance(data, spark.DataFrame) or 
+                isinstance(data, ps.DataFrame)
+            ):
             if isinstance(roles, ABCRole):
                 raise InvalidArgumentError("roles", "dict[str, ABCRole]")
             return DatasetAdapter.frame_to_dataset(data, roles, small)
@@ -256,7 +277,7 @@ class DatasetAdapter(Adapter):
 
     @staticmethod
     def frame_to_dataset(
-        data: pd.DataFrame,
+        data: pd.DataFrame | spark.DataFrame, 
         roles: dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
@@ -280,7 +301,7 @@ class DatasetAdapter(Adapter):
     ) -> Dataset | SmallDataset:
         columns = range(data.shape[1]) if len(roles) == 0 else list(roles.keys())
         data = pd.DataFrame(data=data, columns=columns)
-        result = SmallDataset(
+        result = Dataset(
             roles=roles,
             data=data,
         )

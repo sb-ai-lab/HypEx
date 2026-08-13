@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 from .analyzers.matching import MatchingAnalyzer
-from .comparators import GroupChi2Test, GroupKSTest, GroupTTest
+from .comparators import Chi2Test, KSTest, TTest
 from .comparators.distances import MahalanobisDistance
 from .dataset import AdditionalMatchingRole, FeatureRole, TargetRole, TreatmentRole
 from .encoders.encoders import DummyEncoder
@@ -123,18 +123,18 @@ class Matching(ExperimentShell):
             # "l2": L2Distance(grouping_role=TreatmentRole(), weights=weights),
         }
         test_mapping = {
-            "t-test": GroupTTest(
+            "t-test": TTest(
                 compare_by="matched_pairs",
                 grouping_role=TreatmentRole(),
                 baseline_role=AdditionalMatchingRole(),
             ),
             # "psi": PSI(grouping_role=TreatmentRole(), compare_by="groups"),
-            "ks-test": GroupKSTest(
+            "ks-test": KSTest(
                 grouping_role=TreatmentRole(),
                 compare_by="matched_pairs",
                 baseline_role=AdditionalMatchingRole(),
             ),
-            "chi2-test": GroupChi2Test(
+            "chi2-test": Chi2Test(
                 grouping_role=TreatmentRole(),
                 compare_by="matched_pairs",
                 baseline_role=AdditionalMatchingRole(),

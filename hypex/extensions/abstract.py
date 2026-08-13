@@ -10,45 +10,24 @@ from ..utils.errors import AbstractMethodError
 
 
 class Extension(ABC):
-    def __init__(self):
-        self.BACKEND_MAPPING = {
-            PandasDataset: self._calc_pandas,
-            SparkDataset: self._calc_spark,
-        }
-
-    @abstractmethod
-    def _calc_pandas(self, data: Dataset, **kwargs):
-        raise AbstractMethodError
-    
-    @abstractmethod
-    def _calc_spark(self, data: Dataset, **kwargs):
-        raise AbstractMethodError
-
-    def calc(self, data: Dataset, **kwargs):
-        return self.BACKEND_MAPPING[type(data.backend_data)](data=data, **kwargs)
-
     @staticmethod
-    def result_to_dataset(result: Any, roles: ABCRole | dict[str, ABCRole]) -> Dataset:
-        return DatasetAdapter.to_dataset(result, roles=roles)
+    def result_to_dataset(
+        result: Any, roles: ABCRole | dict[str, ABCRole], small: bool=True
+    ) -> Dataset:
+        return DatasetAdapter.to_dataset(result, roles=roles,small=small)
+    
+    def calc(
+            self, data: Dataset, **kwargs
+    ):
+        raise NotImplementedError
 
 
 class CompareExtension(Extension, ABC):
     def calc(self, data: Dataset, other: Dataset | None = None, **kwargs):
-        return super().calc(data=data, other=other, **kwargs)
+        raise NotImplementedError
 
 
 class MLExtension(Extension):
-    #   TODO: add model
-    def _calc_pandas(
-        self,
-        data: Dataset,
-        mode: Literal["auto", "fit", "predict"] | None = None,
-        **kwargs,
-    ):
-        if mode in ["auto", "fit"]:
-            return self.fit(data, **kwargs)
-        return self.predict(data, **kwargs)
-
     @abstractmethod
     def fit(self, X, Y=None, **kwargs):
         raise NotImplementedError
@@ -60,6 +39,10 @@ class MLExtension(Extension):
     def calc(
         self,
         data: Dataset,
+        mode: Literal["auto", "fit", "predict"] | None = None,
         **kwargs,
     ):
-        return super().calc(data=data, **kwargs)
+        if mode in ["auto", "fit"]:
+            return self.fit(data, **kwargs)
+        return self.predict(data, **kwargs)
+        # return super().calc(data=data, **kwargs)

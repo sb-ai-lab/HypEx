@@ -21,6 +21,7 @@ from ..dataset import (
     TargetRole,
     TempTargetRole,
 )
+from ..dataset.abstract import GroupedDataset
 from ..executor import Calculator
 from ..utils import (
     NAME_BORDER_SYMBOL,
@@ -388,16 +389,12 @@ class GroupsComparator(BaseComparator, ABC):
             target_fields_data, "target_fields_data", "matched_pairs"
         )
 
-        group_col = group_field_data.columns[0]
-        if group_col not in baseline_field_data.columns:
-            baseline_field_data = baseline_field_data.merge(group_field_data, left_index=True, right_index=True, how="left")
-        if group_col not in target_fields_data.columns:
-            target_fields_data = target_fields_data.merge(group_field_data, left_index=True, right_index=True, how="left")
-
-        compared_data = target_fields_data.groupby(by=group_field_data.columns)
-        baseline_indexes = baseline_field_data.groupby(by=group_field_data.columns)
-
+        baseline_indexes = baseline_field_data.merge(group_field_data, left_index=True, right_index=True).groupby(by=group_field_data.columns[0])
         baseline_data = []
+        compared_data = []
+        for group, indexes in group_field_data.reset_index().groupby(group_field_data.columns[0]):
+            compared_data.append((group, target_fields_data.loc[indexes.iget_values(column=0), :]))
+
         for group in baseline_indexes:
             name = group[0]
             indexes = group[1].iget_values(column=0)
@@ -500,10 +497,23 @@ class GroupsComparator(BaseComparator, ABC):
 
     @timeit(level="COMPARATOR", prefix="GROUPS")
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """
+        Execute the comparator on the given data.
+
+        The comparator will split the data into a baseline and a comparison
+        dataset based on the compare_by argument. Then it will calculate
+        statistics comparing the baseline and comparison datasets.
+
+        :param data: The ExperimentData to execute the comparator on
+        :type data: ExperimentData
+        :return: The ExperimentData with the comparison results
+        :rtype: ExperimentData
+        """
         fields = self._get_fields_data(data)
         group_field_data = fields["group_field"]
         target_fields_data = fields["target_fields"]
         baseline_field_data = fields["baseline_field"]
+
         self.key = str(
             target_fields_data.columns[0]
             if len(target_fields_data.columns) == 1
@@ -628,11 +638,24 @@ class GroupHypothesisTesting(GroupsComparator, ABC):
 
 
 class StatsComparator(BaseComparator, ABC):
-    """Two-phase comparator that operates on aggregated statistics instead of raw data.
+    """
+    Two-phase comparator that operates on aggregated statistics instead of raw data.
 
-    Phase 1 — Aggregate: `_compute_stats()` delegates to StatsAggregationExtension.
-    Phase 2 — Compare: `_inner_function()` receives the per-column stats dicts of two
+    Phase 1 — Aggregate: _compute_stats() is called once per group with the full
+    multi-column group slice. It returns {col: {stat: value}} for all target columns
+    in a single pass, allowing backends (e.g. Spark) to issue one aggregation job
+    instead of one per column.
+
+    Phase 2 — Compare: _inner_function() receives the per-column stats dicts of two
     groups (baseline vs compared) and returns the test result for that column.
+
+    Two datasets are stored in analysis_tables:
+    - ``{self.id}{NAME_BORDER_SYMBOL}stats`` — per-group stats table (rows=groups,
+      cols={stat}{NAME_BORDER_SYMBOL}{col})
+    - ``self.id`` — pairwise test results in the same shape as GroupsComparator output
+
+    This design is particularly efficient for Spark backends, where Phase 1 runs
+    as distributed aggregations and only small scalar dicts reach the driver.
     """
     STAT_FUNCTIONS: ClassVar[dict[str, Callable[[Dataset], Any]]] = {
         "mean": lambda d: d.mean(),
@@ -644,23 +667,28 @@ class StatsComparator(BaseComparator, ABC):
         "max": lambda d: d.max(),
     }
 
+    # The statistics this comparator needs; concrete subclasses override it.
     REQUIRED_STATS: ClassVar[list[str]] = []
 
     def __init__(
         self,
         stats: list[str],
+        compare_by: Literal["groups", "matched_pairs"],
         grouping_role: ABCRole | None = None,
         target_roles: ABCRole | list[ABCRole] | None = None,
+        baseline_role: ABCRole | None = None,
         key: Any = "",
         calc_kwargs: dict[str, Any] = {},
     ):
         super().__init__(
             grouping_role=grouping_role,
             target_roles=target_roles,
+            baseline_role=baseline_role,
             key=key,
             calc_kwargs=calc_kwargs,
         )
         self.stats = stats
+        self.compare_by = compare_by
 
     @classmethod
     @timeit(level="AGG", prefix="STATS")
@@ -669,6 +697,7 @@ class StatsComparator(BaseComparator, ABC):
         data: Dataset,
         group_cols: list[str],
         target_columns: list[str],
+        grouped: GroupedDataset,
         stats: list[str] | None = None,
         **kwargs,
     ) -> dict[str, dict[str, dict[str, Any]]]:
@@ -680,6 +709,8 @@ class StatsComparator(BaseComparator, ABC):
             target_columns: List of target column names to compute stats for.
             stats: List of statistical functions to apply. Defaults to REQUIRED_STATS.
             **kwargs: Additional arguments for the aggregation extension.
+            grouped: GroupedDataset (result of target_fields_data.groupby(by=group_field_data)).
+            stats: List of stat names to compute (e.g. ["mean", "var", "count"]).
 
         Returns:
             A nested dictionary mapping group names to target columns to stat values.
@@ -726,11 +757,120 @@ class StatsComparator(BaseComparator, ABC):
         )
         return data
 
-    @timeit(level="COMPARATOR", prefix="STATS")
+    @classmethod
+    def calc(
+        cls,
+        target_fields_data: Dataset | None = None,
+        group_field_data: Dataset | None = None,
+        baseline_fields_data: Dataset | None = None,
+        stats: list[str] | None = None,
+        compare_by: str = "groups",
+        group_col_stats: dict[str, dict[str, dict[str, Any]]] | None = None,
+        **kwargs,
+    ) -> dict:
+        """
+        Stateless entry point mirroring :meth:`GroupsComparator.calc`, so the
+        comparator can be run outside the experiment pipeline.
+
+        Pass either pre-aggregated ``group_col_stats`` (as produced by
+        :meth:`_compute_stats`) or the raw ``target_fields_data`` and
+        ``group_field_data`` to have the statistics aggregated here. ``stats``
+        defaults to the comparator's ``REQUIRED_STATS``, so callers normally
+        don't need to supply it.
+
+        Returns ``{f"{group}{NAME_BORDER_SYMBOL}{col}": Dataset}`` pairwise test
+        results, comparing every non-baseline group against the first group.
+        """
+        if group_col_stats is None:
+            if target_fields_data is None or group_field_data is None:
+                raise ValueError(
+                    "You should pass either group_col_stats or both "
+                    "target_fields_data and group_field_data."
+                )
+
+            grouped = cls._prepare_data(compare_by, target_fields_data, group_field_data, baseline_fields_data)
+            group_col_stats = cls._compute_stats(
+                grouped, list(target_fields_data.columns), stats or cls.REQUIRED_STATS
+            )
+
+        return cls._execute_inner_function(
+            group_col_stats=group_col_stats,
+            compare_by=compare_by,
+            **kwargs
+        )
+
+    @classmethod
+    def _execute_inner_function(
+        cls,
+        group_col_stats: dict[str, dict[str, dict[str, Any]]],
+        compare_by: str,
+        **kwargs
+    ) -> list[Dataset | SmallDataset]:
+        group_names = list(group_col_stats.keys())
+        if len(group_names) < 2:
+            return []
+
+        baseline_name = group_names[0]
+        if compare_by == "groups":
+            result_ds_list = [
+                DatasetAdapter.to_dataset(
+                    cls._inner_function(
+                        group_col_stats[baseline_name][col],
+                        group_col_stats[compared_name][col],
+                        **kwargs,
+                    ),
+                    StatisticRole(),
+                )
+                for compared_name in group_names[1:]
+                for col in  group_col_stats[baseline_name]
+            ]
+        elif compare_by == "matched_pairs":
+            result_ds_list = [
+                DatasetAdapter.to_dataset(
+                    cls._inner_function(
+                        group_col_stats[groups_name][col],
+                        group_col_stats[groups_name][col + "_matched"],
+                        **kwargs,
+                    ),
+                    StatisticRole(),
+                )
+                for groups_name in group_names
+                for col in group_col_stats[baseline_name] if not col.endswith('_matched')
+            ]
+        return result_ds_list
+
+    @staticmethod
+    def _prepare_data(
+        compare_by: str,
+        target_fields_data: Dataset | None = None,
+        group_field_data: Dataset | None = None,
+        baseline_fields_data: Dataset | None = None,
+
+    ) -> GroupedDataset:
+        if compare_by == "groups":
+            grouped: GroupedDataset = (target_fields_data
+                .merge(group_field_data, left_index=True, right_index=True)
+                .groupby(by=group_field_data.columns)
+            )
+        elif compare_by == "matched_pairs":
+            best_match_col = baseline_fields_data.columns[0]
+            group_col = group_field_data.columns[0]
+
+            baseline_fields = baseline_fields_data[best_match_col]
+
+            tmp_data = group_field_data.merge(right=target_fields_data, left_index=True, right_index=True)
+            tmp_data = tmp_data.merge(right=baseline_fields, right_index=True, left_index=True)
+            tmp_data = tmp_data.merge(right=tmp_data, right_index=True, left_on=best_match_col, suffixes=("", "_matched"))
+
+            prepeared_data = tmp_data.drop(columns=[best_match_col, best_match_col + "_matched", group_col + "_matched"])
+            grouped: GroupedDataset = prepeared_data.groupby(by=group_col)
+        return grouped
+
     def execute(self, data: ExperimentData) -> ExperimentData:
         fields = self._get_fields_data(data)
         group_field_data = fields["group_field"]
         target_fields_data = fields["target_fields"]
+        baseline_fields_data = fields["baseline_field"]
 
         if len(target_fields_data.columns) == 0:
             if data.ds.tmp_roles:
@@ -740,18 +880,19 @@ class StatsComparator(BaseComparator, ABC):
         if len(group_field_data.columns) != 1:
             raise NotSuitableFieldError(group_field_data, "Grouping")
 
-        all_cols = list(target_fields_data.columns) + [
-            c for c in group_field_data.columns if c not in target_fields_data.columns
-        ]
-        merged_data = data.ds[all_cols]
-
-        group_col_stats = self._compute_stats(
-            data=merged_data,
-            group_cols=list(group_field_data.columns),
-            target_columns=list(target_fields_data.columns),
-            stats=self.stats,
+        self.key = str(
+            target_fields_data.columns[0]
+            if len(target_fields_data.columns) == 1
+            else list(target_fields_data.columns)
         )
 
+        grouped = self._prepare_data(self.compare_by, target_fields_data, group_field_data, baseline_fields_data)
+
+        # Phase 1: single agg call — all stats × all groups in ONE Spark job.
+        group_col_stats = self._compute_stats(
+            grouped, self.stats
+        )
+        
         group_names = list(group_col_stats.keys())
 
         if len(group_names) < 2:
@@ -761,7 +902,7 @@ class StatsComparator(BaseComparator, ABC):
             return data
 
         for col in target_fields_data.columns:
-            self.key = str(col) 
+            self.key = str(col)
 
             stats_data_dict = {}
             for stat in self.stats:
@@ -773,27 +914,31 @@ class StatsComparator(BaseComparator, ABC):
             stats_dataset.index = group_names
             data = self._set_stats_value(data, stats_dataset)
 
-            baseline_name = group_names[0]
-            col_results = []
-            for compared_name in group_names[1:]:
-                res = self._inner_function(
-                    group_col_stats[baseline_name][col],
-                    group_col_stats[compared_name][col],
-                    **self.calc_kwargs,
-                )
-                col_results.append(DatasetAdapter.to_dataset(res, StatisticRole()))
-
-            if col_results:
-                result_dataset = col_results[0].append(col_results[1:])
-                result_dataset.index = [str(g) for g in group_names[1:]]
-                data = self._set_value(data, result_dataset)
-
-        self.key = str(
-            target_fields_data.columns[0] 
-            if len(target_fields_data.columns) == 1 
-            else list(target_fields_data.columns)
+        # Phase 2: one Dataset per (compared_group, col) pair, then append once.
+        result_ds_list = self.calc(
+            compare_by=self.compare_by,
+            group_col_stats=group_col_stats,
+            **self.calc_kwargs
         )
-        return data
+        if not result_ds_list:
+            return data
+
+        result_dataset = result_ds_list[0].append(result_ds_list[1:])
+
+        if self.compare_by == "groups":
+            result_dataset.index = [
+                f"{compared_name}{NAME_BORDER_SYMBOL}{col}"
+                for compared_name in group_names[1:]
+                for col in target_fields_data.columns
+            ]
+        elif self.compare_by == "matched_pairs":
+            result_dataset.index = [
+                f"{compared_name}{NAME_BORDER_SYMBOL}{col}"
+                for compared_name in group_names
+                for col in target_fields_data.columns
+            ]
+
+        return self._set_value(data, result_dataset)
 
 
 class StatsHypothesisTesting(StatsComparator, ABC):
@@ -809,8 +954,10 @@ class StatsHypothesisTesting(StatsComparator, ABC):
     def __init__(
         self,
         stats: list[str],
+        compare_by: Literal["groups", "matched_pairs"],
         grouping_role: ABCRole | None = None,
         target_roles: ABCRole | list[ABCRole] | None = None,
+        baseline_role: ABCRole | None = None,
         reliability: float = 0.05,
         key: Any = "",
         calc_kwargs: dict[str, Any] = {},
@@ -818,13 +965,14 @@ class StatsHypothesisTesting(StatsComparator, ABC):
         merged_kwargs = {"reliability": reliability, **calc_kwargs}
         super().__init__(
             stats=stats,
+            compare_by=compare_by,
             grouping_role=grouping_role,
             target_roles=target_roles,
+            baseline_role=baseline_role,
             key=key,
             calc_kwargs=merged_kwargs,
         )
         self.reliability = reliability
-
 
 class AdaptiveHypothesisTest(BaseComparator):
     """

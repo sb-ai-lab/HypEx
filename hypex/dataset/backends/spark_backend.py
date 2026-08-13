@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import os
 import warnings
+import copy
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized
+from contextlib import contextmanager
 
 try:
     from typing import Self  # Python >= 3.11
@@ -23,15 +25,13 @@ from pyspark.storagelevel import StorageLevel
 
 
 import pyspark.pandas as ps
-
-ps.set_option("compute.ops_on_diff_frames", True)
+# ps.set_option('compute.ops_on_diff_frames', True)
 
 from pyspark.pandas.exceptions import PandasNotImplementedError
 
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType, SparkTypeMapper
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
-
 
 class SparkNavigation(DatasetBackendNavigation):
     """Navigation interface for PySpark-backed datasets.
@@ -50,7 +50,37 @@ class SparkNavigation(DatasetBackendNavigation):
 
     PANDAS_CONVERSION_LIMIT: int = 100_000
 
-    
+    @staticmethod
+    @contextmanager
+    def _ops_on_diff_frames():
+        """
+        Temporarily enable `ops_on_diff_frames` only if an active Spark session
+        exists on this process (driver). Safe inside serialized UDF closures running on executors.
+        """
+        from pyspark.sql import SparkSession
+        if SparkSession.getActiveSession() is None:
+            yield
+            return
+
+        cur_option = ps.get_option('compute.ops_on_diff_frames')
+        ps.set_option('compute.ops_on_diff_frames', True)
+
+        try:
+            yield
+        finally:
+            ps.set_option('compute.ops_on_diff_frames', cur_option)
+
+    def checkpoint(self):
+        """Create a checkpoint in the Spark execution plan.
+
+        Raises:
+            NotImplementedError: This method is not implemented for SparkNavigation.
+                Use Spark-specific checkpointing mechanisms instead.
+        """
+        raise NotImplementedError(
+            "Method checkpoint not implemented for SparkNavigation."
+        )
+
     def limit(self, num: int | None = None) -> Self:
         """Limit the number of rows in the dataset.
 
@@ -197,7 +227,7 @@ class SparkNavigation(DatasetBackendNavigation):
             if isinstance(data, ps.DataFrame):
                 session = data.to_spark().sparkSession
             elif isinstance(data, SparkDF):
-                session = data.to_spark().sparkSession
+                session = data.sparkSession
             else:
                 raise ValueError(
                     "Session must be provided explicitly or inferred from "
@@ -373,7 +403,7 @@ class SparkNavigation(DatasetBackendNavigation):
                 None if not persisted.
         """
         return getattr(self, "_storage_level_flag", None)
-    
+
     def checkpoint(self, eager: bool = True) -> Self:
         """Truncate the computation graph by creating a checkpoint.
 
@@ -442,8 +472,8 @@ class SparkNavigation(DatasetBackendNavigation):
         if isinstance(item, ps.DataFrame):
             if len(item.columns) != 1:
                 raise ValueError("Boolean DataFrame mask must have exactly one column")
-
-            return self._wrap_result(self.data[item.iloc[:, 0]])
+            with self._ops_on_diff_frames():
+                return self._wrap_result(self.data[item.iloc[:, 0]])
         if isinstance(item, ps.Series):
             return self._wrap_result(self.data[item])
         raise KeyError("No such column or row")
@@ -528,76 +558,108 @@ class SparkNavigation(DatasetBackendNavigation):
     # Binary operations:
     def __add__(self, other: Any) -> Self:
         """Element-wise addition."""
-        return self._wrap_result(self.data + self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data + self.__magic_determine_other(other))
 
     def __sub__(self, other: Any) -> Self:
         """Element-wise subtraction."""
-        return self._wrap_result(self.data - self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data - self.__magic_determine_other(other))
 
     def __mul__(self, other: Any) -> Self:
         """Element-wise multiplication."""
-        return self._wrap_result(self.data * self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data * self.__magic_determine_other(other))
 
     def __floordiv__(self, other: Any) -> Self:
         """Element-wise floor division."""
-        return self._wrap_result(self.data // self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data // self.__magic_determine_other(other))
 
     def __div__(self, other: Any) -> Self:
         """Element-wise division (legacy operator)."""
-        return self._wrap_result(self.data / self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data / self.__magic_determine_other(other))
 
     def __truediv__(self, other: Any) -> Self:
         """Element-wise true division."""
-        return self._wrap_result(self.data / self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data / self.__magic_determine_other(other))
 
     def __mod__(self, other: Any) -> Self:
         """Element-wise modulo operation."""
-        return self._wrap_result(self.data % self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data % self.__magic_determine_other(other))
 
     def __pow__(self, other: Any) -> Self:
         """Element-wise exponentiation."""
-        return self._wrap_result(self.data ** self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data ** self.__magic_determine_other(other))
 
     def __and__(self, other: Any) -> Self:
         """Element-wise logical AND for boolean data."""
-        return self._wrap_result(self.data & self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data & self.__magic_determine_other(other))
 
     def __or__(self, other: Any) -> Self:
         """Element-wise logical OR for boolean data."""
-        return self._wrap_result(self.data | self.__magic_determine_other(other))
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.data | self.__magic_determine_other(other))
 
     # Right arithmetic operators:
     def __radd__(self, other: Any) -> Self:
         """Right-hand addition (other + self)."""
-        return self._wrap_result(self.__magic_determine_other(other) + self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) + self.data)
 
     def __rsub__(self, other: Any) -> Self:
         """Right-hand subtraction (other - self)."""
-        return self._wrap_result(self.__magic_determine_other(other) - self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) - self.data)
 
     def __rmul__(self, other: Any) -> Self:
         """Right-hand multiplication (other * self)."""
-        return self._wrap_result(self.__magic_determine_other(other) * self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) * self.data)
 
     def __rfloordiv__(self, other: Any) -> Self:
         """Right-hand floor division (other // self)."""
-        return self._wrap_result(self.__magic_determine_other(other) // self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) // self.data)
 
     def __rdiv__(self, other: Any) -> Self:
         """Right-hand division (legacy operator, other / self)."""
-        return self._wrap_result(self.__magic_determine_other(other) / self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) / self.data)
 
     def __rtruediv__(self, other: Any) -> Self:
         """Right-hand true division (other / self)."""
-        return self._wrap_result(self.__magic_determine_other(other) / self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) / self.data)
 
     def __rmod__(self, other: Any) -> Self:
         """Right-hand modulo (other % self)."""
-        return self._wrap_result(self.__magic_determine_other(other) % self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) % self.data)
 
     def __rpow__(self, other: Any) -> Self:
         """Right-hand exponentiation (other ** self)."""
-        return self._wrap_result(self.__magic_determine_other(other) ** self.data)
+        with self._ops_on_diff_frames():
+            return self._wrap_result(self.__magic_determine_other(other) ** self.data)
+
+    def __deepcopy__(self, memo):
+        """deepcopy backend data"""
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if isinstance(v, (SparkSession, SparkDF, ps.DataFrame)):
+                setattr(result, k, v)
+                memo[id(v)] = v
+            else:
+                setattr(result, k, copy.deepcopy(v, memo))
+
+        return result
 
     def __repr__(self) -> str:
         """Return string representation of the dataset."""
@@ -740,9 +802,15 @@ class SparkNavigation(DatasetBackendNavigation):
         """Return the index of the underlying DataFrame."""
         return self.data.index
 
-    def reset_index(
-        self, drop: bool = False, inplace: bool = False, **kwargs
-    ) -> Self | None:
+    @index.setter
+    def index(self, value):
+        """Set the index of the underlying DataFrame."""
+        self.data = self.data.set_index(value)
+
+    def reset_index(self,
+                    drop: bool = False,
+                    inplace: bool = False,
+                    **kwargs) -> "SparkNavigation" | None:
         """Reset the index to default integer index.
 
         Args:
@@ -758,6 +826,27 @@ class SparkNavigation(DatasetBackendNavigation):
 
         result = self.data.reset_index(drop=drop, **kwargs)
         return self._wrap_result(result)
+
+    def set_index(self,
+                  keys,
+                  drop=True,
+                  **kwargs) -> "SparkNavigation":
+        """
+        Set the DataFrame index (row labels) using one or more existing columns.
+
+        Args:
+            keys: label or array-like or list of labels/arrays
+
+            drop: `bool`, default True
+                Delete columns to be used as the new index.
+        """
+        if 'append' not in kwargs:
+            kwargs['append'] = False
+
+        if 'inplace' not in kwargs:
+            kwargs['inplace'] = False
+
+        return self._wrap_result(self.data.set_index(keys=keys, drop=drop, **kwargs))
 
     @property
     def columns(self) -> list[str]:
@@ -856,13 +945,13 @@ class SparkNavigation(DatasetBackendNavigation):
             ValueError: If column contains only null values and errors="raise".
         """
         import numpy as np
-        
+
         for column_name, target_type in dtype.items():
             if column_name not in self.data.columns:
                 if errors == "raise":
                     raise KeyError(f"Column '{column_name}' not found")
                 continue
-            
+
             # Check if column has any non-null values to infer type
             # Note: isna().all() triggers an action in Spark, which might be slow.
             # We rely on the try-except block below for performance.
@@ -872,29 +961,29 @@ class SparkNavigation(DatasetBackendNavigation):
                         f"Cannot infer type for column '{column_name}': all values are null"
                     )
                 continue
-                
+
             try:
                 self.data = self.data.astype({column_name: target_type})
-                
+
             except (ValueError, TypeError) as e:
                 error_msg = str(e).lower()
-                
+
                 # Detect if the error is related to missing values/nulls
                 is_nan_error = "missing values" in error_msg or "null" in error_msg or "nan" in error_msg
-                
+
                 if is_nan_error and errors != "ignore":
                     fallback_type = None
-                    
+
                     # Define fallback strategies for common problematic types
                     if target_type == int or (isinstance(target_type, type) and issubclass(target_type, np.integer)):
                         fallback_type = float
                     elif target_type == bool:
                         # Boolean with NaN is tricky. Fallback to object/str is safest for generic usage.
-                        fallback_type = object 
+                        fallback_type = object
                     elif target_type == str:
                          # Usually str handles NaN by converting to 'nan' string, but if it fails:
                         fallback_type = object
-                    
+
                     if fallback_type:
                         try:
                             # Attempt fallback conversion
@@ -910,7 +999,7 @@ class SparkNavigation(DatasetBackendNavigation):
                         f"Consider filling NaNs or using a more compatible type (e.g., float instead of int)."
                     )
                 # If errors == "ignore", we just skip this column and keep its original type
-                
+
         return self._wrap_result(self.data)
 
     def add_column(
@@ -932,7 +1021,7 @@ class SparkNavigation(DatasetBackendNavigation):
         """
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
-        
+
         if isinstance(data, (ps.DataFrame, ps.Series)):
             if isinstance(data, ps.DataFrame):
                 if len(data.columns) == 1:
@@ -941,15 +1030,15 @@ class SparkNavigation(DatasetBackendNavigation):
                         data_tmp = data.rename(columns={data_col_name: name})
                     else:
                         data_tmp = data
-                    
+
                     self.data = self.data.join(data_tmp, how="left")
                     return
-            
+
             elif isinstance(data, ps.Series):
                 data_df = data.to_frame(name=name)
                 self.data = self.data.join(data_df, how="left")
                 return
-        
+
         self.data[name] = data
 
     def random_split_labels(
@@ -990,7 +1079,7 @@ class SparkNavigation(DatasetBackendNavigation):
         """
         seed = random_state if random_state is not None else 42
         mod = 10_000_000
-        
+
         if edges and edges[-1] < mod * 0.5:
             warnings.warn(
                 f"edges={edges} look like absolute row counts, not MOD-scaled values. "
@@ -1035,8 +1124,8 @@ class SparkNavigation(DatasetBackendNavigation):
         sdf = sdf.filter(F.col(name).isNotNull())
 
         return sdf.pandas_api(index_col=list(index_cols))
-        
-        
+
+
     def append(
         self, other: Sequence[SparkNavigation], reset_index: bool = False, axis: int = 0
     ) -> Self:
@@ -1136,6 +1225,12 @@ class SparkNavigation(DatasetBackendNavigation):
             data = ps.DataFrame(data)
         return data
 
+    def to_numpy(self) -> np.ndarray:
+        """
+        This method is extraordinary and used to collect all data on driver.
+        It should only be used with a small amount of data.
+        """
+        return self.data.to_spark().rdd.flatMap(lambda row: row).collect()
 
 class SparkDataset(SparkNavigation, DatasetBackendCalc):
     """Calculation-focused interface for PySpark-backed datasets.
@@ -1146,6 +1241,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     Inherits all navigation and indexing capabilities from SparkNavigation.
     """
+    MAX_ROWS_FOR_DOT = 1000
+    INDEX_COL = "index"
 
     @staticmethod
     def _convert_agg_result(result: ps.Series | ps.DataFrame) -> Self | float:
@@ -1306,6 +1403,12 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 col_mask = self.data[col] == row[col]
                 mask = col_mask if mask is None else mask & col_mask
             yield key, self.data[mask]
+
+    def count_groups(self, group_cols: list[str]) -> int:
+        """Count unique combinations of group_cols"""
+        if not group_cols:
+            return 1
+        return int(self.data[group_cols].nunique())
 
     def grouped_value_counts(self, by: list[str], feature_cols: list[str] | None=None):
         from functools import reduce
@@ -1661,75 +1764,64 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             ValueError: If dimensions are incompatible.
             TypeError: If other is unsupported type.
         """
+        if hasattr(other, "__len__"):
+            if len(other) > self.MAX_ROWS_FOR_DOT:
+                raise ValueError(f"dot method works fine only with rows number in right matrix <= {self.MAX_ROWS_FOR_DOT}")
+        else:
+            raise TypeError("input data type should have attr `__len__`")
+
         if isinstance(other, np.ndarray):
             if other.ndim == 1:
                 if len(other) != len(self.data.columns):
                     raise ValueError(
                         f"Vector length ({len(other)}) must match number of columns ({len(self.data.columns)})"
                     )
-                other_series = ps.Series(other, index=self.data.columns)
-                result = self.data.dot(other_series)
+                pd_other = pd.Series(other, index=self.data.columns)
+                schema = "`0` double"
             else:
-                other_df = ps.DataFrame(other)
-                if other_df.shape[0] != len(self.data.columns):
+                pd_other = pd.DataFrame(other)
+                if pd_other.shape[0] != len(self.data.columns):
                     raise ValueError(
-                        f"Matrix dimensions not aligned: {self.data.shape} dot {other_df.shape}"
+                        f"Matrix dimensions not aligned: {self.data.shape} dot {pd_other.shape}"
                     )
-                other_df.index = self.data.columns
-                result = self.data.dot(other_df)
-            return self._wrap_result(
-                result if isinstance(result, ps.DataFrame) else result.to_frame()
-            )
-
+                pd_other.index = self.data.columns
+                pd_other.columns = [str(i) for i in range(other.shape[1])]
+                schema = ",".join([f"`{i}` double" for i in range(other.shape[1])])
         elif isinstance(other, pd.DataFrame):
-            other_ps = ps.DataFrame(other)
-            if other_ps.shape[0] != len(self.data.columns):
+            pd_other = other
+            schema = ",".join([f"`{name}` double" for name in pd_other.columns])
+            if pd_other.shape[0] != len(self.data.columns):
                 raise ValueError(
-                    f"Matrix dimensions not aligned: {self.data.shape} dot {other_ps.shape}"
+                    f"Matrix dimensions not aligned: {self.data.shape} dot {pd_other.shape}"
                 )
-            other_ps.index = self.data.columns
-            result = self.data.dot(other_ps)
-            return self._wrap_result(
-                result if isinstance(result, ps.DataFrame) else result.to_frame()
-            )
-
         elif isinstance(other, SparkDataset):
-            common_cols = self.data.columns.intersection(other.data.columns)
-
-            if len(common_cols) == 0:
+            pd_other = other.data.to_pandas()
+            schema = ",".join([f"`{name}` double" for name in pd_other.columns])
+            if pd_other.shape[0] != len(self.data.columns):
                 raise ValueError(
-                    f"No common columns for dot product. "
-                    f"Self columns: {self.columns}, Other columns: {other.columns}"
+                    f"Matrix dimensions not aligned: {self.data.shape} dot {pd_other.shape}"
                 )
-
-            other_subset = other.data[common_cols]
-            self_subset = self.data[common_cols]
-
-            if len(common_cols) == 1:
-                result = self_subset.iloc[:, 0].dot(other_subset.iloc[:, 0])
-                return self._wrap_result(
-                    float(result)
-                    if isinstance(result, (int, float, np.number))
-                    else result
-                )
-            else:
-                result = (self_subset * other_subset).sum()
-                return self._wrap_result(
-                    result if isinstance(result, ps.DataFrame) else result.to_frame()
-                )
-
         else:
             raise TypeError(
                 f"Unsupported type for dot: {type(other)}. "
                 f"Expected SparkDataset, np.ndarray, or pd.DataFrame"
             )
 
-    def dropna(
-        self,
-        how: Literal["any", "all"] = "any",
-        subset: str | Iterable[str] | None = None,
-        axis: Literal["index", "rows", "columns"] | int = 0,
-    ) -> SparkDataset:
+        result_spark = (
+            self.data.reset_index().to_spark()
+            .mapInPandas(
+                lambda it: (pdf.drop(columns="index").dot(pd_other).assign(index=pdf["index"]) for pdf in it),
+                schema=schema + ', `index` int'
+            )
+        )
+        result_ps = ps.DataFrame(result_spark).set_index("index")
+        result_ps.index.name = None
+        return self._wrap_result(result_ps)
+
+    def dropna(self,
+               how: Literal["any", "all"] = "any",
+               subset: str | Iterable[str] | None = None,
+               axis: Literal["index", "rows", "columns"] | int = 0) -> SparkDataset:
         """Remove missing values.
 
         Args:
@@ -2056,3 +2148,19 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             else data
         )
         return data_expanded
+
+    def explode(self, column, ignore_index=False):
+        """
+        Transform each element of a list-like to a row.
+
+        Args
+        ----
+            column: `str` or `tuple`
+                Column to explode.
+
+        Return
+        ------
+            DataFrame:
+                Exploded lists to rows of the subset columns; index will be duplicated for these rows.
+        """
+        return self._wrap_result(self.data.explode(column=column, ignore_index=ignore_index))

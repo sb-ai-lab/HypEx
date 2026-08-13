@@ -9,6 +9,7 @@ import warnings
 
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized, TYPE_CHECKING
+import copy
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -226,7 +227,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         if isinstance(item, (slice, int)):
             return self.data.iloc[item]
-        if isinstance(item, (str, list)):
+        if isinstance(item, (str, list, pd.Index)):
             return self.data[item]
         if isinstance(item, pd.DataFrame):
             if len(item.columns) == 1:
@@ -572,6 +573,16 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.__magic_determine_other(other) ** self.data)
 
+    def __deepcopy__(self, memo):
+        """deepcopy backend data"""
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            setattr(result, k, copy.deepcopy(v, memo))
+
+        return result
+
     def __repr__(self):
         """Return string representation of the underlying DataFrame.
 
@@ -709,6 +720,49 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self.data.index
 
+    @index.setter
+    def index(self, value):
+        """Set the index of the underlying DataFrame."""
+        self.data.index = value
+
+    def reset_index(self,
+                    drop: bool = False,
+                    inplace: bool = False,
+                    **kwargs):
+        """Reset the index to default integer index.
+
+        Args:
+            drop (bool): If True, drop the current index instead of adding as column.
+            inplace (bool): Ignored; always returns new instance for consistency.
+            **kwargs: Additional arguments passed to underlying reset_index.
+
+        Returns:
+            New instance with reset index
+        """
+
+        return self._wrap_result(self.data.reset_index(drop=drop, **kwargs))
+
+    def set_index(self,
+                  keys,
+                  drop,
+                  **kwargs):
+        """
+        Set the DataFrame index (row labels) using one or more existing columns.
+
+        Args:
+            keys: label or array-like or list of labels/arrays
+
+            drop: `bool`, default True
+                Delete columns to be used as the new index.
+        """
+        if 'append' not in kwargs:
+            kwargs['append'] = False
+
+        if 'inplace' not in kwargs:
+            kwargs['inplace'] = False
+
+        return self._wrap_result(self.data.set_index(keys=keys, drop=drop, **kwargs))
+
     @property
     def columns(self):
         """Return the column labels of the DataFrame.
@@ -786,6 +840,7 @@ class PandasNavigation(DatasetBackendNavigation):
             type or Dict[str, type]: Single type if column_name is str,
             otherwise dict mapping column names to types.
         """
+        from collections.abc import Iterable as IterableABC
         column_name = self.data.columns if column_name is None else column_name
         dtypes = {}
         for k, v in self.data[column_name].dtypes.items():
@@ -807,7 +862,6 @@ class PandasNavigation(DatasetBackendNavigation):
                 dtypes[k] = str
             elif pd.api.types.is_bool_dtype(v):
                 dtypes[k] = bool
-        from collections.abc import Iterable as IterableABC
         if isinstance(column_name, IterableABC):
             return dtypes
         else:
@@ -983,6 +1037,12 @@ class PandasNavigation(DatasetBackendNavigation):
             data = [data]
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
 
+    def to_numpy(self) -> np.ndarray:
+        """
+        This method is extraordinary and used to collect into numpy array.
+        """
+        return self.data.values.flatten()
+
 
 class PandasDataset(PandasNavigation, DatasetBackendCalc):
     @staticmethod
@@ -1110,6 +1170,12 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             pd.Grouper
         """
         return self.data.groupby(by=by, observed=False, **kwargs)
+
+    def count_groups(self, group_cols: list[str]) -> int:
+        """Count unique combinations of group_cols"""
+        if not group_cols:
+            return 1
+        return int(self.data[group_cols].nunique())
 
     def iter_groups(self, by: list[str]):
         for key, group in self.data.groupby(by=by, observed=False):
@@ -1431,19 +1497,20 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Result of matrix multiplication.
         """
+        initial_index = self.data.index
         if isinstance(other, np.ndarray):
             other_df = pd.DataFrame(
                 data=other,
-                columns=self.columns if other.shape[1] == self.shape[1] else None,
+                index=self.columns if other.shape[0] == self.shape[1] else None,
             )
-            result = self.data.dot(other_df.T)
+            result = self.data.dot(other_df)
             result.columns = (
                 self.columns if other.shape[1] == self.shape[1] else result.columns
             )
         else:
             result = self.data.dot(other.data)
         return self._wrap_result(
-            result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+            result.set_index(initial_index) if isinstance(result, pd.DataFrame) else pd.DataFrame(result, index=initial_index)
         )
 
     def dropna(
@@ -1499,7 +1566,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return self._wrap_result(
             self.data.sample(n=n, frac=frac, random_state=random_state)
         )
-        
+
 
     def random_split_labels(
         self,
@@ -1534,7 +1601,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
         seed = random_state if random_state is not None else 42
         mod = 10_000_000
-        
+
         if edges and edges[-1] < mod * 0.5:
             warnings.warn(
                 f"edges={edges} look like absolute row counts, not MOD-scaled values. "
@@ -1777,14 +1844,31 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
         return data_expanded
 
+    def explode(self, column=None, ignore_index=False):
+        """
+        Transform each element of a list-like to a row.
+
+        Args
+        ----
+            column: `str` or `tuple`
+                Column to explode.
+
+        Return
+        ------
+            DataFrame:
+                Exploded lists to rows of the subset columns; index will be duplicated for these rows.
+        """
+
+        return self._wrap_result(self.data.explode(column=column, ignore_index=ignore_index))
+
     def checkpoint(self, eager: bool = True):
         """Breaks the computation graph (Lineage) to prevent exponential slowdowns.
-        
+
         For the Spark backend, this method materializes the DataFrame to truncate
         the lineage graph. For the Pandas backend, this method acts as a no-op
         since Pandas does not suffer from the same lineage growth issues.
         The signature is kept identical to the Spark backend for API consistency.
-        
+
         Args:
             eager: If ``True``, the checkpoint is executed eagerly. This parameter
                 is ignored for the Pandas backend. Defaults to ``True``.
