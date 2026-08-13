@@ -1,15 +1,14 @@
 from ..analyzers.aa import AAScoreAnalyzer
 from ..dataset import Dataset, ExperimentData, SmallDataset
 from ..reporters.aa import AABestSplitReporter, AAPassedReporter
-from ..reporters.abstract import TestDictReporter
 from ..utils import ExperimentDataEnum
 from ..utils.constants import (
     ID_SPLIT_SYMBOL,
+    NAME_BORDER_SYMBOL,
     TEST_NAME_NORMALIZATION,
-    normalize_test_name,
-    NAME_BORDER_SYMBOL
 )
 from ..utils.enums import RenameEnum
+from ..utils.naming import normalize_test_name
 from .base import Output
 
 

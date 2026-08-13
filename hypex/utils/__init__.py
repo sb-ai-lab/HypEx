@@ -7,7 +7,6 @@ from .constants import (
     UTILITY_COL_SYMBOL,
     UTILITY_INDEX_COL_NAME,
     UTILITY_PHYSICAL_INDEX_COL_NAME,
-    _parse_metric_col,
 )
 from .enums import (
     ABNTestMethodsEnum,
@@ -30,6 +29,9 @@ from .errors import (
     RoleColumnError,
     SpaceError,
 )
+from .naming import _parse_metric_col, normalize_test_name
+from .profiling import ProfilingContext, disable_profiling, enable_profiling, timeit
+from .strict_abc import StrictABC, StrictABCMeta
 from .tutorial_data_creation import (
     create_test_data,
     gen_control_variates_df,
@@ -49,29 +51,23 @@ from .typings import (
     ScalarType,
     SetParamsDictTypes,
     SourceDataTypes,
+    SparkTypeMapper,
     StratificationRoleTypes,
     TargetRoleTypes,
-    SourceDataTypes,
-    SparkTypeMapper
 )
 
-from .strict_abc import StrictABCMeta, StrictABC
-
-from .profiling import timeit, enable_profiling, disable_profiling, ProfilingContext
-
 __all__ = [
-    "Adapter",
     "ID_SPLIT_SYMBOL",
     "MATCHING_INDEXES_SPLITTER_SYMBOL",
     "NAME_BORDER_SYMBOL",
-    "UTILITY_COL_SYMBOL",
-    "UTILITY_INDEX_COL_NAME",
     "NUMBER_TYPES_LIST",
+    "UTILITY_COL_SYMBOL",
     "UTILITY_INDEX_COL_NAME",
     "UTILITY_PHYSICAL_INDEX_COL_NAME",
     "ABNTestMethodsEnum",
     "ABTestTypesEnum",
     "AbstractMethodError",
+    "Adapter",
     "BackendTypeError",
     "BackendsEnum",
     "CategoricalTypes",
@@ -80,7 +76,6 @@ __all__ = [
     "DataTypeError",
     "DecoratedType",
     "DefaultRoleTypes",
-    "SourceDataTypes",
     "DocstringInheritDecorator",
     "ExperimentDataEnum",
     "FeatureRoleTypes",
@@ -92,23 +87,24 @@ __all__ = [
     "NoRequiredArgumentError",
     "NotFoundInExperimentDataError",
     "NotSuitableFieldError",
+    "ProfilingContext",
     "RoleColumnError",
     "RoleNameType",
     "ScalarType",
     "SetParamsDictTypes",
+    "SourceDataTypes",
     "SpaceEnum",
     "SpaceError",
     "StratificationRoleTypes",
+    "StrictABC",
+    "StrictABCMeta",
     "TargetRoleTypes",
+    "_parse_metric_col",
     "create_test_data",
+    "disable_profiling",
+    "enable_profiling",
     "gen_control_variates_df",
     "gen_oracle_df",
     "gen_special_medicine_df",
-    "StrictABCMeta", 
-    "StrictABC",
-    "timeit", 
-    "enable_profiling", 
-    "disable_profiling", 
-    "ProfilingContext",
-    "_parse_metric_col"
+    "timeit"
 ]

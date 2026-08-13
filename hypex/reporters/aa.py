@@ -6,7 +6,6 @@ from typing import Any, ClassVar
 from ..comparators import (
     BaseComparator,
     GroupChi2Test,
-    GroupDifference,
     GroupKSTest,
     GroupTTest,
     StatsChi2Test,
@@ -18,7 +17,8 @@ from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..dataset.dataset import SmallDataset
 from ..splitters import AASplitter, AASplitterWithStratification
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, NotFoundInExperimentDataError
-from ..utils.constants import NAME_BORDER_SYMBOL, _parse_metric_col, normalize_test_name
+from ..utils.constants import NAME_BORDER_SYMBOL
+from ..utils.naming import _parse_metric_col, normalize_test_name
 from .abstract import (
     DatasetReporter,
     DictReporter,

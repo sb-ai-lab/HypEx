@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 import numpy as np
 
@@ -11,7 +11,7 @@ from ..comparators import GroupDifference, GroupSizes
 from ..dataset import Dataset, ExperimentData, SmallDataset
 from ..dataset.roles import InfoRole, StatisticRole, TreatmentRole
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
-from ..utils.constants import TEST_NAME_NORMALIZATION, normalize_test_name
+from ..utils.constants import TEST_NAME_NORMALIZATION
 from ..utils.errors import AbstractMethodError
 
 REPORTABLE_METRICS = frozenset({
