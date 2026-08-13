@@ -142,7 +142,7 @@ class MatchingMetricsExtension(Extension):
     
     @staticmethod
     def _calc_se(
-        n_c: int, n_t: int, var_c: float, var_t: float, w_c: float, w_t: float
+        n_c: int, n_t: int, var_c: float, var_t: float, fs_c: float, fs_t: float
     ) -> float:
         """Calculate the standard error of the treatment effect estimate.
         
@@ -151,13 +151,13 @@ class MatchingMetricsExtension(Extension):
             n_t: Sample size of the treatment group.
             var_c: Variance of the individual treatment effect in control.
             var_t: Variance of the individual treatment effect in treatment.
-            w_c: Sum of squared weights for the control group.
-            w_t: Sum of squared weights for the treatment group.
+            fs_c: Sum of squared weights for the control group times size of control group.
+            fs_t: Sum of squared weights for the treatment group times size of treatment group.
             
         Returns:
             The computed standard error.
         """
-        return np.sqrt(w_c * var_c / n_c ** 2 + w_t * var_t / n_t ** 2)
+        return np.sqrt(fs_c * var_c / n_c + fs_t * var_t / n_t)
     
     @staticmethod
     def _calc_p_value(
@@ -196,36 +196,50 @@ class MatchingMetricsExtension(Extension):
             A dictionary mapping metric names ('ATT', 'ATC', 'ATE') to lists 
             containing [Estimate, Standard Error, P-value, CI Lower, CI Upper].
         """
-        itt_se = self._calc_se(
-            n_c=stats_itc['count'], n_t=stats_itt['count'], 
-            var_c=stats_itc['var'], var_t=stats_itt['var'], 
-            w_c=stats_itt['count'],
-            w_t=(stats_itt['count'] / stats_itc['count']) ** 2 * stats_itt["sq_sum"]
-        )
-        itc_se = self._calc_se(
-            n_c=stats_itt['count'], n_t=stats_itc['count'], 
-            var_c=stats_itt['var'], var_t=stats_itc['var'],
-            w_c=(stats_itc['count'] / (stats_itt['count'])) ** 2 * stats_itc["sq_sum"],
-            w_t=stats_itc['count']
+        m = stats_itc["count"]
+        n = stats_itt["count"]
+
+        var_c = stats_itc["var"]
+        var_t = stats_itt["var"]
+
+        sq_c = stats_itc["sq_sum"]
+        sq_t = stats_itt["sq_sum"]
+
+        att_se = self._calc_se(
+            n_c=m,
+            n_t=n,
+            var_c=var_c,
+            var_t=var_t,
+            fs_c=m * sq_c / (n ** 2),
+            fs_t=1.0,
         )
 
-        p_val_itt = self._calc_p_value(stats_itt['mean'] / itt_se)
-        p_val_itc = self._calc_p_value(stats_itc['mean'] / itc_se)
+        atc_se = self._calc_se(
+            n_c=m,
+            n_t=n,
+            var_c=var_c,
+            var_t=var_t,
+            fs_c=1.0,
+            fs_t=n * sq_t / (m ** 2),
+        )
+
+        p_val_att = self._calc_p_value(stats_itt['mean'] / att_se)
+        p_val_atc = self._calc_p_value(stats_itc['mean'] / atc_se)
 
         if self.metric == "atc":
             return {
                 "ATC": [
-                    stats_itc['mean'] , itc_se, p_val_itc,
-                    stats_itc['mean']  - 1.96 * itc_se, 
-                    stats_itc['mean']  + 1.96 * itc_se,
+                    stats_itc['mean'] , atc_se, p_val_atc,
+                    stats_itc['mean']  - 1.96 * atc_se, 
+                    stats_itc['mean']  + 1.96 * atc_se,
                 ]
             }
         if self.metric == "att":
             return {
                 "ATC": [
-                    stats_itt['mean'] , itt_se, p_val_itt,
-                    stats_itt['mean']  - 1.96 * itt_se, 
-                    stats_itt['mean']  + 1.96 * itt_se,
+                    stats_itt['mean'] , att_se, p_val_att,
+                    stats_itt['mean']  - 1.96 * att_se, 
+                    stats_itt['mean']  + 1.96 * att_se,
                 ]
             }
         ate = (
@@ -234,23 +248,25 @@ class MatchingMetricsExtension(Extension):
                 stats_itc['mean'] * stats_itc['count']
             ) / (stats_itt['count'] + stats_itc['count'])
         )
-        ate_se = self._calc_se(
-            n_c=stats_itc['count'] + stats_itt['count'], n_t=stats_itc['count'] + stats_itt['count'], 
-            var_c=stats_itc['var'], var_t=stats_itt['var'],
-            w_c=stats_itc['count'] + 2 * stats_itc["sum"] + stats_itc["sq_sum"],
-            w_t=stats_itt['count'] + 2 * stats_itt["sum"] + stats_itt["sq_sum"]
-        )
+        N = m + n
+
+        att_var = att_se ** 2
+        atc_var = atc_se ** 2
+
+        ate_var = (n / N) ** 2 * att_var + (m / N) ** 2 * atc_var
+        ate_se = float(np.sqrt(max(ate_var, 0.0)))
+
         p_val_ate = self._calc_p_value(ate / ate_se)
         return {
             "ATT": [
-                    stats_itt['mean'] , itt_se, p_val_itt,
-                    stats_itt['mean']  - 1.96 * itt_se, 
-                    stats_itt['mean']  + 1.96 * itt_se,
+                    stats_itt['mean'] , att_se, p_val_att,
+                    stats_itt['mean']  - 1.96 * att_se, 
+                    stats_itt['mean']  + 1.96 * att_se,
                 ],
             "ATC": [
-                    stats_itc['mean'] , itc_se, p_val_itc,
-                    stats_itc['mean']  - 1.96 * itc_se, 
-                    stats_itc['mean']  + 1.96 * itc_se,
+                    stats_itc['mean'] , atc_se, p_val_atc,
+                    stats_itc['mean']  - 1.96 * atc_se, 
+                    stats_itc['mean']  + 1.96 * atc_se,
                 ],
             "ATE": [
                     ate, ate_se, p_val_ate, 
