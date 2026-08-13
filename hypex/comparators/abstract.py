@@ -8,7 +8,6 @@ from ..dataset import (
     ABCRole,
     AdditionalTargetRole,
     AdditionalTreatmentRole,
-    AdditionalTreatmentRole,
     Dataset,
     DatasetAdapter,
     ExperimentData,
@@ -179,7 +178,6 @@ class GroupsComparator(BaseComparator, ABC):
                 InfoRole(),
             )
         return result
-    
     
     @staticmethod
     def _grouping_data_split(
@@ -668,7 +666,6 @@ class StatsComparator(BaseComparator, ABC):
     def _compute_stats(
         cls,
         grouped: GroupedDataset,
-        # target_columns: list[str],
         stats: list[str] | None = None,
         **kwargs,
     ) -> dict[str, dict[str, dict[str, Any]]]:
@@ -766,7 +763,7 @@ class StatsComparator(BaseComparator, ABC):
                     "You should pass either group_col_stats or both "
                     "target_fields_data and group_field_data."
                 )
-            
+
             grouped = cls._prepare_data(compare_by, target_fields_data, group_field_data, baseline_fields_data)
             group_col_stats = cls._compute_stats(
                 grouped, list(target_fields_data.columns), stats or cls.REQUIRED_STATS
@@ -777,7 +774,7 @@ class StatsComparator(BaseComparator, ABC):
             compare_by=compare_by,
             **kwargs
         )
-    
+
     @classmethod
     def _execute_inner_function(
         cls,
@@ -788,7 +785,7 @@ class StatsComparator(BaseComparator, ABC):
         group_names = list(group_col_stats.keys())
         if len(group_names) < 2:
             return []
-        
+
         baseline_name = group_names[0]
         if compare_by == "groups":
             result_ds_list = [
@@ -824,7 +821,7 @@ class StatsComparator(BaseComparator, ABC):
         target_fields_data: Dataset | None = None,
         group_field_data: Dataset | None = None,
         baseline_fields_data: Dataset | None = None,
-        
+
     ) -> GroupedDataset:
         if compare_by == "groups":
             grouped: GroupedDataset = (target_fields_data
@@ -891,8 +888,8 @@ class StatsComparator(BaseComparator, ABC):
 
         # Phase 2: reuse the stateless calc on the already-aggregated stats.
         result_ds_list = self.calc(
-            compare_by=self.compare_by, 
-            group_col_stats=group_col_stats, 
+            compare_by=self.compare_by,
+            group_col_stats=group_col_stats,
             **self.calc_kwargs
         )
 
