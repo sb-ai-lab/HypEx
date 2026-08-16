@@ -203,6 +203,8 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data = self._read_file(data)
         elif isinstance(data, list):
             self.data = pd.DataFrame(data) if data else pd.DataFrame()
+        elif isinstance(data, PandasDataset):
+            self.data = data.data
         else:
             self.data = pd.DataFrame()
 
@@ -369,7 +371,7 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             pd.DataFrame: Rounded values.
         """
-        return self._wrap_result(round(self.data, ndigits))
+        return self._wrap_result(self.data.round(ndigits))
 
     # Binary operations:
     def __add__(self, other) -> Self:

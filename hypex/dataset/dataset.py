@@ -75,6 +75,7 @@ class SmallDataset(DatasetBase):
         data: pd.DataFrame | str | None = None,
         default_role: ABCRole | None = None,
         session: spark.SparkSession | None = None,
+        backend: BackendsEnum | None = None,
     ):
         if isinstance(roles, dict) and data is not None:
             columns = None
