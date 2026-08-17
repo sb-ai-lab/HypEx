@@ -1,23 +1,20 @@
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any, Literal
-
-import numpy as np
-import time
 
 from ..dataset import (
     ABCRole,
+    AdditionalStatisticRole,
     AdditionalTargetRole,
     Dataset,
     ExperimentData,
     TargetRole,
-    AdditionalStatisticRole
 )
 from ..extensions import BiasExtension, MatchingMetricsExtension
 from ..utils.enums import ExperimentDataEnum
 from ..utils.registry import backend_factory
 from .abstract import GroupOperator
+
 
 class SMD(GroupOperator):
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -79,11 +76,11 @@ class MatchingMetrics(GroupOperator):
             ),
             key=key,
         )
-    
+
     def _write_log(file: str, result: str, time: str, mode: str = "a"):
         with open(file, mode) as f:
             f.write(result + ": " + time + "\n")
-         
+
     @classmethod
     def _inner_function(
         cls,
@@ -115,7 +112,7 @@ class MatchingMetrics(GroupOperator):
             ExperimentData: The updated ExperimentData object with the calculated 
             matching metrics stored in the `variables` space.
         """
-        group_field, target_fields = self._get_fields(data=data)
+        _, target_fields = self._get_fields(data=data)
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
@@ -126,7 +123,7 @@ class MatchingMetrics(GroupOperator):
 
         cls = backend_factory.resolve_backend(MatchingMetricsExtension, data.ds)
         compare_result = cls(self.grouping_role, self.target_roles, self.metric, self.n_neighbors).calc(data.ds)
-        
+
         return self._set_value(data, compare_result)
 
 class Bias(GroupOperator):
@@ -216,7 +213,7 @@ class Bias(GroupOperator):
         super().__init__(
             grouping_role=grouping_role, target_roles=target_roles, key=key
         )
-    
+
     def _set_value(
             self, data: ExperimentData, value: Dataset, key=None
     ) -> ExperimentData:
@@ -298,15 +295,15 @@ class Bias(GroupOperator):
                 # Bias estimates are now in result_data.additional_fields
             ```
         """
-        group_field, target_fields = self._get_fields(data)
-        
+        _, target_fields = self._get_fields(data)
+
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
         if (
             not target_fields and data.initial_ds.tmp_roles
         ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
-            return data  
+            return data
         cls = backend_factory.resolve_backend(BiasExtension, data.ds)
         compare_result: Dataset = cls(self.grouping_role, self.target_roles).calc(data.ds)
         compare_result.roles["bias"] = AdditionalStatisticRole()

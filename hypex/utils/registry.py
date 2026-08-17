@@ -1,10 +1,7 @@
 from __future__ import annotations
-from typing import (
-    Dict, 
-    Type,
-    Union,
-    Iterable
-)
+
+from typing import Iterable
+
 # from ..dataset import Dataset
 
 """
@@ -18,9 +15,9 @@ class BackendFactory:
     """
 
     def __init__(self):
-        self._registry: Dict[Type, Dict[Type, Type]] = {}
-    
-    def register(self, base_cls: Type, backend_types: Union[Type, Iterable[Type]]):
+        self._registry: dict[type, dict[type, type]] = {}
+
+    def register(self, base_cls: type, backend_types: type | Iterable[type]):
         """
         Decorator to register a backend-specific implementation.
         Supports single type or iterable of types.
@@ -38,14 +35,14 @@ class BackendFactory:
                 ...
         ```
         """
-        def decorator(cls: Type):
+        def decorator(cls: type):
             backends = backend_types if isinstance(backend_types, (list, tuple, set)) else [backend_types]
             for b_type in backends:
                 self._registry.setdefault(base_cls, {})[b_type] = cls
             return cls
         return decorator
 
-    def register_explicit(self, base_cls: Type, backend_types: Union[Type, Iterable[Type]], impl_cls: Type):
+    def register_explicit(self, base_cls: type, backend_types: type | Iterable[type], impl_cls: type):
         """Explicit registration without decorator. Supports single type or iterable."""
         backends = backend_types if isinstance(backend_types, (list, tuple, set)) else [backend_types]
         for b_type in backends:
@@ -54,7 +51,7 @@ class BackendFactory:
     @property
     def registry(self):
         return self._registry
-    
+
     def rigestry_output(self):
         """
         Print `backend_factory` structure.
@@ -63,8 +60,8 @@ class BackendFactory:
             print(f"Key class - {key.__name__}:")
             for backend, realization in value.items():
                 print(f"\tBackend - {backend.__name__} : realization - {realization.__name__}")
-    
-    def resolve_backend(self, base_cls: Type, data):
+
+    def resolve_backend(self, base_cls: type, data):
         """
         Resolve and return the backend-specific implementation class for a given base class.
 
@@ -87,7 +84,6 @@ class BackendFactory:
             ```python
                 # Assuming 'data' is backed by Pandas
                 backend_cls = backend_factory.resolve_backend(FaissExtension, data)
-                
                 # backend_cls will resolve to PandasFaissExtension
                 if backend_cls is not None:
                     instance = backend_cls(n_neighbors=5)
@@ -106,6 +102,3 @@ class BackendFactory:
 
 # Singleton
 backend_factory = BackendFactory()
-
-
-    

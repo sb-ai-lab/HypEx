@@ -1,9 +1,11 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Any, Literal
+
 import logging
-from pyspark.sql import SparkSession
+from dataclasses import dataclass, field
+from typing import Any, ClassVar, Literal
+
 from pyspark import SparkConf
+from pyspark.sql import SparkSession
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +78,7 @@ class SparkSessionCalculator:
     INDEX_FILE_SIZE_MULTIPLIER = 1.2
 
     # Mapping from SparkSettings parameters to SparkConf keys
-    SETTINGS_TO_SPARK_CONF = {
+    SETTINGS_TO_SPARK_CONF: ClassVar[dict[str, str]] = {
         "executor_instances": "spark.executor.instances",
         "executor_cores": "spark.executor.cores",
         "executor_memory": "spark.executor.memory",
@@ -171,6 +173,32 @@ class SparkSessionCalculator:
         """Calculate executor memory overhead."""
         overhead_mb = max(384, int(executor_memory_gb * 1024 * 0.1))
         return f"{overhead_mb}m"
+
+    @staticmethod
+    def _define_fs(self, session: SparkSession) -> str:
+        file_sys = None
+        try:
+            hadoop_conf = session.sparkContext._jsc.hadoopConfiguration()
+            file_sys = hadoop_conf.get("fs.defaultFS", "file:///")
+            if file_sys == "file:///": file_sys = None
+        except Exception: pass
+
+        if file_sys is None:
+            try:
+                file_sys = session.conf.get(
+                    "spark.hadoop.fs.defaultFS",
+                    session.conf.get("fs.defaultFS", "file:///")
+                )
+            except Exception:
+                file_sys = "file:///"
+
+        # fsspec не поддерживает viewfs://. Мы заменяем его на hdfs://,
+        # а резолв nameservice в реальные IP возьмет на себя libhdfs 
+        # благодаря добавлению hdfs-site.xml в CLASSPATH.
+        if file_sys and file_sys.startswith("viewfs://"):
+            file_sys = file_sys.replace("viewfs://", "hdfs://", 1)
+
+        return file_sys or "file:///"
 
     def calculate_optimal_settings(self) -> SparkSettings:
         """Calculate optimal Spark session settings.
@@ -378,8 +406,8 @@ class SparkSessionCalculator:
         for key, value in settings.extra_configs.items():
             conf.set(key, str(value))
 
-        print(f"✓ Runtime settings have been applied to the session")
-        print(f"⚠ Executor settings can only be changed when creating the session")
+        print("✓ Runtime settings have been applied to the session")
+        print("⚠ Executor settings can only be changed when creating the session")
 
     @staticmethod
     def create_optimal_session(settings: SparkSettings) -> SparkSession:
@@ -496,8 +524,8 @@ class SparkSessionCalculator:
             {
                 "key": "spark.executor.cores",
                 "value": str(optimal_settings.executor_cores),
-                "reason": f"Limiting cores per executor to prevent OOM when simultaneously "
-                f"loading multiple FAISS indexes into memory. Recommended ≤4 cores.",
+                "reason": "Limiting cores per executor to prevent OOM when simultaneously "
+                "loading multiple FAISS indexes into memory. Recommended ≤4 cores.",
             },
             {
                 "key": "spark.executor.memory",
@@ -509,8 +537,8 @@ class SparkSessionCalculator:
             {
                 "key": "spark.executor.memoryOverhead",
                 "value": optimal_settings.executor_memory_overhead,
-                "reason": f"Memory overhead for JVM, serialization, and off-heap operations. "
-                f"10% of executor memory, minimum 384 MB.",
+                "reason": "Memory overhead for JVM, serialization, and off-heap operations. "
+                "10% of executor memory, minimum 384 MB.",
             },
             {
                 "key": "spark.sql.shuffle.partitions",
@@ -522,26 +550,26 @@ class SparkSessionCalculator:
             {
                 "key": "spark.default.parallelism",
                 "value": str(optimal_settings.default_parallelism),
-                "reason": f"Base parallelism level for RDD operations. Should match "
-                f"shuffle.partitions for consistency.",
+                "reason": "Base parallelism level for RDD operations. Should match "
+                "shuffle.partitions for consistency.",
             },
             {
                 "key": "spark.serializer",
                 "value": optimal_settings.serializer,
-                "reason": f"KryoSerializer provides more efficient serialization compared "
-                f"to JavaSerializer (2-10x faster, smaller size). Critical for FAISS.",
+                "reason": "KryoSerializer provides more efficient serialization compared "
+                "to JavaSerializer (2-10x faster, smaller size). Critical for FAISS.",
             },
             {
                 "key": "spark.memory.fraction",
                 "value": str(optimal_settings.memory_fraction),
-                "reason": f"Memory fraction for execution and storage. 60% provides balance "
-                f"between data caching and FAISS operation execution.",
+                "reason": "Memory fraction for execution and storage. 60% provides balance "
+                "between data caching and FAISS operation execution.",
             },
             {
                 "key": "spark.memory.storageFraction",
                 "value": str(optimal_settings.memory_storage_fraction),
-                "reason": f"Memory fraction for storage (RDD caching). 50% allows storing "
-                f"FAISS indexes in memory without evicting execution memory.",
+                "reason": "Memory fraction for storage (RDD caching). 50% allows storing "
+                "FAISS indexes in memory without evicting execution memory.",
             },
         ]
 
@@ -591,7 +619,7 @@ class SparkSessionCalculator:
                         "parameter": key,
                         "old_value": None,
                         "new_value": str(value),
-                        "reason": f"Additional setting for FAISS pipeline optimization",
+                        "reason": "Additional setting for FAISS pipeline optimization",
                     }
                 )
             elif str(old_value) != str(value):
@@ -602,7 +630,7 @@ class SparkSessionCalculator:
                         "parameter": key,
                         "old_value": old_value,
                         "new_value": str(value),
-                        "reason": f"Optimization of additional setting for FAISS",
+                        "reason": "Optimization of additional setting for FAISS",
                     }
                 )
 

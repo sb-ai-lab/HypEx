@@ -1,14 +1,16 @@
 from __future__ import annotations
-import uuid
-import faiss
-import os
+
 import gc
+import os
 import shutil
 import threading
-from typing import Optional
+import uuid
 from collections import OrderedDict
-from pyspark.sql import SparkSession
+from typing import Optional
+
+import faiss
 from pyspark import RDD, SparkFiles
+from pyspark.sql import SparkSession
 
 
 class FaissIndexStorage:
@@ -28,7 +30,7 @@ class FaissIndexStorage:
     def __init__(
         self,
         sp_s: SparkSession,
-        base_dir: Optional[str] = None  # сохранён для совместимости, не используется
+        base_dir: str | None = None  # сохранён для совместимости, не используется
     ):
         self.sp_s = sp_s
         # для совместимости с внешним кодом
@@ -55,7 +57,6 @@ class FaissIndexStorage:
         ----
             index: faiss.Index
                 partition faiss index.
-        
         Returns
         -------
             serialized index in bytes.

@@ -15,6 +15,7 @@ Classes:
 """
 from pyspark import StorageLevel
 
+
 class DatasetConfig:
     """
     Configuration constants for dataset display and Spark operations.
@@ -98,5 +99,5 @@ class MatchingConfig:
     """
     FAISS_PERSIST_POLITIC: StorageLevel = StorageLevel.MEMORY_AND_DISK
     FAISS_SAMPLE_TARGET: int = 5_000_000
-    FAISS_DRIVER_INDEX_LIMIT: int = 5_000_000 
+    FAISS_DRIVER_INDEX_LIMIT: int = 5_000_000
     FAISS_CHUNK_SIZE: int = 4096
