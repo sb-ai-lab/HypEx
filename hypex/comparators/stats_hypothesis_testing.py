@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 import math
-import numpy as np
-from typing import Any, Literal
-
-from scipy.stats import t as t_dist, chi2_contingency
-
-from ..dataset import ABCRole
-from ..dataset.backends import SparkDataset
-from ..dataset import ABCRole, DatasetAdapter, SmallDataset
-from ..dataset.roles import StatisticRole, TargetRole
-from ..utils import NoColumnsError, BackendsEnum, timeit
-from ..utils.constants import NUMBER_TYPES_LIST, CATEGORICAL_TYPES_LIST
-from ..utils.registry import backend_factory
-from ..utils.errors import NotSuitableFieldError
-from .abstract import StatsHypothesisTesting
-from .comparators import TTest, Chi2Test, ZTest
-
 from math import sqrt
+from typing import Any, ClassVar, Literal
+
+import numpy as np
+from scipy.stats import chi2_contingency, kstwobign  # type: ignore
+from scipy.stats import t as t_dist  # type: ignore
+
+from ..dataset import ABCRole, DatasetAdapter, ExperimentData, SmallDataset
+from ..dataset.backends import SparkDataset
+from ..dataset.roles import StatisticRole, TargetRole
+from ..utils import BackendsEnum, NoColumnsError, timeit
+from ..utils.constants import CATEGORICAL_TYPES_LIST, NUMBER_TYPES_LIST
+from ..utils.errors import NotSuitableFieldError
+from ..utils.registry import backend_factory
+from .abstract import StatsHypothesisTesting
+from .comparators import Chi2Test, TTest, ZTest
+
 
 @backend_factory.register(TTest, SparkDataset)
 class StatsTTest(StatsHypothesisTesting):
@@ -28,7 +28,7 @@ class StatsTTest(StatsHypothesisTesting):
     deviations. Uses the base ``StatsComparator.execute()`` pipeline,
     which already handles per-column result storage emulation.
     """
-    REQUIRED_STATS = ["mean", "std", "count"]
+    REQUIRED_STATS: ClassVar[list[str]] = ["mean", "std", "count"]
 
     def __init__(
             self, 
@@ -67,7 +67,7 @@ class StatsTTest(StatsHypothesisTesting):
             List of numeric types supported by the t-test.
         """
         return NUMBER_TYPES_LIST
-    
+
     @classmethod
     def _inner_function(
         cls,
@@ -136,7 +136,7 @@ class StatsTTest(StatsHypothesisTesting):
         return {"p-value": p_value,
                 "statistic": float(t_stat),
                 "pass": p_value < reliability,}
-    
+
     @staticmethod
     def _t_statistics(n_list: tuple, 
                       s_list: tuple, 
@@ -165,9 +165,9 @@ class StatsTTest(StatsHypothesisTesting):
         else:
             s_delta =sqrt(s_list[0] / n_list[0] + s_list[1] / n_list[1])
             t_stat = (mean_list[0] - mean_list[1]) / s_delta
-        
+
         return t_stat
-    
+
     @staticmethod
     def _degrees_of_freedom(n_list: tuple, 
                        s_list: tuple = (0, 0), 
@@ -208,7 +208,7 @@ class StatsChi2Test(StatsHypothesisTesting):
     are p-value, statistic, pass — making StatsChi2Test a drop-in replacement for GroupTTest
     in pipelines where raw data transfer is expensive (e.g. Spark backend).
     """
-    REQUIRED_STATS = ["value_counts"]
+    REQUIRED_STATS: ClassVar[list[str]] = ["value_counts"]
 
     def __init__(
             self,
@@ -248,7 +248,7 @@ class StatsChi2Test(StatsHypothesisTesting):
             List of categorical types supported by the chi-squared test.
         """
         return CATEGORICAL_TYPES_LIST
-    
+
     @classmethod
     def _inner_function(
         cls,
@@ -322,10 +322,10 @@ class StatsZTest(StatsHypothesisTesting):
     """
     Z-test for proportions (approximation of Chi-square for 2x2 table).
     Compares conversion rates between baseline and compared groups.
-    
+
     For continuous metrics (revenue, spends) use AggTTest instead.
     """
-    REQUIRED_STATS = ["count", "sum"]
+    REQUIRED_STATS: ClassVar[list[str]] = ["count", "sum"]
 
     def __init__(
             self,
@@ -364,7 +364,7 @@ class StatsZTest(StatsHypothesisTesting):
             List of numeric types supported (typically integers/floats for binary sums).
         """
         return NUMBER_TYPES_LIST
-    
+
     @classmethod
     def _inner_function(cls,
                         baseline_stats: dict[str, Any],
@@ -407,7 +407,7 @@ class StatsZTest(StatsHypothesisTesting):
 
         variance = p_pool * (1 - p_pool) * (1/n1 + 1/n2)
         se = math.sqrt(max(0, variance))
-        
+
         if se == 0:
             return {"p-value": None, "statistic": None, "pass": None}
 
@@ -431,7 +431,7 @@ class StatsKSTest(StatsHypothesisTesting):
     For Pandas: delegates to ``GroupKSTest`` (``scipy.stats.ks_2samp``).
     """
 
-    REQUIRED_STATS = ["histogram", "count"]
+    REQUIRED_STATS: ClassVar[list[str]] = ["histogram", "count"]
 
     def __init__(
         self,
@@ -452,6 +452,7 @@ class StatsKSTest(StatsHypothesisTesting):
         """
         super().__init__(
             stats=self.REQUIRED_STATS,
+            compare_by="groups",
             grouping_role=grouping_role,
             target_roles=target_roles,
             key=key,

@@ -12,7 +12,6 @@ from ..comparators import (
     StatsKSTest,
     StatsTTest,
 )
-from ..comparators.adaptive_hypothesis_testing import Chi2Test, KSTest, TTest, UTest
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..dataset.dataset import SmallDataset
 from ..splitters import AASplitter, AASplitterWithStratification
@@ -38,7 +37,6 @@ class AATestReporter(DatasetReporter):
     tests: ClassVar[list[type[BaseComparator]]] = [
         GroupTTest, GroupKSTest, GroupChi2Test,
         StatsTTest, StatsKSTest, StatsChi2Test,
-        TTest, KSTest, Chi2Test, UTest
     ]
 
     def __init__(self, 

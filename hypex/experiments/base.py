@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Iterable, Sequence
 from copy import deepcopy
 from typing import Any
 
-from ..dataset import ABCRole, AdditionalTargetRole, ExperimentData, TempTargetRole, Dataset
+from ..comparators.abstract import StatsComparator, StatsHypothesisTesting
+from ..comparators.comparators import StatTestMasterAbstract
+from ..dataset import (
+    ABCRole,
+    AdditionalTargetRole,
+    Dataset,
+    ExperimentData,
+    TempTargetRole,
+)
 from ..executor import Executor
-from ..utils import ExperimentDataEnum, timeit
-from ..utils import BackendsEnum
+from ..utils import BackendsEnum, ExperimentDataEnum, timeit
 from ..utils.registry import backend_factory
-
-import time
-import inspect
-
 
 
 class Experiment(Executor):
@@ -271,23 +275,19 @@ class OnRoleExperiment(Experiment):
         if not target_fields:
             return data
 
-        from ..comparators.abstract import StatsComparator, StatsHypothesisTesting
-        from ..comparators.adaptive_hypothesis_testing import AdaptiveHypothesisTest
 
         vector_executors = []
         iterative_executors = []
         _backend = data.ds.backend_type
 
         for ex in self.executors:
-            # StatsComparator and StatsHypothesisTesting are truly vectorized (work on aggregated stats)
+            # StatsComparator / StatsHypothesisTesting — истинно векторные
             if isinstance(ex, (StatsComparator, StatsHypothesisTesting)):
                 vector_executors.append(ex)
-            # AdaptiveHypothesisTest is tricky:
-            # On Spark it becomes StatsHypothesisTesting (vectorized).
-            # On Pandas it becomes GroupHypothesisTesting (NOT vectorized, requires single column).
-            # So we should treat AdaptiveHypothesisTest as iterative to be safe for Pandas,
-            # OR check backend. But simpler is to just make them iterative unless they are Stats-based.
-            elif isinstance(ex, AdaptiveHypothesisTest):
+            # Мастер-классы (TTest, KSTest, Chi2Test…):
+            #   Spark  → Stats* (векторный)
+            #   Pandas → Group* (итеративный)
+            elif isinstance(ex, StatTestMasterAbstract):
                 if _backend == BackendsEnum.spark:
                     vector_executors.append(ex)
                 else:

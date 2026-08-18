@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Literal, Any
+from typing import Any, ClassVar, Literal
 
 import numpy as np
 
 from ..dataset import ABCRole, Dataset
 from ..utils.constants import NUMBER_TYPES_LIST
-from .abstract import Comparator, BaseComparator, StatsComparator
+from .abstract import BaseComparator, Comparator, StatsComparator
+
 NUM_OF_BUCKETS = 10
 
 
@@ -28,7 +29,7 @@ class GroupDifference(StatsComparator):
         >>> result = diff.execute(experiment_data)
     """
 
-    REQUIRED_STATS = ["mean"]
+    REQUIRED_STATS: ClassVar[list[str]] = ["mean"]
 
     def __init__(
         self,
@@ -51,10 +52,10 @@ class GroupDifference(StatsComparator):
         """
         super().__init__(
             stats=self.REQUIRED_STATS,
+            compare_by=compare_by,
             grouping_role=grouping_role,
             target_roles=target_roles,
         )
-        self.compare_by = compare_by
 
     @property
     def search_types(self) -> list[type] | None:
@@ -135,7 +136,7 @@ class GroupSizes(StatsComparator):
         >>> result = sizes.execute(experiment_data)
     """
 
-    REQUIRED_STATS = ["count"]
+    REQUIRED_STATS: ClassVar[list[str]] = ["count"]
 
     def __init__(
         self,
@@ -160,10 +161,10 @@ class GroupSizes(StatsComparator):
         """
         super().__init__(
             stats=self.REQUIRED_STATS,
+            compare_by=compare_by,
             grouping_role=grouping_role,
             target_roles=grouping_role,
         )
-        self.compare_by = compare_by
 
     @classmethod
     def _inner_function(
@@ -239,8 +240,6 @@ class StatTestMasterAbstract(BaseComparator):
     """
     Master-abstract class for stat-tests
     """
-    # def __init__(self, **experiment_kwargs):
-    #     self._experiment_kwargs: dict[str, Any] = experiment_kwargs
     def __init__(
             self,
             grouping_role: ABCRole | None = None,

@@ -14,15 +14,6 @@ from ..comparators import (
     StatsTTest,
     StatsZTest,
 )
-from ..comparators.adaptive_hypothesis_testing import (
-    Chi2Test as AdaptiveChi2Test,
-)
-from ..comparators.adaptive_hypothesis_testing import (
-    KSTest as AdaptiveKSTest,
-)
-from ..comparators.adaptive_hypothesis_testing import (
-    TTest as AdaptiveTTest,
-)
 from ..dataset import Dataset, ExperimentData, InfoRole, SmallDataset, StatisticRole
 from ..executor import Executor
 from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
@@ -41,9 +32,6 @@ ANALYSIS_TEST_CLASSES: list[type] = [
     StatsChi2Test,
     StatsZTest,
     StatsKSTest,
-    AdaptiveTTest,
-    AdaptiveKSTest,
-    AdaptiveChi2Test,
 ]
 
 #: (preferred_class, fallback_class, weight) for composite score computation.
