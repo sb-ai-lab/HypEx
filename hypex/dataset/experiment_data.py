@@ -292,9 +292,10 @@ class ExperimentData:
         additional_cols = list(set(self._data.columns) - set(self._initial_cols))
         if not additional_cols:
             return self._data.create_empty(
-                index=self._data.index,
+                # index=self._data.index,
                 backend=self._data.backend_type,
                 session=self._data.session,
+                roles={}
             )
         view = self._data[additional_cols]
         view.roles = {c: self._data.roles[c] for c in additional_cols}
