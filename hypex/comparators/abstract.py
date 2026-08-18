@@ -697,7 +697,6 @@ class StatsComparator(BaseComparator, ABC):
         data: Dataset,
         group_cols: list[str],
         target_columns: list[str],
-        grouped: GroupedDataset,
         stats: list[str] | None = None,
         **kwargs,
     ) -> dict[str, dict[str, dict[str, Any]]]:
@@ -845,34 +844,95 @@ class StatsComparator(BaseComparator, ABC):
         target_fields_data: Dataset | None = None,
         group_field_data: Dataset | None = None,
         baseline_fields_data: Dataset | None = None,
-
     ) -> GroupedDataset:
         if compare_by == "groups":
-            grouped: GroupedDataset = (target_fields_data
-                .merge(group_field_data, left_index=True, right_index=True)
-                .groupby(by=group_field_data.columns)
-            )
+            group_col = group_field_data.columns[0]
+            if group_col in target_fields_data.columns:
+                grouped: GroupedDataset = target_fields_data.groupby(
+                    by=group_field_data.columns
+                )
+            else:
+                grouped: GroupedDataset = (
+                    target_fields_data
+                    .merge(group_field_data, left_index=True, right_index=True)
+                    .groupby(by=group_field_data.columns)
+                )
         elif compare_by == "matched_pairs":
             best_match_col = baseline_fields_data.columns[0]
             group_col = group_field_data.columns[0]
-
             baseline_fields = baseline_fields_data[best_match_col]
-
-            tmp_data = group_field_data.merge(right=target_fields_data, left_index=True, right_index=True)
-            tmp_data = tmp_data.merge(right=baseline_fields, right_index=True, left_index=True)
-            tmp_data = tmp_data.merge(right=tmp_data, right_index=True, left_on=best_match_col, suffixes=("", "_matched"))
-
-            prepeared_data = tmp_data.drop(columns=[best_match_col, best_match_col + "_matched", group_col + "_matched"])
+            tmp_data = group_field_data.merge(
+                right=target_fields_data, left_index=True, right_index=True
+            )
+            tmp_data = tmp_data.merge(
+                right=baseline_fields, right_index=True, left_index=True
+            )
+            tmp_data = tmp_data.merge(
+                right=tmp_data, right_index=True, left_on=best_match_col,
+                suffixes=("", "_matched"),
+            )
+            prepeared_data = tmp_data.drop(
+                columns=[best_match_col, best_match_col + "_matched", group_col + "_matched"]
+            )
             grouped: GroupedDataset = prepeared_data.groupby(by=group_col)
         return grouped
 
+    @timeit(level="COMPARATOR", prefix="STATS")
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """Execute the stats-based comparator on the given experiment data.
+
+        The execution follows a two-phase design optimised for distributed backends:
+
+        **Phase 1 – Aggregate:**
+            A single aggregation call computes all required statistics for every
+            target column across all groups in ONE backend job (e.g. one Spark
+            ``groupBy().agg()``).  This avoids the N×M job explosion that would
+            occur if each (group, column) pair were aggregated separately.
+
+        **Phase 2 – Compare:**
+            The pre-aggregated statistics are fed pairwise (baseline vs. each
+            compared group) into ``_inner_function``, which returns the test
+            result (p-value, statistic, pass) for each (group, column) pair.
+
+        Two artifacts are stored in ``analysis_tables``:
+
+        * ``{self.id}┆stats`` – per-group statistics table
+        (rows = groups, cols = ``{stat}┆{col}``).
+        * ``{self.id}`` – pairwise test results in the same shape as
+        ``GroupsComparator`` output.
+
+        Comparison modes
+        ----------------
+        * ``"groups"`` – standard multi-group comparison.  The first
+        (alphabetically smallest) group is treated as baseline.
+        * ``"matched_pairs"`` – each observation is compared against its
+        matched counterpart.  Requires ``baseline_fields_data`` (e.g.
+        ``AdditionalMatchingRole``) containing match indices.
+
+        Args:
+            data: The ``ExperimentData`` container holding the datasets,
+                roles, and any previously computed analysis tables.
+
+        Returns:
+            The updated ``ExperimentData`` with test results stored in
+            ``analysis_tables`` under this executor's ``self.id``.
+
+        Raises:
+            NoColumnsError: If no target columns are found and no temporary
+                roles are active.
+            NotSuitableFieldError: If the grouping field has more than one
+                column or fewer than two groups are detected.
+        """
+        # ── 1. Resolve field subsets from roles ──────────────────────────────
         fields = self._get_fields_data(data)
         group_field_data = fields["group_field"]
         target_fields_data = fields["target_fields"]
         baseline_fields_data = fields["baseline_field"]
 
+        # ── 2. Early-exit / validation guards ────────────────────────────────
         if len(target_fields_data.columns) == 0:
+            # When tmp_roles are active an empty target set simply means
+            # "no column matched this iteration" – not an error.
             if data.ds.tmp_roles:
                 return data
             raise NoColumnsError(TargetRole().role_name)
@@ -880,64 +940,143 @@ class StatsComparator(BaseComparator, ABC):
         if len(group_field_data.columns) != 1:
             raise NotSuitableFieldError(group_field_data, "Grouping")
 
+        # Set the composite key used for result storage / pipeline lookups.
         self.key = str(
             target_fields_data.columns[0]
             if len(target_fields_data.columns) == 1
             else list(target_fields_data.columns)
         )
 
-        grouped = self._prepare_data(self.compare_by, target_fields_data, group_field_data, baseline_fields_data)
+        group_col = group_field_data.columns[0]
+        target_cols = list(target_fields_data.columns)
 
-        # Phase 1: single agg call — all stats × all groups in ONE Spark job.
-        group_col_stats = self._compute_stats(
-            grouped, self.stats
-        )
-        
-        group_names = list(group_col_stats.keys())
+        # ── 3. Phase 1 – Aggregate all stats in a single backend job ─────────
+        if self.compare_by == "groups":
+            # Build a column projection that contains the group column and all
+            # target columns.  This avoids a merge (which can duplicate column
+            # names when target_roles == grouping_role, e.g. GroupSizes).
+            all_cols = target_cols + (
+                [group_col] if group_col not in target_cols else []
+            )
+            agg_data = data.ds[all_cols]
+
+            group_col_stats = self._compute_stats(
+                data=agg_data,
+                group_cols=[group_col],
+                target_columns=target_cols,
+                grouped=None,          # unused by StatsAggregationExtension
+                stats=self.stats,
+            )
+
+        elif self.compare_by == "matched_pairs":
+            # For matched pairs we must first build a dataset that contains
+            # both the original values and the matched (counterfactual) values
+            # side-by-side, then aggregate both sets.
+            best_match_col = baseline_fields_data.columns[0]
+            baseline_fields = baseline_fields_data[best_match_col]
+
+            # Merge: group_col + target columns + match-index column
+            tmp_data = group_field_data.merge(
+                right=target_fields_data, left_index=True, right_index=True
+            )
+            tmp_data = tmp_data.merge(
+                right=baseline_fields, right_index=True, left_index=True
+            )
+            # Self-merge on the match-index column to pull in the matched rows.
+            # Original columns keep their names; matched counterparts get
+            # the "_matched" suffix.
+            tmp_data = tmp_data.merge(
+                right=tmp_data,
+                right_index=True,
+                left_on=best_match_col,
+                suffixes=("", "_matched"),
+            )
+            # Drop auxiliary columns that are not part of the comparison.
+            prepared_data = tmp_data.drop(
+                columns=[
+                    best_match_col,
+                    best_match_col + "_matched",
+                    group_col + "_matched",
+                ]
+            )
+
+            # The target columns for aggregation include both original and
+            # matched variants so that _inner_function can compare them.
+            matched_target_cols = target_cols + [
+                f"{c}_matched" for c in target_cols
+            ]
+
+            group_col_stats = self._compute_stats(
+                data=prepared_data,
+                group_cols=[group_col],
+                target_columns=matched_target_cols,
+                grouped=None,
+                stats=self.stats,
+            )
+        else:
+            raise ValueError(
+                f"StatsComparator supports 'groups' and 'matched_pairs' only, "
+                f"got compare_by={self.compare_by!r}"
+            )
+
+        # ── 4. Validate that at least two groups exist ───────────────────────
+        group_names = sorted(group_col_stats.keys(), key=str)
 
         if len(group_names) < 2:
-            for col in target_fields_data.columns:
+            # Fewer than two groups → nothing to compare.  Store empty results
+            # so downstream reporters do not crash on a missing key.
+            for col in target_cols:
                 self.key = str(col)
                 self._set_value(data, SmallDataset.create_empty())
             return data
 
-        for col in target_fields_data.columns:
+        # ── 5. Store per-column statistics tables ────────────────────────────
+        # Each column gets a small table (rows = groups, cols = stats) stored
+        # under "{self.id}┆stats".  This is useful for debugging and for
+        # reporters that display raw aggregates.
+        for col in target_cols:
             self.key = str(col)
-
-            stats_data_dict = {}
+            stats_data_dict: dict[str, list] = {}
             for stat in self.stats:
                 stats_data_dict[f"{stat}{NAME_BORDER_SYMBOL}{col}"] = [
                     group_col_stats[g][col][stat] for g in group_names
                 ]
-
             stats_dataset = DatasetAdapter.to_dataset(stats_data_dict, StatisticRole())
             stats_dataset.index = group_names
             data = self._set_stats_value(data, stats_dataset)
 
-        # Phase 2: one Dataset per (compared_group, col) pair, then append once.
-        result_ds_list = self.calc(
-            compare_by=self.compare_by,
+        # ── 6. Phase 2 – Pairwise comparison via _inner_function ─────────────
+        result_ds_list = self._execute_inner_function(
             group_col_stats=group_col_stats,
-            **self.calc_kwargs
+            compare_by=self.compare_by,
+            **self.calc_kwargs,
         )
+
         if not result_ds_list:
             return data
 
+        # ── 7. Assemble the final result Dataset ─────────────────────────────
         result_dataset = result_ds_list[0].append(result_ds_list[1:])
 
         if self.compare_by == "groups":
+            # Index: one row per (compared_group, target_column) pair.
             result_dataset.index = [
                 f"{compared_name}{NAME_BORDER_SYMBOL}{col}"
                 for compared_name in group_names[1:]
-                for col in target_fields_data.columns
+                for col in target_cols
             ]
         elif self.compare_by == "matched_pairs":
+            # Index: one row per (group, target_column) pair.
             result_dataset.index = [
-                f"{compared_name}{NAME_BORDER_SYMBOL}{col}"
-                for compared_name in group_names
-                for col in target_fields_data.columns
+                f"{group_name}{NAME_BORDER_SYMBOL}{col}"
+                for group_name in group_names
+                for col in target_cols
             ]
 
+        # Restore the composite key before storing the final result.
+        self.key = str(
+            target_cols[0] if len(target_cols) == 1 else target_cols
+        )
         return self._set_value(data, result_dataset)
 
 
