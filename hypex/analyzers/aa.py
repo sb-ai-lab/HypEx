@@ -73,22 +73,23 @@ class OneAAStatAnalyzer(Executor):
     score to evaluate the overall consistency of data splitting configurations.
     """
     #: Registered test classes whose results are aggregated by OneAAStatAnalyzer.
-    ANALYSIS_TEST_CLASSES: ClassVar[tuple[type]] = tuple(
+    ANALYSIS_TEST_CLASSES: ClassVar[tuple[type]] = tuple([
         GroupTTest,
         GroupKSTest,
         GroupChi2Test,
         StatsTTest,
         StatsChi2Test,
         StatsZTest,
-        StatsKSTest,
+        StatsKSTest]
     )
 
     #: (preferred_class, fallback_class, weight) for composite score computation.
     #: Preferred = Spark-backed (Stats*), fallback = Pandas-backed (Group*).
-    _SCORE_RULES: ClassVar[tuple[tuple[str, str, int]]] = tuple(
-        ("StatsTTest", "GroupTTest", 1),
-        ("StatsKSTest", "GroupKSTest", 2),
-        ("StatsChi2Test", "GroupChi2Test", 2),
+    _SCORE_RULES: ClassVar[tuple[tuple[str, str, int]]] = tuple([
+            ("StatsTTest", "GroupTTest", 1),
+            ("StatsKSTest", "GroupKSTest", 2),
+            ("StatsChi2Test", "GroupChi2Test", 2),
+        ]
     )
 
     #: Weights for the final best-split scoring formula.

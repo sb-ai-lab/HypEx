@@ -13,6 +13,7 @@ from ..dataset import (
     Dataset,
     DatasetAdapter,
     ExperimentData,
+    GroupedDataset,
     GroupingRole,
     InfoRole,
     PreTargetRole,
@@ -21,7 +22,6 @@ from ..dataset import (
     TargetRole,
     TempTargetRole,
 )
-from ..dataset.abstract import GroupedDataset
 from ..executor import Calculator
 from ..utils import (
     NAME_BORDER_SYMBOL,
@@ -39,7 +39,7 @@ from ..utils.errors import (
 )
 
 
-class BaseComparator(Calculator, ABC):
+class BaseComparator(Calculator):
     """
     Base class for all comparators. Owns role management, field resolution,
     and result storage. Does not prescribe how the comparison is performed.
@@ -883,29 +883,29 @@ class StatsComparator(BaseComparator, ABC):
 
         The execution follows a two-phase design optimised for distributed backends:
 
-        **Phase 1 – Aggregate:**
+        **Phase 1 - Aggregate:**
             A single aggregation call computes all required statistics for every
             target column across all groups in ONE backend job (e.g. one Spark
-            ``groupBy().agg()``).  This avoids the N×M job explosion that would
+            ``groupBy().agg()``).  This avoids the NxM job explosion that would
             occur if each (group, column) pair were aggregated separately.
 
-        **Phase 2 – Compare:**
+        **Phase 2 - Compare:**
             The pre-aggregated statistics are fed pairwise (baseline vs. each
             compared group) into ``_inner_function``, which returns the test
             result (p-value, statistic, pass) for each (group, column) pair.
 
         Two artifacts are stored in ``analysis_tables``:
 
-        * ``{self.id}┆stats`` – per-group statistics table
+        * ``{self.id}┆stats`` - per-group statistics table
         (rows = groups, cols = ``{stat}┆{col}``).
-        * ``{self.id}`` – pairwise test results in the same shape as
+        * ``{self.id}`` - pairwise test results in the same shape as
         ``GroupsComparator`` output.
 
         Comparison modes
         ----------------
-        * ``"groups"`` – standard multi-group comparison.  The first
+        * ``"groups"`` - standard multi-group comparison.  The first
         (alphabetically smallest) group is treated as baseline.
-        * ``"matched_pairs"`` – each observation is compared against its
+        * ``"matched_pairs"`` - each observation is compared against its
         matched counterpart.  Requires ``baseline_fields_data`` (e.g.
         ``AdditionalMatchingRole``) containing match indices.
 
