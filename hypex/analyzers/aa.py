@@ -16,42 +16,10 @@ from ..comparators import (
 )
 from ..dataset import Dataset, ExperimentData, InfoRole, SmallDataset, StatisticRole
 from ..executor import Executor
-from ..experiments.base_complex import IfParamsExperiment, ParamsExperiment
+from ..experiments import IfParamsExperiment, ParamsExperiment
 from ..splitters import AASplitter, AASplitterWithStratification
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, timeit
 from ..utils.naming import _parse_metric_col, normalize_test_name
-
-# ── Constants ─────────────────────────────────────────────────────────────────
-
-#: Registered test classes whose results are aggregated by OneAAStatAnalyzer.
-ANALYSIS_TEST_CLASSES: list[type] = [
-    GroupTTest,
-    GroupKSTest,
-    GroupChi2Test,
-    StatsTTest,
-    StatsChi2Test,
-    StatsZTest,
-    StatsKSTest,
-]
-
-#: (preferred_class, fallback_class, weight) for composite score computation.
-#: Preferred = Spark-backed (Stats*), fallback = Pandas-backed (Group*).
-_SCORE_RULES: list[tuple[str, str, int]] = [
-    ("StatsTTest", "GroupTTest", 1),
-    ("StatsKSTest", "GroupKSTest", 2),
-    ("StatsChi2Test", "GroupChi2Test", 2),
-]
-
-#: Weights for the final best-split scoring formula.
-PVALUE_WEIGHT: float = 2 / 3
-TEST_SCORE_WEIGHT: float = 1 / 3
-
-#: Pass-rate threshold multiplier relative to alpha.
-THRESHOLD_FACTOR: float = 1.2
-
-#: Values treated as "passed" when parsing pass-columns.
-_PASS_TRUTHY = frozenset({"OK", "TRUE", "1"})
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -62,6 +30,8 @@ def _mean_key(class_name: str, field: str) -> str:
 
 def _is_passed(value: Any) -> bool:
     """Check whether a cell value represents a passed test."""
+    #: Values treated as "passed" when parsing pass-columns.
+    _PASS_TRUTHY = frozenset({"OK", "TRUE", "1"})
     return str(value).strip().upper() in _PASS_TRUTHY
 
 
@@ -102,15 +72,37 @@ class OneAAStatAnalyzer(Executor):
     Computes average p-values, pass rates, and a weighted composite quality
     score to evaluate the overall consistency of data splitting configurations.
     """
+    #: Registered test classes whose results are aggregated by OneAAStatAnalyzer.
+    ANALYSIS_TEST_CLASSES: ClassVar[tuple[type]] = tuple(
+        GroupTTest,
+        GroupKSTest,
+        GroupChi2Test,
+        StatsTTest,
+        StatsChi2Test,
+        StatsZTest,
+        StatsKSTest,
+    )
 
-    def _set_value(self, data: ExperimentData, value: Any, key: Any = None) -> ExperimentData:
+    #: (preferred_class, fallback_class, weight) for composite score computation.
+    #: Preferred = Spark-backed (Stats*), fallback = Pandas-backed (Group*).
+    _SCORE_RULES: ClassVar[tuple[tuple[str, str, int]]] = tuple(
+        ("StatsTTest", "GroupTTest", 1),
+        ("StatsKSTest", "GroupKSTest", 2),
+        ("StatsChi2Test", "GroupChi2Test", 2),
+    )
+
+    #: Weights for the final best-split scoring formula.
+    PVALUE_WEIGHT: float = 2 / 3
+    TEST_SCORE_WEIGHT: float = 1 / 3
+
+    def _set_value(self, data: ExperimentData, value: Any) -> ExperimentData:
         """Stores the aggregated metrics in the experiment data container."""
         return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
 
     @timeit(level="ANALYZER", prefix="AA_STAT")
     def execute(self, data: ExperimentData) -> ExperimentData:
         executor_ids = data.get_ids(
-            ANALYSIS_TEST_CLASSES,
+            self.ANALYSIS_TEST_CLASSES,
             searched_space=ExperimentDataEnum.analysis_tables,
         )
 
@@ -156,8 +148,8 @@ class OneAAStatAnalyzer(Executor):
         """Replace NaN values with 0."""
         return {k: (0.0 if np.isnan(v) else v) for k, v in data.items()}
 
-    @staticmethod
-    def _compute_composite_score(analysis_data: dict[str, float]) -> float:
+    @classmethod
+    def _compute_composite_score(cls, analysis_data: dict[str, float]) -> float:
         """Compute the weighted composite score from individual test p-values.
 
         Rules:
@@ -170,7 +162,7 @@ class OneAAStatAnalyzer(Executor):
         score = 0.0
         total_weight = 0
 
-        for preferred, fallback, weight in _SCORE_RULES:
+        for preferred, fallback, weight in cls._SCORE_RULES:
             pref_key = _mean_key(preferred, "p-value")
             fall_key = _mean_key(fallback, "p-value")
 
@@ -194,6 +186,9 @@ class AAScoreAnalyzer(Executor):
     composite score.
     """
 
+    #: Pass-rate threshold multiplier relative to alpha.
+    THRESHOLD_FACTOR: float = 1.2
+
     SPLITTER_CLASS_MAPPING: ClassVar[dict[str, type]] = {
         cls.__name__: cls for cls in (AASplitter, AASplitterWithStratification)
     }
@@ -207,7 +202,7 @@ class AAScoreAnalyzer(Executor):
         """
         super().__init__(key=key)
         self.alpha = alpha
-        self.threshold = 1 - (self.alpha * THRESHOLD_FACTOR)
+        self.threshold = 1 - (self.alpha * self.THRESHOLD_FACTOR)
         self._feature_weights: dict[str, float] = {}
 
     # ── Storage ───────────────────────────────────────────────────────────
@@ -356,8 +351,8 @@ class AAScoreAnalyzer(Executor):
         mean_test_score = self._get_mean_test_score_column(score_table)
 
         score_col = (
-            weighted_pvalues * PVALUE_WEIGHT
-            + mean_test_score * TEST_SCORE_WEIGHT
+            weighted_pvalues * self.PVALUE_WEIGHT
+            + mean_test_score * self.TEST_SCORE_WEIGHT
         )
         return score_col.idxmax()
 
