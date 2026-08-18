@@ -76,6 +76,11 @@ class SparkSessionCalculator:
     BYTES_PER_DECIMAL = 16  # decimal(38, 18) occupies ~16 bytes
     FAISS_INDEX_OVERHEAD = 1.5
     INDEX_FILE_SIZE_MULTIPLIER = 1.2
+    EXECUTOR_REDUNDANCY_FACTOR = 2
+
+    MIN_EXECUTOR_MEMORY_GB = 4
+    MIN_EXECUTOR_OVERHEAD_MB = 2048  # 2 ГБ минимум для native-кода
+    MIN_DRIVER_MEMORY_GB = 8
 
     # Mapping from SparkSettings parameters to SparkConf keys
     SETTINGS_TO_SPARK_CONF: ClassVar[dict[str, str]] = {
@@ -151,28 +156,106 @@ class SparkSessionCalculator:
     def _calculate_optimal_executors(
         self, data_size_bytes: int, num_partitions: int
     ) -> int:
-        """Calculate the optimal number of executors."""
+        """Calculate the optimal number of executors with redundancy.
+
+        Uses EXECUTOR_REDUNDANCY_FACTOR (x2) to provide:
+        - Fault tolerance for executor loss
+        - Better load balancing under data skew
+        - Headroom for long-running FAISS search operations
+        """
         tasks_per_executor = self.target_executor_cores
-        num_executors = max(1, num_partitions // tasks_per_executor)
-        min_executors = 2
+        base_executors = max(1, num_partitions // tasks_per_executor)
+
+        # Your proposal: multiply by redundancy factor
+        num_executors = base_executors * self.EXECUTOR_REDUNDANCY_FACTOR
+
+        min_executors = 4   # was 2 — increased for production stability
         max_executors = 50
         return max(min_executors, min(num_executors, max_executors))
 
     def _calculate_executor_memory(self, data_size_bytes: int, num_partitions: int) -> str:
-        """Calculate executor memory."""
+        """Calculate executor memory accounting for FAISS LRU cache behavior.
+
+        KEY INSIGHT: In SparkFaissExtension._per_partition_predict(), each executor
+        loads ALL partition indexes into a process-wide LRU cache (CachingIndex).
+        Therefore, total memory must accommodate ALL indexes simultaneously,
+        not just one partition's worth.
+
+        Memory breakdown:
+        1. all_indexes_memory: num_partitions × single_index_size
+        2. working_data_memory: parallel tasks × partition_size
+        3. native_overhead: FAISS C++ + PyArrow + JVM metaspace (~1 GB baseline)
+        """
         partition_size_bytes = data_size_bytes / num_partitions
-        index_size_bytes = partition_size_bytes * self.FAISS_INDEX_OVERHEAD
-        memory_for_index_bytes = index_size_bytes * 2
-        overhead_bytes = 512 * 1024 * 1024
-        total_memory_bytes = memory_for_index_bytes + overhead_bytes
-        total_memory_gb = total_memory_bytes / (1024**3)
-        memory_gb = max(2, int(total_memory_gb) + 1)
+        single_index_size_bytes = partition_size_bytes * self.FAISS_INDEX_OVERHEAD
+
+        # CRITICAL FIX: ALL indexes live in the executor's LRU cache simultaneously
+        all_indexes_memory_bytes = single_index_size_bytes * num_partitions
+
+        # Working memory for parallel tasks on this executor
+        parallel_tasks = self.target_executor_cores
+        working_data_bytes = partition_size_bytes * parallel_tasks
+
+        # Native (off-heap) overhead for FAISS + PyArrow + JVM internals
+        native_overhead_bytes = 1 * 1024 * 1024 * 1024  # 1 GB baseline
+
+        total_memory_bytes = (
+            all_indexes_memory_bytes
+            + working_data_bytes
+            + native_overhead_bytes
+        )
+        total_memory_gb = total_memory_bytes / (1024 ** 3)
+
+        # Round up with safety margin, enforce minimum
+        memory_gb = max(
+            self.MIN_EXECUTOR_MEMORY_GB,
+            int(total_memory_gb) + 2   # +2 GB safety margin
+        )
         return f"{memory_gb}g"
 
     def _calculate_memory_overhead(self, executor_memory_gb: int) -> str:
-        """Calculate executor memory overhead."""
-        overhead_mb = max(384, int(executor_memory_gb * 1024 * 0.1))
+        """Calculate executor memory overhead for off-heap operations.
+
+        For FAISS workloads, overhead must cover:
+        - JVM metaspace and GC structures
+        - PyArrow native buffers
+        - Netty direct memory
+        - SparkFiles temporary storage
+
+        30% of executor memory with 2 GB minimum (was: 10% with 384 MB minimum)
+        """
+        overhead_mb = max(
+            self.MIN_EXECUTOR_OVERHEAD_MB,
+            int(executor_memory_gb * 1024 * 0.30)
+        )
         return f"{overhead_mb}m"
+
+    def _calculate_driver_memory(self, data_size_bytes: int) -> str:
+        """Calculate driver memory based on dataset size.
+
+        Driver memory consumers:
+        1. FAISS IVF training sample (FAISS_SAMPLE_TARGET vectors × features × 4 bytes)
+        2. Broadcast variables (index references, configs)
+        3. Bug-triggered index collect() in ExperimentData.field_search()
+        (the entire dataset's index is collected to driver)
+        4. PySpark internal SQL catalyst + Arrow buffers
+        """
+        # 1. Sample for IVF training
+        sample_bytes = 5_000_000 * self.num_columns * self.BYTES_PER_FLOAT
+        sample_gb = sample_bytes / (1024 ** 3)
+
+        # 2. Index collect() bug impact: each row contributes 8 bytes (int64 index)
+        index_collect_bytes = self.num_rows * 8 if self.num_rows else data_size_bytes // self.num_columns
+        index_collect_gb = index_collect_bytes / (1024 ** 3)
+
+        # 3. Base overhead (catalyst, broadcast, Arrow)
+        base_gb = 4
+
+        total_gb = base_gb + sample_gb + index_collect_gb
+
+        # Round up, enforce minimum
+        driver_gb = max(self.MIN_DRIVER_MEMORY_GB, int(total_gb) + 2)
+        return f"{driver_gb}g"
 
     @staticmethod
     def _define_fs(self, session: SparkSession) -> str:
@@ -180,8 +263,10 @@ class SparkSessionCalculator:
         try:
             hadoop_conf = session.sparkContext._jsc.hadoopConfiguration()
             file_sys = hadoop_conf.get("fs.defaultFS", "file:///")
-            if file_sys == "file:///": file_sys = None
-        except Exception: pass
+            if file_sys == "file:///":
+                file_sys = None
+        except Exception:
+            pass
 
         if file_sys is None:
             try:
@@ -217,13 +302,17 @@ class SparkSessionCalculator:
         executor_memory_gb = int(executor_memory.rstrip("g"))
         memory_overhead = self._calculate_memory_overhead(executor_memory_gb)
 
+        # NEW: driver memory is now calculated, not hardcoded
+        driver_memory = self._calculate_driver_memory(data_size_bytes)
+        driver_cores = max(4, self.target_executor_cores)  # was hardcoded 2
+
         settings = SparkSettings(
             executor_instances=num_executors,
             executor_cores=self.target_executor_cores,
             executor_memory=executor_memory,
             executor_memory_overhead=memory_overhead,
-            driver_memory="4g",
-            driver_cores=2,
+            driver_memory=driver_memory,            # ← changed from "4g"
+            driver_cores=driver_cores,              # ← changed from 2
             shuffle_partitions=num_partitions,
             default_parallelism=num_partitions,
             max_partition_bytes="128m",
@@ -239,7 +328,8 @@ class SparkSessionCalculator:
                 "spark.sql.adaptive.skewJoin.enabled": "true",
                 "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
                 "spark.kryoserializer.buffer.max": "512m",
-                "spark.driver.maxResultSize": "2g",
+                # CRITICAL: allow driver to receive large collect() results
+                "spark.driver.maxResultSize": "8g",
             },
         )
         return settings
