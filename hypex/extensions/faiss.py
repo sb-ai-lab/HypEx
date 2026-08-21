@@ -4,6 +4,7 @@ import builtins
 import gc
 from abc import abstractmethod
 from typing import (
+    ClassVar,
     Iterable,
     Literal,
 )
@@ -300,9 +301,10 @@ class PandasFaissExtension(FaissExtension):
             and len(test_data) > 1_000
         ):
             m = 4 # heuristic
-            n_clusters = np.sqrt(len(X) / m)
+            n_clusters = int(np.sqrt(len(X) / m))
             nlist = min(n_clusters, max(1, X.shape[0] // 39))
-            _index = faiss.IndexIVFFlat(self.index, X.shape[1], nlist)
+            quantizer = faiss.IndexFlatL2(X.shape[1])
+            _index = faiss.IndexIVFFlat(quantizer, X.shape[1], nlist)
             _index.train(X)
             self.index = faiss.IndexIDMap(_index)
         self.index.add_with_ids(X, data.index.tolist())
@@ -558,7 +560,7 @@ class SparkFaissExtension(FaissExtension):
         StructField("index",          LongType(),            False),
         StructField("index_list",     ArrayType(LongType()), False)
     ])
-    CLUSTERING_METHODS_MAPPER = {
+    CLUSTERING_METHODS_MAPPER: ClassVar = {
         "k-means": {
             "model": MiniBatchKMeans,
             "params": {
@@ -875,7 +877,7 @@ class SparkFaissExtension(FaissExtension):
             test_data (spark.DataFrame): Input DataFrame with the ``_features``
                 vector column containing query vectors.
 
-            storage_level (Literal): Storage strategy for cached. Use similar option 
+            storage_level (Literal): Storage strategy for cached. Use similar option
                 as input `data`.
 
         Returns:
