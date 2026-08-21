@@ -237,7 +237,7 @@ class MatchingMetricsExtension(Extension):
             }
         if self.metric == "att":
             return {
-                "ATC": [
+                "ATT": [
                     stats_itt['mean'] , att_se, p_val_att,
                     stats_itt['mean']  - 1.96 * att_se,
                     stats_itt['mean']  + 1.96 * att_se,
@@ -418,10 +418,10 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         new_target_vals = new_data[self.new_target_field].values
         bias_vals = new_data[self.bias_field].values
 
-        # control (group_1): target - matched_target - bias
+        # control (group_1): matched_target -target - bias
         _it[mask_1] = target_vals[mask_1] - new_target_vals[mask_1] - bias_vals[mask_1]
         # test (group_2): target - matched_target + bias
-        _it[mask_2] = target_vals[mask_2] - new_target_vals[mask_2] + bias_vals[mask_2]
+        _it[mask_2] = -(target_vals[mask_2] - new_target_vals[mask_2] + bias_vals[mask_2])
 
         new_data['_it'] = _it
 
