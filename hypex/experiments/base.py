@@ -16,6 +16,7 @@ from ..dataset import (
 )
 from ..executor import Executor
 from ..utils import BackendsEnum, ExperimentDataEnum, timeit
+from ..utils import ExperimentDataEnum, HypExLogger
 from ..utils.registry import backend_factory
 
 
@@ -97,6 +98,13 @@ class Experiment(Executor):
             transformer if transformer is not None else self._detect_transformer()
         )
         super().__init__(key)
+
+        # Создаем логгер для эксперимента
+        self.logger = HypExLogger(
+            name="hypex.experiment",
+            level="INFO",
+            log_file="experiment.log"
+        )
 
     def set_params(self, params: dict[str, Any] | dict[type, dict[str, Any]]) -> None:
         """Propagate parameters to the executors in the pipeline.
@@ -181,12 +189,19 @@ class Experiment(Executor):
         Returns:
             The experiment data after all executors have been applied.
         """
+        # Логируем информацию о Spark-сессии
+        self.logger.log_spark_info()
+
         experiment_data = deepcopy(data) if self.transformer else data
         for executor in self.executors:
-            cur_executor = self._get_executor_backend(executor, experiment_data.ds)
-            cur_executor.key = self.key
-            experiment_data = cur_executor.execute(experiment_data)
-            
+            with self.logger.process(
+                name=executor.__class__.__name__,
+                backend=experiment_data.ds.backend_type.value,
+                log_spark=False  # можно включить для детального логирования Spark-процессов
+            ):
+                cur_executor = self._get_executor_backend(executor, experiment_data.ds)
+                cur_executor.key = self.key
+                experiment_data = cur_executor.execute(experiment_data)
         return experiment_data
 
 

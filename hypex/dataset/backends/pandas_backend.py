@@ -719,23 +719,23 @@ class PandasNavigation(DatasetBackendNavigation):
             pd.Index: DataFrame index.
         """
         return self.data.index
-
+    
     @index.setter
     def index(self, value):
         """Set the index of the underlying DataFrame."""
         self.data.index = value
 
-    def reset_index(self,
+    def reset_index(self, 
                     drop: bool = False,
                     inplace: bool = False,
                     **kwargs):
         """Reset the index to default integer index.
-
+        
         Args:
             drop (bool): If True, drop the current index instead of adding as column.
             inplace (bool): Ignored; always returns new instance for consistency.
             **kwargs: Additional arguments passed to underlying reset_index.
-
+            
         Returns:
             New instance with reset index
         """
@@ -840,7 +840,6 @@ class PandasNavigation(DatasetBackendNavigation):
             type or Dict[str, type]: Single type if column_name is str,
             otherwise dict mapping column names to types.
         """
-        from collections.abc import Iterable as IterableABC
         column_name = self.data.columns if column_name is None else column_name
         dtypes = {}
         for k, v in self.data[column_name].dtypes.items():
@@ -862,7 +861,7 @@ class PandasNavigation(DatasetBackendNavigation):
                 dtypes[k] = str
             elif pd.api.types.is_bool_dtype(v):
                 dtypes[k] = bool
-        if isinstance(column_name, IterableABC):
+        if isinstance(column_name, Iterable):
             return dtypes
         else:
             if column_name in dtypes:
@@ -1036,7 +1035,7 @@ class PandasNavigation(DatasetBackendNavigation):
         if not isinstance(data, Iterable) or isinstance(data, str):
             data = [data]
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
-
+    
     def to_numpy(self) -> np.ndarray:
         """
         This method is extraordinary and used to collect into numpy array.
@@ -1488,6 +1487,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
         )
 
+    def count_nulls(self) -> dict[str, int]:
+        return self.data.isna().sum().to_dict()
+
     def dot(self, other: PandasDataset | np.ndarray) -> pd.DataFrame:
         """Compute matrix multiplication with another DataFrame or array.
 
@@ -1854,11 +1856,11 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
                 Column to explode.
 
         Return
-        ------
+        ------  
             DataFrame:
                 Exploded lists to rows of the subset columns; index will be duplicated for these rows.
         """
-
+    
         return self._wrap_result(self.data.explode(column=column, ignore_index=ignore_index))
 
     def checkpoint(self, eager: bool = True):

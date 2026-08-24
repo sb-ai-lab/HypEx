@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import warnings
 import copy
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized
@@ -15,13 +14,11 @@ except ImportError:
 import numpy as np
 import pandas as pd
 
+from pyspark.storagelevel import StorageLevel
 from pyspark.sql import SparkSession
 from pyspark.sql import DataFrame as SparkDF
 import pyspark.sql.functions as F
 from pyspark.sql.types import StructType
-
-from pyspark.pandas.internal import InternalFrame
-from pyspark.storagelevel import StorageLevel
 
 
 import pyspark.pandas as ps
@@ -31,6 +28,7 @@ from pyspark.pandas.exceptions import PandasNotImplementedError
 
 
 from ...utils import FromDictTypes, MergeOnError, ScalarType, SparkTypeMapper
+from ...config import DatasetConfig
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 class SparkNavigation(DatasetBackendNavigation):
@@ -61,7 +59,7 @@ class SparkNavigation(DatasetBackendNavigation):
         if SparkSession.getActiveSession() is None:
             yield
             return
-
+        
         cur_option = ps.get_option('compute.ops_on_diff_frames')
         ps.set_option('compute.ops_on_diff_frames', True)
 
@@ -70,16 +68,38 @@ class SparkNavigation(DatasetBackendNavigation):
         finally:
             ps.set_option('compute.ops_on_diff_frames', cur_option)
 
-    def checkpoint(self):
-        """Create a checkpoint in the Spark execution plan.
+    def checkpoint(self, eager: bool = True) -> Self:
+        """Truncate the computation graph by creating a checkpoint.
 
-        Raises:
-            NotImplementedError: This method is not implemented for SparkNavigation.
-                Use Spark-specific checkpointing mechanisms instead.
+        Uses reliable checkpointing (HDFS/S3) when a checkpoint directory
+        is configured on the SparkContext. Falls back to ``local_checkpoint``
+        otherwise, with a warning that the operation is not fault-tolerant
+        and may fail if an executor is lost.
+
+        Args:
+            eager: If ``True``, the checkpoint is executed eagerly.
+                Defaults to ``True``.
+
+        Returns:
+            The dataset instance itself to allow method chaining.
         """
-        raise NotImplementedError(
-            "Method checkpoint not implemented for SparkNavigation."
-        )
+        import warnings
+
+        sc = self.session.sparkContext
+        checkpoin_dir = sc.getCheckpointDir()
+        if checkpoin_dir is not None:            
+            self.data = self.data.spark.checkpoint(eager=eager)
+        else:
+            warnings.warn(
+                "SparkContext checkpoint directory is not set. "
+                "Falling back to local_checkpoint, which is NOT "
+                "fault-tolerant and may fail if an executor is lost. "
+                "Please set sc.setCheckpointDir('hdfs://...') for "
+                "large jobs.",
+                UserWarning,
+            )
+            self.data = self.data.spark.local_checkpoint(eager=eager)
+        return self
 
     def limit(self, num: int | None = None) -> Self:
         """Limit the number of rows in the dataset.
@@ -107,9 +127,9 @@ class SparkNavigation(DatasetBackendNavigation):
             ValueError: If the object contains more rows than PANDAS_CONVERSION_LIMIT.
         """
         n: int = obj.__len__()
-        if n > self.PANDAS_CONVERSION_LIMIT:
+        if n > DatasetConfig.SPARK_PANDAS_CONVERSION_LIMIT:
             raise ValueError(
-                f"{context}: {n} rows exceed limit {self.PANDAS_CONVERSION_LIMIT}"
+                f"{context}: {n} rows exceed limit {DatasetConfig.SPARK_PANDAS_CONVERSION_LIMIT}"
             )
 
     def _wrap_result(
@@ -367,10 +387,11 @@ class SparkNavigation(DatasetBackendNavigation):
                 else original_index_names
             )
 
-            if blocking:
-                self.data.to_spark().unpersist(blocking=True)
-            else:
-                self.data.spark.unpersist()
+            # if blocking:
+            #     self.data.to_spark().unpersist(blocking=True)
+            # else:
+            #     self.data.spark.unpersist()
+            self.data.to_spark().unpersist(blocking=blocking)
 
             if isinstance(original_index_name, str):
                 if original_index_name in self.data.columns:
@@ -403,40 +424,6 @@ class SparkNavigation(DatasetBackendNavigation):
                 None if not persisted.
         """
         return getattr(self, "_storage_level_flag", None)
-
-    def checkpoint(self, eager: bool = True) -> Self:
-        """Truncate the computation graph by creating a checkpoint.
-
-        Uses reliable checkpointing (HDFS/S3) when a checkpoint directory
-        is configured on the SparkContext. Falls back to ``local_checkpoint``
-        otherwise, with a warning that the operation is not fault-tolerant
-        and may fail if an executor is lost.
-
-        Args:
-            eager: If ``True``, the checkpoint is executed eagerly.
-                Defaults to ``True``.
-
-        Returns:
-            The dataset instance itself to allow method chaining.
-        """
-        import warnings
-
-        sc = self.session.sparkContext
-        try:
-            # getCheckpointDir() raises if no directory is configured.
-            sc.getCheckpointDir()
-            self.data = self.data.spark.checkpoint(eager=eager)
-        except Exception:
-            warnings.warn(
-                "SparkContext checkpoint directory is not set. "
-                "Falling back to local_checkpoint, which is NOT "
-                "fault-tolerant and may fail if an executor is lost. "
-                "Please set sc.setCheckpointDir('hdfs://...') for "
-                "large jobs.",
-                UserWarning,
-            )
-            self.data = self.data.spark.local_checkpoint(eager=eager)
-        return self
 
     def __getitem__(
         self, item: slice | int | str | list | ps.DataFrame | ps.Series
@@ -801,13 +788,13 @@ class SparkNavigation(DatasetBackendNavigation):
     def index(self) -> ps.Index:
         """Return the index of the underlying DataFrame."""
         return self.data.index
-
+    
     @index.setter
     def index(self, value):
         """Set the index of the underlying DataFrame."""
         self.data = self.data.set_index(value)
-
-    def reset_index(self,
+    
+    def reset_index(self, 
                     drop: bool = False,
                     inplace: bool = False,
                     **kwargs) -> "SparkNavigation" | None:
@@ -826,9 +813,9 @@ class SparkNavigation(DatasetBackendNavigation):
 
         result = self.data.reset_index(drop=drop, **kwargs)
         return self._wrap_result(result)
-
+    
     def set_index(self,
-                  keys,
+                  keys, 
                   drop=True,
                   **kwargs) -> "SparkNavigation":
         """
@@ -845,7 +832,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
         if 'inplace' not in kwargs:
             kwargs['inplace'] = False
-
+        
         return self._wrap_result(self.data.set_index(keys=keys, drop=drop, **kwargs))
 
     @property
@@ -934,27 +921,26 @@ class SparkNavigation(DatasetBackendNavigation):
         self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> SparkNavigation:
         """Update column types with validation and error handling.
+
         More robust than astype(), with checks for missing columns and null-only columns.
+
         Args:
             dtype (dict[str, type]): Mapping of column names to target Python types.
             errors (Literal["raise", "ignore"]): Whether to raise on conversion errors.
+
         Returns:
             SparkNavigation: Instance with updated column types.
+
         Raises:
             KeyError: If column not found and errors="raise".
             ValueError: If column contains only null values and errors="raise".
         """
-        import numpy as np
-
         for column_name, target_type in dtype.items():
             if column_name not in self.data.columns:
                 if errors == "raise":
                     raise KeyError(f"Column '{column_name}' not found")
                 continue
 
-            # Check if column has any non-null values to infer type
-            # Note: isna().all() triggers an action in Spark, which might be slow.
-            # We rely on the try-except block below for performance.
             if self.data[column_name].isna().all():
                 if errors == "raise":
                     raise ValueError(
@@ -964,42 +950,11 @@ class SparkNavigation(DatasetBackendNavigation):
 
             try:
                 self.data = self.data.astype({column_name: target_type})
-
             except (ValueError, TypeError) as e:
-                error_msg = str(e).lower()
-
-                # Detect if the error is related to missing values/nulls
-                is_nan_error = "missing values" in error_msg or "null" in error_msg or "nan" in error_msg
-
-                if is_nan_error and errors != "ignore":
-                    fallback_type = None
-
-                    # Define fallback strategies for common problematic types
-                    if target_type == int or (isinstance(target_type, type) and issubclass(target_type, np.integer)):
-                        fallback_type = float
-                    elif target_type == bool:
-                        # Boolean with NaN is tricky. Fallback to object/str is safest for generic usage.
-                        fallback_type = object
-                    elif target_type == str:
-                         # Usually str handles NaN by converting to 'nan' string, but if it fails:
-                        fallback_type = object
-
-                    if fallback_type:
-                        try:
-                            # Attempt fallback conversion
-                            self.data = self.data.astype({column_name: fallback_type})
-                            # Optional: You could log a warning here that type was changed
-                            continue
-                        except Exception:
-                            pass # Fall through to original error if fallback also fails
-
                 if errors == "raise":
                     raise type(e)(
-                        f"Failed to convert column '{column_name}' to {target_type}: {e}. "
-                        f"Consider filling NaNs or using a more compatible type (e.g., float instead of int)."
+                        f"Failed to convert column '{column_name}' to {target_type}: {e}"
                     )
-                # If errors == "ignore", we just skip this column and keep its original type
-
         return self._wrap_result(self.data)
 
     def add_column(
@@ -1022,109 +977,21 @@ class SparkNavigation(DatasetBackendNavigation):
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
 
+        # if isinstance(data, ps.Index):        # if isinstance(data, ps.Index):
+        #     data = data.to_frame()
         if isinstance(data, (ps.DataFrame, ps.Series)):
-            if isinstance(data, ps.DataFrame):
-                if len(data.columns) == 1:
-                    data_col_name = data.columns[0]
-                    if name != data_col_name:
-                        data_tmp = data.rename(columns={data_col_name: name})
-                    else:
-                        data_tmp = data
-
-                    self.data = self.data.join(data_tmp, how="left")
-                    return
-
-            elif isinstance(data, ps.Series):
-                data_df = data.to_frame(name=name)
-                self.data = self.data.join(data_df, how="left")
+            if isinstance(data, ps.DataFrame) and data.shape[1] == 1:
+                data_col = data.columns[0]
+                data_tmp = data
+                if name != data_col:
+                    data_tmp[name] = data_tmp[data_col]
+                    data_tmp = data_tmp.drop(columns=[data_col])
+                self.data = self.data.join(data_tmp)
                 return
+            self.data = self.data.join(data)
+            return
 
         self.data[name] = data
-
-    def random_split_labels(
-        self,
-        edges: list[int],
-        labels: list[str],
-        random_state: int | None = None,
-        frac: float = 1.0,
-        name: str = "split",
-    ) -> ps.DataFrame:
-        """Assign deterministic group labels to rows based on a hash of the index.
-
-        The previous implementation used global ``orderBy`` + ``zipWithIndex``
-        which materializes the entire dataset on a single executor and causes
-        OOM on datasets with tens of millions of rows. This implementation
-        replaces that approach with a ``hash(index_columns, seed) % MOD``
-        modulo operation that runs entirely in a distributed fashion without
-        any global shuffle or sort.
-
-        The split is approximately proportional to the requested ``edges``
-        (within +/- 0.01% for ``MOD = 10_000_000``), which is statistically
-        indistinguishable for AA/AB testing purposes.
-
-        Args:
-            edges: Cumulative upper bounds for each label on the MOD scale.
-                For example, ``[5_000_000, 10_000_000]`` produces roughly a
-                50/50 split.
-            labels: Label strings corresponding to ``edges``.
-            random_state: Seed for the hash function. Defaults to 42 when
-                ``None``.
-            frac: Fraction of data to label. Rows with
-                ``hash >= frac * MOD`` are left unlabeled and filtered out.
-            name: Name of the resulting label column.
-
-        Returns:
-            A ``pyspark.pandas.DataFrame`` containing only the original index
-            columns and the new label column.
-        """
-        seed = random_state if random_state is not None else 42
-        mod = 10_000_000
-
-        if edges and edges[-1] < mod * 0.5:
-            warnings.warn(
-                f"edges={edges} look like absolute row counts, not MOD-scaled values. "
-                f"Expected last edge ≈ {mod}. Auto-scaling.",
-                UserWarning,
-                stacklevel=2,
-            )
-            n_sampled_approx = edges[-1]
-            edges = [int(e / n_sampled_approx * mod) for e in edges]
-            edges[-1] = mod
-
-        # Expose index columns so we can hash them and restore the index
-        # after the Spark transformation round-trip.
-        df_with_index = self.data.reset_index()
-        index_cols = df_with_index.columns[: self.data.index.nlevels]
-
-        # Project only index columns to minimize data sent through the plan.
-        sdf = df_with_index[list(index_cols)].to_spark()
-
-        # Deterministic hash from index columns + seed.
-        hash_cols = [F.col(c) for c in index_cols]
-        hash_expr = F.abs(F.hash(*hash_cols, F.lit(seed))) % F.lit(mod)
-
-        # Build CASE WHEN in REVERSE order. Spark's `otherwise` wraps the
-        # existing expression on the outside, so iterating forward would
-        # cause the first label to shadow all subsequent ones.
-        case_expr = F.lit(None).cast("string")
-        for edge, label in reversed(list(zip(edges, labels))):
-            threshold = min(edge, mod)
-            case_expr = F.when(
-                hash_expr < F.lit(threshold), F.lit(label)
-            ).otherwise(case_expr)
-
-        # Apply the frac filter before returning.
-        if frac < 1.0:
-            frac_threshold = int(frac * mod)
-            case_expr = F.when(
-                hash_expr < F.lit(frac_threshold), case_expr
-            ).otherwise(F.lit(None))
-
-        sdf = sdf.withColumn(name, case_expr)
-        sdf = sdf.filter(F.col(name).isNotNull())
-
-        return sdf.pandas_api(index_col=list(index_cols))
-
 
     def append(
         self, other: Sequence[SparkNavigation], reset_index: bool = False, axis: int = 0
@@ -1240,10 +1107,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     science operations while leveraging Spark's distributed computing capabilities.
 
     Inherits all navigation and indexing capabilities from SparkNavigation.
-    """
-    MAX_ROWS_FOR_DOT = 1000
-    INDEX_COL = "index"
-
+    """  
     @staticmethod
     def _convert_agg_result(result: ps.Series | ps.DataFrame) -> Self | float:
         """Convert aggregation results to appropriate return type.
@@ -1403,12 +1267,13 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 col_mask = self.data[col] == row[col]
                 mask = col_mask if mask is None else mask & col_mask
             yield key, self.data[mask]
-
+    
     def count_groups(self, group_cols: list[str]) -> int:
         """Count unique combinations of group_cols"""
         if not group_cols:
             return 1
         return int(self.data[group_cols].nunique())
+
 
     def grouped_value_counts(self, by: list[str], feature_cols: list[str] | None=None):
         from functools import reduce
@@ -1467,8 +1332,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]
             ]
 
-            if len(numeric_cols) == 0:
-                return None
+            # if len(numeric_cols) == 0:
+            #     return None
 
             data_to_agg = self.data[numeric_cols]
 
@@ -1749,6 +1614,20 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         return self._wrap_result(data.rename(index={old_index_name: "na_counts"}))
 
+    def count_nulls(self) -> dict[str, int]:
+        sp_df = self.data.to_spark()
+        cols = sp_df.columns
+        nulls_row = (
+            sp_df.select(
+                *[
+                    F.count(F.when(F.col(col).isNull() | F.isnan(col), 1))
+                    for col in cols
+                ]
+            )
+            .first()
+        )
+        return {cols[idx]: nulls_row[idx] for idx in range(len(cols))}
+
     def dot(self, other: "SparkDataset" | np.ndarray | pd.DataFrame) -> Self | float:
         """Compute dot product with another dataset or array.
 
@@ -1765,11 +1644,11 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             TypeError: If other is unsupported type.
         """
         if hasattr(other, "__len__"):
-            if len(other) > self.MAX_ROWS_FOR_DOT:
-                raise ValueError(f"dot method works fine only with rows number in right matrix <= {self.MAX_ROWS_FOR_DOT}")
+            if len(other) > DatasetConfig.SPARK_MAX_ROWS_FOR_DOT:
+                raise ValueError(f"dot method works fine only with rows number in right matrix <= {DatasetConfig.SPARK_MAX_ROWS_FOR_DOT}")
         else:
             raise TypeError("input data type should have attr `__len__`")
-
+        
         if isinstance(other, np.ndarray):
             if other.ndim == 1:
                 if len(other) != len(self.data.columns):
@@ -1806,7 +1685,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 f"Unsupported type for dot: {type(other)}. "
                 f"Expected SparkDataset, np.ndarray, or pd.DataFrame"
             )
-
+        
         result_spark = (
             self.data.reset_index().to_spark()
             .mapInPandas(
@@ -2159,7 +2038,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 Column to explode.
 
         Return
-        ------
+        ------  
             DataFrame:
                 Exploded lists to rows of the subset columns; index will be duplicated for these rows.
         """

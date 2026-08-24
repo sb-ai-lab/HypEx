@@ -34,7 +34,10 @@ from ..utils import (
     SourceDataTypes,
     GenericManager
 )
+from ..config import DatasetConfig
 from ..utils.adapter import Adapter
+from .groupby_dataset import GroupedDataset
+from .backends import PandasDataset, SparkDataset
 from .roles import (
     ABCRole,
     DefaultRole,
@@ -391,9 +394,9 @@ class DatasetBase:
 
         return self.__class__(roles=new_roles, data=new_data)
 
-    def set_index(self,
-                  keys,
-                  drop=True,
+    def set_index(self, 
+                  keys, 
+                  drop=True, 
                   **kwargs) -> DatasetBase:
         new_data = self._backend_data.set_index(keys=keys, drop=drop, **kwargs)
         new_roles = deepcopy(self.roles)
@@ -401,7 +404,7 @@ class DatasetBase:
         if drop:
             for col in Adapter.to_list(keys):
                 del new_roles[col]
-
+        
         return self.__class__(roles=new_roles, data=new_data)
 
     def __setitem__(self,
@@ -418,11 +421,10 @@ class DatasetBase:
             self.data[key] = value
         else:
             column_data_type = self.roles[key].data_type
-            from collections.abc import Iterable as IterableABC
             if (
                 column_data_type is None
                 or (
-                    isinstance(value, IterableABC)
+                    isinstance(value, Iterable)
                     and all(isinstance(v, column_data_type) for v in value)
                 )
                 or isinstance(value, column_data_type)
@@ -432,17 +434,17 @@ class DatasetBase:
                 raise TypeError("Value type does not match the expected data type.")
 
     def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
-        display_limit = n_rows if n_rows <= self.DISPLAY_ROWS * 2 else self.DISPLAY_ROWS
+        display_limit = n_rows if n_rows <= DatasetConfig.DISPLAY_ROWS * 2 else DatasetConfig.DISPLAY_ROWS
         head = self._backend_data._display_head_tail(
             rows_display_limit=display_limit,
-            cols_display_limit=self.DISPLAY_COLS,
+            cols_display_limit=DatasetConfig.DISPLAY_COLS,
             n_cols=n_cols,
             n_rows=n_rows)
 
-        if n_rows > self.DISPLAY_ROWS * 2:
+        if n_rows > DatasetConfig.DISPLAY_ROWS * 2:
             _tmp_tail = self._backend_data._display_head_tail(
-                rows_display_limit=self.DISPLAY_ROWS,
-                cols_display_limit=self.DISPLAY_COLS,
+                rows_display_limit=DatasetConfig.DISPLAY_ROWS,
+                cols_display_limit=DatasetConfig.DISPLAY_COLS,
                 n_cols=n_cols,
                 n_rows=n_rows,
                 tail=True)
@@ -704,8 +706,7 @@ class DatasetBase:
                        roles: ABCRole | Iterable[ABCRole],
                        tmp_role: bool =False,
                        search_types: list[type] | None = None) -> list[str]:
-        from collections.abc import Iterable as IterableABC
-        roles = roles if isinstance(roles, IterableABC) else [roles]
+        roles = roles if isinstance(roles, Iterable) else [roles]
         roles_for_search = self._tmp_roles if tmp_role else self.roles
         return [
             str(column)
@@ -718,9 +719,8 @@ class DatasetBase:
         ]
 
     def search_columns_by_type(self, search_types: list[type] | type) -> list[str]:
-        from collections.abc import Iterable as IterableABC
         search_types = (
-            search_types if isinstance(search_types, IterableABC) else [search_types]
+            search_types if isinstance(search_types, Iterable) else [search_types]
         )
         return [
             str(column)
@@ -1073,6 +1073,9 @@ class DatasetBase:
     def na_counts(self) -> Self | ScalarType | None:
         """Count NA values"""
         return self._convert_data_after_agg(self._backend_data.na_counts())
+
+    def count_nulls(self) -> dict[str, int]:
+        return self._backend_data.count_nulls()
 
     def isna(self) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.isna())

@@ -59,10 +59,13 @@ from .typings import (
     GenericManager
 )
 from .registry import BackendFactory
-
+from .logger import HypExLogger, ProcessContext, logger
 from .strict_abc import StrictABCMeta, StrictABC
+from .spark_config import SparkSessionCalculator
+from .index_utils import FaissIndexStorage, CachingIndex
 
 __all__ = [
+    "Adapter",
     "ID_SPLIT_SYMBOL",
     "MATCHING_INDEXES_SPLITTER_SYMBOL",
     "NAME_BORDER_SYMBOL",
@@ -117,5 +120,14 @@ __all__ = [
     "gen_control_variates_df",
     "gen_oracle_df",
     "gen_special_medicine_df",
-    "timeit"
+    "BackendFactory",
+    "GenericManager"
+    "StrictABCMeta",
+    "StrictABC",
+    "HypExLogger",
+    "ProcessContext",
+    "SparkSessionCalculator",
+    "logger",
+    "FaissIndexStorage",
+    "CachingIndex",
 ]
