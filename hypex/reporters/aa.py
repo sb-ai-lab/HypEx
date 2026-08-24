@@ -84,6 +84,7 @@ class AATestReporter(DatasetReporter):
         result.update(extract_group_difference(data, front_flag))
         result.update(extract_tests(data, self.tests, front_flag))
         result.update(extract_analyzer_data(data, "OneAAStatAnalyzer"))
+        
         return result
 
     def report(self, data: ExperimentData) -> dict[str, Any] | Dataset:

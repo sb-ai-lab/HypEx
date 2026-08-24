@@ -217,7 +217,7 @@ class GroupsComparator(BaseComparator, ABC):
             raise TypeError(
                 f"Grouping data must be dict of strings and datasets, but got {type(grouping_data)}"
             )
-        compared_data = list(grouping_data.items())
+        compared_data = sorted(grouping_data.items(), key=lambda x: str(x[0]))
         baseline_data = [compared_data.pop(0)]
 
         baseline_cols = target_fields if compare_by == "groups" else baseline_field

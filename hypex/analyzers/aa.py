@@ -19,6 +19,7 @@ from ..executor import Executor
 from ..experiments import IfParamsExperiment, ParamsExperiment
 from ..splitters import AASplitter, AASplitterWithStratification
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, timeit
+from ..utils.constants import NAME_BORDER_SYMBOL
 from ..utils.naming import _parse_metric_col, normalize_test_name
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -32,6 +33,9 @@ def _is_passed(value: Any) -> bool:
     """Check whether a cell value represents a passed test."""
     #: Values treated as "passed" when parsing pass-columns.
     _PASS_TRUTHY = frozenset({"OK", "TRUE", "1"})
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        return float(value) >= 1.0
+    # ──────────────────────────────────────────────────────
     return str(value).strip().upper() in _PASS_TRUTHY
 
 
@@ -47,20 +51,19 @@ def _collect_tables(
 
 
 def _resolve_column_parts(col: str) -> tuple[str, str, str] | None:
-    """Parse a metric column into (feature, raw_test, group).
-
-    Returns None when the column cannot be parsed.
-    """
     feature, raw_test, _, group = _parse_metric_col(col)
     if raw_test:
+        if NAME_BORDER_SYMBOL in group:
+            group = group.split(NAME_BORDER_SYMBOL)[0]
         return feature, raw_test, group
 
-    # Fallback: legacy ID_SPLIT_SYMBOL format
     if ID_SPLIT_SYMBOL in col:
         parts = col.split(ID_SPLIT_SYMBOL)
         if len(parts) >= 4:
-            return parts[0], parts[1], parts[3]
-
+            grp = parts[3]
+            if NAME_BORDER_SYMBOL in grp:
+                grp = grp.split(NAME_BORDER_SYMBOL)[0]
+            return parts[0], parts[1], grp
     return None
 
 
@@ -189,6 +192,9 @@ class AAScoreAnalyzer(Executor):
 
     #: Pass-rate threshold multiplier relative to alpha.
     THRESHOLD_FACTOR: float = 1.2
+
+    PVALUE_WEIGHT: float = 2 / 3
+    TEST_SCORE_WEIGHT: float = 1 / 3
 
     SPLITTER_CLASS_MAPPING: ClassVar[dict[str, type]] = {
         cls.__name__: cls for cls in (AASplitter, AASplitterWithStratification)
@@ -352,8 +358,8 @@ class AAScoreAnalyzer(Executor):
         mean_test_score = self._get_mean_test_score_column(score_table)
 
         score_col = (
-            weighted_pvalues * self.PVALUE_WEIGHT
-            + mean_test_score * self.TEST_SCORE_WEIGHT
+            weighted_pvalues * AAScoreAnalyzer.PVALUE_WEIGHT
+            + mean_test_score * AAScoreAnalyzer.TEST_SCORE_WEIGHT
         )
         return score_col.idxmax()
 
