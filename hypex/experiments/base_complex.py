@@ -41,17 +41,17 @@ class ExperimentWithReporter(Experiment):
     ):
         if not isinstance(results, list):
             results = [results]
-            
+
         datasets: list[Dataset] = []
-        
+
         for res in results:
             if isinstance(res, dict):
                 datasets.append(SmallDataset.from_dict(res, roles={}))
             elif isinstance(res, (Dataset, SmallDataset)):
                 datasets.append(res)
-                
+
         combined = datasets[0].append(datasets[1:], reset_index=reset_index) if len(datasets) > 1 else datasets[0]
-        
+
         data.analysis_tables[self.id] = combined
         return data
 
@@ -161,15 +161,12 @@ class ParamsExperiment(ExperimentWithReporter):
     def execute(self, data: ExperimentData) -> ExperimentData:
         results = []
         self._update_flat_params()
-                
         for flat_param in tqdm(self._flat_params):
             t_data = ExperimentData(data._clean_ds_for_iteration())
             for executor in self.executors:
                 executor.set_params(flat_param)
-                t_data = executor.execute(t_data)    
-            
-            
-            report = self.reporter.report(t_data)
+                t_data = executor.execute(t_data)
+                report = self.reporter.report(t_data)
             results.append(report)
         result_data = self._set_result(data, results)
         return result_data
