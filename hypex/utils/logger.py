@@ -66,6 +66,7 @@ class HypExLogger:
         name: str = "hypex",
         level: str = "INFO",
         log_file: str | None = None,
+        console_out: bool = True,
         fmt: str = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         datefmt: str = "%Y-%m-%d %H:%M:%S",
     ):
@@ -76,10 +77,11 @@ class HypExLogger:
 
         formatter = logging.Formatter(fmt, datefmt=datefmt)
 
-        # Консольный handler
-        console = logging.StreamHandler()
-        console.setFormatter(formatter)
-        self.logger.addHandler(console)
+        if console_out:
+            # Консольный handler
+            console = logging.StreamHandler()
+            console.setFormatter(formatter)
+            self.logger.addHandler(console)
 
         # Файловый handler
         if log_file:
@@ -87,6 +89,7 @@ class HypExLogger:
             fh = logging.FileHandler(log_file, encoding="utf-8")
             fh.setFormatter(formatter)
             self.logger.addHandler(fh)
+        
 
     def __call__(
         self,
@@ -383,5 +386,6 @@ class ProcessContext:
 logger = HypExLogger(
     name="hypex.experiment",
     level="INFO",
-    log_file="experiment.log"
+    log_file="experiment.log",
+    console_out=False
 )

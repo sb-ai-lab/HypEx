@@ -54,7 +54,8 @@ class Experiment(Executor):
         self.logger = HypExLogger(
             name="hypex.experiment",
             level="INFO",
-            log_file="experiment.log" 
+            log_file="experiment.log",
+            console_out=False
         )
 
     def set_params(self, params: dict[str, Any] | dict[type, dict[str, Any]]) -> None:
