@@ -10,7 +10,6 @@ from ..dataset import (
     Dataset,
     ExperimentData,
     StratificationRole,
-    TreatmentRole,
 )
 from ..dataset.roles import ConstGroupRole
 from ..executor import Calculator
@@ -108,13 +107,24 @@ class AASplitter(Calculator):
             control_size = (
                 0
                 if len(data) <= const_size
-                else (len(data) * control_size - len(const_data["control"]))
-                / (len(data) - const_size)
+                else max(
+                    0.0,
+                    (len(data) * control_size - len(control_indexes))
+                    / (len(data) - const_size),
+                )
             )
-            # control_size = len(data) * control_size
         experiment_data = (
             data[data[const_group_field].isna()] if const_group_field else data
         )
+        if const_group_field and len(experiment_data) == 0:
+            raise ValueError(
+                f"All rows are assigned to constant groups by the ConstGroupRole "
+                f"column '{const_group_field}', so there is nothing left to split. "
+                f"Rows that must take part in the split have to hold a real missing "
+                f"value (None / np.nan) in this column - note that "
+                f"np.where(mask, 'control', np.nan) casts np.nan to the string 'nan', "
+                f"which is not a missing value."
+            )
         experiment_data_index = experiment_data.sample(
             frac=sample_size, random_state=random_state
         ).index
@@ -177,20 +187,24 @@ class AASplitterWithStratification(AASplitter):
         control_size: float = 0.5,
         grouping_fields=None,
         **kwargs,
-    ) -> list[str] | Dataset:
+    ) -> list[str]:
         if not grouping_fields:
             return AASplitter._inner_function(
                 data, random_state, control_size, **kwargs
             )
 
-        result = {"split": []}
+        splits = []
         index = []
-        for group, group_data in data.groupby(grouping_fields):
-            result["split"].extend(
-                AASplitter._inner_function(group_data, random_state, control_size)
+        for _, group_data in data.groupby(grouping_fields):
+            splits.extend(
+                AASplitter._inner_function(
+                    group_data, random_state, control_size, **kwargs
+                )
             )
             index.extend(list(group_data.index))
-        return Dataset.from_dict(result, index=index, roles={"split": TreatmentRole()})
+        # groupby breaks the original row order, so restore it before returning
+        # a flat list: the value is written as a column of the source dataset.
+        return pd.Series(splits, index=index).reindex(data.index).to_list()
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         grouping_fields = data.ds.search_columns(StratificationRole())
@@ -201,8 +215,6 @@ class AASplitterWithStratification(AASplitter):
             grouping_fields=grouping_fields,
             groups_sizes=self.groups_sizes,
         )
-        if isinstance(result, Dataset):
-            result = result.replace_roles({"split": AdditionalTreatmentRole()})
         return self._set_value(data, result)
 
 

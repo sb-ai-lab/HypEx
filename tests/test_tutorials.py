@@ -111,11 +111,11 @@ def test_aatest(aa_data):
         ),
         "aa-strat": pd.DataFrame(
             {
-                "TTest aa test": {0: "OK", 1: "NOT OK"},
-                "KSTest aa test": {0: "OK", 1: "NOT OK"},
+                "TTest aa test": {0: "NOT OK", 1: "OK"},
+                "KSTest aa test": {0: "OK", 1: "OK"},
                 "TTest best split": {0: "OK", 1: "OK"},
                 "KSTest best split": {0: "OK", 1: "OK"},
-                "result": {0: "OK", 1: "NOT OK"},
+                "result": {0: "OK", 1: "OK"},
             }
         ),
         "aa-sample": pd.DataFrame(
