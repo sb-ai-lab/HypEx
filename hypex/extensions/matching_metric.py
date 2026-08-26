@@ -257,6 +257,19 @@ class MatchingMetricsExtension(Extension):
         ate_var = (n / N) ** 2 * att_var + (m / N) ** 2 * atc_var
         ate_se = float(np.sqrt(max(ate_var, 0.0)))
 
+        # sum_c = float(stats_itc.get("sum", 0.0))
+        # sum_t = float(stats_itt.get("sum", 0.0))
+
+        # sq_c = float(stats_itc["sq_sum"])
+        # sq_t = float(stats_itt["sq_sum"])
+
+        # ate_var = (
+        #     var_c * (m + 2.0 * sum_c + sq_c)
+        #     + var_t * (n + 2.0 * sum_t + sq_t)
+        # ) / (N ** 2)
+
+        # ate_se = float(np.sqrt(max(ate_var, 0.0)))
+
         p_val_ate = self._calc_p_value(ate / ate_se)
         return {
             "ATT": [
@@ -406,7 +419,7 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         new_data: pd.DataFrame = data.data.copy()
         scaled_counts = self._calc_scaled_counts(new_data, self.neighbors_cols, self.n_neighbors)
 
-        group_1, group_2, *_ = new_data[self.group_field].unique()
+        group_1, group_2, *_ = sorted(new_data[self.group_field].unique())
 
         # Individual Treatment effect (_it) vectorized calc using numpy!
         _it = np.zeros(len(new_data))
@@ -419,9 +432,9 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         bias_vals = new_data[self.bias_field].values
 
         # control (group_1): matched_target -target - bias
-        _it[mask_1] = target_vals[mask_1] - new_target_vals[mask_1] - bias_vals[mask_1]
+        _it[mask_1] = new_target_vals[mask_1] - target_vals[mask_1] - bias_vals[mask_1]
         # test (group_2): target - matched_target + bias
-        _it[mask_2] = -(target_vals[mask_2] - new_target_vals[mask_2] + bias_vals[mask_2])
+        _it[mask_2] = target_vals[mask_2] - new_target_vals[mask_2] + bias_vals[mask_2]
 
         new_data['_it'] = _it
 
@@ -543,9 +556,11 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
         scaled_counts = self._calc_scaled_counts(new_data, self.neighbors_cols, self.n_neighbors)
         scaled_counts.persist(self.PERSIST_POLITIC)
         # First group is `control`, second one is `test`
-        group_1, group_2, *_ = map(
-            lambda row: row[0],
-            new_data.select(self.group_field).distinct().collect()
+        group_1, group_2, *_ = sorted(
+            map(
+                lambda row: row[0],
+                new_data.select(self.group_field).distinct().collect()
+            )
         )
         stats = (
             new_data
@@ -560,7 +575,7 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
                 '_it',
                 F.when(
                     F.col(self.group_field) == group_1,
-                    F.col(self.target_field) - F.col(self.new_target_field) - F.col(self.bias_field)
+                    F.col(self.new_target_field) - F.col(self.target_field) - F.col(self.bias_field)
                 )
                 .when(
                     F.col(self.group_field) == group_2,
