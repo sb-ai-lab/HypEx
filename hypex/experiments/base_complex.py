@@ -86,7 +86,11 @@ class GroupExperiment(ExperimentWithReporter):
         group_field = data.ds.search_columns(self.searching_role)
         result: list[Dataset] = [
             self.one_iteration(
-                ExperimentData(group_data), str(group[0]), set_key_as_index=True
+                ExperimentData(group_data),
+                # pandas >= 2.0 yields a 1-element tuple when grouping by a list,
+                # while pandas < 2.0 yields the scalar key itself
+                str(group[0] if isinstance(group, tuple) else group),
+                set_key_as_index=True,
             )
             for group, group_data in tqdm(data.ds.groupby(group_field))
         ]
