@@ -45,6 +45,7 @@ class SparkNavigation(DatasetBackendNavigation):
         data (ps.DataFrame): The underlying pyspark.pandas DataFrame.
         session (SparkSession): Active Spark session for distributed operations.
     """
+    _SPARK_WARN_SUPPRESED: bool = False
 
     PANDAS_CONVERSION_LIMIT: int = 100_000
 
@@ -258,6 +259,31 @@ class SparkNavigation(DatasetBackendNavigation):
             raise TypeError("Session must be an instance of SparkSession")
 
         self.session = session
+
+        if not SparkNavigation._SPARK_WARN_SUPPRESED and self.session is not None:
+            try:
+                sc = self.session.sparkContext
+
+                logger_names = [
+                    "org.apache.spark.sql.execution.python.AttachDistributedSequenceExec",
+                    "org.apache.spark.sql.execution.AttachDistributedSequenceExec",
+                    "pyspark.pandas.internal.AttachDistributedSequenceExec",
+                    "org.apache.spark.sql.execution.python",
+                    "org.apache.spark.sql.execution",
+                    "pyspark.pandas.internal",
+                ]
+
+                for logger_name in logger_names:
+                    try:
+                        sc._jvm.org.apache.log4j.LogManager.getLogger(logger_name).setLevel(
+                            sc._jvm.org.apache.log4j.Level.ERROR
+                        )
+                    except Exception:
+                        pass
+
+                SparkNavigation._SPARK_WARN_SUPPRESED = True
+            except Exception:
+                pass
 
         if isinstance(data, ps.DataFrame):
             self.data = data
