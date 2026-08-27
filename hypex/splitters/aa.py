@@ -224,7 +224,7 @@ class AASplitterWithStratification(AASplitter):
         # Note: This materializes groups if not careful, but with the new split method,
         # each group's split is a lightweight transformation.
         
-        for group_key, group_data in data.groupby(grouping_fields):
+        for _, group_data in data.groupby(grouping_fields):
             # group_data is a Dataset
             group_split = AASplitter._inner_function(
                 group_data,

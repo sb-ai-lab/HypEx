@@ -179,7 +179,7 @@ class DatasetBase:
                 roles[column] = deepcopy(self.default_role) or DefaultRole()
         return roles
 
-    def _set_empty_types(self, roles: dict[str, ABCRole]) -> None:
+    def _set_empty_types(self, roles):
         colunms_dtypes = self._backend_data.get_column_type(self._backend_data.columns)
         new_types = {}
         for column, role in roles.items():
@@ -187,6 +187,13 @@ class DatasetBase:
                 role.data_type = colunms_dtypes[column]
             elif role.data_type != colunms_dtypes[column]:
                 new_types[column] = role.data_type
+                
+        if new_types:
+            for c in new_types:
+                try:
+                    na = int(self._backend_data.data[c].isna().sum())
+                except Exception:
+                    na = -1
         self._backend_data = self._backend_data.update_column_type(new_types)
 
     def __init__(

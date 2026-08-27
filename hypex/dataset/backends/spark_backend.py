@@ -917,6 +917,7 @@ class SparkNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data.astype(dtype=dtype))
 
+
     def update_column_type(
         self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> SparkNavigation:
@@ -940,14 +941,13 @@ class SparkNavigation(DatasetBackendNavigation):
                 if errors == "raise":
                     raise KeyError(f"Column '{column_name}' not found")
                 continue
+
             if self.data[column_name].isna().all():
-                if errors == "raise":
-                    raise ValueError(
-                        f"Cannot infer type for column '{column_name}': all values are null"
-                    )
                 continue
+
             if self.data[column_name].isna().any():
                 continue
+
             try:
                 self.data = self.data.astype({column_name: target_type})
             except (ValueError, TypeError) as e:
@@ -1257,7 +1257,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             tuple: (group_key, SparkNavigation) for each unique combination
                 of grouping column values.
         """
-        keys_df = self.data[by].drop_duplicates().to_pandas()
+        keys_df = self.data[by].drop_duplicates().dropna().to_pandas()
         for _, row in keys_df.iterrows():
             key = row[by[0]] if len(by) == 1 else tuple(row[col] for col in by)
             mask = None

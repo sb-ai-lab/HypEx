@@ -14,7 +14,14 @@ from ..comparators import (
     StatsTTest,
     StatsZTest,
 )
-from ..dataset import Dataset, ExperimentData, InfoRole, SmallDataset, StatisticRole
+from ..dataset import (
+    Dataset,
+    ExperimentData,
+    InfoRole,
+    SmallDataset,
+    StatisticRole,
+    StratificationRole,
+)
 from ..executor import Executor
 from ..experiments import IfParamsExperiment, ParamsExperiment
 from ..splitters import AASplitter, AASplitterWithStratification
@@ -419,6 +426,13 @@ class AAScoreAnalyzer(Executor):
             Updated ExperimentData with the best splitter applied.
         """
         self.key = "best splitter"
+
+        strat_cols = data.ds.search_columns(StratificationRole())
+        if strat_cols:
+            cleaned_ds = data.ds.dropna(subset=strat_cols)
+            if len(cleaned_ds) < len(data.ds):
+                data = data.copy(data=cleaned_ds)
+
         result = data.set_value(
             ExperimentDataEnum.variables, self.id, best_splitter_id, self.key
         )
