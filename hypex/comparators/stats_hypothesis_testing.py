@@ -8,7 +8,7 @@ import numpy as np
 from scipy.stats import chi2_contingency, kstwobign  # type: ignore
 from scipy.stats import t as t_dist  # type: ignore
 
-from ..dataset import ABCRole, DatasetAdapter, ExperimentData, SmallDataset
+from ..dataset import ABCRole, Dataset, DatasetAdapter, ExperimentData, SmallDataset
 from ..dataset.backends import SparkDataset
 from ..dataset.roles import StatisticRole, TargetRole
 from ..utils import BackendsEnum, NoColumnsError, timeit
@@ -238,6 +238,26 @@ class StatsChi2Test(StatsHypothesisTesting):
             reliability=reliability
         )
         self.reliability = reliability
+    @classmethod
+    def _compute_stats(
+        cls,
+        data: Dataset,
+        group_cols: list[str],
+        target_columns: list[str],
+        stats: list[str] | None = None,
+        **kwargs,
+    ) -> dict[str, dict[str, dict[str, Any]]]:
+        """Delegate to StatsChi2TestExtension instead of
+        StatsAggregationExtension, which does not support
+        the 'value_counts' statistic."""
+        from ..extensions.stats_hypothesis_testing import StatsChi2TestExtension
+
+        ext = StatsChi2TestExtension()
+        return ext.calc(
+            data=data,
+            group_col=group_cols[0],
+            target_cols=target_columns,
+        )
 
     @property
     def search_types(self) -> list[type] | None:

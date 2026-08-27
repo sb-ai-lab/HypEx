@@ -1137,11 +1137,12 @@ class DatasetBase:
         return result
 
     def filter(self, items=None, regex=None, axis=None):
+        if isinstance(items, DatasetBase):
+            return self[items]
+
         t_data = self._backend_data.filter(items=items, regex=regex, axis=axis)
         t_roles = {c: self.roles[c] for c in t_data.columns if c in self.roles.keys()}
-
         raw_data = t_data.data if hasattr(t_data, "data") else t_data
-
         return self.__class__(roles=t_roles, data=raw_data)
 
     def select(self, columns: str | list[str]):

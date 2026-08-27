@@ -263,36 +263,26 @@ class ABAnalyzer(Executor):
                     t_data.data.index = new_index
 
                 for f in ["p-value", "pass"]:
-                    for i in range(
-                        0, len(analysis_ids), len(analysis_ids) // num_groups
-                    ):
+                    step = len(t_data) // num_groups if num_groups > 0 else 1
+                    if step == 0:
+                        step = 1
+                    
+                    for i in range(0, len(t_data), step):
                         slice_start = i
-                        slice_end = i + len(analysis_ids) // num_groups
-                        sliced = t_data.iloc[slice_start:slice_end]
-                        value = t_data.iloc[
-                            i : i + len(analysis_ids) // num_groups
-                        ][f]
+                        slice_end = min(i + step, len(t_data))
+                        
+                        value = t_data.iloc[slice_start:slice_end][f]
                         multitest_pvalues = self._add_pvalues(
                             multitest_pvalues, value, f
                         )
+                        
+                        group_idx = i // step + 1
+                        if group_idx >= len(groups):
+                            group_idx = len(groups) - 1
+                            
                         analysis_data[
-                            f"{c} {f} {groups[i // num_groups + 1][0]}"
+                            f"{c} {f} {groups[group_idx][0]}"
                         ] = value.mean()
-
-                for f in ["p-value", "pass"]:
-                    if f not in t_data.columns:
-                        continue
-                    col_data = t_data[f]
-                    valid_col = col_data.dropna()
-                    if valid_col.is_empty():
-                        continue
-                    multitest_pvalues = self._add_pvalues(
-                        multitest_pvalues, valid_col, f
-                    )
-                    mean_val = valid_col.mean()
-                    if hasattr(mean_val, "iget_values"):
-                        mean_val = mean_val.iget_values(0, 0)
-                    analysis_data[f"{c} {f} {groups[1][0]}"] = mean_val
 
         analysis_dataset = SmallDataset.from_dict(
             [analysis_data], {f: StatisticRole(float) for f in analysis_data}
