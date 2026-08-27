@@ -99,12 +99,8 @@ class Experiment(Executor):
         )
         super().__init__(key)
 
-        # Создаем логгер для эксперимента
-        self.logger = HypExLogger(
-            name="hypex.experiment",
-            level="INFO",
-            log_file="experiment.log"
-        )
+        # create logger for experiment
+        self.logger = HypExLogger(name="hypex.experiment")
 
     def set_params(self, params: dict[str, Any] | dict[type, dict[str, Any]]) -> None:
         """Propagate parameters to the executors in the pipeline.
