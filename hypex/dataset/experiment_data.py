@@ -24,6 +24,7 @@ from ..utils import (
     NotFoundInExperimentDataError,
 )
 from ..utils.adapter import Adapter
+from ..utils.logger import logger
 from .roles import AdditionalRole, ABCRole, DefaultRole, DisabledRole
 
 _SUPPORTED_SPACES = frozenset(
@@ -35,7 +36,7 @@ _SUPPORTED_SPACES = frozenset(
     }
 )
 
-
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 class ExperimentData:
     """Container for experiment-related data structures.
 

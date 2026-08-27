@@ -10,11 +10,13 @@ from ..dataset import ABCRole
 from ..dataset.backends import SparkDataset
 from ..utils.constants import NUMBER_TYPES_LIST, CATEGORICAL_TYPES_LIST
 from ..utils.registry import backend_factory
+from ..utils.logger import logger
 from .abstract import StatsHypothesisTesting
 from .comparators import TTest, Chi2Test, ZTest
 
 from math import sqrt
 
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 @backend_factory.register(TTest, SparkDataset)
 class StatsTTest(StatsHypothesisTesting):
     """

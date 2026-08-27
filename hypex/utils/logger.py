@@ -387,5 +387,5 @@ logger = HypExLogger(
     name="hypex.experiment",
     level="INFO",
     log_file="experiment.log",
-    console_out=False
+    console_out=True
 )
