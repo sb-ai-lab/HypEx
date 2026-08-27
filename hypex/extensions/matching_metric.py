@@ -251,24 +251,24 @@ class MatchingMetricsExtension(Extension):
         )
         N = m + n
 
-        att_var = att_se ** 2
-        atc_var = atc_se ** 2
+        # att_var = att_se ** 2
+        # atc_var = atc_se ** 2
 
-        ate_var = (n / N) ** 2 * att_var + (m / N) ** 2 * atc_var
-        ate_se = float(np.sqrt(max(ate_var, 0.0)))
-
-        # sum_c = float(stats_itc.get("sum", 0.0))
-        # sum_t = float(stats_itt.get("sum", 0.0))
-
-        # sq_c = float(stats_itc["sq_sum"])
-        # sq_t = float(stats_itt["sq_sum"])
-
-        # ate_var = (
-        #     var_c * (m + 2.0 * sum_c + sq_c)
-        #     + var_t * (n + 2.0 * sum_t + sq_t)
-        # ) / (N ** 2)
-
+        # ate_var = (n / N) ** 2 * att_var + (m / N) ** 2 * atc_var
         # ate_se = float(np.sqrt(max(ate_var, 0.0)))
+
+        sum_c = float(stats_itc.get("sum", 0.0))
+        sum_t = float(stats_itt.get("sum", 0.0))
+
+        sq_c = float(stats_itc["sq_sum"])
+        sq_t = float(stats_itt["sq_sum"])
+
+        ate_var = (
+            var_c * (m + 2.0 * sum_c + sq_c)
+            + var_t * (n + 2.0 * sum_t + sq_t)
+        ) / (N ** 2)
+
+        ate_se = float(np.sqrt(max(ate_var, 0.0)))
 
         p_val_ate = self._calc_p_value(ate / ate_se)
         return {
