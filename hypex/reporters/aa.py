@@ -1,16 +1,32 @@
 from __future__ import annotations
-from typing import Any, ClassVar
-import warnings
 
-from ..comparators import GroupChi2Test, GroupDifference, GroupKSTest, GroupTTest, StatsTTest, BaseComparator
+import warnings
+from typing import Any, ClassVar
+
+from ..comparators import (
+    BaseComparator,
+    GroupChi2Test,
+    GroupKSTest,
+    GroupTTest,
+    StatsChi2Test,
+    StatsKSTest,
+    StatsTTest,
+)
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..dataset.dataset import SmallDataset
 from ..splitters import AASplitter, AASplitterWithStratification
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, NotFoundInExperimentDataError
+from ..utils.constants import NAME_BORDER_SYMBOL
+from ..utils.naming import _parse_metric_col, normalize_test_name
 from .abstract import (
-    DictReporter, DatasetReporter, Reporter, 
-    extract_group_difference, extract_tests, extract_analyzer_data
+    DatasetReporter,
+    DictReporter,
+    Reporter,
+    extract_analyzer_data,
+    extract_group_difference,
+    extract_tests,
 )
+
 
 class AATestReporter(DatasetReporter):
     """Reporter for A/A test results.
@@ -18,7 +34,10 @@ class AATestReporter(DatasetReporter):
     Extracts group differences, statistical test outcomes, and analyzer metadata,
     formatting them into a structured dataset or dictionary.
     """
-    tests: ClassVar[list[type[BaseComparator]]] = [GroupTTest, GroupKSTest, GroupChi2Test, StatsTTest]
+    tests: ClassVar[list[type[BaseComparator]]] = [
+        GroupTTest, GroupKSTest, GroupChi2Test,
+        StatsTTest, StatsKSTest, StatsChi2Test,
+    ]
 
     def __init__(self, 
                  dict_reporter: DictReporter | None = None, 
@@ -65,6 +84,7 @@ class AATestReporter(DatasetReporter):
         result.update(extract_group_difference(data, front_flag))
         result.update(extract_tests(data, self.tests, front_flag))
         result.update(extract_analyzer_data(data, "OneAAStatAnalyzer"))
+        
         return result
 
     def report(self, data: ExperimentData) -> dict[str, Any] | Dataset:
@@ -129,136 +149,103 @@ class AADatasetReporter(AATestReporter):
 
 
 class AAPassedReporter(Reporter):
-    """Reporter for A/A test pass/fail results.
-
-    Aggregates test pass statuses, reformats boolean indicators, 
-    and merges statistical differences (mean, p-value, etc.) into a final summary table.
-    """
     def report(self, data: ExperimentData) -> Dataset:
-        """Generate a report summarizing A/A test pass/fail outcomes.
-
-        Args:
-            data: The experiment data container.
-
-        Returns:
-            A ``Dataset`` containing pass/fail statuses, statistical metrics,
-            and an overall result flag, or ``None`` if the required analyzer data is missing or empty.
-        """
         analyser_ids = data.get_ids("AAScoreAnalyzer", ExperimentDataEnum.analysis_tables)
         analyser_tables = {
             id_[id_.rfind(ID_SPLIT_SYMBOL) + 1:]: data.analysis_tables[id_]
             for id_ in analyser_ids["AAScoreAnalyzer"][ExperimentDataEnum.analysis_tables.value]
         }
         if not analyser_tables.get("aa score") or analyser_tables["aa score"].is_empty():
-            return None
-
-        best_split_table = self._reformat_bool_split(analyser_tables["best split statistics"])
-
-        if best_split_table.is_empty():
             return SmallDataset.create_empty()
 
-        records = best_split_table.to_records()
-        result_records = []
-        
+        aa_score = analyser_tables["aa score"]
+        best_split_stats = analyser_tables.get("best split statistics")
+        if best_split_stats is None or best_split_stats.is_empty():
+            return SmallDataset.create_empty()
+
+        test_names_ordered: list[str] = []
+        seen: set[str] = set()
+        for idx_label in aa_score.index:
+            parts = str(idx_label).split()
+            if len(parts) >= 3:
+                tn = parts[-2]
+            elif len(parts) == 2:
+                tn = parts[0]
+            elif len(parts) == 1:
+                tn = parts[0]
+            else:
+                continue
+            if tn not in seen:
+                seen.add(tn)
+                test_names_ordered.append(tn)
+
+        records = best_split_stats.to_records()
+        result_records: list[dict] = []
+
         for row in records:
-            rec = {
-                "feature": str(row.get("feature", "")),
-                "group": str(row.get("group", ""))
-            }
-            passed = False
-            for col in best_split_table.columns:
-                if col in ("feature", "group"): 
+            feature_groups: set[tuple[str, str]] = set()
+            for k in row.keys():
+                if NAME_BORDER_SYMBOL in k:
                     continue
-                val = row.get(col)
-                rec[col] = val
-                if val in (True, 1, "True", 1.0, "OK"):
-                    passed = True
-            rec["result"] = "OK" if passed else "NOT OK"
-            result_records.append(rec)
+                feature, test, metric, group = _parse_metric_col(k)
+                if feature and feature != "mean":
+                    feature_groups.add((feature, group))
 
-        roles = {"feature": InfoRole(), "group": InfoRole(), "result": StatisticRole()}
-        for col in best_split_table.columns:
-            if col not in ("feature", "group"):
-                roles[col] = best_split_table.roles.get(col, StatisticRole())
+            for feature, group in sorted(feature_groups):
+                rec: dict = {"feature": feature, "group": group}
 
-        result = SmallDataset.from_dict(result_records, roles=roles)
-        
-        diff_source = analyser_tables.get("best split statistics")
-        if diff_source and not diff_source.is_empty():
-            stats_cols = ["feature", "group", "control mean", "test mean", "difference", "difference %"]
-            available = [c for c in stats_cols if c in diff_source.columns]
-            if available:
-                differences = diff_source.select(available)
-                try:
-                    result = result.merge(differences, on=["feature", "group"], how="left")
-                except Exception:
-                    pass
+                # aa test columns
+                for tn in test_names_ordered:
+                    idx_key = f"{feature} {tn} {group}".strip()
+                    try:
+                        pass_val = aa_score.loc[idx_key, "pass"]
+                        if hasattr(pass_val, 'iget_values'):
+                            pass_val = pass_val.iget_values(0, 0)
+                        rec[f"{tn} aa test"] = "OK" if pass_val else "NOT OK"
+                    except Exception:
+                        rec[f"{tn} aa test"] = None
 
-        numeric_cols = ["control mean", "test mean", "difference", "difference %"]
-        for col in numeric_cols:
-            if col in result.columns:
-                try: 
-                    result.data[col] = result.data[col].astype(float).round(6)
-                except Exception: 
-                    pass
-        return result
+                # best split columns
+                for tn in test_names_ordered:
+                    val = None
+                    for k, v in row.items():
+                        f, t, m, g = _parse_metric_col(k)
+                        if f == feature and normalize_test_name(t) == tn and m == "pass" and g == group:
+                            val = v
+                            break
+                    if val is not None:
+                        rec[f"{tn} best split"] = (
+                            "OK" if str(val).strip().upper() in ("OK", "TRUE", "1") else "NOT OK"
+                        )
+                    else:
+                        rec[f"{tn} best split"] = None
 
-    @staticmethod
-    def _reformat_bool(table: SmallDataset) -> SmallDataset:
-        """Extract and reformat pass/fail statuses from a raw results table.
+                # result
+                all_ok = all(
+                    rec.get(f"{tn} best split") != "NOT OK"
+                    for tn in test_names_ordered
+                    if rec.get(f"{tn} best split") is not None
+                )
+                rec["result"] = "OK" if all_ok else "NOT OK"
 
-        Args:
-            table: The raw dataset containing a 'pass' column with nested dictionaries.
+                for metric_name in ("control mean", "test mean", "difference", "difference %"):
+                    val = None
+                    for k, v in row.items():
+                        f, t, m, g = _parse_metric_col(k)
+                        if f == feature and t == "GroupDifference" and m == metric_name and g == group:
+                            val = v
+                            break
+                    rec[metric_name] = val
 
-        Returns:
-            A ``SmallDataset`` with reformatted pass/fail statuses, 
-            or an empty ``SmallDataset`` if the input is invalid or empty.
-        """
-        if table.is_empty() or "pass" not in table.columns:
-            return SmallDataset.create_empty()
-        
-        records = table.to_records()
-        pass_dict = records[0].get("pass") if records else None
-        
-        if not isinstance(pass_dict, dict) or not pass_dict:
-            return SmallDataset.create_empty()
-        return SmallDataset.from_dict(pass_dict, roles={k: InfoRole() for k in pass_dict})
+                result_records.append(rec)
 
-    @staticmethod
-    def _reformat_bool_split(table: SmallDataset) -> SmallDataset:
-        """Extract and reformat split-specific pass/fail statuses.
+        roles: dict = {"feature": InfoRole(), "group": InfoRole(), "result": StatisticRole()}
+        if result_records:
+            for c in result_records[0]:
+                if c not in roles:
+                    roles[c] = StatisticRole()
+        return SmallDataset.from_dict(result_records, roles=roles)
 
-        Args:
-            table: The raw dataset containing columns ending with 'pass'.
-
-        Returns:
-            A ``SmallDataset`` with cleaned boolean pass/fail values per split,
-            or an empty ``SmallDataset`` if no relevant columns are found.
-        """
-        pass_cols = [c for c in table.columns if c.endswith("pass")]
-        if not pass_cols or table.is_empty():
-            return SmallDataset.create_empty()
-            
-        records = table.to_records()
-        rows = []
-        for row in records:
-            row_dict = {}
-            if "feature" in row:
-                row_dict["feature"] = row["feature"]
-            if "group" in row:
-                row_dict["group"] = row["group"]
-                
-            for col in pass_cols:
-                val = row.get(col)
-
-                clean_col = col[:col.rfind("pass")].strip()
-                row_dict[clean_col] = bool(val) if val is not None else False
-            rows.append(row_dict)
-            
-        if not rows:
-            return SmallDataset.create_empty()
-            
-        return SmallDataset.from_dict(rows, roles={c: InfoRole() for c in rows[0]})
 
 class AABestSplitReporter(Reporter):
     """Reporter that attaches best split markers to the dataset.

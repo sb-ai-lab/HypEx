@@ -3,26 +3,26 @@ This module defines data structures and roles used across the library for managi
 """
 
 from .abstract import DatasetBase
-from .groupby_dataset import GroupedDataset
 from .dataset import Dataset, DatasetAdapter, SmallDataset
 from .experiment_data import ExperimentData
+from .groupby_dataset import GroupedDataset
 from .roles import (
     ABCRole,
     AdditionalFeatureRole,
     AdditionalGroupingRole,
     AdditionalMatchingRole,
     AdditionalPreTargetRole,
+    AdditionalStatisticRole,
     AdditionalTargetRole,
     AdditionalTreatmentRole,
-    AdditionalStatisticRole,
     ConstGroupRole,
     DefaultRole,
+    DisabledRole,
     FeatureRole,
     FilterRole,
     GroupingRole,
     IndexRole,
     InfoRole,
-    DisabledRole,
     PreTargetRole,
     ReportRole,
     StatisticRole,
@@ -42,22 +42,21 @@ __all__ = [
     "AdditionalGroupingRole",
     "AdditionalMatchingRole",
     "AdditionalPreTargetRole",
+    "AdditionalStatisticRole",
     "AdditionalTargetRole",
     "AdditionalTreatmentRole",
-    "AdditionalStatisticRole",
     "ConstGroupRole",
     "Dataset",
     "DatasetAdapter",
     "DatasetBase",
-    "GroupedDataset",
     "DefaultRole",
+    "DisabledRole",
     "ExperimentData",
     "FeatureRole",
     "FilterRole",
+    "GroupedDataset",
     "GroupingRole",
-    "indexRole",
     "InfoRole",
-    "DisabledRole",
     "PreTargetRole",
     "SmallDataset",
     "StatisticRole",
@@ -69,4 +68,5 @@ __all__ = [
     "TempTreatmentRole",
     "TreatmentRole",
     "default_roles",
+    "indexRole",
 ]

@@ -237,14 +237,17 @@ class ExperimentData:
 
         storage_level = self._data.get_storage_level() or "MEMORY_AND_DISK"
         was_persisted = self._data.is_persisted
-        
+
+        if was_persisted:
+            self._data.unpersist()
+
+
         if not isinstance(value, Dataset):
             # Raw data (list, scalar, etc.) — add as a single column
             new_data = self._data.add_column(
                 data=value, 
                 role={exec_id: normalized_role}
             )
-            # return self
         elif len(value.columns) == 1:
             # Single-column Dataset — extract the column and add with exec_id as name
             new_data = self._data.add_column(
@@ -293,7 +296,6 @@ class ExperimentData:
         additional_cols = list(set(self._data.columns) - set(self._initial_cols))
         if not additional_cols:
             return self._data.create_empty(
-                # index=self._data.index,
                 backend=self._data.backend_type,
                 session=self._data.session,
                 roles={}
@@ -318,7 +320,7 @@ class ExperimentData:
         cols_to_enable = self._data.search_columns(DisabledRole())
         if cols_to_drop:
             self._data = self._data.drop(columns=cols_to_drop)
-        
+
         if cols_to_enable:
             self._data = self._data.replace_roles(
                 new_roles_map={
@@ -345,7 +347,15 @@ class ExperimentData:
         ]
         if not additional_cols:
             return self._data
-        return self._data.drop(columns=additional_cols)
+
+        cleaned = self._data.drop(columns=additional_cols)
+
+        # truncate the computational graph (DAG) in Spark,
+        # to avoid exponential slowdown at each iteration.
+        if cleaned.backend_type == BackendsEnum.spark:
+            cleaned.checkpoint(eager=True)
+
+        return cleaned
 
     def _set_analysis_tables(self, exec_id: str, value: Any) -> Self:
         """Handle storage in the analysis_tables space.
@@ -543,22 +553,60 @@ class ExperimentData:
         search_types: list[type] | None = None,
         space: Literal["all", "ds", "additional_fields"] = "all",
     ) -> Dataset:
-        """Build a new dataset containing columns matching specified roles.
-        All columns now live in self.ds.
+        """Build a new dataset containing only columns that match the specified roles.
+
+        Instead of creating an empty dataset with the full 60M-row index
+        (which forces a ``toPandas()`` call on the driver and triggers
+        executor checkpoint reads), this method performs a pure column
+        projection via ``self._data[cols]``. This is an O(1) Spark
+        transformation that never materializes the index and never reads
+        from local_checkpoint.
+
+        Args:
+            roles: A single role or iterable of roles to search for.
+            tmp_role: Whether to search in temporary roles instead of
+                permanent ones. Defaults to ``False``.
+            search_types: Optional list of Python types to additionally
+                filter columns by.
+
+        Returns:
+            A new ``Dataset`` containing only the matched columns with
+            the requested roles applied. Returns an empty dataset (without
+            materialized index) if no columns match.
         """
         roles_list = Adapter.to_list(roles)
         role_columns = {
-            role: self.field_search(role, tmp_role, search_types, space) 
+            role: self.field_search(role, tmp_role, search_types, space)
             for role in roles_list
         }
-        searched = Dataset.create_empty(
-            index=self._data.index,
-            backend=self._data.backend_type,
-            session=self._data.session,
-        )
-        for role, cols in role_columns.items():
-            for col in cols:
-                searched = searched.add_column(
-                    data=self.ds[col], role={col: role}
-                )
-        return searched
+
+        # Collect unique columns preserving first-seen order and map each
+        # column to the role that requested it.
+        cols: list[str] = []
+        new_roles: dict[str, ABCRole] = {}
+        for role, found_cols in role_columns.items():
+            for col in found_cols:
+                if col not in cols:
+                    cols.append(col)
+                    new_roles[col] = role
+
+        if not cols:
+            # Return a truly empty dataset WITHOUT evaluating the 60M index.
+            # Passing index=None prevents SparkNavigation.create_empty from
+            # calling ps.DataFrame(index=...) which triggers toPandas().
+            return Dataset.create_empty(
+                roles={},
+                backend=self._data.backend_type,
+                session=self._data.session,
+            )
+
+        # Pure column projection: a lazy Spark transformation that does not
+        # trigger any action, does not read from checkpoint, and does not
+        # ship the index to the driver.
+        subset_ds = self._data[cols]
+
+        # Apply the requested roles to the projected subset.
+        for col, role in new_roles.items():
+            subset_ds.roles[col] = role
+
+        return subset_ds

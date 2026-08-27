@@ -2,8 +2,8 @@ from .encoders import DummyEncoderExtension, PandasDummyEncoderExtension, SparkD
 
 from .faiss import FaissExtension, SparkFaissExtension, PandasFaissExtension
 from .scipy_linalg import (
-    UniteCovExtension, 
-    CholeskyExtension, 
+    UniteCovExtension,
+    CholeskyExtension,
     InverseExtension,
     LstsqExtension,
     SparkLstsqExtension,
@@ -24,8 +24,8 @@ from .scipy_stats import (
 from .statsmodels import MultiTest, MultitestQuantile
 from .bias import BiasExtension, PandasBisaExtesion, SparkBisaExtesion
 from .matching_metric import (
-    MatchingMetricsExtension, 
-    PandasMatchingMetricsExtension, 
+    MatchingMetricsExtension,
+    PandasMatchingMetricsExtension,
     SparkMatchingMetricsExtension
 )
 
@@ -55,7 +55,7 @@ __all__ = [
     "BiasExtension",
     "PandasBisaExtesion",
     "SparkBisaExtesion",
-    "MatchingMetricsExtension", 
-    "PandasMatchingMetricsExtension", 
+    "MatchingMetricsExtension",
+    "PandasMatchingMetricsExtension",
     "SparkMatchingMetricsExtension",
 ]

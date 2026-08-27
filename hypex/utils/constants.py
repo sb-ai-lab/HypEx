@@ -12,3 +12,18 @@ UTILITY_PHYSICAL_INDEX_COL_NAME = "\u23e3_physical_index"
 
 NUMBER_TYPES_LIST = [int, float]
 CATEGORICAL_TYPES_LIST = [str]
+
+TEST_NAME_NORMALIZATION: dict[str, str] = {
+    "StatsTTest": "TTest",
+    "StatsKSTest": "KSTest",
+    "StatsChi2Test": "Chi2Test",
+    "StatsZTest": "ZTest",
+    "GroupTTest": "TTest",
+    "GroupKSTest": "KSTest",
+    "GroupChi2Test": "Chi2Test",
+    "GroupUTest": "UTest",
+    "TTest": "TTest",
+    "KSTest": "KSTest",
+    "Chi2Test": "Chi2Test",
+    "UTest": "UTest",
+}

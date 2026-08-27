@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 import os
 import copy
 from pathlib import Path
@@ -22,7 +23,6 @@ from pyspark.sql.types import StructType
 
 
 import pyspark.pandas as ps
-# ps.set_option('compute.ops_on_diff_frames', True)
 
 from pyspark.pandas.exceptions import PandasNotImplementedError
 
@@ -940,14 +940,14 @@ class SparkNavigation(DatasetBackendNavigation):
                 if errors == "raise":
                     raise KeyError(f"Column '{column_name}' not found")
                 continue
-
             if self.data[column_name].isna().all():
                 if errors == "raise":
                     raise ValueError(
                         f"Cannot infer type for column '{column_name}': all values are null"
                     )
                 continue
-
+            if self.data[column_name].isna().any():
+                continue
             try:
                 self.data = self.data.astype({column_name: target_type})
             except (ValueError, TypeError) as e:
@@ -977,8 +977,6 @@ class SparkNavigation(DatasetBackendNavigation):
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
 
-        # if isinstance(data, ps.Index):        # if isinstance(data, ps.Index):
-        #     data = data.to_frame()
         if isinstance(data, (ps.DataFrame, ps.Series)):
             if isinstance(data, ps.DataFrame) and data.shape[1] == 1:
                 data_col = data.columns[0]
@@ -1809,6 +1807,90 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 df=self.data, n=n, frac=frac or 1.0, seed=random_state
             )
         )
+
+    def random_split_labels(
+        self,
+        edges: list[int],
+        labels: list[str],
+        random_state: int | None = None,
+        frac: float = 1.0,
+        name: str = "split",
+    ) -> ps.DataFrame:
+        """Assign deterministic group labels to rows based on a hash of the index.
+
+        The previous implementation used global ``orderBy`` + ``zipWithIndex``
+        which materializes the entire dataset on a single executor and causes
+        OOM on datasets with tens of millions of rows. This implementation
+        replaces that approach with a ``hash(index_columns, seed) % MOD``
+        modulo operation that runs entirely in a distributed fashion without
+        any global shuffle or sort.
+
+        The split is approximately proportional to the requested ``edges``
+        (within +/- 0.01% for ``MOD = 10_000_000``), which is statistically
+        indistinguishable for AA/AB testing purposes.
+
+        Args:
+            edges: Cumulative upper bounds for each label on the MOD scale.
+                For example, ``[5_000_000, 10_000_000]`` produces roughly a
+                50/50 split.
+            labels: Label strings corresponding to ``edges``.
+            random_state: Seed for the hash function. Defaults to 42 when
+                ``None``.
+            frac: Fraction of data to label. Rows with
+                ``hash >= frac * MOD`` are left unlabeled and filtered out.
+            name: Name of the resulting label column.
+
+        Returns:
+            A ``pyspark.pandas.DataFrame`` containing only the original index
+            columns and the new label column.
+        """
+        seed = random_state if random_state is not None else 42
+        mod = 10_000_000
+
+        if edges and edges[-1] < mod * 0.5:
+            warnings.warn(
+                f"edges={edges} look like absolute row counts, not MOD-scaled values. "
+                f"Expected last edge ≈ {mod}. Auto-scaling.",
+                UserWarning,
+                stacklevel=2,
+            )
+            n_sampled_approx = edges[-1]
+            edges = [int(e / n_sampled_approx * mod) for e in edges]
+            edges[-1] = mod
+
+        # Expose index columns so we can hash them and restore the index
+        # after the Spark transformation round-trip.
+        df_with_index = self.data.reset_index()
+        index_cols = df_with_index.columns[: self.data.index.nlevels]
+
+        # Project only index columns to minimize data sent through the plan.
+        sdf = df_with_index[list(index_cols)].to_spark()
+
+        # Deterministic hash from index columns + seed.
+        hash_cols = [F.col(c) for c in index_cols]
+        hash_expr = F.abs(F.hash(*hash_cols, F.lit(seed))) % F.lit(mod)
+
+        # Build CASE WHEN in REVERSE order. Spark's `otherwise` wraps the
+        # existing expression on the outside, so iterating forward would
+        # cause the first label to shadow all subsequent ones.
+        case_expr = F.lit(None).cast("string")
+        for edge, label in reversed(list(zip(edges, labels))):
+            threshold = min(edge, mod)
+            case_expr = F.when(
+                hash_expr < F.lit(threshold), F.lit(label)
+            ).otherwise(case_expr)
+
+        # Apply the frac filter before returning.
+        if frac < 1.0:
+            frac_threshold = int(frac * mod)
+            case_expr = F.when(
+                hash_expr < F.lit(frac_threshold), case_expr
+            ).otherwise(F.lit(None))
+
+        sdf = sdf.withColumn(name, case_expr)
+        sdf = sdf.filter(F.col(name).isNotNull())
+
+        return sdf.pandas_api(index_col=list(index_cols))
 
     def select_dtypes(
         self, include: str | None = None, exclude: str | None = None

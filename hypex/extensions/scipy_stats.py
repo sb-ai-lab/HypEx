@@ -4,6 +4,7 @@ import warnings
 from typing import Callable, Sequence, Any
 
 import numpy as np
+import pandas as pd
 
 from pyspark.sql import Window
 import pyspark.sql.functions as F
@@ -84,7 +85,7 @@ class GroupTTestExtension(GroupStatTest):
     Master-backend class for statistic test calculation.
     """
     test_function = staticmethod(ttest_ind)
-    def __init__(self, reliability: float = 0.05): 
+    def __init__(self, reliability: float = 0.05):
         super().__init__(self.test_function, reliability)
         self.default_kwargs = {"nan_policy": "omit", "equal_var": False}
 
@@ -93,7 +94,7 @@ class GroupKSTestExtension(GroupStatTest):
     Master-backend class for statistic test calculation.
     """
     test_function = staticmethod(ks_2samp)
-    def __init__(self, reliability: float = 0.05): 
+    def __init__(self, reliability: float = 0.05):
         super().__init__(self.test_function, reliability)
         self.default_kwargs = {}
 
@@ -102,7 +103,7 @@ class GroupUTestExtension(GroupStatTest):
     Master-backend class for statistic test calculation.
     """
     test_function = staticmethod(mannwhitneyu)
-    def __init__(self, reliability: float = 0.05): 
+    def __init__(self, reliability: float = 0.05):
         super().__init__(self.test_function, reliability)
         self.default_kwargs = {"nan_policy": "omit"}
 

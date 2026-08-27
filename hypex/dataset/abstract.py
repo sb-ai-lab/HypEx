@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+import copy
 from copy import deepcopy
 import json
 from abc import ABC
@@ -20,6 +21,8 @@ from numpy import ndarray
 import pyspark.sql as spark
 import pyspark.pandas as ps
 
+from .backends import PandasDataset, SparkDataset
+from .groupby_dataset import GroupedDataset
 from ..utils import (
     BackendsEnum,
     BackendTypeError,
@@ -46,6 +49,9 @@ from .roles import (
 
 
 class DatasetBase:
+    DISPLAY_ROWS = 5
+    DISPLAY_COLS = 10
+
     @dataclass
     class Locker:
         call_class: Any
@@ -294,8 +300,8 @@ class DatasetBase:
         }
 
     def checkpoint(self, eager: bool = True) -> Self:
-        """
-        Breaks the computation graph (Lineage) for the Spark backend.
+        """Breaks the computation graph (Lineage) for the Spark backend.
+
         For the Pandas backend, this method acts as a no-op. It is critical
         for iterative processes (e.g., A/A and A/B tests) to prevent
         exponential slowdowns caused by the growth of the DAG in Spark.
@@ -525,21 +531,21 @@ class DatasetBase:
                     type(other._backend_data), type(self._backend_data)
                 )
             other_raw = (
-                other.backend_data.data 
-                if hasattr(other.backend_data, 'data') 
+                other.backend_data.data
+                if hasattr(other.backend_data, "data")
                 else other.backend_data
             )
-            
-            if hasattr(other_raw, 'columns') and hasattr(self_raw, 'columns'):
+
+            if hasattr(other_raw, "columns") and hasattr(self_raw, "columns"):
                 if len(other_raw.columns) == len(self_raw.columns) and list(
                     other_raw.columns
                 ) != list(self_raw.columns):
                     rename_map = {
-                        other_raw.columns[i]: self_raw.columns[i] 
+                        other_raw.columns[i]: self_raw.columns[i]
                         for i in range(len(self_raw.columns))
                     }
                     other_raw = other_raw.rename(columns=rename_map)
-                if hasattr(self_raw, 'columns') and not hasattr(other_raw, 'columns'):
+                if hasattr(self_raw, "columns") and not hasattr(other_raw, "columns"):
                     other_raw = other_raw.to_frame()
                     if other_raw.columns[0] != self_raw.columns[0]:
                         other_raw.columns = self_raw.columns
@@ -551,22 +557,22 @@ class DatasetBase:
         result_raw = func(other_raw)
 
         result_raw = (
-            result_raw.data 
-            if hasattr(result_raw, 'data') 
+            result_raw.data
+            if hasattr(result_raw, 'data')
             else result_raw
         )
 
         if hasattr(result_raw, 'to_frame') and not hasattr(result_raw, 'columns'):
             col_name = (
-                result_raw.name 
-                if result_raw.name is not None 
+                result_raw.name
+                if result_raw.name is not None
                 else (self_raw.columns[0] if hasattr(self_raw, 'columns') else 'result')
             )
             result_raw = result_raw.to_frame(name=col_name)
 
         actual_columns = (
-            list(result_raw.columns) 
-            if hasattr(result_raw, 'columns') 
+            list(result_raw.columns)
+            if hasattr(result_raw, 'columns')
             else []
         )
         new_roles = {}
@@ -1204,6 +1210,53 @@ class DatasetBase:
             data=self.backend_data.sample(frac=frac, n=n, random_state=random_state),
         )
 
+    def random_split_labels(
+        self,
+        edges: list[int],
+        labels: list[str],
+        random_state: int | None = None,
+        frac: float = 1.0,
+        name: str = "split",
+    ) -> Self:
+        """
+        Splits data into labeled groups using a scalable distributed algorithm.
+
+        For Spark backend: Uses hash-based shuffling and distributed indexing (zipWithIndex)
+        to avoid OOM errors associated with sorting and taking top-N rows.
+
+        For Pandas backend: Uses standard sampling and positional labeling.
+
+        Args:
+            edges: Cumulative upper bounds for each label (e.g., [50M, 100M]).
+            labels: List of label strings corresponding to edges.
+            random_state: Seed for reproducibility.
+            frac: Fraction of data to label (rest will be null if < 1.0).
+            name: Name of the resulting column.
+
+        Returns:
+            A new Dataset instance containing the original index and the new 'name' column.
+        """
+        # Delegate to the backend implementation
+        # The backend method returns a ps.DataFrame or pd.DataFrame with the index preserved
+        result_df = self._backend_data.random_split_labels(
+            edges=edges,
+            labels=labels,
+            random_state=random_state,
+            frac=frac,
+            name=name,
+        )
+
+        # Wrap the result back into a Dataset
+        # Note: The result only has the index and the 'name' column.
+        # Roles should be minimal here, usually just InfoRole or StatisticRole for the split column.
+        from .roles import InfoRole
+
+        return self.__class__(
+            roles={name: InfoRole()},
+            data=result_df,
+            session=self.session if hasattr(self, 'session') else None
+        )
+
     def cov(self) -> DatasetBase:
         t_data = self.backend_data.cov()
         return self.__class__(
@@ -1243,6 +1296,9 @@ class DatasetBase:
             },
             "data": self._backend_data.to_dict(),
         }
+
+    def to_numpy(self) -> ndarray:
+        return self._backend_data.to_numpy()
 
     def to_records(self) -> Any:
         return self._backend_data.to_records()
