@@ -195,7 +195,8 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data = data.to_pandas()
         elif isinstance(data, dict):
             wrapped = {
-                k: v if isinstance(v, list) else [v] for k, v in data["data"].items()
+                k: v if isinstance(v, (list, np.ndarray, tuple)) else [v]
+                for k, v in data["data"].items()
             }
             if "index" in data.keys():
                 self.data = pd.DataFrame(data=wrapped, index=data["index"])

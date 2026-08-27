@@ -16,7 +16,7 @@ from ..utils.constants import CATEGORICAL_TYPES_LIST, NUMBER_TYPES_LIST
 from ..utils.errors import NotSuitableFieldError
 from ..utils.registry import backend_factory
 from .abstract import StatsHypothesisTesting
-from .comparators import Chi2Test, TTest, ZTest
+from .comparators import Chi2Test, KSTest, TTest, ZTest
 
 
 @backend_factory.register(TTest, SparkDataset)
@@ -420,7 +420,7 @@ class StatsZTest(StatsHypothesisTesting):
             "pass": [p_value < reliability],
         }
 
-
+@backend_factory.register(KSTest, SparkDataset)
 class StatsKSTest(StatsHypothesisTesting):
     """Kolmogorov-Smirnov test on aggregated histograms.
 

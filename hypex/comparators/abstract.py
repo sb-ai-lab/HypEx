@@ -273,39 +273,25 @@ class GroupsComparator(BaseComparator, ABC):
         group_field_data = cls._field_validity_check(
             group_field_data, "group_field_data", "groups"
         )
-
         group_col = group_field_data.columns[0]
-
         if group_col not in target_fields_data.columns:
             target_fields_data = target_fields_data.merge(
                 group_field_data, left_index=True, right_index=True, how="left"
             )
-
         data_buckets = sorted(
-            target_fields_data.groupby(by=group_field_data.columns), key=lambda tup: tup[0]
+            target_fields_data.groupby(by=group_field_data.columns),
+            key=lambda tup: tup[0],
         )
-        baseline_data = cls._split_ds_into_columns([data_buckets.pop(0)])
-        compared_data = cls._split_ds_into_columns(data=data_buckets)
-        return baseline_data, compared_data
 
-    @classmethod
-    def _split_for_columns_mode(
-        cls,
-        baseline_field_data: Dataset,
-        target_fields_data: Dataset,
-    ) -> GroupingDataType:
-        baseline_field_data = cls._field_validity_check(
-            baseline_field_data, "baseline_field_data", "columns"
+        target_cols = [c for c in target_fields_data.columns if c != group_col]
+
+        baseline_bucket = data_buckets.pop(0)
+        baseline_data = cls._split_ds_into_columns(
+            [(baseline_bucket[0], baseline_bucket[1][target_cols])]
         )
-        if len(target_fields_data.columns) == 0:
-            raise NoRequiredArgumentError(target_fields_data)
-
-        baseline_data = [(f"{baseline_field_data.columns[0]}", baseline_field_data)]
-        compared_data = [
-            (f"{column}", target_fields_data[column])
-            for column in target_fields_data.columns
-        ]
-
+        compared_data = cls._split_ds_into_columns(
+            [(key, ds[target_cols]) for key, ds in data_buckets]
+        )
         return baseline_data, compared_data
 
     @classmethod

@@ -116,18 +116,15 @@ def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bo
     table = data.analysis_tables.get(comparator_id)
     if table is None or table.is_empty():
         return {}
-        
     key = ResultKey.from_id(comparator_id)
     sep = " " if front else ID_SPLIT_SYMBOL
     result = {}
-    
     records = table.to_records()
     index_values = _get_index_values(table)
-    
     for idx_val, row_dict in zip(index_values, records):
         for col, val in row_dict.items():
-            result[f"{key.field}{sep}{key.executor}{sep}{col}{sep}{idx_val}"] = _normalize_value(val)
-            
+            full_key = f"{key.field}{sep}{key.executor}{sep}{col}{sep}{idx_val}"
+            result[full_key] = _normalize_value(val)
     return result
 
 def extract_tests(data: ExperimentData, test_classes: list[type], front: bool) -> dict[str, Any]:
@@ -363,8 +360,17 @@ class DatasetReporter(Reporter):
         finally:
             self.dict_reporter.front = old_front
 
+    def _report(self, data: ExperimentData) -> dict[str, Any]:
+        return self.dict_reporter.report(data)
+
     def report(self, data: ExperimentData) -> dict | Dataset:
-        dict_result = self.dict_reporter.report(data)
+        old_front = self.dict_reporter.front
+        self.dict_reporter.front = False
+        try:
+            dict_result = self._report(data)
+        finally:
+            self.dict_reporter.front = old_front
+
         if self.output_format == "dict":
             return dict_result
         if self.single_row:

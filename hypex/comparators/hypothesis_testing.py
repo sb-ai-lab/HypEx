@@ -27,7 +27,7 @@ class GroupTTest(GroupHypothesisTesting):
             data, other=test_data, **kwargs
         )
 
-@backend_factory.register(KSTest, [PandasDataset, SparkDataset])
+@backend_factory.register(KSTest, PandasDataset)
 class GroupKSTest(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:

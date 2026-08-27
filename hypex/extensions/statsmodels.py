@@ -5,7 +5,7 @@ from scipy.stats import norm  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
 
 from ..dataset import Dataset, DatasetAdapter, StatisticRole
-from ..utils import ID_SPLIT_SYMBOL, ABNTestMethodsEnum
+from ..utils import ID_SPLIT_SYMBOL, ABNTestMethodsEnum, BackendsEnum
 from .abstract import Extension
 
 
@@ -25,6 +25,11 @@ class MultiTest(Extension):
         self.method = method
         self.alpha = alpha
         super().__init__()
+
+    def calc(self, data: Dataset, **kwargs):
+        if data.backend_type == BackendsEnum.spark:
+            return self._calc_spark(data, **kwargs)
+        return self._calc_pandas(data, **kwargs)
 
     def _calc_pandas(self, data: Dataset, **kwargs):
         """Apply multiple-testing correction on a Pandas-backed dataset.
