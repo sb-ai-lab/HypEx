@@ -117,14 +117,14 @@ class AASplitter(Calculator):
             data_to_split = data.filter(data.select(const_group_field).isna())
         else:
             data_to_split = data
-            
+
         # Determine fraction and total count
         # Note: len() on Spark Dataset triggers a count(), which is necessary 
         # to calculate exact edges for balanced splits.
         n_total = len(data_to_split)
         frac = sample_size if sample_size is not None else 1.0
         n_sampled = int(n_total * frac)
-        
+
         if n_sampled == 0:
             # Return empty dataset with same structure if nothing to sample
             return Dataset.create_empty(roles={"split": StatisticRole()}, backend=data.backend_type)
@@ -136,13 +136,12 @@ class AASplitter(Calculator):
         MOD = 10_000_000
 
         if groups_sizes:
-            labels = ["control"] + [f"test_{i}" for i in range(len(groups_sizes) - 1)]
+            labels = ["control"] + [f"test_{i+1}" for i in range(len(groups_sizes) - 1)]
             edges = []
             cumulative = 0.0
             for i, size_prop in enumerate(groups_sizes):
                 cumulative += size_prop
                 edges.append(int(cumulative * MOD))
-
             edges[-1] = MOD
         else:
             n_control = int(n_sampled * control_size)
@@ -150,7 +149,7 @@ class AASplitter(Calculator):
                 int((n_control / n_sampled) * MOD) if n_sampled > 0 else 0,
                 MOD,
             ]
-            labels = ["control", "test"]
+            labels = ["control", "test_1"]
 
         # Call the new backend method
         # This returns a Dataset with the original index and a new 'split' column
@@ -161,10 +160,10 @@ class AASplitter(Calculator):
             frac=frac,
             name="split"
         )
-        
+
         # Ensure roles are set correctly
         split_ds.roles["split"] = StatisticRole() # Or AdditionalTreatmentRole depending on downstream usage
-        
+
         return split_ds
 
     @timeit(level="SPLIT", prefix="SPLITTER")
@@ -182,10 +181,10 @@ class AASplitter(Calculator):
             groups_sizes=self.groups_sizes,
         )
         data = self._set_value(data, result)
-        
+
         # if data.ds.backend_type == BackendsEnum.spark:
         #     data.ds.checkpoint(eager=True)
-        
+
         return data
 
 

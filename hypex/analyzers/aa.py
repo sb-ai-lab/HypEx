@@ -270,23 +270,20 @@ class AAScoreAnalyzer(Executor):
         return splitter_class.build_from_id(splitter_id)
 
     # ── AA score computation ──────────────────────────────────────────────
-
-    def _analyze_aa_score(
-        self, data: ExperimentData, score_table: Dataset
-    ) -> ExperimentData:
+    def _analyze_aa_score(self, data, score_table):
         """Compute per-feature pass-rate weights and store as 'aa score'."""
-        self._feature_weights = {}
-        aa_rows: list[dict[str, Any]] = []
 
+        self._feature_weights = {}
+        aa_rows = []
         pass_cols = [c for c in score_table.columns if "pass" in c.lower()]
         for col in pass_cols:
             parts = _resolve_column_parts(col)
             if parts is None:
                 continue
-
             feature, raw_test, group = parts
+            if feature == "mean":
+                continue
             test_name = normalize_test_name(raw_test)
-
             col_data = score_table[col]
             pass_rate = (
                 sum(1 for v in col_data if _is_passed(v)) / len(col_data)
@@ -295,14 +292,12 @@ class AAScoreAnalyzer(Executor):
             )
             weight = 1 - abs(self.alpha - pass_rate)
             index_label = f"{feature} {test_name} {group}".strip()
-
             self._feature_weights[index_label] = weight
             aa_rows.append({
                 "_idx": index_label,
                 "score": weight,
                 "pass": weight >= self.threshold,
             })
-
         result_ds = self._build_aa_score_dataset(aa_rows)
         self.key = "aa score"
         return self._set_value(data, result_ds)

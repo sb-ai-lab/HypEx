@@ -153,7 +153,19 @@ class AAPassedReporter(Reporter):
         analyser_ids = data.get_ids("AAScoreAnalyzer", ExperimentDataEnum.analysis_tables)
         analyser_tables = {
             id_[id_.rfind(ID_SPLIT_SYMBOL) + 1:]: data.analysis_tables[id_]
-            for id_ in analyser_ids["AAScoreAnalyzer"][ExperimentDataEnum.analysis_tables.value]
+            for id_ in analyser_ids["AAScoreAnalyzer"][
+                ExperimentDataEnum.analysis_tables.value
+            ]
+        }
+        best_split_stats = analyser_tables.get("best split statistics")
+        analyser_ids = data.get_ids(
+            "AAScoreAnalyzer", ExperimentDataEnum.analysis_tables
+        )
+        analyser_tables = {
+            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1:]: data.analysis_tables[id_]
+            for id_ in analyser_ids["AAScoreAnalyzer"][
+                ExperimentDataEnum.analysis_tables.value
+            ]
         }
         if not analyser_tables.get("aa score") or analyser_tables["aa score"].is_empty():
             return SmallDataset.create_empty()
@@ -179,6 +191,9 @@ class AAPassedReporter(Reporter):
                 seen.add(tn)
                 test_names_ordered.append(tn)
 
+        order_map = {"TTest": 0, "KSTest": 1, "Chi2Test": 2, "ZTest": 3}
+        test_names_ordered.sort(key=lambda x: order_map.get(x, 99))
+
         records = best_split_stats.to_records()
         result_records: list[dict] = []
 
@@ -187,14 +202,13 @@ class AAPassedReporter(Reporter):
             for k in row.keys():
                 if NAME_BORDER_SYMBOL in k:
                     continue
-                feature, test, metric, group = _parse_metric_col(k)
+                feature, _, _, group = _parse_metric_col(k)
                 if feature and feature != "mean":
                     feature_groups.add((feature, group))
 
             for feature, group in sorted(feature_groups):
                 rec: dict = {"feature": feature, "group": group}
 
-                # aa test columns
                 for tn in test_names_ordered:
                     idx_key = f"{feature} {tn} {group}".strip()
                     try:
@@ -205,7 +219,6 @@ class AAPassedReporter(Reporter):
                     except Exception:
                         rec[f"{tn} aa test"] = None
 
-                # best split columns
                 for tn in test_names_ordered:
                     val = None
                     for k, v in row.items():
@@ -214,9 +227,8 @@ class AAPassedReporter(Reporter):
                             val = v
                             break
                     if val is not None:
-                        rec[f"{tn} best split"] = (
-                            "OK" if str(val).strip().upper() in ("OK", "TRUE", "1") else "NOT OK"
-                        )
+                        is_significant = str(val).strip().upper() in ("OK", "TRUE", "1")
+                        rec[f"{tn} best split"] = "NOT OK" if is_significant else "OK"
                     else:
                         rec[f"{tn} best split"] = None
 
@@ -235,11 +247,21 @@ class AAPassedReporter(Reporter):
                         if f == feature and t == "GroupDifference" and m == metric_name and g == group:
                             val = v
                             break
+                    if val is None:
+                        search_key = f"{feature} GroupDifference {metric_name} {group}"
+                        for k, v in row.items():
+                            if search_key in str(k) or str(k).replace(ID_SPLIT_SYMBOL, " ") == search_key:
+                                val = v
+                                break
                     rec[metric_name] = val
 
                 result_records.append(rec)
 
-        roles: dict = {"feature": InfoRole(), "group": InfoRole(), "result": StatisticRole()}
+        roles: dict = {
+            "feature": InfoRole(),
+            "group": InfoRole(),
+            "result": StatisticRole(),
+        }
         if result_records:
             for c in result_records[0]:
                 if c not in roles:
@@ -263,9 +285,17 @@ class AABestSplitReporter(Reporter):
             The original dataset merged with a 'split' column indicating the
             best split configuration.
         """
-        best_split_id = next((c for c in data.additional_fields.columns if c.endswith("best")), None)
+        best_split_id = next(
+            (c for c in data.additional_fields.columns if c.endswith("best")),
+            None,
+        )
         if best_split_id is None:
-            return data.ds
+           return data.ds
+
         markers = data.additional_fields.select([best_split_id])
         markers = markers.rename({best_split_id: "split"})
-        return data.ds.merge(markers, left_index=True, right_index=True)
+        result = data.ds.merge(markers, left_index=True, right_index=True)
+
+        if best_split_id in result.columns:
+            result = result.drop(columns=[best_split_id])
+        return result

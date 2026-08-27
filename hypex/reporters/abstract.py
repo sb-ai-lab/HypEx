@@ -11,7 +11,7 @@ from ..comparators import GroupDifference, GroupSizes
 from ..dataset import Dataset, ExperimentData, SmallDataset
 from ..dataset.roles import InfoRole, StatisticRole, TreatmentRole
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
-from ..utils.constants import TEST_NAME_NORMALIZATION
+from ..utils.constants import TEST_NAME_NORMALIZATION, NAME_BORDER_SYMBOL
 from ..utils.errors import AbstractMethodError
 
 REPORTABLE_METRICS = frozenset({
@@ -121,9 +121,17 @@ def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bo
     result = {}
     records = table.to_records()
     index_values = _get_index_values(table)
+
     for idx_val, row_dict in zip(index_values, records):
+        idx_str = str(idx_val)
+        if NAME_BORDER_SYMBOL in idx_str:
+            group, feature = idx_str.split(NAME_BORDER_SYMBOL, 1)
+        else:
+            group = idx_str
+            feature = key.field
+
         for col, val in row_dict.items():
-            full_key = f"{key.field}{sep}{key.executor}{sep}{col}{sep}{idx_val}"
+            full_key = f"{feature}{sep}{key.executor}{sep}{col}{sep}{group}"
             result[full_key] = _normalize_value(val)
     return result
 
