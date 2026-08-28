@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import typing
+from decimal import Decimal
 from types import MappingProxyType
 from typing import (
     TYPE_CHECKING,
@@ -147,6 +148,7 @@ class SparkTypeMapper:
         StringType: str,
         DateType: str,
         TimestampType: str,
+        DecimalType: Decimal,
     })
 
     @classmethod
