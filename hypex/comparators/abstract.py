@@ -550,11 +550,19 @@ class GroupsComparator(BaseComparator, ABC):
             data.groups[group_field_data.columns[0]] = {
                 f"{group}": ds for group, ds in combined_data.groupby(group_field_data.columns[0])
             }
-            grouping_data = self._split_data_to_buckets(
+            grouping_data = self._grouping_data_split(
+                grouping_data=data.groups[group_field_data.columns[0]],
                 compare_by=self.compare_by,
-                target_fields_data=target_fields_data,
-                baseline_field_data=baseline_field_data,
-                group_field_data=group_field_data,
+                target_fields=(
+                    [data.ds.columns[0]]
+                    if group_field_data.columns[0] == target_fields_data.columns[0]
+                    else list(target_fields_data.columns)
+                ),
+                baseline_field=(
+                    baseline_field_data.columns[0]
+                    if len(baseline_field_data.columns) > 0
+                    else None
+                ),
             )
         if len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1:
             raise NotSuitableFieldError(group_field_data, "Grouping")

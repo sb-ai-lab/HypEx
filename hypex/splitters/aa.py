@@ -117,7 +117,6 @@ class AASplitter(Calculator):
             data_to_split = data.filter(data.select(const_group_field).isna())
         else:
             data_to_split = data
-
         # Determine fraction and total count
         # Note: len() on Spark Dataset triggers a count(), which is necessary 
         # to calculate exact edges for balanced splits.
@@ -127,27 +126,31 @@ class AASplitter(Calculator):
 
         if n_sampled == 0:
             # Return empty dataset with same structure if nothing to sample
-            return Dataset.create_empty(roles={"split": StatisticRole()}, backend=data.backend_type)
-
-        # Calculate edges for labels
-        labels = ["control"]
-        edges = []
+            return Dataset.create_empty(
+                roles={"split": StatisticRole()}, backend=data.backend_type
+            )
 
         MOD = 10_000_000
 
+        effective_mod = int(frac * MOD) if frac < 1.0 else MOD
+
         if groups_sizes:
-            labels = ["control"] + [f"test_{i+1}" for i in range(len(groups_sizes) - 1)]
+            labels = ["control"] + [
+                f"test_{i+1}" for i in range(len(groups_sizes) - 1)
+            ]
             edges = []
             cumulative = 0.0
-            for i, size_prop in enumerate(groups_sizes):
+            for size_prop in groups_sizes:
                 cumulative += size_prop
-                edges.append(int(cumulative * MOD))
-            edges[-1] = MOD
+                edges.append(int(cumulative * effective_mod))
+            edges[-1] = effective_mod
         else:
             n_control = int(n_sampled * control_size)
             edges = [
-                int((n_control / n_sampled) * MOD) if n_sampled > 0 else 0,
-                MOD,
+                int((n_control / n_sampled) * effective_mod)
+                if n_sampled > 0
+                else 0,
+                effective_mod,
             ]
             labels = ["control", "test_1"]
 
@@ -158,12 +161,10 @@ class AASplitter(Calculator):
             labels=labels,
             random_state=random_state,
             frac=frac,
-            name="split"
+            name="split",
         )
-
         # Ensure roles are set correctly
         split_ds.roles["split"] = StatisticRole() # Or AdditionalTreatmentRole depending on downstream usage
-
         return split_ds
 
     @timeit(level="SPLIT", prefix="SPLITTER")
