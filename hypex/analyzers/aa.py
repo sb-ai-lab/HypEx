@@ -363,35 +363,74 @@ class AAScoreAnalyzer(Executor):
             weighted_pvalues * AAScoreAnalyzer.PVALUE_WEIGHT
             + mean_test_score * AAScoreAnalyzer.TEST_SCORE_WEIGHT
         )
+        # ── DEBUG ──────────────────────────────────────────────────────
+        import sys
+        print(f"[DEBUG _find_best_index] if_param_scores is None: {if_param_scores is None}", file=sys.stderr)
+        print(f"[DEBUG _find_best_index] feature_weights ({len(self._feature_weights)}): {self._feature_weights}", file=sys.stderr)
+        print(f"[DEBUG _find_best_index] weighted_pvalues: dtype={weighted_pvalues.dtype}, NaN count={weighted_pvalues.isna().sum()}, values={weighted_pvalues.tolist()}", file=sys.stderr)
+        if isinstance(mean_test_score, pd.Series):
+            print(f"[DEBUG _find_best_index] mean_test_score: dtype={mean_test_score.dtype}, NaN count={mean_test_score.isna().sum()}, values={mean_test_score.tolist()}", file=sys.stderr)
+        else:
+            print(f"[DEBUG _find_best_index] mean_test_score: scalar={mean_test_score}", file=sys.stderr)
+        print(f"[DEBUG _find_best_index] score_col: NaN count={score_col.isna().sum()}, values={score_col.tolist()}", file=sys.stderr)
+        # ────────────────────────────────────────────────────────────────
         return score_col.idxmax()
 
-    def _compute_weighted_pvalues(self, score_table: Dataset) -> pd.Series:
-        """Compute feature-weighted sum of p-values across all test columns."""
-        weighted: pd.Series | None = None
+    # def _compute_weighted_pvalues(self, score_table: Dataset) -> pd.Series:
+    #     """Compute feature-weighted sum of p-values across all test columns."""
+    #     weighted: pd.Series | None = None
 
+    #     pval_cols = [c for c in score_table.columns if "p-value" in c.lower()]
+    #     for col in pval_cols:
+    #         parts = _resolve_column_parts(col)
+    #         if parts is None:
+    #             continue
+
+    #         feature, raw_test, group = parts
+    #         test_name = normalize_test_name(raw_test)
+    #         lookup_key = f"{feature} {test_name} {group}".strip()
+
+    #         weight = self._feature_weights.get(lookup_key, 0)
+    #         if weight == 0:
+    #             weight = self._feature_weights.get(test_name, 0)
+    #         if weight <= 0:
+    #             continue
+
+    #         col_data = score_table.data[col].astype(float)
+    #         contribution = col_data * weight
+    #         weighted = contribution if weighted is None else weighted + contribution
+
+    #     if weighted is None:
+    #         return pd.Series(0.0, index=range(len(score_table)))
+
+    #     return weighted / len(self._feature_weights)
+    def _compute_weighted_pvalues(self, score_table):
+        weighted = None
         pval_cols = [c for c in score_table.columns if "p-value" in c.lower()]
+        # ── DEBUG ──────────────────────────────────────────────────────
+        import sys
+        print(f"[DEBUG _compute_weighted_pvalues] pval_cols = {pval_cols}", file=sys.stderr)
+        # ────────────────────────────────────────────────────────────────
         for col in pval_cols:
             parts = _resolve_column_parts(col)
             if parts is None:
                 continue
-
             feature, raw_test, group = parts
             test_name = normalize_test_name(raw_test)
             lookup_key = f"{feature} {test_name} {group}".strip()
-
             weight = self._feature_weights.get(lookup_key, 0)
             if weight == 0:
                 weight = self._feature_weights.get(test_name, 0)
             if weight <= 0:
                 continue
-
             col_data = score_table.data[col].astype(float)
+            # ── DEBUG ──────────────────────────────────────────────────
+            print(f"[DEBUG _compute_weighted_pvalues] col={col!r}, lookup_key={lookup_key!r}, weight={weight}, NaN={col_data.isna().sum()}/{len(col_data)}, values={col_data.tolist()}", file=sys.stderr)
+            # ────────────────────────────────────────────────────────────
             contribution = col_data * weight
             weighted = contribution if weighted is None else weighted + contribution
-
         if weighted is None:
             return pd.Series(0.0, index=range(len(score_table)))
-
         return weighted / len(self._feature_weights)
 
     @staticmethod

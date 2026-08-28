@@ -533,29 +533,7 @@ class GroupsComparator(BaseComparator, ABC):
                 ),
             )
         else:
-            has_additional = any(
-                isinstance(data.additional_fields.roles[col], (AdditionalTargetRole, AdditionalTreatmentRole))
-                for col in data.additional_fields.columns
-            )
-
-            combined_data = (
-                data.ds.merge(
-                    data.additional_fields[
-                        [
-                            col
-                            for col in data.additional_fields.columns
-                            if isinstance(
-                                data.additional_fields.roles[col], (AdditionalTargetRole, AdditionalTreatmentRole)
-                            )
-                        ]
-                    ],
-                    left_index=True,
-                    right_index=True,
-                    how="outer",
-                )
-                if has_additional
-                else data.ds
-            )
+            combined_data = data.ds
 
             group_col_name = group_field_data.columns[0]
             if group_col_name in combined_data.columns:

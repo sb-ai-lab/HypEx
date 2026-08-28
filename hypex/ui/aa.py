@@ -118,40 +118,38 @@ class AAOutput(Output):
             "ParamsExperiment", ExperimentDataEnum.analysis_tables
         )
         raw_table = experiment_data.analysis_tables[id_]
-        pdf = raw_table.data  # pd.DataFrame, shape=(n_iterations, n_cols)
+        pdf = raw_table.data
         result_rows = []
         for row_idx in range(len(pdf)):
             row: dict = {}
             for col in pdf.columns:
                 val = pdf.iloc[row_idx].get(col)
                 col_str = str(col)
-                # Пропускаем промежуточные стат-колонки
                 if NAME_BORDER_SYMBOL in col_str:
                     continue
-                # Нормализуем имена колонок
                 if ID_SPLIT_SYMBOL in col_str:
                     parts = col_str.split(ID_SPLIT_SYMBOL)
                     norm_parts = [normalize_test_name(p) for p in parts]
                     new_col = " ".join(norm_parts)
                 else:
                     new_col = col_str
-                
+
                 for raw_name, norm_name in TEST_NAME_NORMALIZATION.items():
                     if raw_name != norm_name:
                         new_col = new_col.replace(raw_name, norm_name)
-                
+
                 new_col = new_col.replace(" all", "")
-                
+
                 if "pass" in new_col and not new_col.startswith("mean "):
                     if val is not None and not (isinstance(val, float) and val != val):
                         if isinstance(val, str):
                             val = val.strip().lower() in ("true", "1", "ok")
                         else:
                             val = bool(val)
-                
+
                 row[new_col] = val
             result_rows.append(row)
-            
+
         if result_rows:
             self.experiments = SmallDataset.from_dict(result_rows, roles={})
         else:
@@ -180,8 +178,6 @@ class AAOutput(Output):
             get_analyzer_id("best split statistics")
         ]
 
-        # --- normalize column names in best_split_statistic ---
-        # Rename "StatsTTest pass" → "TTest pass" etc.
         rename_map = {}
         for col in self.best_split_statistic.columns:
             for raw, norm in TEST_NAME_NORMALIZATION.items():

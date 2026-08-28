@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL, TEST_NAME_NORMALIZATION
 
 METRIC_SUFFIXES: tuple[str, ...] = (
