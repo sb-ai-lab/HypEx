@@ -37,7 +37,7 @@ class StatsTTest(StatsHypothesisTesting):
             target_roles: ABCRole | None = None,
             baseline_role: ABCRole | None = None,
             reliability: float = 0.05,
-            key: Any = "", 
+            key: Any = "",
     ):
         """
         Initialize StatsTTest with roles and significance level.
