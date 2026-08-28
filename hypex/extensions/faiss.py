@@ -799,45 +799,66 @@ class SparkFaissExtension(FaissExtension):
 
             yield storage.save_index(index_with_ids)
 
+        def _spark_full_partition_fit(
+            iterator: Iterable,
+            bc_storage: Broadcast
+        ):
+            import faiss
+            import numpy as np
+
+            storage = bc_storage.value
+            ids, vectors = np.array([]), np.array([])
+            for row in iterator:
+                np.append(ids, row["index"])
+                np.append(vectors, list(row['_features']))
+
+            if not ids:
+                return # for empty partition
+
+            index_with_ids = faiss.IndexFlatL2(vectors.shape)
+            index_with_ids.add_with_ids(vectors, ids)
+
+            yield storage.save_index(index_with_ids)
+
         session = vectorized_data.sparkSession
         self.storage = FaissIndexStorage(session)
         self._data_size = self._data_size or vectorized_data.count()
         m = 4 # heuristic
         self.k = int(np.sqrt(self._data_size / m))
 
-        if mode =="sample":
-            frac = min(MatchingConfig.FAISS_SAMPLE_TARGET / max(self._data_size, 1), 1.0)
-            sample_rows = (
-                            vectorized_data
-                            .sample(fraction=frac, seed=self.seed)
-                            .select("_features")
-                            .collect()
-                        )
+        # if mode =="sample":
+        #     frac = min(MatchingConfig.FAISS_SAMPLE_TARGET / max(self._data_size, 1), 1.0)
+        #     sample_rows = (
+        #                     vectorized_data
+        #                     .sample(fraction=frac, seed=self.seed)
+        #                     .select("_features")
+        #                     .collect()
+        #                 )
 
-            X = np.array(
-                [list(row['_features']) for row in sample_rows],
-                dtype=np.float32,
-            )
+        #     X = np.array(
+        #         [list(row['_features']) for row in sample_rows],
+        #         dtype=np.float32,
+        #     )
 
-            d = X.shape[1]
-            # IVF Faiss подерживает до 39 * (training points) на один кластер
-            nlist = min(self.k, max(1, X.shape[0] // 39))
+        #     d = X.shape[1]
+        #     # IVF Faiss подерживает до 39 * (training points) на один кластер
+        #     nlist = min(self.k, max(1, X.shape[0] // 39))
 
-            quantizer = faiss.IndexFlatL2(d)
-            self.index = faiss.IndexIVFFlat(quantizer, d, nlist)
-            self.index.train(X)
+        #     quantizer = faiss.IndexFlatL2(d)
+        #     self.index = faiss.IndexIVFFlat(quantizer, d, nlist)
+        #     self.index.train(X)
 
-        elif mode == "full":
-            self._prefit(
-                vectorized_data=vectorized_data,
-                model_name=model_name
-            )
+        # elif mode == "full":
+        #     self._prefit(
+        #         vectorized_data=vectorized_data,
+        #         model_name=model_name
+        #     )
 
-        else:
-            raise ValueError(f"Incorrect faiss fit mode: '{mode}'")
-        self.index.nprobe = min(self.n_neighbors * 2, self.k)
+        # else:
+        #     raise ValueError(f"Incorrect faiss fit mode: '{mode}'")
+        # self.index.nprobe = min(self.n_neighbors * 2, self.k)
 
-        bc_index = session.sparkContext.broadcast(self.index)
+        # bc_index = session.sparkContext.broadcast(self.index)
         bc_storage = session.sparkContext.broadcast(self.storage)
         del self.index
         self.index = None
@@ -848,7 +869,8 @@ class SparkFaissExtension(FaissExtension):
             vectorized_data
             .select(*features)
             .rdd
-            .mapPartitions(lambda it: _spark_partition_fit(it, bc_index, bc_storage))
+            # .mapPartitions(lambda it: _spark_partition_fit(it, bc_index, bc_storage))
+            .mapPartitions(lambda it: _spark_full_partition_fit(it, bc_storage))
             .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
         )
         self._sharded_rdd.count()
@@ -1050,7 +1072,7 @@ class SparkFaissExtension(FaissExtension):
         vectorized_data = self._vectorize_data(operating_data)
 
         if mode in ["auto", "fit"]:
-            fit_mode = kwargs.get("fit_mode", "sample")
+            fit_mode = kwargs.get("fit_mode", "full")
             model_name = kwargs.get("model", "k-means")
             self._fit(
                 vectorized_data=vectorized_data,
