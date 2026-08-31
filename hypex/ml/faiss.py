@@ -189,5 +189,4 @@ class FaissNearestNeighbors(MLExecutor):
             matched_indexes = matched_indexes.reindex(data.ds.index, fill_value=-1)
         elif len(matched_indexes) < len(data.ds) and self.two_sides:
             raise PairsNotFoundError
-        matched_indexes.data.to_csv("matched_indexes.csv")
         return self._set_value(data, matched_indexes, key="matched")
