@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from ..dataset import Dataset, ExperimentData
@@ -24,7 +25,7 @@ def _html_content(value: Any) -> str:
     return value._repr_html_() if hasattr(value, '_repr_html_') else f'<pre>{str(value)}</pre>'
 
 
-class Summary:
+class Summary(Mapping):
     """Several result tables of one experiment shown together.
 
     Renders as a set of titled sections: plain text in a console and HTML
@@ -45,26 +46,14 @@ class Summary:
         self.title = title
         self.tables = dict(tables)
 
-    def keys(self):
-        return self.tables.keys()
-
-    def values(self):
-        return self.tables.values()
-
-    def items(self):
-        return self.tables.items()
+    def __getitem__(self, name: str) -> Any:
+        return self.tables[name]
 
     def __iter__(self):
         return iter(self.tables)
 
     def __len__(self) -> int:
         return len(self.tables)
-
-    def __contains__(self, name: object) -> bool:
-        return name in self.tables
-
-    def __getitem__(self, name: str) -> Any:
-        return self.tables[name]
 
     def __repr__(self) -> str:
         if not self.tables:
@@ -375,20 +364,11 @@ class ExperimentOutput:
                                                           # cupac.feature_importances
             result.summary["cupac.feature_importances"]   # one table by name
         """
-        tables: dict[str, Any] = {}
-
-        main_summary = getattr(self.main_output, 'summary', None)
-        if main_summary is not None:
-            tables.update(main_summary.tables)
-
+        tables: dict[str, Any] = dict(self.main_output.summary)
         for name, output in self.additional_outputs.items():
-            output_summary = getattr(output, 'summary', None)
-            if output_summary is None:
-                tables[name] = output
-                continue
-            for field, table in output_summary.tables.items():
-                tables[f"{name}.{field}"] = table
-
+            tables.update(
+                {f"{name}.{field}": table for field, table in output.summary.items()}
+            )
         return Summary('Experiment summary', tables)
 
     def __getattr__(self, name: str):
