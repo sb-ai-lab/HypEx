@@ -87,6 +87,34 @@ class AASplitter(Calculator):
         return data
 
     @staticmethod
+    def _apply_const_groups(
+        split_series: pd.Series,
+        const_data: dict[Any, Dataset],
+        label_map: dict[int, str],
+        const_group_field: str | None,
+    ) -> None:
+        """Write the groups the user pinned over the split of the free rows.
+
+        ``control`` and ``test_N`` are the labels of the split itself, ``test`` is
+        the documented alias for ``test_1`` of a two-group split. Anything else is
+        a typo or a group that was not asked for, and both used to end up silently
+        in ``test_1``.
+        """
+        codes = {label: code for code, label in label_map.items()}
+        codes.setdefault("test", 1)
+        for group, group_data in const_data.items():
+            code = codes.get(str(group))
+            if code is None:
+                raise ValueError(
+                    f"Unknown constant group {str(group)!r} in column "
+                    f"'{const_group_field}'. Expected one of {sorted(codes)}, or a "
+                    f"missing value (None / np.nan) for a row that takes part in "
+                    f"the split - note that np.where(mask, 'test', np.nan) writes "
+                    f"the string 'nan', which is not a missing value."
+                )
+            split_series[group_data.index] = code
+
+    @staticmethod
     def _inner_function(
         data: Dataset,
         random_state: int | None = None,
@@ -98,37 +126,36 @@ class AASplitter(Calculator):
     ) -> list[str]:
         sample_size = 1.0 if sample_size is None else sample_size
         control_indexes = []
+        const_data: dict[Any, Dataset] = {}
+        free_size = len(data)
         if const_group_field:
             const_data = dict(data.groupby(const_group_field))
             control_data = const_data.get("control")
             if control_data is not None:
                 control_indexes = list(control_data.index)
-            const_size = sum(len(cd) for cd in const_data.values())
+            # rows with a missing value in the const column are not grouped,
+            # so they are the ones left to be split
+            free_size = len(data) - sum(len(cd) for cd in const_data.values())
             control_size = (
-                0
-                if len(data) <= const_size
+                0.0
+                if free_size == 0
                 else max(
                     0.0,
-                    (len(data) * control_size - len(control_indexes))
-                    / (len(data) - const_size),
+                    (len(data) * control_size - len(control_indexes)) / free_size,
                 )
             )
-        experiment_data = (
-            data[data[const_group_field].isna()] if const_group_field else data
-        )
-        if const_group_field and len(experiment_data) == 0:
-            raise ValueError(
-                f"All rows are assigned to constant groups by the ConstGroupRole "
-                f"column '{const_group_field}', so there is nothing left to split. "
-                f"Rows that must take part in the split have to hold a real missing "
-                f"value (None / np.nan) in this column - note that "
-                f"np.where(mask, 'control', np.nan) casts np.nan to the string 'nan', "
-                f"which is not a missing value."
+        # every row can already be pinned to a constant group: then there is
+        # nothing to split and the constant assignment is the split itself
+        addition_indexes: list = []
+        if free_size:
+            experiment_data = (
+                data[data[const_group_field].isna()] if const_group_field else data
             )
-        experiment_data_index = experiment_data.sample(
-            frac=sample_size, random_state=random_state
-        ).index
-        addition_indexes = list(experiment_data_index)
+            addition_indexes = list(
+                experiment_data.sample(
+                    frac=sample_size, random_state=random_state
+                ).index
+            )
         edges = []
         if groups_sizes:
             if sum(groups_sizes) != 1:
@@ -154,8 +181,20 @@ class AASplitter(Calculator):
         for i, test_index in enumerate(test_indexes):
             split_series[test_index] += i
 
+        # groups can be requested but stay empty - with no free rows to split, or
+        # with sizes too small to take a row - and they still need their label
+        requested_groups = len(groups_sizes) if groups_sizes else 2
         label_map = {0: "control"}
-        label_map.update({i: f"test_{i}" for i in range(1, len(edges))})
+        label_map.update(
+            {i: f"test_{i}" for i in range(1, max(len(edges), requested_groups))}
+        )
+
+        # pinned rows are written last: their group is fixed and must not be
+        # shifted by the random split of the free rows
+        AASplitter._apply_const_groups(
+            split_series, const_data, label_map, const_group_field
+        )
+
         split_series = split_series.map(label_map)
 
         return split_series.to_list()
