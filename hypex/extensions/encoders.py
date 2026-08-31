@@ -24,11 +24,11 @@ class PandasDummyEncoderExtension(DummyEncoderExtension):
     Slave-backend class on pandas for DummyEncoder. 
     """
     def calc(
-        data: Dataset, target_cols: str | None = None, **kwargs
+        data: Dataset, target_cols: str | list[str] | None = None, **kwargs
     ):
+        target_cols = Adapter.to_list(target_cols)
         dummies_df = pd.get_dummies(
             data=data[target_cols].data, drop_first=True, dtype=int
-            # data=data.data, columns=Adapter.to_list(target_cols), drop_first=True, dtype=int # af -> ds variant
         )
         # Setting roles to the dummies in additional fields based on the original
         # roles by searching based on the part of the dummy column name
@@ -48,11 +48,11 @@ class SparkDummyEncoderExtension(DummyEncoderExtension):
     """
 
     def calc(
-        data: Dataset, target_cols: str | None = None, **kwargs
+        data: Dataset, target_cols: str | list[str] | None = None, **kwargs
     ):
+        target_cols = Adapter.to_list(target_cols)
         dummies_df = ps.get_dummies(
             data=data[target_cols].data, drop_first=True, dtype=int
-            # data=data.data, columns=Adapter.to_list(target_cols), drop_first=True, dtype=int # af -> ds variant
         )
 
         roles = {

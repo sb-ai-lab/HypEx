@@ -10,14 +10,18 @@ from ..dataset import (
     ABCRole,
     AdditionalFeatureRole,
     Dataset,
-    GroupedDataset,
     ExperimentData,
     FeatureRole,
+    GroupedDataset,
     GroupingRole,
     TargetRole,
 )
 from ..executor import Calculator
-from ..extensions.scipy_linalg import UniteCovExtension, CholeskyExtension, InverseExtension
+from ..extensions.scipy_linalg import (
+    CholeskyExtension,
+    InverseExtension,
+    UniteCovExtension,
+)
 from ..utils import ExperimentDataEnum, NotSuitableFieldError
 from ..utils.adapter import Adapter
 
@@ -103,7 +107,7 @@ class MahalanobisDistance(Calculator):
                 test_data=None,
                 **kwargs,
             )
-    
+
     def _set_value(
             self, data: ExperimentData, value: Dataset | None = None, key: Any = None
     ) -> ExperimentData:
@@ -182,7 +186,7 @@ class MahalanobisDistance(Calculator):
         """
         test_data = cls._check_test_data(test_data)
         cov = UniteCovExtension().calc(data, test_data)
-    
+
         cholesky = CholeskyExtension().calc(cov)
         mahalanobis_transform = InverseExtension().calc(cholesky)
         mah_cols = mahalanobis_transform.columns
@@ -193,7 +197,7 @@ class MahalanobisDistance(Calculator):
             )
             w_matrix = np.sqrt(np.diag(w_list / w_list.sum()))
             mahalanobis_transform = mahalanobis_transform.dot(w_matrix)
-        
+
         mahalanobis_transform: Dataset = mahalanobis_transform.transpose()
         mahalanobis_transform = mahalanobis_transform.rename({col: new_col for col, new_col in zip(mahalanobis_transform.columns, mah_cols)})
         return mahalanobis_transform
@@ -270,14 +274,14 @@ class MahalanobisDistance(Calculator):
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
         if (
-            not target_fields and data.ds.tmp_roles
+            not target_fields and data.initial_ds.tmp_roles
         ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
             return data
         if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
             grouping_data = list(data.groups[group_field[0]].items())
         else:
             grouping_data = None
-        t_data = deepcopy(data.ds)
+        t_data = deepcopy(data.initial_ds)
         for field in target_fields:
             if field not in t_data.columns:
                 t_data = t_data.add_column(

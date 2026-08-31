@@ -73,10 +73,10 @@ class ABOutput(Output):
         )[1:]
         for i in self._groups:
             groups += [i] * len(ids)
-            
+
         if not ids:
             return None
-            
+
         diff = experiment_data.analysis_tables[ids[0]]
         for i in range(1, len(ids)):
             diff = diff.append(experiment_data.analysis_tables[ids[i]])

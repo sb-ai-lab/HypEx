@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+import copy
 from copy import deepcopy
 import json
 from abc import ABC
@@ -20,6 +21,8 @@ from numpy import ndarray
 import pyspark.sql as spark
 import pyspark.pandas as ps
 
+from .backends import PandasDataset, SparkDataset
+from .groupby_dataset import GroupedDataset
 from ..utils import (
     BackendsEnum,
     BackendTypeError,
@@ -31,6 +34,7 @@ from ..utils import (
     SourceDataTypes,
     GenericManager
 )
+from ..config import DatasetConfig
 from ..utils.adapter import Adapter
 from .groupby_dataset import GroupedDataset
 from .backends import PandasDataset, SparkDataset
@@ -175,7 +179,7 @@ class DatasetBase:
                 roles[column] = deepcopy(self.default_role) or DefaultRole()
         return roles
 
-    def _set_empty_types(self, roles: dict[str, ABCRole]) -> None:
+    def _set_empty_types(self, roles):
         colunms_dtypes = self._backend_data.get_column_type(self._backend_data.columns)
         new_types = {}
         for column, role in roles.items():
@@ -183,6 +187,13 @@ class DatasetBase:
                 role.data_type = colunms_dtypes[column]
             elif role.data_type != colunms_dtypes[column]:
                 new_types[column] = role.data_type
+                
+        if new_types:
+            for c in new_types:
+                try:
+                    na = int(self._backend_data.data[c].isna().sum())
+                except Exception:
+                    na = -1
         self._backend_data = self._backend_data.update_column_type(new_types)
 
     def __init__(
@@ -294,6 +305,25 @@ class DatasetBase:
             if self.backend_type == BackendsEnum.pandas
             else self.is_persisted(),
         }
+
+    def checkpoint(self, eager: bool = True) -> Self:
+        """Breaks the computation graph (Lineage) for the Spark backend.
+
+        For the Pandas backend, this method acts as a no-op. It is critical
+        for iterative processes (e.g., A/A and A/B tests) to prevent
+        exponential slowdowns caused by the growth of the DAG in Spark.
+
+        Args:
+            eager: If ``True``, the checkpoint is executed eagerly,
+                immediately materializing the DataFrame. If ``False``,
+                the checkpoint is deferred until the next action.
+                Defaults to ``True``.
+
+        Returns:
+            The dataset instance itself (``Self``) to allow method chaining.
+        """
+        self._backend_data.checkpoint(eager=eager)
+        return self
 
     def __repr__(self):
         n_cols = len(self.columns)
@@ -411,17 +441,17 @@ class DatasetBase:
                 raise TypeError("Value type does not match the expected data type.")
 
     def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
-        display_limit = n_rows if n_rows <= self.DISPLAY_ROWS * 2 else self.DISPLAY_ROWS
+        display_limit = n_rows if n_rows <= DatasetConfig.DISPLAY_ROWS * 2 else DatasetConfig.DISPLAY_ROWS
         head = self._backend_data._display_head_tail(
             rows_display_limit=display_limit,
-            cols_display_limit=self.DISPLAY_COLS,
+            cols_display_limit=DatasetConfig.DISPLAY_COLS,
             n_cols=n_cols,
             n_rows=n_rows)
 
-        if n_rows > self.DISPLAY_ROWS * 2:
+        if n_rows > DatasetConfig.DISPLAY_ROWS * 2:
             _tmp_tail = self._backend_data._display_head_tail(
-                rows_display_limit=self.DISPLAY_ROWS,
-                cols_display_limit=self.DISPLAY_COLS,
+                rows_display_limit=DatasetConfig.DISPLAY_ROWS,
+                cols_display_limit=DatasetConfig.DISPLAY_COLS,
                 n_cols=n_cols,
                 n_rows=n_rows,
                 tail=True)
@@ -508,21 +538,21 @@ class DatasetBase:
                     type(other._backend_data), type(self._backend_data)
                 )
             other_raw = (
-                other.backend_data.data 
-                if hasattr(other.backend_data, 'data') 
+                other.backend_data.data
+                if hasattr(other.backend_data, "data")
                 else other.backend_data
             )
-            
-            if hasattr(other_raw, 'columns') and hasattr(self_raw, 'columns'):
+
+            if hasattr(other_raw, "columns") and hasattr(self_raw, "columns"):
                 if len(other_raw.columns) == len(self_raw.columns) and list(
                     other_raw.columns
                 ) != list(self_raw.columns):
                     rename_map = {
-                        other_raw.columns[i]: self_raw.columns[i] 
+                        other_raw.columns[i]: self_raw.columns[i]
                         for i in range(len(self_raw.columns))
                     }
                     other_raw = other_raw.rename(columns=rename_map)
-                if hasattr(self_raw, 'columns') and not hasattr(other_raw, 'columns'):
+                if hasattr(self_raw, "columns") and not hasattr(other_raw, "columns"):
                     other_raw = other_raw.to_frame()
                     if other_raw.columns[0] != self_raw.columns[0]:
                         other_raw.columns = self_raw.columns
@@ -534,22 +564,22 @@ class DatasetBase:
         result_raw = func(other_raw)
 
         result_raw = (
-            result_raw.data 
-            if hasattr(result_raw, 'data') 
+            result_raw.data
+            if hasattr(result_raw, 'data')
             else result_raw
         )
 
         if hasattr(result_raw, 'to_frame') and not hasattr(result_raw, 'columns'):
             col_name = (
-                result_raw.name 
-                if result_raw.name is not None 
+                result_raw.name
+                if result_raw.name is not None
                 else (self_raw.columns[0] if hasattr(self_raw, 'columns') else 'result')
             )
             result_raw = result_raw.to_frame(name=col_name)
 
         actual_columns = (
-            list(result_raw.columns) 
-            if hasattr(result_raw, 'columns') 
+            list(result_raw.columns)
+            if hasattr(result_raw, 'columns')
             else []
         )
         new_roles = {}
@@ -1051,6 +1081,9 @@ class DatasetBase:
         """Count NA values"""
         return self._convert_data_after_agg(self._backend_data.na_counts())
 
+    def count_nulls(self) -> dict[str, int]:
+        return self._backend_data.count_nulls()
+
     def isna(self) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.isna())
 
@@ -1104,11 +1137,12 @@ class DatasetBase:
         return result
 
     def filter(self, items=None, regex=None, axis=None):
+        if isinstance(items, DatasetBase):
+            return self[items]
+
         t_data = self._backend_data.filter(items=items, regex=regex, axis=axis)
         t_roles = {c: self.roles[c] for c in t_data.columns if c in self.roles.keys()}
-
         raw_data = t_data.data if hasattr(t_data, "data") else t_data
-
         return self.__class__(roles=t_roles, data=raw_data)
 
     def select(self, columns: str | list[str]):
@@ -1184,6 +1218,53 @@ class DatasetBase:
             data=self.backend_data.sample(frac=frac, n=n, random_state=random_state),
         )
 
+    def random_split_labels(
+        self,
+        edges: list[int],
+        labels: list[str],
+        random_state: int | None = None,
+        frac: float = 1.0,
+        name: str = "split",
+    ) -> Self:
+        """
+        Splits data into labeled groups using a scalable distributed algorithm.
+
+        For Spark backend: Uses hash-based shuffling and distributed indexing (zipWithIndex)
+        to avoid OOM errors associated with sorting and taking top-N rows.
+
+        For Pandas backend: Uses standard sampling and positional labeling.
+
+        Args:
+            edges: Cumulative upper bounds for each label (e.g., [50M, 100M]).
+            labels: List of label strings corresponding to edges.
+            random_state: Seed for reproducibility.
+            frac: Fraction of data to label (rest will be null if < 1.0).
+            name: Name of the resulting column.
+
+        Returns:
+            A new Dataset instance containing the original index and the new 'name' column.
+        """
+        # Delegate to the backend implementation
+        # The backend method returns a ps.DataFrame or pd.DataFrame with the index preserved
+        result_df = self._backend_data.random_split_labels(
+            edges=edges,
+            labels=labels,
+            random_state=random_state,
+            frac=frac,
+            name=name,
+        )
+
+        # Wrap the result back into a Dataset
+        # Note: The result only has the index and the 'name' column.
+        # Roles should be minimal here, usually just InfoRole or StatisticRole for the split column.
+        from .roles import InfoRole
+
+        return self.__class__(
+            roles={name: InfoRole()},
+            data=result_df,
+            session=self.session if hasattr(self, 'session') else None
+        )
+
     def cov(self) -> DatasetBase:
         t_data = self.backend_data.cov()
         return self.__class__(
@@ -1223,6 +1304,9 @@ class DatasetBase:
             },
             "data": self._backend_data.to_dict(),
         }
+
+    def to_numpy(self) -> ndarray:
+        return self._backend_data.to_numpy()
 
     def to_records(self) -> Any:
         return self._backend_data.to_records()
