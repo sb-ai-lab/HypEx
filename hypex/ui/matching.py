@@ -20,12 +20,17 @@ class MatchingOutput(Output):
     resume: Dataset
     full_data: Dataset
     quality_results: Dataset
+    indexes: Dataset
 
     def __init__(self, searching_class: type = MatchingAnalyzer):
         super().__init__(
             resume_reporter=MatchingDictReporter(searching_class),
             additional_reporters=MatchingQualityDatasetReporter(),
         )
+    
+    def _get_output_fields(self) -> list[str]:
+        """Return ordered fields for Matching test output display."""
+        return ['resume', 'indexes', 'full_data', 'quality_results']
 
     def _extract_full_data(self, experiment_data: ExperimentData, indexes: Dataset):
         self.indexes = Dataset(roles={}, data=experiment_data.ds.index)
@@ -90,22 +95,30 @@ class MatchingOutput(Output):
         return reformatted_resume
 
     @staticmethod
-    def _collect_grouped_indexes(experiment_data, group) -> Dataset:
+    def _collect_grouped_indexes(experiment_data, group_indexes) -> Dataset:
         group_indexes_id = experiment_data.ds.search_columns(GroupingRole())
-        indexes = [
-            Dataset.from_dict(
-                {
-                    "indexes": list(
-                        map(int, values.split(MATCHING_INDEXES_SPLITTER_SYMBOL))
-                    )
-                },
-                index=experiment_data.ds[
-                    experiment_data.ds[group_indexes_id] == group
-                ].index,
-                roles={"indexes": StatisticRole()},
+        indexes = []
+        for group, values in group_indexes.items():
+            group_index = experiment_data.ds[
+                experiment_data.ds[group_indexes_id] == group
+            ].index
+            if len(group_index) == 0:
+                raise ValueError(
+                    f"Group {group!r} is not present in column(s) {group_indexes_id} "
+                    f"of the source data, so its matching indexes cannot be mapped "
+                    f"back to rows."
+                )
+            indexes.append(
+                Dataset.from_dict(
+                    {
+                        "indexes": list(
+                            map(int, values.split(MATCHING_INDEXES_SPLITTER_SYMBOL))
+                        )
+                    },
+                    index=group_index,
+                    roles={"indexes": StatisticRole()},
+                )
             )
-            for group, values in group.items()
-        ]
         return indexes[0].append(indexes[1:]).sort()
 
     def extract(self, experiment_data: ExperimentData):

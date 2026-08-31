@@ -47,22 +47,11 @@ class ABAnalyzer(Executor):
         target_fields = data.ds.search_columns(TargetRole(), search_types=[int, float])
         if self.multitest_method and len(data.groups[group_field]) > 2:
             if self.multitest_method != ABNTestMethodsEnum.quantile:
-                multitest_result = MultiTest(self.multitest_method).calc(
+                # the group of every p-value is carried in its index, so the
+                # labels of the table cannot drift apart from the values
+                multitest_result = MultiTest(self.multitest_method, self.alpha).calc(
                     p_values, **kwargs
                 )
-                groups = []
-                for i in list(data.groups[group_field].keys())[1:]:
-                    groups += [i] * len(target_fields)
-                multitest_result = multitest_result.add_column(
-                    groups
-                    * (
-                        len(multitest_result)
-                        // len(target_fields)
-                        // (len(data.groups[group_field]) - 1)
-                    ),
-                    role={"group": StatisticRole()},
-                )
-
             else:
                 multitest_result = Dataset.create_empty()
                 for target_field in target_fields:
@@ -104,21 +93,33 @@ class ABAnalyzer(Executor):
             t_data = deepcopy(data.analysis_tables[analysis_ids[0]])
             for aid in analysis_ids[1:]:
                 t_data = t_data.append(data.analysis_tables[aid])
-            if len(analysis_ids) < len(t_data):
-                analysis_ids *= num_groups
+            group_labels = [groups[i][0] for i in range(1, num_groups + 1)]
+            if len(analysis_ids) * num_groups != len(t_data):
+                raise ValueError(
+                    f"{c} produced {len(t_data)} rows for {len(analysis_ids)} "
+                    f"target(s) and {num_groups} test group(s): the rows cannot be "
+                    f"attributed to a target and a group."
+                )
+            # rows come target-major - one row per (target, test group) - so every
+            # id is repeated per group, not the whole block of ids
+            analysis_ids = [
+                f"{analysis_id}{ID_SPLIT_SYMBOL}{group}"
+                for analysis_id in analysis_ids
+                for group in group_labels
+            ]
             t_data.data.index = analysis_ids
             for f in ["p-value", "pass"]:
-                for i in range(0, len(analysis_ids), len(analysis_ids) // num_groups):
-                    value = t_data.iloc[i : i + len(analysis_ids) // num_groups][f]
-                    multitest_pvalues = self._add_pvalues(multitest_pvalues, value, f)
-                    analysis_data[f"{c} {f} {groups[i // num_groups + 1][0]}"] = (
-                        value.mean()
-                    )
+                multitest_pvalues = self._add_pvalues(multitest_pvalues, t_data[f], f)
+                for number, group in enumerate(group_labels):
+                    # target-major rows: a group holds every num_groups-th one
+                    analysis_data[f"{c} {f} {group}"] = t_data.iloc[
+                        number::num_groups
+                    ][f].mean()
             if c not in ["UTest", "TTest"]:
                 indexes = t_data.index
                 values = t_data.data.values.tolist()
                 for idx, value in zip(indexes, values):
-                    name = idx.split(ID_SPLIT_SYMBOL)[-1]
+                    name = idx.split(ID_SPLIT_SYMBOL)[2]
                     analysis_data[
                         f"{c} {name[name.find(NAME_BORDER_SYMBOL) + 1 : name.rfind(NAME_BORDER_SYMBOL)]}"
                     ] = value[0]

@@ -2,7 +2,7 @@ from .analyzers.aa import OneAAStatAnalyzer
 from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from .dataset import TargetRole, TreatmentRole
 from .experiments.base import Experiment, OnRoleExperiment
-from .ui.base import ExperimentShell
+from .ui.base import ExperimentShell, ExperimentOutput
 from .ui.homo import HomoOutput
 
 HOMOGENEITY_TEST = Experiment(
@@ -67,5 +67,5 @@ class HomogeneityTest(ExperimentShell):
         """Initialize HomogeneityTest with default experiment and output configurations."""
         super().__init__(
             experiment=HOMOGENEITY_TEST,
-            output=HomoOutput(),
+            output=ExperimentOutput(main_output=HomoOutput()),
         )

@@ -10,7 +10,9 @@ from .executor.executor import Executor
 from .experiments.base import Experiment, OnRoleExperiment
 from .transformers import CUPEDTransformer
 from .ui.ab import ABOutput
-from .ui.base import ExperimentShell
+from .ui.base import ExperimentShell, ExperimentOutput
+from .ui.cupac import CupacOutput
+from .ui.cuped import CupedOutput
 from .utils import ABNTestMethodsEnum, ABTestTypesEnum
 
 
@@ -160,6 +162,12 @@ class ABTest(ExperimentShell):
             cupac_models: str | list[str] — model name (e.g. 'linear', 'ridge', 'lasso', 'catboost') or list of model names to try. If None, all available models will be tried and the best will be selected by variance reduction.
             enable_cupac: bool — Enable CUPAC variance reduction. CUPAC configuration is extracted from dataset.features_mapping.
         """
+        additional_outputs = {}
+        if enable_cupac:
+            additional_outputs['cupac'] = CupacOutput()
+        if cuped_features:
+            additional_outputs['cuped'] = CupedOutput()
+
         if "t_test_equal_var" in kwargs:
             warnings.warn(
                 "t_test_equal_var is deprecated and will be removed in a future version. "
@@ -177,7 +185,10 @@ class ABTest(ExperimentShell):
                 cupac_models,
                 enable_cupac,
             ),
-            output=ABOutput(),
+            output=ExperimentOutput(
+                main_output=ABOutput(),
+                additional_outputs=additional_outputs
+        ),
         )
         if equal_variance is not None:
             self.experiment.set_params(

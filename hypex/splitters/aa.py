@@ -10,11 +10,16 @@ from ..dataset import (
     Dataset,
     ExperimentData,
     StratificationRole,
-    TreatmentRole,
 )
 from ..dataset.roles import ConstGroupRole
 from ..executor import Calculator
 from ..utils import ExperimentDataEnum
+
+# assigning a string into a column that does not exist yet makes pandas fill the
+# rows the mask does not cover with the string form of a missing value - 'nan'
+# for np.nan, 'None', 'NaT', '<NA>' - so these labels mean "this row takes part
+# in the split", exactly like a real missing value does
+MISSING_CONST_LABELS = frozenset({"", "nan", "none", "nat", "<na>"})
 
 
 class AASplitter(Calculator):
@@ -88,6 +93,33 @@ class AASplitter(Calculator):
         return data
 
     @staticmethod
+    def _apply_const_groups(
+        split_series: pd.Series,
+        const_data: dict[Any, Dataset],
+        label_map: dict[int, str],
+        const_group_field: str | None,
+    ) -> None:
+        """Write the groups the user pinned over the split of the free rows.
+
+        ``control`` and ``test_N`` are the labels of the split itself, ``test`` is
+        the documented alias for ``test_1`` of a two-group split. Anything else is
+        a typo or a group that was not asked for, and both used to end up silently
+        in ``test_1``.
+        """
+        codes = {label: code for code, label in label_map.items()}
+        codes.setdefault("test", 1)
+        for group, group_data in const_data.items():
+            code = codes.get(str(group))
+            if code is None:
+                raise ValueError(
+                    f"Unknown constant group {str(group)!r} in column "
+                    f"'{const_group_field}'. Expected one of {sorted(codes)}, or a "
+                    f"missing value (None / np.nan / 'nan') for a row that takes "
+                    f"part in the split."
+                )
+            split_series[group_data.index] = code
+
+    @staticmethod
     def _inner_function(
         data: Dataset,
         random_state: int | None = None,
@@ -99,26 +131,47 @@ class AASplitter(Calculator):
     ) -> list[str]:
         sample_size = 1.0 if sample_size is None else sample_size
         control_indexes = []
+        const_data: dict[Any, Dataset] = {}
+        free_size = len(data)
         if const_group_field:
-            const_data = dict(data.groupby(const_group_field))
+            const_data = {
+                group: group_data
+                for group, group_data in data.groupby(const_group_field)
+                if str(group).strip().lower() not in MISSING_CONST_LABELS
+            }
             control_data = const_data.get("control")
             if control_data is not None:
                 control_indexes = list(control_data.index)
-            const_size = sum(len(cd) for cd in const_data.values())
+            # rows with a missing value in the const column are not grouped,
+            # so they are the ones left to be split
+            free_size = len(data) - sum(len(cd) for cd in const_data.values())
             control_size = (
-                0
-                if len(data) <= const_size
-                else (len(data) * control_size - len(const_data["control"]))
-                / (len(data) - const_size)
+                0.0
+                if free_size == 0
+                else max(
+                    0.0,
+                    (len(data) * control_size - len(control_indexes)) / free_size,
+                )
             )
-            # control_size = len(data) * control_size
-        experiment_data = (
-            data[data[const_group_field].isna()] if const_group_field else data
-        )
-        experiment_data_index = experiment_data.sample(
-            frac=sample_size, random_state=random_state
-        ).index
-        addition_indexes = list(experiment_data_index)
+        # every row can already be pinned to a constant group: then there is
+        # nothing to split and the constant assignment is the split itself
+        pinned_indexes = {
+            index for group_data in const_data.values() for index in group_data.index
+        }
+        addition_indexes: list = []
+        if free_size:
+            experiment_data = (
+                data.loc[
+                    [index for index in data.data.index if index not in pinned_indexes]
+                ]
+                if const_group_field
+                else data
+            )
+            addition_indexes = list(
+                experiment_data.sample(
+                    frac=sample_size, random_state=random_state
+                ).index
+            )
         edges = []
         if groups_sizes:
             if sum(groups_sizes) != 1:
@@ -144,8 +197,20 @@ class AASplitter(Calculator):
         for i, test_index in enumerate(test_indexes):
             split_series[test_index] += i
 
+        # groups can be requested but stay empty - with no free rows to split, or
+        # with sizes too small to take a row - and they still need their label
+        requested_groups = len(groups_sizes) if groups_sizes else 2
         label_map = {0: "control"}
-        label_map.update({i: f"test_{i}" for i in range(1, len(edges))})
+        label_map.update(
+            {i: f"test_{i}" for i in range(1, max(len(edges), requested_groups))}
+        )
+
+        # pinned rows are written last: their group is fixed and must not be
+        # shifted by the random split of the free rows
+        AASplitter._apply_const_groups(
+            split_series, const_data, label_map, const_group_field
+        )
+
         split_series = split_series.map(label_map)
 
         return split_series.to_list()
@@ -177,20 +242,24 @@ class AASplitterWithStratification(AASplitter):
         control_size: float = 0.5,
         grouping_fields=None,
         **kwargs,
-    ) -> list[str] | Dataset:
+    ) -> list[str]:
         if not grouping_fields:
             return AASplitter._inner_function(
                 data, random_state, control_size, **kwargs
             )
 
-        result = {"split": []}
+        splits = []
         index = []
-        for group, group_data in data.groupby(grouping_fields):
-            result["split"].extend(
-                AASplitter._inner_function(group_data, random_state, control_size)
+        for _, group_data in data.groupby(grouping_fields):
+            splits.extend(
+                AASplitter._inner_function(
+                    group_data, random_state, control_size, **kwargs
+                )
             )
             index.extend(list(group_data.index))
-        return Dataset.from_dict(result, index=index, roles={"split": TreatmentRole()})
+        # groupby breaks the original row order, so restore it before returning
+        # a flat list: the value is written as a column of the source dataset.
+        return pd.Series(splits, index=index).reindex(data.index).to_list()
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         grouping_fields = data.ds.search_columns(StratificationRole())
@@ -201,8 +270,6 @@ class AASplitterWithStratification(AASplitter):
             grouping_fields=grouping_fields,
             groups_sizes=self.groups_sizes,
         )
-        if isinstance(result, Dataset):
-            result = result.replace_roles({"split": AdditionalTreatmentRole()})
         return self._set_value(data, result)
 
 

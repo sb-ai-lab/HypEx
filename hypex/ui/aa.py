@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from ..analyzers.aa import AAScoreAnalyzer
 from ..dataset import Dataset, ExperimentData
 from ..reporters.aa import AABestSplitReporter, AAPassedReporter
@@ -17,6 +19,10 @@ class AAOutput(Output):
             resume_reporter=AAPassedReporter(),
             additional_reporters={"best_split": AABestSplitReporter()},
         )
+    
+    def _get_output_fields(self) -> list[str]:
+        """Return ordered fields for AA test output display."""
+        return ['resume', 'best_split', 'experiments', 'aa_score', 'best_split_statistic']
 
     def _extract_experiments(self, experiment_data: ExperimentData):
         id_ = experiment_data.get_one_id(

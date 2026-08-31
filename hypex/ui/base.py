@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from ..dataset import Dataset, ExperimentData
@@ -7,6 +8,74 @@ from ..experiments.base import Experiment
 from ..reporters import Reporter
 from ..utils import ID_SPLIT_SYMBOL
 from ..utils.enums import RenameEnum
+
+
+def _html_section(title: str, level: int = 2) -> str:
+    """Generate HTML section header."""
+    border = '3px' if level == 2 else '2px'
+    return (f'<div style="margin: {"25" if level == 2 else "20"}px 0 {"12" if level == 2 else "8"}px 0; '
+            f'padding: {"8" if level == 2 else "4"}px 0; border-bottom: {border} solid {"#333" if level == 2 else "#ddd"};">'
+            f'<strong style="font-size: {1.2 if level == 2 else 1.1}em;">{title}</strong></div>')
+
+
+def _html_content(value: Any) -> str:
+    """Generate HTML content for a value."""
+    if value is None:
+        return '<div style="color: #888;">None</div>'
+    return value._repr_html_() if hasattr(value, '_repr_html_') else f'<pre>{str(value)}</pre>'
+
+
+class Summary(Mapping):
+    """Several result tables of one experiment shown together.
+
+    Renders as a set of titled sections: plain text in a console and HTML
+    tables in Jupyter. Behaves like an ordered mapping, so a single table can
+    still be taken out by its name.
+
+    Examples
+    --------
+    .. code-block:: python
+
+        result = ABTest(enable_cupac=True).execute(data)
+        result.summary                                # all relevant tables at once
+        result.summary["cupac.feature_importances"]   # one of them
+        list(result.summary)                          # available table names
+    """
+
+    def __init__(self, title: str, tables: dict[str, Any]):
+        self.title = title
+        self.tables = dict(tables)
+
+    def __getitem__(self, name: str) -> Any:
+        return self.tables[name]
+
+    def __iter__(self):
+        return iter(self.tables)
+
+    def __len__(self) -> int:
+        return len(self.tables)
+
+    def __repr__(self) -> str:
+        if not self.tables:
+            return f"{self.title}(no tables available)"
+
+        parts = [f"{self.title}:"]
+        for name, table in self.tables.items():
+            parts.append(f"\n{'=' * 60}")
+            parts.append(f"{name}:")
+            parts.append("=" * 60)
+            parts.append("None" if table is None else str(table))
+        return "\n".join(parts)
+
+    def _repr_html_(self) -> str:
+        """Return HTML representation for Jupyter notebook display."""
+        if not self.tables:
+            return f"<div><b>{self.title}:</b> no tables available</div>"
+
+        return '\n'.join(
+            _html_section(name, 3) + _html_content(table)
+            for name, table in self.tables.items()
+        )
 
 
 class Output:
@@ -60,6 +129,95 @@ class Output:
         self.resume_reporter = resume_reporter
         self.additional_reporters = additional_reporters or {}
 
+    def _get_output_fields(self) -> list[str]:
+        """Get list of output fields to display in __repr__.
+        
+        This method can be overridden in subclasses for custom field ordering
+        or filtering. By default, it returns all annotated attributes from the
+        class hierarchy.
+        
+        Returns:
+            list[str]: List of field names to display, with 'resume' always first.
+        
+        Examples
+        --------
+        .. code-block:: python
+        
+            # Default behavior - automatic from annotations
+            class MyOutput(Output):
+                resume: Dataset
+                custom_field: Dataset
+            
+            # Custom override
+            class MyOutput(Output):
+                def _get_output_fields(self) -> list[str]:
+                    return ['resume', 'custom_field', 'special_metric']
+        """
+        all_annotations = {}
+        for cls in reversed(self.__class__.__mro__):
+            if cls is object:
+                continue
+            if hasattr(cls, '__annotations__'):
+                all_annotations.update(cls.__annotations__)
+        
+        fields = [
+            name for name in all_annotations.keys()
+            if not name.startswith('_') and hasattr(self, name)
+        ]
+        
+        # Ensure 'resume' is always first if it exists
+        if 'resume' in fields:
+            fields.remove('resume')
+            fields.insert(0, 'resume')
+        
+        return fields
+    
+    @property
+    def summary(self) -> Summary:
+        """All tables of this output, ready to be shown together.
+
+        Returns:
+            Summary: Every field of the output (resume first) as one printable
+            set of tables.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            output.summary                  # every table of the output
+            output.summary["resume"]        # one table by name
+        """
+        return Summary(
+            self.__class__.__name__,
+            {
+                field: getattr(self, field)
+                for field in self._get_output_fields()
+                if hasattr(self, field)
+            },
+        )
+
+    def __repr__(self) -> str:
+        """Return string representation showing all output fields with their data.
+
+        Displays all experiment output fields with their actual data tables.
+
+        Returns:
+            str: Formatted string showing all output fields with data.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            output = ABOutput()
+            output.extract(experiment_data)
+            print(output)  # Shows all tables: resume, multitest, sizes
+        """
+        return str(self.summary)
+
+    def _repr_html_(self) -> str:
+        """Return HTML representation for Jupyter notebook display."""
+        return self.summary._repr_html_()
+
     def _extract_by_reporters(self, experiment_data: ExperimentData):
         """Extracts reports from all configured reporters.
 
@@ -99,6 +257,191 @@ class Output:
             print(output.resume)  # Access the main report
         """
         self._extract_by_reporters(experiment_data)
+
+
+class ExperimentOutput:
+    """Container for experiment outputs with automatic delegation to main output.
+    
+    This class acts as a facade over main_output and additional_outputs, providing
+    seamless access to all experiment results while maintaining backward compatibility.
+    
+    Attributes:
+        main_output (Output): Primary output (e.g., ABOutput, AAOutput).
+        additional_outputs (dict[str, Output]): Dict of supplementary outputs (e.g., {'cupac': CupacOutput}).
+    
+    Examples
+    --------
+    .. code-block:: python
+    
+        # Access main output fields directly
+        result = ExperimentOutput(main_output=ABOutput(...))
+        print(result.resume)  # Delegates to main_output.resume
+        print(result.multitest)  # Delegates to main_output.multitest
+        
+        # Access additional outputs by name
+        result = ExperimentOutput(
+            main_output=ABOutput(...),
+            additional_outputs={'cupac': CupacOutput(...)}
+        )
+        print(result.cupac.variance_reductions)
+        
+        # List all available outputs
+        print(result.outputs)  # ['main', 'cupac']
+
+        # Show every relevant table at once
+        result.summary
+    """
+    
+    def __init__(
+        self, 
+        main_output: Output, 
+        additional_outputs: dict[str, Output] | None = None
+    ):
+        """Initialize ExperimentOutput with main and additional outputs.
+        
+        Args:
+            main_output: Primary output object containing main experiment results.
+            additional_outputs: Optional dict of named additional outputs.
+        """
+        self.main_output = main_output
+        self.additional_outputs = additional_outputs or {}
+    
+    def extract(self, experiment_data: ExperimentData) -> None:
+        """Extract data from experiment_data for all outputs.
+        
+        Calls extract() on main_output and all additional_outputs that have this method.
+        For outputs that need additional context (like CupacOutput needing resume_data),
+        passes it as a parameter.
+        
+        Args:
+            experiment_data: Experiment data to extract from.
+        """
+        # Extract main output
+        self.main_output.extract(experiment_data)
+        
+        # Extract additional outputs
+        for name, output in self.additional_outputs.items():
+            output.extract(experiment_data)
+    
+    @property
+    def outputs(self) -> list[str]:
+        """Get list of all available output names.
+        
+        Returns:
+            List of output names including 'main' and any additional outputs.
+        
+        Examples
+        --------
+        .. code-block:: python
+        
+            result = ExperimentOutput(
+                main_output=ABOutput(...),
+                additional_outputs={'cupac': CupacOutput(...)}
+            )
+            print(result.outputs)  # ['main', 'cupac']
+        """
+        return ['main_output'] + list(self.additional_outputs.keys())
+    
+    @property
+    def summary(self) -> Summary:
+        """Every relevant table of the experiment shown together.
+
+        Collects the tables of the main output and of every additional output.
+        Section names repeat the attribute path, so ``cupac.variance_reductions``
+        in the summary is ``result.cupac.variance_reductions``.
+
+        Returns:
+            Summary: All tables of the experiment as one printable object.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            result = ABTest(enable_cupac=True).execute(data)
+            result.summary                                # resume, multitest, sizes,
+                                                          # cupac.resume,
+                                                          # cupac.variance_reductions,
+                                                          # cupac.feature_importances
+            result.summary["cupac.feature_importances"]   # one table by name
+        """
+        tables: dict[str, Any] = dict(self.main_output.summary)
+        for name, output in self.additional_outputs.items():
+            tables.update(
+                {f"{name}.{field}": table for field, table in output.summary.items()}
+            )
+        return Summary('Experiment summary', tables)
+
+    def __getattr__(self, name: str):
+        """Delegate attribute access to main_output first, then additional_outputs.
+        
+        Args:
+            name: Attribute name to access.
+            
+        Returns:
+            Attribute value from main_output or additional_outputs.
+            
+        Raises:
+            AttributeError: If attribute not found in any output.
+        """
+        # Avoid recursion for private/special attributes
+        if name.startswith('_'):
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        
+        # Try main_output first
+        if hasattr(self.main_output, name):
+            return getattr(self.main_output, name)
+        
+        # Then check additional_outputs
+        if name in self.additional_outputs:
+            return self.additional_outputs[name]
+        
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+    
+    def __dir__(self):
+        """Support for dir() and IDE autocompletion.
+        
+        Returns:
+            Sorted list of all available attributes.
+        """
+        main_attrs = dir(self.main_output)
+        additional_attrs = list(self.additional_outputs.keys())
+        own_attrs = ['main_output', 'additional_outputs', 'outputs']
+        return sorted(set(main_attrs + additional_attrs + own_attrs))
+    
+    def __repr__(self) -> str:
+        """Print resume from all outputs.
+        
+        Returns:
+            Formatted string with resumes from main and additional outputs.
+        """
+        parts = []
+        
+        if hasattr(self.main_output, 'resume'):
+            if len(self.additional_outputs) > 0:
+                parts.append("MAIN RESULTS")
+            parts.append(str(self.main_output.resume))
+        
+        for name, output in self.additional_outputs.items():
+            if hasattr(output, 'resume'):
+                parts.append(f"\n{name.upper()} RESULTS")
+                parts.append(str(output.resume))
+        
+        return "\n".join(parts)
+    
+    def _repr_html_(self) -> str:
+        """Return HTML representation for Jupyter notebook display."""
+        parts = []
+        
+        if hasattr(self.main_output, 'resume'):
+            if self.additional_outputs:
+                parts.append(_html_section('MAIN RESULTS'))
+            parts.append(_html_content(self.main_output.resume))
+        
+        for name, output in self.additional_outputs.items():
+            if hasattr(output, 'resume'):
+                parts.extend([_html_section(f'{name.upper()} RESULTS'), _html_content(output.resume)])
+        
+        return '\n'.join(parts)
 
 
 class ExperimentShell:
@@ -157,7 +500,7 @@ class ExperimentShell:
         """
         return self._experiment
 
-    def execute(self, data: Dataset | ExperimentData) -> Output:
+    def execute(self, data: Dataset | ExperimentData):
         """Executes the experiment on the provided data.
 
         Runs the configured experiment on the input data and formats the results
@@ -168,7 +511,7 @@ class ExperimentShell:
                 Can be either a Dataset or ExperimentData instance.
 
         Returns:
-            Output: Formatted experiment results through the configured output handler.
+            Output | ExperimentOutput: Formatted experiment results.
 
         Examples
         --------
@@ -177,10 +520,16 @@ class ExperimentShell:
             shell = ExperimentShell(experiment, output)
             dataset = Dataset(...)  # Your input data
             results = shell.execute(dataset)
-            print(results.resume)  # Access formatted results
+            print(results.resume)  # Access main output
+            print(results.summary)  # All relevant tables at once
+            print(results.cupac.variance_reductions)  # Access additional output
         """
         if isinstance(data, Dataset):
             data = ExperimentData(data)
         result_experiment_data = self._experiment.execute(data)
+        
+        # Extract data - works for both Output and ExperimentOutput
         self._out.extract(result_experiment_data)
+        
         return self._out
+
