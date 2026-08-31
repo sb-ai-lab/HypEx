@@ -4,7 +4,8 @@ First release marked as production/stable. It brings back the KS-test in A/B rep
 
 ## ⚠️ Breaking changes
 - `result.cupac` exists only when the A/B test actually ran CUPAC (`enable_cupac=True`); otherwise it raises `AttributeError`. It used to be a placeholder object with `variance_reductions = None`, so code shaped like `if result.cupac.variance_reductions is None:` has to become `if "cupac" not in result.outputs:` (or `getattr(result, "cupac", None)`).
-- A value in a `ConstGroupRole` column that is neither `control` nor a group of the split now raises `ValueError` instead of quietly joining `test_1`.
+- A value in a `ConstGroupRole` column that is neither `control`, a group of the split, nor a label standing for a missing value now raises `ValueError` instead of quietly joining `test_1`.
+- The verdict column of `result.multitest` is called `H0 rejected` instead of `rejected`.
 
 ## ✨ New features
 
@@ -26,6 +27,7 @@ First release marked as production/stable. It brings back the KS-test in A/B rep
 ### A/B multiple testing
 - The `multitest` table mixed up its labels: rows come metric-major while `field` and `group` were filled group-major, so with more than one metric and more than one test group every row except the first and the last described the wrong comparison - `new p-value` and `rejected` included. The group of a p-value now travels with the p-value itself, and the table carries it as an explicit `group` column next to `field`.
 - `alpha` never reached the correction: `ABAnalyzer(alpha=...)` was dropped on the way to `multipletests`, which always rejected at 0.05.
+- The verdict column is renamed to `H0 rejected` and documented: it tells whether the null hypothesis of that comparison - the groups do not differ - is rejected at `alpha` once the correction is applied. `False` means there is not enough evidence against it, not that the groups are the same.
 - The correction is applied within each statistical test separately. A metric checked by both a t-test and a u-test used to land in one family and inflate its own correction twice over.
 - The per-group aggregates of `ABAnalyzer` (`TTest p-value 1`, `TTest pass 2`, ...) were transposed the same way: `TTest p-value 1` was the mean over the first *metric*, not over the first group. They are now averaged over the rows of their own group.
 
@@ -33,6 +35,7 @@ First release marked as production/stable. It brings back the KS-test in A/B rep
 - Stratified split (`stratification=True`) assigned groups in `groupby` order instead of the original row order, i.e. to the wrong rows - the A/A `resume` numbers for stratified runs were wrong. Stratifying over a column with more than two categories crashed with `ValueError`.
 - `AATest(sample_size=..., groups_sizes=...)` crashed with `TypeError: cannot convert dictionary update sequence element #0 to a sequence` - the second pass got its arguments shifted.
 - Constant groups (`ConstGroupRole`) are decoded instead of being guessed: `control`, `test` and `test_N` put a pinned row into that very group. `test_2` used to be silently merged into `test_1`, since only the literal `control` was ever read and everything else fell through to the default group. An unrecognised value now raises with the list of accepted labels - which also catches the classic `np.where(mask, 'test', np.nan)`, where `np.nan` becomes the string `'nan'`.
+- A label that stands for a missing value (`'nan'`, `'None'`, `'NaT'`, `'<NA>'`, `''`) means the row is not pinned. Assigning a string into a column that does not exist yet makes pandas fill every row the mask does not cover with exactly that string - `df.loc[df['treat'] == 0, 'grp'] = 'control'` leaves `'nan'` in all the other rows, the pattern of the A/A tutorial - and those rows used to be pinned to `test_1` without a word. They take part in the split now, so an A/A run over such a column returns different groups than in 1.0.6.
 - A dataset where every row is already pinned to a constant group is a valid input now - the constant assignment is the split - instead of failing with `IndexError: single positional indexer is out-of-bounds` on an empty slice. The control size can no longer become negative when most rows are pinned, and the labels of the groups that stayed empty are no longer lost.
 - Known limitations of constant groups: `groups_sizes` is applied to the free rows only and is not compensated for the pinned ones (unlike `control_size`), so pinned rows skew the resulting proportions; and a stratified split (`AATest(stratification=True)`) ignores the `ConstGroupRole` column altogether - pinned rows are split at random like any other, and an unrecognised label is not reported there.
 
