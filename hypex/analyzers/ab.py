@@ -279,7 +279,7 @@ class ABAnalyzer(Executor):
                         group_idx = i // step + 1
                         if group_idx >= len(groups):
                             group_idx = len(groups) - 1
-                            
+
                         analysis_data[
                             f"{c} {f} {groups[group_idx][0]}"
                         ] = value.mean()
