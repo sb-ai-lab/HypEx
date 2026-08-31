@@ -358,167 +358,6 @@ class PandasFaissExtension(FaissExtension):
 # Global functions for PySpark partition logic
 # ---------------------------------------------------------------------------
 
-# def _partition_load(partition_iter: Iterable, batch_size: int):
-#     """
-#     Load batches of feature vectors from a Spark partition iterator.
-
-#     Reads rows from the partition in chunks of ``batch_size`` and yields
-#     each batch as a list of feature vectors. Used during the iterative
-#     prefit phase to train clustering models on the driver without loading
-#     the entire dataset at once.
-
-#     Args:
-#         partition_iter (Iterable): Iterator over partition rows. Each row
-#             is expected to have a ``_features`` column containing the
-#             feature vector.
-#         batch_size (int): Number of rows to accumulate per batch.
-
-#     Yields:
-#         list: A batch of feature vectors (each element is a list of floats).
-#     """
-#     batch = []
-#     for row in partition_iter:
-#         batch.append(list(row["_features"]))
-#         if len(batch) >= batch_size:
-#             yield batch
-#             batch = []
-#     if batch:
-#         yield batch
-
-# def _spark_partition_fit(
-#     iterator: Iterable,
-#     bc_index: Broadcast,
-#     bc_storage: Broadcast
-# ):
-#     """
-#     Build a local FAISS index on each Spark partition.
-
-#     Receives a pre-trained IVF quantizer via broadcast, adds the partition's
-#     vectors to a local ``IndexIDMap`` wrapper, and yields the serialized
-#     index. Each partition produces one serialized index file that is later
-#     used during the distributed predict phase.
-
-#     Args:
-#         iterator (Iterable): Iterator over partition rows. Each row must
-#             contain ``index`` (long) and ``_features`` (vector) columns.
-#         bc_index (Broadcast): Broadcasted pre-trained FAISS index (quantizer).
-
-#     Yields:
-#         bytes: Serialized FAISS index for the partition, produced by
-#             ``faiss.serialize_index``.
-#     """
-#     import faiss
-#     import numpy as np
-
-#     index = bc_index.value
-#     storage = bc_storage.value
-#     ids, vectors = [], []
-#     for row in iterator:
-#         ids.append(row["index"])
-#         vectors.append(list(row['_features']))
-
-#     if not ids:
-#         return # for empty partition
-
-#     ids = np.array(ids, dtype=np.int64)
-#     vectors = np.array(vectors, dtype=np.float32)
-
-#     index_copy = faiss.clone_index(index)
-#     index_with_ids = faiss.IndexIDMap(index_copy)
-#     index_with_ids.add_with_ids(vectors, ids)
-
-#     # byte_array = faiss.serialize_index(index_with_ids)
-#     # yield storage.save_index(byte_array)
-#     yield storage.save_index(index_with_ids)
-
-# def  _per_partition_predict(
-#     shard_iter: Iterable,
-#     bc_n_neighbors: Broadcast,
-#     bc_references: Broadcast,
-#     bc_chunk_size: Broadcast,
-#     bc_k: Broadcast,
-#     bc_storage: Broadcast
-# ):
-#     """
-#     Perform distributed nearest-neighbor search on each Spark partition.
-
-#     For each chunk of query vectors in the partition, iteratively loads
-#     serialized FAISS indexes from the driver-distributed files, searches
-#     for the top-k nearest neighbors, and aggregates candidates across all
-#     partition indexes. The final top-``n_neighbors`` results are yielded
-#     as ``(query_id, [neighbor_ids])`` tuples.
-
-#     Args:
-#         shard_iter (Iterable): Iterator over partition rows. Each row must
-#             contain ``index`` (long) and ``_features`` (vector) columns.
-#         bc_n_neighbors (Broadcast): Number of nearest neighbors to return.
-#         bc_references (Broadcast): List of serialized index file names
-#             distributed via ``SparkFiles``.
-#         bc_chunk_size (Broadcast): Number of query rows to process per batch.
-#         bc_k (Broadcast): Number of IVF clusters (used to set ``nprobe``).
-
-#     Yields:
-#         tuple: ``(int(query_id), list[int(neighbor_ids)])`` for each query
-#             vector in the partition.
-#     """
-#     import faiss
-#     import numpy as np
-#     from pyspark import SparkFiles
-#     import gc
-#     import builtins
-
-#     cache = get_executor_cache()
-
-#     real_n = bc_n_neighbors.value
-#     references = bc_references.value
-#     chunk_size = bc_chunk_size.value
-#     storage = bc_storage.value
-
-#     def iter_chunk(it: Iterable, chunk_size: int):
-#         chunk = []
-#         amount = 0
-#         for row in it:
-#             chunk.append(row)
-#             amount += 1
-
-#             if amount >= chunk_size:
-#                 amount = 0
-#                 yield chunk
-#                 chunk =[]
-
-#         if chunk:
-#             yield chunk
-
-#     for chunk in iter_chunk(shard_iter, chunk_size):
-#         if not chunk:
-#             return
-#         query_ids = np.array([r["index"] for r in chunk], dtype=np.int64)
-#         batch = np.array([list(r["_features"]) for r in chunk], dtype=np.float32)  # (Q, d)
-#         del chunk
-#         gc.collect()
-
-#         candidates = [[] for _ in range(len(query_ids))]
-#         for ref in references:
-#             tmp_index = cache.get(ref, storage, nprobe=min(real_n, bc_k.value))
-#             # tmp_index.nprobe = real_n
-#             # tmp_index.nprobe = min(real_n * 2, bc_k.value)
-#             k = min(real_n, tmp_index.ntotal)
-#             dists, nids = tmp_index.search(batch, k)   # (Q, k)
-#             del tmp_index
-#             gc.collect()
-
-#             for q_idx in range(len(query_ids)):
-#                 for rank in range(k):
-#                     nid = int(nids[q_idx, rank])
-#                     if nid >= 0:
-#                         candidates[q_idx].append((float(dists[q_idx, rank]), nid))
-
-#         for q_idx, qid in enumerate(query_ids):
-#             top = sorted(candidates[q_idx], key=lambda x: x[0])[:real_n]
-#             output = [int(nid) for _, nid in top]
-#             yield (int(qid), output)
-#             # yield (output,)
-
 @logger.log_methods(log_args=False, log_result=False, private=True)
 @backend_factory.register(FaissExtension, SparkDataset)
 class SparkFaissExtension(FaissExtension):
@@ -793,7 +632,6 @@ class SparkFaissExtension(FaissExtension):
             index_with_ids = faiss.IndexIDMap(index_copy)
             index_with_ids.add_with_ids(vectors, ids)
 
-            # TODO: `bias` optimization
             # inner_index = faiss.downcast_index(index_with_ids.index)
             # inner_index.make_direct_map()
 
@@ -807,15 +645,21 @@ class SparkFaissExtension(FaissExtension):
             import numpy as np
 
             storage = bc_storage.value
-            ids, vectors = np.array([]), np.array([])
+            ids, vectors = [], []
             for row in iterator:
-                np.append(ids, row["index"])
-                np.append(vectors, list(row['_features']))
+                ids.append(row["index"])
+                vectors.append(list(row['_features']))
 
             if not ids:
                 return # for empty partition
 
-            index_with_ids = faiss.IndexFlatL2(vectors.shape)
+            ids = np.array(ids, dtype=np.int64)
+            vectors = np.array(vectors, dtype=np.float32)
+
+            d = vectors.shape[1]
+
+            quantizer = faiss.IndexFlatL2(d)
+            index_with_ids = faiss.IndexIDMap(quantizer)
             index_with_ids.add_with_ids(vectors, ids)
 
             yield storage.save_index(index_with_ids)
@@ -826,39 +670,39 @@ class SparkFaissExtension(FaissExtension):
         m = 4 # heuristic
         self.k = int(np.sqrt(self._data_size / m))
 
-        # if mode =="sample":
-        #     frac = min(MatchingConfig.FAISS_SAMPLE_TARGET / max(self._data_size, 1), 1.0)
-        #     sample_rows = (
-        #                     vectorized_data
-        #                     .sample(fraction=frac, seed=self.seed)
-        #                     .select("_features")
-        #                     .collect()
-        #                 )
+        if mode =="sample":
+            frac = min(MatchingConfig.FAISS_SAMPLE_TARGET / max(self._data_size, 1), 1.0)
+            sample_rows = (
+                            vectorized_data
+                            .sample(fraction=frac, seed=self.seed)
+                            .select("_features")
+                            .collect()
+                        )
 
-        #     X = np.array(
-        #         [list(row['_features']) for row in sample_rows],
-        #         dtype=np.float32,
-        #     )
+            X = np.array(
+                [list(row['_features']) for row in sample_rows],
+                dtype=np.float32,
+            )
 
-        #     d = X.shape[1]
-        #     # IVF Faiss подерживает до 39 * (training points) на один кластер
-        #     nlist = min(self.k, max(1, X.shape[0] // 39))
+            d = X.shape[1]
+            # IVF Faiss подерживает до 39 * (training points) на один кластер
+            nlist = min(self.k, max(1, X.shape[0] // 39))
 
-        #     quantizer = faiss.IndexFlatL2(d)
-        #     self.index = faiss.IndexIVFFlat(quantizer, d, nlist)
-        #     self.index.train(X)
+            quantizer = faiss.IndexFlatL2(d)
+            self.index = faiss.IndexIVFFlat(quantizer, d, nlist)
+            self.index.train(X)
 
-        # elif mode == "full":
-        #     self._prefit(
-        #         vectorized_data=vectorized_data,
-        #         model_name=model_name
-        #     )
+        elif mode == "full":
+            self._prefit(
+                vectorized_data=vectorized_data,
+                model_name=model_name
+            )
 
-        # else:
-        #     raise ValueError(f"Incorrect faiss fit mode: '{mode}'")
-        # self.index.nprobe = min(self.n_neighbors * 2, self.k)
+        else:
+            raise ValueError(f"Incorrect faiss fit mode: '{mode}'")
+        self.index.nprobe = min(self.n_neighbors * 2, self.k)
 
-        # bc_index = session.sparkContext.broadcast(self.index)
+        bc_index = session.sparkContext.broadcast(self.index)
         bc_storage = session.sparkContext.broadcast(self.storage)
         del self.index
         self.index = None
@@ -869,8 +713,8 @@ class SparkFaissExtension(FaissExtension):
             vectorized_data
             .select(*features)
             .rdd
-            # .mapPartitions(lambda it: _spark_partition_fit(it, bc_index, bc_storage))
-            .mapPartitions(lambda it: _spark_full_partition_fit(it, bc_storage))
+            .mapPartitions(lambda it: _spark_partition_fit(it, bc_index, bc_storage))
+            # .mapPartitions(lambda it: _spark_full_partition_fit(it, bc_storage))
             .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
         )
         self._sharded_rdd.count()
@@ -1022,7 +866,7 @@ class SparkFaissExtension(FaissExtension):
 
         storage_level = storage_level or "MEMORY_AND_DISK"
         result.persist(storage_level=storage_level, action="count")
-        result.checkpoint(eager=True)
+        # result.checkpoint(eager=True)
 
         return result
 

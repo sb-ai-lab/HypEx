@@ -317,7 +317,7 @@ class FaissNearestNeighbors(MLExecutor):
                 col: AdditionalMatchingRole() for col in  t_index_field.columns
             }
             matched_indexes = matched_indexes.append(t_index_field)
-        matched_indexes.checkpoint(eager=True)
+        # matched_indexes.checkpoint(eager=True)
         if len(matched_indexes) < len(data.ds) and not self.two_sides:
             matched_indexes = matched_indexes.reindex(data.ds.index, fill_value=-1)
         elif len(matched_indexes) < len(data.ds) and self.two_sides:

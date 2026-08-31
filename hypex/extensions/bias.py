@@ -563,7 +563,7 @@ class SparkBisaExtesion(BiasExtension):
         final_dataset.index.name = None
 
         final_dataset.persist(storage_level)
-        final_dataset.checkpoint(eager=True)
+        # final_dataset.checkpoint(eager=True)
 
         initial_data.unpersist()
         matched_data.unpersist()
