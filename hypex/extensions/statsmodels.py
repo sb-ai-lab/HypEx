@@ -10,6 +10,15 @@ from .abstract import Extension
 
 
 class MultiTest(Extension):
+    """Multiple-testing correction over the p-values of an A/B/n test.
+
+    The resulting table holds the p-value of every comparison before and after
+    the correction, and ``H0 rejected``: whether the null hypothesis of that
+    comparison - the groups do not differ - is rejected at ``alpha`` once the
+    correction is applied. ``False`` means there is not enough evidence against
+    it, not that the groups are the same.
+    """
+
     def __init__(self, method: ABNTestMethodsEnum, alpha: float = 0.05):
         self.method = method
         self.alpha = alpha
@@ -58,7 +67,7 @@ class MultiTest(Extension):
                     old / new if old != 0 else 0.0
                     for new, old in zip(corrected, p_values)
                 ],
-                "rejected": rejected,
+                "H0 rejected": rejected,
             },
             StatisticRole(),
         )

@@ -110,7 +110,7 @@ def test_correction_is_applied_within_each_test(abn_data):
         for key, corrected_value, rejected_value in zip(keys, corrected, rejected):
             row = _row(table, key[0], key[1], test)
             assert row["new p-value"] == pytest.approx(corrected_value)
-            assert bool(row["rejected"]) == bool(rejected_value)
+            assert bool(row["H0 rejected"]) == bool(rejected_value)
 
     # and the result is really not the correction over both tests at once
     pooled_corrected = multipletests(pooled, method="holm", alpha=0.05)[1]
@@ -126,7 +126,7 @@ def test_alpha_reaches_the_correction(abn_data):
         test.experiment.set_params({ABAnalyzer: {"alpha": alpha}})
         row = _row(test.execute(_dataset(abn_data)).multitest.data, "m2", "1")
         corrected = row["new p-value"]
-        rejections[alpha] = bool(row["rejected"])
+        rejections[alpha] = bool(row["H0 rejected"])
 
     # the corrected p-value itself does not depend on alpha, only the verdict does
     assert 0.05 < corrected < 0.2
