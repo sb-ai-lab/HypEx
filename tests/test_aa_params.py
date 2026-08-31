@@ -142,36 +142,53 @@ def test_const_groups_leave_the_split_working(free_share):
     assert len(result.resume.data) > 0
 
 
-def test_missing_values_pandas_wrote_as_strings_stay_free():
-    """Assigning a string into a column that does not exist yet makes pandas
-    write the missing values of the other rows as the string 'nan' - the
-    pattern of the A/A tutorial. Those rows are unpinned like any other missing
-    value; they used to be forced into test_1 instead."""
-    frame = pd.DataFrame(
-        {
-            "user_id": np.arange(300),
-            "treat": [0.0, 1.0, np.nan] * 100,
-            "pre_spends": np.random.default_rng(3).normal(100, 10, 300),
-        }
-    )
-    frame.loc[frame["treat"] == 0, "forced"] = "control"
-    frame.loc[frame["treat"] == 1, "forced"] = "test"
-    assert (frame["forced"] == "nan").sum() == 100, "pandas no longer writes 'nan'"
-
-    data = Dataset(
-        roles={
-            "user_id": InfoRole(),
-            "pre_spends": TargetRole(),
-            "forced": ConstGroupRole(str),
-        },
-        data=frame,
-    )
-
-    split = pd.Series(
-        AASplitter._inner_function(data, random_state=1, const_group_field="forced")
-    )
-
-    assert set(split[frame["forced"] == "control"]) == {"control"}
-    assert set(split[frame["forced"] == "test"]) == {"test_1"}
-    # the rows pandas marked as 'nan' were split, not pinned
-    assert set(split[frame["forced"] == "nan"]) == {"control", "test_1"}
+def test_a_string_that_stands_for_a_missing_value_is_not_a_group():
+    """A column can carry a missing value as the string 'nan' - pandas writes it
+    that way when a string is assigned into a column that does not exist yet.
+    Such a row is not pinned; it used to be forced into test_1."""
+    data = _make_data()
+    labels = ["control", "test", "nan"]
+    values = [labels[i % len(labels)] for i in range(len(data))]
+    data = _with_const_groups(data, values)
+
+    split = AASplitter._inner_function(data, random_state=1, const_group_field="forced")
+
+    assert {s for s, v in zip(split, values) if v == "control"} == {"control"}
+    assert {s for s, v in zip(split, values) if v == "test"} == {"test_1"}
+    # the rows that only look pinned were split
+    assert {s for s, v in zip(split, values) if v == "nan"} == {"control", "test_1"}
+
+
+def test_rows_no_mask_covered_stay_free():
+    """The pattern of the A/A tutorial: the column is built by assigning a string
+    under a mask, and the rows neither mask covers hold a missing value - the
+    string 'nan' on pandas 2.1, a real one on 2.3. Both must stay unpinned."""
+    frame = pd.DataFrame(
+        {
+            "user_id": np.arange(300),
+            "treat": [0.0, 1.0, np.nan] * 100,
+            "pre_spends": np.random.default_rng(3).normal(100, 10, 300),
+        }
+    )
+    frame.loc[frame["treat"] == 0, "forced"] = "control"
+    frame.loc[frame["treat"] == 1, "forced"] = "test"
+
+    data = Dataset(
+        roles={
+            "user_id": InfoRole(),
+            "pre_spends": TargetRole(),
+            "forced": ConstGroupRole(str),
+        },
+        data=frame,
+    )
+
+    split = AASplitter._inner_function(data, random_state=1, const_group_field="forced")
+
+    assert len(split) == len(frame)
+    uncovered = [
+        assigned
+        for assigned, pinned in zip(split, frame["forced"])
+        if pinned not in ("control", "test")
+    ]
+    assert len(uncovered) == 100
+    assert set(uncovered) == {"control", "test_1"}
