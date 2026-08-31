@@ -15,6 +15,12 @@ from ..dataset.roles import ConstGroupRole
 from ..executor import Calculator
 from ..utils import ExperimentDataEnum
 
+# assigning a string into a column that does not exist yet makes pandas fill the
+# rows the mask does not cover with the string form of a missing value - 'nan'
+# for np.nan, 'None', 'NaT', '<NA>' - so these labels mean "this row takes part
+# in the split", exactly like a real missing value does
+MISSING_CONST_LABELS = frozenset({"", "nan", "none", "nat", "<na>"})
+
 
 class AASplitter(Calculator):
     def __init__(
@@ -108,9 +114,8 @@ class AASplitter(Calculator):
                 raise ValueError(
                     f"Unknown constant group {str(group)!r} in column "
                     f"'{const_group_field}'. Expected one of {sorted(codes)}, or a "
-                    f"missing value (None / np.nan) for a row that takes part in "
-                    f"the split - note that np.where(mask, 'test', np.nan) writes "
-                    f"the string 'nan', which is not a missing value."
+                    f"missing value (None / np.nan / 'nan') for a row that takes "
+                    f"part in the split."
                 )
             split_series[group_data.index] = code
 
@@ -129,7 +134,11 @@ class AASplitter(Calculator):
         const_data: dict[Any, Dataset] = {}
         free_size = len(data)
         if const_group_field:
-            const_data = dict(data.groupby(const_group_field))
+            const_data = {
+                group: group_data
+                for group, group_data in data.groupby(const_group_field)
+                if str(group).strip().lower() not in MISSING_CONST_LABELS
+            }
             control_data = const_data.get("control")
             if control_data is not None:
                 control_indexes = list(control_data.index)
@@ -146,10 +155,17 @@ class AASplitter(Calculator):
             )
         # every row can already be pinned to a constant group: then there is
         # nothing to split and the constant assignment is the split itself
+        pinned_indexes = {
+            index for group_data in const_data.values() for index in group_data.index
+        }
         addition_indexes: list = []
         if free_size:
             experiment_data = (
-                data[data[const_group_field].isna()] if const_group_field else data
+                data.loc[
+                    [index for index in data.data.index if index not in pinned_indexes]
+                ]
+                if const_group_field
+                else data
             )
             addition_indexes = list(
                 experiment_data.sample(

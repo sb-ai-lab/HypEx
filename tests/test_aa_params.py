@@ -64,13 +64,11 @@ def test_all_rows_in_const_groups_are_kept_as_the_split():
     assert split == expected
 
 
-@pytest.mark.parametrize(
-    "label", ["tset", "nan", "test_5"], ids=["typo", "nan-string", "not-requested"]
-)
+@pytest.mark.parametrize("label", ["tset", "test_5"], ids=["typo", "not-requested"])
 def test_unknown_constant_group_is_reported(label):
     """A value that is neither ``control`` nor a group of the split used to end up
-    in ``test_1`` without a word - a typo, a group that was not asked for and the
-    string 'nan' left by ``np.where(mask, 'test', np.nan)`` alike."""
+    in ``test_1`` without a word - a typo and a group that was not asked for
+    alike. Labels that stand for a missing value are a separate story."""
     data = _make_data()
     values = np.where(np.arange(len(data)) % 2 == 0, "control", label)
     data = _with_const_groups(data, values)
@@ -142,3 +140,38 @@ def test_const_groups_leave_the_split_working(free_share):
     assert "control" in groups
     assert any(group.startswith("test") for group in groups)
     assert len(result.resume.data) > 0
+
+
+def test_missing_values_pandas_wrote_as_strings_stay_free():
+    """Assigning a string into a column that does not exist yet makes pandas
+    write the missing values of the other rows as the string 'nan' - the
+    pattern of the A/A tutorial. Those rows are unpinned like any other missing
+    value; they used to be forced into test_1 instead."""
+    frame = pd.DataFrame(
+        {
+            "user_id": np.arange(300),
+            "treat": [0.0, 1.0, np.nan] * 100,
+            "pre_spends": np.random.default_rng(3).normal(100, 10, 300),
+        }
+    )
+    frame.loc[frame["treat"] == 0, "forced"] = "control"
+    frame.loc[frame["treat"] == 1, "forced"] = "test"
+    assert (frame["forced"] == "nan").sum() == 100, "pandas no longer writes 'nan'"
+
+    data = Dataset(
+        roles={
+            "user_id": InfoRole(),
+            "pre_spends": TargetRole(),
+            "forced": ConstGroupRole(str),
+        },
+        data=frame,
+    )
+
+    split = pd.Series(
+        AASplitter._inner_function(data, random_state=1, const_group_field="forced")
+    )
+
+    assert set(split[frame["forced"] == "control"]) == {"control"}
+    assert set(split[frame["forced"] == "test"]) == {"test_1"}
+    # the rows pandas marked as 'nan' were split, not pinned
+    assert set(split[frame["forced"] == "nan"]) == {"control", "test_1"}
