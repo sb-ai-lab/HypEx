@@ -15,21 +15,50 @@ class MultiTest(Extension):
         self.alpha = alpha
         super().__init__()
 
+    @staticmethod
+    def _index_parts(index) -> tuple[list[str], list[str], list[str]]:
+        """Split the ids of the p-values into test, field and group labels.
+
+        An id is ``test<sep>params<sep>field`` and, when the p-value belongs to a
+        particular test group, ``<sep>group`` on top of that.
+        """
+        parts = [str(i).split(ID_SPLIT_SYMBOL) for i in index]
+        tests = [part[0] for part in parts]
+        fields = [part[2] if len(part) > 2 else "" for part in parts]
+        groups = [part[3] if len(part) > 3 else "" for part in parts]
+        return tests, fields, groups
+
     def _calc_pandas(self, data: Dataset, **kwargs):
         p_values = data.data.values.flatten()
-        new_pvalues = multipletests(
-            p_values, method=self.method.value, alpha=self.alpha, **kwargs
-        )
+        tests, fields, groups = self._index_parts(data.index)
+
+        corrected = np.empty(len(p_values), dtype=float)
+        rejected = np.empty(len(p_values), dtype=bool)
+        # every statistical test is a family of its own: the same metric checked
+        # by a t-test and by a u-test must not inflate the correction of the other
+        for test in dict.fromkeys(tests):
+            positions = [i for i, name in enumerate(tests) if name == test]
+            test_rejected, test_corrected = multipletests(
+                [p_values[i] for i in positions],
+                method=self.method.value,
+                alpha=self.alpha,
+                **kwargs,
+            )[:2]
+            corrected[positions] = test_corrected
+            rejected[positions] = test_rejected
+
         return DatasetAdapter.to_dataset(
             {
-                "field": [i.split(ID_SPLIT_SYMBOL)[2] for i in data.index],
-                "test": [i.split(ID_SPLIT_SYMBOL)[0] for i in data.index],
+                "field": fields,
+                "group": groups,
+                "test": tests,
                 "old p-value": p_values,
-                "new p-value": new_pvalues[1],
+                "new p-value": corrected,
                 "correction": [
-                    j / i if j != 0 else 0.0 for i, j in zip(new_pvalues[1], p_values)
+                    old / new if old != 0 else 0.0
+                    for new, old in zip(corrected, p_values)
                 ],
-                "rejected": new_pvalues[0],
+                "rejected": rejected,
             },
             StatisticRole(),
         )
