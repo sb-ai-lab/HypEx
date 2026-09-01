@@ -1178,7 +1178,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return int(self.data[group_cols].nunique())
 
     def iter_groups(self, by: list[str]):
-        for key, group in self.data.groupby(by=by, observed=False):
+        by_arg = by[0] if len(by) == 1 else by
+        for key, group in self.data.groupby(by=by_arg, observed=False):
             yield key, group
 
     def grouped_value_counts(self, by: list[str], feature_cols: list[str] | None=None):

@@ -16,6 +16,7 @@ from ..dataset.dataset import SmallDataset
 from ..experiments.base import Executor
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
 from ..utils import ABNTestMethodsEnum, ExperimentDataEnum, timeit
+from ..utils.constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
 
 
 class ABAnalyzer(Executor):
@@ -235,64 +236,61 @@ class ABAnalyzer(Executor):
 
         for c, spaces in executor_ids.items():
             analysis_ids = spaces.get("analysis_tables", [])
+
+            analysis_ids = [
+                aid for aid in analysis_ids
+                if not aid.endswith(f"{NAME_BORDER_SYMBOL}stats")
+            ]
+
             if len(analysis_ids) == 0:
                 continue
-
             t_data = deepcopy(data.analysis_tables[analysis_ids[0]])
             for aid in analysis_ids[1:]:
                 t_data = t_data.append(data.analysis_tables[aid])
-
             if len(t_data) > 0:
-                current_index_len = (
-                    len(t_data.data.index)
-                    if hasattr(t_data.data, "index")
-                    else 0
-                )
-                if current_index_len != len(t_data):
-                    new_index = []
-                    for i in range(len(t_data)):
-                        if i < len(analysis_ids):
-                            new_index.append(analysis_ids[i])
-                        else:
-                            col_name = (
-                                t_data.columns[0]
-                                if len(t_data.columns) > 0
-                                else "metric"
-                            )
-                            new_index.append(f"{c}┴┴{col_name}┴┴row{i}")
-                    t_data.data.index = new_index
+
+                index_obj = t_data.data.index
+                if hasattr(index_obj, "to_list"):
+                    index_values = index_obj.to_list()
+                elif hasattr(index_obj, "tolist"):
+                    index_values = index_obj.tolist()
+                else:
+                    index_values = list(index_obj)
+
+                new_index = []
+                for idx_val in index_values:
+                    idx_str = str(idx_val)
+                    if NAME_BORDER_SYMBOL in idx_str:
+                        group, feature = idx_str.split(NAME_BORDER_SYMBOL, 1)
+                        new_index.append(
+                            f"{c}{ID_SPLIT_SYMBOL}{ID_SPLIT_SYMBOL}"
+                            f"{feature}{ID_SPLIT_SYMBOL}{group}"
+                        )
+                    else:
+                        new_index.append(idx_str)
+                t_data.data.index = new_index
 
                 for f in ["p-value", "pass"]:
-                    for i in range(
-                        0, len(analysis_ids), len(analysis_ids) // num_groups
-                    ):
+                    step = len(t_data) // num_groups if num_groups > 0 else 1
+                    if step == 0:
+                        step = 1
+                    
+                    for i in range(0, len(t_data), step):
                         slice_start = i
-                        slice_end = i + len(analysis_ids) // num_groups
-                        sliced = t_data.iloc[slice_start:slice_end]
-                        value = t_data.iloc[
-                            i : i + len(analysis_ids) // num_groups
-                        ][f]
+                        slice_end = min(i + step, len(t_data))
+                        
+                        value = t_data.iloc[slice_start:slice_end][f]
                         multitest_pvalues = self._add_pvalues(
                             multitest_pvalues, value, f
                         )
-                        analysis_data[
-                            f"{c} {f} {groups[i // num_groups + 1][0]}"
-                        ] = value.mean()
+                        
+                        group_idx = i // step + 1
+                        if group_idx >= len(groups):
+                            group_idx = len(groups) - 1
 
-                for f in ["p-value", "pass"]:
-                    if f not in t_data.columns:
-                        continue
-                    col_data = t_data[f]
-                    valid_col = col_data.dropna()
-                    if valid_col.is_empty():
-                        continue
-                    multitest_pvalues = self._add_pvalues(
-                        multitest_pvalues, valid_col, f
-                    )
-                    mean_val = valid_col.mean()
-                    if hasattr(mean_val, "iget_values"):
-                        mean_val = mean_val.iget_values(0, 0)
-                    analysis_data[f"{c} {f} {groups[1][0]}"] = mean_val
+                        analysis_data[
+                            f"{c} {f} {groups[group_idx][0]}"
+                        ] = value.mean()
 
         analysis_dataset = SmallDataset.from_dict(
             [analysis_data], {f: StatisticRole(float) for f in analysis_data}

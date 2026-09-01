@@ -110,22 +110,10 @@ class MatchingMetricsExtension(Extension):
 
     @staticmethod
     def _extract_info(data: Dataset) -> tuple[Dataset, list[str], list[str]]:
-        """Extract neighbor indices, numeric columns, bias, and new target columns.
-
-        Args:
-            data: The dataset containing matching results.
-
-        Returns:
-            A tuple containing:
-                - List of neighbor index columns.
-                - List of numeric columns.
-                - Name of the bias column (or None if not present).
-                - Name of the new (matched) target column (or None if not present).
-        """
+        """Extract neighbor indices, numeric columns, bias, and new target columns."""
         neighbors_cols = data.search_columns(AdditionalMatchingRole())
         if len(neighbors_cols) == 0:
             raise ValueError("No indexes were found")
-
         numeric_cols = data.search_columns(
             roles=[
                 FeatureRole(), TargetRole(),
@@ -259,12 +247,6 @@ class MatchingMetricsExtension(Extension):
         )
         N = m + n
 
-        # att_var = att_se ** 2
-        # atc_var = atc_se ** 2
-
-        # ate_var = (n / N) ** 2 * att_var + (m / N) ** 2 * atc_var
-        # ate_se = float(np.sqrt(max(ate_var, 0.0)))
-
         sum_c = float(stats_itc.get("sum", 0.0))
         sum_t = float(stats_itt.get("sum", 0.0))
 
@@ -313,10 +295,7 @@ class MatchingMetricsExtension(Extension):
         self._set_columns(data)
         neighbors_cols, numeric_cols, bias_col, new_target_col = self._extract_info(data)
         if bias_col is None:
-            # neighbors_cols, numeric_cols, bias_col = self._extract_info(data)
-            new_target_data = self.prepare_data(
-                data = data,
-            )
+            new_target_data = self.prepare_data(data=data)
             new_data = data.add_column(new_target_data)
             new_target_col = self.target_field + "_matched"
             bias_col = "bias"

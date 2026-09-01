@@ -14,7 +14,14 @@ from ..comparators import (
     StatsTTest,
     StatsZTest,
 )
-from ..dataset import Dataset, ExperimentData, InfoRole, SmallDataset, StatisticRole
+from ..dataset import (
+    Dataset,
+    ExperimentData,
+    InfoRole,
+    SmallDataset,
+    StatisticRole,
+    StratificationRole,
+)
 from ..executor import Executor
 from ..experiments import IfParamsExperiment, ParamsExperiment
 from ..splitters import AASplitter, AASplitterWithStratification
@@ -263,23 +270,20 @@ class AAScoreAnalyzer(Executor):
         return splitter_class.build_from_id(splitter_id)
 
     # ── AA score computation ──────────────────────────────────────────────
-
-    def _analyze_aa_score(
-        self, data: ExperimentData, score_table: Dataset
-    ) -> ExperimentData:
+    def _analyze_aa_score(self, data, score_table):
         """Compute per-feature pass-rate weights and store as 'aa score'."""
-        self._feature_weights = {}
-        aa_rows: list[dict[str, Any]] = []
 
+        self._feature_weights = {}
+        aa_rows = []
         pass_cols = [c for c in score_table.columns if "pass" in c.lower()]
         for col in pass_cols:
             parts = _resolve_column_parts(col)
             if parts is None:
                 continue
-
             feature, raw_test, group = parts
+            if feature == "mean":
+                continue
             test_name = normalize_test_name(raw_test)
-
             col_data = score_table[col]
             pass_rate = (
                 sum(1 for v in col_data if _is_passed(v)) / len(col_data)
@@ -288,14 +292,12 @@ class AAScoreAnalyzer(Executor):
             )
             weight = 1 - abs(self.alpha - pass_rate)
             index_label = f"{feature} {test_name} {group}".strip()
-
             self._feature_weights[index_label] = weight
             aa_rows.append({
                 "_idx": index_label,
                 "score": weight,
                 "pass": weight >= self.threshold,
             })
-
         result_ds = self._build_aa_score_dataset(aa_rows)
         self.key = "aa score"
         return self._set_value(data, result_ds)
@@ -363,33 +365,26 @@ class AAScoreAnalyzer(Executor):
         )
         return score_col.idxmax()
 
-    def _compute_weighted_pvalues(self, score_table: Dataset) -> pd.Series:
-        """Compute feature-weighted sum of p-values across all test columns."""
-        weighted: pd.Series | None = None
-
+    def _compute_weighted_pvalues(self, score_table):
+        weighted = None
         pval_cols = [c for c in score_table.columns if "p-value" in c.lower()]
         for col in pval_cols:
             parts = _resolve_column_parts(col)
             if parts is None:
                 continue
-
             feature, raw_test, group = parts
             test_name = normalize_test_name(raw_test)
             lookup_key = f"{feature} {test_name} {group}".strip()
-
             weight = self._feature_weights.get(lookup_key, 0)
             if weight == 0:
                 weight = self._feature_weights.get(test_name, 0)
             if weight <= 0:
                 continue
-
             col_data = score_table.data[col].astype(float)
             contribution = col_data * weight
             weighted = contribution if weighted is None else weighted + contribution
-
         if weighted is None:
             return pd.Series(0.0, index=range(len(score_table)))
-
         return weighted / len(self._feature_weights)
 
     @staticmethod
@@ -419,6 +414,13 @@ class AAScoreAnalyzer(Executor):
             Updated ExperimentData with the best splitter applied.
         """
         self.key = "best splitter"
+
+        strat_cols = data.ds.search_columns(StratificationRole())
+        if strat_cols:
+            cleaned_ds = data.ds.dropna(subset=strat_cols)
+            if len(cleaned_ds) < len(data.ds):
+                data = data.copy(data=cleaned_ds)
+
         result = data.set_value(
             ExperimentDataEnum.variables, self.id, best_splitter_id, self.key
         )

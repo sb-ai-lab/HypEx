@@ -11,7 +11,7 @@ from ..comparators import GroupDifference, GroupSizes
 from ..dataset import Dataset, ExperimentData, SmallDataset
 from ..dataset.roles import InfoRole, StatisticRole, TreatmentRole
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
-from ..utils.constants import TEST_NAME_NORMALIZATION
+from ..utils.constants import TEST_NAME_NORMALIZATION, NAME_BORDER_SYMBOL
 from ..utils.errors import AbstractMethodError
 
 REPORTABLE_METRICS = frozenset({
@@ -101,6 +101,30 @@ def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
         return index_obj.tolist()
     return list(index_obj)
 
+def _normalize_group_name(group: str) -> str:
+    """Normalize group names by stripping tuple notation.
+
+    StatsComparator may produce tuple keys like '(1,)' while
+    GroupsComparator produces plain strings like '1'.
+    This function unifies them so the reporter merges rows correctly.
+
+    Examples:
+        '(1,)'   -> '1'
+        '(2,)'   -> '2'
+        "('a',)" -> "'a'"  (multi-value tuples are left as-is)
+        '1'      -> '1'   (already normal)
+    """
+    stripped = group.strip()
+    if stripped.startswith('(') and stripped.endswith(')'):
+        inner = stripped[1:-1]
+        # Remove trailing comma for single-element tuples: "1," -> "1"
+        if inner.endswith(','):
+            inner = inner[:-1]
+        # Only simplify if there's no remaining comma (single-element tuple)
+        if ',' not in inner:
+            return inner.strip()
+    return group
+
 def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bool) -> dict[str, Any]:
     """Extract and flatten metrics from a comparator's analysis table.
 
@@ -121,9 +145,18 @@ def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bo
     result = {}
     records = table.to_records()
     index_values = _get_index_values(table)
+
     for idx_val, row_dict in zip(index_values, records):
+        idx_str = str(idx_val)
+        if NAME_BORDER_SYMBOL in idx_str:
+            group, feature = idx_str.split(NAME_BORDER_SYMBOL, 1)
+        else:
+            group = idx_str
+            feature = key.field
+        group = _normalize_group_name(group)
+
         for col, val in row_dict.items():
-            full_key = f"{key.field}{sep}{key.executor}{sep}{col}{sep}{idx_val}"
+            full_key = f"{feature}{sep}{key.executor}{sep}{col}{sep}{group}"
             result[full_key] = _normalize_value(val)
     return result
 
@@ -297,19 +330,27 @@ class TestDictReporter(DictReporter, ABC):
         for feature, groups in data.items():
             for group, tests in groups.items():
                 row = {"feature": feature, "group": group}
+                
+                if "GroupDifference" in tests:
+                    metrics = tests["GroupDifference"]
+                    for k in ("control mean", "test mean", "difference", "difference %"):
+                        if k in metrics:
+                            row[k] = metrics.get(k)
+                            
                 for test_name, metrics in tests.items():
                     if test_name == "GroupDifference":
-                        row.update({k: metrics.get(k) for k in REPORTABLE_METRICS if k not in ("pass", "p-value")})
-                    else:
-                        row[f"{test_name} pass"] = metrics.get("pass")
-                        row[f"{test_name} p-value"] = metrics.get("p-value")
+                        continue
+                    norm_name = TEST_NAME_NORMALIZATION.get(test_name, test_name)
+                    row[f"{norm_name} pass"] = metrics.get("pass")
+                    row[f"{norm_name} p-value"] = metrics.get("p-value")
+                    
                 result.append(row)
-
+                
         for row in result:
             for k, v in list(row.items()):
                 if "pass" in k:
                     row[k] = "OK" if v is True or str(v).lower() in ("true", "1") else "NOT OK"
-
+                    
         if not result:
             return SmallDataset.from_dict(
                 {"feature": [], "group": []},

@@ -85,18 +85,17 @@ class StatsAggregationExtension(Extension):
             A nested dictionary mapping ``group_key`` → ``column`` →
             ``statistic`` → ``value``.
         """
-        from ..utils import NAME_BORDER_SYMBOL
-
         pdf = data.data  # pd.DataFrame
-        grouped = pdf.groupby(group_cols)
+        
+        group_by_arg = group_cols if len(group_cols) > 1 else group_cols[0]
+        grouped = pdf.groupby(group_by_arg)
         agg_result = grouped[target_cols].agg(stats)
-
-        # Flatten MultiIndex columns: (col, stat) → "col┆stat"
+        
+        # Flatten MultiIndex columns: (col, stat) -> "col┆stat"
         agg_result.columns = [
             f"{col}{NAME_BORDER_SYMBOL}{stat}"
             for col, stat in agg_result.columns
         ]
-
         result = {}
         for group_key in agg_result.index:
             result[group_key] = {}
@@ -106,8 +105,8 @@ class StatsAggregationExtension(Extension):
                 for stat in stats:
                     col_name = f"{col}{NAME_BORDER_SYMBOL}{stat}"
                     result[group_key][col][stat] = row[col_name]
-
         return result
+
 
     @timeit(level="SPARK", prefix="AGG_EXT_SPARK")
     def _calc_spark(
@@ -141,33 +140,45 @@ class StatsAggregationExtension(Extension):
 
         sdf = data.data.to_spark()
 
+        def safe_col(name: str):
+            return F.col(f"`{name}`")
+
+        for _col in target_cols:
+            sdf = sdf.withColumn(
+                _col,
+                F.when(F.isnan(safe_col(_col)), F.lit(None).cast("double"))
+                .otherwise(safe_col(_col)),
+            )
+
         agg_exprs = []
         for col in target_cols:
+            col_ref = safe_col(col)
             for stat in stats:
                 alias = f"{col}{NAME_BORDER_SYMBOL}{stat}"
                 if stat == "mean":
-                    agg_exprs.append(F.mean(F.col(col)).alias(alias))
+                    agg_exprs.append(F.mean(col_ref).alias(alias))
                 elif stat == "std":
-                    agg_exprs.append(F.stddev(F.col(col)).alias(alias))
+                    agg_exprs.append(F.stddev(col_ref).alias(alias))
                 elif stat == "var":
-                    agg_exprs.append(F.variance(F.col(col)).alias(alias))
+                    agg_exprs.append(F.variance(col_ref).alias(alias))
                 elif stat == "count":
-                    agg_exprs.append(F.count(F.col(col)).alias(alias))
+                    agg_exprs.append(F.count(col_ref).alias(alias))
                 elif stat == "sum":
-                    agg_exprs.append(F.sum(F.col(col)).alias(alias))
+                    agg_exprs.append(F.sum(col_ref).alias(alias))
                 elif stat == "min":
-                    agg_exprs.append(F.min(F.col(col)).alias(alias))
+                    agg_exprs.append(F.min(col_ref).alias(alias))
                 elif stat == "max":
-                    agg_exprs.append(F.max(F.col(col)).alias(alias))
+                    agg_exprs.append(F.max(col_ref).alias(alias))
 
-        agg_sdf = sdf.groupBy(*group_cols).agg(*agg_exprs)
+        group_col_refs = [safe_col(c) for c in group_cols]
+        agg_sdf = sdf.groupBy(*group_col_refs).agg(*agg_exprs)
         rows = agg_sdf.collect()
 
         result = {}
         for row in rows:
             group_key = (
-                row[group_cols[0]] 
-                if len(group_cols) == 1 
+                row[group_cols[0]]
+                if len(group_cols) == 1
                 else tuple(row[c] for c in group_cols)
             )
             result[group_key] = {}
@@ -257,27 +268,31 @@ class StatsKSTestExtension(Extension):
 
         sdf = data.data.to_spark()
 
+        def safe_col(name: str):
+            return F.col(f"`{name}`")
+
         # ── Job 1: global bounds (min/max for all targets) ──────────
         agg_exprs = []
         for col in target_cols:
+            col_ref = safe_col(col)
             agg_exprs.extend([
-                F.min(F.col(col)).alias(f"{col}┆min"),
-                F.max(F.col(col)).alias(f"{col}┆max"),
+                F.min(col_ref).alias(f"{col}┆min"),
+                F.max(col_ref).alias(f"{col}┆max"),
             ])
         bounds_row = sdf.agg(*agg_exprs).collect()[0]
 
         # ── Unpivot: all targets -> (column_name, value) ────────────
         unpivoted = sdf.select(
-            group_col,
+            safe_col(group_col),
             F.explode(F.array([
                 F.struct(
                     F.lit(col).alias("column_name"),
-                    F.col(col).alias("value"),
+                    safe_col(col).alias("value"),
                 )
                 for col in target_cols
             ])).alias("data"),
         ).select(
-            group_col,
+            safe_col(group_col).alias(group_col),
             F.col("data.column_name").alias("column_name"),
             F.col("data.value").alias("value"),
         )
@@ -286,7 +301,7 @@ class StatsKSTestExtension(Extension):
         count_rows = (
             unpivoted
             .filter(F.col("value").isNotNull())
-            .groupBy(group_col, "column_name")
+            .groupBy(safe_col(group_col), F.col("column_name"))
             .count()
             .collect()
         )
@@ -299,15 +314,12 @@ class StatsKSTestExtension(Extension):
         for col in target_cols:
             col_min = bounds_row[f"{col}┆min"]
             col_max = bounds_row[f"{col}┆max"]
-
             if col_min is None or col_max is None or col_min == col_max:
-                # Edge case: all values identical or all NULL -> bucket 0
                 bucket_expr = F.when(
                     F.col("column_name") == F.lit(col),
                     F.lit(0).cast("int"),
                 ).otherwise(bucket_expr)
                 continue
-
             width = (col_max - col_min) / self.n_bins
             bucket_expr = F.when(
                 (F.col("column_name") == F.lit(col)) & F.col("value").isNotNull(),
@@ -322,14 +334,13 @@ class StatsKSTestExtension(Extension):
             unpivoted
             .withColumn("_bucket", bucket_expr)
             .filter(F.col("value").isNotNull() & F.col("_bucket").isNotNull())
-            .groupBy(group_col, "column_name", "_bucket")
+            .groupBy(safe_col(group_col), F.col("column_name"), F.col("_bucket"))
             .count()
             .collect()
         )
 
         # ── Assemble all_group_stats ────────────────────────────────
         all_group_stats: dict[str, dict[str, dict]] = {}
-
         for row in hist_rows:
             grp = row[group_col]
             col = row["column_name"]
@@ -340,7 +351,6 @@ class StatsKSTestExtension(Extension):
             )
             all_group_stats[grp][col]["histogram"][bucket] = cnt
 
-        # Fill in counts from Job 2 (this was the missing piece)
         for (grp, col), cnt in group_counts.items():
             all_group_stats.setdefault(grp, {}).setdefault(
                 col, {"histogram": {}, "count": 0}
@@ -453,32 +463,35 @@ class StatsChi2TestExtension(Extension):
             ``{"value_counts": {category: count, ...}}``.
         """
         import pyspark.sql.functions as F
-        
+
         sdf = data.data.to_spark()
-        
+
+        def safe_col(name: str):
+            return F.col(f"`{name}`")
+
         # UNPIVOT
         unpivoted = sdf.select(
-            group_col,
+            safe_col(group_col),
             F.explode(F.array([
                 F.struct(
                     F.lit(col).alias("column_name"),
-                    F.col(col).alias("value")
+                    safe_col(col).alias("value")
                 ) for col in target_cols
             ])).alias("data")
         ).select(
-            group_col,
+            safe_col(group_col).alias(group_col),
             F.col("data.column_name").alias("column_name"),
             F.col("data.value").alias("value")
         )
-        
+
         value_counts_df = (
             unpivoted
             .filter(F.col("value").isNotNull())
-            .groupBy(group_col, "column_name", "value")
+            .groupBy(safe_col(group_col), F.col("column_name"), F.col("value"))
             .count()
             .collect()
         )
-        
+
         result = {}
         for row in value_counts_df:
             grp = row[group_col]
@@ -487,5 +500,5 @@ class StatsChi2TestExtension(Extension):
             cnt = row["count"]
             result.setdefault(grp, {}).setdefault(col, {"value_counts": {}})
             result[grp][col]["value_counts"][val] = cnt
-        
+
         return result
