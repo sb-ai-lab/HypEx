@@ -15,7 +15,7 @@ from ..dataset import (
 )
 from ..dataset.roles import ConstGroupRole, IndexRole
 from ..executor import Calculator
-from ..utils import ExperimentDataEnum, BackendsEnum
+from ..utils import ExperimentDataEnum, BackendsEnum, timeit
 
 
 class AASplitter(Calculator):
@@ -86,6 +86,8 @@ class AASplitter(Calculator):
             unique_vals = data.ds[splitter_col].unique()
             group_keys = list(unique_vals[splitter_col].to_dict().values())
             for group_key in group_keys:
+                if group_key is None:
+                    continue
                 mask = data.ds[splitter_col] == group_key
                 group_data = data.ds[mask]
                 data.set_value(
@@ -105,51 +107,67 @@ class AASplitter(Calculator):
         sample_size: float | None = 1.0,
         const_group_field: str | None = None,
         **kwargs,
-    ) -> list[str]:
-        # >>>TODO: need fix in feature>>>
+    ) -> Dataset:
+        """
+        Splits data into control/test groups using distributed labeling.
+        Avoids iloc/sort-limit OOM issues on Spark.
+        """
+        # Handle const_group_field filtering
         if const_group_field:
-            const_data = dict(data.groupby(const_group_field))
-            control_data = const_data.get("control")
-            const_size = sum(len(cd) for cd in const_data.values())
-            control_size = (
-                0
-                if len(data) <= const_size
-                else (len(data)*control_size - len(const_data["control"])) / (len(data) - const_size)
-            )
-        # <<<TODO: need fix in feature<<<
-        ds_sampled = (data
-            .filter(data.select(const_group_field).isna()) if const_group_field else data
-        ).sample(frac=sample_size if sample_size is not None else 1.0, random_state=random_state)
-        len_ds_sampled = len(ds_sampled)
-
-        edges = []
-        if groups_sizes:
-            if sum(groups_sizes) != 1:
-                raise ValueError("Groups sizes must sum to 1")
-            for group_size in groups_sizes:
-                size = int(len_ds_sampled * group_size) + (
-                    0 if not edges else edges[-1]
-                )
-                size = min(size, len_ds_sampled)
-                if size not in edges:
-                    edges += [size]
+            data_to_split = data.filter(data.select(const_group_field).isna())
         else:
-            edges = [int(len_ds_sampled * control_size), len_ds_sampled]
-            
-        test_slices = [slice(edges[i - 1], edges[i]) for i in range(1, len(edges))]
+            data_to_split = data
+        # Determine fraction and total count
+        # Note: len() on Spark Dataset triggers a count(), which is necessary 
+        # to calculate exact edges for balanced splits.
+        n_total = len(data_to_split)
+        frac = sample_size if sample_size is not None else 1.0
+        n_sampled = int(n_total * frac)
 
-        control_data = ds_sampled.iloc[: edges[0]]
-        control_data.add_column("control", {"split": StatisticRole()})
-        
-        for i, test_index in enumerate(test_slices):
-            test_data = ds_sampled.iloc[test_index].add_column(f"test_{i}", {"split": StatisticRole()})
-            if i == 0:
-                ds_out = control_data.append(test_data)
-            else:
-                ds_out = ds_out.append(test_data)        
-        
-        return ds_out["split"]
+        if n_sampled == 0:
+            # Return empty dataset with same structure if nothing to sample
+            return Dataset.create_empty(
+                roles={"split": StatisticRole()}, backend=data.backend_type
+            )
 
+        MOD = 10_000_000
+
+        effective_mod = int(frac * MOD) if frac < 1.0 else MOD
+
+        if groups_sizes:
+            labels = ["control"] + [
+                f"test_{i+1}" for i in range(len(groups_sizes) - 1)
+            ]
+            edges = []
+            cumulative = 0.0
+            for size_prop in groups_sizes:
+                cumulative += size_prop
+                edges.append(int(cumulative * effective_mod))
+            edges[-1] = effective_mod
+        else:
+            n_control = int(n_sampled * control_size)
+            edges = [
+                int((n_control / n_sampled) * effective_mod)
+                if n_sampled > 0
+                else 0,
+                effective_mod,
+            ]
+            labels = ["control", "test_1"]
+
+        # Call the new backend method
+        # This returns a Dataset with the original index and a new 'split' column
+        split_ds = data_to_split.random_split_labels(
+            edges=edges,
+            labels=labels,
+            random_state=random_state,
+            frac=frac,
+            name="split",
+        )
+        # Ensure roles are set correctly
+        split_ds.roles["split"] = StatisticRole() # Or AdditionalTreatmentRole depending on downstream usage
+        return split_ds
+
+    @timeit(level="SPLIT", prefix="SPLITTER")
     def execute(self, data: ExperimentData) -> ExperimentData:
         const_group_fields = data.ds.search_columns(ConstGroupRole())
         const_group_fields = (
@@ -163,10 +181,12 @@ class AASplitter(Calculator):
             const_group_field=const_group_fields,
             groups_sizes=self.groups_sizes,
         )
-        return self._set_value(
-            data,
-            result,
-        )
+        data = self._set_value(data, result)
+
+        # if data.ds.backend_type == BackendsEnum.spark:
+        #     data.ds.checkpoint(eager=True)
+
+        return data
 
 
 class AASplitterWithStratification(AASplitter):
@@ -176,24 +196,63 @@ class AASplitterWithStratification(AASplitter):
         random_state: int | None = None,
         control_size: float = 0.5,
         grouping_fields=None,
+        groups_sizes: list[float] | None = None,
+        sample_size: float | None = 1.0,
         **kwargs,
-    ) -> list[str] | Dataset:
+    ) -> Dataset:
         if not grouping_fields:
             return AASplitter._inner_function(
-                data, random_state, control_size, **kwargs
+                data,
+                random_state,
+                control_size,
+                groups_sizes=groups_sizes,
+                sample_size=sample_size,
+                **kwargs,
             )
-
-        result = {"split": []}
-        index = []
-        for group, group_data in data.groupby(grouping_fields):
-            result["split"].extend(
-                AASplitter._inner_function(group_data, random_state, control_size)
+        
+        # For stratified split, we need to apply the split logic within each group.
+        # However, doing len() per group is expensive.
+        # Optimization: Use the global random_split_labels but include grouping fields in the hash?
+        # No, stratification requires exact proportions PER GROUP.
+        
+        # We must iterate groups. To avoid OOM, we rely on the new random_split_labels 
+        # being safe for each group partition.
+        
+        result_splits = []
+        
+        # GroupBy in Spark Dataset returns an iterator of (key, Dataset)
+        # Note: This materializes groups if not careful, but with the new split method,
+        # each group's split is a lightweight transformation.
+        
+        for _, group_data in data.groupby(grouping_fields):
+            # group_data is a Dataset
+            group_split = AASplitter._inner_function(
+                group_data,
+                random_state,
+                control_size,
+                groups_sizes=groups_sizes,
+                sample_size=sample_size,
+                **kwargs,
             )
-            index.extend(list(group_data.index))
-        return Dataset.from_dict(result, index=index, roles={"split": TreatmentRole()})
+            result_splits.append(group_split)
+            
+        if not result_splits:
+            return Dataset.create_empty(roles={"split": StatisticRole()}, backend=data.backend_type)
+            
+        # Append all splits back together
+        combined_split = result_splits[0]
+        for i in range(1, len(result_splits)):
+            combined_split = combined_split.append(result_splits[i])
+            
+        return combined_split
 
+    @timeit(level="SPLIT", prefix="SPLITTER_STRAT")
     def execute(self, data: ExperimentData) -> ExperimentData:
         grouping_fields = data.ds.search_columns(StratificationRole())
+        
+        if data.ds.backend_type == BackendsEnum.spark and not data.ds.is_persisted:
+            data.ds.persist(storage_level="MEMORY_AND_DISK", action="count")
+
         result = self.calc(
             data.ds,
             random_state=self.random_state,
@@ -201,6 +260,13 @@ class AASplitterWithStratification(AASplitter):
             grouping_fields=grouping_fields,
             groups_sizes=self.groups_sizes,
         )
+        
         if isinstance(result, Dataset):
             result = result.replace_roles({"split": AdditionalTreatmentRole()})
-        return self._set_value(data, result)
+        
+        data = self._set_value(data, result)
+
+        # if data.ds.backend_type == BackendsEnum.spark:
+        #     data.ds.checkpoint(eager=True)
+
+        return data

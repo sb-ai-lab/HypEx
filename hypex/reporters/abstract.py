@@ -3,14 +3,15 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 import numpy as np
 
-from ..dataset import Dataset, SmallDataset, ExperimentData
-from ..dataset.roles import InfoRole, TreatmentRole
 from ..comparators import GroupDifference, GroupSizes
+from ..dataset import Dataset, ExperimentData, SmallDataset
+from ..dataset.roles import InfoRole, StatisticRole, TreatmentRole
 from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
+from ..utils.constants import TEST_NAME_NORMALIZATION, NAME_BORDER_SYMBOL
 from ..utils.errors import AbstractMethodError
 
 REPORTABLE_METRICS = frozenset({
@@ -100,6 +101,30 @@ def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
         return index_obj.tolist()
     return list(index_obj)
 
+def _normalize_group_name(group: str) -> str:
+    """Normalize group names by stripping tuple notation.
+
+    StatsComparator may produce tuple keys like '(1,)' while
+    GroupsComparator produces plain strings like '1'.
+    This function unifies them so the reporter merges rows correctly.
+
+    Examples:
+        '(1,)'   -> '1'
+        '(2,)'   -> '2'
+        "('a',)" -> "'a'"  (multi-value tuples are left as-is)
+        '1'      -> '1'   (already normal)
+    """
+    stripped = group.strip()
+    if stripped.startswith('(') and stripped.endswith(')'):
+        inner = stripped[1:-1]
+        # Remove trailing comma for single-element tuples: "1," -> "1"
+        if inner.endswith(','):
+            inner = inner[:-1]
+        # Only simplify if there's no remaining comma (single-element tuple)
+        if ',' not in inner:
+            return inner.strip()
+    return group
+
 def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bool) -> dict[str, Any]:
     """Extract and flatten metrics from a comparator's analysis table.
 
@@ -115,18 +140,24 @@ def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bo
     table = data.analysis_tables.get(comparator_id)
     if table is None or table.is_empty():
         return {}
-        
     key = ResultKey.from_id(comparator_id)
     sep = " " if front else ID_SPLIT_SYMBOL
     result = {}
-    
     records = table.to_records()
     index_values = _get_index_values(table)
-    
+
     for idx_val, row_dict in zip(index_values, records):
+        idx_str = str(idx_val)
+        if NAME_BORDER_SYMBOL in idx_str:
+            group, feature = idx_str.split(NAME_BORDER_SYMBOL, 1)
+        else:
+            group = idx_str
+            feature = key.field
+        group = _normalize_group_name(group)
+
         for col, val in row_dict.items():
-            result[f"{key.field}{sep}{key.executor}{sep}{col}{sep}{idx_val}"] = _normalize_value(val)
-            
+            full_key = f"{feature}{sep}{key.executor}{sep}{col}{sep}{group}"
+            result[full_key] = _normalize_value(val)
     return result
 
 def extract_tests(data: ExperimentData, test_classes: list[type], front: bool) -> dict[str, Any]:
@@ -299,19 +330,27 @@ class TestDictReporter(DictReporter, ABC):
         for feature, groups in data.items():
             for group, tests in groups.items():
                 row = {"feature": feature, "group": group}
+                
+                if "GroupDifference" in tests:
+                    metrics = tests["GroupDifference"]
+                    for k in ("control mean", "test mean", "difference", "difference %"):
+                        if k in metrics:
+                            row[k] = metrics.get(k)
+                            
                 for test_name, metrics in tests.items():
                     if test_name == "GroupDifference":
-                        row.update({k: metrics.get(k) for k in REPORTABLE_METRICS if k not in ("pass", "p-value")})
-                    else:
-                        row[f"{test_name} pass"] = metrics.get("pass")
-                        row[f"{test_name} p-value"] = metrics.get("p-value")
+                        continue
+                    norm_name = TEST_NAME_NORMALIZATION.get(test_name, test_name)
+                    row[f"{norm_name} pass"] = metrics.get("pass")
+                    row[f"{norm_name} p-value"] = metrics.get("p-value")
+                    
                 result.append(row)
-
+                
         for row in result:
             for k, v in list(row.items()):
                 if "pass" in k:
                     row[k] = "OK" if v is True or str(v).lower() in ("true", "1") else "NOT OK"
-
+                    
         if not result:
             return SmallDataset.from_dict(
                 {"feature": [], "group": []},
@@ -335,49 +374,26 @@ class TestDictReporter(DictReporter, ABC):
 
 class DatasetReporter(Reporter):
     """Reporter that outputs results as a structured ``Dataset`` or dictionary."""
+
     def __init__(
         self,
         dict_reporter: DictReporter | None = None,
-        output_format: Literal["dict", "dataset"] = "dataset"
+        output_format: Literal["dict", "dataset"] = "dataset",
+        single_row: bool = False,
     ):
         self.dict_reporter = dict_reporter or DictReporter()
         self.output_format = output_format
-        
+        self.single_row = single_row
+
     @property
     def front(self) -> bool:
-        """Get or set the front-end formatting flag on the underlying dict reporter.
-
-        Getter returns the current boolean state. Setter updates the state.
-        """
         return self.dict_reporter.front
 
     @front.setter
     def front(self, value: bool) -> None:
-        """Get or set the front-end formatting flag on the underlying dict reporter.
-
-        Getter returns the current boolean state. Setter updates the state.
-        """
         self.dict_reporter.front = value
 
-    def _with_front(
-        self,
-        data: ExperimentData,
-        front_flag: bool,
-        func: Callable[[ExperimentData], dict | Dataset],
-    ) -> dict | Dataset:
-        """Temporarily override the ``front`` flag, execute a function, and restore.
-
-        Ensures the ``front`` state is always restored, even if the function
-        raises an exception.
-
-        Args:
-            data: The experiment data container.
-            front_flag: The temporary value for the ``front`` flag.
-            func: Callable to execute with the experiment data.
-
-        Returns:
-            The result of ``func``.
-        """
+    def _with_front(self, data, front_flag, func):
         old_front = self.dict_reporter.front
         self.dict_reporter.front = front_flag
         try:
@@ -385,31 +401,48 @@ class DatasetReporter(Reporter):
         finally:
             self.dict_reporter.front = old_front
 
+    def _report(self, data: ExperimentData) -> dict[str, Any]:
+        return self.dict_reporter.report(data)
+
     def report(self, data: ExperimentData) -> dict | Dataset:
-        """Generate the final report in the configured format.
+        old_front = self.dict_reporter.front
+        self.dict_reporter.front = False
+        try:
+            dict_result = self._report(data)
+        finally:
+            self.dict_reporter.front = old_front
 
-        Args:
-            data: The experiment data container.
-
-        Returns:
-            The report as a dictionary or ``Dataset``, depending on ``output_format``.
-        """
-        dict_result = self.dict_reporter.report(data)
-        
         if self.output_format == "dict":
             return dict_result
+        if self.single_row:
+            return self._to_single_row_dataset(dict_result)
         struct_dict = TestDictReporter._get_struct_dict(dict_result)
         return TestDictReporter._convert_struct_dict_to_dataset(struct_dict)
 
     @staticmethod
-    def convert_to_dataset(data: dict) -> Dataset | SmallDataset:
-        """Convert a flat dictionary report into a structured ``Dataset``.
+    def _to_single_row_dataset(data: dict) -> SmallDataset:
+        """Convert flat dict with composite keys to a single-row dataset.
 
-        Args:
-            data: The flat dictionary with composite keys.
-
-        Returns:
-            A ``Dataset`` or ``SmallDataset`` containing the structured results.
+        Each key like ``feature┆Executor┆metric┆group`` becomes a column
+        ``feature Executor metric group`` (with normalised test names).
         """
+        row: dict[str, Any] = {}
+        for key, value in data.items():
+            col = str(key)
+            if ID_SPLIT_SYMBOL in col:
+                col = col.replace(ID_SPLIT_SYMBOL, " ")
+            # Normalize executor names: StatsTTest → TTest, etc.
+            for raw_name, norm_name in TEST_NAME_NORMALIZATION.items():
+                if raw_name != norm_name:
+                    col = col.replace(raw_name, norm_name)
+            row[col] = _normalize_value(value)
+        if not row:
+            return SmallDataset.create_empty()
+        return SmallDataset.from_dict(
+            [row], roles={c: StatisticRole() for c in row}
+        )
+
+    @staticmethod
+    def convert_to_dataset(data: dict) -> Dataset | SmallDataset:
         struct_dict = TestDictReporter._get_struct_dict(data)
         return TestDictReporter._convert_struct_dict_to_dataset(struct_dict)

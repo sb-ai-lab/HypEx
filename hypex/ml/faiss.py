@@ -287,29 +287,26 @@ class FaissNearestNeighbors(MLExecutor):
         nans = 0
 
         for group, result in compare_result.items():
-            nans += (
-                # TODO: find more elegant solution
-                sum(result.isna().nunique().values()) - len(result.columns)
-            )
+            nans += sum(result.count_nulls().values())
             result = result.fillna(-1).astype({col: int for col in result.columns})
         if nans > 0:
             warn(
                 f"Faiss returned {nans} nans, which were replaced with dummy matches. Check if the data is suitable for the test.",
                 UserWarning,
             )
-        matched_indexes = Dataset.create_empty(
+        matched_indexes: Dataset = Dataset.create_empty(
             backend=data.ds.backend_type,
             session=data.ds.session
         )
-        # matched_indexes.index.name = None
         for res_k, res_v in compare_result.items():
             group = grouping_data[1][1] if res_k == "test" else grouping_data[0][1]
             # res_v has index similar to group data
             #`limit` may be removed
-            t_index_field: Dataset = res_v.limit(len(group))
+            t_index_field: Dataset = res_v
 
             # TODO: Similar comment as abobe: find more elegant solution
-            n_nans = sum(t_index_field.isna().nunique().values()) - len(t_index_field.columns)
+            n_nans = sum(t_index_field.count_nulls().values())
+            # n_nans = sum(t_index_field.isna().nunique().values()) - len(t_index_field.columns)
 
             if n_nans:
                 raise PairsNotFoundError
@@ -320,8 +317,7 @@ class FaissNearestNeighbors(MLExecutor):
                 col: AdditionalMatchingRole() for col in  t_index_field.columns
             }
             matched_indexes = matched_indexes.append(t_index_field)
-        if matched_indexes is not None:
-            matched_indexes = matched_indexes.sort()
+        matched_indexes.checkpoint(eager=True)
         if len(matched_indexes) < len(data.ds) and not self.two_sides:
             matched_indexes = matched_indexes.reindex(data.ds.index, fill_value=-1)
         elif len(matched_indexes) < len(data.ds) and self.two_sides:
@@ -330,5 +326,6 @@ class FaissNearestNeighbors(MLExecutor):
         # unpersist `contol` and `test` indexes as they are
         # already persisted in `ds` using  `_set_value`
         for res_v in compare_result.values():
-            res_v.unpersist()
+            if res_v.is_persisted:
+                res_v.unpersist()
         return result
