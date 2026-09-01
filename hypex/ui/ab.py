@@ -4,7 +4,7 @@ from ..analyzers.ab import ABAnalyzer
 from ..comparators import GroupDifference, GroupSizes
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole, TreatmentRole
 from ..reporters.ab import ABDatasetReporter
-from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
+from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, NAME_BORDER_SYMBOL
 from .base import Output
 
 
@@ -66,11 +66,15 @@ class ABOutput(Output):
             GroupDifference,
             searched_space=ExperimentDataEnum.analysis_tables,
         )["GroupDifference"]["analysis_tables"]
-        self._groups = list(
-            experiment_data.groups[
-                experiment_data.ds.search_columns(TreatmentRole())[0]
-            ].keys()
-        )[1:]
+
+        self._groups = [
+            str(g) for g in list(
+                experiment_data.groups[
+                    experiment_data.ds.search_columns(TreatmentRole())[0]
+                ].keys()
+            )[1:]
+        ]
+
         for i in self._groups:
             groups += [i] * len(ids)
 
@@ -80,20 +84,25 @@ class ABOutput(Output):
         diff = experiment_data.analysis_tables[ids[0]]
         for i in range(1, len(ids)):
             diff = diff.append(experiment_data.analysis_tables[ids[i]])
-            
+
         for cid in ids:
             targets.append(cid.split(ID_SPLIT_SYMBOL)[-1])
-            
+
         return diff.add_column(groups, role={"group": StatisticRole()}).add_column(
             targets * len(self._groups), role={"feature": StatisticRole()}
         )
 
-    def _extract_sizes(self, experiment_data: ExperimentData):
+    def _extract_sizes(self, experiment_data: ExperimentData):        
         ids = experiment_data.get_ids(
             GroupSizes,
             searched_space=ExperimentDataEnum.analysis_tables,
         )["GroupSizes"]["analysis_tables"]
-        self.sizes = experiment_data.analysis_tables[ids[0]].add_column(
+        
+        main_ids = [i for i in ids if not i.endswith(f"{NAME_BORDER_SYMBOL}stats")]
+        if not main_ids:
+            main_ids = ids
+            
+        self.sizes = experiment_data.analysis_tables[main_ids[0]].add_column(
             self._groups, role={"group": StatisticRole()}
         )
 

@@ -6,6 +6,7 @@ from statsmodels.stats.multitest import multipletests  # type: ignore
 
 from ..dataset import Dataset, DatasetAdapter, StatisticRole
 from ..utils import ID_SPLIT_SYMBOL, ABNTestMethodsEnum, BackendsEnum
+from ..utils.constants import TEST_NAME_NORMALIZATION
 from .abstract import Extension
 
 
@@ -56,14 +57,15 @@ class MultiTest(Extension):
         new_pvalues = multipletests(
             p_values, method=self.method.value, alpha=self.alpha, **kwargs
         )
-
         fields: list[str] = []
         tests: list[str] = []
         for idx in data.index:
             s = str(idx)
             parts = s.split(ID_SPLIT_SYMBOL)
             fields.append(parts[2] if len(parts) > 2 else s)
-            tests.append(parts[0] if len(parts) > 0 else s)
+
+            test_name = parts[0] if len(parts) > 0 else s
+            tests.append(TEST_NAME_NORMALIZATION.get(test_name, test_name))
 
         return DatasetAdapter.to_dataset(
             {

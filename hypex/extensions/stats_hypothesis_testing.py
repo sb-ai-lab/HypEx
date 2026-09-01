@@ -85,18 +85,17 @@ class StatsAggregationExtension(Extension):
             A nested dictionary mapping ``group_key`` → ``column`` →
             ``statistic`` → ``value``.
         """
-        from ..utils import NAME_BORDER_SYMBOL
-
         pdf = data.data  # pd.DataFrame
-        grouped = pdf.groupby(group_cols)
+        
+        group_by_arg = group_cols if len(group_cols) > 1 else group_cols[0]
+        grouped = pdf.groupby(group_by_arg)
         agg_result = grouped[target_cols].agg(stats)
-
-        # Flatten MultiIndex columns: (col, stat) → "col┆stat"
+        
+        # Flatten MultiIndex columns: (col, stat) -> "col┆stat"
         agg_result.columns = [
             f"{col}{NAME_BORDER_SYMBOL}{stat}"
             for col, stat in agg_result.columns
         ]
-
         result = {}
         for group_key in agg_result.index:
             result[group_key] = {}
@@ -106,7 +105,6 @@ class StatsAggregationExtension(Extension):
                 for stat in stats:
                     col_name = f"{col}{NAME_BORDER_SYMBOL}{stat}"
                     result[group_key][col][stat] = row[col_name]
-
         return result
 
 
@@ -142,10 +140,15 @@ class StatsAggregationExtension(Extension):
 
         sdf = data.data.to_spark()
 
-        # FIX: экранируем имена колонок обратными кавычками,
-        # чтобы точки не интерпретировались как доступ к полю структуры
         def safe_col(name: str):
             return F.col(f"`{name}`")
+
+        for _col in target_cols:
+            sdf = sdf.withColumn(
+                _col,
+                F.when(F.isnan(safe_col(_col)), F.lit(None).cast("double"))
+                .otherwise(safe_col(_col)),
+            )
 
         agg_exprs = []
         for col in target_cols:
