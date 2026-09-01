@@ -16,6 +16,7 @@ from ..dataset.dataset import SmallDataset
 from ..experiments.base import Executor
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
 from ..utils import ABNTestMethodsEnum, ExperimentDataEnum, timeit
+from ..utils.constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
 
 
 class ABAnalyzer(Executor):
@@ -235,32 +236,39 @@ class ABAnalyzer(Executor):
 
         for c, spaces in executor_ids.items():
             analysis_ids = spaces.get("analysis_tables", [])
+
+            analysis_ids = [
+                aid for aid in analysis_ids
+                if not aid.endswith(f"{NAME_BORDER_SYMBOL}stats")
+            ]
+
             if len(analysis_ids) == 0:
                 continue
-
             t_data = deepcopy(data.analysis_tables[analysis_ids[0]])
             for aid in analysis_ids[1:]:
                 t_data = t_data.append(data.analysis_tables[aid])
-
             if len(t_data) > 0:
-                current_index_len = (
-                    len(t_data.data.index)
-                    if hasattr(t_data.data, "index")
-                    else 0
-                )
-                if current_index_len != len(t_data):
-                    new_index = []
-                    for i in range(len(t_data)):
-                        if i < len(analysis_ids):
-                            new_index.append(analysis_ids[i])
-                        else:
-                            col_name = (
-                                t_data.columns[0]
-                                if len(t_data.columns) > 0
-                                else "metric"
-                            )
-                            new_index.append(f"{c}┴┴{col_name}┴┴row{i}")
-                    t_data.data.index = new_index
+
+                index_obj = t_data.data.index
+                if hasattr(index_obj, "to_list"):
+                    index_values = index_obj.to_list()
+                elif hasattr(index_obj, "tolist"):
+                    index_values = index_obj.tolist()
+                else:
+                    index_values = list(index_obj)
+
+                new_index = []
+                for idx_val in index_values:
+                    idx_str = str(idx_val)
+                    if NAME_BORDER_SYMBOL in idx_str:
+                        group, feature = idx_str.split(NAME_BORDER_SYMBOL, 1)
+                        new_index.append(
+                            f"{c}{ID_SPLIT_SYMBOL}{ID_SPLIT_SYMBOL}"
+                            f"{feature}{ID_SPLIT_SYMBOL}{group}"
+                        )
+                    else:
+                        new_index.append(idx_str)
+                t_data.data.index = new_index
 
                 for f in ["p-value", "pass"]:
                     step = len(t_data) // num_groups if num_groups > 0 else 1
