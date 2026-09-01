@@ -132,8 +132,16 @@ class MatchingMetricsExtension(Extension):
             ],
             search_types=[int, float]
         )
-        bias_col = data.search_columns(AdditionalStatisticRole())[0] or None
-        new_target_col = data.search_columns(AdditionalTargetRole())[0] or None
+        bias_col = (
+            data.search_columns(AdditionalStatisticRole())[0]
+            if data.search_columns(AdditionalStatisticRole())
+            else None
+        )
+        new_target_col = (
+            data.search_columns(AdditionalTargetRole())[0]
+            if data.search_columns(AdditionalTargetRole())
+            else None
+        )
         return neighbors_cols, numeric_cols, bias_col, new_target_col
 
     def _set_columns(self, data: Dataset) -> list[str]:
@@ -308,8 +316,6 @@ class MatchingMetricsExtension(Extension):
             # neighbors_cols, numeric_cols, bias_col = self._extract_info(data)
             new_target_data = self.prepare_data(
                 data = data,
-                neighbors_cols=neighbors_cols,
-                numeric_cols=numeric_cols
             )
             new_data = data.add_column(new_target_data)
             new_target_col = self.target_field + "_matched"
@@ -362,9 +368,11 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         # adjusting the features of our neighbors according to their indexes
         matched_features = t_data.loc[melted['match_index']].copy()
         matched_features.index = melted['initial_index'].values
+        matched_features.index.name = 'initial_index'
 
         # calc mean by initial index
         matched_data = matched_features.groupby(level=0).mean()
+        matched_data = matched_data.reset_index() # reset is nessesary because 'initial index' will be used as data index soon
         matched_data = matched_data.rename(columns={col: f"{col}_matched" for col in numeric_cols})
 
         # add zero bias if Bias extension didn't execute
