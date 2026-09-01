@@ -1,6 +1,10 @@
+# hypex/ui/matching.py
 from __future__ import annotations
 
 from typing import Any
+
+import pandas as pd
+
 
 from ..analyzers.matching import MatchingAnalyzer
 from ..dataset import (
@@ -14,7 +18,7 @@ from ..dataset import (
     TargetRole,
 )
 from ..reporters.matching import MatchingDictReporter, MatchingQualityDatasetReporter
-from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL, BackendsEnum
+from ..utils import BackendsEnum, ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL
 from .base import Output
 
 
@@ -35,7 +39,6 @@ class MatchingOutput(Output):
             resume_reporter=MatchingDictReporter(searching_class),
             additional_reporters={"quality_results": MatchingQualityDatasetReporter()},
         )
-    
 
     def _extract_full_data(self, experiment_data: ExperimentData, indexes: Dataset):
         """Build the full matched dataset from original data and matched indexes.
@@ -50,44 +53,80 @@ class MatchingOutput(Output):
         """
         # ── Convert to list to avoid PySpark Index → Pandas assignment error ──
         ds_index = experiment_data.ds.index.to_numpy().tolist()
-
         self.indexes = Dataset(roles={}, data=experiment_data.ds.index)
+
         for i in range(len(indexes.columns)):
             t_indexes = indexes.iloc[:, i]
             t_indexes.index = ds_index
             filtered_field = indexes.drop(
                 indexes[indexes[t_indexes.columns[0]] == -1], axis=0
             )
-            matched_data = experiment_data.ds.loc[
-                list(map(lambda x: x[0], filtered_field.get_values()))
-            ].rename({col: col + f"_matched_{i}" for col in experiment_data.ds.columns})
 
-            # ── FIX: Handle index assignment based on backend ──
+            lookup_vals = list(map(lambda x: x[0], filtered_field.get_values()))
             filtered_index_list = filtered_field.index.to_numpy().tolist()
+
             if experiment_data.ds.backend_type == BackendsEnum.spark:
-                # PySpark's set_index() expects column names, not raw values.
-                # Add the desired index as a temporary column, then promote it.
-                temp_col_name = f"_hypex_temp_idx_{i}"
-                matched_data = matched_data.add_column(
-                    filtered_index_list,
-                    {temp_col_name: InfoRole()},
+                mapping_ds = Dataset(
+                    roles={
+                        "_hypex_pos": InfoRole(),
+                        "_hypex_lookup": InfoRole(),
+                    },
+                    data=pd.DataFrame({
+                        "_hypex_pos": filtered_index_list,
+                        "_hypex_lookup": lookup_vals,
+                    }),
+                    backend=BackendsEnum.spark,
+                    session=experiment_data.ds.session,
                 )
-                matched_data = matched_data.set_index(temp_col_name, drop=True)
+                orig_cols = set(experiment_data.ds.columns)
+                ds_reset = experiment_data.ds.reset_index()
+                idx_col = next(c for c in ds_reset.columns if c not in orig_cols)
+
+                matched_data = mapping_ds.merge(
+                    ds_reset,
+                    left_on="_hypex_lookup",
+                    right_on=idx_col,
+                    how="left",
+                )
+                matched_data = matched_data.set_index("_hypex_pos", drop=True)
+                matched_data = matched_data.drop(columns=["_hypex_lookup", idx_col])
             else:
+                matched_data = experiment_data.ds.loc[lookup_vals]
                 matched_data.index = filtered_index_list
+
+            matched_data = matched_data.rename(
+                {col: f"{col}_matched_{i}" for col in matched_data.columns}
+            )
+
+            reindexed_matched = experiment_data.ds.merge(
+                matched_data,
+                left_index=True,
+                right_index=True,
+                how="left",
+            )
+            reindexed_matched = reindexed_matched.drop(
+                columns=list(experiment_data.ds.columns)
+            )
 
             self.indexes = (
                 t_indexes
                 if self.indexes.is_empty()
                 else self.indexes.add_column(t_indexes)
             )
+
             if hasattr(self, "full_data") and self.full_data is not None:
-                self.full_data = self.full_data.append(
-                    matched_data.reindex(experiment_data.ds.index), axis=1
+                self.full_data = self.full_data.merge(
+                    reindexed_matched,
+                    left_index=True,
+                    right_index=True,
+                    how="left",
                 )
             else:
-                self.full_data = experiment_data.ds.append(
-                    matched_data.reindex(experiment_data.ds.index), axis=1
+                self.full_data = experiment_data.ds.merge(
+                    reindexed_matched,
+                    left_index=True,
+                    right_index=True,
+                    how="left",
                 )
 
     @staticmethod
@@ -190,25 +229,26 @@ class MatchingOutput(Output):
             else:
                 indexes = SmallDataset.create_empty()
 
-        outcome = experiment_data.field_search(TargetRole())[0]
 
         if reformatted_resume:
             first_key = next(iter(reformatted_resume.keys()))
-            outcome_dict = {
-                key: outcome
-                for key in reformatted_resume[first_key].keys()
+            group_keys = list(reformatted_resume[first_key].keys())
+            transposed_resume = {
+                metric: [values[group] for group in group_keys]
+                for metric, values in reformatted_resume.items()
             }
-            reformatted_resume["outcome"] = outcome_dict
-
-        self.resume = SmallDataset.from_dict(
-            reformatted_resume,
-            roles={
-                column: StatisticRole() for column in list(reformatted_resume.keys())
-            },
-        )
+            self.resume = SmallDataset.from_dict(
+                {"data": transposed_resume, "index": group_keys},
+                roles={
+                    column: StatisticRole()
+                    for column in list(reformatted_resume.keys())
+                },
+            )
+        else:
+            self.resume = SmallDataset.create_empty()
 
         self._extract_full_data(
             experiment_data,
             indexes,
         )
-        self.resume = round(self.resume, 2)
+        self.resume.data = self.resume.data.round(2)

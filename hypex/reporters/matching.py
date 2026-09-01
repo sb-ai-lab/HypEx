@@ -1,19 +1,20 @@
-# hypex/reporters/matching.py
 from __future__ import annotations
 
-from typing import Any, ClassVar, Literal
 import warnings
+from typing import Any, ClassVar, Literal
 
 from ..analyzers.matching import MatchingAnalyzer
 from ..comparators import GroupChi2Test, GroupKSTest, GroupTTest
-from ..dataset import Dataset, ExperimentData, StatisticRole
+from ..dataset import Dataset, ExperimentData
 from ..ml import FaissNearestNeighbors
-from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL, ExperimentDataEnum
+from ..utils import (
+    ID_SPLIT_SYMBOL,
+    MATCHING_INDEXES_SPLITTER_SYMBOL,
+    ExperimentDataEnum,
+)
 from .abstract import (
     DatasetReporter,
     DictReporter,
-    Reporter,
-    TestDictReporter,
     extract_tests,
 )
 
@@ -162,7 +163,7 @@ class MatchingDatasetReporter(MatchingReporter):
             DeprecationWarning, 
             stacklevel=2
         )
-        
+
     def report(self, data: ExperimentData) -> Dataset:
         """Directly return the valid dataset from MatchingAnalyzer.
         
@@ -176,7 +177,7 @@ class MatchingDatasetReporter(MatchingReporter):
             The pre-computed matching metrics dataset.
         """
         analyzer_id = data.get_one_id(self.searching_class, ExperimentDataEnum.analysis_tables)
-        return data.analysis_tables[analyzer_id]
+        return data.analysis_tables[analyzer_id].to_dataset()
 
 
 class MatchingQualityDatasetReporter(MatchingQualityReporter):
