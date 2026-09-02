@@ -42,18 +42,17 @@ class MatchingOutput(Output):
 
     def _extract_full_data(self, experiment_data: ExperimentData, indexes: Dataset):
         """Build the full matched dataset from original data and matched indexes.
-
         Materialises the dataset index as a plain Python list so that it can be
         safely assigned to Pandas-backed SmallDataset objects regardless of the
         backend used by ``experiment_data.ds`` (Pandas or Spark).
-
         Args:
             experiment_data: The experiment data container.
             indexes: Dataset containing matched neighbor indexes per group.
         """
         # ── Convert to list to avoid PySpark Index → Pandas assignment error ──
         ds_index = experiment_data.ds.index.to_numpy().tolist()
-        self.indexes = Dataset(roles={}, data=experiment_data.ds.index)
+
+        self.indexes = SmallDataset.create_empty(roles={})
 
         for i in range(len(indexes.columns)):
             t_indexes = indexes.iloc[:, i]
@@ -61,10 +60,8 @@ class MatchingOutput(Output):
             filtered_field = indexes.drop(
                 indexes[indexes[t_indexes.columns[0]] == -1], axis=0
             )
-
             lookup_vals = list(map(lambda x: x[0], filtered_field.get_values()))
             filtered_index_list = filtered_field.index.to_numpy().tolist()
-
             if experiment_data.ds.backend_type == BackendsEnum.spark:
                 mapping_ds = Dataset(
                     roles={
@@ -81,7 +78,6 @@ class MatchingOutput(Output):
                 orig_cols = set(experiment_data.ds.columns)
                 ds_reset = experiment_data.ds.reset_index()
                 idx_col = next(c for c in ds_reset.columns if c not in orig_cols)
-
                 matched_data = mapping_ds.merge(
                     ds_reset,
                     left_on="_hypex_lookup",
@@ -93,11 +89,9 @@ class MatchingOutput(Output):
             else:
                 matched_data = experiment_data.ds.loc[lookup_vals]
                 matched_data.index = filtered_index_list
-
             matched_data = matched_data.rename(
                 {col: f"{col}_matched_{i}" for col in matched_data.columns}
             )
-
             reindexed_matched = experiment_data.ds.merge(
                 matched_data,
                 left_index=True,
@@ -108,11 +102,13 @@ class MatchingOutput(Output):
                 columns=list(experiment_data.ds.columns)
             )
 
-            self.indexes = (
-                t_indexes
-                if self.indexes.is_empty()
-                else self.indexes.add_column(t_indexes)
-            )
+            if self.indexes.is_empty():
+                self.indexes = t_indexes
+            else:
+                self.indexes.add_column(
+                    data=t_indexes.data,
+                    role={col: t_indexes.roles.get(col, InfoRole()) for col in t_indexes.columns}
+                )
 
             if hasattr(self, "full_data") and self.full_data is not None:
                 self.full_data = self.full_data.merge(
