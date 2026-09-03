@@ -1,3 +1,3 @@
-from .operators import SMD
+from .operators import SMD, Bias, MatchingMetrics
 
 __all__ = ["SMD"]
