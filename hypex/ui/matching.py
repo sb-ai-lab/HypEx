@@ -19,9 +19,10 @@ from ..dataset import (
 )
 from ..reporters.matching import MatchingDictReporter, MatchingQualityDatasetReporter
 from ..utils import BackendsEnum, ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL
+from ..utils.logger import logger
 from .base import Output
 
-
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 class MatchingOutput(Output):
     """Output handler for matching experiment results."""
 
