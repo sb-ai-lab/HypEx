@@ -934,6 +934,8 @@ class SparkFaissExtension(FaissExtension):
 
         storage_level = storage_level or "MEMORY_AND_DISK"
         result.persist(storage_level=storage_level, action="count")
+        if MatchingConfig.FAISS_CHECKPOINT_RESULT:
+            result.checkpoint(eager=True)
 
         queries.unpersist()
 
@@ -1138,6 +1140,8 @@ class SparkFaissExtension(FaissExtension):
 
         storage_level = storage_level or "MEMORY_AND_DISK"
         result.persist(storage_level=storage_level, action="count")
+        if MatchingConfig.FAISS_CHECKPOINT_RESULT:
+            result.checkpoint(eager=True)
 
         return result
 

@@ -128,6 +128,16 @@ class MatchingConfig:
             skewed clusters producing tasks that do not fit in memory.
             Defaults to 250_000.
 
+        FAISS_CHECKPOINT_RESULT (bool): Whether to truncate the Spark lineage
+            of the matched-indexes result before handing it downstream. The
+            search plan is long (cluster assignment, co-group, aggregation);
+            without truncation every later action in ``Bias`` and
+            ``MatchingMetrics`` re-analyzes and replays it, which dominates the
+            runtime on small datasets. Requires ``sc.setCheckpointDir(...)`` to
+            be fault-tolerant — otherwise ``SparkDataset.checkpoint`` falls back
+            to ``local_checkpoint``, which is lost together with an executor.
+            Defaults to True.
+
         FAISS_INDEX_CACHE_LIMIT (int): Maximum number of FAISS indexes held
             simultaneously in the executor-side ``CachingIndex`` in
             ``"legacy"`` mode. ``None`` means unbounded, which lets a worker
@@ -141,4 +151,5 @@ class MatchingConfig:
     FAISS_SEARCH_MODE: str = "copartitioned"
     FAISS_N_PROBES: int = 8
     FAISS_MAX_GROUP_ROWS: int = 250_000
+    FAISS_CHECKPOINT_RESULT: bool = True
     FAISS_INDEX_CACHE_LIMIT: int | None = 2
