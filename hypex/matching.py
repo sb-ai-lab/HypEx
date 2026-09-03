@@ -182,7 +182,6 @@ class Matching(ExperimentShell):
         executors = (
             executors if distance == "l2" else [distance_mapping[distance], *executors]
         )
-        executors = executors if not encode_categories else [DummyEncoder(), *executors]
         executors = [
             TypeCaster(
                 dtype={int: float},
@@ -190,6 +189,7 @@ class Matching(ExperimentShell):
             ),
             *executors
         ]
+        executors = executors if not encode_categories else [DummyEncoder(), *executors]
         return (
             Experiment(executors=executors)
             if not group_match
