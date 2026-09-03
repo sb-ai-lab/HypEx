@@ -55,7 +55,7 @@ class FaissExtension(MLExtension):
         faiss_mode (Literal["base", "fast", "auto"]): Execution mode controlling
             the trade-off between accuracy and speed. "auto" selects the best
             index type based on dataset size.
-        mahalonobis (Dataset | None): Optional Mahalanobis transformation matrix
+        mahalanobis (Dataset | None): Optional Mahalanobis transformation matrix
             applied to features before indexing.
         index: The underlying FAISS index object (set after ``fit``).
 
@@ -67,7 +67,7 @@ class FaissExtension(MLExtension):
         self,
         n_neighbors: int = 1,
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
-        mahalonobis: Dataset = None,
+        mahalanobis: Dataset = None,
     ):
         """
         Initialize the FAISS extension.
@@ -80,14 +80,14 @@ class FaissExtension(MLExtension):
                 - "fast": Forces an optimized approximate index (IVF).
                 - "auto": Automatically selects the best index type based on
                   dataset size. Defaults to "auto".
-            mahalonobis (Dataset, optional): A pre-computed Mahalanobis
+            mahalanobis (Dataset, optional): A pre-computed Mahalanobis
                 transformation matrix. If provided, features are projected into
                 a decorrelated space before building the FAISS index.
                 Defaults to None.
         """
         self.n_neighbors = n_neighbors
         self.faiss_mode = faiss_mode
-        self.mahalonobis = mahalonobis
+        self.mahalanobis = mahalanobis
         self.index = None
 
         super().__init__()
@@ -153,7 +153,6 @@ class FaissExtension(MLExtension):
             super().calc(X, mode="predict", **kwargs), AdditionalMatchingRole()
         )
 
-# TODO: add mahalonobis matrix logic into pandas realization
 @backend_factory.register(FaissExtension, PandasDataset)
 class PandasFaissExtension(FaissExtension):
     """
@@ -167,20 +166,20 @@ class PandasFaissExtension(FaissExtension):
     Inherits from:
         FaissExtension: The master-abstract FAISS extension class.
     """
-    def __init__(self, n_neighbors = 1, faiss_mode = "auto", mahalonobis: Dataset = None,):
+    def __init__(self, n_neighbors = 1, faiss_mode = "auto", mahalanobis: Dataset = None,):
         """
         Initialize the Pandas FAISS extension.
 
         Args:
             n_neighbors (int, optional): Number of nearest neighbors. Defaults to 1.
             faiss_mode (str, optional): Execution mode. Defaults to "auto".
-            mahalonobis (Dataset, optional): Mahalanobis transformation matrix.
+            mahalanobis (Dataset, optional): Mahalanobis transformation matrix.
                 Defaults to None.
         """
-        super().__init__(n_neighbors, faiss_mode, mahalonobis)
+        super().__init__(n_neighbors, faiss_mode, mahalanobis)
 
     @staticmethod
-    def _mahalonobis_transform(data: Dataset, mahalonobis: Dataset | None) -> Dataset:
+    def _mahalanobis_transform(data: Dataset, mahalanobis: Dataset | None) -> Dataset:
         """
         Apply the Mahalanobis transformation to the input dataset.
 
@@ -190,17 +189,21 @@ class PandasFaissExtension(FaissExtension):
 
         Args:
             data (Dataset): The input dataset to transform.
-            mahalonobis (Dataset | None): The transformation matrix. If None,
+            mahalanobis (Dataset | None): The transformation matrix. If None,
                 no transformation is applied.
 
         Returns:
-            Dataset: The transformed dataset, or the original if ``mahalonobis``
+            Dataset: The transformed dataset, or the original if ``mahalanobis``
                 is None.
         """
-        if mahalonobis is None:
+        if mahalanobis is None:
             return data
         else:
-            return data.dot(mahalonobis)
+            mahalanobis_index = list(mahalanobis.index)
+            valid_cols = [col for col in data.columns if col in mahalanobis_index]
+            if valid_cols and len(valid_cols) < len(data.columns):
+                data = data[valid_cols]
+            return data.dot(mahalanobis)
 
     @staticmethod
     def _prepare_indexes(index: np.ndarray, dist: np.ndarray, k: int):
@@ -290,7 +293,7 @@ class PandasFaissExtension(FaissExtension):
             data (Dataset): The baseline dataset to index.
             test_data (Dataset): The query dataset (used for size heuristics).
         """
-        X = self._mahalonobis_transform(data, self.mahalonobis).data.values
+        X = self._mahalanobis_transform(data, self.mahalanobis).data.values
         self.index = faiss.IndexIDMap(faiss.IndexFlatL2(X.shape[1]))
         if (
             (
@@ -347,8 +350,8 @@ class PandasFaissExtension(FaissExtension):
                 raise ValueError("index is not created yet. Raise 'fit' before 'predict'.")
 
             X = (
-                self._mahalonobis_transform(test_data, self.mahalonobis).data.values if mode == "auto"
-                else self._mahalonobis_transform(data, self.mahalonobis).data.values
+                self._mahalanobis_transform(test_data, self.mahalanobis).data.values if mode == "auto"
+                else self._mahalanobis_transform(data, self.mahalanobis).data.values
             )
             return self._predict(data, test_data, X)
         return self
@@ -422,7 +425,7 @@ class SparkFaissExtension(FaissExtension):
             self,
             n_neighbors = 1,
             faiss_mode = "auto",
-            mahalonobis: Dataset = None,
+            mahalanobis: Dataset = None,
     ):
         """
         Initialize the Spark FAISS extension.
@@ -430,10 +433,10 @@ class SparkFaissExtension(FaissExtension):
         Args:
             n_neighbors (int, optional): Number of nearest neighbors. Defaults to 1.
             faiss_mode (str, optional): Execution mode. Defaults to "auto".
-            mahalonobis (Dataset, optional): Mahalanobis transformation matrix.
+            mahalanobis (Dataset, optional): Mahalanobis transformation matrix.
                 Defaults to None.
         """
-        super().__init__(n_neighbors, faiss_mode, mahalonobis)
+        super().__init__(n_neighbors, faiss_mode, mahalanobis)
         self.seed: int = 21
         self.storage: FaissIndexStorage | None = None
         self._data_size: int | None = None
@@ -908,8 +911,8 @@ class SparkFaissExtension(FaissExtension):
         mode = mode or "auto"
         operating_data: spark.DataFrame = (
             data._backend_data.data.to_spark(index_col='index')
-            if self.mahalonobis is None
-            else data.dot(self.mahalonobis)._backend_data.data.to_spark(index_col='index')
+            if self.mahalanobis is None
+            else data.dot(self.mahalanobis)._backend_data.data.to_spark(index_col='index')
         )
         # self.k = (operating_data.count())
         self._data_size = operating_data.count()
@@ -932,8 +935,8 @@ class SparkFaissExtension(FaissExtension):
 
             test_operating_data = (
                 test_data._backend_data.data.to_spark(index_col='index')
-                if self.mahalonobis is None
-                else test_data.dot(self.mahalonobis)._backend_data.data.to_spark(index_col='index')
+                if self.mahalanobis is None
+                else test_data.dot(self.mahalanobis)._backend_data.data.to_spark(index_col='index')
             )
             vectorized_test = self._vectorize_data(test_operating_data)
 
