@@ -27,17 +27,19 @@ class UniteCovExtension(Extension):
     def calc(
          self, data: Dataset, test_data: Dataset | None = None, **kwargs
     ):
-        cov_data = data.data.cov().to_numpy()
+        cov_data = data.cov()
         if test_data is None:
             result = cov_data
         else:
-            cov_test = test_data.data.cov().to_numpy()
-            result = (cov_data + cov_test) / 2
+            cov_test = test_data.cov()
+            result: Dataset = (cov_data + cov_test) / 2
         
-        return self.result_to_dataset(
-            pd.DataFrame(result, columns=data.columns),
-            {column: FeatureRole() for column in data.columns},
-        )
+        # return self.result_to_dataset(
+        #     pd.DataFrame(result, columns=data.columns),
+        #     {column: FeatureRole() for column in data.columns},
+        # )
+        return result
+
 
 class CholeskyExtension(Extension):
     def calc(
