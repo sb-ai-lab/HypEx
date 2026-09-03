@@ -685,7 +685,6 @@ class SparkFaissExtension(FaissExtension):
         else:
             raise ValueError(f"Incorrect faiss fit mode: '{mode}'")
 
-        self.index.nprobe = min(self.n_neighbors * 2, self.k)
         coarse = faiss.downcast_index(self.index.quantizer)
         self._centroids = np.ascontiguousarray(
             coarse.reconstruct_n(0, coarse.ntotal), dtype=np.float32
@@ -730,7 +729,6 @@ class SparkFaissExtension(FaissExtension):
 
         control = (
             arr_df
-            .select("index", "_fvec")
             .mapInPandas(_assign_one, schema=self.ASSIGN_SCHEMA)
             .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
         )
@@ -833,7 +831,6 @@ class SparkFaissExtension(FaissExtension):
 
         queries = (
             arr_df
-            .select("index", "_fvec")
             .mapInPandas(_assign_topp, schema=self.ASSIGN_MULTI_SCHEMA)
             .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
         )
@@ -995,6 +992,7 @@ class SparkFaissExtension(FaissExtension):
         session = vectorized_data.sparkSession
         self.storage = FaissIndexStorage(session)
 
+        self.index.nprobe = min(self.n_neighbors * 2, self.k)
         bc_index = session.sparkContext.broadcast(self.index)
         bc_storage = session.sparkContext.broadcast(self.storage)
         del self.index
@@ -1167,7 +1165,6 @@ class SparkFaissExtension(FaissExtension):
         legacy = MatchingConfig.FAISS_SEARCH_MODE == "legacy"
         feature_col = "_features" if legacy else "_fvec"
 
-        self._data_size = self._data_size or vectorized_data.count()
         self._train_quantizer(
             prepared_data=vectorized_data,
             mode=mode,
@@ -1290,11 +1287,6 @@ class SparkFaissExtension(FaissExtension):
         executor memory and disk. Should be called when the extension is no
         longer needed to avoid resource leaks in long-running Spark applications.
         """
-        clustered = getattr(self, '_clustered_data', None)
-        if clustered is not None:
-            clustered.unpersist()
-            self._clustered_data = None
-
         control = getattr(self, '_control_df', None)
         if control is not None:
             control.unpersist()

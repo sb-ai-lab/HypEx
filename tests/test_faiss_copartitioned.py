@@ -140,9 +140,28 @@ def test_more_probes_only_improve_recall(data):
     assert recalls[-1] > 0.99
 
 
-def test_salting_oversized_clusters_does_not_change_results(data):
+def test_salting_oversized_clusters_does_not_change_results(data, monkeypatch):
+    """Splitting clusters must not move a single match.
+
+    The layout is captured so the test fails loudly if the fixture ever stops
+    producing clusters large enough to be split — otherwise this would silently
+    degrade into a comparison of two unsalted runs.
+    """
+    seen = {}
+    original = SparkFaissExtension._layout_frame
+
+    def capture(self, session, n_buckets):
+        seen["salts"] = max(self._cluster_salts.values())
+        seen["buckets"] = max(n_buckets.values()) if n_buckets else 1
+        return original(self, session, n_buckets)
+
     unsalted = _match(data, "copartitioned", probes=8)
+
+    monkeypatch.setattr(SparkFaissExtension, "_layout_frame", capture)
     salted = _match(data, "copartitioned", probes=8, max_group=200)
+
+    assert seen["salts"] > 1, "control side was never split — the test proves nothing"
+    assert seen["buckets"] > 1, "query side was never split — the test proves nothing"
     pd.testing.assert_frame_equal(unsalted, salted)
 
 
