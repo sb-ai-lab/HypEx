@@ -132,6 +132,23 @@ class CachingIndex:
         self._cache: OrderedDict = OrderedDict()
         self._lock = threading.Lock()
 
+    def resize(self, max_index: int | None) -> None:
+        """
+        Change the cache bound, evicting the oldest entries if it shrank.
+
+        Args
+        ----
+            max_index: Optional[int]
+                new maximum number of cached indexes, None for unbounded.
+        """
+        with self._lock:
+            self._max = max_index
+            if max_index:
+                while len(self._cache) > max_index:
+                    _, evicted = self._cache.popitem(last=False)
+                    del evicted
+                gc.collect()
+
     def get(
         self,
         reference: str,

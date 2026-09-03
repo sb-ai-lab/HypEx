@@ -13,6 +13,8 @@ Classes:
         matching pipeline, including persistence policies, sampling
         targets, and batch sizes.
 """
+from __future__ import annotations
+
 from pyspark import StorageLevel
 
 
@@ -96,8 +98,47 @@ class MatchingConfig:
             usage. Smaller chunks reduce memory pressure at the cost of
             additional iteration overhead.
             Defaults to 4096.
+
+        FAISS_SEARCH_MODE (str): Strategy used by ``SparkFaissExtension``
+            for the fit/predict phases.
+
+            - ``"copartitioned"``: control rows are grouped by their nearest
+              IVF centroid and queries are routed to the same groups, so a
+              task holds exactly one cluster index and its own queries.
+              Executor memory does not depend on the dataset size.
+            - ``"legacy"``: one FAISS index per data partition, collected on
+              the driver and distributed to every executor via ``SparkFiles``.
+              Executor memory grows with the whole dataset; kept only for
+              reproducing earlier results.
+
+            Defaults to ``"copartitioned"``.
+
+        FAISS_N_PROBES (int): Number of nearest centroids each query is
+            routed to in ``"copartitioned"`` mode. Higher values raise
+            recall and the shuffled volume proportionally (the query
+            payload is duplicated once per probe). ``2`` reproduces the
+            recall of the legacy path; ``8`` gives ~0.99 recall@1 and
+            ``16`` ~0.9998 on synthetic data.
+            Defaults to 8.
+
+        FAISS_MAX_GROUP_ROWS (int): Upper bound on the number of rows of a
+            single side of one co-grouped cluster. Clusters exceeding it
+            are split into salted sub-groups (control) or buckets (queries),
+            with the opposite side duplicated across them. Guards against
+            skewed clusters producing tasks that do not fit in memory.
+            Defaults to 250_000.
+
+        FAISS_INDEX_CACHE_LIMIT (int): Maximum number of FAISS indexes held
+            simultaneously in the executor-side ``CachingIndex`` in
+            ``"legacy"`` mode. ``None`` means unbounded, which lets a worker
+            accumulate every partition index in RSS.
+            Defaults to 2.
     """
     FAISS_PERSIST_POLITIC: StorageLevel = StorageLevel.MEMORY_AND_DISK
     FAISS_SAMPLE_TARGET: int = 5_000_000
     FAISS_DRIVER_INDEX_LIMIT: int = 5_000_000
     FAISS_CHUNK_SIZE: int = 4096
+    FAISS_SEARCH_MODE: str = "copartitioned"
+    FAISS_N_PROBES: int = 8
+    FAISS_MAX_GROUP_ROWS: int = 250_000
+    FAISS_INDEX_CACHE_LIMIT: int | None = 2
