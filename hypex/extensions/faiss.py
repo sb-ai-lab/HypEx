@@ -92,6 +92,33 @@ class FaissExtension(MLExtension):
 
         super().__init__()
 
+    @staticmethod
+    def _mahalanobis_transform(data: Dataset, mahalanobis: Dataset | None) -> Dataset:
+        """
+        Apply the Mahalanobis transformation to the input dataset.
+
+        Projects the features into a decorrelated space using the provided
+        transformation matrix. If no matrix is provided, returns the data
+        unchanged.
+
+        Args:
+            data (Dataset): The input dataset to transform.
+            mahalanobis (Dataset | None): The transformation matrix. If None,
+                no transformation is applied.
+
+        Returns:
+            Dataset: The transformed dataset, or the original if ``mahalanobis``
+                is None.
+        """
+        if mahalanobis is None:
+            return data
+        else:
+            mahalanobis_index = list(mahalanobis.index)
+            valid_cols = [col for col in data.columns if col in mahalanobis_index]
+            if valid_cols and len(valid_cols) < len(data.columns):
+                data = data[valid_cols]
+            return data.dot(mahalanobis.data)
+
     @abstractmethod
     def calc(
         self,
@@ -177,33 +204,6 @@ class PandasFaissExtension(FaissExtension):
                 Defaults to None.
         """
         super().__init__(n_neighbors, faiss_mode, mahalanobis)
-
-    @staticmethod
-    def _mahalanobis_transform(data: Dataset, mahalanobis: Dataset | None) -> Dataset:
-        """
-        Apply the Mahalanobis transformation to the input dataset.
-
-        Projects the features into a decorrelated space using the provided
-        transformation matrix. If no matrix is provided, returns the data
-        unchanged.
-
-        Args:
-            data (Dataset): The input dataset to transform.
-            mahalanobis (Dataset | None): The transformation matrix. If None,
-                no transformation is applied.
-
-        Returns:
-            Dataset: The transformed dataset, or the original if ``mahalanobis``
-                is None.
-        """
-        if mahalanobis is None:
-            return data
-        else:
-            mahalanobis_index = list(mahalanobis.index)
-            valid_cols = [col for col in data.columns if col in mahalanobis_index]
-            if valid_cols and len(valid_cols) < len(data.columns):
-                data = data[valid_cols]
-            return data.dot(mahalanobis)
 
     @staticmethod
     def _prepare_indexes(index: np.ndarray, dist: np.ndarray, k: int):
@@ -912,7 +912,8 @@ class SparkFaissExtension(FaissExtension):
         operating_data: spark.DataFrame = (
             data._backend_data.data.to_spark(index_col='index')
             if self.mahalanobis is None
-            else data.dot(self.mahalanobis)._backend_data.data.to_spark(index_col='index')
+            # else data.dot(self.mahalanobis.data)._backend_data.data.to_spark(index_col='index')
+            else self._mahalanobis_transform(data, self.mahalanobis)._backend_data.data.to_spark(index_col='index')
         )
         # self.k = (operating_data.count())
         self._data_size = operating_data.count()
@@ -936,7 +937,7 @@ class SparkFaissExtension(FaissExtension):
             test_operating_data = (
                 test_data._backend_data.data.to_spark(index_col='index')
                 if self.mahalanobis is None
-                else test_data.dot(self.mahalanobis)._backend_data.data.to_spark(index_col='index')
+                else self._mahalanobis_transform(test_data, self.mahalanobis)._backend_data.data.to_spark(index_col='index')
             )
             vectorized_test = self._vectorize_data(test_operating_data)
 
