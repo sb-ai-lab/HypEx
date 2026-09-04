@@ -1627,10 +1627,6 @@ class TestDataset(unittest.TestCase):
         result = bool(self.dataset)
         self.assertTrue(result)  # Expecting non-empty Dataset to return True
 
-    @pytest.mark.xfail(
-        reason="Dataset does not implement __xor__ (and the other bitwise dunders)",
-        strict=True,
-    )
     def test_operators(self):
         test_cases = [
             (
@@ -1679,11 +1675,6 @@ class TestDataset(unittest.TestCase):
                 lambda x, y: x | y,
             ),
             (
-                "^",
-                pd.DataFrame({"col1": [1, 0, 1], "col2": [0, 1, 1]}),
-                lambda x, y: x ^ y,
-            ),
-            (
                 "<",
                 pd.DataFrame({"col1": [1, 2, 3], "col2": [3, 2, 1]}),
                 lambda x, y: x < y,
@@ -1722,15 +1713,23 @@ class TestDataset(unittest.TestCase):
             ("rtruediv", 8.0, lambda x, y: x / y),
             ("rmod", 9, lambda x, y: x % y),
             ("rpow", 2, lambda x, y: x**y),
-            ("rdiv2", 10, lambda x, y: x / y),
+            ("rdivten", 10, lambda x, y: x / y),
             ("div", 2, lambda x, y: x / y),
         ]
 
         for operator, other_data, expected_operator in test_cases:
             with self.subTest(operator=operator):
-                # Create the other dataset
-                other_dataset = Dataset(
-                    roles=self.roles, data=other_data, backend=BackendsEnum.pandas
+                # The right-hand cases supply a scalar, which cannot be wrapped
+                # in a Dataset carrying these roles -- doing so unconditionally
+                # is why this half of the test raised RoleColumnError.
+                other = (
+                    Dataset(
+                        roles=self.roles,
+                        data=other_data,
+                        backend=BackendsEnum.pandas,
+                    )
+                    if isinstance(other_data, pd.DataFrame)
+                    else other_data
                 )
                 # Perform the operation using the operator directly
                 operator_functions = {
@@ -1743,7 +1742,6 @@ class TestDataset(unittest.TestCase):
                     "**": lambda self, other: self.dataset**other,
                     "&": lambda self, other: self.dataset & other,
                     "|": lambda self, other: self.dataset | other,
-                    "^": lambda self, other: self.dataset ^ other,
                     "<": lambda self, other: self.dataset < other,
                     "<=": lambda self, other: self.dataset <= other,
                     ">": lambda self, other: self.dataset > other,
@@ -1758,15 +1756,12 @@ class TestDataset(unittest.TestCase):
                     "rtruediv": lambda self, other: other / self.dataset,
                     "rmod": lambda self, other: other % self.dataset,
                     "rpow": lambda self, other: other**self.dataset,
-                    "rdiv2": lambda self, other: other / self.dataset,
+                    "rdivten": lambda self, other: other / self.dataset,
+                    "div": lambda self, other: other / self.dataset,
                 }
 
-                operator = (
-                    operator  # Assuming operator is defined somewhere in the code
-                )
-                result = operator_functions.get(operator, lambda self, other: other)(
-                    self, other_dataset
-                )
+                self.assertIn(operator, operator_functions)
+                result = operator_functions[operator](self, other)
 
                 # Check the result type
                 self.assertIsInstance(
@@ -1780,6 +1775,19 @@ class TestDataset(unittest.TestCase):
                     else expected_operator(self.data, other_data)
                 )
                 pd.testing.assert_frame_equal(result.data, expected_data)
+
+    @pytest.mark.xfail(
+        reason="Dataset does not implement __xor__; every other operator works",
+        strict=True,
+    )
+    def test_xor_operator(self):
+        other = Dataset(
+            roles=self.roles,
+            data=pd.DataFrame({"col1": [1, 0, 1], "col2": [0, 1, 1]}),
+            backend=BackendsEnum.pandas,
+        )
+        result = self.dataset ^ other
+        self.assertIsInstance(result, Dataset)
 
     def test_locker_getitem(self):
         # Using .loc (e.g., for the first row)
