@@ -55,7 +55,7 @@ class FaissExtension(MLExtension):
         faiss_mode (Literal["base", "fast", "auto"]): Execution mode controlling
             the trade-off between accuracy and speed. "auto" selects the best
             index type based on dataset size.
-        mahalonobis (Dataset | None): Optional Mahalanobis transformation matrix
+        mahalanobis (Dataset | None): Optional Mahalanobis transformation matrix
             applied to features before indexing.
         index: The underlying FAISS index object (set after ``fit``).
 
@@ -67,7 +67,7 @@ class FaissExtension(MLExtension):
         self,
         n_neighbors: int = 1,
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
-        mahalonobis: Dataset = None,
+        mahalanobis: Dataset = None,
     ):
         """
         Initialize the FAISS extension.
@@ -80,17 +80,44 @@ class FaissExtension(MLExtension):
                 - "fast": Forces an optimized approximate index (IVF).
                 - "auto": Automatically selects the best index type based on
                   dataset size. Defaults to "auto".
-            mahalonobis (Dataset, optional): A pre-computed Mahalanobis
+            mahalanobis (Dataset, optional): A pre-computed Mahalanobis
                 transformation matrix. If provided, features are projected into
                 a decorrelated space before building the FAISS index.
                 Defaults to None.
         """
         self.n_neighbors = n_neighbors
         self.faiss_mode = faiss_mode
-        self.mahalonobis = mahalonobis
+        self.mahalanobis = mahalanobis
         self.index = None
 
         super().__init__()
+
+    @staticmethod
+    def _mahalanobis_transform(data: Dataset, mahalanobis: Dataset | None) -> Dataset:
+        """
+        Apply the Mahalanobis transformation to the input dataset.
+
+        Projects the features into a decorrelated space using the provided
+        transformation matrix. If no matrix is provided, returns the data
+        unchanged.
+
+        Args:
+            data (Dataset): The input dataset to transform.
+            mahalanobis (Dataset | None): The transformation matrix. If None,
+                no transformation is applied.
+
+        Returns:
+            Dataset: The transformed dataset, or the original if ``mahalanobis``
+                is None.
+        """
+        if mahalanobis is None:
+            return data
+        else:
+            mahalanobis_index = list(mahalanobis.index)
+            valid_cols = [col for col in data.columns if col in mahalanobis_index]
+            if valid_cols and len(valid_cols) < len(data.columns):
+                data = data[valid_cols]
+            return data.dot(mahalanobis.data)
 
     @abstractmethod
     def calc(
@@ -153,7 +180,6 @@ class FaissExtension(MLExtension):
             super().calc(X, mode="predict", **kwargs), AdditionalMatchingRole()
         )
 
-# TODO: add mahalonobis matrix logic into pandas realization
 @backend_factory.register(FaissExtension, PandasDataset)
 class PandasFaissExtension(FaissExtension):
     """
@@ -167,40 +193,17 @@ class PandasFaissExtension(FaissExtension):
     Inherits from:
         FaissExtension: The master-abstract FAISS extension class.
     """
-    def __init__(self, n_neighbors = 1, faiss_mode = "auto", mahalonobis: Dataset = None,):
+    def __init__(self, n_neighbors = 1, faiss_mode = "auto", mahalanobis: Dataset = None,):
         """
         Initialize the Pandas FAISS extension.
 
         Args:
             n_neighbors (int, optional): Number of nearest neighbors. Defaults to 1.
             faiss_mode (str, optional): Execution mode. Defaults to "auto".
-            mahalonobis (Dataset, optional): Mahalanobis transformation matrix.
+            mahalanobis (Dataset, optional): Mahalanobis transformation matrix.
                 Defaults to None.
         """
-        super().__init__(n_neighbors, faiss_mode, mahalonobis)
-
-    @staticmethod
-    def _mahalonobis_transform(data: Dataset, mahalonobis: Dataset | None) -> Dataset:
-        """
-        Apply the Mahalanobis transformation to the input dataset.
-
-        Projects the features into a decorrelated space using the provided
-        transformation matrix. If no matrix is provided, returns the data
-        unchanged.
-
-        Args:
-            data (Dataset): The input dataset to transform.
-            mahalonobis (Dataset | None): The transformation matrix. If None,
-                no transformation is applied.
-
-        Returns:
-            Dataset: The transformed dataset, or the original if ``mahalonobis``
-                is None.
-        """
-        if mahalonobis is None:
-            return data
-        else:
-            return data.dot(mahalonobis)
+        super().__init__(n_neighbors, faiss_mode, mahalanobis)
 
     @staticmethod
     def _prepare_indexes(index: np.ndarray, dist: np.ndarray, k: int):
@@ -290,7 +293,7 @@ class PandasFaissExtension(FaissExtension):
             data (Dataset): The baseline dataset to index.
             test_data (Dataset): The query dataset (used for size heuristics).
         """
-        X = self._mahalonobis_transform(data, self.mahalonobis).data.values
+        X = self._mahalanobis_transform(data, self.mahalanobis).data.values
         self.index = faiss.IndexIDMap(faiss.IndexFlatL2(X.shape[1]))
         if (
             (
@@ -347,8 +350,8 @@ class PandasFaissExtension(FaissExtension):
                 raise ValueError("index is not created yet. Raise 'fit' before 'predict'.")
 
             X = (
-                self._mahalonobis_transform(test_data, self.mahalonobis).data.values if mode == "auto"
-                else self._mahalonobis_transform(data, self.mahalonobis).data.values
+                self._mahalanobis_transform(test_data, self.mahalanobis).data.values if mode == "auto"
+                else self._mahalanobis_transform(data, self.mahalanobis).data.values
             )
             return self._predict(data, test_data, X)
         return self
@@ -357,167 +360,6 @@ class PandasFaissExtension(FaissExtension):
 # ---------------------------------------------------------------------------
 # Global functions for PySpark partition logic
 # ---------------------------------------------------------------------------
-
-# def _partition_load(partition_iter: Iterable, batch_size: int):
-#     """
-#     Load batches of feature vectors from a Spark partition iterator.
-
-#     Reads rows from the partition in chunks of ``batch_size`` and yields
-#     each batch as a list of feature vectors. Used during the iterative
-#     prefit phase to train clustering models on the driver without loading
-#     the entire dataset at once.
-
-#     Args:
-#         partition_iter (Iterable): Iterator over partition rows. Each row
-#             is expected to have a ``_features`` column containing the
-#             feature vector.
-#         batch_size (int): Number of rows to accumulate per batch.
-
-#     Yields:
-#         list: A batch of feature vectors (each element is a list of floats).
-#     """
-#     batch = []
-#     for row in partition_iter:
-#         batch.append(list(row["_features"]))
-#         if len(batch) >= batch_size:
-#             yield batch
-#             batch = []
-#     if batch:
-#         yield batch
-
-# def _spark_partition_fit(
-#     iterator: Iterable,
-#     bc_index: Broadcast,
-#     bc_storage: Broadcast
-# ):
-#     """
-#     Build a local FAISS index on each Spark partition.
-
-#     Receives a pre-trained IVF quantizer via broadcast, adds the partition's
-#     vectors to a local ``IndexIDMap`` wrapper, and yields the serialized
-#     index. Each partition produces one serialized index file that is later
-#     used during the distributed predict phase.
-
-#     Args:
-#         iterator (Iterable): Iterator over partition rows. Each row must
-#             contain ``index`` (long) and ``_features`` (vector) columns.
-#         bc_index (Broadcast): Broadcasted pre-trained FAISS index (quantizer).
-
-#     Yields:
-#         bytes: Serialized FAISS index for the partition, produced by
-#             ``faiss.serialize_index``.
-#     """
-#     import faiss
-#     import numpy as np
-
-#     index = bc_index.value
-#     storage = bc_storage.value
-#     ids, vectors = [], []
-#     for row in iterator:
-#         ids.append(row["index"])
-#         vectors.append(list(row['_features']))
-
-#     if not ids:
-#         return # for empty partition
-
-#     ids = np.array(ids, dtype=np.int64)
-#     vectors = np.array(vectors, dtype=np.float32)
-
-#     index_copy = faiss.clone_index(index)
-#     index_with_ids = faiss.IndexIDMap(index_copy)
-#     index_with_ids.add_with_ids(vectors, ids)
-
-#     # byte_array = faiss.serialize_index(index_with_ids)
-#     # yield storage.save_index(byte_array)
-#     yield storage.save_index(index_with_ids)
-
-# def  _per_partition_predict(
-#     shard_iter: Iterable,
-#     bc_n_neighbors: Broadcast,
-#     bc_references: Broadcast,
-#     bc_chunk_size: Broadcast,
-#     bc_k: Broadcast,
-#     bc_storage: Broadcast
-# ):
-#     """
-#     Perform distributed nearest-neighbor search on each Spark partition.
-
-#     For each chunk of query vectors in the partition, iteratively loads
-#     serialized FAISS indexes from the driver-distributed files, searches
-#     for the top-k nearest neighbors, and aggregates candidates across all
-#     partition indexes. The final top-``n_neighbors`` results are yielded
-#     as ``(query_id, [neighbor_ids])`` tuples.
-
-#     Args:
-#         shard_iter (Iterable): Iterator over partition rows. Each row must
-#             contain ``index`` (long) and ``_features`` (vector) columns.
-#         bc_n_neighbors (Broadcast): Number of nearest neighbors to return.
-#         bc_references (Broadcast): List of serialized index file names
-#             distributed via ``SparkFiles``.
-#         bc_chunk_size (Broadcast): Number of query rows to process per batch.
-#         bc_k (Broadcast): Number of IVF clusters (used to set ``nprobe``).
-
-#     Yields:
-#         tuple: ``(int(query_id), list[int(neighbor_ids)])`` for each query
-#             vector in the partition.
-#     """
-#     import faiss
-#     import numpy as np
-#     from pyspark import SparkFiles
-#     import gc
-#     import builtins
-
-#     cache = get_executor_cache()
-
-#     real_n = bc_n_neighbors.value
-#     references = bc_references.value
-#     chunk_size = bc_chunk_size.value
-#     storage = bc_storage.value
-
-#     def iter_chunk(it: Iterable, chunk_size: int):
-#         chunk = []
-#         amount = 0
-#         for row in it:
-#             chunk.append(row)
-#             amount += 1
-
-#             if amount >= chunk_size:
-#                 amount = 0
-#                 yield chunk
-#                 chunk =[]
-
-#         if chunk:
-#             yield chunk
-
-#     for chunk in iter_chunk(shard_iter, chunk_size):
-#         if not chunk:
-#             return
-#         query_ids = np.array([r["index"] for r in chunk], dtype=np.int64)
-#         batch = np.array([list(r["_features"]) for r in chunk], dtype=np.float32)  # (Q, d)
-#         del chunk
-#         gc.collect()
-
-#         candidates = [[] for _ in range(len(query_ids))]
-#         for ref in references:
-#             tmp_index = cache.get(ref, storage, nprobe=min(real_n, bc_k.value))
-#             # tmp_index.nprobe = real_n
-#             # tmp_index.nprobe = min(real_n * 2, bc_k.value)
-#             k = min(real_n, tmp_index.ntotal)
-#             dists, nids = tmp_index.search(batch, k)   # (Q, k)
-#             del tmp_index
-#             gc.collect()
-
-#             for q_idx in range(len(query_ids)):
-#                 for rank in range(k):
-#                     nid = int(nids[q_idx, rank])
-#                     if nid >= 0:
-#                         candidates[q_idx].append((float(dists[q_idx, rank]), nid))
-
-#         for q_idx, qid in enumerate(query_ids):
-#             top = sorted(candidates[q_idx], key=lambda x: x[0])[:real_n]
-#             output = [int(nid) for _, nid in top]
-#             yield (int(qid), output)
-#             # yield (output,)
 
 @logger.log_methods(log_args=False, log_result=False, private=True)
 @backend_factory.register(FaissExtension, SparkDataset)
@@ -583,7 +425,7 @@ class SparkFaissExtension(FaissExtension):
             self,
             n_neighbors = 1,
             faiss_mode = "auto",
-            mahalonobis: Dataset = None,
+            mahalanobis: Dataset = None,
     ):
         """
         Initialize the Spark FAISS extension.
@@ -591,10 +433,10 @@ class SparkFaissExtension(FaissExtension):
         Args:
             n_neighbors (int, optional): Number of nearest neighbors. Defaults to 1.
             faiss_mode (str, optional): Execution mode. Defaults to "auto".
-            mahalonobis (Dataset, optional): Mahalanobis transformation matrix.
+            mahalanobis (Dataset, optional): Mahalanobis transformation matrix.
                 Defaults to None.
         """
-        super().__init__(n_neighbors, faiss_mode, mahalonobis)
+        super().__init__(n_neighbors, faiss_mode, mahalanobis)
         self.seed: int = 21
         self.storage: FaissIndexStorage | None = None
         self._data_size: int | None = None
@@ -793,9 +635,35 @@ class SparkFaissExtension(FaissExtension):
             index_with_ids = faiss.IndexIDMap(index_copy)
             index_with_ids.add_with_ids(vectors, ids)
 
-            # TODO: `bias` optimization
             # inner_index = faiss.downcast_index(index_with_ids.index)
             # inner_index.make_direct_map()
+
+            yield storage.save_index(index_with_ids)
+
+        def _spark_full_partition_fit(
+            iterator: Iterable,
+            bc_storage: Broadcast
+        ):
+            import faiss
+            import numpy as np
+
+            storage = bc_storage.value
+            ids, vectors = [], []
+            for row in iterator:
+                ids.append(row["index"])
+                vectors.append(list(row['_features']))
+
+            if not ids:
+                return # for empty partition
+
+            ids = np.array(ids, dtype=np.int64)
+            vectors = np.array(vectors, dtype=np.float32)
+
+            d = vectors.shape[1]
+
+            quantizer = faiss.IndexFlatL2(d)
+            index_with_ids = faiss.IndexIDMap(quantizer)
+            index_with_ids.add_with_ids(vectors, ids)
 
             yield storage.save_index(index_with_ids)
 
@@ -849,6 +717,7 @@ class SparkFaissExtension(FaissExtension):
             .select(*features)
             .rdd
             .mapPartitions(lambda it: _spark_partition_fit(it, bc_index, bc_storage))
+            # .mapPartitions(lambda it: _spark_full_partition_fit(it, bc_storage))
             .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
         )
         self._sharded_rdd.count()
@@ -1000,7 +869,7 @@ class SparkFaissExtension(FaissExtension):
 
         storage_level = storage_level or "MEMORY_AND_DISK"
         result.persist(storage_level=storage_level, action="count")
-        result.checkpoint(eager=True)
+        # result.checkpoint(eager=True)
 
         return result
 
@@ -1042,15 +911,16 @@ class SparkFaissExtension(FaissExtension):
         mode = mode or "auto"
         operating_data: spark.DataFrame = (
             data._backend_data.data.to_spark(index_col='index')
-            if self.mahalonobis is None
-            else data.dot(self.mahalonobis)._backend_data.data.to_spark(index_col='index')
+            if self.mahalanobis is None
+            # else data.dot(self.mahalanobis.data)._backend_data.data.to_spark(index_col='index')
+            else self._mahalanobis_transform(data, self.mahalanobis)._backend_data.data.to_spark(index_col='index')
         )
         # self.k = (operating_data.count())
         self._data_size = operating_data.count()
         vectorized_data = self._vectorize_data(operating_data)
 
         if mode in ["auto", "fit"]:
-            fit_mode = kwargs.get("fit_mode", "sample")
+            fit_mode = kwargs.get("fit_mode", "full")
             model_name = kwargs.get("model", "k-means")
             self._fit(
                 vectorized_data=vectorized_data,
@@ -1066,8 +936,8 @@ class SparkFaissExtension(FaissExtension):
 
             test_operating_data = (
                 test_data._backend_data.data.to_spark(index_col='index')
-                if self.mahalonobis is None
-                else test_data.dot(self.mahalonobis)._backend_data.data.to_spark(index_col='index')
+                if self.mahalanobis is None
+                else self._mahalanobis_transform(test_data, self.mahalanobis)._backend_data.data.to_spark(index_col='index')
             )
             vectorized_test = self._vectorize_data(test_operating_data)
 

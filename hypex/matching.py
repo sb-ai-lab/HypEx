@@ -143,10 +143,6 @@ class Matching(ExperimentShell):
         two_sides = metric == "ate"
         test_pairs = metric == "atc"
         executors: list[Executor] = [
-            TypeCaster(
-                dtype={int: float},
-                roles=[FeatureRole(), TargetRole()],
-            ),
             FaissNearestNeighbors(
                 grouping_role=TreatmentRole(),
                 two_sides=two_sides,
@@ -186,6 +182,13 @@ class Matching(ExperimentShell):
         executors = (
             executors if distance == "l2" else [distance_mapping[distance], *executors]
         )
+        executors = [
+            TypeCaster(
+                dtype={int: float},
+                roles=[FeatureRole(), TargetRole()],
+            ),
+            *executors
+        ]
         executors = executors if not encode_categories else [DummyEncoder(), *executors]
         return (
             Experiment(executors=executors)
