@@ -15,7 +15,7 @@ from ...utils import AbstractMethodError, FromDictTypes
 class DatasetBackendNavigation(ABC):
     """Abstract interface for dataset navigation and basic I/O.
 
-    Subclasses must implement the abstract methods to provide backend‑specific
+    Subclasses must implement the abstract methods to provide backend-specific
     behaviour (e.g., pandas, PySpark).  The class defines the minimal set of
     operations required for data inspection, indexing, type handling, and
     structural modifications.
@@ -49,7 +49,7 @@ class DatasetBackendNavigation(ABC):
 
     @abstractmethod
     def from_dict(self, data: FromDictTypes, index: Iterable | Sized | None = None):
-        """Build/replace the internal data from a dict‑like structure.
+        """Build/replace the internal data from a dict-like structure.
 
         Args:
             data: A dictionary or list of records that can be converted to a

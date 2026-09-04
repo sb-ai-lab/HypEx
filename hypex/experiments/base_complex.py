@@ -6,9 +6,10 @@ from typing import Any
 
 from tqdm import tqdm
 
-from ..dataset import ABCRole, Dataset, SmallDataset, ExperimentData, GroupingRole
+from ..dataset import ABCRole, Dataset, ExperimentData, GroupingRole, SmallDataset
 from ..executor import Executor, IfExecutor
 from ..reporters import DatasetReporter, Reporter
+from ..utils import timeit
 from ..utils.enums import ExperimentDataEnum
 from .base import Experiment
 
@@ -40,17 +41,17 @@ class ExperimentWithReporter(Experiment):
     ):
         if not isinstance(results, list):
             results = [results]
-            
+
         datasets: list[Dataset] = []
-        
+
         for res in results:
             if isinstance(res, dict):
                 datasets.append(SmallDataset.from_dict(res, roles={}))
             elif isinstance(res, (Dataset, SmallDataset)):
                 datasets.append(res)
-                
+
         combined = datasets[0].append(datasets[1:], reset_index=reset_index) if len(datasets) > 1 else datasets[0]
-        
+
         data.analysis_tables[self.id] = combined
         return data
 
@@ -70,6 +71,7 @@ class CycledExperiment(ExperimentWithReporter):
     def generate_params_hash(self) -> str:
         return f"{self.reporter.__class__.__name__} x {self.n_iterations}"
 
+    @timeit(level="PIPELINE", prefix="CYCLED")
     def execute(self, data: ExperimentData) -> ExperimentData:
         result: list[Dataset] = [
             self.one_iteration(data, str(i)) for i in tqdm(range(self.n_iterations))
@@ -95,13 +97,33 @@ class GroupExperiment(ExperimentWithReporter):
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field = data.ds.search_columns(self.searching_role)
         clean_ds = data._clean_ds_for_iteration()
-        result: list[Dataset] = [
-            self.one_iteration(
-                ExperimentData(group_data), str(group[0]), set_key_as_index=True
-            )
-            for group, group_data in tqdm(clean_ds.groupby(group_field))
-        ]
-        return self._set_result(data, result, reset_index=False)
+        results = []
+        for group, group_data in tqdm(clean_ds.groupby(group_field)):
+            key = str(group[0])
+            res = self.one_iteration(ExperimentData(group_data), key, set_key_as_index=False)
+            results.append((key, res))
+        return self._set_result(data, results)
+
+    def _set_result(self, data: ExperimentData, results: list[tuple[str, Dataset | dict]]) -> ExperimentData:
+        datasets = []
+        for key, res in results:
+            if isinstance(res, dict):
+                ds = SmallDataset.from_dict(res, roles={})
+            else:
+                ds = res
+            new_cols = {col: f"{key} {col}" for col in ds.columns}
+            ds = ds.rename(new_cols)
+            datasets.append(ds)
+            
+        if not datasets:
+            return data
+            
+        combined = datasets[0]
+        for ds in datasets[1:]:
+            combined = combined.merge(ds, left_index=True, right_index=True, how="outer")
+            
+        data.analysis_tables[self.id] = combined
+        return data
 
 
 class ParamsExperiment(ExperimentWithReporter):
@@ -155,18 +177,16 @@ class ParamsExperiment(ExperimentWithReporter):
         self._params = params
         self._update_flat_params()
 
+    @timeit(level="PIPELINE", prefix="PARAMS")
     def execute(self, data: ExperimentData) -> ExperimentData:
         results = []
         self._update_flat_params()
-                
         for flat_param in tqdm(self._flat_params):
             t_data = ExperimentData(data._clean_ds_for_iteration())
             for executor in self.executors:
                 executor.set_params(flat_param)
-                t_data = executor.execute(t_data)    
-            
-            
-            report = self.reporter.report(t_data)
+                t_data = executor.execute(t_data)
+                report = self.reporter.report(t_data)
             results.append(report)
         result_data = self._set_result(data, results)
         return result_data
@@ -185,6 +205,7 @@ class IfParamsExperiment(ParamsExperiment):
         self.stopping_criterion = stopping_criterion
         super().__init__(executors, reporter, params, transformer, key)
 
+    @timeit(level="PIPELINE", prefix="PARAMS")
     def execute(self, data: ExperimentData) -> ExperimentData:
         self._update_flat_params()
         for flat_param in tqdm(self._flat_params):
