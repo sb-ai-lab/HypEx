@@ -77,9 +77,6 @@ ENV/
 env.bak/
 venv.bak/
 
-# Poetry
-poetry.lock
-
 # Editors / IDE
 .idea/
 .vscode/
