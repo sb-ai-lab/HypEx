@@ -44,26 +44,13 @@ exclude_patterns = [
     ".DS_Store",
 ]
 
-# Delete external references
-autosummary_mock_imports = [
-    "numpy",
-    "pandas",
-    "scipy",
-    "sklearn",
-    "networkx",
-    "holidays",
-    "joblib",
-    "yaml",
-    "gensim",
-    "PIL",
-    "albumentations",
-    "tqdm",
-    "matplotlib",
-    "seaborn",
-    "json2html",
-    "faiss",
-    "statsmodels",
-]
+# autosummary_mock_imports used to list numpy, pandas, scipy and friends. The
+# docs environment installs the package with all extras, so there is nothing
+# to mock -- and mocking numpy actively broke the build: importing hypex
+# under the mock raised "numpy.dtype is not a type object", which autosummary
+# reported as the misleading "no module named hypex". The rest of the list
+# (gensim, PIL, albumentations, networkx, holidays, json2html) names packages
+# this project has never depended on.
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]

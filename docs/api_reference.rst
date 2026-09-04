@@ -112,7 +112,8 @@ Pre-processing steps applied to :class:`~hypex.dataset.Dataset` objects.
 Experiments
 -----------
 
-Pipeline runners that chain executors over :class:`~hypex.dataset.ExperimentData`.
+Pipeline runners that chain executors over
+:class:`~hypex.dataset.ExperimentData`.
 
 .. autosummary::
    :toctree: _autosummary
