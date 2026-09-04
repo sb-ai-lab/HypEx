@@ -97,7 +97,12 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 line-length = 88
 target-version = "py38"
+extend-exclude = ["docs/_build", "docs/_autosummary"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "C90", "UP", "RUF", "I"]
-ignore = ["E501", "RUF003", "C901"]
+# E501: line length is enforced by `ruff format`, not by the linter.
+# RUF002/RUF003: docstrings and comments legitimately use Greek and Cyrillic
+# characters (statistical notation, Russian-language notes).
+# C901: complexity is tracked, not gated.
+ignore = ["E501", "RUF002", "RUF003", "C901"]
