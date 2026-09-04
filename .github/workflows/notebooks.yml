@@ -1,0 +1,41 @@
+name: Tutorial notebooks
+
+on:
+  schedule:
+    # Nightly. Executing every notebook is slow and depends on the whole
+    # scientific stack, so it does not belong on the pull-request path.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+  pull_request:
+    branches: [ master, dev/master ]
+    paths:
+      - "examples/tutorials/**"
+      - "hypex/**"
+      - ".github/workflows/notebooks.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  execute:
+    name: Execute the tutorials
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: poetry.lock
+
+      - run: python -m pip install tox
+
+      # Read the Docs renders these notebooks; until now nothing ever ran
+      # them, so a tutorial could break without any signal before release.
+      - run: tox -e notebooks

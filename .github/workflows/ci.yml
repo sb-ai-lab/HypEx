@@ -3,120 +3,271 @@ name: Continuous Integration
 on:
   push:
     branches: [ master, dev/master ]
-    paths-ignore:
-      - "docs/**"
-      - "*.md"
   pull_request:
     branches: [ master, dev/master ]
-    paths-ignore:
-      - "docs/**"
-      - "*.md"
+  workflow_dispatch:
+
+# Least privilege by default; no job here needs to write to the repository.
+permissions:
+  contents: read
+
+# A new push to the same ref makes the in-flight run obsolete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 jobs:
-  test:
+  # ---------------------------------------------------------------------------
+  # Fast feedback: everything that needs neither the dependency tree nor a
+  # matrix. Runs in well under a minute and fails the run before the matrix
+  # has finished booting.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint and spelling
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: poetry.lock
+
+      - name: Cache tox environments
+        uses: actions/cache@v4
+        with:
+          path: .tox
+          key: tox-lint-${{ runner.os }}-${{ hashFiles('tox.ini', 'pyproject.toml') }}
+
+      - run: python -m pip install tox
+
+      # Named environments explicitly. tox-gh-actions is deliberately NOT
+      # installed here: it rewrites envlist from [gh-actions] in tox.ini, which
+      # is how the old "linters" job silently ran the 3.10 test suite instead of
+      # any linter.
+      - run: tox -e lint,codespell
+
+  lockfile:
+    name: Lockfile is in sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: python -m pip install "poetry>=2.0"
+
+      # Catches a pyproject.toml edited without re-running `poetry lock`.
+      - run: poetry check --lock
+
+  # ---------------------------------------------------------------------------
+  # The test matrix. Narrowed from 17 jobs to 10: every supported interpreter
+  # on Linux, plus the oldest and newest on macOS and Windows, which is where
+  # platform bugs actually show up.
+  # ---------------------------------------------------------------------------
+  tests:
+    name: Tests ${{ matrix.python-version }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    continue-on-error: ${{ matrix.experimental || false }}
     strategy:
+      # One red interpreter must not hide the state of the others.
+      fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        # Exclude Python 3.13 on Windows due to segmentation fault issues
-        exclude:
-          - os: windows-latest
-            python-version: "3.13"
+        include:
+          - { os: ubuntu-latest, python-version: "3.8" }
+          - { os: ubuntu-latest, python-version: "3.9" }
+          - { os: ubuntu-latest, python-version: "3.10" }
+          - { os: ubuntu-latest, python-version: "3.11" }
+          - { os: ubuntu-latest, python-version: "3.12" }
+          - { os: ubuntu-latest, python-version: "3.13", experimental: true }
+          # macos-latest is arm64 and setup-python has no arm64 build of 3.8,
+          # so the oldest interpreter has to run on the x86_64 runner.
+          - { os: macos-13, python-version: "3.8" }
+          - { os: macos-latest, python-version: "3.13", experimental: true }
+          - { os: windows-latest, python-version: "3.8" }
+          # 3.13 on Windows segfaulted; revisit once the Linux/macOS 3.13 legs
+          # are green on numpy 2.x.
+          - { os: windows-latest, python-version: "3.12" }
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: poetry.lock
 
-      - name: Install system dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config gfortran g++
-          # Install OpenBLAS for scipy builds (needed for Python 3.13)
-          if [[ "${{ matrix.python-version }}" == "3.13" ]]; then
-            sudo apt-get install -y libopenblas-dev liblapack-dev
-          fi
+      - name: Cache tox environments
+        uses: actions/cache@v4
+        with:
+          path: .tox
+          key: >-
+            tox-${{ runner.os }}-py${{ matrix.python-version }}-${{
+            hashFiles('tox.ini', 'pyproject.toml') }}
 
-      - name: Install system dependencies (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew update
-          brew install pkg-config
-          # Install gcc, gfortran, and OpenBLAS for Python versions that need compilation
-          if [[ "${{ matrix.python-version }}" == "3.13" ]]; then
-            brew install gcc gfortran openblas
-            # Add Homebrew's bin directory to PATH to ensure gcc and gfortran are found
-            echo "$(brew --prefix)/bin" >> $GITHUB_PATH
-          fi
+      # tox builds and populates its own virtualenvs. The previous `poetry
+      # install` step here installed the dependency tree into a Poetry venv
+      # that nothing subsequently used.
+      - run: python -m pip install tox tox-gh-actions
 
-      - name: Install dependencies for tox
-        run: |
-          python -m pip install --upgrade pip
-          pip install tox tox-gh-actions
-          pip install poetry
+      - name: Run the test suite
+        run: tox
 
-      - name: Install project dependencies with retry
-        # Use poetry install with retry logic for network issues
-        shell: bash
-        run: |
-          # Try with system dependencies first, fall back to source if needed
-          poetry config virtualenvs.create true
-          poetry config virtualenvs.in-project false
-          
-          # For Python 3.13, try to install with --no-build-isolation first
-          if [[ "${{ matrix.python-version }}" == "3.13" ]]; then
-            # Use environment variables to help with compilation
-            if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-              export LDFLAGS="-L$(brew --prefix zlib)/lib"
-              export CPPFLAGS="-I$(brew --prefix zlib)/include"
-            fi
-            
-            # Try to install with system site packages enabled for system libraries
-            poetry install --no-root --without dev --no-interaction || \
-            echo "First attempt failed, retrying with different options..."
-            
-            # Fallback: try using pip directly with pre-compiled wheels where possible
-            python -m pip install --upgrade setuptools wheel
-            
-            # For problematic packages, try to get pre-compiled wheels
-            if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-              python -m pip install --only-binary :all: numpy scipy matplotlib || \
-              python -m pip install numpy scipy matplotlib --no-build-isolation
-            fi
-          else
-            poetry install --no-root --without dev --no-interaction
-          fi
-
-      - name: Run unit tests
-        shell: bash
-        env:
-          # For Python 3.13 compilation
-          NPY_DISTUTILS_APPEND_FLAGS: 1
-        run: |
-          # Use tox-gh-actions to select the right tox environment
-          tox
-
-  linters:
+  # ---------------------------------------------------------------------------
+  # One fully reproducible run off poetry.lock, carrying coverage. The matrix
+  # above deliberately resolves the declared ranges instead -- for a library,
+  # testing only a pinned set would hide breakage in the range users install.
+  # ---------------------------------------------------------------------------
+  coverage:
+    name: Coverage (locked)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: poetry.lock
+
+      - run: python -m pip install "poetry>=2.0"
+
+      - name: Install from the lockfile
+        run: poetry install --all-extras --with dev --no-interaction
+
+      - name: Run the test suite with coverage
+        run: >-
+          poetry run pytest tests
+          --cov=hypex --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: warn
+
+      # Codecov is optional: without a token on a private fork it is skipped
+      # rather than failing the run.
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        continue-on-error: true
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
+          cache: pip
+          cache-dependency-path: poetry.lock
 
-      - name: Install dependencies for linters
+      # nbsphinx shells out to pandoc, which is not a Python package.
+      - name: Install pandoc
         run: |
-          python -m pip install --upgrade pip
-          pip install tox tox-gh-actions
-          pip install poetry
-          poetry install --no-root
+          sudo apt-get update
+          sudo apt-get install -y pandoc
 
-      - name: Run linters (mypy, codespell, docs)
-        run: |
-          tox
+      - run: python -m pip install tox
+
+      # Read the Docs builds the same tree; catching a broken docs build here
+      # means catching it before merge rather than after.
+      - run: tox -e docs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docs-html
+          path: docs/_build/html
+          if-no-files-found: warn
+
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: poetry.lock
+
+      - run: python -m pip install tox
+
+      # Builds the sdist and wheel and runs twine check on them, so a release
+      # cannot be the first time we discover the metadata is invalid.
+      - run: tox -e build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  # ---------------------------------------------------------------------------
+  # Advisory jobs. They report, they do not block, and each carries the
+  # condition under which it should be promoted to blocking.
+  # ---------------------------------------------------------------------------
+  typing:
+    name: Type checks (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # 239 mypy errors across 40 files today. Drop this line once that reaches
+    # zero; tox -e typing already fails honestly.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: poetry.lock
+
+      - run: python -m pip install tox
+
+      - run: tox -e typing
+
+  audit:
+    name: Dependency audit (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Advisory because a new CVE in a transitive dependency should not turn an
+    # unrelated pull request red. The scheduled run in security.yml is what
+    # gets watched.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: poetry.lock
+
+      - run: python -m pip install tox
+
+      - run: tox -e audit

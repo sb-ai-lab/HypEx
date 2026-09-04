@@ -1,0 +1,33 @@
+version: 2
+
+updates:
+  # Poetry dependencies. Grouped so a routine week is one pull request rather
+  # than a dozen, with the scientific stack kept separate because those bumps
+  # need a real look at the test matrix.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+      scientific-stack:
+        patterns: ["numpy", "scipy", "pandas", "scikit-learn", "matplotlib", "statsmodels", "seaborn", "faiss-cpu"]
+    labels: [dependencies]
+
+  # Workflow actions. Unpinned actions are the usual way a supply-chain issue
+  # reaches CI.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    groups:
+      github-actions:
+        patterns: ["*"]
+    labels: [dependencies, ci]

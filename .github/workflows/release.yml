@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and check the artifacts without publishing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: poetry.lock
+
+      - run: python -m pip install "poetry>=2.0" twine
+
+      # A tag that disagrees with the packaged version produces a release
+      # nobody can reproduce. Refuse before anything is built.
+      - name: Check the tag matches the project version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          project="$(poetry version --short)"
+          echo "tag=${tag} pyproject=${project}"
+          if [ "${tag}" != "${project}" ]; then
+            echo "::error::Tag v${tag} does not match pyproject.toml version ${project}"
+            exit 1
+          fi
+
+      - run: poetry check --lock
+
+      - name: Build sdist and wheel
+        run: poetry build
+
+      - name: Verify the artifact metadata
+        run: twine check --strict dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+    environment:
+      name: pypi
+      url: https://pypi.org/p/HypEx
+    # Trusted Publishing: PyPI verifies this OIDC token, so there is no API
+    # token to store or rotate. Configure the publisher once at
+    # https://pypi.org/manage/project/HypEx/settings/publishing/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: Create the GitHub release
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      # Uses RELEASE_NOTES_<version>.md when the release adds one, and falls
+      # back to generated notes otherwise.
+      - name: Locate the release notes
+        id: notes
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          file="RELEASE_NOTES_${version}.md"
+          if [ -f "${file}" ]; then
+            echo "path=${file}" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::${file} not found; using generated notes"
+          fi
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          body_path: ${{ steps.notes.outputs.path }}
+          generate_release_notes: ${{ steps.notes.outputs.path == '' }}
+          fail_on_unmatched_files: true
