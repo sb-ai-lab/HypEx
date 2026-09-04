@@ -214,7 +214,7 @@ class DatasetBase:
             )
         elif data is not None:
             if isinstance(data, DatasetBase):
-                self._backend_data = deepcopy(data._backend)
+                self._backend_data = deepcopy(data._backend_data)
             elif isinstance(data, (PandasDataset, SparkDataset)):
                 self._backend_data = data
             elif any(
@@ -234,7 +234,7 @@ class DatasetBase:
                 self._backend_data = PandasDataset(data)
 
         self.default_role = default_role
-        if roles is None and data.hasattr("roles") and data.roles is not None:
+        if roles is None and hasattr(data, "roles") and data.roles is not None:
             roles = data.roles
         elif roles is None:
             roles = {}
