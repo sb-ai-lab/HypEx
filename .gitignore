@@ -60,6 +60,10 @@ dmypy.json
 docs/_build/
 docs/_autosummary/
 
+# CatBoost writes training logs next to whatever runs it; the tutorials
+# regenerate these on every execution, so they are build output, not source.
+catboost_info/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 /*.ipynb
