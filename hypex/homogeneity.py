@@ -2,7 +2,7 @@ from .analyzers.aa import OneAAStatAnalyzer
 from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from .dataset import TargetRole, TreatmentRole
 from .experiments.base import Experiment, OnRoleExperiment
-from .ui.base import ExperimentShell, ExperimentOutput
+from .ui.base import ExperimentOutput, ExperimentShell
 from .ui.homo import HomoOutput
 
 HOMOGENEITY_TEST = Experiment(

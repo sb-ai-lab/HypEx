@@ -112,9 +112,9 @@ class ABAnalyzer(Executor):
                 multitest_pvalues = self._add_pvalues(multitest_pvalues, t_data[f], f)
                 for number, group in enumerate(group_labels):
                     # target-major rows: a group holds every num_groups-th one
-                    analysis_data[f"{c} {f} {group}"] = t_data.iloc[
-                        number::num_groups
-                    ][f].mean()
+                    analysis_data[f"{c} {f} {group}"] = t_data.iloc[number::num_groups][
+                        f
+                    ].mean()
             if c not in ["UTest", "TTest"]:
                 indexes = t_data.index
                 values = t_data.data.values.tolist()
@@ -129,7 +129,10 @@ class ABAnalyzer(Executor):
             {f: StatisticRole() for f in analysis_data},
             BackendsEnum.pandas,
         )
-        if not multitest_pvalues.is_empty() or self.multitest_method == ABNTestMethodsEnum.quantile:
+        if (
+            not multitest_pvalues.is_empty()
+            or self.multitest_method == ABNTestMethodsEnum.quantile
+        ):
             data = self.execute_multitest(
                 data,
                 multitest_pvalues if not multitest_pvalues.is_empty() else data.ds,

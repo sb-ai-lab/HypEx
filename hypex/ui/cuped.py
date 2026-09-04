@@ -9,7 +9,7 @@ from .base import Output
 
 class CupedOutput(Output):
     """Output container for CUPED variance reduction analysis.
-    
+
     Attributes:
         resume: Dataset with summary of CUPED results (target, covariate, variance_reduction)
         variance_reductions: Dataset containing variance reduction metrics
@@ -24,7 +24,7 @@ class CupedOutput(Output):
 
     def extract(self, experiment_data: ExperimentData) -> None:
         """Extract CUPED variance reduction data from experiment results.
-        
+
         Args:
             experiment_data: Experiment data containing variance reduction metrics
         """

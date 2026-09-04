@@ -16,7 +16,6 @@ from hypex.utils import (
 
 
 class TestDataset(unittest.TestCase):
-
     def setUp(self):
         # Initialize test data and roles
         self.roles = {"col1": InfoRole(int), "col2": InfoRole(int)}
@@ -876,7 +875,6 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(dropped_dataset.columns, "col2")
 
     def test_dropna_all(self):
-
         # Test with how='all'
         self.dataset.data.loc[0] = [None, None]
         result = self.dataset.dropna(how="all")
@@ -991,7 +989,6 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(dataset_from_list.shape, (3, 2))
 
     def test_groupby(self):
-
         data_grouped = pd.DataFrame({"col1": [1, 2, 1], "col2": [4, 5, 6]})
         dataset_grouped = Dataset(roles=self.roles, data=data_grouped)
 

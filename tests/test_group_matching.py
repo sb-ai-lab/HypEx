@@ -21,9 +21,7 @@ def grouped_data():
     df = pd.DataFrame(
         {
             "user_id": range(n),
-            "accept_date": rng.choice(
-                ["2025-07-31", "2025-08-31", "2025-09-30"], n
-            ),
+            "accept_date": rng.choice(["2025-07-31", "2025-08-31", "2025-09-30"], n),
             "treat": rng.integers(0, 2, n),
             "age": rng.normal(40, 5, n),
             "income": rng.normal(100, 20, n),

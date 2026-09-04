@@ -8,7 +8,7 @@ from . import Reporter
 
 class CupedReporter(Reporter):
     """Reporter for extracting CUPED analysis results from experiment data."""
-    
+
     def report(self, data: ExperimentData) -> Dataset | None:
         """Generate summary resume for CUPED results."""
         return self.extract_resume(data)
@@ -16,10 +16,10 @@ class CupedReporter(Reporter):
     @staticmethod
     def extract_resume(data: ExperimentData) -> Dataset | str:
         """Generate summary resume for CUPED results.
-        
+
         Args:
             data: Experiment data containing variance reduction metrics
-            
+
         Returns:
             Dataset with target, covariate, and variance_reduction columns
         """
@@ -28,7 +28,7 @@ class CupedReporter(Reporter):
             for col in data.additional_fields.columns
             if col.endswith("_variance_reduction")
         ]
-        
+
         if not variance_cols:
             return "No CUPED data available"
 
@@ -37,15 +37,17 @@ class CupedReporter(Reporter):
         for col in variance_cols:
             metric_name = col.replace("_variance_reduction", "")
             reduction_value = data.additional_fields.data[col].iloc[0]
-            
+
             # Try to find covariate name from dataset roles or use simple format
             covariate = f"{metric_name.replace('_cuped', '')}_lag"
-            
-            resume_data.append({
-                "target": metric_name.replace("_cuped", ""),
-                "covariate": covariate,
-                "variance_reduction": f"{reduction_value:.1f}%"
-            })
+
+            resume_data.append(
+                {
+                    "target": metric_name.replace("_cuped", ""),
+                    "covariate": covariate,
+                    "variance_reduction": f"{reduction_value:.1f}%",
+                }
+            )
 
         return Dataset.from_dict(
             data=resume_data,
@@ -59,10 +61,10 @@ class CupedReporter(Reporter):
     @staticmethod
     def extract_variance_reductions(data: ExperimentData) -> Dataset | str:
         """Generate variance reduction report for CUPED transformations.
-        
+
         Args:
             data: Experiment data containing variance reduction metrics in additional_fields
-            
+
         Returns:
             Dataset with variance reduction metrics or error message string
         """
@@ -71,7 +73,7 @@ class CupedReporter(Reporter):
             for col in data.additional_fields.columns
             if col.endswith("_variance_reduction")
         ]
-        
+
         if not variance_cols:
             return "No variance reduction data available. Ensure CUPED was applied."
 

@@ -10,7 +10,7 @@ from .executor.executor import Executor
 from .experiments.base import Experiment, OnRoleExperiment
 from .transformers import CUPEDTransformer
 from .ui.ab import ABOutput
-from .ui.base import ExperimentShell, ExperimentOutput
+from .ui.base import ExperimentOutput, ExperimentShell
 from .ui.cupac import CupacOutput
 from .ui.cuped import CupedOutput
 from .utils import ABNTestMethodsEnum, ABTestTypesEnum
@@ -164,9 +164,9 @@ class ABTest(ExperimentShell):
         """
         additional_outputs = {}
         if enable_cupac:
-            additional_outputs['cupac'] = CupacOutput()
+            additional_outputs["cupac"] = CupacOutput()
         if cuped_features:
-            additional_outputs['cuped'] = CupedOutput()
+            additional_outputs["cuped"] = CupedOutput()
 
         if "t_test_equal_var" in kwargs:
             warnings.warn(
@@ -186,15 +186,12 @@ class ABTest(ExperimentShell):
                 enable_cupac,
             ),
             output=ExperimentOutput(
-                main_output=ABOutput(),
-                additional_outputs=additional_outputs
-        ),
+                main_output=ABOutput(), additional_outputs=additional_outputs
+            ),
         )
         if equal_variance is not None:
             self.experiment.set_params(
                 {TTest: {"calc_kwargs": {"equal_var": equal_variance}}}
             )
         else:
-            self.experiment.set_params(
-                {TTest: {"calc_kwargs": {"equal_var": False}}}
-            )
+            self.experiment.set_params({TTest: {"calc_kwargs": {"equal_var": False}}})

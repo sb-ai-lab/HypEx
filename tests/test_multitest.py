@@ -51,7 +51,9 @@ def _row(table: pd.DataFrame, field: str, group: str, test: str = "TTest") -> pd
         & (table["group"].astype(str) == group)
         & (table["test"] == test)
     ]
-    assert len(rows) == 1, f"expected one row for {test} {field} {group}, got {len(rows)}"
+    assert len(rows) == 1, (
+        f"expected one row for {test} {field} {group}, got {len(rows)}"
+    )
     return rows.iloc[0]
 
 

@@ -458,8 +458,9 @@ class Comparator(Calculator, ABC):
             raise NotSuitableFieldError(group_field_data, "Grouping")
 
         if (
-            group_field_data.columns[0] in data.groups
-        ) and self.compare_by != "matched_pairs":  # TODO: proper split between groups and columns
+            (group_field_data.columns[0] in data.groups)
+            and self.compare_by != "matched_pairs"
+        ):  # TODO: proper split between groups and columns
             grouping_data = self._grouping_data_split(
                 grouping_data=data.groups[group_field_data.columns[0]],
                 compare_by=self.compare_by,

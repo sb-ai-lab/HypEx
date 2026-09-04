@@ -31,9 +31,9 @@ def _make_dataset(x: np.ndarray, y: np.ndarray) -> Dataset:
 @pytest.mark.parametrize(
     "x_scale, y_scale",
     [
-        (1.0, 1.0),   # equal scale: the old (buggy) theta also happened to work
-        (1.0, 5.0),   # target on a larger scale than the covariate
-        (8.0, 1.0),   # covariate on a much larger scale than the target
+        (1.0, 1.0),  # equal scale: the old (buggy) theta also happened to work
+        (1.0, 5.0),  # target on a larger scale than the covariate
+        (8.0, 1.0),  # covariate on a much larger scale than the target
     ],
 )
 def test_cuped_reaches_rho_squared_reduction(x_scale, y_scale):

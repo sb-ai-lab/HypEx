@@ -13,7 +13,6 @@ from .abstract import MLExtension
 
 
 class CupacExtension(MLExtension):
-
     def __init__(
         self,
         n_folds: int = 5,
@@ -61,7 +60,6 @@ class CupacExtension(MLExtension):
         y_values = Y_df.iloc[:, 0] if len(Y_df.columns) > 0 else Y_df
 
         kf = KFold(n_splits=self.n_folds, shuffle=True, random_state=self.random_state)
-        fold_var_reductions = []
         fold_feature_importances = []
 
         feature_names = X_df.columns.tolist()

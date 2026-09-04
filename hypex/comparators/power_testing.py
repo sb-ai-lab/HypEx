@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from scipy.stats import norm
 
-from ..dataset import ABCRole, Dataset, ExperimentData, TreatmentRole, TargetRole
+from ..dataset import ABCRole, Dataset, ExperimentData, TargetRole, TreatmentRole
 from ..utils import ExperimentDataEnum
 from .comparators import Comparator
 
@@ -89,38 +89,23 @@ class MDEBySize(PowerTesting):
     ) -> dict:
         if data is not None:
             feature_columns = data.search_columns(self.target_roles, search_types=None)
-            grouping_column = data.search_columns(self.grouping_role, search_types=None)[0]
-            data_groups = data[feature_columns + [grouping_column]].groupby(grouping_column)
+            grouping_column = data.search_columns(
+                self.grouping_role, search_types=None
+            )[0]
+            data_groups = data[[*feature_columns, grouping_column]].groupby(
+                grouping_column
+            )
             baseline_data = [data_groups[0]]
             compared_data = data_groups[1:]
 
             return self._execute_inner_function(
-            baseline_data=baseline_data,
-            compared_data=compared_data,
-            compare_by=compare_by,
-            **kwargs,
-        )
-
-        if compare_by is None and target_fields_data is None:
-            raise ValueError(
-                "You should pass either compare_by or target_fields argument."
-            )
-
-        if grouping_data is None:
-            grouping_data = self._split_data_to_buckets(
+                baseline_data=baseline_data,
+                compared_data=compared_data,
                 compare_by=compare_by,
-                target_fields_data=target_fields_data,
-                baseline_field_data=baseline_field_data,
-                group_field_data=group_field_data,
+                **kwargs,
             )
 
-        baseline_data, compared_data = grouping_data
-        return self._execute_inner_function(
-            baseline_data=baseline_data,
-            compared_data=compared_data,
-            compare_by=compare_by,
-            **kwargs,
-        )
+        raise ValueError("data is required.")
 
     @classmethod
     def _inner_function(

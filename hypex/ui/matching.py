@@ -27,10 +27,10 @@ class MatchingOutput(Output):
             resume_reporter=MatchingDictReporter(searching_class),
             additional_reporters=MatchingQualityDatasetReporter(),
         )
-    
+
     def _get_output_fields(self) -> list[str]:
         """Return ordered fields for Matching test output display."""
-        return ['resume', 'indexes', 'full_data', 'quality_results']
+        return ["resume", "indexes", "full_data", "quality_results"]
 
     def _extract_full_data(self, experiment_data: ExperimentData, indexes: Dataset):
         self.indexes = Dataset(roles={}, data=experiment_data.ds.index)

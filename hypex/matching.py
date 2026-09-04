@@ -14,7 +14,7 @@ from .ml.faiss import FaissNearestNeighbors
 from .operators.operators import Bias, MatchingMetrics
 from .reporters.matching import MatchingDatasetReporter
 from .transformers import TypeCaster
-from .ui.base import ExperimentShell, ExperimentOutput
+from .ui.base import ExperimentOutput, ExperimentShell
 from .ui.matching import MatchingOutput
 
 
@@ -229,6 +229,8 @@ class Matching(ExperimentShell):
                 encode_categories,
             ),
             output=ExperimentOutput(
-                main_output=MatchingOutput(GroupExperiment if group_match else MatchingAnalyzer)
+                main_output=MatchingOutput(
+                    GroupExperiment if group_match else MatchingAnalyzer
+                )
             ),
         )

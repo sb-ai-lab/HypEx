@@ -184,7 +184,6 @@ class CUPACExecutor(MLExecutor):
 
         # Build training and prediction structures for each target
         for target in targets.keys():
-
             cupac_data[target] = {"X_train": [], "Y_train": []}
             # Only real targets (not virtual) need prediction
             if target in data.ds.columns:

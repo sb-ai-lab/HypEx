@@ -1,4 +1,5 @@
 """CUPAC-specific output classes."""
+
 from __future__ import annotations
 
 from ..dataset import Dataset, ExperimentData
@@ -25,7 +26,7 @@ class CupacOutput(Output):
 
     def extract(self, experiment_data: ExperimentData) -> None:
         """Extract CUPAC analysis results from experiment data.
-        
+
         Args:
             experiment_data: Experiment data containing CUPAC reports
         """

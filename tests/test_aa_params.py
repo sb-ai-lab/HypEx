@@ -101,9 +101,7 @@ def test_test_is_an_alias_for_the_first_test_group():
 
     split = AASplitter._inner_function(data, random_state=1, const_group_field="forced")
 
-    assert [
-        "control" if value == "control" else "test_1" for value in values
-    ] == split
+    assert ["control" if value == "control" else "test_1" for value in values] == split
 
 
 def test_all_rows_in_const_groups_with_groups_sizes():
@@ -140,8 +138,8 @@ def test_const_groups_leave_the_split_working(free_share):
     assert "control" in groups
     assert any(group.startswith("test") for group in groups)
     assert len(result.resume.data) > 0
-
-
+
+
 def test_a_string_that_stands_for_a_missing_value_is_not_a_group():
     """A column can carry a missing value as the string 'nan' - pandas writes it
     that way when a string is assigned into a column that does not exist yet.
