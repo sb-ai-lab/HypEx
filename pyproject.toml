@@ -45,7 +45,12 @@ pandas = [
 
 numpy = [
     { version = ">=1.17.0, <=1.24.4", python = "<3.9" },
-    { version = ">=1.17.0, <=1.26.4", python = ">=3.9" }
+    { version = ">=1.17.0, <=1.26.4", python = ">=3.9, <3.13" },
+    # numpy gained CPython 3.13 wheels in 2.1; 1.26.4 predates 3.13 entirely
+    # and has to be compiled from source there, which is what the OpenBLAS /
+    # gfortran scaffolding in CI was working around. scipy, matplotlib and
+    # faiss-cpu already carry a dedicated >=3.13 branch; numpy was missed.
+    { version = ">=2.1.0, <2.3.0", python = ">=3.13" }
 ]
 
 scipy = [
@@ -84,9 +89,10 @@ nbsphinx = "*"
 nbsphinx_link = "*"
 sphinx_autodoc-typehints = "*"
 sphinx_rtd_theme = "^1.2.2"
-ruff = "*"
+ruff = "0.16.6"
 alive-progress = "^3.1.0"
 psutil = "^7.0.0"
+pytest-cov = "^5.0.0"
 jsonschema = "^4.23.0"
 
 
@@ -97,7 +103,10 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 line-length = 88
 target-version = "py38"
-extend-exclude = ["docs/_build", "docs/_autosummary"]
+# Ruff >= 0.14 also formats Python blocks inside Markdown. Keep it away from
+# prose: wrapping README examples at 88 columns makes them harder to read,
+# not easier.
+extend-exclude = ["docs/_build", "docs/_autosummary", "*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "C90", "UP", "RUF", "I"]
@@ -106,3 +115,14 @@ select = ["E", "F", "W", "C90", "UP", "RUF", "I"]
 # characters (statistical notation, Russian-language notes).
 # C901: complexity is tracked, not gated.
 ignore = ["E501", "RUF002", "RUF003", "C901"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["hypex"]
+exclude = "^(docs|examples|dist)/"
+# Most of the scientific stack ships no stubs; that is not a defect in hypex.
+ignore_missing_imports = true
+# The existing backlog is large, so the strict flags stay off for now and the
+# CI job is advisory. Tighten these as the backlog is burned down.
+warn_unused_ignores = true
+warn_redundant_casts = true

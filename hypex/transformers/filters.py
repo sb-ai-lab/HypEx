@@ -272,8 +272,9 @@ class OutliersFilter(Transformer):
         upper_percentile: float = 1,
     ) -> Dataset:
         mask = data[target_cols].apply(
-            func=lambda x: (x < x.quantile(lower_percentile))
-            | (x > x.quantile(upper_percentile)),
+            func=lambda x: (
+                (x < x.quantile(lower_percentile)) | (x > x.quantile(upper_percentile))
+            ),
             role={column: InfoRole() for column in target_cols},
             axis=0,
         )
