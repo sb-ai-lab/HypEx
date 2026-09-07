@@ -5,6 +5,7 @@ from typing import Any, ClassVar, Literal
 
 from ..analyzers.matching import MatchingAnalyzer
 from ..comparators import (
+    BaseComparator,
     GroupChi2Test,
     GroupKSTest,
     GroupTTest,
@@ -113,7 +114,7 @@ class MatchingReporter(DatasetReporter):
 class MatchingQualityReporter(DatasetReporter):
     """Reporter for matching quality tests (T-Test, KS-Test, Chi2-Test)."""
     
-    tests: ClassVar[list] = [
+    tests: ClassVar[list[type[BaseComparator]]] = [
         GroupTTest, GroupKSTest, GroupChi2Test, 
         StatsTTest, StatsKSTest, StatsChi2Test
     ]
