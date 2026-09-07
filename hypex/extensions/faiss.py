@@ -235,7 +235,7 @@ class PandasFaissExtension(FaissExtension):
             data: Dataset,
             test_data: Dataset,
             X: np.ndarray
-    ) -> pd.Series:
+    ) -> Dataset:
         """
         Perform the FAISS search on the query vectors.
 
