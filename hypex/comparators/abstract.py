@@ -739,18 +739,82 @@ class StatsComparator(BaseComparator, ABC):
         group_col_stats: dict[str, dict[str, dict[str, Any]]] | None = None,
         **kwargs,
     ) -> dict:
-        """
-        Stateless entry point mirroring :meth:`GroupsComparator.calc`, so the
-        comparator can be run outside the experiment pipeline.
+        """Stateless entry point mirroring :meth:`GroupsComparator.calc`.
 
-        Pass either pre-aggregated ``group_col_stats`` (as produced by
-        :meth:`_compute_stats`) or the raw ``target_fields_data`` and
-        ``group_field_data`` to have the statistics aggregated here. ``stats``
-        defaults to the comparator's ``REQUIRED_STATS``, so callers normally
-        don't need to supply it.
+        Runs the two-phase stats comparator outside the experiment pipeline.
 
-        Returns ``{f"{group}{NAME_BORDER_SYMBOL}{col}": Dataset}`` pairwise test
-        results, comparing every non-baseline group against the first group.
+        **Phase 1 – Aggregate.**  When ``group_col_stats`` is not supplied,
+        this method builds a column projection from ``target_fields_data``
+        (merging in ``group_field_data`` when the grouping column is absent)
+        and delegates to :meth:`_compute_stats`, which issues a **single**
+        backend aggregation job (one ``groupBy().agg()`` on Spark) for all
+        target columns simultaneously.
+
+        **Phase 2 – Compare.**  The pre-aggregated statistics are fed
+        pairwise (baseline vs. each compared group) into
+        :meth:`_inner_function`, which returns the test result
+        (``p-value``, ``statistic``, ``pass``) for every
+        ``(group, column)`` pair.
+
+        Two invocation modes are supported:
+
+        * **Pre-aggregated** – pass ``group_col_stats`` directly (e.g. the
+        output of a previous :meth:`_compute_stats` call).  No data
+        preparation is performed.
+        * **Raw data** – pass ``target_fields_data`` **and**
+        ``group_field_data``.  Statistics are aggregated internally.
+
+        Args:
+            target_fields_data: Dataset containing the target metric
+                columns to compare.  Required when ``group_col_stats``
+                is ``None``.
+            group_field_data: Single-column Dataset that defines group
+                membership (e.g. treatment assignment).  Required when
+                ``group_col_stats`` is ``None``.
+            baseline_fields_data: Dataset with match-index columns.
+                Used only when ``compare_by="matched_pairs"``; ignored
+                for ``compare_by="groups"``.
+            stats: Statistic names to compute in Phase 1
+                (e.g. ``["mean", "std", "count"]``).  When ``None``,
+                defaults to the class-level ``REQUIRED_STATS``.
+            compare_by: Comparison mode.  Supported values:
+
+                * ``"groups"`` – standard multi-group comparison.
+                The first (alphabetically smallest) group is treated
+                as the baseline.
+                * ``"matched_pairs"`` – each observation is compared
+                against its matched counterpart.  Requires
+                ``baseline_fields_data``.
+
+            group_col_stats: Pre-aggregated statistics in the nested-dict
+                format produced by :meth:`_compute_stats`::
+
+                    {group_key: {column: {stat_name: value}}}
+
+                When provided, ``target_fields_data`` and
+                ``group_field_data`` are ignored.
+            **kwargs: Additional keyword arguments forwarded to
+                :meth:`_inner_function` (e.g. ``reliability``).
+
+        Returns:
+            dict[str, Dataset]: Pairwise test results keyed by
+            ``f"{group}{NAME_BORDER_SYMBOL}{col}"``.  Every non-baseline
+            group is compared against the first (baseline) group.
+
+        Raises:
+            ValueError: If neither ``group_col_stats`` nor both
+                ``target_fields_data`` and ``group_field_data`` are
+                provided, or if ``compare_by`` is not one of the
+                supported modes.
+
+        Example:
+            >>> from hypex.comparators.stats_hypothesis_testing import StatsTTest
+            >>> result = StatsTTest.calc(
+            ...     target_fields_data=ds_metrics,
+            ...     group_field_data=ds_treat,
+            ... )
+            >>> for key, ds in result.items():
+            ...     print(key, ds.get_values(row="p-value", column="p-value"))
         """
         if group_col_stats is None:
             if target_fields_data is None or group_field_data is None:
@@ -759,15 +823,67 @@ class StatsComparator(BaseComparator, ABC):
                     "target_fields_data and group_field_data."
                 )
 
-            grouped = cls._prepare_data(compare_by, target_fields_data, group_field_data, baseline_fields_data)
-            group_col_stats = cls._compute_stats(
-                grouped, list(target_fields_data.columns), stats or cls.REQUIRED_STATS
-            )
+            group_col = group_field_data.columns[0]
+            target_cols = list(target_fields_data.columns)
+
+            if compare_by == "groups":
+                if group_col in target_fields_data.columns:
+                    agg_data = target_fields_data
+                else:
+                    agg_data = target_fields_data.merge(
+                        group_field_data, left_index=True, right_index=True
+                    )
+
+                group_col_stats = cls._compute_stats(
+                    data=agg_data,
+                    group_cols=[group_col],
+                    target_columns=target_cols,
+                    stats=stats or cls.REQUIRED_STATS,
+                )
+
+            elif compare_by == "matched_pairs":
+                best_match_col = baseline_fields_data.columns[0]
+                baseline_fields = baseline_fields_data[best_match_col]
+
+                tmp_data = group_field_data.merge(
+                    right=target_fields_data, left_index=True, right_index=True
+                )
+                tmp_data = tmp_data.merge(
+                    right=baseline_fields, right_index=True, left_index=True
+                )
+                tmp_data = tmp_data.merge(
+                    right=tmp_data, right_index=True, left_on=best_match_col,
+                    suffixes=("", "_matched"),
+                )
+                prepared_data = tmp_data.drop(
+                    columns=[
+                        best_match_col,
+                        best_match_col + "_matched",
+                        group_col + "_matched",
+                    ]
+                )
+
+                matched_target_cols = target_cols + [
+                    f"{c}_matched" for c in target_cols
+                ]
+
+                group_col_stats = cls._compute_stats(
+                    data=prepared_data,
+                    group_cols=[group_col],
+                    target_columns=matched_target_cols,
+                    stats=stats or cls.REQUIRED_STATS,
+                )
+
+            else:
+                raise ValueError(
+                    f"StatsComparator supports 'groups' and 'matched_pairs' only, "
+                    f"got compare_by={compare_by!r}"
+                )
 
         return cls._execute_inner_function(
             group_col_stats=group_col_stats,
             compare_by=compare_by,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod
