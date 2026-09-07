@@ -187,13 +187,7 @@ class DatasetBase:
                 role.data_type = colunms_dtypes[column]
             elif role.data_type != colunms_dtypes[column]:
                 new_types[column] = role.data_type
-                
-        if new_types:
-            for c in new_types:
-                try:
-                    na = int(self._backend_data.data[c].isna().sum())
-                except Exception:
-                    na = -1
+
         self._backend_data = self._backend_data.update_column_type(new_types)
 
     def __init__(
