@@ -13,6 +13,8 @@ Classes:
         matching pipeline, including persistence policies, sampling
         targets, and batch sizes.
 """
+from typing import Literal
+
 from pyspark import StorageLevel
 
 
@@ -96,8 +98,21 @@ class MatchingConfig:
             usage. Smaller chunks reduce memory pressure at the cost of
             additional iteration overhead.
             Defaults to 4096.
+
+        FAISS_FIT_MODE (Literal["full", "sample"]): Strategy for training
+            the IVF quantizer during the distributed fit phase.
+            - ``"sample"``: trains the quantizer on a random subset of
+              the data (up to ``FAISS_SAMPLE_TARGET`` rows). Faster but
+              may produce less accurate clusters for highly non-uniform
+              distributions.
+            - ``"full"``: trains the quantizer on the entire dataset
+              using iterative mini-batch clustering (MiniBatchKMeans or
+              BIRCH) via ``_prefit``. Slower but yields higher-quality
+              clusters.
+            Defaults to ``"sample"``.
     """
     FAISS_PERSIST_POLITIC: StorageLevel = StorageLevel.MEMORY_AND_DISK
     FAISS_SAMPLE_TARGET: int = 5_000_000
     FAISS_DRIVER_INDEX_LIMIT: int = 5_000_000
     FAISS_CHUNK_SIZE: int = 4096
+    FAISS_FIT_MODE: Literal["full", "sample"] = "sample"

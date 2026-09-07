@@ -323,6 +323,7 @@ class FaissNearestNeighbors(MLExecutor):
         elif len(matched_indexes) < len(data.ds) and self.two_sides:
             raise PairsNotFoundError
         result = self._set_value(data, matched_indexes, key="matched")
+        result.ds.checkpoint(eager=True)
         # unpersist `contol` and `test` indexes as they are
         # already persisted in `ds` using  `_set_value`
         for res_v in compare_result.values():

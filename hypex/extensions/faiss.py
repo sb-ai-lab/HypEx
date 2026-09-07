@@ -869,7 +869,7 @@ class SparkFaissExtension(FaissExtension):
 
         storage_level = storage_level or "MEMORY_AND_DISK"
         result.persist(storage_level=storage_level, action="count")
-        # result.checkpoint(eager=True)
+        result.checkpoint(eager=True)
 
         return result
 
@@ -915,12 +915,12 @@ class SparkFaissExtension(FaissExtension):
             # else data.dot(self.mahalanobis.data)._backend_data.data.to_spark(index_col='index')
             else self._mahalanobis_transform(data, self.mahalanobis)._backend_data.data.to_spark(index_col='index')
         )
-        # self.k = (operating_data.count())
+         # self.k = (operating_data.count())
         self._data_size = operating_data.count()
         vectorized_data = self._vectorize_data(operating_data)
 
         if mode in ["auto", "fit"]:
-            fit_mode = kwargs.get("fit_mode", "full")
+            fit_mode = MatchingConfig.FAISS_FIT_MODE
             model_name = kwargs.get("model", "k-means")
             self._fit(
                 vectorized_data=vectorized_data,
@@ -969,5 +969,5 @@ class SparkFaissExtension(FaissExtension):
 
 def get_executor_cache() -> CachingIndex:
     if not hasattr(builtins, "_faiss_index_cache"):
-        builtins._faiss_index_cache = CachingIndex()
+        builtins._faiss_index_cache = CachingIndex(max_index=5)
     return builtins._faiss_index_cache
