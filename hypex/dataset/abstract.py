@@ -1,43 +1,38 @@
 from __future__ import annotations
 
-import warnings
-import copy
-from copy import deepcopy
 import json
-from abc import ABC
+import warnings
 from collections.abc import Iterable as IterableABC
+from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any, Iterable, Callable, Hashable, Literal, Optional, Sequence
+from typing import Any, Callable, Hashable, Iterable, Literal, Sequence
 
 try:
     from typing import Self  # Python >= 3.11
 except ImportError:
-    from typing_extensions import Self  # Python < 3.11
+    from typing_extensions import Self  # type: ignore # Python < 3.11
 
 
 import pandas as pd  # type: ignore
+import pyspark.pandas as ps  # type: ignore
+import pyspark.sql as spark  # type: ignore
 from numpy import ndarray
 
-import pyspark.sql as spark
-import pyspark.pandas as ps
-
-from .backends import PandasDataset, SparkDataset
-from .groupby_dataset import GroupedDataset
+from ..config import DatasetConfig
 from ..utils import (
     BackendsEnum,
     BackendTypeError,
     ConcatBackendError,
     ConcatDataError,
     DataTypeError,
+    GenericManager,
     RoleColumnError,
     ScalarType,
     SourceDataTypes,
-    GenericManager
 )
-from ..config import DatasetConfig
 from ..utils.adapter import Adapter
-from .groupby_dataset import GroupedDataset
 from .backends import PandasDataset, SparkDataset
+from .groupby_dataset import GroupedDataset
 from .roles import (
     ABCRole,
     DefaultRole,
@@ -196,7 +191,7 @@ class DatasetBase:
         data: spark.DataFrame | pd.DataFrame | str | Self | None = None,
         backend: BackendsEnum | None = None,
         default_role: ABCRole | None = None,
-        session: Optional[spark.SparkSession] = None,
+        session: spark.SparkSession | None = None,
         data_compression: Literal[
             "downcasting", "encoding", "auto", "disable"
         ] = "auto",
