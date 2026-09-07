@@ -638,7 +638,7 @@ class DatasetBase:
             session=self.session,
         )
 
-    def __bool__(self) -> Self:
+    def __bool__(self) -> bool:
         return not self._backend_data.is_empty()
 
     # Binary math operators:
