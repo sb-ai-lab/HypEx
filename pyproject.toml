@@ -94,6 +94,7 @@ alive-progress = "^3.1.0"
 psutil = "^7.0.0"
 pytest-cov = "^5.0.0"
 jsonschema = "^4.23.0"
+pre-commit = ">=3.5"
 
 
 [build-system]
@@ -115,6 +116,18 @@ select = ["E", "F", "W", "C90", "UP", "RUF", "I"]
 # characters (statistical notation, Russian-language notes).
 # C901: complexity is tracked, not gated.
 ignore = ["E501", "RUF002", "RUF003", "C901"]
+
+[tool.codespell]
+# The word list is shared by the tox env, the pre-commit hook and a bare local
+# `codespell`; file selection is not, because pre-commit hands the hook the
+# staged files instead of letting it walk the tree (see .pre-commit-config.yaml).
+skip = ".git,.tox,.venv,.mypy_cache,.ruff_cache,docs,_build,imgs,schemes,poetry.lock,*.ipynb"
+# Dotfile directories hold CONTRIBUTING.md, the issue templates and the
+# workflows -- all user-facing prose that codespell skips by default.
+check-hidden = true
+# dotA: a column name in the test fixtures. TE/te: treatment effect.
+# TTest/ttest: the class name and the statistic.
+ignore-words-list = "dotA,TE,te,TTest,ttest"
 
 [tool.mypy]
 python_version = "3.10"

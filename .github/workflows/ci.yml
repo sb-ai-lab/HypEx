@@ -51,6 +51,21 @@ jobs:
       # installed here: it rewrites envlist from [gh-actions] in tox.ini, which
       # is how the old "linters" job silently ran the 3.10 test suite instead of
       # any linter.
+      # The pre-commit hooks apply locally what this job enforces here. Pinned
+      # in three places, so check they still agree -- a drift means a commit
+      # cleaned up by the hooks gets rejected by CI.
+      - name: Ruff pins agree across tox, pre-commit and pyproject
+        run: |
+          tox_ver=$(grep -oP 'ruff == \K[0-9.]+' tox.ini | sort -u)
+          pc_ver=$(grep -A1 'astral-sh/ruff-pre-commit' .pre-commit-config.yaml \
+                   | grep -oP 'rev: v\K[0-9.]+')
+          pp_ver=$(grep -oP '^ruff = "\K[0-9.]+' pyproject.toml)
+          echo "tox=$tox_ver pre-commit=$pc_ver pyproject=$pp_ver"
+          if [ "$(printf '%s\n' "$tox_ver" "$pc_ver" "$pp_ver" | sort -u | wc -l)" != "1" ]; then
+            echo "::error::Ruff versions disagree between tox.ini, .pre-commit-config.yaml and pyproject.toml"
+            exit 1
+          fi
+
       - run: tox -e lint,codespell
 
   lockfile:
