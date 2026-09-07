@@ -4,7 +4,15 @@ import warnings
 from typing import Any, ClassVar, Literal
 
 from ..analyzers.matching import MatchingAnalyzer
-from ..comparators import GroupChi2Test, GroupKSTest, GroupTTest
+from ..comparators import (
+    BaseComparator,
+    GroupChi2Test,
+    GroupKSTest,
+    GroupTTest,
+    StatsChi2Test,
+    StatsKSTest,
+    StatsTTest,
+)
 from ..dataset import Dataset, ExperimentData
 from ..ml import FaissNearestNeighbors
 from ..utils import (
@@ -106,7 +114,10 @@ class MatchingReporter(DatasetReporter):
 class MatchingQualityReporter(DatasetReporter):
     """Reporter for matching quality tests (T-Test, KS-Test, Chi2-Test)."""
     
-    tests: ClassVar[list] = [GroupTTest, GroupKSTest, GroupChi2Test]
+    tests: ClassVar[list[type[BaseComparator]]] = [
+        GroupTTest, GroupKSTest, GroupChi2Test, 
+        StatsTTest, StatsKSTest, StatsChi2Test
+    ]
     
     def _report(self, data: ExperimentData) -> dict: 
         """Extract quality test outcomes.

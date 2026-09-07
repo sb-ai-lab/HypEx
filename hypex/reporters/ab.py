@@ -21,23 +21,6 @@ class ABTestReporter(DatasetReporter):
     tests: ClassVar[list[type[BaseComparator]]] = [GroupTTest, GroupUTest, GroupChi2Test, StatsTTest, StatsChi2Test]
 
     def _report(self, data: ExperimentData) -> dict[str, Any]:
-        """Construct the internal dictionary report for A/B tests.
-
-        Args:
-            data: The experiment data container.
-
-        Returns:
-            A dictionary containing group sizes, differences, test results,
-            and analyzer metrics.
-        """
-        result = {}
-        result.update(extract_group_sizes(data, self.front))
-        result.update(extract_group_difference(data, self.front))
-        result.update(extract_tests(data, self.tests, self.front))
-        result.update(extract_analyzer_data(data, ABAnalyzer))
-        return result
-
-    def _report(self, data: ExperimentData) -> dict[str, Any]:
         """Generate the final A/B test report.
 
         Ensures the ``front`` formatting flag is disabled before generating the report, 

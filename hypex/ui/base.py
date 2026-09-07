@@ -5,7 +5,7 @@ from typing import Any
 from ..dataset import Dataset, ExperimentData
 from ..experiments.base import Experiment
 from ..reporters import Reporter
-from ..utils import ID_SPLIT_SYMBOL
+from ..utils import ID_SPLIT_SYMBOL, BackendsEnum
 from ..utils.enums import RenameEnum
 
 
@@ -148,11 +148,80 @@ class ExperimentShell:
         experiment: Experiment,
         output: Output,
         experiment_params: dict[str, Any] | None = None,
+        auto_persist: bool = True,
     ):
         if experiment_params:
             experiment.set_params(experiment_params)
         self._out = output
         self._experiment = experiment
+        self.auto_persist = auto_persist
+
+    def execute(self, data: Dataset | ExperimentData) -> Output:
+        """Execute the experiment pipeline on the provided data.
+
+        Orchestrates the full experiment lifecycle: data preparation, optional
+        caching for Spark backends, pipeline execution, and result extraction.
+
+        **Auto-persist behaviour (Spark only):**
+        When ``auto_persist`` is enabled (default) and the input dataset uses
+        the Spark backend, the method automatically persists the dataset with
+        ``MEMORY_AND_DISK`` storage level before the pipeline starts. This
+        avoids costly recomputation of the source DataFrame across multiple
+        stages (splitters, comparators, analyzers). After the pipeline
+        completes, the dataset is unpersisted **only** if it was persisted by
+        this method — datasets that the user cached manually are left untouched.
+
+        For the Pandas backend, ``persist`` / ``unpersist`` are no-ops, so
+        the method behaves identically regardless of backend.
+
+        Args:
+            data: Input data for the experiment. Accepts either a raw
+                :class:`~hypex.dataset.Dataset` (which will be wrapped in an
+                :class:`~hypex.dataset.ExperimentData` container) or an
+                already-prepared :class:`~hypex.dataset.ExperimentData` instance.
+
+        Returns:
+            Output: The experiment output object containing the formatted
+            results (resume, multitest table, quality reports, etc.),
+            populated by the configured :class:`Output` handler.
+
+        Example:
+            .. code-block:: python
+
+                ab_test = ABTest(multitest_method="bonferroni")
+                result = ab_test.execute(spark_dataset)
+                print(result.resume)
+                print(result.multitest)
+
+        See Also:
+            :meth:`Dataset.persist`: Manual caching control.
+            :class:`ExperimentShell`: Constructor accepting ``auto_persist`` flag.
+        """
+        if isinstance(data, Dataset):
+            data = ExperimentData(data)
+
+        # ── Auto-persist for Spark backend ──────────────────────────
+        original_ds = data.ds
+        persisted_by_us = False
+        if (
+            self.auto_persist
+            and original_ds.backend_type == BackendsEnum.spark
+            and not original_ds.is_persisted
+        ):
+            original_ds.persist(
+                storage_level="MEMORY_AND_DISK", action="count"
+            )
+            persisted_by_us = True
+        # ─────────────────────────────────────────────────────────────
+
+        result_experiment_data = self._experiment.execute(data)
+        self._out.extract(result_experiment_data)
+
+        # Unpersist only if WE persisted it (not the user)
+        if persisted_by_us and original_ds.is_persisted:
+            original_ds.unpersist()
+
+        return self._out
 
     @property
     def experiment(self):
@@ -162,31 +231,3 @@ class ExperimentShell:
             Experiment: The experiment configuration object.
         """
         return self._experiment
-
-    def execute(self, data: Dataset | ExperimentData) -> Output:
-        """Executes the experiment on the provided data.
-
-        Runs the configured experiment on the input data and formats the results
-        using the configured output handler.
-
-        Args:
-            data (Union[Dataset, ExperimentData]): Input data for the experiment.
-                Can be either a Dataset or ExperimentData instance.
-
-        Returns:
-            Output: Formatted experiment results through the configured output handler.
-
-        Examples
-        --------
-        .. code-block:: python
-
-            shell = ExperimentShell(experiment, output)
-            dataset = Dataset(...)  # Your input data
-            results = shell.execute(dataset)
-            print(results.resume)  # Access formatted results
-        """
-        if isinstance(data, Dataset):
-            data = ExperimentData(data)
-        result_experiment_data = self._experiment.execute(data)
-        self._out.extract(result_experiment_data)
-        return self._out

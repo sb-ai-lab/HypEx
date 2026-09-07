@@ -92,24 +92,34 @@ class ABAnalyzer(Executor):
     def execute_multitest(self, data: ExperimentData, p_values: Dataset, **kwargs):
         """Applies multiple testing correction to aggregated p-values.
 
-        Retrieves treatment and target fields from the experiment data, then
-        applies the specified correction method if more than two groups exist.
-        For standard methods, uses ``MultiTest`` from statsmodels. For the
-        ``quantile`` method, uses simulation-based ``MultitestQuantile``.
+        Retrieves treatment and target fields from the experiment data and calculates
+        the total number of statistical comparisons being made. The correction is
+        applied if the total number of comparisons (calculated as
+        ``(num_groups - 1) * num_target_fields``) is strictly greater than 1.
+
+        For standard correction methods (e.g., Bonferroni, Holm), it uses the
+        ``MultiTest`` extension wrapping ``statsmodels``. For the ``quantile`` method,
+        it uses the simulation-based ``MultitestQuantile`` extension.
 
         Args:
-            data: The experiment data container with group information.
-            p_values: Dataset containing raw p-values from statistical tests.
-            **kwargs: Additional arguments passed to the correction method.
+            data: The experiment data container holding dataset roles, groups, 
+                and metadata.
+            p_values: A dataset containing the raw, uncorrected p-values to be 
+                adjusted.
+            **kwargs: Extra keyword arguments forwarded to the underlying 
+                multitest extensions.
 
         Returns:
-            Updated ``ExperimentData`` with corrected p-values stored under
-            the ``"MultiTest"`` key, or the original ``data`` if correction
-            is not applicable.
+            ExperimentData: The updated experiment data instance with the 
+            multitest correction results stored in the analysis tables.
         """
         group_field = data.ds.search_columns(TreatmentRole())[0]
         target_fields = data.ds.search_columns(TargetRole(), search_types=[int, float])
-        if self.multitest_method and len(data.groups[group_field]) > 2:
+
+        num_groups = len(data.groups[group_field])
+        num_comparisons = (num_groups - 1) * len(target_fields)
+
+        if self.multitest_method and num_comparisons > 1:
             if self.multitest_method != ABNTestMethodsEnum.quantile:
                 multitest_result = MultiTest(self.multitest_method).calc(
                     p_values, **kwargs

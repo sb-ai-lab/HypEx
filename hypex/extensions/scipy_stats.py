@@ -56,7 +56,7 @@ class GroupStatTest(CompareExtension):
 
         return other
 
-    def _extract_arrays(self, data: Dataset, other: Dataset) -> tuple[Sequence]:
+    def _extract_arrays(self, data: Dataset, other: Dataset) -> tuple[Sequence, ...]:
         raise NotImplementedError("This method should be relized using backend-dependent mixin.")
 
     @staticmethod
