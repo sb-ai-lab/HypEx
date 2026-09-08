@@ -406,7 +406,6 @@ class SparkFaissExtension(FaissExtension):
         "k-means": {
             "model": MiniBatchKMeans,
             "params": {
-                # "n_clusters" : 1000,
                 "random_state" : 21,
                 "max_no_improvement" : None,
                 "batch_size" : 5_000_000,
@@ -540,7 +539,6 @@ class SparkFaissExtension(FaissExtension):
         ):
             np_batch = np.array(batch, dtype=np.float32)
             model.partial_fit(np_batch)
-            # self._index.train(np_batch)
 
 
         if np_batch is not None:
@@ -637,9 +635,6 @@ class SparkFaissExtension(FaissExtension):
             index_with_ids = faiss.IndexIDMap(index_copy)
             index_with_ids.add_with_ids(vectors, ids)
 
-            # inner_index = faiss.downcast_index(index_with_ids.index)
-            # inner_index.make_direct_map()
-
             yield storage.save_index(index_with_ids)
 
         def _spark_full_partition_fit(
@@ -713,24 +708,6 @@ class SparkFaissExtension(FaissExtension):
             partition_func = _spark_full_partition_fit
         else:
             raise ValueError(f"Incorrect faiss fit mode: '{MatchingConfig.FAISS_FIT_MODE}'")
-        # self.index.nprobe = min(self.n_neighbors * 2, self.k)
-
-        # # bc_index = session.sparkContext.broadcast(self.index)
-        # bc_storage = session.sparkContext.broadcast(self.storage)
-        # del self.index
-        # self.index = None
-        # gc.collect()
-
-        # features = ["index", "_features"]
-        # self._sharded_rdd = (
-        #     vectorized_data
-        #     .select(*features)
-        #     .rdd
-        #     .mapPartitions(lambda it: _spark_partition_fit(it, bc_index, bc_storage))
-        #     # .mapPartitions(lambda it: _spark_full_partition_fit(it, bc_storage))
-        #     .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
-        # )
-        # self._sharded_rdd.count()
         bc_storage = session.sparkContext.broadcast(self.storage)
 
         features = ["index", "_features"]
@@ -944,10 +921,9 @@ class SparkFaissExtension(FaissExtension):
         operating_data: spark.DataFrame = (
             data._backend_data.data.to_spark(index_col='index')
             if self.mahalanobis is None
-            # else data.dot(self.mahalanobis.data)._backend_data.data.to_spark(index_col='index')
             else self._mahalanobis_transform(data, self.mahalanobis)._backend_data.data.to_spark(index_col='index')
         )
-         # self.k = (operating_data.count())
+        
         self._data_size = operating_data.count()
         vectorized_data = self._vectorize_data(operating_data)
 
@@ -1001,5 +977,5 @@ class SparkFaissExtension(FaissExtension):
 
 def get_executor_cache() -> CachingIndex:
     if not hasattr(builtins, "_faiss_index_cache"):
-        builtins._faiss_index_cache = CachingIndex(max_index=5)
+        builtins._faiss_index_cache = CachingIndex()
     return builtins._faiss_index_cache
