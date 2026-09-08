@@ -572,9 +572,11 @@ class SparkFaissExtension(FaissExtension):
         - **"sample"**: Trains the IVF quantizer on a random sample of the data
           (up to ``_SAMPLE_TARGET`` rows). Faster but may produce less accurate
           clusters for non-uniform distributions.
-        - **"full"**: Trains the IVF quantizer on the entire dataset using
+        - **"cluster"**: Trains the IVF quantizer on the entire dataset using
           iterative mini-batch clustering via ``_prefit``. Slower but more
           accurate.
+        - **"full"**: exact search; each partition gets its own flat
+          ``IndexFlatL2`` index (no shared quantizer).
 
         After training, each partition builds a local ``IndexIDMap`` on top of
         the shared quantizer, and the serialized indexes are persisted as an RDD.
@@ -673,7 +675,7 @@ class SparkFaissExtension(FaissExtension):
         m = 4 # heuristic
         self.k = int(np.sqrt(self._data_size / m))
 
-        if mode =="sample":
+        if MatchingConfig.FAISS_FIT_MODE =="sample":
             frac = min(MatchingConfig.FAISS_SAMPLE_TARGET / max(self._data_size, 1), 1.0)
             sample_rows = (
                             vectorized_data
@@ -695,32 +697,62 @@ class SparkFaissExtension(FaissExtension):
             self.index = faiss.IndexIVFFlat(quantizer, d, nlist)
             self.index.train(X)
 
-        elif mode == "full":
+            broadcast_index_required = True
+            partition_func = _spark_partition_fit
+
+        elif MatchingConfig.FAISS_FIT_MODE == "cluster":
             self._prefit(
                 vectorized_data=vectorized_data,
                 model_name=model_name
             )
-
+            broadcast_index_required = True
+            partition_func = _spark_partition_fit
+        elif MatchingConfig.FAISS_FIT_MODE == "full":
+            self.index = None
+            broadcast_index_required = False
+            partition_func = _spark_full_partition_fit
         else:
-            raise ValueError(f"Incorrect faiss fit mode: '{mode}'")
-        self.index.nprobe = min(self.n_neighbors * 2, self.k)
+            raise ValueError(f"Incorrect faiss fit mode: '{MatchingConfig.FAISS_FIT_MODE}'")
+        # self.index.nprobe = min(self.n_neighbors * 2, self.k)
 
-        bc_index = session.sparkContext.broadcast(self.index)
+        # # bc_index = session.sparkContext.broadcast(self.index)
+        # bc_storage = session.sparkContext.broadcast(self.storage)
+        # del self.index
+        # self.index = None
+        # gc.collect()
+
+        # features = ["index", "_features"]
+        # self._sharded_rdd = (
+        #     vectorized_data
+        #     .select(*features)
+        #     .rdd
+        #     .mapPartitions(lambda it: _spark_partition_fit(it, bc_index, bc_storage))
+        #     # .mapPartitions(lambda it: _spark_full_partition_fit(it, bc_storage))
+        #     .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
+        # )
+        # self._sharded_rdd.count()
         bc_storage = session.sparkContext.broadcast(self.storage)
-        del self.index
-        self.index = None
-        gc.collect()
 
         features = ["index", "_features"]
-        self._sharded_rdd = (
-            vectorized_data
-            .select(*features)
-            .rdd
-            .mapPartitions(lambda it: _spark_partition_fit(it, bc_index, bc_storage))
-            # .mapPartitions(lambda it: _spark_full_partition_fit(it, bc_storage))
-            .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
-        )
-        self._sharded_rdd.count()
+        rdd = vectorized_data.select(*features).rdd
+
+        if broadcast_index_required:
+            bc_index = session.sparkContext.broadcast(self.index)
+            del self.index
+            self.index = None
+            gc.collect()
+
+            self._sharded_rdd = (
+                rdd
+                .mapPartitions(lambda it: partition_func(it, bc_index, bc_storage))
+                .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
+            )
+        else:
+            self._sharded_rdd = (
+                rdd
+                .mapPartitions(lambda it: partition_func(it, bc_storage))
+                .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
+            )
 
     def _predict(
             self,
@@ -814,7 +846,7 @@ class SparkFaissExtension(FaissExtension):
                 query_ids = np.array([r["index"] for r in chunk], dtype=np.int64)
                 batch = np.array([list(r["_features"]) for r in chunk], dtype=np.float32)  # (Q, d)
                 del chunk
-                # gc.collect() # TODO: detect time decr when gc.collect disabled
+                gc.collect() # TODO: detect time decr when gc.collect disabled
 
                 candidates = [[] for _ in range(len(query_ids))]
                 for ref in references:
@@ -822,7 +854,7 @@ class SparkFaissExtension(FaissExtension):
                     k = min(real_n, tmp_index.ntotal)
                     dists, nids = tmp_index.search(batch, k)   # (Q, k)
                     del tmp_index
-                    # gc.collect() # TODO: detect time decr when gc.collect disabled
+                    gc.collect() # TODO: detect time decr when gc.collect disabled
 
                     for q_idx in range(len(query_ids)):
                         for rank in range(k):

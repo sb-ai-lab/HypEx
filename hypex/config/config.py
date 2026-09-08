@@ -105,7 +105,7 @@ class MatchingConfig:
               the data (up to ``FAISS_SAMPLE_TARGET`` rows). Faster but
               may produce less accurate clusters for highly non-uniform
               distributions.
-            - ``"full"``: trains the quantizer on the entire dataset
+            - ``"cluster"``: trains the quantizer on the entire dataset
               using iterative mini-batch clustering (MiniBatchKMeans or
               BIRCH) via ``_prefit``. Slower but yields higher-quality
               clusters.
@@ -115,4 +115,4 @@ class MatchingConfig:
     FAISS_SAMPLE_TARGET: int = 5_000_000
     FAISS_DRIVER_INDEX_LIMIT: int = 5_000_000
     FAISS_CHUNK_SIZE: int = 4096
-    FAISS_FIT_MODE: Literal["full", "sample"] = "sample"
+    FAISS_FIT_MODE: Literal["sample", "cluster", "full"] = "sample"
