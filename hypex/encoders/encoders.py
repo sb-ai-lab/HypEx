@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from ..dataset import Dataset
 from ..extensions.encoders import DummyEncoderExtension
-from .abstract import Encoder
 from ..utils.registry import backend_factory
+from .abstract import Encoder
+
 
 class DummyEncoder(Encoder):
     """
@@ -16,9 +17,9 @@ class DummyEncoder(Encoder):
 
     Inherits from:
         Encoder: The base abstract class for all data encoders in the HypEx library.
-    
+
     Example:
-    
+
         >>> # Typically used internally by the preprocessing pipeline
         >>> encoder = DummyEncoder(target_roles="category_column")
         >>> encoded_data = encoder.execute(experiment_data)
@@ -50,7 +51,7 @@ class DummyEncoder(Encoder):
         """
         if not target_cols:
             return Dataset.create_empty()
-        
+
         encoder_cls = backend_factory.resolve_backend(DummyEncoderExtension, data)
         return encoder_cls.calc(
             data=data, target_cols=target_cols, **kwargs

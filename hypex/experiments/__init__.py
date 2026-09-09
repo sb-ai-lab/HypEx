@@ -1,11 +1,18 @@
 from .base import Experiment, OnRoleExperiment
-from .base_complex import CycledExperiment, GroupExperiment
-from .base_complex import IfParamsExperiment, IfExecutor, ParamsExperiment
+from .base_complex import (
+           CycledExperiment,
+           GroupExperiment,
+           IfExecutor,
+           IfParamsExperiment,
+           ParamsExperiment,
+)
 
-__all__ = ["CycledExperiment", 
-           "Experiment", 
-           "GroupExperiment", 
-           "OnRoleExperiment",
-           "IfParamsExperiment",
+__all__ = [
+           "CycledExperiment",
+           "Experiment",
+           "GroupExperiment",
            "IfExecutor",
-           "ParamsExperiment"]
+           "IfParamsExperiment",
+           "OnRoleExperiment",
+           "ParamsExperiment",
+]

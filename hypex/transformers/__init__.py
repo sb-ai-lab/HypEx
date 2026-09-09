@@ -3,6 +3,7 @@ from .category_agg import CategoryAggregator
 from .cuped import CUPEDTransformer
 from .filters import ConstFilter, CorrFilter, CVFilter, NanFilter, OutliersFilter
 from .na_filler import NaFiller
+from .na_dropper import NaDropper
 from .shuffle import Shuffle
 from .type_caster import TypeCaster
 
@@ -16,6 +17,7 @@ __all__ = [
     "DummyEncoder",
     "NaFiller",
     "NanFilter",
+    "NaDropper",
     "OutliersFilter",
     "Shuffle",
     "TypeCaster",

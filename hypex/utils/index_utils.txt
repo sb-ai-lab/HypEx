@@ -1,0 +1,448 @@
+from __future__ import annotations
+import fsspec
+import uuid
+import faiss
+import os
+import gc
+import tempfile
+import threading
+import shutil
+from typing import Optional
+from collections import OrderedDict
+from pyspark.sql import SparkSession
+from pyspark import RDD, SparkFiles
+
+def _bootstrap_fsspec_hdfs():
+    """
+    Настраивает окружение для fsspec (PyArrow/libhdfs) на драйвере и экзекьюторах.
+    Критично для YARN: libhdfs запускает JVM, которая должна увидеть hdfs-site.xml 
+    через CLASSPATH для резолва HA (nameservices) и подхватить Kerberos-токены.
+    """
+    if "ARROW_LIBHDFS_DIR" not in os.environ:
+        search_dirs = [
+            "/usr/hdp/current/hadoop-client/lib/native",
+            "/opt/cloudera/parcels/CDH/lib/hadoop/lib/native",
+            "/opt/hadoop/lib/native",
+        ]
+        hadoop_home = os.environ.get("HADOOP_HOME")
+        if hadoop_home:
+            search_dirs.append(os.path.join(hadoop_home, "lib", "native"))
+
+        for d in search_dirs:
+            if os.path.exists(os.path.join(d, "libhdfs.so")):
+                os.environ["ARROW_LIBHDFS_DIR"] = d
+                current_ld = os.environ.get("LD_LIBRARY_PATH", "")
+                if d not in current_ld:
+                    os.environ["LD_LIBRARY_PATH"] = f"{d}:{current_ld}" if current_ld else d
+                break
+
+    if "HADOOP_CONF_DIR" not in os.environ:
+        conf_dirs = [
+            "/usr/hdp/current/hadoop-client/conf",
+            "/etc/hadoop/conf",
+            "/opt/cloudera/parcels/CDH/lib/hadoop/etc/hadoop",
+        ]
+        hadoop_home = os.environ.get("HADOOP_HOME")
+        if hadoop_home:
+            conf_dirs.append(os.path.join(hadoop_home, "etc", "hadoop"))
+            
+        for d in conf_dirs:
+            if os.path.exists(os.path.join(d, "hdfs-site.xml")):
+                os.environ["HADOOP_CONF_DIR"] = d
+                break
+
+    conf_dir = os.environ.get("HADOOP_CONF_DIR")
+    if conf_dir:
+        current_cp = os.environ.get("CLASSPATH", "")
+        if conf_dir not in current_cp:
+            os.environ["CLASSPATH"] = f"{conf_dir}:{current_cp}" if current_cp else conf_dir
+
+
+class FaissIndexStorage:
+    DISTRIBUTED_DIRS = []
+    LOCAL_DIRS = []
+
+    def __init__(self, sp_s: SparkSession, base_dir: Optional[str] = None):
+        self.sp_s = sp_s
+        self._distributed = False
+        self._distributed_dir = None
+        self._local_tmp_dir = None
+        self._fs = None  # Кэш для инстанса файловой системы
+        
+        _bootstrap_fsspec_hdfs()
+        default_fs = self.define_fs(sp_s)
+        
+        if default_fs.startswith("file"):
+            self._distributed = False
+            dir_id = uuid.uuid1().hex[:8]
+            self._local_tmp_dir = f"__partition_indexes{dir_id}"
+            os.makedirs(self._local_tmp_dir, exist_ok=True)
+            FaissIndexStorage.LOCAL_DIRS.append(self._local_tmp_dir)
+        else:
+            self._distributed = True
+            self._distributed_dir = (
+                base_dir or
+                f"{default_fs.rstrip('/')}/tmp/faiss_indexes_{uuid.uuid1().hex[:8]}"
+            )
+            FaissIndexStorage.DISTRIBUTED_DIRS.append(self._distributed_dir)
+
+    def _get_fs(self):
+        """
+        Ленивая инициализация файловой системы.
+        Явное использование fsspec.filesystem() вместо fsspec.open() 
+        дает контроль над подключением и переиспользование сессии,
+        что критично для стабильной работы с HA HDFS / viewfs.
+        """
+        if self._fs is None:
+            _bootstrap_fsspec_hdfs()
+            protocol = "file"
+            target_dir = self._distributed_dir if self._distributed else self._local_tmp_dir
+            if "://" in target_dir:
+                protocol = target_dir.split("://")[0]
+                
+            if protocol in ("hdfs", "viewfs"):
+                # Явно запрашиваем HDFS бэкенд (PyArrow/libhdfs).
+                # auto_mkdir=True полезен для создания промежуточных директорий.
+                self._fs = fsspec.filesystem("hdfs", auto_mkdir=True)
+            else:
+                # Для s3, gs, file, abfs и т.д.
+                self._fs = fsspec.filesystem(protocol)
+        return self._fs
+
+    @staticmethod
+    def define_fs(session: SparkSession) -> str:
+        file_sys = None
+        try:
+            hadoop_conf = session.sparkContext._jsc.hadoopConfiguration()
+            file_sys = hadoop_conf.get("fs.defaultFS", "file:///")
+            if file_sys == "file:///": file_sys = None
+        except Exception: pass
+            
+        if file_sys is None:
+            try:
+                file_sys = session.conf.get(
+                    "spark.hadoop.fs.defaultFS",
+                    session.conf.get("fs.defaultFS", "file:///")
+                )
+            except Exception:
+                file_sys = "file:///"
+                
+        # fsspec не поддерживает viewfs://. Мы заменяем его на hdfs://,
+        # а резолв nameservice в реальные IP возьмет на себя libhdfs 
+        # благодаря добавлению hdfs-site.xml в CLASSPATH.
+        if file_sys and file_sys.startswith("viewfs://"):
+            file_sys = file_sys.replace("viewfs://", "hdfs://", 1)
+            
+        return file_sys or "file:///"
+
+    @staticmethod
+    def debug_filesystem(session: SparkSession) -> dict:
+        results = {"detected_fs": None, "errors": []}
+        print("=" * 80)
+        print("🔍 FSSPEC FILESYSTEM DEBUG (Pure fsspec / PyArrow mode)")
+        print("=" * 80)
+        
+        _bootstrap_fsspec_hdfs()
+        detected_fs = FaissIndexStorage.define_fs(session)
+        results["detected_fs"] = detected_fs
+        print(f"Detected FS: {detected_fs}")
+        print(f"CLASSPATH includes HADOOP_CONF_DIR: {'HADOOP_CONF_DIR' in os.environ.get('CLASSPATH', '')}")
+        
+        if not detected_fs.startswith("file"):
+            try:
+                # Используем filesystem() для диагностики
+                fs = fsspec.filesystem("hdfs")
+                print(f"✅ Successfully initialized fsspec backend: {type(fs).__name__}")
+                
+                test_uri = f"{detected_fs.rstrip('/')}/tmp/fsspec_test_{uuid.uuid1().hex[:8]}.txt"
+                clean_path = fs._strip_protocol(test_uri)
+                with fs.open(clean_path, "w") as f:
+                    f.write("test")
+                fs.rm(clean_path)
+                print("✅ Read/Write test passed!")
+            except Exception as e:
+                results["errors"].append(str(e))
+                print(f"❌ Test failed: {e}")
+                
+        print("=" * 80)
+        return results
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if "sp_s" in state: del state["sp_s"]
+        # Не сериализуем инстанс ФС, он будет пересоздан на экзекьюторе
+        state["_fs"] = None
+        return state
+
+    def save_index(self, index: faiss.Index):
+        if self._distributed:
+            uri = os.path.join(self._distributed_dir, f"index_{uuid.uuid1().hex[:8]}.faiss")
+            fs = self._get_fs()
+            # _strip_protocol превращает "hdfs://cluster/path" в "/path"
+            # Это исключает баги парсинга URI внутри бэкендов fsspec
+            clean_path = fs._strip_protocol(uri)
+            with fs.open(clean_path, "wb") as f:
+                faiss.write_index(index, faiss.PyCallbackIOWriter(f.write))
+            return uri
+        else:
+            return faiss.serialize_index(index)
+
+    def collect_and_register(self, rdd: RDD):
+        index_refs = []
+        if self._distributed:
+            index_refs = rdd.collect()
+        else:
+            for shard in rdd.toLocalIterator():
+                partition_indexes = faiss.deserialize_index(shard)
+                run_id = uuid.uuid1().hex[:8]
+                index_file_name = f"__partition_index_{run_id}.index"
+                faiss.write_index(partition_indexes, f"{self._local_tmp_dir}/{index_file_name}")    
+                self.sp_s.sparkContext.addFile(f"{self._local_tmp_dir}/{index_file_name}")
+                index_refs.append(index_file_name)
+                del partition_indexes
+                gc.collect()
+        return index_refs
+
+    def load_index(self, link: str) -> faiss.Index:
+        if self._distributed:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".faiss") as temp:
+                load_temp = temp.name
+            try:
+                fs = self._get_fs()
+                clean_link = fs._strip_protocol(link)
+                with fs.open(clean_link, "rb") as f_in, open(load_temp, "wb") as f_out:
+                    shutil.copyfileobj(f_in, f_out, length=64*1024*1024)
+                return faiss.read_index(load_temp)
+            finally:
+                if os.path.exists(load_temp): os.remove(load_temp)
+        else:
+            return faiss.read_index(SparkFiles.get(link))
+
+    @staticmethod
+    def cleanup():
+        if FaissIndexStorage.DISTRIBUTED_DIRS:
+            _bootstrap_fsspec_hdfs()
+            for dir in FaissIndexStorage.DISTRIBUTED_DIRS:
+                try:
+                    protocol = dir.split("://")[0] if "://" in dir else "file"
+                    if protocol in ("hdfs", "viewfs"):
+                        fs = fsspec.filesystem("hdfs")
+                    else:
+                        fs = fsspec.filesystem(protocol)
+                    clean_dir = fs._strip_protocol(dir)
+                    fs.rm(clean_dir, recursive=True)
+                except Exception as e:
+                    print(f"⚠ Cleanup failed for {dir}: {e}")
+            FaissIndexStorage.DISTRIBUTED_DIRS = []
+            
+        if FaissIndexStorage.LOCAL_DIRS:
+            for dir in FaissIndexStorage.LOCAL_DIRS:
+                if os.path.exists(dir): shutil.rmtree(dir)
+            FaissIndexStorage.LOCAL_DIRS = []
+
+
+class CachingIndex:
+    def __init__(self, max_index: Optional[int] = None):
+        self._max = max_index
+        self._cache: OrderedDict = OrderedDict()
+        self._lock = threading.Lock()
+
+    def get(self, reference: str, storage: FaissIndexStorage, nprobe: int):
+        with self._lock:
+            if reference in self._cache:
+                self._cache.move_to_end(key=reference)
+                return self._cache[reference]
+            if self._max and len(self._cache) >= self._max:
+                _, evicted = self._cache.popitem(last=False)
+                del evicted
+                import gc; gc.collect()
+            tmp_index = storage.load_index(reference)
+            inner = faiss.downcast_index(tmp_index)
+            if hasattr(inner, "nprobe"): inner.nprobe = nprobe
+            self._cache[reference] = tmp_index
+            return tmp_index
+
+###############################################################
+#       Simple Realizarion                                    #
+###############################################################
+from __future__ import annotations
+
+import fsspec
+import uuid
+import faiss
+import os
+import gc
+import tempfile
+import threading
+import shutil
+
+from typing import Optional
+from collections import OrderedDict
+
+from pyspark.sql import SparkSession
+from pyspark import RDD, SparkFiles
+
+class FaissIndexStorage:
+    DISTRIBUTED_DIRS = []
+    LOACL_DIRS = []
+
+    def __init__(
+        self,
+        sp_s: SparkSession,
+        base_dir: Optional[str] = None 
+    ):
+        self.sp_s = sp_s
+        
+        self._distributed = False
+        self._distributed_dir = None
+        self._local_tmp_dir = None
+
+        default_fs = self.define_fs(sp_s)
+
+        if default_fs.startswith("file"):
+            dir_id = uuid.uuid1().hex[:8]
+            self._local_tmp_dir = f"__partition_indexes{dir_id}"
+            os.makedirs(self._local_tmp_dir, exist_ok=True)
+
+            FaissIndexStorage.LOACL_DIRS.append(self._local_tmp_dir)
+        else:
+            self._distributed = True
+            self._distributed_dir = (
+                base_dir  or
+                f"{default_fs.rstrip('/')}/tmp/faiss_indexes_{uuid.uuid1().hex[:8]}"
+            )
+            FaissIndexStorage.DISTRIBUTED_DIRS.append(self._distributed_dir)
+
+    @staticmethod
+    def define_fs(session: SparkSession) -> str:
+        # First approach
+        try:
+            hadoop_conf = session.sparkContext._jsc.hadoopConfiguration()
+            file_sys = hadoop_conf.get("fs.defaultFS", "file:///")
+            if file_sys != "file:///":
+                return file_sys
+        except:
+            pass
+
+        # Second appraoch
+        try:
+            return session.conf.get(
+                "spark.hadoop.fs.defaultFS",
+                session.conf.get("fs.defaultFS", "file:///")
+            )
+        except Exception:
+            return "file:///"
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if "sp_s" in state:
+            del state["sp_s"]
+        return state
+
+    def save_index(self, index: faiss.Index):
+        if self._distributed:
+            uri = os.path.join(
+                self._distributed_dir, f"index_{uuid.uuid1().hex[:8]}.faiss"
+            )
+            with fsspec.open(uri, "wb").open() as f:
+                faiss.write_index(index, faiss.PyCallbackIOWriter(f.write))
+            return uri
+        else:
+            return faiss.serialize_index(index)
+
+    def collect_and_register(self, rdd: RDD):
+        index_refs = []
+        if self._distributed:
+            index_refs = rdd.collect()
+        else:
+            for shard in rdd.toLocalIterator():
+                partition_indexes = faiss.deserialize_index(shard)
+                run_id = uuid.uuid1().hex[:8]
+                index_file_name = f"__partition_index_{run_id}.index"
+                faiss.write_index(
+                    partition_indexes,
+                    f"{self._local_tmp_dir}/{index_file_name}" 
+                )    
+                self.sp_s.sparkContext.addFile(f"{self._local_tmp_dir}/{index_file_name}")
+                index_refs.append(index_file_name)
+    
+                del partition_indexes   # ← explicit release
+                gc.collect()
+        return index_refs
+
+    def load_index(self, link: str) -> faiss.Index:
+        if self._distributed:
+            with tempfile.NamedTemporaryFile(
+                delete=False, suffix=".faiss"
+            ) as temp:
+                load_temp = temp.name
+            try:
+                with fsspec.open(link, "rb").open() as f_in,\
+                     open(load_temp, "wb") as f_out:
+                    while True:
+                        chunk = f_in.read(64 * 1024 * 1024)  # 64 MB chunks
+                        if not chunk:
+                            break
+                        f_out.write(chunk)
+                index = faiss.read_index(load_temp)
+            finally:
+                if os.path.exists(load_temp):
+                    os.remove(load_temp)
+            return index
+        else:
+            return faiss.read_index(SparkFiles.get(link))
+
+    @staticmethod
+    def cleanup():
+        if FaissIndexStorage.DISTRIBUTED_DIRS:
+            for dir in FaissIndexStorage.DISTRIBUTED_DIRS:
+                try:
+                    fs, _ = fsspec.core.url_to_fs(
+                        dir, use_listings_cache=False
+                    )
+                    fs.rm(dir, recursive=True)
+                except Exception:
+                    pass
+            FaissIndexStorage.DISTRIBUTED_DIRS = []
+
+        if FaissIndexStorage.LOACL_DIRS:
+            for dir in FaissIndexStorage.LOACL_DIRS:
+                if os.path.exists(dir):
+                    shutil.rmtree(dir)
+            FaissIndexStorage.LOACL_DIRS = []
+
+class CachingIndex:
+    """
+    LRU-кэш FAISS-индексов в памяти экзекьютора.
+    Предотвращает повторную загрузку одного и того же индекса
+    при обработке нескольких партиций.
+    """
+
+    def __init__(self, max_index: Optional[int] = None):
+        self._max = max_index
+        self._cache: OrderedDict = OrderedDict()
+        self._lock = threading.Lock()
+
+    def get(
+        self,
+        reference: str,
+        storage: FaissIndexStorage,
+        nprobe: int,
+    ):
+        with self._lock:
+            if reference in self._cache:
+                self._cache.move_to_end(key=reference)
+                return self._cache[reference]
+
+            if self._max and len(self._cache) >= self._max:
+                _, evicted = self._cache.popitem(last=False)
+                del evicted
+                import gc; gc.collect()
+
+            tmp_index = storage.load_index(reference)
+            inner = faiss.downcast_index(tmp_index)
+            if hasattr(inner, "nprobe"):
+                inner.nprobe = nprobe
+
+            self._cache[reference] = tmp_index
+            return tmp_index

@@ -3,6 +3,7 @@
 *.png
 *.pickle
 *.html
+__partition_indexes_*/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

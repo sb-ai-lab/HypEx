@@ -1,5 +1,8 @@
+from .aa import AAScoreAnalyzer, OneAAStatAnalyzer
 from .matching import MatchingAnalyzer
 
 __all__ = [
-    "MatchingAnalyzer"
+    "AAScoreAnalyzer",
+    "MatchingAnalyzer",
+    "OneAAStatAnalyzer"
 ]

@@ -8,6 +8,7 @@ from ..reporters import Reporter
 from ..utils import ID_SPLIT_SYMBOL
 from ..utils.enums import RenameEnum
 
+
 class Output:
     """A class for handling experiment output reporting and formatting.
 

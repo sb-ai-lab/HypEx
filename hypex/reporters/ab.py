@@ -37,7 +37,7 @@ class ABTestReporter(DatasetReporter):
         result.update(extract_analyzer_data(data, ABAnalyzer))
         return result
 
-    def report(self, data: ExperimentData) -> dict[str, Any] | Dataset:
+    def _report(self, data: ExperimentData) -> dict[str, Any]:
         """Generate the final A/B test report.
 
         Ensures the ``front`` formatting flag is disabled before generating the report, 
@@ -49,11 +49,12 @@ class ABTestReporter(DatasetReporter):
         Returns:
             The report as a dictionary or ``Dataset``.
         """
-        return self._with_front(
-            data, 
-            front_flag=False, 
-            func=lambda d: DatasetReporter.report(self, d)
-        )
+        result = {}
+        result.update(extract_group_sizes(data, self.front))
+        result.update(extract_group_difference(data, self.front))
+        result.update(extract_tests(data, self.tests, self.front))
+        result.update(extract_analyzer_data(data, ABAnalyzer))
+        return result
 
     @staticmethod
     def report_variance_reductions(data: ExperimentData) -> Dataset | str:

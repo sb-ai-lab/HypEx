@@ -1,51 +1,50 @@
 from .abstract import (
     BaseComparator,
     Comparator,
-    GroupsComparator,
     GroupHypothesisTesting,
+    GroupsComparator,
     StatsComparator,
     StatsHypothesisTesting,
 )
 from .comparators import (
-    PSI, 
-    GroupDifference, 
-    GroupSizes,
-    TTest,
+    PSI,
     Chi2Test,
+    GroupDifference,
+    GroupSizes,
     KSTest,
+    TTest,
     UTest,
-    ZTest
+    ZTest,
 )
 from .distances import MahalanobisDistance
 from .hypothesis_testing import GroupChi2Test, GroupKSTest, GroupTTest, GroupUTest
-from .stats_hypothesis_testing import StatsTTest, StatsChi2Test, StatsZTest
-# from .adaptive_hypothesis_testing import Chi2Test, KSTest, TTest, UTest
 from .power_testing import MDEBySize, PowerTesting
+from .stats_hypothesis_testing import StatsChi2Test, StatsKSTest, StatsTTest, StatsZTest
 
 __all__ = [
-    "AggTTest",
+    "PSI",
     "BaseComparator",
-    "GroupChi2Test",
+    "Chi2Test",
     "Comparator",
+    "GroupChi2Test",
     "GroupDifference",
-    "GroupSizes",
-    "GroupsComparator",
+    "GroupHypothesisTesting",
     "GroupKSTest",
+    "GroupSizes",
+    "GroupTTest",
+    "GroupUTest",
+    "GroupsComparator",
+    "KSTest",
     "MDEBySize",
     "MahalanobisDistance",
     "PowerTesting",
-    "PSI",
-    "GroupHypothesisTesting",
+    "StatsChi2Test",
     "StatsComparator",
     "StatsHypothesisTesting",
-    "GroupTTest",
-    "GroupUTest",
+    "StatsKSTest",
     "StatsTTest",
-    "StatsChi2Test",
     "StatsZTest",
     "TTest",
-    "Chi2Test",
-    "KSTest",
     "UTest",
-    "ZTest"
+    "ZTest",
 ]

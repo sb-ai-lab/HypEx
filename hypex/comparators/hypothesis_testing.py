@@ -11,7 +11,8 @@ from ..extensions.scipy_stats import (
 from ..utils.constants import NUMBER_TYPES_LIST
 from ..utils.registry import backend_factory
 from .abstract import GroupHypothesisTesting, StatsComparator
-from .comparators import TTest, KSTest, UTest, Chi2Test
+from .comparators import Chi2Test, KSTest, TTest, UTest
+
 
 @backend_factory.register(TTest, PandasDataset)
 class GroupTTest(GroupHypothesisTesting):
@@ -27,7 +28,7 @@ class GroupTTest(GroupHypothesisTesting):
             data, other=test_data, **kwargs
         )
 
-@backend_factory.register(KSTest, [PandasDataset, SparkDataset])
+@backend_factory.register(KSTest, PandasDataset)
 class GroupKSTest(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
