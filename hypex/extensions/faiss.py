@@ -724,6 +724,7 @@ class SparkFaissExtension(FaissExtension):
                 .mapPartitions(lambda it: partition_func(it, bc_index, bc_storage))
                 .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
             )
+            bc_index.destroy(blocking=True)
         else:
             self._sharded_rdd = (
                 rdd
@@ -880,6 +881,12 @@ class SparkFaissExtension(FaissExtension):
         result.persist(storage_level=storage_level, action="count")
         result.checkpoint(eager=True)
 
+        bc_index_references.destroy(blocking=True)
+        bc_n_neighbors.destroy(blocking=True)
+        bc_chunk_size.destroy(blocking=True)
+        bc_k.destroy(blocking=True)
+        bc_storage.destroy(blocking=True)
+
         return result
 
 
@@ -923,7 +930,7 @@ class SparkFaissExtension(FaissExtension):
             if self.mahalanobis is None
             else self._mahalanobis_transform(data, self.mahalanobis)._backend_data.data.to_spark(index_col='index')
         )
-        
+
         self._data_size = operating_data.count()
         vectorized_data = self._vectorize_data(operating_data)
 
