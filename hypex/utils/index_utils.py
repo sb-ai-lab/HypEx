@@ -6,11 +6,12 @@ import shutil
 import threading
 import uuid
 from collections import OrderedDict
-from typing import Optional
 
 import faiss
 from pyspark import RDD, SparkFiles
 from pyspark.sql import SparkSession
+
+from ..config import MatchingConfig
 
 
 class FaissIndexStorage:
@@ -127,8 +128,8 @@ class CachingIndex:
     Prevents repeated loading of the same index
     when processing multiple batches.
     """
-    def __init__(self, max_index: Optional[int] = None):
-        self._max = max_index
+    def __init__(self):
+        self._max = MatchingConfig.CACHING_INDEX_MAX_SIZE
         self._cache: OrderedDict = OrderedDict()
         self._lock = threading.Lock()
 

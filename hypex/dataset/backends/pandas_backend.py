@@ -1511,6 +1511,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             result.columns = (
                 self.columns if other.shape[1] == self.shape[1] else result.columns
             )
+        elif isinstance(other, pd.DataFrame):
+            result = self.data.dot(other)
         else:
             result = self.data.dot(other.data)
         return self._wrap_result(

@@ -64,6 +64,7 @@ class HypExLogger:
         name: str = "hypex",
         level: str | None = None,
         log_file: str | None = None,
+        console_out: bool = True,
         fmt: str = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         datefmt: str = "%Y-%m-%d %H:%M:%S",
     ) -> None:
@@ -99,6 +100,7 @@ class HypExLogger:
             fh = logging.FileHandler(log_file, encoding="utf-8")
             fh.setFormatter(formatter)
             self.logger.addHandler(fh)
+        
 
     def __call__(
         self,

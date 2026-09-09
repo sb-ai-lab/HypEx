@@ -193,7 +193,7 @@ class PandasBisaExtesion(BiasExtension):
             A numpy array of shape (2, n_features) containing the regression 
             coefficients for group 1 (control) and group 2 (treatment).
         """
-        group_1, group_2, *_ = data[self.group_field].unique()
+        group_1, group_2, *_ = sorted(data[self.group_field].unique())
         
         features = [col + "_matched" for col in self.features]
         target = self.target_field + "_matched"
@@ -241,7 +241,7 @@ class PandasBisaExtesion(BiasExtension):
             A DataFrame indexed by the original observation index, containing 
             the calculated 'bias' and the 'matched_target' values.
         """
-        group_1, group_2, *_ = data[self.group_field].unique()
+        group_1, group_2, *_ = sorted(data[self.group_field].unique())
         
         bias = np.zeros(len(data))
         
@@ -253,12 +253,12 @@ class PandasBisaExtesion(BiasExtension):
         
         # Calculate bias for group 1
         if mask_1.any():
-            diff_1 = data.loc[mask_1, features].values - data.loc[mask_1, matched_features].values
+            diff_1 = data.loc[mask_1, matched_features].values - data.loc[mask_1, features].values
             bias[mask_1] = np.dot(diff_1, coefficients_1)
             
         # Calculate bias for group 2
         if mask_2.any():
-            diff_2 = data.loc[mask_2, features].values - data.loc[mask_2, matched_features].values
+            diff_2 = data.loc[mask_2, matched_features].values - data.loc[mask_2, features].values
             bias[mask_2] = np.dot(diff_2, coefficients_2)
             
         final_data = pd.DataFrame({
@@ -431,9 +431,11 @@ class SparkBisaExtesion(BiasExtension):
         Returns:
             A numpy array of shape (2, n_features) with coefficients for both groups.
         """
-        group_1, group_2, *_ = map(
-            lambda row: row[0], 
-            data.select(self.group_field).distinct().collect()
+        group_1, group_2, *_ = sorted(
+            map(
+                lambda row: row[0],
+                data.select(self.group_field).distinct().collect()
+            )
         )
         features = [col + "_matched" for col in self.features]
         asembler = VectorAssembler(inputCols=features, outputCol='_features')
@@ -485,9 +487,11 @@ class SparkBisaExtesion(BiasExtension):
         Returns:
             A SparkDF containing 'index', 'bias', and 'matched_target' columns.
         """
-        group_1, group_2, *_ = map(
-            lambda row: row[0], 
-            data.select(self.group_field).distinct().collect()
+        group_1, group_2, *_ = sorted(
+            map(
+                lambda row: row[0],
+                data.select(self.group_field).distinct().collect()
+            )
         )
         initial_data = data.withColumn(
             "bias",
@@ -495,7 +499,7 @@ class SparkBisaExtesion(BiasExtension):
                 F.col(self.group_field) == group_1,
                 sum(
                     [
-                        (F.col(col) - F.col(col + "_matched")) * coefficients_1[idx]
+                        (F.col(col + "_matched") - F.col(col)) * coefficients_1[idx]
                         for idx, col in enumerate(self.features)
                     ]
                 )
@@ -504,7 +508,7 @@ class SparkBisaExtesion(BiasExtension):
                 F.col(self.group_field) == group_2,
                 sum(
                     [
-                        (F.col(col) - F.col(col + "_matched")) * coefficients_2[idx]
+                        (F.col(col + "_matched") - F.col(col)) * coefficients_2[idx]
                         for idx, col in enumerate(self.features)
                     ]
                 )

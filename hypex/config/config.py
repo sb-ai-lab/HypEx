@@ -13,6 +13,8 @@ Classes:
         matching pipeline, including persistence policies, sampling
         targets, and batch sizes.
 """
+from typing import Literal
+
 from pyspark import StorageLevel
 
 
@@ -96,8 +98,41 @@ class MatchingConfig:
             usage. Smaller chunks reduce memory pressure at the cost of
             additional iteration overhead.
             Defaults to 4096.
+
+        FAISS_FIT_MODE (Literal["full", "sample"]): Strategy for training
+            the IVF quantizer during the distributed fit phase.
+            - ``"sample"``: trains the quantizer on a random subset of
+              the data (up to ``FAISS_SAMPLE_TARGET`` rows). Faster but
+              may produce less accurate clusters for highly non-uniform
+              distributions.
+            - ``"cluster"``: trains the quantizer on the entire dataset
+              using iterative mini-batch clustering (MiniBatchKMeans or
+              BIRCH) via ``_prefit``. Slower but yields higher-quality
+              clusters.
+            - ``"full"``: exact search; each partition gets its own flat
+              ``IndexFlatL2`` index (no shared quantizer). Slower than
+              `"sample"`` but it has the highest accuracy according
+              to the `pandas` realization.
+            Defaults to ``"sample"``.
+
+        CACHING_INDEX_MAX_SIZE (int): Maximum number of serialized FAISS
+            partition indexes that can be simultaneously held in the
+            per-executor LRU cache (``CachingIndex``) during the
+            distributed predict phase. When the cache is full and a new
+            index is requested, the least-recently-used entry is evicted
+            and its memory is released. A larger value reduces redundant
+            deserialization at the cost of higher per-executor memory
+            consumption; a smaller value limits memory pressure but may
+            increase I/O and deserialization overhead. This value is
+            consumed by ``get_executor_cache()`` in
+            ``hypex/extensions/faiss.py`` and passed to the
+            ``CachingIndex`` constructor in ``hypex/utils/index_utils.py``.
+            Defaults to 5.
     """
     FAISS_PERSIST_POLITIC: StorageLevel = StorageLevel.MEMORY_AND_DISK
     FAISS_SAMPLE_TARGET: int = 5_000_000
     FAISS_DRIVER_INDEX_LIMIT: int = 5_000_000
     FAISS_CHUNK_SIZE: int = 4096
+    FAISS_FIT_MODE: Literal["sample", "cluster", "full"] = "sample"
+
+    CACHING_INDEX_MAX_SIZE: int = 5

@@ -15,10 +15,12 @@ from ..utils import BackendsEnum, NoColumnsError, timeit
 from ..utils.constants import CATEGORICAL_TYPES_LIST, NUMBER_TYPES_LIST
 from ..utils.errors import NotSuitableFieldError
 from ..utils.registry import backend_factory
+from ..utils.logger import logger
 from .abstract import StatsHypothesisTesting
 from .comparators import Chi2Test, KSTest, TTest, ZTest
 
 
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 @backend_factory.register(TTest, SparkDataset)
 class StatsTTest(StatsHypothesisTesting):
     """Two-sample t-test with automatic variance homogeneity check.
