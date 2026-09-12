@@ -1,6 +1,8 @@
-from ..analyzers.aa import AAScoreAnalyzer
+import matplotlib.pyplot as plt
+
+from ..analyzers.aa import AADryTestAnalyzer, AAScoreAnalyzer
 from ..dataset import Dataset, ExperimentData, InfoRole, SmallDataset, StatisticRole
-from ..reporters.aa import AABestSplitReporter, AAPassedReporter
+from ..reporters.aa import AABestSplitReporter, AADryTestReporter, AAPassedReporter
 from ..utils import ExperimentDataEnum, _parse_metric_col
 from ..utils.constants import (
     ID_SPLIT_SYMBOL,
@@ -201,3 +203,14 @@ class AAOutput(Output):
         self._extract_experiments(experiment_data)
         self._extract_aa_score(experiment_data)
         self._extract_best_split_statistic(experiment_data)
+
+
+class AADryOutput(Output):
+    experiments: Dataset
+    aa_score: Dataset
+    fig: plt.Figure
+    def __init__(self):
+        super().__init__(
+            resume_reporter=AADryTestReporter(),
+            additional_reporters={"best_split": AABestSplitReporter()}
+        )

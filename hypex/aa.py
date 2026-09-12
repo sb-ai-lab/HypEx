@@ -3,19 +3,18 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from .transformers.na_dropper import NaDropper
-from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
-from .comparators import GroupDifference, GroupSizes
+from .analyzers.aa import AADryTestAnalyzer, AAScoreAnalyzer, OneAAStatAnalyzer
+from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from .comparators.abstract import Comparator
-from .comparators import Chi2Test, KSTest, TTest
-from .dataset import AdditionalTreatmentRole, TargetRole
+from .dataset import AdditionalTreatmentRole, FeatureRole, TargetRole
 from .experiments.base import Experiment, OnRoleExperiment
 from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from .forks.aa import IfAAExecutor
-from .reporters import DatasetReporter, DictReporter
+from .reporters import DatasetReporter
 from .reporters.aa import OneAADictReporter
 from .splitters import AASplitter, AASplitterWithStratification
-from .ui.aa import AAOutput
+from .transformers.na_dropper import NaDropper
+from .ui.aa import AADryOutput, AAOutput
 from .ui.base import ExperimentShell
 from .utils import SpaceEnum
 
@@ -81,9 +80,9 @@ class AATest(ExperimentShell):
         additional_params: dict[str, Any] | None,
         random_states: Iterable[int] | None,
         groups_sizes: list[float] | None,
+        dry_test: bool
     ) -> Experiment:
         """Builds the experiment pipeline for A/A testing."""
-        
         aa_metrics = Experiment(
             executors=[
                 GroupSizes(grouping_role=AdditionalTreatmentRole()),
@@ -98,28 +97,29 @@ class AATest(ExperimentShell):
                             reliability=0.05
                         ),
                         KSTest(
-                            compare_by="groups", 
+                            compare_by="groups",
                             grouping_role=AdditionalTreatmentRole()
                         ),
                         Chi2Test(
                             compare_by="groups", grouping_role=AdditionalTreatmentRole()
                         ),
                     ],
-                    role=TargetRole(),
+                    role=[TargetRole(), FeatureRole()],
+                    # role=TargetRole()
                 ),
                 OneAAStatAnalyzer(),
             ]
         )
-        
+
         one_aa_base = Experiment(executors=[NaDropper(), AASplitter(), aa_metrics])
         one_aa_strat = Experiment(executors=[NaDropper(), AASplitterWithStratification(), aa_metrics])
         base_experiment = one_aa_strat if stratification else one_aa_base
-        
+
         params = AATest._prepare_params(
             n_iterations, control_size, random_states, sample_size,
             additional_params, groups_sizes
         )
-        
+
         experiment_params = [
             ParamsExperiment(
                 executors=[base_experiment],
@@ -127,7 +127,7 @@ class AATest(ExperimentShell):
                 reporter=DatasetReporter(OneAADictReporter(front=False), single_row=True),
             )
         ]
-        
+
         if sample_size:
             params_no_sample = AATest._prepare_params(
                 n_iterations, control_size, random_states,
@@ -143,9 +143,11 @@ class AATest(ExperimentShell):
                     stopping_criterion=IfAAExecutor(sample_size=sample_size),
                 )
             )
-        
+
         experiment_params.append(AAScoreAnalyzer())
-        
+        if dry_test:
+            experiment_params.append(AADryTestAnalyzer())
+
         return Experiment(experiment_params, key="AATest")
 
     @staticmethod
@@ -200,10 +202,16 @@ class AATest(ExperimentShell):
         random_states: Iterable[int] | None = None,
         t_test_equal_var: bool | None = None,
         groups_sizes: list[float] | None = None,
+        dry_test: bool = False
     ):
         if n_iterations is None:
             n_iterations = 2000 if precision_mode else 10
-            
+
+        if dry_test:
+            output = AADryOutput()
+        else:
+            output = AAOutput()
+
         super().__init__(
             experiment=self._make_experiment(
                 stratification=stratification,
@@ -213,10 +221,11 @@ class AATest(ExperimentShell):
                 additional_params=additional_params,
                 random_states=random_states,
                 groups_sizes=groups_sizes,
+                dry_test=dry_test
             ),
-            output=AAOutput(),
+            output=output,
         )
-        
+
         if t_test_equal_var is not None:
             self.experiment.set_params(
                 {TTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}

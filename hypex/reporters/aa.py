@@ -299,3 +299,7 @@ class AABestSplitReporter(Reporter):
         if best_split_id in result.columns:
             result = result.drop(columns=[best_split_id])
         return result
+
+class AADryTestReporter(Reporter):
+    def report(self, data: ExperimentData) -> Dataset:
+        ...
