@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import inspect
-import html                                   
-from collections.abc import Mapping, Sequence 
+import html
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ..dataset import (
