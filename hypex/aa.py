@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+from .transformers.na_dropper import NaDropper
 from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
 from .comparators import GroupDifference, GroupSizes
 from .comparators.abstract import Comparator
@@ -110,8 +111,8 @@ class AATest(ExperimentShell):
             ]
         )
         
-        one_aa_base = Experiment(executors=[AASplitter(), aa_metrics])
-        one_aa_strat = Experiment(executors=[AASplitterWithStratification(), aa_metrics])
+        one_aa_base = Experiment(executors=[NaDropper(), AASplitter(), aa_metrics])
+        one_aa_strat = Experiment(executors=[NaDropper(), AASplitterWithStratification(), aa_metrics])
         base_experiment = one_aa_strat if stratification else one_aa_base
         
         params = AATest._prepare_params(
@@ -123,7 +124,7 @@ class AATest(ExperimentShell):
             ParamsExperiment(
                 executors=[base_experiment],
                 params=params,
-                reporter=DatasetReporter(OneAADictReporter(front=False)),
+                reporter=DatasetReporter(OneAADictReporter(front=False), single_row=True),
             )
         ]
         

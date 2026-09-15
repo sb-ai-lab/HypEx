@@ -5,6 +5,8 @@ try:
 except ImportError:
     from typing_extensions import Self  # Python < 3.11
 
+import warnings
+
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized, TYPE_CHECKING
 import copy
@@ -193,7 +195,8 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data = data.to_pandas()
         elif isinstance(data, dict):
             wrapped = {
-                k: v if isinstance(v, list) else [v] for k, v in data["data"].items()
+                k: v if isinstance(v, (list, np.ndarray, tuple)) else [v]
+                for k, v in data["data"].items()
             }
             if "index" in data.keys():
                 self.data = pd.DataFrame(data=wrapped, index=data["index"])
@@ -1175,7 +1178,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return int(self.data[group_cols].nunique())
 
     def iter_groups(self, by: list[str]):
-        for key, group in self.data.groupby(by=by, observed=False):
+        by_arg = by[0] if len(by) == 1 else by
+        for key, group in self.data.groupby(by=by_arg, observed=False):
             yield key, group
 
     def grouped_value_counts(self, by: list[str], feature_cols: list[str] | None=None):
@@ -1373,7 +1377,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             list[str]: Names of numeric columns.
         """
-        return self.data.select_dtypes(include=ScalarType).columns.tolist()
+        _scalar_types = getattr(ScalarType, "__args__", (ScalarType,))
+        return self.data.select_dtypes(include=list(_scalar_types)).columns.tolist()
 
     def corr(
         self,
@@ -1484,6 +1489,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
         )
 
+    def count_nulls(self) -> dict[str, int]:
+        return self.data.isna().sum().to_dict()
+
     def dot(self, other: PandasDataset | np.ndarray) -> pd.DataFrame:
         """Compute matrix multiplication with another DataFrame or array.
 
@@ -1503,6 +1511,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             result.columns = (
                 self.columns if other.shape[1] == self.shape[1] else result.columns
             )
+        elif isinstance(other, pd.DataFrame):
+            result = self.data.dot(other)
         else:
             result = self.data.dot(other.data)
         return self._wrap_result(
@@ -1562,6 +1572,79 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return self._wrap_result(
             self.data.sample(n=n, frac=frac, random_state=random_state)
         )
+
+
+    def random_split_labels(
+        self,
+        edges: list[int],
+        labels: list[str],
+        random_state: int | None = None,
+        frac: float = 1.0,
+        name: str = "split",
+    ) -> pd.DataFrame:
+        """Deterministic split using a hash of the index.
+
+        Produces identical results to the Spark backend for the same seed
+        and index values. Uses MD5 hashing of the stringified index
+        concatenated with the seed to assign each row to a bucket in
+        ``[0, MOD)``, then maps buckets to labels via the ``edges``
+        thresholds.
+
+        Args:
+            edges: Cumulative upper bounds for each label on the MOD scale.
+            labels: Label strings corresponding to ``edges``.
+            random_state: Seed for reproducibility. Defaults to 42.
+            frac: Fraction of data to label. Rows outside this fraction
+                are excluded from the result.
+            name: Name of the resulting label column.
+
+        Returns:
+            A ``pd.DataFrame`` with the original index and the new label
+            column. Rows outside ``frac`` or beyond the last edge are
+            excluded.
+        """
+        import hashlib
+
+        seed = random_state if random_state is not None else 42
+        mod = 10_000_000
+
+        if edges and edges[-1] < mod * 0.5:
+            warnings.warn(
+                f"edges={edges} look like absolute row counts, not MOD-scaled values. "
+                f"Expected last edge ≈ {mod}. Auto-scaling.",
+                UserWarning,
+                stacklevel=2,
+            )
+            n_sampled_approx = edges[-1]
+            edges = [int(e / n_sampled_approx * mod) for e in edges]
+            edges[-1] = mod
+
+        df_with_index = self.data.reset_index()
+        index_cols = df_with_index.columns[: self.data.index.nlevels]
+
+        def compute_hash(row):
+            index_str = "_".join(str(row[c]) for c in index_cols) + f"_{seed}"
+            hash_val = int(hashlib.md5(index_str.encode()).hexdigest(), 16)
+            return hash_val % mod
+
+        df_with_index["_hash"] = df_with_index.apply(compute_hash, axis=1)
+
+        # Assign labels in reverse order so that the smallest threshold
+        # wins (matching Spark CASE WHEN semantics).
+        df_with_index[name] = None
+        for edge, label in list(zip(edges, labels)):
+            threshold = min(edge, mod)
+            mask = (df_with_index["_hash"] < threshold) & df_with_index[name].isna()
+            df_with_index.loc[mask, name] = label
+
+        # Apply frac filter.
+        if frac < 1.0:
+            frac_threshold = int(frac * mod)
+            df_with_index.loc[df_with_index["_hash"] >= frac_threshold, name] = None
+
+        result = df_with_index[df_with_index[name].notna()][[name]]
+        result.index = self.data.index[df_with_index[name].notna().values]
+        return result
 
     def select_dtypes(
         self,
@@ -1784,5 +1867,16 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     
         return self._wrap_result(self.data.explode(column=column, ignore_index=ignore_index))
 
-    def checkpoint(self):
+    def checkpoint(self, eager: bool = True):
+        """Breaks the computation graph (Lineage) to prevent exponential slowdowns.
+
+        For the Spark backend, this method materializes the DataFrame to truncate
+        the lineage graph. For the Pandas backend, this method acts as a no-op
+        since Pandas does not suffer from the same lineage growth issues.
+        The signature is kept identical to the Spark backend for API consistency.
+
+        Args:
+            eager: If ``True``, the checkpoint is executed eagerly. This parameter
+                is ignored for the Pandas backend. Defaults to ``True``.
+        """
         pass
