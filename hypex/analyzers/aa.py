@@ -485,12 +485,10 @@ class AADryTestAnalyzer(Executor):
     def _build_dry_score_dataset(rows: dict[str, Any]) -> SmallDataset:
         if not rows:
             return SmallDataset.from_dict([{}], roles={})
-        df = pd.DataFrame(rows).set_index("index")
-        # df.index.name = None
+        df = pd.DataFrame(rows).set_index("_idx")
         return SmallDataset(
             roles={
                 "p-value": StatisticRole(),
-                "statistic": StatisticRole(),
                 "pass": StatisticRole()
             },
             data=df,
@@ -506,11 +504,13 @@ class AADryTestAnalyzer(Executor):
                 and any(t_col in col for t_col in target_cols)
             ]
         data = score_table[dry_cols]
-        rows = {"p-value": [], "statistic": [], "pass": [], "index": []}
+        rows = {"p-value": [], "pass": [], "_idx": []}
         for col, t_col in zip(dry_cols, target_cols):
             tmp_dict = UniformCheck(self.alpha).calc(data[col]).to_dict()['data']['data']
-            tmp_dict['index'] = [t_col]
-            for key in tmp_dict:
+            tmp_dict["_idx"] = [t_col]
+            for key in rows.keys():
+                if key == "pass":
+                    tmp_dict[key] = [bool(1 - int(tmp_dict[key][0]))]
                 rows[key].extend(tmp_dict[key])
 
         self._plot_results(data, target_cols, dry_cols)
