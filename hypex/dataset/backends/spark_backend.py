@@ -1692,6 +1692,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 schema = ",".join([f"`{i}` double" for i in range(other.shape[1])])
         elif isinstance(other, pd.DataFrame):
             pd_other = other
+            pd_other.columns = [str(c) for c in pd_other.columns]
             schema = ",".join([f"`{name}` double" for name in pd_other.columns])
             if pd_other.shape[0] != len(self.data.columns):
                 raise ValueError(
