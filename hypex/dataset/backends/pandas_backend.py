@@ -850,7 +850,7 @@ class PandasNavigation(DatasetBackendNavigation):
                 dtypes[k] = float
             elif pd.api.types.is_object_dtype(v):
                 if len(self.data) > 0 and pd.api.types.is_list_like(
-                    self.data[column_name].iloc[0]
+                    self.data[k].iloc[0]
                 ):
                     dtypes[k] = object
                 else:

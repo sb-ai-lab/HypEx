@@ -141,6 +141,8 @@ class GroupChi2TestExtension(GroupStatTest):
                 },
                 StatisticRole(),
             )
+        if isinstance(contingency_table, Dataset):
+            contingency_table = contingency_table.data.values
         statistic, p_value, *_ = chi2_contingency(contingency_table, **kwargs)
         return self._form_results(statistic, p_value, self.reliability)
 
@@ -181,11 +183,18 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
 
         if len(counted_data) < 2:
             return None
-        data_vc = data_vc.add_column(counted_data[counted_data.columns[0]])
-        other_vc = other_vc.add_column(counted_data[counted_data.columns[0]])
-        return data_vc.merge(other_vc, on=counted_data.columns[0])[
-            ["count_x", "count_y"]
-        ].fillna(0)
+        col_name = str(counted_data.columns[0])
+        col_role = counted_data.roles.get(col_name, StatisticRole())
+
+        data_vc = data_vc.add_column(
+            counted_data[col_name].data,
+            role={col_name: col_role},
+        )
+        other_vc = other_vc.add_column(
+            counted_data[col_name].data,
+            role={col_name: col_role},
+        )
+        return data_vc.merge(other_vc, on=col_name)[["count_x", "count_y"]].fillna(0)
 
 @backend_factory.register(GroupKSTestExtension, SparkDataset)
 class SparkKSTestExtension(GroupKSTestExtension):
