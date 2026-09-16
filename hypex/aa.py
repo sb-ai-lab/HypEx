@@ -14,7 +14,7 @@ from .reporters import DatasetReporter
 from .reporters.aa import OneAADictReporter
 from .splitters import AASplitter, AASplitterWithStratification
 from .transformers.na_dropper import NaDropper
-from .ui.aa import AADryOutput, AAOutput
+from .ui.aa import AAOutput
 from .ui.base import ExperimentShell
 from .utils import SpaceEnum
 
@@ -144,9 +144,9 @@ class AATest(ExperimentShell):
                 )
             )
 
-        experiment_params.append(AAScoreAnalyzer())
         if dry_test:
             experiment_params.append(AADryTestAnalyzer())
+        experiment_params.append(AAScoreAnalyzer())
 
         return Experiment(experiment_params, key="AATest")
 
@@ -207,10 +207,6 @@ class AATest(ExperimentShell):
         if n_iterations is None:
             n_iterations = 2000 if precision_mode else 10
 
-        if dry_test:
-            output = AADryOutput()
-        else:
-            output = AAOutput()
 
         super().__init__(
             experiment=self._make_experiment(
@@ -223,7 +219,7 @@ class AATest(ExperimentShell):
                 groups_sizes=groups_sizes,
                 dry_test=dry_test
             ),
-            output=output,
+            output=AAOutput()
         )
 
         if t_test_equal_var is not None:
