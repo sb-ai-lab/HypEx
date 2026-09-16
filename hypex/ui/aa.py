@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 
 from ..analyzers.aa import AADryTestAnalyzer, AAScoreAnalyzer
 from ..dataset import Dataset, ExperimentData, InfoRole, SmallDataset, StatisticRole
-from ..reporters.aa import AABestSplitReporter, AADryTestReporter, AAPassedReporter
+from ..reporters.aa import AABestSplitReporter, AAPassedReporter
 from ..utils import ExperimentDataEnum, _parse_metric_col
 from ..utils.constants import (
     ID_SPLIT_SYMBOL,
@@ -162,6 +162,29 @@ class AAOutput(Output):
             self.experiments, RenameEnum.columns
         )
 
+    @staticmethod
+    def _get_dry_score(experiment_data: ExperimentData, aa_score: Dataset) -> Dataset:
+        dry_score_analyser_ids = experiment_data.get_ids(
+            AADryTestAnalyzer, ExperimentDataEnum.analysis_tables
+        )[AADryTestAnalyzer.__name__][ExperimentDataEnum.analysis_tables.value]
+
+        if len(dry_score_analyser_ids) == 0:
+            return aa_score
+
+        dry_score_analyser_ids = dry_score_analyser_ids[0]
+        table = (
+            aa_score.merge(
+                experiment_data.analysis_tables[dry_score_analyser_ids],
+                right_index=True,
+                left_index=True,
+                how='left'
+            )
+        )
+        new_pass_col = (table["pass_x"].fillna(1) + table["pass_y"].fillna(1)).rename({"pass_x": "pass"})
+        table.add_column(new_pass_col)
+        table = table.drop(columns=["pass_x", "pass_y"])
+        return table
+
     def _extract_aa_score(self, experiment_data: ExperimentData):
         def get_analyzer_id(key: str):
             target_id = [i for i in aa_score_analyser_ids if i.endswith(key)]
@@ -174,6 +197,7 @@ class AAOutput(Output):
         )[AAScoreAnalyzer.__name__][ExperimentDataEnum.analysis_tables.value]
 
         self.aa_score = experiment_data.analysis_tables[get_analyzer_id("aa score")]
+        self.aa_score = self._get_dry_score(experiment_data, self.aa_score)
         self.aa_score = self._replace_splitters(self.aa_score, RenameEnum.index)
 
         self.best_split_statistic = experiment_data.analysis_tables[
@@ -203,14 +227,3 @@ class AAOutput(Output):
         self._extract_experiments(experiment_data)
         self._extract_aa_score(experiment_data)
         self._extract_best_split_statistic(experiment_data)
-
-
-class AADryOutput(Output):
-    experiments: Dataset
-    aa_score: Dataset
-    fig: plt.Figure
-    def __init__(self):
-        super().__init__(
-            resume_reporter=AADryTestReporter(),
-            additional_reporters={"best_split": AABestSplitReporter()}
-        )
