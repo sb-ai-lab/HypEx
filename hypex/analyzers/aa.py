@@ -301,6 +301,17 @@ class AAScoreAnalyzer(Executor):
                 "score": weight,
                 "pass": weight >= self.threshold,
             })
+
+        dry_score = self._get_dry_score(data)
+        if dry_score is not None and not dry_score.is_empty():
+            for row in aa_rows:
+                try:
+                    dry_pass = dry_score.get_values(row=row["_idx"], column="pass")
+                    if dry_pass is not None:
+                        row["pass"] = row["pass"] and bool(dry_pass)
+                except Exception:
+                    pass
+
         result_ds = self._build_aa_score_dataset(aa_rows)
         self.key = "aa score"
         return self._set_value(data, result_ds)
@@ -444,6 +455,14 @@ class AAScoreAnalyzer(Executor):
             return None
         return data.analysis_tables[table_ids[0]]
 
+    @staticmethod
+    def _get_dry_score(data: ExperimentData) -> Dataset | None:
+        dry_ids = data.get_ids("AADryTestAnalyzer", ExperimentDataEnum.analysis_tables)
+        dry_table_ids = dry_ids.get("AADryTestAnalyzer", {}).get("analysis_tables", [])
+        if not dry_table_ids:
+            return None
+        return data.analysis_tables[dry_table_ids[0]]
+
 class AADryTestAnalyzer(Executor):
 
     def __init__(
@@ -505,9 +524,11 @@ class AADryTestAnalyzer(Executor):
             ]
         data = score_table[dry_cols]
         rows = {"p-value": [], "pass": [], "_idx": []}
-        for col, t_col in zip(dry_cols, target_cols):
+        for col in dry_cols:
             tmp_dict = UniformCheck(self.alpha).calc(data[col]).to_dict()['data']['data']
-            tmp_dict["_idx"] = [t_col]
+            feature, raw_test, group = _resolve_column_parts(col)
+            test_name = normalize_test_name(raw_test)
+            tmp_dict["_idx"] = [f"{feature} {test_name} {group}".strip()]
             for key in rows.keys():
                 if key == "pass":
                     tmp_dict[key] = [bool(1 - int(tmp_dict[key][0]))]
