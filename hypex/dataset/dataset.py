@@ -26,6 +26,7 @@ from .roles import (
     AdditionalRole,
     DefaultRole,
 )
+from .backends import PandasDataset, SparkDataset
 
 from typing import Literal
 
@@ -112,7 +113,10 @@ class SmallDataset(DatasetBase):
             else:
                 data = data.to_frame()
 
-        super().__init__(roles, data, BackendsEnum.pandas, default_role, session)
+        if isinstance(data, (PandasDataset, SparkDataset)):
+            super().__init__(roles, data, None, default_role, session)
+        else:
+            super().__init__(roles, data, BackendsEnum.pandas, default_role, session)
         self.loc = self.Locker(
             call_class=self.__class__, backend=self._backend_data, roles=self.roles
         )
