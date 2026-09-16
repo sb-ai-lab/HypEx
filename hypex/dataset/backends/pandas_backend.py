@@ -918,6 +918,9 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             None: Modifies self.data in-place.
         """
+        if not isinstance(name, (str, list)):
+            # pd.Index, tuple, np.ndarray etc
+            name = list(name) if hasattr(name, '__iter__') else [name]
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
             
