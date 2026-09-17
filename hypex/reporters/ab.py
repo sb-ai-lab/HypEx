@@ -1,15 +1,28 @@
 from __future__ import annotations
-from typing import Any, ClassVar
+
 import warnings
+from typing import Any, ClassVar
 
 from ..analyzers.ab import ABAnalyzer
-from ..comparators import GroupChi2Test, GroupTTest, GroupUTest, BaseComparator
-from ..comparators import StatsTTest, StatsChi2Test
+from ..comparators import (
+    BaseComparator,
+    GroupChi2Test,
+    GroupTTest,
+    GroupUTest,
+    StatsChi2Test,
+    StatsTTest,
+)
 from ..dataset import Dataset, ExperimentData, StatisticRole
 from .abstract import (
-    DictReporter, DatasetReporter, Reporter, 
-    extract_group_difference, extract_tests, extract_analyzer_data, extract_group_sizes
+    DatasetReporter,
+    DictReporter,
+    Reporter,
+    extract_analyzer_data,
+    extract_group_difference,
+    extract_group_sizes,
+    extract_tests,
 )
+
 
 class ABTestReporter(DatasetReporter):
     """Reporter for A/B test results.
@@ -18,7 +31,10 @@ class ABTestReporter(DatasetReporter):
     and analyzer data, formatting them into a structured dataset or dictionary.
     """
     
-    tests: ClassVar[list[type[BaseComparator]]] = [GroupTTest, GroupUTest, GroupChi2Test, StatsTTest, StatsChi2Test]
+    tests: ClassVar[list[type[BaseComparator]]] = [
+        GroupTTest, GroupUTest, GroupChi2Test,
+        StatsTTest, StatsChi2Test
+    ]
 
     def _report(self, data: ExperimentData) -> dict[str, Any]:
         """Generate the final A/B test report.

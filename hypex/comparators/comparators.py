@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any, ClassVar, Literal
 
 import numpy as np
@@ -19,6 +20,11 @@ class GroupDifference(StatsComparator):
     to leverage vectorized Spark aggregation instead of iterative raw-data
     processing, significantly reducing execution time and DAG lineage size.
 
+    Computes absolute and percentage differences between baseline and compared
+    group means, along with the 95% Confidence Interval (CI) for the absolute
+    difference. Uses pre-aggregated statistics (mean, variance, count) to 
+    leverage vectorized Spark aggregation.
+
     Attributes:
         REQUIRED_STATS: List of statistics required for computation (["mean"]).
         compare_by: Comparison mode identifier. Retained for backward
@@ -29,7 +35,7 @@ class GroupDifference(StatsComparator):
         >>> result = diff.execute(experiment_data)
     """
 
-    REQUIRED_STATS: ClassVar[list[str]] = ["mean"]
+    REQUIRED_STATS: ClassVar[list[str]] = ["mean", "var", "count"]
 
     def __init__(
         self,
@@ -73,37 +79,35 @@ class GroupDifference(StatsComparator):
         baseline_stats: dict[str, Any],
         compared_stats: dict[str, Any],
         **kwargs,
-    ) -> dict:
-        """Computes mean difference metrics from pre-aggregated statistics.
-
-        Calculates the absolute difference and percentage change between
-        baseline and compared group means. Handles edge cases where means
-        are missing or the baseline mean is zero.
-
+    ) -> dict[str, Any]:
+        """Computes mean difference metrics and 95% Confidence Interval.
+        
+        Calculates the absolute difference, percentage change, and the 95% CI
+        bounds using the standard error of the difference between two independent
+        means.
+        
         Args:
             baseline_stats: Aggregated statistics dict for the baseline group.
-                Must contain a "mean" key.
+                Must contain "mean", "var", and "count".
             compared_stats: Aggregated statistics dict for the compared group.
-                Must contain a "mean" key.
+                Must contain "mean", "var", and "count".
             **kwargs: Additional keyword arguments (unused).
-
+            
         Returns:
-            Dictionary with keys:
-                - "control mean": Baseline group mean.
-                - "test mean": Compared group mean.
-                - "difference": Absolute difference (test - control).
-                - "difference %": Percentage change relative to control.
-                  Returns None if control mean is zero or either mean is missing.
+            Dictionary with keys: "control mean", "test mean", "difference",
+            "difference %", "ci lower", "ci upper".
         """
         control_mean = baseline_stats.get("mean")
         test_mean = compared_stats.get("mean")
-
+        
         if control_mean is None or test_mean is None:
             return {
                 "control mean": control_mean,
                 "test mean": test_mean,
                 "difference": None,
                 "difference %": None,
+                "ci lower": None,
+                "ci upper": None,
             }
 
         difference = test_mean - control_mean
@@ -111,11 +115,37 @@ class GroupDifference(StatsComparator):
             (test_mean / control_mean - 1) * 100 if control_mean != 0 else None
         )
 
+        # --- Confidence Interval Calculation ---
+        ci_lower = None
+        ci_upper = None
+        
+        control_var = baseline_stats.get("var")
+        test_var = compared_stats.get("var")
+        control_n = baseline_stats.get("count")
+        test_n = compared_stats.get("count")
+
+        # Check if we have enough data to calculate Standard Error
+        if (
+            control_var is not None and test_var is not None
+            and control_n is not None and test_n is not None
+            and control_n > 1 and test_n > 1
+        ):
+            # Standard Error (SE) of the difference between two independent means
+            se = math.sqrt((control_var / control_n) + (test_var / test_n))
+            
+            # Z-score for 95% confidence level
+            z_score = 1.96 
+            
+            ci_lower = difference - (z_score * se)
+            ci_upper = difference + (z_score * se)
+
         return {
             "control mean": control_mean,
             "test mean": test_mean,
             "difference": difference,
             "difference %": difference_pct,
+            "ci lower": ci_lower,
+            "ci upper": ci_upper,
         }
 
 
