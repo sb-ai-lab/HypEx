@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Any
 
-from ..dataset import Dataset, ExperimentData
+from ..dataset import Dataset
+from ..dataset.experiment_data import ExperimentData
+
 from ..dataset.ml_data import MLExperimentData
 from ..dataset.roles import (
     AdditionalTargetRole,

@@ -50,17 +50,24 @@ numpy = [
 
 scipy = [
     { version = ">=1.5.0, <=1.10.1", python = "<3.9" },
-    { version = ">=1.5.0, <=1.13.1", python = ">=3.9" }
+    { version = ">=1.5.0, <=1.13.1", python = ">=3.9, <3.13" },
+    { version = ">=1.14.1, <=1.16.0", python = ">=3.13" }
 ]
 
 matplotlib = [
     { version = ">=3.0.0, <=3.7.3", python = "<3.9" },
-    { version = ">=3.0.0, <=3.9.0", python = ">=3.9" }
+    { version = ">=3.0.0, <=3.9.0", python = ">=3.9, <3.13" },
+    { version = ">=3.10.0, <=3.11.0", python = ">=3.13" }
 ]
 
-faiss-cpu = ">=1.6.0, <=1.8.0"
+faiss-cpu = [
+    { version = ">=1.6.0, <=1.8.0", python = "<3.9" },
+    { version = ">=1.9.0,<=1.14.0", python = ">=3.9" }
+]
 seaborn = "<=0.13.2"
 statsmodels = "<=0.14.2"
+pyspark = "3.5.1"
+pyarrow = ">=4.0.0"
 
 [tool.poetry.extras]
 cat = ["catboost"]
@@ -68,6 +75,7 @@ lgbm = ["lightgbm"]
 all = ["catboost", "lightgbm"]
 
 [tool.poetry.group.dev.dependencies]
+python = "3.8.17"
 docutils = ">=0.17,<0.21"
 jupyter = "^1.0.0"
 pytest = "^7.4.3"
@@ -80,6 +88,7 @@ ruff = "*"
 alive-progress = "^3.1.0"
 psutil = "^7.0.0"
 jsonschema = "^4.23.0"
+mypy = ">=1.8.0,<1.17"
 
 
 [build-system]

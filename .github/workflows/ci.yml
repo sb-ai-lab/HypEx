@@ -19,9 +19,9 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
         os: [ubuntu-latest, macos-latest, windows-latest]
-        # Exclude Python 3.13 on macOS due to missing wheels
+        # Exclude Python 3.13 on Windows due to segmentation fault issues
         exclude:
-          - os: macos-latest
+          - os: windows-latest
             python-version: "3.13"
     steps:
       - uses: actions/checkout@v4
@@ -31,16 +31,26 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config gfortran g++
+          # Install OpenBLAS for scipy builds (needed for Python 3.13)
+          if [[ "${{ matrix.python-version }}" == "3.13" ]]; then
+            sudo apt-get install -y libopenblas-dev liblapack-dev
+          fi
+
       - name: Install system dependencies (macOS)
         if: matrix.os == 'macos-latest'
         run: |
           brew update
           brew install pkg-config
-          # Only install gcc for Python versions that need compilation
+          # Install gcc, gfortran, and OpenBLAS for Python versions that need compilation
           if [[ "${{ matrix.python-version }}" == "3.13" ]]; then
-            brew install gcc
-            echo "CC=gcc-$(gcc --version | grep -o '[0-9]\+\.[0-9]\+' | head -1)" >> $GITHUB_ENV
-            echo "CXX=g++-$(gcc --version | grep -o '[0-9]\+\.[0-9]\+' | head -1)" >> $GITHUB_ENV
+            brew install gcc gfortran openblas
+            # Add Homebrew's bin directory to PATH to ensure gcc and gfortran are found
+            echo "$(brew --prefix)/bin" >> $GITHUB_PATH
           fi
 
       - name: Install dependencies for tox
@@ -51,6 +61,7 @@ jobs:
 
       - name: Install project dependencies with retry
         # Use poetry install with retry logic for network issues
+        shell: bash
         run: |
           # Try with system dependencies first, fall back to source if needed
           poetry config virtualenvs.create true
@@ -81,12 +92,13 @@ jobs:
           fi
 
       - name: Run unit tests
+        shell: bash
         env:
           # For Python 3.13 compilation
           NPY_DISTUTILS_APPEND_FLAGS: 1
         run: |
           # Use tox-gh-actions to select the right tox environment
-          tox -e py
+          tox
 
   linters:
     runs-on: ubuntu-latest
@@ -107,4 +119,4 @@ jobs:
 
       - name: Run linters (mypy, codespell, docs)
         run: |
-          tox -e lint
+          tox

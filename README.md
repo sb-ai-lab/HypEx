@@ -159,6 +159,23 @@ result.variance_reduction_report  # Variance reduction report for CUPED/CUPAC
 ```
 More about A/B test [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/ABTestTutorial.ipynb)
 
+
+## Spark backend status and compatibility
+
+The Spark backend has been significantly expanded to cover the same core dataset operations as the Pandas backend for navigation and transformation workflows (append, merge, sort, fill/drop missing values, transpose, sampling, rename/reindex, and conversions to dict/records).
+
+### Supported runtime matrix
+
+- Python: `3.8.17+` (project target `>=3.8`)
+- PySpark: `3.5.1`
+- JVM: Java 8/11/17 recommended for Spark
+
+### Notes on architecture
+
+- `Dataset` can use Spark backend for large data processing.
+- `SmallDataset` remains pandas-based by design for compact `analysis_tables` payloads and reporting.
+- `ExperimentData.analysis_tables` now validates and normalizes incoming data (`Dataset`, `SmallDataset`, and dict payloads with explicit roles) into `SmallDataset` consistently.
+
 ## Documentation
 
 For more detailed information about the library and its features, visit

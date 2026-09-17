@@ -1,23 +1,18 @@
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any, Literal
-
-import numpy as np
 
 from ..dataset import (
     ABCRole,
-    AdditionalMatchingRole,
+    AdditionalStatisticRole,
     AdditionalTargetRole,
     Dataset,
     ExperimentData,
-    FeatureRole,
-    InfoRole,
     TargetRole,
 )
-from ..extensions.scipy_stats import NormCDF
+from ..extensions import BiasExtension, MatchingMetricsExtension
 from ..utils.enums import ExperimentDataEnum
-from ..utils.errors import NoneArgumentError
+from ..utils.registry import backend_factory
 from .abstract import GroupOperator
 
 
@@ -32,8 +27,20 @@ class SMD(GroupOperator):
         test_data = cls._check_test_data(test_data=test_data)
         return (data.mean() + test_data.mean()) / data.std()
 
-
 class MatchingMetrics(GroupOperator):
+    """
+    Calculator for estimating treatment effects (ATT, ATC, ATE) and their 
+    statistical significance after matching.
+
+    This class computes the Individual Treatment Effect on the Treated (ITT) 
+    and Control (ITC), applies optional bias correction, and calculates the 
+    final Average Treatment Effects along with their standard errors, p-values, 
+    and confidence intervals. It also handles the calculation of scaled counts 
+    (weights) to account for multiple matches or specific matching strategies.
+
+    Inherits from:
+        GroupOperator: The base class for group-based operators in the HypEx library.
+    """
     def __init__(
         self,
         grouping_role: ABCRole | None = None,
@@ -42,9 +49,25 @@ class MatchingMetrics(GroupOperator):
         n_neighbors: int = 1,
         key: Any = "",
     ):
+        """
+        Initialize the matching metrics calculator.
+
+        Args:
+            grouping_role (ABCRole | None, optional): The role defining the grouping 
+                column. Defaults to None.
+            target_roles (ABCRole | list[ABCRole] | None, optional): The role(s) 
+                defining the target column(s). Defaults to None.
+            metric (Literal["auto", "atc", "att", "ate"] | None, optional): The type 
+                of treatment effect to estimate. "atc" = average treatment effect on 
+                controls, "att" = average treatment effect on treated, "ate" = average 
+                treatment effect, "auto" = calculates all. Defaults to "auto".
+            n_neighbors (int, optional): The number of neighbors used in the matching 
+                process, used for scaling counts. Defaults to 1.
+            key (Any, optional): Optional identifier for the operator instance. 
+                Defaults to "".
+        """
         self.metric = metric or "auto"
         self.n_neighbors = n_neighbors
-        self.__scaled_counts = {}
         target_roles = target_roles or TargetRole()
         super().__init__(
             grouping_role=grouping_role,
@@ -54,51 +77,9 @@ class MatchingMetrics(GroupOperator):
             key=key,
         )
 
-    def _calc_scaled_counts(self, matches, indexes, group):
-        matches_counts = Dataset({})
-        matches_counts = matches_counts.add_column(
-            indexes.index, {"indexes": InfoRole()}
-        )
-        matches_counts = matches_counts.add_column([0], {"count": InfoRole(float)})
-        for col in matches.columns:
-            v_counts = matches[col].value_counts()
-            matches_counts = matches_counts.merge(
-                v_counts,
-                how="left",
-                left_on="indexes",
-                right_on=col,
-                suffixes=(("", col)),
-            ).drop(columns=col)
-        matches_counts.index = indexes.index
-        matches_counts = matches_counts.drop(columns="indexes").fillna(0)
-        for col in matches_counts.columns:
-            if col != "count":
-                matches_counts["count"] += matches_counts[col]
-        self.__scaled_counts[group] = matches_counts["count"] / self.n_neighbors
-
-    @staticmethod
-    def _calc_vars(value):
-        var = 0 if value[value.columns[0]].isna().sum() > 0 else value.var()
-        return value * 0 + var
-
-    @staticmethod
-    def _calc_se(var_c, var_t, scaled_counts, group=None):
-        n_c, n_t = len(var_c), len(var_t)
-        if group is not None:
-            groups = list(scaled_counts.keys())
-            groups.remove(group)
-            group_other = groups[0]
-            weights_c = scaled_counts[group_other] * 0 + 1
-            weights_t = scaled_counts[group] * n_t / n_c
-        else:
-            n = n_c + n_t
-            weights_c = (n_c / n) * (scaled_counts["test"] + 1)
-            weights_t = (n_t / n) * (scaled_counts["control"] + 1)
-
-        return np.sqrt(
-            (weights_t**2 * var_t).sum() / n_t**2
-            + (weights_c**2 * var_c).sum() / n_c**2
-        )
+    def _write_log(file: str, result: str, time: str, mode: str = "a"):
+        with open(file, mode) as f:
+            f.write(result + ": " + time + "\n")
 
     @classmethod
     def _inner_function(
@@ -108,189 +89,158 @@ class MatchingMetrics(GroupOperator):
         target_fields: list[str] | None = None,
         **kwargs,
     ) -> Any:
-        if target_fields is None or test_data is None:
-            raise NoneArgumentError(
-                ["target_fields", "test_data"], "att, atc, ate estimation"
-            )
-        metric = kwargs.get("metric", "ate")
-        scaled_counts = kwargs.get("scaled_counts")
-        itt = test_data[target_fields[0]] - test_data[target_fields[1]]
-        itc = data[target_fields[1]] - data[target_fields[0]]
-        bias = kwargs.get("bias", {})
-        if bias and len(bias) > 0:
-            if metric in ["atc", "ate"]:
-                itc -= Dataset.from_dict(
-                    {"test": bias["control"]}, roles={}, index=itc.index
-                )
-            if metric in ["att", "ate"]:
-                itt += Dataset.from_dict(
-                    {"control": bias["test"]}, roles={}, index=itt.index
-                )
-        var_t = cls._calc_vars(itc)
-        var_c = cls._calc_vars(itt)
-        itt_se = cls._calc_se(var_c, var_t, scaled_counts, "control")
-        itc_se = cls._calc_se(var_t, var_c, scaled_counts, "test")
-        itt = itt.mean()
-        itc = itc.mean()
-        p_val_itt = (
-            NormCDF()
-            .calc(
-                Dataset.from_dict(
-                    {"value": [itt / itt_se]}, roles={"value": InfoRole()}
-                )
-            )
-            .get_values()[0][0]
-        )
-        p_val_itc = (
-            NormCDF()
-            .calc(
-                Dataset.from_dict(
-                    {"value": [itc / itc_se]}, roles={"value": InfoRole()}
-                )
-            )
-            .get_values()[0][0]
-        )
-        if metric == "atc":
-            return {
-                "ATC": [
-                    itc,
-                    itc_se,
-                    p_val_itc,
-                    itc - 1.96 * itc_se,
-                    itc + 1.96 * itc_se,
-                ]
-            }
-        if metric == "att":
-            return {
-                "ATT": [
-                    itt,
-                    itt_se,
-                    p_val_itt,
-                    itt - 1.96 * itt_se,
-                    itt + 1.96 * itt_se,
-                ]
-            }
-        len_control, len_test = len(data), len(test_data)
-        ate = (itt * len_test + itc * len_control) / (len_test + len_control)
-        ate_se = cls._calc_se(var_c, var_t, scaled_counts)
-        p_val_ate = (
-            NormCDF()
-            .calc(
-                Dataset.from_dict(
-                    {"value": [ate / ate_se]}, roles={"value": InfoRole()}
-                )
-            )
-            .get_values()[0][0]
-        )
-        return {
-            "ATT": [itt, itt_se, p_val_itt, itt - 1.96 * itt_se, itt + 1.96 * itt_se],
-            "ATC": [itc, itc_se, p_val_itc, itc - 1.96 * itc_se, itc + 1.96 * itc_se],
-            "ATE": [ate, ate_se, p_val_ate, ate - 1.96 * ate_se, ate + 1.96 * ate_se],
-        }
+        pass
 
     @classmethod
     def _execute_inner_function(
         cls, grouping_data, target_fields: list[str] | None = None, **kwargs
     ) -> dict:
-        metric = kwargs.get("metric", "ate")
-        if target_fields is None or len(target_fields) != 2:
-            raise ValueError(
-                f"This operator works with 2 targets, but got {len(target_fields) if target_fields else None}"
-            )
-        return cls._inner_function(
-            data=grouping_data[0][1],
-            test_data=grouping_data[1][1],
-            target_fields=target_fields,
-            metric=metric,
-            bias=kwargs.get("bias_estimation", None),
-            scaled_counts=kwargs.get("scaled_counts"),
-        )
-
-    def _prepare_new_target(
-        self,
-        data: ExperimentData,
-        t_data: Dataset,
-        group_field: str,
-    ) -> Dataset:
-        new_target = data.ds.search_columns(TargetRole())[0]
-        indexes, matched_data = Bias.prepare_data(data, t_data)
-        matched_data = matched_data[new_target + "_matched"]
-        grouped_data = data.ds.groupby(group_field)
-        control_indexes = indexes.loc[grouped_data[0][1].index, :]
-        test_indexes = indexes.loc[grouped_data[1][1].index, :]
-        self._calc_scaled_counts(control_indexes, test_indexes, "test")
-        self._calc_scaled_counts(test_indexes, control_indexes, "control")
-
-        return matched_data
+        pass
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field, target_fields = self._get_fields(data=data)
-        bias = (
-            data.variables[data.get_one_id(Bias, ExperimentDataEnum.variables)]
-            if len(
-                data.get_ids(Bias, ExperimentDataEnum.variables)["Bias"]["variables"]
-            )
-            > 0
-            else None
-        )
-        t_data = deepcopy(data.ds)
-        if len(target_fields) != 2:
-            matched_data = self._prepare_new_target(data, t_data, group_field)
-            target_fields += [matched_data.search_columns(TargetRole())[0]]
-            data.set_value(
-                ExperimentDataEnum.additional_fields,
-                self.id,
-                matched_data,
-                role=AdditionalTargetRole(),
-            )
-            t_data = t_data.add_column(
-                matched_data.reindex(t_data.index),
-                role={target_fields[1]: TargetRole()},
-            )
+        """
+        Main execution method for calculating matching metrics.
+
+        Orchestrates the calculation process: retrieves fields, prepares targets 
+        if necessary (e.g., when a second target is missing), calculates the metrics 
+        using the `calc` method, and stores the results in the `ExperimentData` object.
+
+        Args:
+            data (ExperimentData): The experiment data containing the matched dataset.
+
+        Returns:
+            ExperimentData: The updated ExperimentData object with the calculated 
+            matching metrics stored in the `variables` space.
+        """
+        _, target_fields = self._get_fields(data=data)
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
         if (
-            not target_fields and data.ds.tmp_roles
+            not target_fields and data.initial_ds.tmp_roles
         ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
             return data
 
-        compare_result = self.calc(
-            data=t_data,
-            group_field=group_field,
-            target_fields=target_fields,
-            metric=self.metric,
-            bias_estimation=bias,
-            scaled_counts=self.__scaled_counts,
-        )
+        cls = backend_factory.resolve_backend(MatchingMetricsExtension, data.ds)
+        compare_result = cls(self.grouping_role, self.target_roles, self.metric, self.n_neighbors).calc(data.ds)
+
         return self._set_value(data, compare_result)
 
-
 class Bias(GroupOperator):
+    """
+    Calculator for estimating selection bias after matching.
+
+    This operator quantifies the residual bias between treatment and control
+    groups that remains after the matching procedure. It uses a linear
+    regression model (via ``LstsqExtension``) trained on the matched sample
+    to predict the counterfactual outcome, then computes the difference
+    between the observed and predicted values.
+
+    The bias is defined as:
+        - For treatment group:  bias_t = E[Y(0) | T=1] - E[Y(0) | T=0]
+        - For control group:    bias_c = E[Y(1) | T=1] - E[Y(1) | T=0]
+
+    where Y(0) and Y(1) are potential outcomes under control and treatment,
+    and T is the treatment assignment indicator.
+
+    The computation proceeds as follows:
+        1. For each group, fit a linear model: target ~ features
+           using the matched observations as the training signal.
+        2. Compute the matched (counterfactual) features by averaging
+           over the matched pairs for each observation.
+        3. Estimate bias as: (X - X_matched) · coefficients,
+           where X are the original features and X_matched are the
+           pair-averaged features.
+
+    The operator automatically handles cases where one group lacks
+    matched observations (e.g., one-sided matching) by computing bias
+    only for the group with available matched data.
+
+    Inherits from:
+        GroupOperator: The base class for group-based operators in the HypEx library.
+
+    Examples:
+        ```python
+            # Typically used internally by the Matching pipeline
+            from hypex.operators import Bias
+            from hypex.dataset import TreatmentRole, TargetRole
+
+            bias_calc = Bias(
+                grouping_role=TreatmentRole(),
+                target_roles=[TargetRole()],
+            )
+            result = bias_calc.execute(experiment_data)
+        ```
+    Args:
+        grouping_role (ABCRole | None, optional): The role defining the
+            treatment assignment column (e.g., ``TreatmentRole()``).
+            Defaults to None, which falls back to ``GroupingRole()``.
+        target_roles (list[ABCRole] | None, optional): The role(s) defining
+            the target outcome column(s) for which bias should be estimated.
+            Defaults to None, which falls back to ``TargetRole()``.
+        key (Any, optional): Optional identifier for the operator instance.
+            Defaults to "".
+
+    Attributes:
+        calc_bias (staticmethod): Core computation that applies the dot
+            product between feature differences and regression coefficients.
+        prepare_data (staticmethod): Helper that constructs the matched
+            dataset by exploding match indices and aggregating features.
+
+    See Also:
+        MatchingMetrics: The operator that uses the bias estimates to
+            compute bias-corrected treatment effects (ATT, ATC, ATE).
+        LstsqExtension: The backend-agnostic least-squares solver used
+            to fit the regression coefficients.
+    """
     def __init__(
         self,
         grouping_role: ABCRole | None = None,
         target_roles: list[ABCRole] | None = None,
         key: Any = "",
     ):
+        """
+        Initialize the Bias calculator.
+
+        Args:
+            grouping_role (ABCRole | None, optional): The role defining the
+                treatment assignment column. Defaults to None.
+            target_roles (list[ABCRole] | None, optional): The role(s) defining
+                the target outcome column(s). Defaults to None.
+            key (Any, optional): Optional identifier for the operator instance.
+                Defaults to "".
+        """
         super().__init__(
             grouping_role=grouping_role, target_roles=target_roles, key=key
         )
 
-    @staticmethod
-    def calc_coefficients(X: Dataset, Y: Dataset) -> list[float]:
-        X_l = Dataset.create_empty(roles={"temp": InfoRole()}, index=X.index).fillna(1)
-        X = X_l.append(X, axis=1).data.values
-        return np.linalg.lstsq(X, Y.data.values, rcond=-1)[0][1:]
+    def _set_value(
+            self, data: ExperimentData, value: Dataset, key=None
+    ) -> ExperimentData:
+        """
+        Store the calculated bias values into the ExperimentData object.
 
-    @staticmethod
-    def calc_bias(
-        X: Dataset, X_matched: Dataset, coefficients: list[float]
-    ) -> list[float]:
-        return [
-            (j - i).dot(coefficients)[0]
-            for i, j in zip(X.data.values, X_matched.data.values)
-        ]
+        This method saves the bias estimates as additional fields in the
+        ExperimentData, making them available for downstream operators
+        (e.g., MatchingMetrics) to apply bias correction.
+
+        Args:
+            data (ExperimentData): The experiment data object to update.
+            value (Dataset): The dataset containing bias estimates for
+                treatment and/or control groups.
+            key (Any, optional): Optional key for the stored value.
+                Defaults to None.
+
+        Returns:
+            ExperimentData: The updated experiment data with bias values
+                stored in the ``additional_fields`` space.
+        """
+        return data.set_value(
+            space=ExperimentDataEnum.additional_fields,
+            executor_id=self.id,
+            value=value,
+            role=value.roles,
+        )
 
     @classmethod
     def _inner_function(
@@ -301,50 +251,7 @@ class Bias(GroupOperator):
         features_fields: list[str] | None = None,
         **kwargs,
     ) -> dict:
-        if target_fields is None or features_fields is None or test_data is None:
-            raise NoneArgumentError(
-                ["target_fields", "features_fields", "test_data"], "bias_estimation"
-            )
-        if data[target_fields[1]].isna().sum() > 0:
-            return {
-                "test": cls.calc_bias(
-                    test_data[features_fields[: len(features_fields) // 2]],
-                    test_data[features_fields[len(features_fields) // 2 :]],
-                    cls.calc_coefficients(
-                        test_data[features_fields[len(features_fields) // 2 :]],
-                        test_data[target_fields[1]],
-                    ),
-                )
-            }
-        if test_data[target_fields[1]].isna().sum() > 0:
-            return {
-                "control": cls.calc_bias(
-                    data[features_fields[: len(features_fields) // 2]],
-                    data[features_fields[len(features_fields) // 2 :]],
-                    cls.calc_coefficients(
-                        data[features_fields[len(features_fields) // 2 :]],
-                        data[target_fields[1]],
-                    ),
-                )
-            }
-        return {
-            "test": cls.calc_bias(
-                test_data[features_fields[: len(features_fields) // 2]],
-                test_data[features_fields[len(features_fields) // 2 :]],
-                cls.calc_coefficients(
-                    test_data[features_fields[len(features_fields) // 2 :]],
-                    test_data[target_fields[1]],
-                ),
-            ),
-            "control": cls.calc_bias(
-                data[features_fields[: len(features_fields) // 2]],
-                data[features_fields[len(features_fields) // 2 :]],
-                cls.calc_coefficients(
-                    data[features_fields[len(features_fields) // 2 :]],
-                    data[target_fields[1]],
-                ),
-            ),
-        }
+        pass
 
     @classmethod
     def _execute_inner_function(
@@ -354,78 +261,55 @@ class Bias(GroupOperator):
         features_fields: list[str] | None = None,
         **kwargs,
     ) -> dict:
-        return cls._inner_function(
-            grouping_data[0][1],
-            test_data=grouping_data[1][1],
-            target_fields=target_fields,
-            features_fields=features_fields,
-            **kwargs,
-        )
-
-    @staticmethod
-    def prepare_data(data: ExperimentData, t_data: Dataset) -> Dataset:
-        indexes = data.field_search(AdditionalMatchingRole())
-        if len(indexes) == 0:
-            raise ValueError("No indexes were found")
-        indexes = data.additional_fields[indexes]
-        indexes.index = t_data.index
-        filtered_field = indexes.drop(
-            indexes[indexes[indexes.columns[0]] == -1], axis=0
-        )
-        matched_data = Dataset({})
-        matched_data.index = filtered_field.index
-        numeric_cols = t_data.search_columns(
-            [FeatureRole(), TargetRole()], search_types=[int, float]
-        )
-        for d_col in numeric_cols:
-            matched_data_col = Dataset({})
-            matched_data_col.index = filtered_field.index
-            for i, i_col in enumerate(indexes.columns):
-                index_matched_data = data.ds.loc[
-                    list(filtered_field[i_col].get_values(column=i_col))
-                ][d_col].rename(
-                    {d_col: d_col + f"_matched_{i}" for _ in data.ds.columns}
-                )
-                matched_data_col = matched_data_col.add_column(index_matched_data)
-            default_value = [t_data.roles[d_col].data_type(0)]
-            matched_data_col = matched_data_col.add_column(
-                default_value * matched_data_col.shape[0],
-                {d_col + "_matched": t_data.roles[d_col]},
-            )
-            for col in matched_data_col.columns:
-                if col != d_col + "_matched":
-                    matched_data_col[d_col + "_matched"] += matched_data_col[col]
-            matched_data = matched_data.add_column(
-                default_value * matched_data_col.shape[0],
-                {d_col + "_matched": t_data.roles[d_col]},
-            )
-            matched_data[d_col + "_matched"] = matched_data_col[d_col + "_matched"] / (
-                matched_data_col.shape[1] - 1
-            )
-
-        return indexes, matched_data
+        pass
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field, target_fields = self._get_fields(data)
-        t_data = deepcopy(data.ds)
-        if len(target_fields) < 2:
-            _, matched_data = self.prepare_data(data, t_data)
-            target_fields += [matched_data.search_columns(TargetRole())[0]]
-            t_data = t_data.append(matched_data.reindex(t_data.index), axis=1)
+        """
+        Execute the bias estimation on the given experiment data.
+
+        This method orchestrates the entire bias calculation process:
+            1. Retrieves grouping and target fields
+            2. Prepares matched data if necessary (when second target is missing)
+            3. Computes bias estimates for treatment and/or control groups
+            4. Stores the results in the ExperimentData object
+
+        The bias estimates are stored as additional fields with the role
+        ``AdditionalStatisticRole``, making them available for downstream
+        operators (e.g., ``MatchingMetrics``) to apply bias correction.
+
+        Args:
+            data (ExperimentData): The experiment data containing the matched
+                dataset and match indices.
+
+        Returns:
+            ExperimentData: The updated ExperimentData object with bias estimates
+                stored in the ``additional_fields`` space.
+
+        Examples:
+            ```python
+                bias_calc = Bias(
+                    grouping_role=TreatmentRole(),
+                    target_roles=[TargetRole()]
+                )
+                result_data = bias_calc.execute(experiment_data)
+                # Bias estimates are now in result_data.additional_fields
+            ```
+        """
+        _, target_fields = self._get_fields(data)
+
         self.key = str(
             target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
         if (
-            not target_fields and data.ds.tmp_roles
+            not target_fields and data.initial_ds.tmp_roles
         ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
             return data
+        cls = backend_factory.resolve_backend(BiasExtension, data.ds)
+        compare_result: Dataset = cls(self.grouping_role, self.target_roles).calc(data.ds)
+        compare_result.roles["bias"] = AdditionalStatisticRole()
+        compare_result.roles["matched_target"] = AdditionalTargetRole()
 
-        compare_result = self.calc(
-            data=t_data,
-            group_field=group_field,
-            target_fields=target_fields,
-            features_fields=t_data.search_columns(
-                FeatureRole(), search_types=[int, float]
-            ),
-        )
-        return self._set_value(data, compare_result)
+        output = self._set_value(data, compare_result)
+        if compare_result.is_persisted:
+            compare_result.unpersist()
+        return output

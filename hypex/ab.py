@@ -3,7 +3,15 @@ from __future__ import annotations
 from typing import Dict, List, Literal, Optional, Union
 
 from .analyzers.ab import ABAnalyzer
-from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest, UTest
+from .comparators import (
+    Chi2Test,
+    GroupDifference,
+    GroupSizes,
+    GroupTTest,
+    KSTest,
+    TTest,
+    UTest,
+)
 from .dataset import AdditionalTargetRole, TargetRole, TreatmentRole
 from .executor.executor import Executor
 from .experiments.base import Experiment, OnRoleExperiment
@@ -227,5 +235,5 @@ class ABTest(ExperimentShell):
         )
         if t_test_equal_var is not None:
             self.experiment.set_params(
-                {TTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
+                {GroupTTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
             )

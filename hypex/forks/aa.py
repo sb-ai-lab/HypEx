@@ -25,7 +25,7 @@ class IfAAExecutor(IfExecutor):
             score_table = data.analysis_tables[score_table_id]
             feature_pass = sum(
                 [
-                    score_table.loc[:, column].get_values()[0][0]
+                    score_table.select(column).iget_values(0, 0)
                     for column in score_table.columns
                     if "pass" in column
                 ]

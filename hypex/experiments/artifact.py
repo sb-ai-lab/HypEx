@@ -4,8 +4,10 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from ..dataset.ml_data import MLExperimentData
+if TYPE_CHECKING:
+    from ..experiments import MLExperiment
 
 
 class ExperimentArtifact:
@@ -16,7 +18,7 @@ class ExperimentArtifact:
     - Metadata (experiment.json)
     - Fitted ML executor states (ml_executors/)
     - Trained models (models/)
-    
+    ;
     MLExperiment delegates to this class instead of doing it itself.
     
     Directory structure:

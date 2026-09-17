@@ -4,7 +4,7 @@ import json
 import os
 import time
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import numpy as np
 from sklearn.model_selection import GroupKFold, KFold
@@ -12,7 +12,11 @@ from sklearn.model_selection import GroupKFold, KFold
 from ..dataset import Dataset
 from .backends.abstract import MLModelBackendBase
 from .backends.catboost_backend import CatBoostModelBackendBase
-from .backends.sklearn_backend import LassoBackend, LinearRegressionBackend, RidgeBackend
+from .backends.sklearn_backend import (
+    LassoBackend,
+    LinearRegressionBackend,
+    RidgeBackend,
+)
 from .stats import ModelStats
 
 
@@ -27,7 +31,7 @@ class MLModel:
     
     MLModel работает с Dataset, backend обрабатывает специфику данных.
     """
-    
+
     # Registry для создания моделей
     _MODEL_BACKENDS = {
         "linear": LinearRegressionBackend,
@@ -35,7 +39,7 @@ class MLModel:
         "lasso": LassoBackend,
         "catboost": CatBoostModelBackendBase,
     }
-    
+
     @classmethod
     def create(cls, model_type: str, **kwargs) -> MLModel:
         """
@@ -58,12 +62,12 @@ class MLModel:
                 f"Unknown model type: {model_type}. "
                 f"Available: {list(cls._MODEL_BACKENDS.keys())}"
             )
-        
+
         backend_class = cls._MODEL_BACKENDS[model_type]
         backend = backend_class(**kwargs)
-        
+
         return cls(backend, model_type, **kwargs)
-    
+
     def __init__(
         self, model_backend: MLModelBackendBase, model_type: str, **metadata
     ):
@@ -77,22 +81,22 @@ class MLModel:
         self.model_type = model_type
         self.metadata = metadata
         self.metadata["created_at"] = datetime.now().isoformat()
-    
+
     @property
     def backend(self) -> MLModelBackendBase:
         """Model backend (аналог Dataset.backend)"""
         return self._backend
-    
+
     @property
     def feature_names(self) -> List[str]:
         """Feature names used in training"""
         return self._backend.feature_names_ or []
-    
+
     @property
     def is_fitted(self) -> bool:
         """Whether model is fitted"""
         return self._backend.is_fitted
-    
+
     def fit(self, X: Dataset, y: Dataset) -> MLModel:
         """
         Fit model on Dataset.
@@ -108,7 +112,7 @@ class MLModel:
         """
         self._backend.fit(X, y)
         return self
-    
+
     def predict(self, X: Dataset) -> Dataset:
         """
         Predict on Dataset.
@@ -122,7 +126,7 @@ class MLModel:
             Predictions as Dataset
         """
         return self._backend.predict(X)
-    
+
     def get_feature_importances(self) -> Dict[str, float]:
         """
         Get feature importances as dict.
@@ -132,12 +136,12 @@ class MLModel:
         """
         importances = self._backend.get_feature_importances()
         return dict(zip(self.feature_names, importances))
-    
+
     def clone(self) -> MLModel:
         """Clone unfitted model"""
         new_backend = self._backend.clone()
         return MLModel(new_backend, self.model_type, **self.metadata)
-    
+
     def cross_validate(
         self,
         X: Dataset,
@@ -169,13 +173,13 @@ class MLModel:
         # This is an exception - the rest of the code uses Dataset API.
         X_data = X.backend.data
         y_data = y.backend.data
-        
+
         # Convert to numpy for splitting
         if hasattr(X_data, "values"):
             X_np = X_data.values
         else:
             X_np = np.array(X_data)
-        
+
         if hasattr(y_data, "values"):
             y_np = (
                 y_data.values.ravel()
@@ -184,7 +188,7 @@ class MLModel:
             )
         else:
             y_np = np.array(y_data).ravel()
-        
+
         if groups is not None:
             groups_np = np.asarray(groups)
             if groups_np.shape[0] != X_np.shape[0] or groups_np.shape[0] != y_np.shape[0]:
@@ -199,54 +203,54 @@ class MLModel:
         else:
             kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
             split_iterator = kf.split(X_np)
-        
+
         fold_scores = []
         fold_importances = []
-        
+
         start_time = time.time()
-        
+
         for fold_idx, (train_idx, val_idx) in enumerate(split_iterator):
             # Create fold datasets
             X_train_fold = X.iloc[train_idx]
             X_val_fold = X.iloc[val_idx]
             y_train_fold = y.iloc[train_idx]
             y_val_fold = y.iloc[val_idx]
-            
+
             # Clone and fit model
             fold_model = self.clone()
             fold_model.fit(X_train_fold, y_train_fold)
-            
+
             # Predict (returns Dataset)
             y_pred_ds = fold_model.predict(X_val_fold)
             y_pred = np.array(y_pred_ds.get_values(column="prediction"))
-            
+
             # Calculate score
             if metric_func is None:
                 # Default: variance reduction for CUPAC
                 y_val_col = y_val_fold.columns[0]
                 y_val_np = np.array(y_val_fold.get_values(column=y_val_col))
-                
+
                 # mean() returns float for single column Dataset
                 y_train_mean = float(y_train_fold.mean())
-                
+
                 y_adjusted = y_val_np - y_pred + y_train_mean
                 score = self._calculate_variance_reduction(y_val_np, y_adjusted)
             else:
                 y_val_col = y_val_fold.columns[0]
                 y_val_np = np.array(y_val_fold.get_values(column=y_val_col))
                 score = metric_func(y_val_np, y_pred)
-            
+
             fold_scores.append(score)
             fold_importances.append(fold_model.get_feature_importances())
-        
+
         training_time = time.time() - start_time
-        
+
         # Aggregate results
         aggregated_importances = self._aggregate_importances(
             fold_importances, aggregation
         )
         aggregated_score = self._aggregate_scores(fold_scores, aggregation)
-        
+
         # Create ModelStats
         return ModelStats(
             model_name=self.model_type,
@@ -258,7 +262,7 @@ class MLModel:
             training_time_seconds=training_time,
             aggregation_method=aggregation,
         )
-    
+
     @staticmethod
     def _calculate_variance_reduction(
         y_original: np.ndarray, y_adjusted: np.ndarray
@@ -269,7 +273,7 @@ class MLModel:
         if var_orig < 1e-10:
             return 0.0
         return float(max(0, (1 - var_adj / var_orig) * 100))
-    
+
     @staticmethod
     def _aggregate_importances(
         fold_importances: List[Dict[str, float]], method: str
@@ -277,9 +281,9 @@ class MLModel:
         """Aggregate feature importances across folds"""
         if not fold_importances:
             return {}
-        
+
         features = fold_importances[0].keys()
-        
+
         if method == "mean":
             agg_func = np.mean
         elif method == "median":
@@ -288,12 +292,12 @@ class MLModel:
             agg_func = np.max
         else:
             raise ValueError(f"Unknown aggregation method: {method}")
-        
+
         return {
             feature: float(agg_func([fold[feature] for fold in fold_importances]))
             for feature in features
         }
-    
+
     @staticmethod
     def _aggregate_scores(scores: List[float], method: str) -> float:
         """Aggregate CV scores"""
@@ -305,7 +309,7 @@ class MLModel:
             return float(np.max(scores))
         else:
             raise ValueError(f"Unknown aggregation method: {method}")
-    
+
     def save(self, directory: str) -> Dict[str, str]:
         """
         Save model and metadata to directory.
@@ -314,16 +318,16 @@ class MLModel:
             Dict with saved file paths
         """
         os.makedirs(directory, exist_ok=True)
-        
+
         # Save backend model file
         if self.model_type == "catboost":
             model_filename = "catboost_model.cbm"
         else:
             model_filename = "sklearn_model.pkl"
-        
+
         model_path = os.path.join(directory, model_filename)
         self._backend.save_model_file(model_path)
-        
+
         # Save metadata
         metadata = {
             "model_type": self.model_type,
@@ -331,28 +335,28 @@ class MLModel:
             "model_filename": model_filename,
             "metadata": self.metadata,
         }
-        
+
         meta_path = os.path.join(directory, "model_metadata.json")
         with open(meta_path, "w") as f:
             json.dump(metadata, f, indent=2)
-        
+
         return {"model": model_path, "metadata": meta_path}
-    
+
     @classmethod
     def load(cls, directory: str) -> MLModel:
         """Load model from directory"""
         # Load metadata
         meta_path = os.path.join(directory, "model_metadata.json")
-        with open(meta_path, "r") as f:
+        with open(meta_path) as f:
             metadata = json.load(f)
-        
+
         model_type = metadata["model_type"]
         backend_data = metadata["backend_data"]
         model_filename = metadata["model_filename"]
-        
+
         # Load backend
         backend_class = cls._MODEL_BACKENDS[model_type]
         model_path = os.path.join(directory, model_filename)
         backend = backend_class.load_model_file(model_path, backend_data)
-        
+
         return cls(backend, model_type, **metadata["metadata"])

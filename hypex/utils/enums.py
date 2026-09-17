@@ -13,6 +13,7 @@ class ExperimentDataEnum(enum.Enum):
 @enum.unique
 class BackendsEnum(enum.Enum):
     pandas = "pandas"
+    spark = "spark"
 
 
 @enum.unique

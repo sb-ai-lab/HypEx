@@ -3,7 +3,9 @@ This module defines data structures and roles used across the library for managi
 """
 
 from .abstract import DatasetBase
-from .dataset import Dataset, DatasetAdapter, ExperimentData
+from .dataset import Dataset, DatasetAdapter, SmallDataset
+from .experiment_data import ExperimentData
+from .groupby_dataset import GroupedDataset
 from .ml_data import MLData, MLExperimentData
 from .roles import (
     ABCRole,
@@ -11,15 +13,19 @@ from .roles import (
     AdditionalGroupingRole,
     AdditionalMatchingRole,
     AdditionalPreTargetRole,
+    AdditionalStatisticRole,
     AdditionalTargetRole,
     AdditionalTreatmentRole,
     ConstGroupRole,
     DefaultRole,
+    DisabledRole,
     FeatureRole,
     FilterRole,
     GroupingRole,
+    IndexRole,
     InfoRole,
     PreTargetRole,
+    ReportRole,
     StatisticRole,
     StratificationRole,
     TargetRole,
@@ -37,6 +43,7 @@ __all__ = [
     "AdditionalGroupingRole",
     "AdditionalMatchingRole",
     "AdditionalPreTargetRole",
+    "AdditionalStatisticRole",
     "AdditionalTargetRole",
     "AdditionalTreatmentRole",
     "ConstGroupRole",
@@ -44,14 +51,19 @@ __all__ = [
     "DatasetAdapter",
     "DatasetBase",
     "DefaultRole",
+    "DisabledRole",
     "ExperimentData",
     "FeatureRole",
     "FilterRole",
+    "GroupedDataset",
     "GroupingRole",
+    "IndexRole",
     "InfoRole",
     "MLData",
     "MLExperimentData",
     "PreTargetRole",
+    "ReportRole",
+    "SmallDataset",
     "StatisticRole",
     "StratificationRole",
     "TargetRole",
@@ -61,4 +73,5 @@ __all__ = [
     "TempTreatmentRole",
     "TreatmentRole",
     "default_roles",
+    "indexRole",
 ]

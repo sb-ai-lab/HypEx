@@ -1,4 +1,5 @@
-from ..dataset.dataset import DatasetAdapter, ExperimentData
+from ..dataset.dataset import DatasetAdapter
+from ..dataset.experiment_data import ExperimentData
 from ..dataset.roles import StatisticRole
 from ..executor.executor import Executor
 from ..operators.operators import MatchingMetrics
@@ -20,6 +21,6 @@ class MatchingAnalyzer(Executor):
             data,
             DatasetAdapter.to_dataset(
                 variables,
-                {field: StatisticRole() for field in list(variables.keys())},
-            ).transpose(roles={column: StatisticRole() for column in columns}),
+                {field: StatisticRole(float) for field in list(variables.keys())},
+            ).transpose(roles={column: StatisticRole(float) for column in columns}),
         )

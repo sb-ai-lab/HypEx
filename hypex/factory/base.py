@@ -1,7 +1,7 @@
 # import sys
 #
 # from ..analyzers import ABAnalyzer, OneAAStatAnalyzer
-# from ..comparators import GroupDifference, GroupSizes, ATE, TTest, KSTest, UTest
+# from ..comparators import GroupDifference, GroupSizes, ATE, GroupTTest, GroupKSTest, GroupUTest
 # from ..dataset import (
 #     ExperimentData,
 #     Arg1Role,
@@ -34,9 +34,9 @@
 #     GroupDifference,
 #     GroupSizes,
 #     ATE,
-#     TTest,
-#     KSTest,
-#     UTest,
+#     GroupTTest,
+#     GroupKSTest,
+#     GroupUTest,
 #     Arg1Role,
 #     Arg2Role,
 #     InfoRole,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 
 class Adapter:
@@ -10,6 +11,10 @@ class Adapter:
             return []
         if isinstance(data, str):
             return [data]
+        if hasattr(data, 'to_list'):
+            return data.to_list()
+        if hasattr(data, 'to_array'):
+            return data.to_array()
         return list(data) if isinstance(data, Sequence) else [data]
 
     @staticmethod
