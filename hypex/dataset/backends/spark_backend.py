@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import warnings
-import os
 import copy
-from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Sequence, Sized
+import os
+import warnings
 from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, Callable, ClassVar, Iterable, Literal, Sequence, Sized
 
 try:
     from typing import Self  # Python >= 3.11
@@ -13,23 +13,21 @@ except ImportError:
     from typing_extensions import Self  # Python < 3.11
 
 import numpy as np
-import pandas as pd
+import pandas as pd  # pyright: ignore[reportMissingImports]
+import pyspark.pandas as ps  # pyright: ignore[reportMissingImports]
+import pyspark.sql.functions as F  # pyright: ignore[reportMissingImports]
+from pyspark.pandas.exceptions import (
+    PandasNotImplementedError,  # pyright: ignore[reportMissingImports]
+)
+from pyspark.sql import DataFrame as SparkDF  # pyright: ignore[reportMissingImports]
+from pyspark.sql import SparkSession  # pyright: ignore[reportMissingImports]
+from pyspark.sql.types import StructType  # pyright: ignore[reportMissingImports]
+from pyspark.storagelevel import StorageLevel  # pyright: ignore[reportMissingImports]
 
-from pyspark.storagelevel import StorageLevel
-from pyspark.sql import SparkSession
-from pyspark.sql import DataFrame as SparkDF
-import pyspark.sql.functions as F
-from pyspark.sql.types import StructType
-
-
-import pyspark.pandas as ps
-
-from pyspark.pandas.exceptions import PandasNotImplementedError
-
-
-from ...utils import FromDictTypes, MergeOnError, ScalarType, SparkTypeMapper
 from ...config import DatasetConfig
+from ...utils import FromDictTypes, MergeOnError, ScalarType, SparkTypeMapper
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
+
 
 class SparkNavigation(DatasetBackendNavigation):
     """Navigation interface for PySpark-backed datasets.
@@ -48,6 +46,13 @@ class SparkNavigation(DatasetBackendNavigation):
     _SPARK_WARN_SUPPRESED: bool = False
 
     PANDAS_CONVERSION_LIMIT: int = 100_000
+    
+    _SPARK_TYPE_MAP: ClassVar[dict[str, str]] = {
+        "float32": "float",
+        "float64": "double",
+        "int32": "int",
+        "int64": "long",
+    }
 
     @staticmethod
     @contextmanager
@@ -941,7 +946,11 @@ class SparkNavigation(DatasetBackendNavigation):
         Returns:
             SparkNavigation: New instance with casted column types.
         """
-        return self._wrap_result(self.data.astype(dtype=dtype))
+        normalized = {}
+        for col, t in dtype.items():
+            t_str = getattr(t, "__name__", str(t))
+            normalized[col] = self._SPARK_TYPE_MAP.get(t_str, t)
+        return self._wrap_result(self.data.astype(dtype=normalized))
 
 
     def update_column_type(
