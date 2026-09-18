@@ -11,6 +11,10 @@ class Adapter:
             return []
         if isinstance(data, str):
             return [data]
+        if hasattr(data, 'to_list'):
+            return data.to_list()
+        if hasattr(data, 'to_array'):
+            return data.to_array()
         return list(data) if isinstance(data, Sequence) else [data]
 
     @staticmethod

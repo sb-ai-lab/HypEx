@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from collections.abc import Sequence
 from typing import Any
 
-from ..dataset.dataset import Dataset, ExperimentData
+from ..dataset.dataset import Dataset
+from ..dataset.experiment_data import ExperimentData
 from ..dataset.roles import ABCRole, FeatureRole
 from .abstract import Transformer
 
@@ -13,11 +15,13 @@ class TypeCaster(Transformer):
         self,
         dtype: dict[str, type] | dict[type, type],
         roles: ABCRole | Sequence[ABCRole] | None = None,
+        downcasting: bool=True,
         key: Any = "",
     ):
         super().__init__(key=key)
         self.dtype = dtype
         self.roles = roles or FeatureRole()
+        self.downcasting = downcasting
 
     @staticmethod
     def _inner_function(
@@ -25,6 +29,16 @@ class TypeCaster(Transformer):
         dtype: dict[str, type],
     ) -> Dataset:
         return data.astype(dtype=dtype)
+
+    @staticmethod
+    def _downcast(
+        data: Dataset,
+    ) -> Dataset:
+        double_cols = [
+            col for col, c_type in data.roles.items()
+            if c_type.data_type is Decimal or c_type.data_type is float
+        ]
+        return data.astype({col: float for col in double_cols})
 
     @classmethod
     def calc(
@@ -34,6 +48,10 @@ class TypeCaster(Transformer):
         roles: ABCRole | Sequence[ABCRole] | None = None,
         **kwargs,
     ):
+        downcasting = kwargs.pop("downcasting", True)
+        if downcasting:
+            data = TypeCaster._downcast(data=data)
+
         cast_mapping = {}
         for k, v in dtype.items():
             if isinstance(k, str):
@@ -52,6 +70,7 @@ class TypeCaster(Transformer):
                 data=data.ds,
                 dtype=self.dtype,
                 roles=self.roles,
+                downcasting=self.downcasting,
             )
         )
         return result

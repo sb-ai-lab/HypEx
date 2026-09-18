@@ -1,12 +1,22 @@
 from __future__ import annotations
 
+try:
+    from typing import Self  # Python >= 3.11
+except ImportError:
+    from typing_extensions import Self  # Python < 3.11
+
+import warnings
+
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Literal, Sequence, Sized, Union, Optional, List, Self
+from typing import Any, Callable, Iterable, Literal, Sequence, Sized, TYPE_CHECKING
+import copy
 
 import numpy as np
 import pandas as pd  # type: ignore
 import pyspark.sql as spark
 import pyspark.sql.functions as F
+
+import pyspark.pandas as ps
 
 from pyspark.ml.feature import StringIndexer
 
@@ -17,22 +27,23 @@ from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
 class PandasNavigation(DatasetBackendNavigation):
-    
-    def _wrap_result(self, 
-                     result: pd.DataFrame | pd.Series | Any,
-                     wrap_series: bool = False) -> Self | pd.Series | Any:
+    def _wrap_result(
+        self, result: pd.DataFrame | pd.Series | Any, wrap_series: bool = False
+    ) -> Self | pd.Series | Any:
         if isinstance(result, pd.DataFrame):
             return self.__class__(data=result)
-        
+
         if wrap_series and isinstance(result, pd.Series):
             return self.__class__(data=result.to_frame())
-        
+
         return result
 
-    def _data_compression(self,
-                          data: spark.DataFrame,
-                          data_compression: Literal["downcasting", "encoding", "auto", "disable"],
-                          non_compresion_cols: List[str] | None) -> pd.DataFrame:
+    def _data_compression(
+        self,
+        data: spark.DataFrame,
+        data_compression: Literal["downcasting", "encoding", "auto", "disable"],
+        non_compresion_cols: list[str] | None,
+    ) -> pd.DataFrame:
         """Compress data before convertation `spark.DataFrame` to pandas.DataFrame.
 
         Args:
@@ -48,22 +59,30 @@ class PandasNavigation(DatasetBackendNavigation):
         result = data
 
         if data_compression in ["downcasting", "auto"]:
-            double_columns = [col for col, c_type in columns_dict.items()
-                          if c_type == 'double' or c_type.startswith('decimal')]
+            double_columns = [
+                col
+                for col, c_type in columns_dict.items()
+                if c_type == "double" or c_type.startswith("decimal")
+            ]
             result = self._downcasting(data, double_columns)
 
         if data_compression in ["encoding", "auto"]:
             if non_compresion_cols is None:
                 non_compresion_cols = []
-            categorical_columns = [col for col, c_type in columns_dict.items()
-                               if c_type in ['string', 'varchar'] and col not in non_compresion_cols]
+            categorical_columns = [
+                col
+                for col, c_type in columns_dict.items()
+                if c_type in ["string", "varchar"] and col not in non_compresion_cols
+            ]
             result, labels = self._encoding(result, categorical_columns)
 
         self._labels_dict = labels
         return result.toPandas()
 
     @staticmethod
-    def _encoding(data: spark.DataFrame, categorical_columns: List[str]) -> spark.DataFrame:
+    def _encoding(
+        data: spark.DataFrame, categorical_columns: list[str]
+    ) -> spark.DataFrame:
         """Encoding categorical features.
 
         Args:
@@ -74,24 +93,37 @@ class PandasNavigation(DatasetBackendNavigation):
             `spark.DataFrame`: dataframe with encoded categorical columns.
         """
         filled_data = data.na.fill("UNKNOWN")
-        indexer = StringIndexer(inputCols=categorical_columns,
-                                outputCols=[f"{col}_indexed" for col in categorical_columns],
-                                handleInvalid="keep")
+        indexer = StringIndexer(
+            inputCols=categorical_columns,
+            outputCols=[f"{col}_indexed" for col in categorical_columns],
+            handleInvalid="keep",
+        )
         model = indexer.fit(filled_data)
-        labels = {col : {idx : label for idx, label in  enumerate(labels_list)}
-                  for labels_list, col in zip(model.labelsArray, categorical_columns)}
+        labels = {
+            col: {idx: label for idx, label in enumerate(labels_list)}
+            for labels_list, col in zip(model.labelsArray, categorical_columns)
+        }
 
-        return ((
-                    model
-                    .transform(filled_data)
-                    .select(*[
-                        F.col(f"{col}_indexed").cast("int").alias(col) if col in categorical_columns else
-                        F.col(col) for col in filled_data.columns
-                    ])
-                ), labels)
+        return (
+            (
+                model.transform(filled_data).select(
+                    *[
+                        (
+                            F.col(f"{col}_indexed").cast("int").alias(col)
+                            if col in categorical_columns
+                            else F.col(col)
+                        )
+                        for col in filled_data.columns
+                    ]
+                )
+            ),
+            labels,
+        )
 
     @staticmethod
-    def _downcasting(data: spark.DataFrame, numeric_columns: List[str]) -> spark.DataFrame:
+    def _downcasting(
+        data: spark.DataFrame, numeric_columns: list[str]
+    ) -> spark.DataFrame:
         """Downcasting data.
 
         Args:
@@ -101,12 +133,11 @@ class PandasNavigation(DatasetBackendNavigation):
         Returns:
             `spark.DataFrame`: downcasted dataframe.
         """
-        return (
-            data
-            .select(*[
-                F.col(col).cast("float") if col in numeric_columns else
-                F.col(col) for col in data.columns
-            ])
+        return data.select(
+            *[
+                F.col(col).cast("float") if col in numeric_columns else F.col(col)
+                for col in data.columns
+            ]
         )
 
     @staticmethod
@@ -130,10 +161,14 @@ class PandasNavigation(DatasetBackendNavigation):
         else:
             raise ValueError(f"Unsupported file extension {file_extension}")
 
-    def __init__(self,
-                 data: pd.DataFrame | dict | str | pd.Series | None = None,
-                 data_compression: Literal["downcasting", "encoding", "auto", "disable"] = "auto",
-                 non_compresion_cols: List[str] | None = None):
+    def __init__(
+        self,
+        data: pd.DataFrame | dict | str | pd.Series | None = None,
+        data_compression: Literal[
+            "downcasting", "encoding", "auto", "disable"
+        ] = "auto",
+        non_compresion_cols: list[str] | None = None,
+    ):
         """Initialize PandasNavigation with various data sources.
 
         Args:
@@ -153,14 +188,24 @@ class PandasNavigation(DatasetBackendNavigation):
         elif isinstance(data, pd.Series):
             self.data = pd.DataFrame(data)
         elif isinstance(data, spark.DataFrame):
-            self.data = self._data_compression(data, data_compression, non_compresion_cols)
+            self.data = self._data_compression(
+                data, data_compression, non_compresion_cols
+            )
+        elif isinstance(data, ps.DataFrame):
+            self.data = data.to_pandas()
         elif isinstance(data, dict):
+            wrapped = {
+                k: v if isinstance(v, (list, np.ndarray, tuple)) else [v]
+                for k, v in data["data"].items()
+            }
             if "index" in data.keys():
-                self.data = pd.DataFrame(data=data["data"], index=data["index"])
+                self.data = pd.DataFrame(data=wrapped, index=data["index"])
             else:
-                self.data = pd.DataFrame(data=data["data"])
+                self.data = pd.DataFrame(data=wrapped)
         elif isinstance(data, str):
             self.data = self._read_file(data)
+        elif isinstance(data, list):
+            self.data = pd.DataFrame(data) if data else pd.DataFrame()
         else:
             self.data = pd.DataFrame()
 
@@ -183,7 +228,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         if isinstance(item, (slice, int)):
             return self.data.iloc[item]
-        if isinstance(item, (str, list)):
+        if isinstance(item, (str, list, pd.Index)):
             return self.data[item]
         if isinstance(item, pd.DataFrame):
             if len(item.columns) == 1:
@@ -219,7 +264,7 @@ class PandasNavigation(DatasetBackendNavigation):
             return other
 
     # comparison operators:
-    def __eq__(self, other) -> Any:
+    def __eq__(self, other) -> Self:
         """Element-wise equality comparison (==).
 
         Args:
@@ -230,7 +275,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data == self.__magic_determine_other(other))
 
-    def __ne__(self, other) -> Any:
+    def __ne__(self, other) -> Self:
         """Element-wise inequality comparison (!=).
 
         Args:
@@ -241,7 +286,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data != self.__magic_determine_other(other))
 
-    def __le__(self, other) -> Any:
+    def __le__(self, other) -> Self:
         """Element-wise less-than-or-equal comparison (<=).
 
         Args:
@@ -252,7 +297,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data <= self.__magic_determine_other(other))
 
-    def __lt__(self, other) -> Any:
+    def __lt__(self, other) -> Self:
         """Element-wise less-than comparison (<).
 
         Args:
@@ -263,7 +308,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data < self.__magic_determine_other(other))
 
-    def __ge__(self, other) -> Any:
+    def __ge__(self, other) -> Self:
         """Element-wise greater-than-or-equal comparison (>=).
 
         Args:
@@ -274,7 +319,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data >= self.__magic_determine_other(other))
 
-    def __gt__(self, other) -> Any:
+    def __gt__(self, other) -> Self:
         """Element-wise greater-than comparison (>).
 
         Args:
@@ -286,7 +331,7 @@ class PandasNavigation(DatasetBackendNavigation):
         return self._wrap_result(self.data > self.__magic_determine_other(other))
 
     # Unary operations:
-    def __pos__(self) -> Any:
+    def __pos__(self) -> Self:
         """Unary positive operation (+self).
 
         Returns:
@@ -294,7 +339,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(+self.data)
 
-    def __neg__(self) -> Any:
+    def __neg__(self) -> Self:
         """Unary negation operation (-self).
 
         Returns:
@@ -302,7 +347,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(-self.data)
 
-    def __abs__(self) -> Any:
+    def __abs__(self) -> Self:
         """Absolute value operation (abs(self)).
 
         Returns:
@@ -310,7 +355,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(abs(self.data))
 
-    def __invert__(self) -> Any:
+    def __invert__(self) -> Self:
         """Bitwise inversion operation (~self).
 
         Returns:
@@ -318,7 +363,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(~self.data)
 
-    def __round__(self, ndigits: int = 0) -> Any:
+    def __round__(self, ndigits: int = 0) -> Self:
         """Round numeric values to specified decimal places.
 
         Args:
@@ -330,7 +375,7 @@ class PandasNavigation(DatasetBackendNavigation):
         return self._wrap_result(round(self.data, ndigits))
 
     # Binary operations:
-    def __add__(self, other) -> Any:
+    def __add__(self, other) -> Self:
         """Element-wise addition (self + other).
 
         Args:
@@ -341,7 +386,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data + self.__magic_determine_other(other))
 
-    def __sub__(self, other) -> Any:
+    def __sub__(self, other) -> Self:
         """Element-wise subtraction (self - other).
 
         Args:
@@ -352,7 +397,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data - self.__magic_determine_other(other))
 
-    def __mul__(self, other) -> Any:
+    def __mul__(self, other) -> Self:
         """Element-wise multiplication (self * other).
 
         Args:
@@ -363,7 +408,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data * self.__magic_determine_other(other))
 
-    def __floordiv__(self, other) -> Any:
+    def __floordiv__(self, other) -> Self:
         """Element-wise floor division (self // other).
 
         Args:
@@ -374,7 +419,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data // self.__magic_determine_other(other))
 
-    def __div__(self, other) -> Any:
+    def __div__(self, other) -> Self:
         """Element-wise division (self / other) - Python 2 compatibility.
 
         Args:
@@ -385,7 +430,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data / self.__magic_determine_other(other))
 
-    def __truediv__(self, other) -> Any:
+    def __truediv__(self, other) -> Self:
         """Element-wise true division (self / other).
 
         Args:
@@ -396,7 +441,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data / self.__magic_determine_other(other))
 
-    def __mod__(self, other) -> Any:
+    def __mod__(self, other) -> Self:
         """Element-wise modulo operation (self % other).
 
         Args:
@@ -407,7 +452,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data % self.__magic_determine_other(other))
 
-    def __pow__(self, other) -> Any:
+    def __pow__(self, other) -> Self:
         """Element-wise exponentiation (self ** other).
 
         Args:
@@ -418,7 +463,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data ** self.__magic_determine_other(other))
 
-    def __and__(self, other) -> Any:
+    def __and__(self, other) -> Self:
         """Element-wise bitwise AND operation (self & other).
 
         Args:
@@ -429,7 +474,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data & self.__magic_determine_other(other))
 
-    def __or__(self, other) -> Any:
+    def __or__(self, other) -> Self:
         """Element-wise bitwise OR operation (self | other).
 
         Args:
@@ -441,7 +486,7 @@ class PandasNavigation(DatasetBackendNavigation):
         return self._wrap_result(self.data | self.__magic_determine_other(other))
 
     # Right arithmetic operators:
-    def __radd__(self, other) -> Any:
+    def __radd__(self, other) -> Self:
         """Reflected addition (other + self).
 
         Args:
@@ -452,7 +497,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.__magic_determine_other(other) + self.data)
 
-    def __rsub__(self, other) -> Any:
+    def __rsub__(self, other) -> Self:
         """Reflected subtraction (other - self).
 
         Args:
@@ -463,7 +508,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.__magic_determine_other(other) - self.data)
 
-    def __rmul__(self, other) -> Any:
+    def __rmul__(self, other) -> Self:
         """Reflected multiplication (other * self).
 
         Args:
@@ -474,7 +519,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.__magic_determine_other(other) * self.data)
 
-    def __rfloordiv__(self, other) -> Any:
+    def __rfloordiv__(self, other) -> Self:
         """Reflected floor division (other // self).
 
         Args:
@@ -485,7 +530,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.__magic_determine_other(other) // self.data)
 
-    def __rdiv__(self, other) -> Any:
+    def __rdiv__(self, other) -> Self:
         """Reflected division (other / self) - Python 2 compatibility.
 
         Args:
@@ -496,7 +541,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.__magic_determine_other(other) / self.data)
 
-    def __rtruediv__(self, other) -> Any:
+    def __rtruediv__(self, other) -> Self:
         """Reflected true division (other / self).
 
         Args:
@@ -507,7 +552,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.__magic_determine_other(other) / self.data)
 
-    def __rmod__(self, other) -> Any:
+    def __rmod__(self, other) -> Self:
         """Reflected modulo (other % self).
 
         Args:
@@ -518,7 +563,7 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.__magic_determine_other(other) % self.data)
 
-    def __rpow__(self, other) -> Any:
+    def __rpow__(self, other) -> Self:
         """Reflected exponentiation (other ** self).
 
         Args:
@@ -528,6 +573,16 @@ class PandasNavigation(DatasetBackendNavigation):
             pd.DataFrame: Result of exponentiation.
         """
         return self._wrap_result(self.__magic_determine_other(other) ** self.data)
+
+    def __deepcopy__(self, memo):
+        """deepcopy backend data"""
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            setattr(result, k, copy.deepcopy(v, memo))
+
+        return result
 
     def __repr__(self):
         """Return string representation of the underlying DataFrame.
@@ -545,12 +600,13 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         return self._wrap_result(self.data._repr_html_())
 
-    def _display_head_tail(self,
-                           rows_display_limit: int,
-                           cols_display_limit: int,
-                           n_cols: int,
-                           n_rows: int,
-                           tail: bool=False
+    def _display_head_tail(
+        self,
+        rows_display_limit: int,
+        cols_display_limit: int,
+        n_cols: int,
+        n_rows: int,
+        tail: bool = False,
     ) -> pd.DataFrame:
         """Returns n head rows or n tail rows
         Args:
@@ -565,30 +621,36 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         if tail:
             head_tail = self.data.tail(rows_display_limit)
-            head_tail.index = [(n_rows - rows_display_limit + i) for i in range(rows_display_limit)]
+            head_tail.index = [
+                (n_rows - rows_display_limit + i) for i in range(rows_display_limit)
+            ]
         else:
             head_tail = self.data.head(rows_display_limit)
 
         if n_cols > 2 * cols_display_limit:
-            left_cols = self.columns[: cols_display_limit]
+            left_cols = self.columns[:cols_display_limit]
             right_cols = self.columns[-cols_display_limit:]
             tmp = pd.DataFrame(
                 [["..."] for _ in range(len(head_tail))],
                 index=head_tail.index,
-                columns=["..."]
+                columns=["..."],
             )
 
-            return self._wrap_result(pd.concat([head_tail.loc[:, left_cols],
-                                     tmp,
-                                     head_tail.loc[:, right_cols]],
-                                     axis=1).replace(self.labels_dict))
+            # return self._wrap_result(pd.concat([head_tail.loc[:, left_cols],
+            #                          tmp,
+            #                          head_tail.loc[:, right_cols]],
+            #                          axis=1).replace(self.labels_dict))
+            return pd.concat(
+                [head_tail.loc[:, left_cols], tmp, head_tail.loc[:, right_cols]], axis=1
+            ).replace(self.labels_dict)
         else:
-            return self._wrap_result(head_tail.replace(self.labels_dict))
+            # return self._wrap_result(head_tail.replace(self.labels_dict))
+            return head_tail.replace(self.labels_dict)
 
     def get_values(
-            self,
-            row: str | None = None,
-            column: str | None = None,
+        self,
+        row: str | None = None,
+        column: str | None = None,
     ) -> Any:
         """Get values by label-based indexing.
 
@@ -611,9 +673,9 @@ class PandasNavigation(DatasetBackendNavigation):
         return self._wrap_result(result.values.tolist())
 
     def iget_values(
-            self,
-            row: int | None = None,
-            column: int | None = None,
+        self,
+        row: int | None = None,
+        column: int | None = None,
     ) -> Any:
         """Get values by integer-position-based indexing.
 
@@ -636,10 +698,8 @@ class PandasNavigation(DatasetBackendNavigation):
         return self._wrap_result(result.values.tolist())
 
     def create_empty(
-            self,
-            index: Iterable | None = None,
-            columns: Iterable[str] | None = None,
-    ):
+        self, index: Iterable | None = None, columns: Iterable[str] | None = None
+    ) -> Self:
         """Replace current data with an empty DataFrame with specified structure.
 
         Args:
@@ -660,6 +720,49 @@ class PandasNavigation(DatasetBackendNavigation):
             pd.Index: DataFrame index.
         """
         return self.data.index
+    
+    @index.setter
+    def index(self, value):
+        """Set the index of the underlying DataFrame."""
+        self.data.index = value
+
+    def reset_index(self, 
+                    drop: bool = False,
+                    inplace: bool = False,
+                    **kwargs):
+        """Reset the index to default integer index.
+        
+        Args:
+            drop (bool): If True, drop the current index instead of adding as column.
+            inplace (bool): Ignored; always returns new instance for consistency.
+            **kwargs: Additional arguments passed to underlying reset_index.
+            
+        Returns:
+            New instance with reset index
+        """
+
+        return self._wrap_result(self.data.reset_index(drop=drop, **kwargs))
+
+    def set_index(self,
+                  keys,
+                  drop,
+                  **kwargs):
+        """
+        Set the DataFrame index (row labels) using one or more existing columns.
+
+        Args:
+            keys: label or array-like or list of labels/arrays
+
+            drop: `bool`, default True
+                Delete columns to be used as the new index.
+        """
+        if 'append' not in kwargs:
+            kwargs['append'] = False
+
+        if 'inplace' not in kwargs:
+            kwargs['inplace'] = False
+
+        return self._wrap_result(self.data.set_index(keys=keys, drop=drop, **kwargs))
 
     @property
     def columns(self):
@@ -692,8 +795,14 @@ class PandasNavigation(DatasetBackendNavigation):
     def labels_dict(self):
         return self._labels_dict
 
+    def limit(self, num: int | None = None) -> Any:
+        if not num:
+            return self.data
+        else:
+            return self.data.iloc[:num]
+
     def _get_column_index(
-            self, column_name: Sequence[str] | str
+        self, column_name: Sequence[str] | str
     ) -> int | Sequence[int]:
         """Get integer position(s) of column(s) by name(s).
 
@@ -714,7 +823,7 @@ class PandasNavigation(DatasetBackendNavigation):
             raise ValueError("Wrong column_name type.")
 
     def get_column_type(
-            self, column_name: Iterable[str] | str = None
+        self, column_name: Iterable[str] | str = None
     ) -> dict[str, type] | type | None:
         """Get Python type(s) corresponding to pandas dtype(s) of column(s).
 
@@ -739,14 +848,16 @@ class PandasNavigation(DatasetBackendNavigation):
                 dtypes[k] = int
             elif pd.api.types.is_float_dtype(v):
                 dtypes[k] = float
-            elif pd.api.types.is_object_dtype(v) and pd.api.types.is_list_like(
+            elif pd.api.types.is_object_dtype(v):
+                if len(self.data) > 0 and pd.api.types.is_list_like(
                     self.data[column_name].iloc[0]
-            ):
-                dtypes[k] = object
+                ):
+                    dtypes[k] = object
+                else:
+                    dtypes[k] = str
             elif (
-                    pd.api.types.is_string_dtype(v)
-                    or pd.api.types.is_object_dtype(v)
-                    or v == "category"
+                pd.api.types.is_string_dtype(v)
+                or v == "category"
             ):
                 dtypes[k] = str
             elif pd.api.types.is_bool_dtype(v):
@@ -759,7 +870,7 @@ class PandasNavigation(DatasetBackendNavigation):
         return None
 
     def astype(
-            self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
+        self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
     ) -> pd.DataFrame:
         """Cast DataFrame columns to specified dtypes.
 
@@ -791,40 +902,50 @@ class PandasNavigation(DatasetBackendNavigation):
                 #     self.labels_dict.pop(column_name)
                 self.data = self.astype({column_name: type_name})
         return self
-
+    
     def add_column(
-            self,
-            data: Any,
-            name: str | list[str],
-            index: Sequence | None = None,
+        self,
+        data: Any,
+        name: str | list[str],
+        index: Sequence | None = None,
     ):
         """Add a new column to the DataFrame.
-
         Args:
-             Sequence of values for the new column.
+            data: Sequence of values for the new column.
             name: Column name (str) or single-element list containing name.
             index: Optional index labels for the new column. If None,
-                uses existing DataFrame index.
-
+                   uses existing DataFrame index.
         Returns:
             None: Modifies self.data in-place.
         """
         if isinstance(name, list) and len(name) == 1:
             name = name[0]
+            
         if isinstance(data, pd.DataFrame):
-            data = data.values
-        else:
+            if data.shape[1] == 1:
+                data = data.iloc[:, 0]
+            else:
+                data = data.values
+        elif isinstance(data, np.ndarray):
+            if data.ndim == 2 and data.shape[1] == 1:
+                data = data[:, 0]
+        elif not isinstance(data, pd.Series):
             data = Adapter.to_list(data)
-        if len(self.data) != len(data):
-            if isinstance(data[0], Iterable) and len(data[0]) == 1:
-                data = data.squeeze()
-            data = pd.Series(data)
+            
+        if isinstance(data, list):
+            if len(data) == 1 and len(self.data) > 1:
+                data = pd.Series(data[0], index=self.data.index)
+            elif len(self.data) != len(data):
+                if len(data) > 0 and isinstance(data[0], Iterable) and len(data[0]) == 1:
+                    data = np.squeeze(data)
+                data = pd.Series(data)
+                
         if index:
             self.data = self.data.join(
                 pd.DataFrame(data, columns=[name], index=list(index))
             )
         else:
-            self.data.loc[:, name] = data
+            self.data[name] = data
 
     def append(self, other, reset_index: bool = False, axis: int = 0) -> pd.DataFrame:
         """Append other PandasDataset(s) to current DataFrame.
@@ -915,6 +1036,12 @@ class PandasNavigation(DatasetBackendNavigation):
         if not isinstance(data, Iterable) or isinstance(data, str):
             data = [data]
         return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+    
+    def to_numpy(self) -> np.ndarray:
+        """
+        This method is extraordinary and used to collect into numpy array.
+        """
+        return self.data.values.flatten()
 
 
 class PandasDataset(PandasNavigation, DatasetBackendCalc):
@@ -940,10 +1067,12 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             return float(result.loc[result.index[0], result.columns[0]])
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
-    def __init__(self,
-                 data: pd.DataFrame | dict | str | pd.Series | None = None,
-                 data_compression: str | None = None,
-                 non_compresion_cols: list | None = None):
+    def __init__(
+        self,
+        data: pd.DataFrame | dict | str | pd.Series | None = None,
+        data_compression: str | None = None,
+        non_compresion_cols: list | None = None,
+    ):
         super().__init__(data, data_compression, non_compresion_cols)
 
     def get(self, key, default=None) -> Any:
@@ -958,7 +1087,11 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         """
         return self.data.get(key, default)
 
-    def take(self, indices: int | list[int], axis: Literal["index", "columns", "rows"] | int = 0) -> Any:
+    def take(
+        self,
+        indices: int | list[int],
+        axis: Literal["index", "columns", "rows"] | int = 0,
+    ) -> Any:
         """Return elements at specified positions along axis.
 
         Args:
@@ -1010,11 +1143,10 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def unique(self):
         """Get unique values for each column.
-
         Returns:
-            dict: Mapping of column names to arrays of unique values.
+            dict: Mapping of column names to pandas Series of unique values.
         """
-        return {column: self.data[column].unique() for column in self.data.columns}
+        return {column: pd.Series(self.data[column].unique()) for column in self.data.columns}
 
     def nunique(self, dropna: bool = True):
         """Count number of unique values per column.
@@ -1038,6 +1170,39 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             pd.Grouper
         """
         return self.data.groupby(by=by, observed=False, **kwargs)
+
+    def count_groups(self, group_cols: list[str]) -> int:
+        """Count unique combinations of group_cols"""
+        if not group_cols:
+            return 1
+        return int(self.data[group_cols].nunique())
+
+    def iter_groups(self, by: list[str]):
+        by_arg = by[0] if len(by) == 1 else by
+        for key, group in self.data.groupby(by=by_arg, observed=False):
+            yield key, group
+
+    def grouped_value_counts(self, by: list[str], feature_cols: list[str] | None=None):
+        if feature_cols is None:
+            feature_cols = [col for col in self.data.columns if col not in set(by)]
+        result = {
+            col: self.data.groupby(by=by, observed=False)[col].value_counts().to_dict()
+            for col in feature_cols
+        }
+        # result[col] is {(group_key, val): count}; pivot to {group_key: {val: count}}
+        rows: dict = {}
+        for col, vc_dict in result.items():
+            for composite_key, count in vc_dict.items():
+                group_key = (
+                    composite_key[0] if len(by) == 1 else composite_key[: len(by)]
+                )
+                val = composite_key[-1]
+                rows.setdefault(group_key, {}).setdefault(col, {})[val] = count
+
+        return {
+            "data": {col: [rows[k].get(col, {}) for k in rows] for col in feature_cols},
+            "index": list(rows.keys()),
+        }
 
     def agg(self, func: str | list, **kwargs) -> pd.DataFrame | float:
         """Aggregate DataFrame using specified function(s).
@@ -1114,7 +1279,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Mode values (may have multiple rows if multimodal).
         """
-        return self._wrap_result(self.data.mode(numeric_only=numeric_only, dropna=dropna))
+        return self._wrap_result(
+            self.data.mode(numeric_only=numeric_only, dropna=dropna)
+        )
 
     def var(
         self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
@@ -1129,7 +1296,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             float or pd.DataFrame: Variance value(s).
         """
-        return self._wrap_result(self.agg(["var"], skipna=skipna, ddof=ddof, numeric_only=numeric_only))
+        return self._wrap_result(
+            self.agg(["var"], skipna=skipna, ddof=ddof, numeric_only=numeric_only)
+        )
 
     def log(self) -> pd.DataFrame:
         """Compute natural logarithm of all numeric values.
@@ -1184,7 +1353,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         data.index = ["cv"]
         if data.shape == (1, 1):
             return float(data.loc[data.index[0], data.columns[0]])
-        return self._wrap_result(data if isinstance(data, pd.DataFrame) else pd.DataFrame(data))
+        return self._wrap_result(
+            data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+        )
 
     def sort_index(self, ascending: bool = True, **kwargs) -> pd.DataFrame:
         """Sort DataFrame by index labels.
@@ -1206,7 +1377,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             list[str]: Names of numeric columns.
         """
-        return self.df.select_dtypes(include=ScalarType).columns.tolist()
+        _scalar_types = getattr(ScalarType, "__args__", (ScalarType,))
+        return self.data.select_dtypes(include=list(_scalar_types)).columns.tolist()
 
     def corr(
         self,
@@ -1220,7 +1392,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Correlation matrix.
         """
-        return self._wrap_result(self.data.corr(method='pearson', numeric_only=numeric_only))
+        return self._wrap_result(
+            self.data.corr(method="pearson", numeric_only=numeric_only)
+        )
 
     def isna(self) -> pd.DataFrame:
         """Detect missing values (NaN, None).
@@ -1243,7 +1417,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Sorted DataFrame.
         """
-        return self._wrap_result(self.data.sort_values(by=by, ascending=ascending, **kwargs))
+        return self._wrap_result(
+            self.data.sort_values(by=by, ascending=ascending, **kwargs)
+        )
 
     def value_counts(
         self,
@@ -1263,9 +1439,11 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: DataFrame with value counts (reset index).
         """
-        return self._wrap_result(self.data.value_counts(
-            normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
-        ).reset_index())
+        return self._wrap_result(
+            self.data.value_counts(
+                normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
+            ).reset_index()
+        )
 
     def fillna(
         self,
@@ -1307,7 +1485,12 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         data.index = ["na_counts"]
         if data.shape[0] == 1 and data.shape[1] == 1:
             return int(data.loc[data.index[0], data.columns[0]])
-        return self._wrap_result(data if isinstance(data, pd.DataFrame) else pd.DataFrame(data))
+        return self._wrap_result(
+            data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+        )
+
+    def count_nulls(self) -> dict[str, int]:
+        return self.data.isna().sum().to_dict()
 
     def dot(self, other: PandasDataset | np.ndarray) -> pd.DataFrame:
         """Compute matrix multiplication with another DataFrame or array.
@@ -1318,18 +1501,23 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Result of matrix multiplication.
         """
+        initial_index = self.data.index
         if isinstance(other, np.ndarray):
             other_df = pd.DataFrame(
                 data=other,
-                columns=self.columns if other.shape[1] == self.shape[1] else None,
+                index=self.columns if other.shape[0] == self.shape[1] else None,
             )
-            result = self.data.dot(other_df.T)
+            result = self.data.dot(other_df)
             result.columns = (
                 self.columns if other.shape[1] == self.shape[1] else result.columns
             )
+        elif isinstance(other, pd.DataFrame):
+            result = self.data.dot(other)
         else:
             result = self.data.dot(other.data)
-        return self._wrap_result(result if isinstance(result, pd.DataFrame) else pd.DataFrame(result))
+        return self._wrap_result(
+            result.set_index(initial_index) if isinstance(result, pd.DataFrame) else pd.DataFrame(result, index=initial_index)
+        )
 
     def dropna(
         self,
@@ -1361,7 +1549,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         result = self.data.transpose()
         if names is not None:
             result.columns = names
-        return self._wrap_result(result if isinstance(result, pd.DataFrame) else pd.DataFrame(result))
+        return self._wrap_result(
+            result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
+        )
 
     def sample(
         self,
@@ -1379,7 +1569,82 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Randomly sampled DataFrame.
         """
-        return self._wrap_result(self.data.sample(n=n, frac=frac, random_state=random_state))
+        return self._wrap_result(
+            self.data.sample(n=n, frac=frac, random_state=random_state)
+        )
+
+
+    def random_split_labels(
+        self,
+        edges: list[int],
+        labels: list[str],
+        random_state: int | None = None,
+        frac: float = 1.0,
+        name: str = "split",
+    ) -> pd.DataFrame:
+        """Deterministic split using a hash of the index.
+
+        Produces identical results to the Spark backend for the same seed
+        and index values. Uses MD5 hashing of the stringified index
+        concatenated with the seed to assign each row to a bucket in
+        ``[0, MOD)``, then maps buckets to labels via the ``edges``
+        thresholds.
+
+        Args:
+            edges: Cumulative upper bounds for each label on the MOD scale.
+            labels: Label strings corresponding to ``edges``.
+            random_state: Seed for reproducibility. Defaults to 42.
+            frac: Fraction of data to label. Rows outside this fraction
+                are excluded from the result.
+            name: Name of the resulting label column.
+
+        Returns:
+            A ``pd.DataFrame`` with the original index and the new label
+            column. Rows outside ``frac`` or beyond the last edge are
+            excluded.
+        """
+        import hashlib
+
+        seed = random_state if random_state is not None else 42
+        mod = 10_000_000
+
+        if edges and edges[-1] < mod * 0.5:
+            warnings.warn(
+                f"edges={edges} look like absolute row counts, not MOD-scaled values. "
+                f"Expected last edge ≈ {mod}. Auto-scaling.",
+                UserWarning,
+                stacklevel=2,
+            )
+            n_sampled_approx = edges[-1]
+            edges = [int(e / n_sampled_approx * mod) for e in edges]
+            edges[-1] = mod
+
+        df_with_index = self.data.reset_index()
+        index_cols = df_with_index.columns[: self.data.index.nlevels]
+
+        def compute_hash(row):
+            index_str = "_".join(str(row[c]) for c in index_cols) + f"_{seed}"
+            hash_val = int(hashlib.md5(index_str.encode()).hexdigest(), 16)
+            return hash_val % mod
+
+        df_with_index["_hash"] = df_with_index.apply(compute_hash, axis=1)
+
+        # Assign labels in reverse order so that the smallest threshold
+        # wins (matching Spark CASE WHEN semantics).
+        df_with_index[name] = None
+        for edge, label in list(zip(edges, labels)):
+            threshold = min(edge, mod)
+            mask = (df_with_index["_hash"] < threshold) & df_with_index[name].isna()
+            df_with_index.loc[mask, name] = label
+
+        # Apply frac filter.
+        if frac < 1.0:
+            frac_threshold = int(frac * mod)
+            df_with_index.loc[df_with_index["_hash"] >= frac_threshold, name] = None
+
+        result = df_with_index[df_with_index[name].notna()][[name]]
+        result.index = self.data.index[df_with_index[name].notna().values]
+        return result
 
     def select_dtypes(
         self,
@@ -1395,13 +1660,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: DataFrame with selected columns.
         """
-        return self._wrap_result(self.data.select_dtypes(include=include, exclude=exclude))
-
-    def limit(self, num: int | None = None) -> Any:
-        if not num:
-            return self.data
-        else:
-            return self.data.iloc[: num]
+        return self._wrap_result(
+            self.data.select_dtypes(include=include, exclude=exclude)
+        )
 
     def isin(self, values: Iterable) -> pd.DataFrame:
         """Check if elements are contained in passed values.
@@ -1461,16 +1722,18 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             left_index = True
             right_index = True
 
-        return self._wrap_result(self.data.merge(
-            right=right.data,
-            on=on,
-            left_on=left_on,
-            right_on=right_on,
-            left_index=left_index,
-            right_index=right_index,
-            suffixes=suffixes,
-            how=how,
-        ))
+        return self._wrap_result(
+            self.data.merge(
+                right=right.data,
+                on=on,
+                left_on=left_on,
+                right_on=right_on,
+                left_index=left_index,
+                right_index=right_index,
+                suffixes=suffixes,
+                how=how,
+            )
+        )
 
     def drop(
         self,
@@ -1488,7 +1751,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: DataFrame with specified labels removed.
         """
-        return self._wrap_result(self.data.drop(labels=labels, axis=axis, columns=columns))
+        return self._wrap_result(
+            self.data.drop(labels=labels, axis=axis, columns=columns)
+        )
 
     def filter(
         self,
@@ -1540,8 +1805,12 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         elif isinstance(to_replace, pd.Series):
             to_replace = to_replace.to_list()
         elif isinstance(to_replace, dict):
-            return self._wrap_result(self.data.replace(to_replace=to_replace, regex=regex))
-        return self._wrap_result(self.data.replace(to_replace=to_replace, value=value, regex=regex))
+            return self._wrap_result(
+                self.data.replace(to_replace=to_replace, regex=regex)
+            )
+        return self._wrap_result(
+            self.data.replace(to_replace=to_replace, value=value, regex=regex)
+        )
 
     def reindex(self, labels: str = "", fill_value: str | None = None) -> pd.DataFrame:
         """Conform DataFrame to new index with optional fill value.
@@ -1581,5 +1850,33 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
         return data_expanded
 
-    def checkpoint(self):
+    def explode(self, column=None, ignore_index=False):
+        """
+        Transform each element of a list-like to a row.
+
+        Args
+        ----
+            column: `str` or `tuple`
+                Column to explode.
+
+        Return
+        ------  
+            DataFrame:
+                Exploded lists to rows of the subset columns; index will be duplicated for these rows.
+        """
+    
+        return self._wrap_result(self.data.explode(column=column, ignore_index=ignore_index))
+
+    def checkpoint(self, eager: bool = True):
+        """Breaks the computation graph (Lineage) to prevent exponential slowdowns.
+
+        For the Spark backend, this method materializes the DataFrame to truncate
+        the lineage graph. For the Pandas backend, this method acts as a no-op
+        since Pandas does not suffer from the same lineage growth issues.
+        The signature is kept identical to the Spark backend for API consistency.
+
+        Args:
+            eager: If ``True``, the checkpoint is executed eagerly. This parameter
+                is ignored for the Pandas backend. Defaults to ``True``.
+        """
         pass

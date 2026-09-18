@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 from ..dataset import Dataset
+from ..dataset.backends import PandasDataset, SparkDataset
 from ..extensions.scipy_stats import (
-    Chi2TestExtension,
-    KSTestExtension,
-    TTestExtension,
-    UTestExtension,
+    GroupChi2TestExtension,
+    GroupKSTestExtension,
+    GroupTTestExtension,
+    GroupUTestExtension,
 )
 from ..utils.constants import NUMBER_TYPES_LIST
-from .abstract import StatHypothesisTesting
+from ..utils.registry import backend_factory
+from .abstract import GroupHypothesisTesting, StatsComparator
+from .comparators import Chi2Test, KSTest, TTest, UTest
 
 
-class TTest(StatHypothesisTesting):
+@backend_factory.register(TTest, PandasDataset)
+class GroupTTest(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         return NUMBER_TYPES_LIST
@@ -20,12 +24,12 @@ class TTest(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return TTestExtension(kwargs.get("reliability", 0.05)).calc(
+        return GroupTTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
-
-class KSTest(StatHypothesisTesting):
+@backend_factory.register(KSTest, PandasDataset)
+class GroupKSTest(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         return NUMBER_TYPES_LIST
@@ -34,12 +38,13 @@ class KSTest(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return KSTestExtension(kwargs.get("reliability", 0.05)).calc(
+        test_cls = backend_factory.resolve_backend(GroupKSTestExtension, data)
+        return test_cls(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
-
-class UTest(StatHypothesisTesting):
+@backend_factory.register(UTest, [PandasDataset, SparkDataset])
+class GroupUTest(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         return NUMBER_TYPES_LIST
@@ -48,12 +53,13 @@ class UTest(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return UTestExtension(kwargs.get("reliability", 0.05)).calc(
+        # test_cls = backend_factory.resolve_backend(GroupUTestExtension, data)
+        return GroupUTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
-
-class Chi2Test(StatHypothesisTesting):
+@backend_factory.register(Chi2Test, PandasDataset)
+class GroupChi2Test(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         return [str]
@@ -62,6 +68,7 @@ class Chi2Test(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return Chi2TestExtension(reliability=kwargs.get("reliability", 0.05)).calc(
+        test_cls = backend_factory.resolve_backend(GroupChi2TestExtension, data)
+        return test_cls(reliability=kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )

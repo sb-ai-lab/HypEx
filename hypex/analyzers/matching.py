@@ -1,4 +1,5 @@
-from ..dataset.dataset import DatasetAdapter, ExperimentData
+from ..dataset.dataset import DatasetAdapter
+from ..dataset.experiment_data import ExperimentData
 from ..dataset.roles import StatisticRole
 from ..executor.executor import Executor
 from ..operators.operators import MatchingMetrics

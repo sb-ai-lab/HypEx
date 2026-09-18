@@ -3,7 +3,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from ..dataset.dataset import Dataset, ExperimentData
+from ..dataset.dataset import Dataset
+from ..dataset.experiment_data import ExperimentData
 from ..dataset.roles import StatisticRole, TargetRole
 from .abstract import Transformer
 
