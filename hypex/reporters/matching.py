@@ -20,13 +20,14 @@ from ..utils import (
     MATCHING_INDEXES_SPLITTER_SYMBOL,
     ExperimentDataEnum,
 )
+from ..utils.logger import logger
 from .abstract import (
     DatasetReporter,
     DictReporter,
     extract_tests,
 )
 
-
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 class MatchingReporter(DatasetReporter):
     """Reporter for matching experiment results.
     
@@ -110,7 +111,7 @@ class MatchingReporter(DatasetReporter):
             for col in ids
         }
 
-
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 class MatchingQualityReporter(DatasetReporter):
     """Reporter for matching quality tests (T-Test, KS-Test, Chi2-Test)."""
     
@@ -132,7 +133,7 @@ class MatchingQualityReporter(DatasetReporter):
 
 
 # ── Backwards-compatible aliases ─────────────────────────────────────────────
-
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 class MatchingDictReporter(MatchingReporter):
     """Legacy reporter wrapper for dictionary output.
     
@@ -146,7 +147,7 @@ class MatchingDictReporter(MatchingReporter):
             stacklevel=2
         )
 
-
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 class MatchingQualityDictReporter(MatchingQualityReporter):
     """Legacy reporter wrapper for dictionary output.
     
@@ -161,7 +162,7 @@ class MatchingQualityDictReporter(MatchingQualityReporter):
             stacklevel=2
         )
 
-
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 class MatchingDatasetReporter(MatchingReporter):
     """Legacy reporter wrapper for dataset output.
     
@@ -190,7 +191,7 @@ class MatchingDatasetReporter(MatchingReporter):
         analyzer_id = data.get_one_id(self.searching_class, ExperimentDataEnum.analysis_tables)
         return data.analysis_tables[analyzer_id].to_dataset()
 
-
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 class MatchingQualityDatasetReporter(MatchingQualityReporter):
     """Legacy reporter wrapper for dataset output.
     

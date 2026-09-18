@@ -189,7 +189,7 @@ class MahalanobisDistance(Calculator):
 
         cholesky = CholeskyExtension().calc(cov)
         mahalanobis_transform = InverseExtension().calc(cholesky)
-        mah_cols = mahalanobis_transform.columns
+        # mah_cols = mahalanobis_transform.columns
         if weights is not None:
             features = data.columns
             w_list = np.array(
@@ -199,7 +199,7 @@ class MahalanobisDistance(Calculator):
             mahalanobis_transform = mahalanobis_transform.dot(w_matrix)
 
         mahalanobis_transform: Dataset = mahalanobis_transform.transpose()
-        mahalanobis_transform = mahalanobis_transform.rename({col: new_col for col, new_col in zip(mahalanobis_transform.columns, mah_cols)})
+        # mahalanobis_transform = mahalanobis_transform.rename({col: new_col for col, new_col in zip(mahalanobis_transform.columns, mah_cols)})
         return mahalanobis_transform
 
     @classmethod
