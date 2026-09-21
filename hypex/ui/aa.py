@@ -163,7 +163,7 @@ class AAOutput(Output):
         )
 
     @staticmethod
-    def _get_dry_score(experiment_data: ExperimentData, aa_score: Dataset) -> Dataset:
+    def _add_dry_score(experiment_data: ExperimentData, aa_score: Dataset) -> Dataset:
         dry_score_analyser_ids = experiment_data.get_ids(
             AADryTestAnalyzer, ExperimentDataEnum.analysis_tables
         )[AADryTestAnalyzer.__name__][ExperimentDataEnum.analysis_tables.value]
@@ -197,7 +197,7 @@ class AAOutput(Output):
         )[AAScoreAnalyzer.__name__][ExperimentDataEnum.analysis_tables.value]
 
         self.aa_score = experiment_data.analysis_tables[get_analyzer_id("aa score")]
-        self.aa_score = self._get_dry_score(experiment_data, self.aa_score)
+        self.aa_score = self._add_dry_score(experiment_data, self.aa_score)
         self.aa_score = self._replace_splitters(self.aa_score, RenameEnum.index)
 
         self.best_split_statistic = experiment_data.analysis_tables[
