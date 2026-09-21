@@ -25,7 +25,7 @@ from ..utils import (
     SetParamsDictTypes,
 )
 from ..utils.adapter import Adapter
-
+from ..utils.constants import NAME_BORDER_SYMBOL
 
 class Executor(ABC):
     # Maximum number of list / dict elements expanded into separate
@@ -157,15 +157,22 @@ class Executor(ABC):
             if name == "self":
                 continue
 
-            # *args and **kwargs
-            if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
+            #  **kwargs
+            if param.kind == param.VAR_POSITIONAL:
+                stored = getattr(self, name, None)
+                if isinstance(stored, dict):
+                    out.update(stored)
+                continue
+
+            # *args
+            if param.kind == param.VAR_KEYWORD:
                 continue
 
             value = getattr(self, name, param.default)
 
             if deep and hasattr(value, "get_params") and not isinstance(value, type):
                 deep_items = value.get_params().items()
-                out.update((name + "__" + k, val) for k, val in deep_items)
+                out.update((name + NAME_BORDER_SYMBOL + k, val) for k, val in deep_items)
 
             out[name] = value
 
