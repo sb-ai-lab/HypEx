@@ -15,7 +15,9 @@ from ..utils.constants import TEST_NAME_NORMALIZATION, NAME_BORDER_SYMBOL
 from ..utils.errors import AbstractMethodError
 
 REPORTABLE_METRICS = frozenset({
-    "pass", "p-value", "difference", "difference %", "control mean", "test mean"
+    "pass", "p-value", "difference",
+    "difference %", "control mean", "test mean",
+    "ci lower", "ci upper",
 })
 
 @dataclass(frozen=True)

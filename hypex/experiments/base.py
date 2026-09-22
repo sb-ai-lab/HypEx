@@ -15,8 +15,7 @@ from ..dataset import (
     TempTargetRole,
 )
 from ..executor import Executor
-from ..utils import BackendsEnum, ExperimentDataEnum, timeit
-from ..utils import ExperimentDataEnum, HypExLogger
+from ..utils import BackendsEnum, ExperimentDataEnum, HypExLogger, timeit
 from ..utils.registry import backend_factory
 
 
