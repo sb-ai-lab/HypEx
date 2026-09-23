@@ -63,33 +63,31 @@ class MatchingOutput(Output):
         """
         backend = experiment_data.ds.backend_type
 
-        # ── FIX: Ensure `indexes` uses the same backend as `experiment_data.ds` ──
-        # `indexes` is typically constructed as a Pandas-backed `SmallDataset`
-        # from the reporter's dictionary output. Merging it directly with a
-        # Spark-backed `experiment_data.ds` raises a `BackendTypeError`.
-        # We convert it to the target backend while explicitly preserving the 
-        # row index so that positional mapping remains correct after the join.
+        # ── Ensure indexes uses the same backend as experiment_data.ds ──
         if indexes.backend_type != backend:
-            idx_col_name = "__hypex_original_index__"
-            pdf = indexes.data.copy()
-            pdf.index.name = idx_col_name
-            pdf = pdf.reset_index()
-            
-            roles = dict(indexes.roles)
-            roles[idx_col_name] = InfoRole()
-            
-            indexes = Dataset(
-                roles=roles,
-                data=pdf,
+            indexes = indexes.to_backend(
                 backend=backend,
                 session=experiment_data.ds.session,
             )
-            indexes = indexes.set_index(idx_col_name)
-        # ────────────────────────────────────────────────────────────────────────
 
         # ── Break the DAG once before the iterative merge loop ──────────
         if backend == BackendsEnum.spark and not experiment_data.ds.is_persisted:
             experiment_data.ds.checkpoint(eager=True)
+
+        # ── Pre-compute ds_reset ONCE outside the loop ─────────────────
+        # Previously ds_reset was created inside _match_spark on EVERY
+        # iteration, duplicating the entire experiment_data.ds lineage
+        # each time.  Hoisting it here ensures the reset_index node
+        # appears exactly once in the DAG.
+        ds_reset: Dataset | None = None
+        idx_col: str | None = None
+        if backend == BackendsEnum.spark:
+            orig_cols = set(experiment_data.ds.columns)
+            ds_reset = experiment_data.ds.reset_index(drop=False)
+            idx_col = next(c for c in ds_reset.columns if c not in orig_cols)
+            # Checkpoint ds_reset so downstream joins reference a
+            # materialized node instead of re-expanding the full lineage.
+            ds_reset.checkpoint(eager=True)
 
         # ── Container for raw index columns (same backend as input) ─────
         self.indexes = Dataset.create_empty(
@@ -97,26 +95,28 @@ class MatchingOutput(Output):
             backend=backend,
             session=experiment_data.ds.session,
         )
-        
+
         for i in range(len(indexes.columns)):
             t_indexes = indexes.iloc[:, i]
             col_name = t_indexes.columns[0]
-            
+
             # ── Build the matched subset for this neighbor position ─────
             if backend == BackendsEnum.spark:
                 matched_data = self._match_spark(
                     experiment_data, t_indexes, col_name,
+                    ds_reset=ds_reset,
+                    idx_col=idx_col,
                 )
             else:
                 matched_data = self._match_pandas(
                     experiment_data, t_indexes, col_name,
                 )
-                
+
             # ── Rename matched columns with a position suffix ───────────
             matched_data = matched_data.rename(
                 {col: f"{col}_matched_{i}" for col in matched_data.columns}
             )
-            
+
             # ── Left-join matched columns onto the full original index ──
             reindexed_matched = experiment_data.ds.merge(
                 matched_data,
@@ -127,7 +127,7 @@ class MatchingOutput(Output):
             reindexed_matched = reindexed_matched.drop(
                 columns=list(experiment_data.ds.columns),
             )
-            
+
             # ── Accumulate raw index columns ────────────────────────────
             if self.indexes.is_empty():
                 self.indexes = t_indexes
@@ -139,7 +139,7 @@ class MatchingOutput(Output):
                         for col in t_indexes.columns
                     },
                 )
-                
+
             # ── Accumulate the full matched dataset ─────────────────────
             if hasattr(self, "full_data") and self.full_data is not None:
                 self.full_data = self.full_data.merge(
@@ -156,45 +156,12 @@ class MatchingOutput(Output):
                     how="left",
                 )
 
-
-    # ─────────────────────────────────────────────────────────────────────
-    # Backend-specific matching helpers
-    # ─────────────────────────────────────────────────────────────────────
-
-    def _match_pandas(
-        self,
-        experiment_data: ExperimentData,
-        t_indexes: Dataset,
-        col_name: str,
-    ) -> Dataset:
-        """Build matched data using in-memory Pandas label lookup.
-
-        Args:
-            experiment_data: The experiment data container.
-            t_indexes: Single-column ``Dataset`` with match indices.
-            col_name: Name of the match-index column in *t_indexes*.
-
-        Returns:
-            A ``Dataset`` containing the matched rows, indexed by the
-            original observation positions.
-        """
-        # Align the index column with the main dataset's index.
-        ds_index = experiment_data.ds.index.to_numpy().tolist()
-        t_indexes.index = ds_index
-
-        # Keep only matched rows (drop -1 sentinels).
-        filtered = t_indexes[t_indexes[col_name] != -1]
-
-        # Extract lookup values and original positions.
-        raw_vals = filtered.get_values(column=col_name)
-        lookup_vals = [
-            v[0] if isinstance(v, (list, tuple)) else v for v in raw_vals
-        ]
-        filtered_index_list = list(filtered.index)
-
-        matched_data = experiment_data.ds.loc[lookup_vals]
-        matched_data.index = filtered_index_list
-        return matched_data
+            # ── Checkpoint after EVERY merge to truncate lineage ────────
+            # Without this, each merge embeds the entire accumulated
+            # lineage, producing O(N²) plan growth.  With checkpoint,
+            # each iteration starts from a clean materialized snapshot.
+            if backend == BackendsEnum.spark:
+                self.full_data.checkpoint(eager=True)
 
 
     def _match_spark(
@@ -202,6 +169,8 @@ class MatchingOutput(Output):
         experiment_data: ExperimentData,
         t_indexes: Dataset,
         col_name: str,
+        ds_reset: Dataset | None = None,
+        idx_col: str | None = None,
     ) -> Dataset:
         """Build matched data via a lazy Spark join — no driver collection.
 
@@ -213,6 +182,9 @@ class MatchingOutput(Output):
             experiment_data: The experiment data container.
             t_indexes: Single-column ``Dataset`` with match indices.
             col_name: Name of the match-index column in *t_indexes*.
+            ds_reset: Pre-computed ``experiment_data.ds.reset_index()``.
+                When provided, avoids re-creating this node on every call.
+            idx_col: Name of the exposed index column in *ds_reset*.
 
         Returns:
             A ``Dataset`` containing the matched rows, indexed by the
@@ -233,10 +205,11 @@ class MatchingOutput(Output):
             col_name: "_hypex_lookup",
         })
 
-        # 4. Expose the original dataset's index as a join key column.
-        orig_cols = set(experiment_data.ds.columns)
-        ds_reset = experiment_data.ds.reset_index(drop=False)
-        idx_col = next(c for c in ds_reset.columns if c not in orig_cols)
+        # 4. Use pre-computed ds_reset or fall back to computing it.
+        if ds_reset is None:
+            orig_cols = set(experiment_data.ds.columns)
+            ds_reset = experiment_data.ds.reset_index(drop=False)
+            idx_col = next(c for c in ds_reset.columns if c not in orig_cols)
 
         # 5. Lazy join: match-index value → original dataset row.
         matched_data = mapping_ds.merge(
@@ -249,9 +222,8 @@ class MatchingOutput(Output):
         # 6. Restore the positional index and drop helper columns.
         matched_data = matched_data.set_index("_hypex_pos", drop=True)
         matched_data = matched_data.drop(columns=["_hypex_lookup", idx_col])
-
         return matched_data
-
+    
     @staticmethod
     def _reformat_resume(resume: dict[str, Any]) -> dict[str, Any]:
         """Reformat a flat resume dictionary with composite keys into a nested structure.

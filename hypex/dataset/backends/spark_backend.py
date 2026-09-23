@@ -25,7 +25,13 @@ from pyspark.sql.types import StructType  # pyright: ignore[reportMissingImports
 from pyspark.storagelevel import StorageLevel  # pyright: ignore[reportMissingImports]
 
 from ...config import DatasetConfig
-from ...utils import FromDictTypes, MergeOnError, ScalarType, SparkTypeMapper
+from ...utils import (
+    BackendsEnum,
+    FromDictTypes,
+    MergeOnError,
+    ScalarType,
+    SparkTypeMapper,
+)
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
 
 
@@ -53,6 +59,47 @@ class SparkNavigation(DatasetBackendNavigation):
         "int32": "int",
         "int64": "long",
     }
+    
+    def to_backend(
+        self,
+        target_backend: BackendsEnum,
+        session: Any | None = None,
+    ) -> Self:
+        """Convert spark backend to another backend with index preservation.
+
+        When converting to Pandas, the memory-limit guard
+        ``_check_pandas_conversion`` is invoked first. The pandas index is
+        preserved automatically by ``to_pandas()``.
+
+        Args:
+            target_backend: Target backend enum value.
+            session: Ignored for this backend (kept for API symmetry).
+
+        Returns:
+            A new backend instance with converted data, or ``self`` when
+            already on the target backend.
+
+        Raises:
+            ValueError: If *target_backend* is unsupported or the row count
+                exceeds ``DatasetConfig.SPARK_PANDAS_CONVERSION_LIMIT``.
+        """
+        if target_backend == BackendsEnum.spark:
+            return self
+
+        if target_backend == BackendsEnum.pandas:
+            # Guard against OOM on the driver.
+            self._check_pandas_conversion(
+                obj=self.data, context="to_backend conversion"
+            )
+
+            # to_pandas() preserves the index natively.
+            pdf = self.data.to_pandas()
+
+            from .pandas_backend import PandasDataset  # lazy to avoid circular import
+
+            return PandasDataset(data=pdf)
+
+        raise ValueError(f"Unsupported target backend: {target_backend!r}")
 
     @staticmethod
     @contextmanager

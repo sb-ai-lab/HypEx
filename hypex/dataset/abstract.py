@@ -118,6 +118,68 @@ class DatasetBase:
             else:
                 raise TypeError("Value type does not match the expected data type.")
 
+    def to_backend(
+        self,
+        backend: BackendsEnum,
+        session: spark.SparkSession | None = None,
+    ) -> Self:
+        """Convert dataset to the specified backend with index preservation.
+
+        Delegates the actual conversion to the backend-specific
+        ``to_backend()`` implementation. Semantic roles are deep-copied
+        so the original dataset remains untouched.
+
+        For ``BackendsEnum.spark`` targets the pandas index is explicitly
+        saved as a temporary column before ``createDataFrame`` (which would
+        otherwise drop it), then restored after conversion.
+
+        Args:
+            backend: Target backend enum value.
+            session: Spark session. Required when converting to
+                ``BackendsEnum.spark``. When ``None``, falls back to
+                ``self.session``.
+
+        Returns:
+            A new ``Dataset`` instance with converted backend and preserved
+            roles. Returns ``self`` when already on the target backend.
+
+        Raises:
+            ValueError: If *backend* is unsupported, *session* is missing
+                for spark conversion, or the conversion would exceed
+                memory limits (spark → pandas with large datasets).
+
+        Example:
+            >>> spark_ds = pandas_ds.to_backend(
+            ...     backend=BackendsEnum.spark,
+            ...     session=spark_session,
+            ... )
+            >>> pandas_ds = spark_ds.to_backend(backend=BackendsEnum.pandas)
+        """
+        # No-op when already on the target backend.
+        if self.backend_type == backend:
+            return self
+
+        # Resolve session for spark targets.
+        if backend == BackendsEnum.spark:
+            if session is None:
+                session = self.session
+            if session is None:
+                raise ValueError(
+                    "Spark session is required for spark backend conversion. "
+                    "Pass the session argument or ensure the dataset has one."
+                )
+
+        new_backend_data = self._backend_data.to_backend(
+            target_backend=backend,
+            session=session,
+        )
+
+        return self.__class__(
+            roles=deepcopy(self.roles),
+            data=new_backend_data,
+            session=session,
+        )
+
     @staticmethod
     def _select_backend_from_data(
         data: Any,

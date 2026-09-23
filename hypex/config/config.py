@@ -13,11 +13,13 @@ Classes:
         matching pipeline, including persistence policies, sampling
         targets, and batch sizes.
 """
-from typing import Literal
+from dataclasses import dataclass
+from typing import ClassVar, Literal
 
-from pyspark import StorageLevel
+from pyspark import StorageLevel  # pyright: ignore[reportMissingImports]
 
 
+@dataclass(frozen=True)
 class DatasetConfig:
     """
     Configuration constants for dataset display and Spark operations.
@@ -55,13 +57,18 @@ class DatasetConfig:
             across distributed operations.
             Defaults to "index".
     """
-    DISPLAY_ROWS: int = 5
-    DISPLAY_COLS: int = 10
+    DISPLAY_ROWS: ClassVar[int] = 5
+    DISPLAY_COLS: ClassVar[int] = 10
+    SPARK_PANDAS_CONVERSION_LIMIT: ClassVar[int] = 100_000
+    SPARK_MAX_ROWS_FOR_DOT: ClassVar[int] = 1_000
+    SPARK_INDEX_COL: ClassVar[str] = "index"
 
-    SPARK_PANDAS_CONVERSION_LIMIT: int = 100_000
-    SPARK_MAX_ROWS_FOR_DOT: int = 1000
-    SPARK_INDEX_COL: str = "index"
+    #: Column name used to preserve the row index during
+    #: ``pd.DataFrame → spark.DataFrame`` round-trips in
+    #: ``Dataset.to_backend()``.
+    BACKEND_CONVERSION_INDEX_COL: ClassVar[str] = "__hypex_temp_index__"
 
+@dataclass(frozen=False)
 class MatchingConfig:
     """
     Configuration constants for the FAISS-based distributed matching pipeline.
@@ -129,10 +136,10 @@ class MatchingConfig:
             ``CachingIndex`` constructor in ``hypex/utils/index_utils.py``.
             Defaults to 5.
     """
-    FAISS_PERSIST_POLITIC: StorageLevel = StorageLevel.MEMORY_AND_DISK
-    FAISS_SAMPLE_TARGET: int = 5_000_000
-    FAISS_DRIVER_INDEX_LIMIT: int = 5_000_000
-    FAISS_CHUNK_SIZE: int = 4096
-    FAISS_FIT_MODE: Literal["sample", "cluster", "full"] = "sample"
+    FAISS_PERSIST_POLITIC: ClassVar[StorageLevel] = StorageLevel.MEMORY_AND_DISK
+    FAISS_SAMPLE_TARGET: ClassVar[int] = 5_000_000
+    FAISS_DRIVER_INDEX_LIMIT: ClassVar[int] = 5_000_000
+    FAISS_CHUNK_SIZE: ClassVar[int] = 4096
+    FAISS_FIT_MODE: ClassVar[Literal["sample", "cluster", "full"]] = "sample"
 
-    CACHING_INDEX_MAX_SIZE: int = 5
+    CACHING_INDEX_MAX_SIZE: ClassVar[int] = 5
