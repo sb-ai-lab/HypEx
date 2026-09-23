@@ -3,6 +3,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+import numpy as np
+
 from ..dataset.dataset import Dataset
 from ..dataset.experiment_data import ExperimentData
 from ..dataset.roles import StatisticRole, TargetRole
@@ -36,14 +38,12 @@ class CUPEDTransformer(Transformer):
             mean_y = result[target_feature].mean()
             cov_xy = mean_xy - mean_x * mean_y
 
-            std_y = result[target_feature].std()
-            std_x = result[pre_target_feature].std()
-
-            # Handle zero variance or NaN case (single observation)
-            if std_y == 0 or std_x == 0 or std_y != std_y or std_x != std_x:
+            mean_xx = (result[pre_target_feature] * result[pre_target_feature]).mean()
+            var_x = mean_xx - mean_x * mean_x
+            if var_x == 0 or np.isnan(var_x):
                 theta = 0
             else:
-                theta = cov_xy / (std_y * std_x)
+                theta = cov_xy / var_x
             pre_target_mean = result[pre_target_feature].mean()
             new_values_ds = (
                 result[target_feature]
