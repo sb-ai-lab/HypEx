@@ -5,7 +5,6 @@ from typing import Any
 
 from ..dataset.dataset import Dataset
 from ..dataset.experiment_data import ExperimentData
-
 from ..dataset.roles import (
     AdditionalTargetRole,
     FeatureRole,
@@ -173,11 +172,16 @@ class CUPACExecutor(MLExecutor):
         # Calculate maximum lag for each target (max across target lags and cofounder feature lags)
         max_lags = {}
         for target, lags in targets.items():
-            if lags:
-                max_lag = max(lags.keys())
-                for feature in cofounders[target]:
-                    if features.get(feature):
-                        max_lag = max(max(features[feature].keys()), max_lag)
+            if not lags:
+                raise ValueError(
+                    f"Target '{target}' has no lag periods defined. "
+                    f"CUPAC requires at least one historical period. "
+                    f"Assign PreTargetRole(lag=N) to historical columns of this target."
+                )
+            max_lag = max(lags.keys())
+            for feature in cofounders[target]:
+                if features.get(feature):
+                    max_lag = max(max(features[feature].keys()), max_lag)
             max_lags[target] = max_lag
 
         # Build training and prediction structures for each target
