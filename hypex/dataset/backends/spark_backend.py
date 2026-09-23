@@ -413,10 +413,10 @@ class SparkNavigation(DatasetBackendNavigation):
                 else original_index_names
             )
 
-            # if blocking:
-            #     self.data.to_spark().unpersist(blocking=True)
-            # else:
-            #     self.data.spark.unpersist()
+            if blocking:
+                self.data.to_spark().unpersist(blocking=True)
+            else:
+                self.data.to_spark().unpersist()
             self.data.to_spark().unpersist(blocking=blocking)
 
             if isinstance(original_index_name, str):

@@ -150,123 +150,128 @@ class AADatasetReporter(AATestReporter):
 
 class AAPassedReporter(Reporter):
     def report(self, data: ExperimentData) -> Dataset:
-        analyser_ids = data.get_ids("AAScoreAnalyzer", ExperimentDataEnum.analysis_tables)
-        analyser_tables = {
-            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1:]: data.analysis_tables[id_]
-            for id_ in analyser_ids["AAScoreAnalyzer"][
-                ExperimentDataEnum.analysis_tables.value
-            ]
-        }
-        best_split_stats = analyser_tables.get("best split statistics")
-        analyser_ids = data.get_ids(
-            "AAScoreAnalyzer", ExperimentDataEnum.analysis_tables
-        )
-        analyser_tables = {
-            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1:]: data.analysis_tables[id_]
-            for id_ in analyser_ids["AAScoreAnalyzer"][
-                ExperimentDataEnum.analysis_tables.value
-            ]
-        }
-        if not analyser_tables.get("aa score") or analyser_tables["aa score"].is_empty():
+        aa_score, best_split = self._collect_tables(data)
+        if aa_score is None or best_split is None:
             return SmallDataset.create_empty()
 
-        aa_score = analyser_tables["aa score"]
-        best_split_stats = analyser_tables.get("best split statistics")
-        if best_split_stats is None or best_split_stats.is_empty():
-            return SmallDataset.create_empty()
+        test_names = self._ordered_test_names(aa_score)
 
-        test_names_ordered: list[str] = []
-        seen: set[str] = set()
-        for idx_label in aa_score.index:
-            parts = str(idx_label).split()
-            if len(parts) >= 3:
-                tn = parts[-2]
-            elif len(parts) == 2:
-                tn = parts[0]
-            elif len(parts) == 1:
-                tn = parts[0]
-            else:
-                continue
-            if tn not in seen:
-                seen.add(tn)
-                test_names_ordered.append(tn)
+        records = []
+        for row in best_split.to_records():
+            for feature, group in self._feature_groups(row):
+                rec = self._build_record(row, feature, group, test_names, aa_score)
+                records.append(rec)
 
+        return self._to_dataset(records)
+
+    # ── collecting tables ────────────────────────────────────────────────
+
+    @staticmethod
+    def _collect_tables(data: ExperimentData):
+        ids = data.get_ids("AAScoreAnalyzer", ExperimentDataEnum.analysis_tables)
+        tables = {
+            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1:]: data.analysis_tables[id_]
+            for id_ in ids.get("AAScoreAnalyzer", {}).get("analysis_tables", [])
+        }
+        aa_score = tables.get("aa score")
+        best_split = tables.get("best split statistics")
+
+        if aa_score is None or aa_score.is_empty():
+            return None, None
+        if best_split is None or best_split.is_empty():
+            return None, None
+
+        return aa_score, best_split
+
+    # ── helpers ────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _ordered_test_names(aa_score: Dataset) -> list[str]:
         order_map = {"TTest": 0, "KSTest": 1, "Chi2Test": 2, "ZTest": 3}
-        test_names_ordered.sort(key=lambda x: order_map.get(x, 99))
+        names = dict.fromkeys(
+            str(idx).split()[-2] if len(str(idx).split()) >= 3
+            else str(idx).split()[0]
+            for idx in aa_score.index
+        )
+        return sorted(names, key=lambda t: order_map.get(t, 99))
 
-        records = best_split_stats.to_records()
-        result_records: list[dict] = []
+    @staticmethod
+    def _feature_groups(row: dict) -> list[tuple[str, str]]:
+        groups = set()
+        for k in row:
+            if NAME_BORDER_SYMBOL in k:
+                continue
+            f, _, _, g = _parse_metric_col(k)
+            if f and f != "mean":
+                groups.add((f, g))
+        return sorted(groups)
 
-        for row in records:
-            feature_groups: set[tuple[str, str]] = set()
-            for k in row.keys():
-                if NAME_BORDER_SYMBOL in k:
-                    continue
-                feature, _, _, group = _parse_metric_col(k)
-                if feature and feature != "mean":
-                    feature_groups.add((feature, group))
+    # ── building record ───────────────────────────────────────────────────
 
-            for feature, group in sorted(feature_groups):
-                rec: dict = {"feature": feature, "group": group}
+    def _build_record(self, row, feature, group, test_names, aa_score) -> dict:
+        rec: dict = {"feature": feature, "group": group}
 
-                for tn in test_names_ordered:
-                    idx_key = f"{feature} {tn} {group}".strip()
-                    try:
-                        pass_val = aa_score.loc[idx_key, "pass"]
-                        if hasattr(pass_val, 'iget_values'):
-                            pass_val = pass_val.iget_values(0, 0)
-                        rec[f"{tn} aa test"] = "OK" if pass_val else "NOT OK"
-                    except Exception:
-                        rec[f"{tn} aa test"] = None
+        for tn in test_names:
+            idx_key = f"{feature} {tn} {group}".strip()
 
-                for tn in test_names_ordered:
-                    val = None
-                    for k, v in row.items():
-                        f, t, m, g = _parse_metric_col(k)
-                        if f == feature and normalize_test_name(t) == tn and m == "pass" and g == group:
-                            val = v
-                            break
-                    if val is not None:
-                        is_significant = str(val).strip().upper() in ("OK", "TRUE", "1")
-                        rec[f"{tn} best split"] = "NOT OK" if is_significant else "OK"
-                    else:
-                        rec[f"{tn} best split"] = None
+            rec[f"{tn} aa score"] = self._aa_pass(aa_score, idx_key)
 
-                # result
-                all_ok = all(
-                    rec.get(f"{tn} best split") != "NOT OK"
-                    for tn in test_names_ordered
-                    if rec.get(f"{tn} best split") is not None
-                )
-                rec["result"] = "OK" if all_ok else "NOT OK"
+            rec[f"{tn} best split"] = self._best_split_pass(row, feature, tn, group)
 
-                for metric_name in ("control mean", "test mean", "difference", "difference %"):
-                    val = None
-                    for k, v in row.items():
-                        f, t, m, g = _parse_metric_col(k)
-                        if f == feature and t == "GroupDifference" and m == metric_name and g == group:
-                            val = v
-                            break
-                    if val is None:
-                        search_key = f"{feature} GroupDifference {metric_name} {group}"
-                        for k, v in row.items():
-                            if search_key in str(k) or str(k).replace(ID_SPLIT_SYMBOL, " ") == search_key:
-                                val = v
-                                break
-                    rec[metric_name] = val
 
-                result_records.append(rec)
+        failed = any(
+            rec.get(f"{tn} {sfx}") == "NOT OK"
+            for tn in test_names
+            for sfx in ("aa score", "best split")
+        )
+        rec["result"] = "NOT OK" if failed else "OK"
 
+
+        for m in ("control mean", "test mean", "difference", "difference %"):
+            rec[m] = self._metric(row, feature, "GroupDifference", m, group)
+
+        return rec
+
+    # ── value extractors ───────────────────────────────────────────────────
+
+    @staticmethod
+    def _aa_pass(aa_score: Dataset, idx_key: str):
+        try:
+            v = aa_score.get_values(row=idx_key, column="pass")
+            return "OK" if v else "NOT OK"
+        except Exception:
+            return None
+
+    @staticmethod
+    def _best_split_pass(row: dict, feature: str, tn: str, group: str):
+        for k, v in row.items():
+            f, t, m, g = _parse_metric_col(k)
+            if f == feature and normalize_test_name(t) == tn and m == "pass" and g == group:
+                return "NOT OK" if str(v).strip().upper() in ("OK", "TRUE", "1") else "OK"
+        return None
+
+    @staticmethod
+    def _metric(row: dict, feature: str, test: str, metric: str, group: str):
+        for k, v in row.items():
+            f, t, m, g = _parse_metric_col(k)
+            if f == feature and t == test and m == metric and g == group:
+                return v
+        return None
+
+    # ── dataset assembly ───────────────────────────────────────────────────
+
+    @staticmethod
+    def _to_dataset(records: list[dict]) -> SmallDataset:
         roles: dict = {
             "feature": InfoRole(),
             "group": InfoRole(),
             "result": StatisticRole(),
         }
-        if result_records:
-            for c in result_records[0]:
+        if records:
+            for c in records[0]:
                 if c not in roles:
                     roles[c] = StatisticRole()
-        return SmallDataset.from_dict(result_records, roles=roles)
+        return SmallDataset.from_dict(records, roles=roles)
 
 
 class AABestSplitReporter(Reporter):
