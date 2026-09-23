@@ -47,54 +47,41 @@ class CupacExtension(MLExtension):
     def _kfold_fit_pandas(
         self, model: str, X: Dataset, Y: Dataset
     ) -> tuple[float, dict[str, float]]:
-        """
-        Perform K-fold cross-validation and return variance reduction and feature importances.
-
-        Returns:
-            tuple: (mean_variance_reduction, mean_feature_importances)
-        """
         model_proto = CUPAC_MODELS[model]["pandasdataset"]
-
         X_df = X.data
         Y_df = Y.data
-
         y_values = Y_df.iloc[:, 0] if len(Y_df.columns) > 0 else Y_df
-
         kf = KFold(n_splits=self.n_folds, shuffle=True, random_state=self.random_state)
-        fold_var_reductions = []
-        fold_feature_importances = []
 
+        fold_feature_importances = []
         feature_names = X_df.columns.tolist()
+
+        # Collect out-of-fold predictions for cross-fitting
+        y_original = y_values.to_numpy()
+        oof_pred = np.full(len(y_original), np.nan)
 
         for train_idx, val_idx in kf.split(X_df):
             X_train, X_val = X_df.iloc[train_idx], X_df.iloc[val_idx]
-            y_train, y_val = y_values.iloc[train_idx], y_values.iloc[val_idx]
-
+            y_train = y_values.iloc[train_idx]
             m = clone(model_proto)
             m.fit(X_train, y_train)
+            oof_pred[val_idx] = m.predict(X_val)
 
-            pred = m.predict(X_val)
-
-            y_original = y_val.to_numpy()
-            y_adjusted = y_original - pred + y_train.mean()
-
-            var_reduction = self._calculate_variance_reduction(y_original, y_adjusted)
-            fold_var_reductions.append(var_reduction)
-
-            # Extract feature importances for this fold
             fold_importances = self._extract_fold_importances(m, model, feature_names)
             fold_feature_importances.append(fold_importances)
 
-        mean_var_reduction = float(np.nanmean(fold_var_reductions))
+        # CUPED theta-residualize on pooled OOF predictions
+        theta = self._cuped_theta(y_original, oof_pred)
+        y_adjusted = y_original - theta * (oof_pred - oof_pred.mean())
 
-        # Average feature importances across folds: convert to dict with mean values
+        mean_var_reduction = self._calculate_variance_reduction(y_original, y_adjusted)
+
         mean_importances = {
             feature: float(
                 np.mean([fold_imp[feature] for fold_imp in fold_feature_importances])
             )
             for feature in feature_names
         }
-
         return mean_var_reduction, mean_importances
 
     def _fit_pandas(self, model: str, X: Dataset, Y: Dataset) -> Any:
