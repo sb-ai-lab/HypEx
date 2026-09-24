@@ -670,6 +670,11 @@ class SparkFaissExtension(FaissExtension):
         m = 4 # heuristic
         self.k = int(np.sqrt(self._data_size / m))
 
+        self._nprobe = max(
+            self.n_neighbors,
+            min(max(self.k // 10, 10), 50)
+        )
+
         if MatchingConfig.FAISS_FIT_MODE =="sample":
             frac = min(MatchingConfig.FAISS_SAMPLE_TARGET / max(self._data_size, 1), 1.0)
             sample_rows = (
@@ -691,6 +696,7 @@ class SparkFaissExtension(FaissExtension):
             quantizer = faiss.IndexFlatL2(d)
             self.index = faiss.IndexIVFFlat(quantizer, d, nlist)
             self.index.train(X)
+            self.index.nprobe = self._nprobe
 
             broadcast_index_required = True
             partition_func = _spark_partition_fit
@@ -700,6 +706,7 @@ class SparkFaissExtension(FaissExtension):
                 vectorized_data=vectorized_data,
                 model_name=model_name
             )
+            self.index.nprobe = self._nprobe
             broadcast_index_required = True
             partition_func = _spark_partition_fit
         elif MatchingConfig.FAISS_FIT_MODE == "full":
@@ -724,13 +731,14 @@ class SparkFaissExtension(FaissExtension):
                 .mapPartitions(lambda it: partition_func(it, bc_index, bc_storage))
                 .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
             )
-            bc_index.destroy(blocking=True)
+            # bc_index.destroy(blocking=True)
         else:
             self._sharded_rdd = (
                 rdd
                 .mapPartitions(lambda it: partition_func(it, bc_storage))
                 .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
             )
+        self._sharded_rdd.count()
 
     def _predict(
             self,
@@ -823,16 +831,19 @@ class SparkFaissExtension(FaissExtension):
                     return
                 query_ids = np.array([r["index"] for r in chunk], dtype=np.int64)
                 batch = np.array([list(r["_features"]) for r in chunk], dtype=np.float32)  # (Q, d)
-                del chunk
-                gc.collect() # TODO: detect time decr when gc.collect disabled
+                # del chunk
+                # gc.collect() # TODO: detect time decr when gc.collect disabled
 
                 candidates = [[] for _ in range(len(query_ids))]
                 for ref in references:
-                    tmp_index = cache.get(ref, storage, nprobe=min(real_n, bc_k.value))
+                    tmp_index = cache.get(
+                        ref,
+                        storage,
+                    )
                     k = min(real_n, tmp_index.ntotal)
                     dists, nids = tmp_index.search(batch, k)   # (Q, k)
                     del tmp_index
-                    gc.collect() # TODO: detect time decr when gc.collect disabled
+                    # gc.collect() # TODO: detect time decr when gc.collect disabled
 
                     for q_idx in range(len(query_ids)):
                         for rank in range(k):
@@ -848,7 +859,7 @@ class SparkFaissExtension(FaissExtension):
         session = test_data.sparkSession
         index_references = self.storage.collect_and_register(self._sharded_rdd)
 
-        self._sharded_rdd.unpersist()
+        self._sharded_rdd.unpersist(blocking=True)
         self._sharded_rdd = None
         bc_index_references = session.sparkContext.broadcast(index_references)
         bc_n_neighbors = session.sparkContext.broadcast(self.n_neighbors)
@@ -968,12 +979,12 @@ class SparkFaissExtension(FaissExtension):
         """
         clustered = getattr(self, '_clustered_data', None)
         if clustered is not None:
-            clustered.unpersist()
+            clustered.unpersist(blocking=True)
             self._clustered_data = None
 
         sharded = getattr(self, '_sharded_rdd', None)
         if sharded is not None:
-            sharded.unpersist()
+            sharded.unpersist(blocking=True)
             self._sharded_rdd = None
 
     def __enter__(self) -> SparkFaissExtension:

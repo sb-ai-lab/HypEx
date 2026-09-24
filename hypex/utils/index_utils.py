@@ -137,7 +137,7 @@ class CachingIndex:
         self,
         reference: str,
         storage: FaissIndexStorage,
-        nprobe: int,
+        # nprobe: int,
     ):
         with self._lock:
             if reference in self._cache:
@@ -145,11 +145,13 @@ class CachingIndex:
                 return self._cache[reference]
             if self._max and len(self._cache) >= self._max:
                 _, evicted = self._cache.popitem(last=False)
+                if hasattr(evicted, 'thisown'):
+                    evicted.thisown = 1
                 del evicted
                 gc.collect()
             tmp_index = storage.load_index(reference)
-            inner = faiss.downcast_index(tmp_index)
-            if hasattr(inner, "nprobe"):
-                inner.nprobe = nprobe
+            # inner = faiss.downcast_index(tmp_index)
+            # if hasattr(inner, "nprobe"):
+            #     inner.nprobe = nprobe
             self._cache[reference] = tmp_index
             return tmp_index
