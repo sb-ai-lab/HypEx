@@ -238,10 +238,6 @@ class ExperimentData:
         storage_level = self._data.get_storage_level() or "MEMORY_AND_DISK"
         was_persisted = self._data.is_persisted
 
-        if was_persisted:
-            self._data.unpersist()
-
-
         if not isinstance(value, Dataset):
             # Raw data (list, scalar, etc.) — add as a single column
             new_data = self._data.add_column(
@@ -272,8 +268,10 @@ class ExperimentData:
                 else:
                     new_data.roles[new_col_name] = value.roles.get(col, DefaultRole())
         new_data.persist(storage_level=storage_level, action="none")
+
         if was_persisted:
             self._data.unpersist()
+
         self._data = new_data
         return self
     
@@ -352,8 +350,8 @@ class ExperimentData:
 
         # truncate the computational graph (DAG) in Spark,
         # to avoid exponential slowdown at each iteration.
-        if cleaned.backend_type == BackendsEnum.spark:
-            cleaned.checkpoint(eager=True)
+        # if cleaned.backend_type == BackendsEnum.spark:
+        #     cleaned.checkpoint(eager=True)
 
         return cleaned
 
