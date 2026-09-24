@@ -238,7 +238,7 @@ class PandasFaissExtension(FaissExtension):
             data: Dataset,
             test_data: Dataset,
             X: np.ndarray
-    ) -> pd.Series:
+    ) -> Dataset:
         """
         Perform the FAISS search on the query vectors.
 
@@ -731,7 +731,6 @@ class SparkFaissExtension(FaissExtension):
                 .mapPartitions(lambda it: partition_func(it, bc_index, bc_storage))
                 .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
             )
-            # bc_index.destroy(blocking=True)
         else:
             self._sharded_rdd = (
                 rdd
@@ -843,6 +842,7 @@ class SparkFaissExtension(FaissExtension):
                     k = min(real_n, tmp_index.ntotal)
                     dists, nids = tmp_index.search(batch, k)   # (Q, k)
                     del tmp_index
+                    # gc.collect() # TODO: detect time decr when gc.collect disabled
                     # gc.collect() # TODO: detect time decr when gc.collect disabled
 
                     for q_idx in range(len(query_ids)):

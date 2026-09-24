@@ -3,24 +3,22 @@ from __future__ import annotations
 try:
     from typing import Self  # Python >= 3.11
 except ImportError:
-    from typing_extensions import Self  # Python < 3.11
+    from typing_extensions import Self  # pyright: ignore[reportMissingModuleSource]
 
-import warnings
-
-from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Sequence, Sized, TYPE_CHECKING
 import copy
+import warnings
+from pathlib import Path
+from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
 import numpy as np
 import pandas as pd  # type: ignore
-import pyspark.sql as spark
-import pyspark.sql.functions as F
+import pyspark.pandas as ps  # type: ignore
+import pyspark.sql as spark  # type: ignore
+import pyspark.sql.functions as F  # type: ignore
+from pyspark.ml.feature import StringIndexer  # type: ignore
 
-import pyspark.pandas as ps
-
-from pyspark.ml.feature import StringIndexer
-
-from ...utils import FromDictTypes, MergeOnError, ScalarType
+from ...config import DatasetConfig
+from ...utils import BackendsEnum, FromDictTypes, MergeOnError, ScalarType
 from ...utils.adapter import Adapter
 from ...utils.constants import UTILITY_INDEX_COL_NAME
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
@@ -37,6 +35,60 @@ class PandasNavigation(DatasetBackendNavigation):
             return self.__class__(data=result.to_frame())
 
         return result
+
+    def to_backend(
+        self,
+        target_backend: BackendsEnum,
+        session: spark.SparkSession | None = None,
+    ) -> Self:
+        """Convert pandas backend to another backend with index preservation.
+
+        When converting to Spark, the pandas index is explicitly saved as a
+        temporary column (``DatasetConfig.BACKEND_CONVERSION_INDEX_COL``)
+        before ``createDataFrame``, then restored via ``set_index`` on the
+        resulting ``pyspark.pandas.DataFrame``.
+
+        Args:
+            target_backend: Target backend enum value.
+            session: Spark session. Required for ``BackendsEnum.spark``.
+
+        Returns:
+            A new backend instance with converted data, or ``self`` when
+            already on the target backend.
+
+        Raises:
+            ValueError: If *target_backend* is unsupported or *session*
+                is ``None`` for spark conversion.
+        """
+        if target_backend == BackendsEnum.pandas:
+            return self
+
+        if target_backend == BackendsEnum.spark:
+            if session is None:
+                raise ValueError(
+                    "Spark session is required for pandas → spark conversion"
+                )
+
+            idx_col = DatasetConfig.BACKEND_CONVERSION_INDEX_COL
+
+            # Preserve index as an explicit column before the round-trip.
+            pdf = self.data.copy()
+            pdf.index.name = idx_col
+            pdf = pdf.reset_index()
+
+            # pd.DataFrame → spark.DataFrame → ps.DataFrame
+            spark_df = session.createDataFrame(pdf)
+            ps_df = ps.DataFrame(spark_df)
+
+            # Restore the index on the Spark side.
+            from .spark_backend import SparkDataset  # lazy to avoid circular import
+
+            result = SparkDataset(data=ps_df, session=session)
+            result.data = result.data.set_index(idx_col)
+            result.data.index.name = None
+            return result
+
+        raise ValueError(f"Unsupported target backend: {target_backend!r}")
 
     def _data_compression(
         self,
@@ -850,7 +902,7 @@ class PandasNavigation(DatasetBackendNavigation):
                 dtypes[k] = float
             elif pd.api.types.is_object_dtype(v):
                 if len(self.data) > 0 and pd.api.types.is_list_like(
-                    self.data[column_name].iloc[0]
+                    self.data[k].iloc[0]
                 ):
                     dtypes[k] = object
                 else:

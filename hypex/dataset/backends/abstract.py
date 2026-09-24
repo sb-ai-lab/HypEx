@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Sequence, Sized
 from typing import Any, Literal
 
-from ...utils import AbstractMethodError, FromDictTypes
+from ...utils import AbstractMethodError, BackendsEnum, FromDictTypes
 
 
 class DatasetBackendNavigation(ABC):
@@ -20,6 +20,35 @@ class DatasetBackendNavigation(ABC):
     operations required for data inspection, indexing, type handling, and
     structural modifications.
     """
+
+    @abstractmethod
+    def to_backend(
+        self,
+        target_backend: BackendsEnum,
+        session: Any | None = None,
+    ) -> Self:
+        """Convert the dataset to a different backend preserving the index.
+
+        Enables cross-backend operations by converting the underlying data
+        representation while maintaining row identity through explicit index
+        preservation.
+
+        Args:
+            target_backend: Target backend enum value
+                (``BackendsEnum.pandas`` or ``BackendsEnum.spark``).
+            session: Spark session instance. Required when converting
+                to ``BackendsEnum.spark``. Ignored for pandas.
+
+        Returns:
+            A new backend instance with converted data and preserved index.
+            Returns ``self`` when already on the target backend.
+
+        Raises:
+            ValueError: If *target_backend* is unsupported, *session* is
+                missing for spark conversion, or the conversion would
+                exceed memory limits.
+        """
+        raise AbstractMethodError
 
     @property
     def name(self) -> str:

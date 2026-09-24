@@ -1,30 +1,31 @@
 from __future__ import annotations
 
 import warnings
-from typing import Callable, Sequence, Any
+from copy import copy
+from typing import Any, Callable, Sequence
 
 import numpy as np
 import pandas as pd
-
-from pyspark.sql import Window
 import pyspark.sql.functions as F
 from pyspark.sql import DataFrame as SparkDF
-
+from pyspark.sql import Window
 from scipy.stats import (  # type: ignore
     chi2_contingency,
     ks_2samp,
+    kstwo,
+    kstwobign,
     mannwhitneyu,
     norm,
     ttest_ind,
-    kstwo,
-    kstwobign,
     kstest
 )
-from ..utils.registry import backend_factory
 
-from ..dataset import SmallDataset, Dataset, DatasetAdapter, StatisticRole
+from ..dataset import Dataset, DatasetAdapter, SmallDataset, StatisticRole
 from ..dataset.backends import PandasDataset, SparkDataset
+from ..dataset.roles import ABCRole
+from ..utils.registry import backend_factory
 from .abstract import CompareExtension
+
 
 class GroupStatTest(CompareExtension):
     """
@@ -57,7 +58,7 @@ class GroupStatTest(CompareExtension):
 
         return other
 
-    def _extract_arrays(self, data: Dataset, other: Dataset) -> tuple[Sequence]:
+    def _extract_arrays(self, data: Dataset, other: Dataset) -> tuple[Sequence, ...]:
         raise NotImplementedError("This method should be relized using backend-dependent mixin.")
 
     @staticmethod
@@ -142,6 +143,8 @@ class GroupChi2TestExtension(GroupStatTest):
                 },
                 StatisticRole(),
             )
+        if isinstance(contingency_table, Dataset):
+            contingency_table = contingency_table.data.values
         statistic, p_value, *_ = chi2_contingency(contingency_table, **kwargs)
         return self._form_results(statistic, p_value, self.reliability)
 
@@ -159,12 +162,34 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
 
     @staticmethod
     def mini_category_replace(counts: Dataset) -> Dataset:
+        """Merge rare categories (count < 7) into a single 'other' bucket.
+
+        Args:
+            counts: Value-counts dataset with a category column and 'count'.
+
+        Returns:
+            Dataset with rare categories aggregated into 'other'.
+        """
         mini_counts = counts["count"][counts["count"] < 7]
         if len(mini_counts) > 0:
+            cat_col = counts.columns[0]
+            # Override the category column's data_type to str because
+            # we are inserting the literal string "other".
+            new_roles: dict[str, ABCRole] = {}
+            for col, role in counts.roles.items():
+                new_role = copy(role)
+                if col == cat_col:
+                    new_role.data_type = str
+                new_roles[col] = new_role
+
             counts = counts.append(
-                Dataset.from_dict(
-                    [{counts.columns[0]: "other", "count": mini_counts["count"].sum()}],
-                    roles=mini_counts.roles,
+                DatasetAdapter.to_dataset(
+                    {
+                        cat_col: ["other"],
+                        "count": [int(mini_counts["count"].sum())],
+                    },
+                    roles=new_roles,
+                    small=False,
                 )
             )
             counts = counts[counts["count"] >= 7]
@@ -182,11 +207,18 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
 
         if len(counted_data) < 2:
             return None
-        data_vc = data_vc.add_column(counted_data[counted_data.columns[0]])
-        other_vc = other_vc.add_column(counted_data[counted_data.columns[0]])
-        return data_vc.merge(other_vc, on=counted_data.columns[0])[
-            ["count_x", "count_y"]
-        ].fillna(0)
+        col_name = str(counted_data.columns[0])
+        col_role = counted_data.roles.get(col_name, StatisticRole())
+
+        data_vc = data_vc.add_column(
+            counted_data[col_name].data,
+            role={col_name: col_role},
+        )
+        other_vc = other_vc.add_column(
+            counted_data[col_name].data,
+            role={col_name: col_role},
+        )
+        return data_vc.merge(other_vc, on=col_name)[["count_x", "count_y"]].fillna(0)
 
 @backend_factory.register(GroupKSTestExtension, SparkDataset)
 class SparkKSTestExtension(GroupKSTestExtension):

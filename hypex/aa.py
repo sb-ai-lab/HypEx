@@ -7,12 +7,14 @@ from .analyzers.aa import AADryTestAnalyzer, AAScoreAnalyzer, OneAAStatAnalyzer
 from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from .comparators.abstract import Comparator
 from .dataset import AdditionalTreatmentRole, FeatureRole, TargetRole
+from .executor import Executor
 from .experiments.base import Experiment, OnRoleExperiment
 from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from .forks.aa import IfAAExecutor
 from .reporters import DatasetReporter
 from .reporters.aa import OneAADictReporter
 from .splitters import AASplitter, AASplitterWithStratification
+from .transformers.float32_caster import Float32Caster
 from .transformers.na_dropper import NaDropper
 from .ui.aa import AAOutput
 from .ui.base import ExperimentShell
@@ -80,7 +82,8 @@ class AATest(ExperimentShell):
         additional_params: dict[str, Any] | None,
         random_states: Iterable[int] | None,
         groups_sizes: list[float] | None,
-        dry_test: bool
+        float32: bool = False,
+        dry_test: bool = False
     ) -> Experiment:
         """Builds the experiment pipeline for A/A testing."""
         aa_metrics = Experiment(
@@ -110,9 +113,15 @@ class AATest(ExperimentShell):
                 OneAAStatAnalyzer(),
             ]
         )
+        
+        pre_executors: list[Executor] = [NaDropper()]
+        if float32:
+            pre_executors.append(Float32Caster())
 
-        one_aa_base = Experiment(executors=[NaDropper(), AASplitter(), aa_metrics])
-        one_aa_strat = Experiment(executors=[NaDropper(), AASplitterWithStratification(), aa_metrics])
+        one_aa_base = Experiment(executors=[*pre_executors, AASplitter(), aa_metrics])
+        one_aa_strat = Experiment(executors=[*pre_executors, AASplitterWithStratification(), aa_metrics])
+        
+        
         base_experiment = one_aa_strat if stratification else one_aa_base
 
         params = AATest._prepare_params(
@@ -202,6 +211,7 @@ class AATest(ExperimentShell):
         random_states: Iterable[int] | None = None,
         t_test_equal_var: bool | None = None,
         groups_sizes: list[float] | None = None,
+        float32: bool = False,
         dry_test: bool = False
     ):
         if n_iterations is None:
@@ -217,6 +227,7 @@ class AATest(ExperimentShell):
                 additional_params=additional_params,
                 random_states=random_states,
                 groups_sizes=groups_sizes,
+                float32=float32,
                 dry_test=dry_test
             ),
             output=AAOutput()
