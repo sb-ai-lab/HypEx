@@ -7,11 +7,12 @@ from typing import Any, Dict, Optional, Tuple
 from ..dataset import Dataset, ExperimentData
 from ..dataset.ml_data import MLData, MLExperimentData
 from ..dataset.roles import PreTargetRole, TargetRole
-from ..executor import Executor
+# from ..executor import Executor
+from ..executor import Calculator
 from ..utils.enums import MLModeEnum
 
 
-class Splitter(Executor, ABC):
+class Splitter(Calculator, ABC):
     """
     Base class for general splitters.
 
