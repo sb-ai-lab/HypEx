@@ -14,8 +14,8 @@ from ..dataset.roles import StatisticRole, TargetRole
 from ..utils import BackendsEnum, NoColumnsError, timeit
 from ..utils.constants import CATEGORICAL_TYPES_LIST, NUMBER_TYPES_LIST
 from ..utils.errors import NotSuitableFieldError
-from ..utils.registry import backend_factory
 from ..utils.logger import logger
+from ..utils.registry import backend_factory
 from .abstract import StatsHypothesisTesting
 from .comparators import Chi2Test, KSTest, TTest, ZTest
 
@@ -39,7 +39,9 @@ class StatsTTest(StatsHypothesisTesting):
             target_roles: ABCRole | None = None,
             baseline_role: ABCRole | None = None,
             reliability: float = 0.05,
+            equal_variance: bool | None = None,
             key: Any = "",
+            **kwargs,
     ):
         """
         Initialize StatsTTest with roles and significance level.
@@ -51,14 +53,17 @@ class StatsTTest(StatsHypothesisTesting):
             key: Optional identifier for the test instance.
         """
         super().__init__(
-            stats=self.REQUIRED_STATS, 
+            stats=self.REQUIRED_STATS,
             compare_by=compare_by,
             grouping_role=grouping_role,
             target_roles=target_roles,
             baseline_role=baseline_role,
-            key=key, 
-            reliability=reliability
+            key=key,
+            reliability=reliability,
+            calc_kwargs={"equal_variance": equal_variance, **kwargs}
+            if equal_variance is not None else kwargs,
         )
+        self.equal_variance = equal_variance
 
     @property
     def search_types(self) -> list[type] | None:
@@ -104,21 +109,24 @@ class StatsTTest(StatsHypothesisTesting):
         current_means = (baseline_stats["mean"], compared_stats["mean"])
         current_sizes = (n1, n2)
 
+        equal_variance: bool | None = kwargs.get("equal_variance")
+
         # Edge case: both variances are zero
         if current_variances[0] == 0 and current_variances[1] == 0:
-            # If variances are zero, check equality of means
             if current_means[0] == current_means[1]:
-                return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+                # Identical distributions → no difference → pass=False
+                return {"p-value": 1.0, "statistic": 0.0, "pass": False}
             else:
-                return {"p-value": 0.0, "statistic": float("inf"), "pass": False}
+                return {"p-value": 0.0, "statistic": float("inf"), "pass": True}
 
         # Edge case: one of the variances is zero
         if current_variances[0] == 0 or current_variances[1] == 0:
-            # Use Welch's t-test with one zero variance
             similar_var = False
+        elif equal_variance is not None:
+            similar_var = equal_variance
         else:
             similar_var = (current_variances[0] < 2 * current_variances[1] and
-                          current_variances[0] > 0.5 * current_variances[1])
+                           current_variances[0] > 0.5 * current_variances[1])
 
         t_stat = cls._t_statistics(
                         n_list=current_sizes,
