@@ -3,7 +3,14 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from ..comparators import GroupTTest, GroupUTest, StatsChi2Test, StatsTTest
+from ..comparators import (
+    GroupKSTest,
+    GroupTTest,
+    GroupUTest,
+    StatsChi2Test,
+    StatsKSTest,
+    StatsTTest,
+)
 from ..dataset import (
     Dataset,
     ExperimentData,
@@ -193,7 +200,10 @@ class ABAnalyzer(Executor):
         Raises:
             KeyError: If the treatment column cannot be found in the dataset.
         """
-        executor_ids = data.get_ids([GroupTTest, GroupUTest, StatsTTest, StatsChi2Test])
+        executor_ids = data.get_ids(
+            [GroupTTest, GroupUTest, GroupKSTest,
+             StatsTTest, StatsChi2Test, StatsKSTest]
+        )
 
         group_field = data.ds.search_columns(TreatmentRole())[0]
 
