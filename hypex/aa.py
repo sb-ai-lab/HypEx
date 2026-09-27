@@ -17,7 +17,7 @@ from .splitters import AASplitter, AASplitterWithStratification
 from .transformers.float32_caster import Float32Caster
 from .transformers.na_dropper import NaDropper
 from .ui.aa import AAOutput
-from .ui.base import ExperimentOutput, ExperimentShell
+from .ui.base import ExperimentShell
 from .utils import SpaceEnum
 
 
@@ -245,9 +245,9 @@ class AATest(ExperimentShell):
                 groups_sizes=groups_sizes,
                 float32=float32,
                 early_stopping=early_stopping,
-            ),
-            output=ExperimentOutput(main_output=AAOutput()),
-        )
+             ),
+            output=AAOutput(),
+         )
 
         if equal_variance is not None:
             self.experiment.set_params(

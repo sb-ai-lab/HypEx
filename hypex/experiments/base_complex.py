@@ -115,14 +115,14 @@ class GroupExperiment(ExperimentWithReporter):
             new_cols = {col: f"{key} {col}" for col in ds.columns}
             ds = ds.rename(new_cols)
             datasets.append(ds)
-            
+
         if not datasets:
             return data
-            
+
         combined = datasets[0]
         for ds in datasets[1:]:
             combined = combined.merge(ds, left_index=True, right_index=True, how="outer")
-            
+
         data.analysis_tables[self.id] = combined
         return data
 
