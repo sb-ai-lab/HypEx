@@ -176,7 +176,8 @@ class CUPACExecutor(MLExecutor):
                 raise ValueError(
                     f"Target '{target}' has no lag periods defined. "
                     f"CUPAC requires at least one historical period. "
-                    f"Assign PreTargetRole(lag=N) to historical columns of this target."
+                    f"Assign PreTargetRole(lag=N) to historical columns "
+                    f"of this target."
                 )
             max_lag = max(lags.keys())
             for feature in cofounders[target]:
