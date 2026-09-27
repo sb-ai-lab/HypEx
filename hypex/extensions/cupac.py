@@ -8,6 +8,7 @@ from sklearn.base import clone
 from sklearn.model_selection import KFold
 
 from ..dataset import AdditionalTargetRole, Dataset
+from ..utils.cuped_theta import cuped_theta
 from ..utils.models import CUPAC_MODELS
 from .abstract import MLExtension
 
@@ -22,6 +23,10 @@ class CupacExtension(MLExtension):
         super().__init__()
         self.n_folds = n_folds
         self.random_state = random_state
+
+    @staticmethod
+    def _cuped_theta(y, pred) -> float:
+        return cuped_theta(y, pred)
 
     def _calc_pandas(
         self,
@@ -55,25 +60,20 @@ class CupacExtension(MLExtension):
 
         fold_feature_importances = []
         feature_names = X_df.columns.tolist()
-
-        # Collect out-of-fold predictions for cross-fitting
+        # OOF cross-fitting: theta estimated on out-of-fold predictions
         y_original = y_values.to_numpy()
         oof_pred = np.full(len(y_original), np.nan)
-
         for train_idx, val_idx in kf.split(X_df):
             X_train, X_val = X_df.iloc[train_idx], X_df.iloc[val_idx]
             y_train = y_values.iloc[train_idx]
             m = clone(model_proto)
             m.fit(X_train, y_train)
             oof_pred[val_idx] = m.predict(X_val)
-
             fold_importances = self._extract_fold_importances(m, model, feature_names)
             fold_feature_importances.append(fold_importances)
 
-        # CUPED theta-residualize on pooled OOF predictions
         theta = self._cuped_theta(y_original, oof_pred)
         y_adjusted = y_original - theta * (oof_pred - oof_pred.mean())
-
         mean_var_reduction = self._calculate_variance_reduction(y_original, y_adjusted)
 
         mean_importances = {
