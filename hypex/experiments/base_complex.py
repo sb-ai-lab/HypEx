@@ -223,8 +223,14 @@ class IfParamsExperiment(ParamsExperiment):
         transformer: bool | None = None,
         key: str = "",
     ):
-        self.stopping_criterion = stopping_criterion
-        super().__init__(executors, reporter, params, transformer, key)
+        super().__init__(
+            executors,
+            reporter,
+            params,
+            transformer,
+            stopping_criterion=stopping_criterion,
+            key=key,
+        )
 
     @timeit(level="PIPELINE", prefix="PARAMS")
     def execute(self, data: ExperimentData) -> ExperimentData:
