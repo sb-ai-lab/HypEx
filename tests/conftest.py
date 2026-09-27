@@ -9,14 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from hypex.dataset import (
-    Dataset,
-    FeatureRole,
-    GroupingRole,
-    TargetRole,
-    TreatmentRole,
-)
-from hypex.utils.enums import BackendsEnum
+from hypex.dataset import ABCRole, Dataset
+from hypex.utils import BackendsEnum
 
 
 # ---------------------------------------------------------------------------
@@ -52,8 +46,6 @@ def spark_session():
         .config("spark.ui.enabled", "false")
         .config("spark.sql.shuffle.partitions", "2")
         .config("spark.sql.execution.arrow.pyspark.enabled", "false")
-        .config("spark.driver.extraJavaOptions", "-Dio.netty.tryReflectionSetAccessible=true")
-        .config("spark.executor.extraJavaOptions", "-Dio.netty.tryReflectionSetAccessible=true")
         .getOrCreate()
     )
     # Suppress noisy Spark logs during tests
@@ -140,7 +132,7 @@ def make_dataset(backend, spark_session):
     """
     def _factory(
         data: pd.DataFrame,
-        roles: dict,
+        roles: dict[str, ABCRole],
         session=None,
     ) -> Dataset:
         """Create a Dataset from a pandas DataFrame and roles mapping.
