@@ -67,7 +67,8 @@ class CUPACExecutor(MLExecutor):
 
         if wrong_models:
             raise ValueError(
-                f"Wrong cupac models: {wrong_models}. Available models: {list(CUPAC_MODELS.keys())}"
+                f"Wrong or not installed cupac models: {wrong_models}. "
+                f"Available models: {list(CUPAC_MODELS.keys())}"
             )
 
     @staticmethod
