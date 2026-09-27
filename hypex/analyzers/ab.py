@@ -121,9 +121,7 @@ class ABAnalyzer(Executor):
 
         if self.multitest_method and num_comparisons > 1:
             if self.multitest_method != ABNTestMethodsEnum.quantile:
-                multitest_result = MultiTest(self.multitest_method).calc(
-                    p_values, **kwargs
-                )
+                multitest_result = MultiTest(self.multitest_method, self.alpha).calc(p_values, **kwargs)
                 groups = []
                 for i in list(data.groups[group_field].keys())[1:]:
                     groups += [i] * len(target_fields)
