@@ -1555,10 +1555,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         """
         initial_index = self.data.index
         if isinstance(other, np.ndarray):
-            other_df = pd.DataFrame(
-                data=other,
-                index=self.columns if other.shape[0] == self.shape[1] else None,
-            )
+            if other.ndim == 1:
+                other_df = pd.DataFrame(data=other, index=self.columns)
+            else:
+                other_df = pd.DataFrame(
+                    data=other,
+                    index=self.columns if other.shape[0] == self.shape[1] else None,
+                )
             result = self.data.dot(other_df)
             result.columns = (
                 self.columns if other.shape[1] == self.shape[1] else result.columns
