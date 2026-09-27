@@ -17,7 +17,7 @@ from .splitters import AASplitter, AASplitterWithStratification
 from .transformers.float32_caster import Float32Caster
 from .transformers.na_dropper import NaDropper
 from .ui.aa import AAOutput
-from .ui.base import ExperimentShell
+from .ui.base import ExperimentOutput, ExperimentShell
 from .utils import SpaceEnum
 
 
@@ -206,13 +206,27 @@ class AATest(ExperimentShell):
         sample_size: float | None = None,
         additional_params: dict[str, Any] | None = None,
         random_states: Iterable[int] | None = None,
-        t_test_equal_var: bool | None = None,
+        equal_variance: bool | None = None,
         groups_sizes: list[float] | None = None,
         float32: bool = False,
+        early_stopping: bool = False,
+        t_test_equal_var: bool | None = None,
     ):
+        import warnings
+
+        if t_test_equal_var is not None:
+            warnings.warn(
+                "t_test_equal_var is deprecated and will be removed in a "
+                "future version. Use equal_variance instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if equal_variance is None:
+                equal_variance = t_test_equal_var
+
         if n_iterations is None:
             n_iterations = 2000 if precision_mode else 10
-            
+
         super().__init__(
             experiment=self._make_experiment(
                 stratification=stratification,
@@ -223,11 +237,12 @@ class AATest(ExperimentShell):
                 random_states=random_states,
                 groups_sizes=groups_sizes,
                 float32=float32,
+                early_stopping=early_stopping,
             ),
-            output=AAOutput(),
+            output=ExperimentOutput(main_output=AAOutput()),
         )
-        
-        if t_test_equal_var is not None:
+
+        if equal_variance is not None:
             self.experiment.set_params(
-                {TTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
+                {TTest: {"calc_kwargs": {"equal_var": equal_variance}}}
             )
