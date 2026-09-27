@@ -47,16 +47,15 @@ class MultiTest(Extension):
 
     def _calc_pandas(self, data: Dataset, **kwargs):
         """Apply multiple testing correction to a Pandas-backed collection of p-values.
-
+        
         Parses the composite index of *data* to identify which statistical test
         family (e.g. TTest, KSTest, Chi2Test) each p-value belongs to, then
         applies ``statsmodels.stats.multitest.multipletests`` **independently
         within each family**.  This ensures that corrections such as Holm or
         Bonferroni control the family-wise error rate per test type rather
         than across all heterogeneous comparisons simultaneously.
-
+        
         The workflow is:
-
         1. Flatten the p-value matrix into a 1-D array.
         2. Decompose each index label into ``(test, field, group)`` via
            :meth:`_index_parts`.
@@ -67,7 +66,7 @@ class MultiTest(Extension):
            alpha=self.alpha)``.
         5. Assemble the results into a :class:`Dataset` with one row per
            original p-value.
-
+        
         Args:
             data: A Pandas-backed ``Dataset`` whose values are raw,
                 uncorrected p-values.  The index must follow the composite
@@ -76,45 +75,45 @@ class MultiTest(Extension):
             **kwargs: Additional keyword arguments forwarded directly to
                 ``statsmodels.stats.multitest.multipletests`` (e.g.
                 ``maxiter`` for iterative methods).
-
+        
         Returns:
             Dataset: A new ``Dataset`` (via ``DatasetAdapter.to_dataset``)
             with the following columns, all assigned
             :class:`~hypex.dataset.StatisticRole`:
-
+            
             - ``"field"`` – the metric / feature name extracted from the
               index.
-            - ``"group"`` – the compared-group label extracted from the
-              index (empty string when not applicable).
             - ``"test"`` – the normalized test family name (e.g.
               ``"TTest"``).
             - ``"old p-value"`` – the original, uncorrected p-value.
             - ``"new p-value"`` – the p-value after correction.
             - ``"correction"`` – the ratio ``old / new`` (``0.0`` when the
               old p-value is zero).
-            - ``"H0 rejected"`` – boolean flag indicating whether the null
+            - ``"rejected"`` – boolean flag indicating whether the null
               hypothesis is rejected at ``self.alpha`` after correction.
-
+            - ``"group"`` – the compared-group label extracted from the
+              index (empty string when not applicable).
+        
         Raises:
             ValueError: If ``data`` contains no p-values or the index
                 format is incompatible with :meth:`_index_parts`.
-
+        
         Example:
             .. code-block:: python
-
-            multitest = MultiTest(method=ABNTestMethodsEnum.holm, alpha=0.05)
-            corrected_ds = multitest._calc_pandas(p_value_dataset)
-            print(corrected_ds[["test", "old p-value", "new p-value", "H0 rejected"]])
+            
+                multitest = MultiTest(method=ABNTestMethodsEnum.holm, alpha=0.05)
+                corrected_ds = multitest._calc_pandas(p_value_dataset)
+                print(corrected_ds[["test", "old p-value", "new p-value", "rejected"]])
         """
         p_values = data.data.values.flatten()
         tests_raw, fields, groups = self._index_parts(data.index)
-
+        
         # Normalize BEFORE grouping into families
         tests = [TEST_NAME_NORMALIZATION.get(t, t) for t in tests_raw]
-
+        
         corrected = np.empty(len(p_values), dtype=float)
         rejected = np.empty(len(p_values), dtype=bool)
-
+        
         # Correction per statistical test family
         for test in dict.fromkeys(tests):
             positions = [i for i, name in enumerate(tests) if name == test]
@@ -126,11 +125,10 @@ class MultiTest(Extension):
             )[:2]
             corrected[positions] = test_corrected
             rejected[positions] = test_rejected
-
+        
         return DatasetAdapter.to_dataset(
             {
                 "field": fields,
-                "group": groups,
                 "test": tests,
                 "old p-value": p_values,
                 "new p-value": corrected,
@@ -138,7 +136,8 @@ class MultiTest(Extension):
                     old / new if old != 0 else 0.0
                     for new, old in zip(corrected, p_values)
                 ],
-                "H0 rejected": rejected,
+                "rejected": rejected,
+                "group": groups,
             },
             StatisticRole(),
         )
