@@ -253,18 +253,21 @@ class ABAnalyzer(Executor):
                 else:
                     index_values = list(index_obj)
 
-                new_index = []
-                for idx_val in index_values:
-                    idx_str = str(idx_val)
-                    if NAME_BORDER_SYMBOL in idx_str:
-                        group, feature = idx_str.split(NAME_BORDER_SYMBOL, 1)
-                        new_index.append(
-                            f"{c}{ID_SPLIT_SYMBOL}{ID_SPLIT_SYMBOL}"
-                            f"{feature}{ID_SPLIT_SYMBOL}{group}"
-                        )
-                    else:
-                        new_index.append(idx_str)
-                t_data.data.index = new_index
+                group_labels = [groups[i][0] for i in range(1, num_groups + 1)]
+                if len(analysis_ids) * num_groups != len(t_data):
+                    raise ValueError(
+                        f"{c} produced {len(t_data)} rows for "
+                        f"{len(analysis_ids)} target(s) and "
+                        f"{num_groups} test group(s): the rows cannot "
+                        f"be attributed to a target and a group."
+                    )
+                # Rows come target-major: one row per (target, test group)
+                analysis_ids = [
+                    f"{aid}{ID_SPLIT_SYMBOL}{group}"
+                    for aid in analysis_ids
+                    for group in group_labels
+                ]
+                t_data.data.index = analysis_ids
 
                 for f in ["p-value", "pass"]:
                     step = len(t_data) // num_groups if num_groups > 0 else 1
