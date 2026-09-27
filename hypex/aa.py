@@ -83,6 +83,7 @@ class AATest(ExperimentShell):
         random_states: Iterable[int] | None,
         groups_sizes: list[float] | None,
         float32: bool = False,
+        early_stopping: bool = False,
     ) -> Experiment:
         """Builds the experiment pipeline for A/A testing."""
         
@@ -132,7 +133,13 @@ class AATest(ExperimentShell):
             ParamsExperiment(
                 executors=[base_experiment],
                 params=params,
-                reporter=DatasetReporter(OneAADictReporter(front=False), single_row=True),
+                reporter=DatasetReporter(
+                    OneAADictReporter(front=False), single_row=True
+                ),
+                stopping_criterion=(
+                    IfAAExecutor(all_features_passed=True)
+                    if early_stopping else None
+                ),
             )
         ]
         
