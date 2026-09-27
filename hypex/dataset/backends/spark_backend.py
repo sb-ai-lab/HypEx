@@ -1398,37 +1398,31 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             SparkDataset | float: Aggregated results, or scalar for single-value results.
         """
         subset = kwargs.pop("subset", None)
-        func = func if isinstance(func, (list, dict)) else [func]
+        if isinstance(func, str):
+            func = "variance" if func == "var" else "stddev" if func == "std" else func
+        elif isinstance(func, list):
+            func = ["variance" if f == "var" else "stddev" if f == "std" else f for f in func]
 
+        func = func if isinstance(func, (list, dict)) else [func]
         if subset is not None:
-            if isinstance(subset, str):
-                subset = [subset]
+            if isinstance(subset, str): subset = [subset]
             data_to_agg = self.data[subset]
         else:
             types = self.get_column_type()
-            numeric_cols = [
-                col
-                for col, dtype in types.items()
-                if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]
-            ]
-
-            # if len(numeric_cols) == 0:
-            #     return None
-
+            numeric_cols = [col for col, dtype in types.items() if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]]
             data_to_agg = self.data[numeric_cols]
+            if data_to_agg is None or len(data_to_agg.columns) == 0: return None
 
-        if data_to_agg is None or len(data_to_agg.columns) == 0:
-            return None
-
-        if isinstance(func, list) and len(func) == 1:
+        if isinstance(func, dict):
+            agg_dict = func
+        elif isinstance(func, list) and len(func) == 1:
             agg_dict = {col: func[0] for col in data_to_agg.columns}
         else:
             agg_dict = {col: func for col in data_to_agg.columns}
 
         result = data_to_agg.agg(agg_dict, **kwargs)
         converted = self._convert_agg_result(result)
-
-        if isinstance(converted, ps.DataFrame):
+        if isinstance(converted, ps.DataFrame): 
             return self._wrap_result(converted)
         return self._wrap_result(converted)
 
