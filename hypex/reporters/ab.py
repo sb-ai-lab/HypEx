@@ -5,11 +5,12 @@ from typing import Any, ClassVar
 
 from ..analyzers.ab import ABAnalyzer
 from ..comparators import (
-    BaseComparator,
     GroupChi2Test,
+    GroupKSTest,
     GroupTTest,
     GroupUTest,
     StatsChi2Test,
+    StatsKSTest,
     StatsTTest,
 )
 from ..dataset import Dataset, ExperimentData, StatisticRole
@@ -30,10 +31,10 @@ class ABTestReporter(DatasetReporter):
     Extracts group sizes, metric differences, statistical test outcomes,
     and analyzer data, formatting them into a structured dataset or dictionary.
     """
-    
-    tests: ClassVar[list[type[BaseComparator]]] = [
-        GroupTTest, GroupUTest, GroupChi2Test,
-        StatsTTest, StatsChi2Test
+
+    tests: ClassVar[list] = [
+        GroupTTest, GroupKSTest, GroupUTest, GroupChi2Test,
+        StatsTTest, StatsKSTest, StatsChi2Test,
     ]
 
     def _report(self, data: ExperimentData) -> dict[str, Any]:
