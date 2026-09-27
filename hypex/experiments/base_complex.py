@@ -99,7 +99,8 @@ class GroupExperiment(ExperimentWithReporter):
         clean_ds = data._clean_ds_for_iteration()
         results = []
         for group, group_data in tqdm(clean_ds.groupby(group_field)):
-            key = str(group[0])
+            # pandas >= 2.0 yields a 1-element tuple; < 2.0 yields scalar
+            key = str(group[0] if isinstance(group, tuple) else group)
             res = self.one_iteration(ExperimentData(group_data), key, set_key_as_index=False)
             results.append((key, res))
         return self._set_result(data, results)
