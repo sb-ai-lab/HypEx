@@ -328,6 +328,20 @@ class TestDictReporter(DictReporter, ABC):
         Returns:
             A ``SmallDataset`` containing the structured test results.
         """
+        def _is_truthy(v) -> bool:
+            """Return True iff v represents a truthy pass value.
+
+            Handles the case where transpose().to_records() stringifies
+            booleans (e.g. numpy.bool_(False) → "False"), so a plain
+            bool() check would incorrectly treat the non-empty string
+            "False" as True.
+            """
+            if v is None:
+                return False
+            if isinstance(v, str):
+                return v.lower() == "true"
+            return bool(v)
+
         result = []
         for feature, groups in data.items():
             for group, tests in groups.items():
@@ -351,8 +365,9 @@ class TestDictReporter(DictReporter, ABC):
         for row in result:
             for k, v in list(row.items()):
                 if "pass" in k:
-                    row[k] = "OK" if v is True or str(v).lower() in ("true", "1") else "NOT OK"
-                    
+                    # truthy pass = difference detected = NOT OK
+                    row[k] = "NOT OK" if _is_truthy(v) else "OK"
+
         if not result:
             return SmallDataset.from_dict(
                 {"feature": [], "group": []},
