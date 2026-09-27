@@ -139,7 +139,16 @@ class ParamsExperiment(ExperimentWithReporter):
         super().__init__(executors, reporter, transformer, key)
         self._params = params
         self._flat_params: list[dict[type, dict[str, Any]]] = []
-        self.stopping_criterion = stopping_criterion 
+        self.stopping_criterion = stopping_criterion
+
+    def _stopping_criterion_met(self, t_data: ExperimentData) -> bool:
+        if self.stopping_criterion is None:
+            return False
+        if_result = self.stopping_criterion.execute(t_data)
+        if_executor_id = if_result.get_one_id(
+            self.stopping_criterion.__class__, ExperimentDataEnum.variables
+        )
+        return bool(if_result.variables[if_executor_id]["response"])
 
     def generate_params_hash(self) -> str:
         return f"ParamsExperiment: {self.reporter.__class__.__name__}"
