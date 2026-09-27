@@ -269,8 +269,6 @@ class DatasetAdapter(Adapter):
                 data=data, columns=[next(iter(roles.keys()))] if len(roles) > 0 else [0]
             ),
         )
-        if not small:
-            result = result.to_dataset()
         return result
 
     @staticmethod
