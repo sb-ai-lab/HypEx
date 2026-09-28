@@ -1,5 +1,5 @@
 from .aa import AABestSplitReporter, AAPassedReporter, AATestReporter
-from .ab import ABTestReporter, CupacReporter
+from .ab import ABTestReporter
 from .abstract import (
     REPORTABLE_METRICS,
     DatasetReporter,
@@ -8,6 +8,8 @@ from .abstract import (
     ResultKey,
     TestDictReporter,
 )
+from .cupac import CupacReporter
+from .cuped import CupedReporter
 from .homo import HomogeneityReporter
 from .matching import MatchingQualityReporter, MatchingReporter
 
@@ -21,6 +23,7 @@ __all__ = [
     "ABDictReporter",
     "ABTestReporter",
     "CupacReporter",
+    "CupedReporter",
     "DatasetReporter",
     "DictReporter",
     "HomoDatasetReporter",
@@ -36,5 +39,5 @@ __all__ = [
     "OneAADictReporter",
     "Reporter",
     "ResultKey",
-    "TestDictReporter"
+    "TestDictReporter",
 ]
