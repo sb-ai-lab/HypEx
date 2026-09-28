@@ -251,5 +251,5 @@ class AATest(ExperimentShell):
 
         if equal_variance is not None:
             self.experiment.set_params(
-                {TTest: {"calc_kwargs": {"equal_var": equal_variance}}}
+                {TTest: {"calc_kwargs": {"equal_variance": equal_variance}}}
             )
