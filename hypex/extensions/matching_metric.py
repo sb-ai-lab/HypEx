@@ -143,6 +143,9 @@ class MatchingMetricsExtension(Extension):
     ) -> float:
         """Calculate the standard error of the treatment effect estimate.
 
+        Returns NaN instead of 0.0 for degenerate inputs to prevent
+        false significance (SE=0 → z=±inf → p=0).
+
         Args:
             n_c: Sample size of the control group.
             n_t: Sample size of the treatment group.
@@ -152,8 +155,12 @@ class MatchingMetricsExtension(Extension):
             fs_t: Sum of squared weights for the treatment group times size of treatment group.
 
         Returns:
-            The computed standard error.
+            The computed standard error, or NaN for degenerate inputs.
         """
+        if n_c == 0 or n_t == 0:
+            return float("nan")
+        if np.isnan(var_c) or np.isnan(var_t):
+            return float("nan")
         return np.sqrt(fs_c * var_c / n_c + fs_t * var_t / n_t)
 
     @staticmethod
