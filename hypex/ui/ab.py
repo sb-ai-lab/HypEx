@@ -1,4 +1,3 @@
-# hypex/ui/ab.py
 """UI output handlers for A/B test results including CUPED and CUPAC."""
 from __future__ import annotations
 
