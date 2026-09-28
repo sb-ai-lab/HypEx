@@ -345,7 +345,8 @@ class StatsChi2Test(StatsHypothesisTesting):
                 }
         except ValueError:
             # For example, when all values in the table are identical
-            return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+            # No difference detected → pass=False
+            return {"p-value": 1.0, "statistic": 0.0, "pass": False}
 
         return result
 
