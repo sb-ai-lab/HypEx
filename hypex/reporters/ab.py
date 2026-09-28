@@ -122,12 +122,15 @@ class ABDictReporter(ABTestReporter):
 
 class ABDatasetReporter(ABTestReporter):
     """Legacy reporter wrapper for dataset output.
-
     Deprecated: Use ``ABTestReporter()`` instead.
     """
     def __init__(self):
         """Initialize the legacy dataset reporter."""
-        super().__init__(DictReporter(), output_format="dataset")
+        super().__init__(
+            DictReporter(),
+            output_format="dataset",
+            invert_pass=True,  # AB: significant effect = OK
+        )
         warnings.warn("ABDatasetReporter is deprecated.", DeprecationWarning, stacklevel=2)
 
 class CupacReporter(Reporter):
