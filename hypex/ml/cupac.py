@@ -3,12 +3,13 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from ..dataset.dataset import Dataset, SmallDataset, StatisticRole
+from ..dataset.dataset import Dataset, SmallDataset
 from ..dataset.experiment_data import ExperimentData, ExperimentDataEnum
 from ..dataset.roles import (
     AdditionalTargetRole,
     FeatureRole,
     PreTargetRole,
+    StatisticRole,
     TargetRole,
 )
 from ..executor import MLExecutor
