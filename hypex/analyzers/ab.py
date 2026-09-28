@@ -22,7 +22,7 @@ from ..dataset import (
 from ..dataset.dataset import SmallDataset
 from ..experiments.base import Executor
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
-from ..utils import ABNTestMethodsEnum, ExperimentDataEnum, timeit
+from ..utils import ABNTestMethodsEnum, Adapter, ExperimentDataEnum, timeit
 from ..utils.constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
 
 
@@ -174,20 +174,8 @@ class ABAnalyzer(Executor):
 
     @staticmethod
     def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
-        """Extract index values from a dataset in a backend-agnostic way.
-
-        Args:
-            table: The dataset instance.
-
-        Returns:
-            A list of index values.
-        """
-        index_obj = table.data.index
-        if hasattr(index_obj, "to_list"):
-            return index_obj.to_list()
-        if hasattr(index_obj, "tolist"):
-            return index_obj.tolist()
-        return list(index_obj)
+        """Extract index values from a dataset in a backend-agnostic way."""
+        return Adapter.to_list(table.data.index)
 
     @staticmethod
     def _extract_id_prefix(analysis_id: str) -> str:
