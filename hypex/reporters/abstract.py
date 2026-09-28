@@ -400,16 +400,17 @@ class TestDictReporter(DictReporter, ABC):
 
 class DatasetReporter(Reporter):
     """Reporter that outputs results as a structured ``Dataset`` or dictionary."""
-
     def __init__(
         self,
         dict_reporter: DictReporter | None = None,
         output_format: Literal["dict", "dataset"] = "dataset",
         single_row: bool = False,
+        invert_pass: bool = False,
     ):
         self.dict_reporter = dict_reporter or DictReporter()
         self.output_format = output_format
         self.single_row = single_row
+        self._invert_pass = invert_pass
 
     @property
     def front(self) -> bool:
