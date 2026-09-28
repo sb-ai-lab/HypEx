@@ -37,15 +37,19 @@ class CupedOutput:
         Args:
             experiment_data: The experiment data container.
         """
-        reporter = CupedReporter()
-        result = reporter.report(experiment_data)
-        self.variance_reductions = result if not result.is_empty() else None
+        report = ABTestReporter.report_variance_reductions(experiment_data)
+        if isinstance(report, str):
+            self.variance_reductions = None
+        else:
+            self.variance_reductions = report
 
     def __repr__(self) -> str:
         if self.variance_reductions is None:
             return "CupedOutput(no CUPED data available)"
-        n = len(self.variance_reductions)
-        return f"CupedOutput(variance_reductions: {n} target(s))"
+        return (
+            f"CupedOutput(variance_reductions: "
+            f"{len(self.variance_reductions)} target(s))"
+        )
 
 
 # ── CupacOutput ──────────────────────────────────────────────────────────────
