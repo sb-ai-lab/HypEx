@@ -94,18 +94,14 @@ class CUPEDTransformer(Transformer):
         return cls._inner_function(data, cuped_features)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        """Run CUPED on the experiment dataset and store variance reductions.
-
-        Adjusted targets are appended to ``ds`` with ``TargetRole``.
-        Variance-reduction percentages are written to ``analysis_tables``
-        via ``set_value`` as a ``SmallDataset``.
+        """Run CUPED and store variance reductions in analysis_tables.
 
         Args:
             data: The experiment data container.
 
         Returns:
-            Updated ``ExperimentData`` with adjusted targets and
-            variance-reduction report in ``analysis_tables``.
+            Updated ``ExperimentData`` with adjusted targets in ``ds``
+            and variance-reduction report in ``analysis_tables``.
         """
         new_ds = self.calc(data=data.ds, cuped_features=self.cuped_features)
 

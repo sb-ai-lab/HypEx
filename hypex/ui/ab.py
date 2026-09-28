@@ -29,7 +29,7 @@ class CupedOutput:
     """
 
     def __init__(self) -> None:
-        self.variance_reductions: SmallDataset | None = None
+        self.variance_reductions: Dataset | None = None
 
     def extract(self, experiment_data: ExperimentData) -> None:
         """Populate CUPED outputs from experiment data.
@@ -125,6 +125,20 @@ class ABOutput(Output):
 
     # ── Internal extraction helpers (unchanged from original) ────────
 
+    @property
+    def variance_reduction_report(self) -> Dataset | str:
+        """Get variance reduction report for CUPED/CUPAC transformations.
+
+        Returns:
+            A ``SmallDataset`` with variance reduction percentages per
+            transformed metric, or a descriptive string if unavailable.
+        """
+        if hasattr(self, "_experiment_data"):
+            return self.resume_reporter.report_variance_reductions(
+                self._experiment_data,
+            )
+        return "No experiment data available."
+
     def _extract_multitest_result(self, experiment_data: ExperimentData) -> None:
         multitest_id = experiment_data.get_one_id(
             ABAnalyzer, ExperimentDataEnum.analysis_tables,
@@ -206,8 +220,8 @@ class ABOutput(Output):
         self._extract_differences(experiment_data)
         self._extract_multitest_result(experiment_data)
         self._extract_sizes(experiment_data)
+        self._extract_variance_reductions(experiment_data)
+        self._extract_feature_importances(experiment_data)
 
         if self.cuped is not None:
             self.cuped.extract(experiment_data)
-        if self.cupac is not None:
-            self.cupac.extract(experiment_data)
