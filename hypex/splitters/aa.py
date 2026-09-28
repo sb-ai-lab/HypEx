@@ -109,30 +109,76 @@ class AASplitter(Calculator):
         const_group_field: str | None = None,
         **kwargs,
     ) -> Dataset:
-        """
-        Splits data into control/test groups using distributed labeling.
-        Avoids iloc/sort-limit OOM issues on Spark.
-        """
-        # Handle const_group_field filtering
-        if const_group_field:
-            data_to_split = data.filter(data.select(const_group_field).isna())
-        else:
-            data_to_split = data
-        # Determine fraction and total count
-        # Note: len() on Spark Dataset triggers a count(), which is necessary 
-        # to calculate exact edges for balanced splits.
-        n_total = len(data_to_split)
-        frac = sample_size if sample_size is not None else 1.0
-        n_sampled = int(n_total * frac)
+        """Split data into control/test groups using distributed labeling.
 
-        if n_sampled == 0:
-            # Return empty dataset with same structure if nothing to sample
-            return Dataset.create_empty(
-                roles={"split": StatisticRole()}, backend=data.backend_type
+        When *const_group_field* is provided, rows with non-missing values
+        in that column are **pinned** to their respective groups and do
+        NOT participate in random splitting.  Only rows with missing
+        values (NaN, None, empty string, etc.) are split randomly.
+
+        The effective ``control_size`` is adjusted so that the TOTAL
+        control fraction (pinned + random) matches the requested value.
+
+        Args:
+            data: Input dataset to split.
+            random_state: Seed for reproducibility.
+            control_size: Desired fraction of data in control group.
+            groups_sizes: Custom group size proportions.
+            sample_size: Fraction of data to sample.
+            const_group_field: Column with pinned group assignments.
+            **kwargs: Additional arguments (unused).
+
+        Returns:
+            Dataset with a ``split`` column assigning each row to a group.
+
+        Raises:
+            ValueError: If an unknown constant group label is encountered.
+        """
+        # ── 1. Separate pinned rows from free rows ──────────────────
+        sample_size = sample_size if sample_size is not None else 1.0
+        control_indexes: list = []
+        const_data: dict[str, Dataset] = {}
+        free_size = len(data)
+
+        if const_group_field:
+            const_data = {
+                group: group_data
+                for group, group_data in data.groupby(const_group_field)
+                if str(group).strip().lower() not in MISSING_CONST_LABELS
+            }
+            # Extract pinned control rows to adjust random control_size
+            control_data = const_data.get("control")
+            if control_data is not None:
+                control_indexes = list(control_data.index)
+
+            free_size = len(data) - sum(
+                len(cd) for cd in const_data.values()
             )
 
-        MOD = 10_000_000
+            # Adjust control_size: account for already-pinned control rows
+            control_size = (
+                0.0
+                if free_size == 0
+                else max(
+                    0.0,
+                    (len(data) * control_size - len(control_indexes))
+                    / free_size,
+                )
+            )
 
+            pinned_indexes = {
+                index
+                for group_data in const_data.values()
+                for index in group_data.index
+            }
+        else:
+            pinned_indexes = set()
+
+        # ── 2. Determine edges and labels ───────────────────────────
+        frac = sample_size
+        n_sampled = int(free_size * frac)
+
+        MOD = 10_000_000
         effective_mod = int(frac * MOD) if frac < 1.0 else MOD
 
         if groups_sizes:
@@ -146,7 +192,7 @@ class AASplitter(Calculator):
                 edges.append(int(cumulative * effective_mod))
             edges[-1] = effective_mod
         else:
-            n_control = int(n_sampled * control_size)
+            n_control = int(n_sampled * control_size) if n_sampled > 0 else 0
             edges = [
                 int((n_control / n_sampled) * effective_mod)
                 if n_sampled > 0
@@ -155,17 +201,40 @@ class AASplitter(Calculator):
             ]
             labels = ["control", "test_1"]
 
-        # Call the new backend method
-        # This returns a Dataset with the original index and a new 'split' column
-        split_ds = data_to_split.random_split_labels(
-            edges=edges,
-            labels=labels,
-            random_state=random_state,
-            frac=frac,
-            name="split",
-        )
-        # Ensure roles are set correctly
-        split_ds.roles["split"] = StatisticRole() # Or AdditionalTreatmentRole depending on downstream usage
+        # Build label_map for _apply_const_groups
+        label_map = {i: label for i, label in enumerate(labels)}
+
+        # ── 3. Random split on free rows only ───────────────────────
+        if free_size > 0 and n_sampled > 0:
+            experiment_data = (
+                data.filter(~data.index.isin(pinned_indexes))
+                if const_group_field
+                else data
+            )
+            split_ds = experiment_data.random_split_labels(
+                edges=edges,
+                labels=labels,
+                random_state=random_state,
+                frac=frac,
+                name="split",
+            )
+        else:
+            split_ds = Dataset.create_empty(
+                roles={"split": StatisticRole()},
+                backend=data.backend_type,
+                session=data.session if hasattr(data, "session") else None,
+            )
+
+        # ── 4. Append pinned groups ─────────────────────────────────
+        if const_group_field and const_data:
+            split_ds = AASplitter._apply_const_groups(
+                split_ds=split_ds,
+                const_data=const_data,
+                label_map=label_map,
+                const_group_field=const_group_field,
+            )
+
+        split_ds.roles["split"] = StatisticRole()
         return split_ds
 
     @timeit(level="SPLIT", prefix="SPLITTER")
