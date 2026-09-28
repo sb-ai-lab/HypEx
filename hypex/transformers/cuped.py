@@ -9,6 +9,7 @@ import numpy as np
 from ..dataset.dataset import Dataset, SmallDataset
 from ..dataset.experiment_data import ExperimentData
 from ..dataset.roles import StatisticRole, TargetRole
+from ..utils.cuped_theta import cuped_theta
 from ..utils.enums import ExperimentDataEnum
 from .abstract import Transformer
 
@@ -45,6 +46,9 @@ class CUPEDTransformer(Transformer):
     ) -> Dataset:
         """Compute CUPED-adjusted columns.
 
+        Uses the shared ``cuped_theta`` helper for numerically stable
+        θ estimation with centered arithmetic.
+
         Args:
             data: Input dataset containing target and pre-target columns.
             cuped_features: Mapping ``{target: pre_target}``.
@@ -54,15 +58,10 @@ class CUPEDTransformer(Transformer):
         """
         result = deepcopy(data)
         for target_feature, pre_target_feature in cuped_features.items():
-            mean_xy = (result[target_feature] * result[pre_target_feature]).mean()
-            mean_x = result[pre_target_feature].mean()
-            mean_y = result[target_feature].mean()
-            cov_xy = mean_xy - mean_x * mean_y
-            mean_xx = (result[pre_target_feature] * result[pre_target_feature]).mean()
-            var_x = mean_xx - mean_x * mean_x
-
-            theta = 0.0 if (var_x == 0 or np.isnan(var_x)) else cov_xy / var_x
-
+            theta = cuped_theta(
+                result[target_feature].data.values.flatten(),
+                result[pre_target_feature].data.values.flatten(),
+            )
             pre_target_mean = result[pre_target_feature].mean()
             new_values_ds = (
                 result[target_feature]
