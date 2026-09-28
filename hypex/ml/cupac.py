@@ -75,36 +75,37 @@ class CUPACExecutor(MLExecutor):
 
     @staticmethod
     def _prepare_data(data: ExperimentData) -> dict[str, dict[str, list]]:
-        """
-        Prepare data for CUPAC by organizing temporal fields into training and prediction structures.
+        """Prepare data for CUPAC by organizing temporal fields into training
+        and prediction structures.
 
         This method performs complex data organization:
-        1. Groups target and feature fields by their temporal lags
-        2. Identifies cofounders (features used for prediction)
-        3. Structures data into X_train, Y_train for model training
-        4. Creates X_predict for current period adjustment (if applicable)
+        1. Groups target and feature fields by their temporal lags.
+        2. Identifies cofounders (features used for prediction).
+        3. Structures data into X_train, Y_train for model training.
+        4. Creates X_predict for current period adjustment (if applicable).
 
         Args:
-            data (ExperimentData): Input experiment data with temporal roles.
+            data: Input experiment data with temporal roles.
 
         Returns:
-            dict: Nested dictionary with structure:
+            Nested dictionary with structure::
+
                 {target_name: {
                     'X_train': [[feature_cols_at_lag_n], ..., [feature_cols_at_lag_2]],
                     'Y_train': [target_at_lag_n-1, ..., target_at_lag_1],
-                    'X_predict': [[feature_cols_at_lag_1]] (optional, only for real targets)
+                    'X_predict': [[feature_cols_at_lag_1]] (optional)
                 }}
         """
 
         def agg_temporal_fields(role, data) -> dict[str, dict]:
-            """
-            Aggregate fields by their temporal lags.
+            """Aggregate fields by their temporal lags.
 
             Returns:
-                dict: {field_name: {lag: field_name_with_lag}} or {field_name: {}}
-                      Empty dict means lag=0 or None (current period).
+                dict: ``{field_name: {lag: field_name_with_lag}}`` or
+                ``{field_name: {}}``. Empty dict means lag=0 or None
+                (current period).
             """
-            fields = {}
+            fields: dict[str, dict] = {}
             searched_fields = data.field_search(
                 (
                     [TargetRole(), PreTargetRole()]
@@ -113,6 +114,17 @@ class CUPACExecutor(MLExecutor):
                 ),
                 search_types=[int, float],
             )
+
+            # ── BUGFIX: exclude synthetic columns created by a previous
+            #    CUPAC run (AdditionalTargetRole inherits TargetRole,
+            #    so field_search picks them up). These columns have no
+            #    lag metadata and must not be treated as real targets.
+            from ..dataset.roles import AdditionalRole
+            searched_fields = [
+                f for f in searched_fields
+                if not isinstance(data.ds.roles.get(f), AdditionalRole)
+            ]
+            # ──────────────────────────────────────────────────────────
 
             searched_lags = [
                 (
@@ -133,47 +145,75 @@ class CUPACExecutor(MLExecutor):
                     if data.ds.roles[field].parent not in fields:
                         fields[data.ds.roles[field].parent] = {}
                     fields[data.ds.roles[field].parent][lag] = field
-
             return fields
 
         def agg_train_predict_x(mode: str, lag: int) -> None:
-            """
-            Aggregate features and targets for a specific lag into training/prediction sets.
+            """Aggregate features and targets for a specific lag into
+            training/prediction sets.
 
-            For each cofounder feature, creates a list structure where:
-            - First and last lags start new sublists
-            - Intermediate lags append to existing sublists
-            This groups temporal sequences of the same feature together.
+            For each cofounder feature, accumulates lag column names into
+            a single list so that all lags are vertically stacked together.
+            The target (used as an autoregressive feature) is accumulated
+            in the same manner at a fixed position after all cofounders.
+
+            Args:
+                mode: Target accumulator key (``"X_train"`` or
+                    ``"X_predict"``).
+                lag: Current lag being processed.
             """
             for i, cofounder in enumerate(cofounders[target]):
                 if lag in [1, max_lags[target]]:
-                    cupac_data[target][mode].append([features[cofounder][lag]])
+                    # First or last lag → create a new entry for this feature.
+                    cupac_data[target][mode].append(
+                        [features[cofounder][lag]]
+                    )
                 else:
-                    cupac_data[target][mode][i].append(cofounder)
+                    # Intermediate lag → append to the existing entry.
+                    cupac_data[target][mode][i].append(
+                        features[cofounder][lag]
+                    )
 
-            cupac_data[target][mode].append([targets[target][lag]])
+            # ── Target as autoregressive feature ──────────────────────
+            # The target entry sits at a fixed index right after all
+            # cofounders.  We create it on the FIRST call for a given
+            # mode (detected by list length) and append on subsequent
+            # calls.  This works for both X_train (first call at
+            # lag=max_lags) and X_predict (single call at lag=1).
+            target_idx = len(cofounders[target])
+            if target_idx >= len(cupac_data[target][mode]):
+                # Entry does not exist yet → create it.
+                cupac_data[target][mode].append(
+                    [targets[target][lag]]
+                )
+            else:
+                # Entry already exists → append the new lag column.
+                cupac_data[target][mode][target_idx].append(
+                    targets[target][lag]
+                )
 
-        cupac_data = {}
+        cupac_data: dict[str, dict[str, list]] = {}
         targets = agg_temporal_fields(TargetRole(), data)
         features = agg_temporal_fields(FeatureRole(), data)
 
         # Determine cofounders (features used for prediction) for each target
-        cofounders = {}
+        cofounders: dict[str, list[str]] = {}
         for target in targets:
             if target in data.ds.columns:
                 cofounders[target] = data.ds.roles[target].cofounders
             else:
                 # For virtual targets, get cofounders from the earliest lag
                 min_lag = min(targets[target].keys())
-                cofounders[target] = data.ds.roles[targets[target][min_lag]].cofounders
+                cofounders[target] = data.ds.roles[
+                    targets[target][min_lag]
+                ].cofounders
+            if cofounders[target] is None:
+                raise ValueError(
+                    f"Cofounders must be defined in the first lag for "
+                    f"virtual target '{target}'"
+                )
 
-                if cofounders[target] is None:
-                    raise ValueError(
-                        f"Cofounders must be defined in the first lag for virtual target '{target}'"
-                    )
-
-        # Calculate maximum lag for each target (max across target lags and cofounder feature lags)
-        max_lags = {}
+        # Calculate maximum lag for each target
+        max_lags: dict[str, int] = {}
         for target, lags in targets.items():
             if not lags:
                 raise ValueError(
@@ -190,19 +230,19 @@ class CUPACExecutor(MLExecutor):
 
         # Build training and prediction structures for each target
         for target in targets.keys():
-
             cupac_data[target] = {"X_train": [], "Y_train": []}
             # Only real targets (not virtual) need prediction
             if target in data.ds.columns:
                 cupac_data[target]["X_predict"] = []
 
             # Build training data: iterate from max_lag down to 2
-            # Each iteration creates X_train entry for lag and Y_train entry for lag-1
             for lag in range(max_lags[target], 1, -1):
                 agg_train_predict_x("X_train", lag)
-                cupac_data[target]["Y_train"].append(targets[target][lag - 1])
+                cupac_data[target]["Y_train"].append(
+                    targets[target][lag - 1]
+                )
 
-            # Build prediction data for current period (lag=1) if applicable
+            # Build prediction data for current period (lag=1)
             if "X_predict" in cupac_data[target].keys():
                 agg_train_predict_x("X_predict", 1)
 
@@ -258,31 +298,22 @@ class CUPACExecutor(MLExecutor):
     def _agg_data_from_cupac_data(
         data: ExperimentData, cupac_data_slice: list
     ) -> Dataset:
-        """
-        Aggregate columns from cupac_data structure into a single Dataset.
+        import logging
+        _dbg = logging.getLogger("hypex.cupac.debug")
+        _dbg.setLevel(logging.WARNING)
 
-        This method handles two types of column structures:
-        1. Single column: [column_name] - directly extracted
-        2. Multiple lag columns: [col_lag1, col_lag2, ...] - vertically stacked
+        _dbg.warning(
+            f"[AGG DEBUG] cupac_data_slice ({len(cupac_data_slice)} entries):"
+        )
+        for _i, _col in enumerate(cupac_data_slice):
+            _dbg.warning(f"  [{_i}] len={len(_col)} → {_col}")
 
-        Args:
-            data: Original ExperimentData with all columns.
-            cupac_data_slice: List of column specifications, where each element is:
-                - [single_col_name] for non-temporal columns
-                - [col_name_lag1, col_name_lag2, ...] for temporal sequences
-
-        Returns:
-            Dataset with standardized column names (0, 1, 2, ...).
-        """
         res_dataset = None
         column_counter = 0
-
         for column in cupac_data_slice:
             if len(column) == 1:
-                # Single column case: extract directly
                 col_data = data.ds[column[0]]
             else:
-                # Multiple lag columns: stack them vertically
                 res_lag_column = None
                 for lag_column in column:
                     tmp_dataset = data.ds[lag_column]
@@ -295,12 +326,24 @@ class CUPACExecutor(MLExecutor):
                         )
                 col_data = res_lag_column
 
-            # Standardize column names to numeric format for model training
             standard_col_name = f"{column_counter}"
             col_data = col_data.rename(
                 {next(iter(col_data.columns)): standard_col_name}
             )
             column_counter += 1
+
+            # ── DEBUG: row count before add_column ────────────────────
+            _dbg.warning(
+                f"  col[{column_counter - 1}] "
+                f"(from {column!r}): "
+                f"{len(col_data)} rows"
+                + (
+                    f" | res_dataset has {len(res_dataset)} rows"
+                    if res_dataset is not None
+                    else " | res_dataset is None (first col)"
+                )
+            )
+            # ──────────────────────────────────────────────────────────
 
             if res_dataset is None:
                 res_dataset = col_data
@@ -312,13 +355,13 @@ class CUPACExecutor(MLExecutor):
         """Execute CUPAC variance reduction on the experiment data.
 
         Process:
-            1. Validate models and prepare temporal data structures.
-            2. For each target:
-               a. Try all specified models with cross-validation.
-               b. Select the model with best variance reduction.
-               c. Fit the best model on all training data.
-               d. Predict and adjust current target values.
-               e. Store adjusted target and variance-reduction metrics.
+        1. Validate models and prepare temporal data structures.
+        2. For each target:
+        a. Try all specified models with cross-validation.
+        b. Select the model with best variance reduction.
+        c. Fit the best model on all training data.
+        d. Predict and adjust current target values.
+        e. Store adjusted target and variance-reduction metrics.
 
         Args:
             data: Input data with temporal features and targets.
@@ -327,6 +370,21 @@ class CUPACExecutor(MLExecutor):
             Data with CUPAC-adjusted targets and variance reduction reports.
         """
         self._validate_models()
+
+        # ── BUGFIX: remove CUPAC columns from a previous run on the
+        #    same Dataset object.  CUPACExecutor is not a transformer,
+        #    so Experiment.execute() does NOT deepcopy the data.
+        #    Without this cleanup, re-running .execute(data) raises
+        #    "Columns with the same name already exist".
+        existing_cupac_cols = [
+            col for col in data.ds.columns
+            if col.endswith("_cupac")
+            and isinstance(data.ds.roles.get(col), AdditionalTargetRole)
+        ]
+        if existing_cupac_cols:
+            data = data.copy(data=data.ds.drop(columns=existing_cupac_cols))
+        # ──────────────────────────────────────────────────────────────
+
         cupac_data = self._prepare_data(data)
 
         for target, target_data in cupac_data.items():

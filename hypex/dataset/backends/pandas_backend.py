@@ -821,9 +821,11 @@ class PandasNavigation(DatasetBackendNavigation):
         """Return the column labels of the DataFrame.
 
         Returns:
-            pd.Index: DataFrame columns.
+            list[str]: Column names as a plain list, consistent
+            with the ``DatasetBase.columns`` interface and the
+            ``SparkNavigation.columns`` implementation.
         """
-        return self.data.columns
+        return self.data.columns.tolist()
 
     @property
     def session(self):

@@ -27,6 +27,64 @@ class CupacExtension(MLExtension):
     @staticmethod
     def _cuped_theta(y, pred) -> float:
         return cuped_theta(y, pred)
+    
+    def calc(
+        self,
+        data: Dataset,
+        mode: Literal["auto", "kfold_fit", "fit", "predict"] | None = None,
+        model: str | Any = None,
+        Y: Dataset | None = None,
+        **kwargs,
+    ) -> Any:
+        """Route to the appropriate internal method based on mode.
+
+        Args:
+            data: Feature dataset (X).
+            mode: Operation mode. One of "kfold_fit", "fit", "predict".
+            model: Model name (str) for fit modes, or fitted model
+                object for predict.
+            Y: Target dataset. Required for "kfold_fit" and "fit".
+            **kwargs: Additional arguments (unused).
+
+        Returns:
+            - "kfold_fit": (variance_reduction, feature_importances)
+            - "fit": fitted model object
+            - "predict": Dataset with predictions
+        """
+        if mode == "kfold_fit":
+            return self._kfold_fit_pandas(model, data, Y)
+        if mode == "fit":
+            return self._fit_pandas(model, data, Y)
+        if mode == "predict":
+            return self._predict_pandas(model, data)
+        raise ValueError(f"Unsupported mode: {mode!r}")
+
+    def fit(self, X: Dataset, Y: Dataset | None = None, **kwargs) -> Any:
+        """Train model on full data. Delegates to _fit_pandas.
+
+        Args:
+            X: Feature dataset.
+            Y: Target dataset.
+            **kwargs: Must contain 'model' key.
+
+        Returns:
+            Fitted model object.
+        """
+        model = kwargs.get("model")
+        return self._fit_pandas(model, X, Y)
+    
+    def predict(self, X: Dataset, **kwargs) -> Dataset:
+        """Generate predictions using a fitted model.
+
+        Args:
+            X: Feature dataset.
+            **kwargs: Must contain 'model' key (fitted model object).
+
+        Returns:
+            Dataset with a 'predict' column.
+        """
+        model = kwargs.get("model")
+        return self._predict_pandas(model, X)
 
     def _calc_pandas(
         self,
