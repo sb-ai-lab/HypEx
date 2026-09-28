@@ -333,7 +333,8 @@ class StatsChi2Test(StatsHypothesisTesting):
             non_zero_cols = col_sums > 0
             contingency_table = contingency_table[:, non_zero_cols]
             if contingency_table.shape[1] < 2:
-                return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+                # Only one non-zero column → no difference → pass=False
+                return {"p-value": 1.0, "statistic": 0.0, "pass": False}
 
         try:
             statistics = chi2_contingency(contingency_table, **kwargs)
