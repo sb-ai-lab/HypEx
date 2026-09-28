@@ -13,7 +13,8 @@ from ..comparators import (
     StatsKSTest,
     StatsTTest,
 )
-from ..dataset import Dataset, ExperimentData, StatisticRole
+from ..dataset import Dataset, ExperimentData, SmallDataset, StatisticRole
+from ..dataset.experiment_data import ExperimentDataEnum
 from .abstract import (
     DatasetReporter,
     DictReporter,
@@ -60,37 +61,52 @@ class ABTestReporter(DatasetReporter):
     def report_variance_reductions(data: ExperimentData) -> Dataset | str:
         """Extract and format variance reduction metrics from CUPED/CUPAC.
 
+        Searches ``analysis_tables`` for results stored by
+        ``CUPEDTransformer`` and builds a summary table.
+
         Args:
             data: The experiment data container.
 
         Returns:
-            A ``Dataset`` with transformed metric names and variance reduction percentages, 
-            or a descriptive string if no data is available.
+            A ``SmallDataset`` with columns ``Transformed Metric Name``
+            and ``Variance Reduction (%)``, or a descriptive string if
+            no variance reduction data is available.
         """
-        
-        variance_cols = [c for c in data.additional_fields.columns if c.endswith("_variance_reduction")]
-        if not variance_cols:
-            return "No variance reduction data available. Ensure CUPED or CUPAC was applied."
-        
-        report_data = []
-        records = data.additional_fields.limit(1).to_records()
-        first_row = records[0] if records else {}
-        
-        for col in variance_cols:
-            metric_name = col.replace("_variance_reduction", "")
-            reduction_value = first_row.get(col)
-            report_data.append({
-                "Transformed Metric Name": metric_name, 
-                "Variance Reduction (%)": reduction_value
-            })
-        
-        return Dataset.from_dict(
-            data=report_data,
+        from ..transformers.cuped import CUPEDTransformer
+
+        ids = data.get_ids(
+            CUPEDTransformer,
+            searched_space=ExperimentDataEnum.analysis_tables,
+        )
+        table_ids = ids.get(CUPEDTransformer.__name__, {}).get(
+            ExperimentDataEnum.analysis_tables.value, [],
+        )
+        if not table_ids:
+            return (
+                "No variance reduction data available. "
+                "Ensure CUPED or CUPAC was applied."
+            )
+
+        table = data.analysis_tables[table_ids[0]]
+        if table.is_empty():
+            return "No variance reduction data available."
+
+        records = table.to_records()
+        report_data = [
+            {
+                "Transformed Metric Name": row["feature"],
+                "Variance Reduction (%)": row["variance_reduction_pct"],
+            }
+            for row in records
+        ]
+
+        return SmallDataset.from_dict(
+            report_data,
             roles={
-                "Transformed Metric Name": StatisticRole(), 
-                "Variance Reduction (%)": StatisticRole()
+                "Transformed Metric Name": StatisticRole(str),
+                "Variance Reduction (%)": StatisticRole(float),
             },
-        ) if report_data else "No variance reduction data available."
+        )
 
 class ABDictReporter(ABTestReporter):
     """Legacy reporter wrapper for dictionary output.
@@ -176,7 +192,7 @@ class CupacReporter(Reporter):
                 "variance_reduction_real": StatisticRole()
             }
         ) if var_data else None
-        
+
         fi_ds = Dataset.from_dict(
             data=imp_data, 
             roles={
