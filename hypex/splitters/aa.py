@@ -15,7 +15,7 @@ from ..dataset import (
 )
 from ..dataset.roles import ConstGroupRole, IndexRole
 from ..executor import Calculator
-from ..utils import ExperimentDataEnum, BackendsEnum, timeit
+from ..utils import BackendsEnum, ExperimentDataEnum, timeit
 
 
 class AASplitter(Calculator):
@@ -249,21 +249,23 @@ class AASplitterWithStratification(AASplitter):
     @timeit(level="SPLIT", prefix="SPLITTER_STRAT")
     def execute(self, data: ExperimentData) -> ExperimentData:
         grouping_fields = data.ds.search_columns(StratificationRole())
-        
+        const_group_fields = data.ds.search_columns(ConstGroupRole())
+        const_group_field = (
+            const_group_fields[0] if len(const_group_fields) > 0 else None
+        )
         if data.ds.backend_type == BackendsEnum.spark and not data.ds.is_persisted:
             data.ds.persist(storage_level="MEMORY_AND_DISK", action="count")
-
         result = self.calc(
             data.ds,
             random_state=self.random_state,
             control_size=self.control_size,
             grouping_fields=grouping_fields,
             groups_sizes=self.groups_sizes,
+            const_group_field=const_group_field,  # ── НОВОЕ ──
         )
-        
         if isinstance(result, Dataset):
             result = result.replace_roles({"split": AdditionalTreatmentRole()})
-        
+
         data = self._set_value(data, result)
 
         # if data.ds.backend_type == BackendsEnum.spark:
