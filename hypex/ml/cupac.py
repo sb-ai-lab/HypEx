@@ -298,16 +298,6 @@ class CUPACExecutor(MLExecutor):
     def _agg_data_from_cupac_data(
         data: ExperimentData, cupac_data_slice: list
     ) -> Dataset:
-        import logging
-        _dbg = logging.getLogger("hypex.cupac.debug")
-        _dbg.setLevel(logging.WARNING)
-
-        _dbg.warning(
-            f"[AGG DEBUG] cupac_data_slice ({len(cupac_data_slice)} entries):"
-        )
-        for _i, _col in enumerate(cupac_data_slice):
-            _dbg.warning(f"  [{_i}] len={len(_col)} → {_col}")
-
         res_dataset = None
         column_counter = 0
         for column in cupac_data_slice:
@@ -331,19 +321,6 @@ class CUPACExecutor(MLExecutor):
                 {next(iter(col_data.columns)): standard_col_name}
             )
             column_counter += 1
-
-            # ── DEBUG: row count before add_column ────────────────────
-            _dbg.warning(
-                f"  col[{column_counter - 1}] "
-                f"(from {column!r}): "
-                f"{len(col_data)} rows"
-                + (
-                    f" | res_dataset has {len(res_dataset)} rows"
-                    if res_dataset is not None
-                    else " | res_dataset is None (first col)"
-                )
-            )
-            # ──────────────────────────────────────────────────────────
 
             if res_dataset is None:
                 res_dataset = col_data
@@ -433,7 +410,7 @@ class CUPACExecutor(MLExecutor):
 
                 data = data.set_value(
                     space=ExperimentDataEnum.additional_fields,
-                    executor_id=f"{self.id}{ID_SPLIT_SYMBOL}{target}_cupac",
+                    executor_id=f"{target}_cupac",
                     value=target_cupac,
                     role=AdditionalTargetRole(),
                 )
