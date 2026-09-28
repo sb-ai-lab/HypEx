@@ -70,6 +70,28 @@ class ExperimentData:
 
         self._initial_cols = deepcopy(self._data.columns)
 
+    def copy(self, data: Dataset | SmallDataset | None = None) -> Self:
+        """Create a deep copy of this ExperimentData instance.
+
+        Args:
+            data: Optional replacement dataset for the primary data field.
+                When provided, ``_initial_cols`` is reset to match the new
+                dataset's columns so that the ``additional_fields`` view
+                and ``field_search(space="ds")`` remain consistent.
+
+        Returns:
+            A new ExperimentData instance with deep-copied internal state.
+        """
+        result = deepcopy(self)
+        if data is not None:
+            result._data = data
+            # Sync _initial_cols with the replacement dataset.
+            # Without this, columns dropped from _data (e.g. CUPAC
+            # cleanup) remain in _initial_cols, causing KeyError in
+            # field_search(space="ds") and incorrect additional_fields.
+            result._initial_cols = deepcopy(data.columns)
+        return result
+
     @property
     def initial_ds(self) -> Dataset | SmallDataset:
         return self._data[self._initial_cols]
@@ -531,16 +553,29 @@ class ExperimentData:
         space: Literal["all", "ds", "additional_fields"] = "all",
     ) -> list[str]:
         """Search for column names matching specified semantic roles.
-        
-        After the refactor, ALL columns live in self.ds 
+
+        After the refactor, ALL columns live in ``self.ds``
         (including AdditionalRole columns), so we search only there.
+
+        Args:
+            roles: A single role or iterable of roles to match.
+            tmp_role: Whether to search temporary roles.
+            search_types: Optional Python types to filter columns by.
+            space: Which column subset to search in.
+
+        Returns:
+            List of matching column names.
         """
-        space_dict = {
-            "all": self.ds,
-            "ds": self.ds[self._initial_cols],
-            "additional_fields": self.additional_fields,
-        }
-        search_space = space_dict[space]
+        # Lazy evaluation: only resolve the requested space to avoid
+        # KeyError when _initial_cols references columns that have been
+        # dropped from ds (e.g. after CUPAC cleanup via copy()).
+        if space == "ds":
+            search_space = self.ds[self._initial_cols]
+        elif space == "additional_fields":
+            search_space = self.additional_fields
+        else:  # "all"
+            search_space = self.ds
+
         roles_list = Adapter.to_list(roles)
         return search_space.search_columns(
             roles_list, tmp_role=tmp_role, search_types=search_types
