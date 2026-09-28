@@ -315,7 +315,11 @@ class TestDictReporter(DictReporter, ABC):
         return dict(tree)
 
     @staticmethod
-    def _convert_struct_dict_to_dataset(data: dict) -> SmallDataset:
+    def _convert_struct_dict_to_dataset(
+        data: dict,
+        *,
+        invert_pass: bool = False,
+    ) -> SmallDataset:
         """Transform a nested dictionary into a ``SmallDataset``.
 
         Flattens the hierarchical structure into rows, mapping metrics to
@@ -361,12 +365,17 @@ class TestDictReporter(DictReporter, ABC):
                     row[f"{norm_name} p-value"] = metrics.get("p-value")
                     
                 result.append(row)
-                
+
         for row in result:
             for k, v in list(row.items()):
                 if "pass" in k:
-                    # truthy pass = difference detected = NOT OK
-                    row[k] = "NOT OK" if _is_truthy(v) else "OK"
+                    truthy = _is_truthy(v)
+                    if invert_pass:
+                        # AB convention: significant effect = OK
+                        row[k] = "OK" if truthy else "NOT OK"
+                    else:
+                        # AA Convention: detected difference = NOT OK
+                        row[k] = "NOT OK" if truthy else "OK"
 
         if not result:
             return SmallDataset.from_dict(
