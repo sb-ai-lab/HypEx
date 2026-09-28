@@ -10,8 +10,8 @@ import numpy as np
 from ..comparators import GroupDifference, GroupSizes
 from ..dataset import Dataset, ExperimentData, SmallDataset
 from ..dataset.roles import InfoRole, StatisticRole, TreatmentRole
-from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
-from ..utils.constants import TEST_NAME_NORMALIZATION, NAME_BORDER_SYMBOL
+from ..utils import ID_SPLIT_SYMBOL, Adapter, ExperimentDataEnum
+from ..utils.constants import NAME_BORDER_SYMBOL, TEST_NAME_NORMALIZATION
 from ..utils.errors import AbstractMethodError
 
 REPORTABLE_METRICS = frozenset({
@@ -84,11 +84,13 @@ def _normalize_value(val: Any) -> Any:
         
     return val
 
+@staticmethod
 def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
     """Extract index values from a dataset in a backend-agnostic way.
 
-    Handles differences between pandas (``tolist``) and pyspark.pandas
-    (``to_list``) APIs.
+    Delegates to :meth:`Adapter.to_list` which handles ``pd.Index``
+    (``.tolist()``), ``ps.Index`` (``.to_list()``), and plain
+    iterables uniformly.
 
     Args:
         table: The dataset instance.
@@ -96,12 +98,7 @@ def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
     Returns:
         A list of index values.
     """
-    index_obj = table.index
-    if hasattr(index_obj, "to_list"):
-        return index_obj.to_list()
-    if hasattr(index_obj, "tolist"):
-        return index_obj.tolist()
-    return list(index_obj)
+    return Adapter.to_list(table.data.index)
 
 def _normalize_group_name(group: str) -> str:
     """Normalize group names by stripping tuple notation.
