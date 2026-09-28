@@ -437,13 +437,15 @@ class DatasetReporter(Reporter):
             dict_result = self._report(data)
         finally:
             self.dict_reporter.front = old_front
-
         if self.output_format == "dict":
             return dict_result
         if self.single_row:
             return self._to_single_row_dataset(dict_result)
         struct_dict = TestDictReporter._get_struct_dict(dict_result)
-        return TestDictReporter._convert_struct_dict_to_dataset(struct_dict)
+        return TestDictReporter._convert_struct_dict_to_dataset(
+            struct_dict,
+            invert_pass=self._invert_pass,
+        )
 
     @staticmethod
     def _to_single_row_dataset(data: dict) -> SmallDataset:
