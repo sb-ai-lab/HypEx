@@ -708,7 +708,7 @@ class StatsKSTest(StatsHypothesisTesting):
         d_stat = float(d_stat)
 
         if d_stat == 0.0:
-            return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+            return {"p-value": 1.0, "statistic": 0.0, "pass": False}
 
         try:
             en = np.sqrt(n1 * n2 / (n1 + n2))
