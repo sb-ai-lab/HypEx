@@ -1,3 +1,4 @@
+"""CUPED (Controlled-experiment Using Pre-Experiment Data) transformer."""
 from __future__ import annotations
 
 from copy import deepcopy
@@ -13,17 +14,16 @@ from .abstract import Transformer
 
 
 class CUPEDTransformer(Transformer):
-    """Applies the CUPED (Controlled-experiment Using Pre-Experiment Data)
-    variance reduction to target features.
+    """Apply CUPED variance reduction to target features.
 
-    For each ``(target, pre_target)`` pair the transformer computes
+    For each ``(target, pre_target)`` pair computes
     ``theta = Cov(Y, X) / Var(X)`` and produces an adjusted column
     ``{target}_cuped = Y - theta * (X - mean(X))``.
 
-    The adjusted columns are added to the main dataset with
-    ``TargetRole`` so that downstream comparators (TTest, etc.)
-    pick them up automatically.  Variance-reduction percentages are
-    stored in ``analysis_tables`` under the transformer's executor ID.
+    Adjusted columns are added with ``TargetRole`` so downstream
+    comparators pick them up automatically.  Variance-reduction
+    percentages are stored in ``analysis_tables`` under the
+    transformer's executor ID as a ``SmallDataset``.
 
     Args:
         cuped_features: Mapping ``{target_feature: pre_target_feature}``.
@@ -96,30 +96,41 @@ class CUPEDTransformer(Transformer):
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Run CUPED on the experiment dataset and store variance reductions.
 
+        Adjusted targets are appended to ``ds`` with ``TargetRole``.
+        Variance-reduction percentages are written to ``analysis_tables``
+        via ``set_value`` as a ``SmallDataset``.
+
         Args:
             data: The experiment data container.
 
         Returns:
-            Updated ``ExperimentData`` with adjusted targets in ``ds``
-            and variance-reduction report in ``analysis_tables``.
+            Updated ``ExperimentData`` with adjusted targets and
+            variance-reduction report in ``analysis_tables``.
         """
         new_ds = self.calc(data=data.ds, cuped_features=self.cuped_features)
 
         # ── Compute variance reductions ──────────────────────────────
-        variance_reductions: dict[str, float] = {}
-        for target_feature, _ in self.cuped_features.items():
+        report_rows: list[dict[str, Any]] = []
+        for target_feature in self.cuped_features:
             original_var = data.ds[target_feature].var()
             adjusted_var = new_ds[f"{target_feature}_cuped"].var()
-            variance_reductions[target_feature] = (
+            variance_reduction = (
                 (1 - adjusted_var / original_var) * 100
                 if original_var > 0
                 else 0.0
             )
+            report_rows.append({
+                "feature": f"{target_feature}_cuped",
+                "variance_reduction_pct": variance_reduction,
+            })
 
-        # ── Store variance reductions in analysis_tables (SmallDataset) ──
+        # ── Store in analysis_tables (principle #9) ─────────────────
         report_ds = SmallDataset.from_dict(
-            [variance_reductions],
-            roles={k: StatisticRole(float) for k in variance_reductions},
+            report_rows,
+            roles={
+                "feature": StatisticRole(str),
+                "variance_reduction_pct": StatisticRole(float),
+            },
         )
         data = data.set_value(
             ExperimentDataEnum.analysis_tables,
