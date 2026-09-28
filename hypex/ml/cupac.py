@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from ..dataset.dataset import Dataset
-from ..dataset.experiment_data import ExperimentData
+from ..dataset.dataset import Dataset, SmallDataset, StatisticRole
+from ..dataset.experiment_data import ExperimentData, ExperimentDataEnum
 from ..dataset.roles import (
     AdditionalTargetRole,
     FeatureRole,
@@ -13,6 +13,7 @@ from ..dataset.roles import (
 )
 from ..executor import MLExecutor
 from ..extensions.cupac import CupacExtension
+from ..utils import ID_SPLIT_SYMBOL
 from ..utils.adapter import Adapter
 from ..utils.models import CUPAC_MODELS
 
@@ -307,44 +308,41 @@ class CUPACExecutor(MLExecutor):
         return res_dataset
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        """
-        Execute CUPAC variance reduction on the experiment data.
+        """Execute CUPAC variance reduction on the experiment data.
 
         Process:
-        1. Validate models and prepare temporal data structures
-        2. For each target:
-            a. Try all specified models with cross-validation
-            b. Select the model with best variance reduction
-            c. Fit the best model on all training data
-            d. Predict and adjust current target values (if applicable)
-            e. Calculate variance reduction metrics
-        3. Store adjusted targets and metrics in ExperimentData
+            1. Validate models and prepare temporal data structures.
+            2. For each target:
+               a. Try all specified models with cross-validation.
+               b. Select the model with best variance reduction.
+               c. Fit the best model on all training data.
+               d. Predict and adjust current target values.
+               e. Store adjusted target and variance-reduction metrics.
 
         Args:
-            data (ExperimentData): Input data with temporal features and targets.
+            data: Input data with temporal features and targets.
 
         Returns:
-            ExperimentData: Data with CUPAC-adjusted targets and variance reduction reports.
+            Data with CUPAC-adjusted targets and variance reduction reports.
         """
         self._validate_models()
         cupac_data = self._prepare_data(data)
-        for target, target_data in cupac_data.items():
-            # Extract feature names once before data aggregation
-            X_train_feature_names = [column[0] for column in target_data["X_train"]]
 
+        for target, target_data in cupac_data.items():
+            X_train_feature_names = [column[0] for column in target_data["X_train"]]
             X_train = self._agg_data_from_cupac_data(data, target_data["X_train"])
             Y_train = self._agg_data_from_cupac_data(data, [target_data["Y_train"]])
-            best_model, best_var_red, best_feature_importances = None, None, None
 
-            # Model selection via cross-validation
-            # Feature importances are extracted during CV for efficiency
+            best_model: str | None = None
+            best_var_red: float | None = None
+            best_feature_importances: dict[str, float] | None = None
+
             for model in self.cupac_models:
                 var_red, fold_importances = self.calc(
-                    mode="kfold_fit", model=model, X=X_train, Y=Y_train
+                    mode="kfold_fit", model=model, X=X_train, Y=Y_train,
                 )
                 if best_var_red is None or var_red > best_var_red:
                     best_model, best_var_red = model, var_red
-                    # Map standardized column names to original feature names
                     best_feature_importances = {
                         X_train_feature_names[int(col_idx)]: importance
                         for col_idx, importance in fold_importances.items()
@@ -352,48 +350,70 @@ class CUPACExecutor(MLExecutor):
 
             if best_model is None:
                 raise RuntimeError(
-                    f"No models were successfully fitted for target '{target}'. All models failed during training."
+                    f"No models were successfully fitted for target '{target}'."
                 )
 
-            cupac_variance_reduction_real = None
+            cupac_variance_reduction_real: float | None = None
 
-            # Apply CUPAC adjustment to current period (if target is real, not virtual)
-            # We need to fit the model on all data for prediction, but importances are already from CV
             if "X_predict" in target_data:
                 fitted_model = self.calc(
-                    mode="fit", model=best_model, X=X_train, Y=Y_train
+                    mode="fit", model=best_model, X=X_train, Y=Y_train,
                 )
-
                 X_predict = self._agg_data_from_cupac_data(
-                    data, target_data["X_predict"]
+                    data, target_data["X_predict"],
                 )
-
                 prediction = self.calc(mode="predict", model=fitted_model, X=X_predict)
 
-                # Adjust target by removing explained variation
                 theta = self.extension._cuped_theta(
                     data.ds[target].data.iloc[:, 0],
                     prediction.data.iloc[:, 0],
                 )
                 explained_variation = (prediction - prediction.mean()) * theta
                 target_cupac = data.ds[target] - explained_variation
-
                 target_cupac = target_cupac.rename({target: f"{target}_cupac"})
-                data.additional_fields = data.additional_fields.add_column(
-                    data=target_cupac, role={f"{target}_cupac": AdditionalTargetRole()}
+
+                data = data.set_value(
+                    space=ExperimentDataEnum.additional_fields,
+                    executor_id=f"{self.id}{ID_SPLIT_SYMBOL}{target}_cupac",
+                    value=target_cupac,
+                    role=AdditionalTargetRole(),
                 )
+
                 cupac_variance_reduction_real = (
                     self.extension._calculate_variance_reduction(
-                        data.ds[target], target_cupac
+                        data.ds[target], target_cupac,
                     )
                 )
 
-            report = {
+            # ✅ FIX: store report as SmallDataset via set_value
+            report: dict[str, Any] = {
                 "cupac_best_model": best_model,
                 "cupac_variance_reduction_cv": best_var_red,
                 "cupac_variance_reduction_real": cupac_variance_reduction_real,
-                "cupac_feature_importances": best_feature_importances,
             }
-            data.analysis_tables[f"{target}_cupac_report"] = report
+            report_ds = SmallDataset.from_dict(
+                [report],
+                roles={
+                    "cupac_best_model": StatisticRole(),
+                    "cupac_variance_reduction_cv": StatisticRole(float),
+                    "cupac_variance_reduction_real": StatisticRole(float),
+                },
+            )
+            data = data.set_value(
+                ExperimentDataEnum.analysis_tables,
+                f"{self.id}{ID_SPLIT_SYMBOL}{target}",
+                report_ds,
+            )
+
+            if best_feature_importances:
+                imp_ds = SmallDataset.from_dict(
+                    [best_feature_importances],
+                    roles={k: StatisticRole(float) for k in best_feature_importances},
+                )
+                data = data.set_value(
+                    ExperimentDataEnum.analysis_tables,
+                    f"{self.id}{ID_SPLIT_SYMBOL}{target}{ID_SPLIT_SYMBOL}importances",
+                    imp_ds,
+                )
 
         return data
