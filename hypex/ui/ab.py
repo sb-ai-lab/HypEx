@@ -255,34 +255,47 @@ class ABOutput(Output):
     # ── CUPAC feature importances ────────────────────────────────────
 
     def _extract_feature_importances(self, experiment_data: ExperimentData) -> None:
-        """Extract CUPAC feature importances from analysis_tables."""
-        cupac_report_keys = [
-            key
-            for key in experiment_data.analysis_tables.keys()
-            if key.endswith("_cupac_report")
-        ]
-        if not cupac_report_keys:
+        """Extract CUPAC feature importances from analysis_tables.
+
+        CUPACExecutor stores importances under keys like
+        ``CUPACExecutor┆hash┆target┆importances``.
+        """
+        from ..ml.cupac import CUPACExecutor
+
+        ids = experiment_data.get_ids(
+            CUPACExecutor,
+            searched_space=ExperimentDataEnum.analysis_tables,
+        )
+        all_ids = ids.get(CUPACExecutor.__name__, {}).get(
+            ExperimentDataEnum.analysis_tables.value, [],
+        )
+        imp_ids = [i for i in all_ids if i.endswith("importances")]
+
+        if not imp_ids:
             self.cupac.feature_importances = None
             return
 
         importance_data: list[dict[str, Any]] = []
-        for key in cupac_report_keys:
-            report = experiment_data.analysis_tables[key]
-            target_name = key.replace("_cupac_report", "")
-
-            if isinstance(report, dict):
-                get_val = report.get
-                imp_dict = report.get("cupac_feature_importances", {})
-            else:
-                rec = report.to_records()[0] if not report.is_empty() else {}
-                get_val = rec.get
-                imp_dict = rec.get("cupac_feature_importances", {})
-
-            model_name = get_val("cupac_best_model")
-            if not imp_dict:
+        for aid in imp_ids:
+            table = experiment_data.analysis_tables.get(aid)
+            if table is None or table.is_empty():
                 continue
-
-            for feature, importance in imp_dict.items():
+            records = table.to_records()
+            if not records:
+                continue
+            rec = records[0]
+            # Extract target from ID: CUPACExecutor┆hash┆target┆importances
+            parts = aid.split(ID_SPLIT_SYMBOL)
+            target_name = parts[-2] if len(parts) >= 2 else "unknown"
+            # Find model from the main report
+            main_id = ID_SPLIT_SYMBOL.join(parts[:-1])
+            main_table = experiment_data.analysis_tables.get(main_id)
+            model_name = None
+            if main_table and not main_table.is_empty():
+                main_records = main_table.to_records()
+                if main_records:
+                    model_name = main_records[0].get("cupac_best_model")
+            for feature, importance in rec.items():
                 importance_data.append({
                     "target": target_name,
                     "feature": feature,
