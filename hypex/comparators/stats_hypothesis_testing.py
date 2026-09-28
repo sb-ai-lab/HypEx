@@ -313,7 +313,8 @@ class StatsChi2Test(StatsHypothesisTesting):
 
         # Edge case: only one category across all groups
         if len(full_key_set) < 2:
-            return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+            # Only one category → no difference → pass=False
+            return {"p-value": 1.0, "statistic": 0.0, "pass": False}
 
         contingency_table = np.zeros((2, len(full_key_set)))
         for idx, key in enumerate(full_key_set):
