@@ -24,10 +24,6 @@ class CupacExtension(MLExtension):
         self.n_folds = n_folds
         self.random_state = random_state
 
-    @staticmethod
-    def _cuped_theta(y, pred) -> float:
-        return cuped_theta(y, pred)
-    
     def calc(
         self,
         data: Dataset,
@@ -130,7 +126,7 @@ class CupacExtension(MLExtension):
             fold_importances = self._extract_fold_importances(m, model, feature_names)
             fold_feature_importances.append(fold_importances)
 
-        theta = self._cuped_theta(y_original, oof_pred)
+        theta = cuped_theta(y_original, oof_pred)
         y_adjusted = y_original - theta * (oof_pred - oof_pred.mean())
         mean_var_reduction = self._calculate_variance_reduction(y_original, y_adjusted)
 
