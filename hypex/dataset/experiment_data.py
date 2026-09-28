@@ -531,20 +531,6 @@ class ExperimentData:
             raise NotFoundInExperimentDataError(cls_name)
         return ids[0]
 
-    def copy(self, data: Dataset | SmallDataset | None = None) -> Self:
-        """Create a deep copy of this ExperimentData instance.
-
-        Args:
-            data: Optional replacement dataset for the primary data field.
-
-        Returns:
-            A new ExperimentData instance with deep-copied internal state.
-        """
-        result = deepcopy(self)
-        if data is not None:
-            result._data = data
-        return result
-
     def field_search(
         self,
         roles: ABCRole | Iterable[ABCRole],
