@@ -11,11 +11,12 @@ from ..dataset import (
     ExperimentData,
     StatisticRole,
     StratificationRole,
-    TreatmentRole,
 )
-from ..dataset.roles import ConstGroupRole, IndexRole
+from ..dataset.roles import ConstGroupRole
 from ..executor import Calculator
 from ..utils import BackendsEnum, ExperimentDataEnum, timeit
+
+MISSING_CONST_LABELS = frozenset({"", "nan", "none", "nat", "<na>"})
 
 
 class AASplitter(Calculator):
@@ -187,6 +188,67 @@ class AASplitter(Calculator):
         #     data.ds.checkpoint(eager=True)
 
         return data
+
+    @staticmethod
+    def _apply_const_groups(
+        split_ds: Dataset,
+        const_data: dict[str, Dataset],
+        label_map: dict[int, str],
+        const_group_field: str | None,
+    ) -> Dataset:
+        """Write pinned groups over the split of free rows.
+
+        For each pinned group in *const_data*, creates a single-column
+        Dataset with the appropriate split label and appends it to the
+        random-split result.
+
+        Args:
+            split_ds: Dataset with split labels for free rows.
+            const_data: Dict mapping group label → Dataset of pinned rows.
+            label_map: Mapping from group codes to labels
+                (e.g. ``{0: "control", 1: "test_1"}``).
+            const_group_field: Name of the const group column.
+
+        Returns:
+            Dataset with both free and pinned rows labeled.
+
+        Raises:
+            ValueError: If an unknown constant group label is found.
+        """
+        # Build reverse mapping: label → code
+        codes = {label: code for code, label in label_map.items()}
+        codes.setdefault("test", 1)
+
+        pinned_rows = []
+        for group, group_data in const_data.items():
+            group_str = str(group).strip().lower()
+            code = codes.get(group_str)
+            if code is None:
+                raise ValueError(
+                    f"Unknown constant group {str(group)!r} in column "
+                    f"'{const_group_field}'. Expected one of "
+                    f"{sorted(codes)}, or a missing value "
+                    f"(None / np.nan / 'nan') for a row that takes "
+                    f"part in the split."
+                )
+            label = label_map.get(code, str(group))
+            # Create a single-column dataset with the split label
+            # matching the index of the pinned group data.
+            import pandas as pd
+            pinned_ds = Dataset.create_empty(
+                roles={"split": StatisticRole()},
+                backend=group_data.backend_type,
+                session=group_data.session if hasattr(group_data, "session") else None,
+            )
+            pinned_ds.data = pd.DataFrame(
+                {"split": [label] * len(group_data)},
+                index=group_data.index,
+            )
+            pinned_rows.append(pinned_ds)
+
+        if pinned_rows:
+            return split_ds.append(pinned_rows)
+        return split_ds
 
 
 class AASplitterWithStratification(AASplitter):
