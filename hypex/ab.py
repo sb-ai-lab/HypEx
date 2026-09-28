@@ -136,33 +136,25 @@ class ABTest(ExperimentShell):
         return Experiment(executors=executors)
 
     def __init__(
-            self,
-            additional_tests: (
-                str | ABTestTypesEnum | list[str | ABTestTypesEnum] | None
-            ) = None,
-            multitest_method: (
-                Literal[
-                    "bonferroni",
-                    "sidak",
-                    "holm-sidak",
-                    "holm",
-                    "simes-hochberg",
-                    "hommel",
-                    "fdr_bh",
-                    "fdr_by",
-                    "fdr_tsbh",
-                    "fdr_tsbhy",
-                    "quantile",
-                ]
-                | None
-            ) = "holm",
-            equal_variance: bool | None = None,
-            cuped_features: dict[str, str] | None = None,
-            cupac_models: str | list[str] | None = None,
-            enable_cupac: bool = False,
-            float32: bool = False,
-            t_test_equal_var: bool | None = None,
-        ):
+        self,
+        additional_tests: (
+            str | ABTestTypesEnum | list[str | ABTestTypesEnum] | None
+        ) = None,
+        multitest_method: (
+            Literal[
+                "bonferroni", "sidak", "holm-sidak", "holm",
+                "simes-hochberg", "hommel", "fdr_bh", "fdr_by",
+                "fdr_tsbh", "fdr_tsbhy", "quantile",
+            ]
+            | None
+        ) = "holm",
+        equal_variance: bool | None = None,
+        cuped_features: dict[str, str] | None = None,
+        cupac_models: str | list[str] | None = None,
+        enable_cupac: bool = False,
+        float32: bool = False,
+        t_test_equal_var: bool | None = None,
+    ):
         """
         Args:
             additional_tests: Statistical test(s) to run in addition to the default group difference calculation. Valid options are 't-test', 'u-test', 'chi2-test' or ABTestTypesEnum.t_test, ABTestTypesEnum.u_test, and ABTestTypesEnum.chi2_test. Can be a single test name/enum or list of test names/enums. Defaults to [ABTestTypesEnum.t_test].
@@ -179,14 +171,8 @@ class ABTest(ExperimentShell):
                 DeprecationWarning,
                 stacklevel=2,
             )
-            if equal_variance is None:
-                equal_variance = t_test_equal_var
-
-        additional_outputs = {}
-        if enable_cupac:
-            additional_outputs["cupac"] = CupacOutput()
-        if cuped_features:
-            additional_outputs["cuped"] = CupedOutput()
+        if equal_variance is None:
+            equal_variance = t_test_equal_var
 
         super().__init__(
             experiment=self._make_experiment(
@@ -205,5 +191,5 @@ class ABTest(ExperimentShell):
 
         if equal_variance is not None:
             self.experiment.set_params(
-                {TTest: {"calc_kwargs": {"equal_var": equal_variance}}},
+                {TTest: {"calc_kwargs": {"equal_var": equal_variance}}}
             )

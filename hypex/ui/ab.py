@@ -1,4 +1,5 @@
 # hypex/ui/ab.py
+"""UI output handlers for A/B test results including CUPED and CUPAC."""
 from __future__ import annotations
 
 from typing import Any
@@ -8,18 +9,19 @@ from ..comparators import GroupDifference, GroupSizes
 from ..dataset import (
     Dataset,
     ExperimentData,
+    InfoRole,
     SmallDataset,
     StatisticRole,
     TreatmentRole,
 )
-from ..reporters.ab import ABTestReporter
+from ..reporters.ab import ABDatasetReporter, ABTestReporter
 from ..reporters.abstract import _get_index_values
-from ..reporters.cupac import CupacReporter
-from ..reporters.cuped import CupedReporter
+from ..transformers.cuped import CUPEDTransformer
 from ..utils import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL, ExperimentDataEnum
 from .base import Output
 
 # ── CupedOutput ──────────────────────────────────────────────────────────────
+
 
 class CupedOutput:
     """Container for CUPED variance-reduction results.
@@ -29,7 +31,7 @@ class CupedOutput:
     """
 
     def __init__(self) -> None:
-        self.variance_reductions: Dataset | None = None
+        self.variance_reductions: SmallDataset | None = None
 
     def extract(self, experiment_data: ExperimentData) -> None:
         """Populate CUPED outputs from experiment data.
@@ -54,6 +56,7 @@ class CupedOutput:
 
 # ── CupacOutput ──────────────────────────────────────────────────────────────
 
+
 class CupacOutput:
     """Container for CUPAC variance-reduction results.
 
@@ -63,19 +66,8 @@ class CupacOutput:
     """
 
     def __init__(self) -> None:
-        self.variance_reductions: SmallDataset | None = None
-        self.feature_importances: SmallDataset | None = None
-
-    def extract(self, experiment_data: ExperimentData) -> None:
-        """Populate CUPAC outputs from experiment data.
-
-        Args:
-            experiment_data: The experiment data container.
-        """
-        reporter = CupacReporter()
-        result = reporter.report(experiment_data)
-        self.variance_reductions = result.get("variance_reductions")
-        self.feature_importances = result.get("feature_importances")
+        self.variance_reductions: Dataset | None = None
+        self.feature_importances: Dataset | None = None
 
     def __repr__(self) -> str:
         has_vr = self.variance_reductions is not None
@@ -84,13 +76,18 @@ class CupacOutput:
             return "CupacOutput(no CUPAC data available)"
         parts: list[str] = []
         if has_vr:
-            parts.append(f"variance_reductions: {len(self.variance_reductions)} target(s)")
+            parts.append(
+                f"variance_reductions: {len(self.variance_reductions)} target(s)"
+            )
         if has_fi:
-            parts.append(f"feature_importances: {len(self.feature_importances)} rows")
+            parts.append(
+                f"feature_importances: {len(self.feature_importances)} rows"
+            )
         return f"CupacOutput({', '.join(parts)})"
 
 
-# ── ABOutput (updated) ───────────────────────────────────────────────────────
+# ── ABOutput ─────────────────────────────────────────────────────────────────
+
 
 class ABOutput(Output):
     """Output handler for A/B test results.
@@ -105,7 +102,7 @@ class ABOutput(Output):
     multitest: Dataset | str
     sizes: Dataset
     cuped: CupedOutput | None
-    cupac: CupacOutput | None
+    cupac: CupacOutput
 
     def __init__(
         self,
@@ -120,24 +117,10 @@ class ABOutput(Output):
         """
         self._groups: list[str] = []
         self.cuped = CupedOutput() if enable_cuped else None
-        self.cupac = CupacOutput() if enable_cupac else None
-        super().__init__(resume_reporter=ABTestReporter())
+        self.cupac = CupacOutput()
+        super().__init__(resume_reporter=ABDatasetReporter())
 
-    # ── Internal extraction helpers (unchanged from original) ────────
-
-    @property
-    def variance_reduction_report(self) -> Dataset | str:
-        """Get variance reduction report for CUPED/CUPAC transformations.
-
-        Returns:
-            A ``SmallDataset`` with variance reduction percentages per
-            transformed metric, or a descriptive string if unavailable.
-        """
-        if hasattr(self, "_experiment_data"):
-            return self.resume_reporter.report_variance_reductions(
-                self._experiment_data,
-            )
-        return "No experiment data available."
+    # ── Multitest ────────────────────────────────────────────────────
 
     def _extract_multitest_result(self, experiment_data: ExperimentData) -> None:
         multitest_id = experiment_data.get_one_id(
@@ -149,6 +132,8 @@ class ABOutput(Output):
             self.multitest = (
                 "There was less than three groups or multitest method wasn't provided"
             )
+
+    # ── Differences ──────────────────────────────────────────────────
 
     def _extract_differences(self, experiment_data: ExperimentData) -> Dataset | None:
         targets: list[str] = []
@@ -182,6 +167,8 @@ class ABOutput(Output):
             targets * len(self._groups), role={"feature": StatisticRole()},
         )
 
+    # ── Sizes ────────────────────────────────────────────────────────
+
     def _extract_sizes(self, experiment_data: ExperimentData) -> None:
         ids = experiment_data.get_ids(
             GroupSizes,
@@ -207,6 +194,115 @@ class ABOutput(Output):
         self.sizes = table.add_column(
             self._groups, role={"group": StatisticRole()},
         )
+
+    # ── CUPAC variance reductions ────────────────────────────────────
+
+    def _extract_variance_reductions(self, experiment_data: ExperimentData) -> None:
+        """Extract CUPAC variance reduction data from analysis_tables."""
+        cupac_report_keys = [
+            key
+            for key in experiment_data.analysis_tables.keys()
+            if key.endswith("_cupac_report")
+        ]
+        if not cupac_report_keys:
+            self.cupac.variance_reductions = None
+            return
+
+        variance_data: list[dict[str, Any]] = []
+        for key in cupac_report_keys:
+            report = experiment_data.analysis_tables[key]
+            target_name = key.replace("_cupac_report", "")
+
+            if isinstance(report, dict):
+                get_val = report.get
+            else:
+                rec = report.to_records()[0] if not report.is_empty() else {}
+                get_val = rec.get
+
+            variance_data.append({
+                "target": target_name,
+                "best_model": get_val("cupac_best_model"),
+                "variance_reduction_cv": get_val("cupac_variance_reduction_cv"),
+                "variance_reduction_real": get_val("cupac_variance_reduction_real"),
+            })
+
+        if variance_data:
+            self.cupac.variance_reductions = SmallDataset.from_dict(
+                variance_data,
+                roles={
+                    "target": InfoRole(str),
+                    "best_model": InfoRole(str),
+                    "variance_reduction_cv": StatisticRole(float),
+                    "variance_reduction_real": StatisticRole(float),
+                },
+            )
+
+    # ── CUPAC feature importances ────────────────────────────────────
+
+    def _extract_feature_importances(self, experiment_data: ExperimentData) -> None:
+        """Extract CUPAC feature importances from analysis_tables."""
+        cupac_report_keys = [
+            key
+            for key in experiment_data.analysis_tables.keys()
+            if key.endswith("_cupac_report")
+        ]
+        if not cupac_report_keys:
+            self.cupac.feature_importances = None
+            return
+
+        importance_data: list[dict[str, Any]] = []
+        for key in cupac_report_keys:
+            report = experiment_data.analysis_tables[key]
+            target_name = key.replace("_cupac_report", "")
+
+            if isinstance(report, dict):
+                get_val = report.get
+                imp_dict = report.get("cupac_feature_importances", {})
+            else:
+                rec = report.to_records()[0] if not report.is_empty() else {}
+                get_val = rec.get
+                imp_dict = rec.get("cupac_feature_importances", {})
+
+            model_name = get_val("cupac_best_model")
+            if not imp_dict:
+                continue
+
+            for feature, importance in imp_dict.items():
+                importance_data.append({
+                    "target": target_name,
+                    "feature": feature,
+                    "importance": importance,
+                    "model": model_name,
+                })
+
+        if importance_data:
+            self.cupac.feature_importances = SmallDataset.from_dict(
+                importance_data,
+                roles={
+                    "target": InfoRole(str),
+                    "feature": InfoRole(str),
+                    "importance": StatisticRole(float),
+                    "model": InfoRole(str),
+                },
+            )
+        else:
+            self.cupac.feature_importances = None
+
+    # ── Variance reduction report property ───────────────────────────
+
+    @property
+    def variance_reduction_report(self) -> Dataset | str:
+        """Get variance reduction report for CUPED/CUPAC transformations.
+
+        Returns:
+            A ``SmallDataset`` with variance reduction percentages per
+            transformed metric, or a descriptive string if unavailable.
+        """
+        if hasattr(self, "_experiment_data"):
+            return self.resume_reporter.report_variance_reductions(
+                self._experiment_data,
+            )
+        return "No experiment data available."
 
     # ── Main extract ─────────────────────────────────────────────────
 

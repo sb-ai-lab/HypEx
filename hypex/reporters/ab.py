@@ -59,10 +59,7 @@ class ABTestReporter(DatasetReporter):
 
     @staticmethod
     def report_variance_reductions(data: ExperimentData) -> Dataset | str:
-        """Extract variance reduction metrics from CUPED results.
-
-        Searches ``analysis_tables`` for results stored by
-        ``CUPEDTransformer`` and builds a summary table.
+        """Extract variance reduction metrics from CUPED results in analysis_tables.
 
         Args:
             data: The experiment data container.
