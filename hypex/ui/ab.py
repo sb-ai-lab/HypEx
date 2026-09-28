@@ -197,32 +197,46 @@ class ABOutput(Output):
     # ── CUPAC variance reductions ────────────────────────────────────
 
     def _extract_variance_reductions(self, experiment_data: ExperimentData) -> None:
-        """Extract CUPAC variance reduction data from analysis_tables."""
-        cupac_report_keys = [
-            key
-            for key in experiment_data.analysis_tables.keys()
-            if key.endswith("_cupac_report")
-        ]
-        if not cupac_report_keys:
+        """Extract CUPAC variance reduction data from analysis_tables.
+
+        CUPACExecutor stores reports under keys like
+        ``CUPACExecutor┆hash┆target`` (not ``*_cupac_report``).
+        Each report is a SmallDataset with columns
+        ``cupac_best_model``, ``cupac_variance_reduction_cv``,
+        ``cupac_variance_reduction_real``.
+        """
+        from ..ml.cupac import CUPACExecutor
+
+        ids = experiment_data.get_ids(
+            CUPACExecutor,
+            searched_space=ExperimentDataEnum.analysis_tables,
+        )
+        all_ids = ids.get(CUPACExecutor.__name__, {}).get(
+            ExperimentDataEnum.analysis_tables.value, [],
+        )
+        # Filter out importance sub-reports
+        main_ids = [i for i in all_ids if not i.endswith("importances")]
+
+        if not main_ids:
             self.cupac.variance_reductions = None
             return
 
         variance_data: list[dict[str, Any]] = []
-        for key in cupac_report_keys:
-            report = experiment_data.analysis_tables[key]
-            target_name = key.replace("_cupac_report", "")
-
-            if isinstance(report, dict):
-                get_val = report.get
-            else:
-                rec = report.to_records()[0] if not report.is_empty() else {}
-                get_val = rec.get
-
+        for aid in main_ids:
+            table = experiment_data.analysis_tables.get(aid)
+            if table is None or table.is_empty():
+                continue
+            records = table.to_records()
+            if not records:
+                continue
+            rec = records[0]
+            # Extract target name from composite ID
+            target_name = aid.split(ID_SPLIT_SYMBOL)[-1]
             variance_data.append({
                 "target": target_name,
-                "best_model": get_val("cupac_best_model"),
-                "variance_reduction_cv": get_val("cupac_variance_reduction_cv"),
-                "variance_reduction_real": get_val("cupac_variance_reduction_real"),
+                "best_model": rec.get("cupac_best_model"),
+                "variance_reduction_cv": rec.get("cupac_variance_reduction_cv"),
+                "variance_reduction_real": rec.get("cupac_variance_reduction_real"),
             })
 
         if variance_data:
@@ -235,6 +249,8 @@ class ABOutput(Output):
                     "variance_reduction_real": StatisticRole(float),
                 },
             )
+        else:
+            self.cupac.variance_reductions = None
 
     # ── CUPAC feature importances ────────────────────────────────────
 
