@@ -392,14 +392,19 @@ class AASplitterWithStratification(AASplitter):
             result_splits.append(group_split)
             
         if not result_splits:
-            return Dataset.create_empty(roles={"split": StatisticRole()}, backend=data.backend_type)
-            
-        # Append all splits back together
-        combined_split = result_splits[0]
-        for i in range(1, len(result_splits)):
-            combined_split = combined_split.append(result_splits[i])
-            
-        return combined_split
+            return Dataset.create_empty(
+                roles={"split": StatisticRole()},
+                backend=data.backend_type,
+                session=data.session,
+            )
+
+        # One concat over all strata: chaining append() per stratum builds an
+        # N-deep union tree in the Spark plan.
+        return (
+            result_splits[0]
+            if len(result_splits) == 1
+            else result_splits[0].append(result_splits[1:])
+        )
 
     @timeit(level="SPLIT", prefix="SPLITTER_STRAT")
     def execute(self, data: ExperimentData) -> ExperimentData:
