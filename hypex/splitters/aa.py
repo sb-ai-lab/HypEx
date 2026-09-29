@@ -322,7 +322,14 @@ class AASplitter(Calculator):
         # ── 4. free rows are split, pinned rows keep their label ────
         parts: list[Dataset] = []
         if const_group_field:
-            tagged = data.select(const_group_field).fillna(
+            tagged = data.select(const_group_field)
+            # Guard: cast non-string columns to str so that fillna with a
+            # string sentinel does not raise TypeError / ValueError
+            # (float64, Int64, boolean, category dtypes).
+            col_role = tagged.roles.get(const_group_field)
+            if col_role is None or col_role.data_type is not str:
+                tagged = tagged.astype({const_group_field: str})
+            tagged = tagged.fillna(
                 values={const_group_field: _FREE_CONST_SENTINEL}
             )
             if translation:
