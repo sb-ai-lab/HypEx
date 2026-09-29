@@ -103,6 +103,16 @@ class AASplitter(Calculator):
             self._generate_id()
 
     def _set_value(self, data: ExperimentData, value, key=None) -> ExperimentData:
+        """Store the split result and optionally save per-group subsets.
+
+        Args:
+            data: The experiment data container.
+            value: The split result dataset.
+            key: Optional sub-key (unused).
+
+        Returns:
+            Updated ExperimentData with the split column and groups.
+        """
         data = data.set_value(
             ExperimentDataEnum.additional_fields,
             self._id,
@@ -114,10 +124,16 @@ class AASplitter(Calculator):
             unique_vals = data.ds[splitter_col].unique()
             group_keys = list(unique_vals[splitter_col].to_dict().values())
             for group_key in group_keys:
-                if group_key is None:
+                # NaN != NaN is the standard Python check for float/np.nan.
+                # Also catches pd.NaT and any other "not equal to self" value.
+                # The previous `group_key is None` check did NOT catch NaN.
+                if group_key is None or group_key != group_key:
                     continue
                 mask = data.ds[splitter_col] == group_key
                 group_data = data.ds[mask]
+                # Skip empty groups (e.g. rows excluded by sample_size < 1).
+                if len(group_data) == 0:
+                    continue
                 data.set_value(
                     space=ExperimentDataEnum.groups,
                     executor_id=self._id,
