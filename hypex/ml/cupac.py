@@ -16,6 +16,7 @@ from ..executor import MLExecutor
 from ..extensions.cupac import CupacExtension
 from ..utils import ID_SPLIT_SYMBOL
 from ..utils.adapter import Adapter
+from ..utils.cuped_theta import cuped_theta
 from ..utils.models import CUPAC_MODELS
 
 
@@ -400,9 +401,9 @@ class CUPACExecutor(MLExecutor):
                 )
                 prediction = self.calc(mode="predict", model=fitted_model, X=X_predict)
 
-                theta = self.extension._cuped_theta(
-                    data.ds[target].data.iloc[:, 0],
-                    prediction.data.iloc[:, 0],
+                theta = cuped_theta(
+                    data.ds[target].data.values.flatten(),
+                    prediction.data.values.flatten(),
                 )
                 explained_variation = (prediction - prediction.mean()) * theta
                 target_cupac = data.ds[target] - explained_variation
