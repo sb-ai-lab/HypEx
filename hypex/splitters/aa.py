@@ -230,7 +230,7 @@ class AASplitter(Calculator):
             # metadata (`DatasetBase._set_roles`), it does not read or
             # touch `selected.data`, so this costs no Spark job either.
             dtype = selected.data[const_group_field].dtype
-            if not (dtype == object or dtype.name == "string"):
+            if dtype.name not in ("object", "string"):
                 if data.backend_type == BackendsEnum.spark:
                     widened_role = deepcopy(selected.roles[const_group_field])
                     widened_role.data_type = str
