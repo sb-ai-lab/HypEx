@@ -143,6 +143,9 @@ class MatchingMetricsExtension(Extension):
     ) -> float:
         """Calculate the standard error of the treatment effect estimate.
 
+        Returns NaN instead of 0.0 for degenerate inputs to prevent
+        false significance (SE=0 → z=±inf → p=0).
+
         Args:
             n_c: Sample size of the control group.
             n_t: Sample size of the treatment group.
@@ -152,8 +155,12 @@ class MatchingMetricsExtension(Extension):
             fs_t: Sum of squared weights for the treatment group times size of treatment group.
 
         Returns:
-            The computed standard error.
+            The computed standard error, or NaN for degenerate inputs.
         """
+        if n_c == 0 or n_t == 0:
+            return float("nan")
+        if np.isnan(var_c) or np.isnan(var_t):
+            return float("nan")
         return np.sqrt(fs_c * var_c / n_c + fs_t * var_t / n_t)
 
     @staticmethod
@@ -179,23 +186,28 @@ class MatchingMetricsExtension(Extension):
         )
 
     def _calc_metrics(
-            self,
-            stats_itc: dict[str, float],
-            stats_itt: dict[str, float]
+        self,
+        stats_itc: dict[str, float],
+        stats_itt: dict[str, float]
     ) -> dict[str, float]:
         """Compute final ATT, ATC, and ATE metrics with confidence intervals.
+
+        Returns NaN-filled rows when either group has zero observations,
+        preventing downstream KeyError on missing metric keys.
 
         Args:
             stats_itc: Aggregated statistics for the Individual Treatment effect on Control.
             stats_itt: Aggregated statistics for the Individual Treatment effect on Treated.
 
         Returns:
-            A dictionary mapping metric names ('ATT', 'ATC', 'ATE') to lists 
+            A dictionary mapping metric names ('ATT', 'ATC', 'ATE') to lists
             containing [Estimate, Standard Error, P-value, CI Lower, CI Upper].
         """
         m = stats_itc["count"]
         n = stats_itt["count"]
-
+        if m == 0 or n == 0:
+            nan_row = [float("nan")] * 5
+            return {"ATT": nan_row, "ATC": nan_row, "ATE": nan_row}
         var_c = stats_itc["var"]
         var_t = stats_itt["var"]
 

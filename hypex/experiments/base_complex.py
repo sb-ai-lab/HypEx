@@ -99,7 +99,8 @@ class GroupExperiment(ExperimentWithReporter):
         clean_ds = data._clean_ds_for_iteration()
         results = []
         for group, group_data in tqdm(clean_ds.groupby(group_field)):
-            key = str(group[0])
+            # pandas >= 2.0 yields a 1-element tuple; < 2.0 yields scalar
+            key = str(group[0] if isinstance(group, tuple) else group)
             res = self.one_iteration(ExperimentData(group_data), key, set_key_as_index=False)
             results.append((key, res))
         return self._set_result(data, results)
@@ -114,14 +115,14 @@ class GroupExperiment(ExperimentWithReporter):
             new_cols = {col: f"{key} {col}" for col in ds.columns}
             ds = ds.rename(new_cols)
             datasets.append(ds)
-            
+
         if not datasets:
             return data
-            
+
         combined = datasets[0]
         for ds in datasets[1:]:
             combined = combined.merge(ds, left_index=True, right_index=True, how="outer")
-            
+
         data.analysis_tables[self.id] = combined
         return data
 
@@ -133,11 +134,22 @@ class ParamsExperiment(ExperimentWithReporter):
         reporter: DatasetReporter,
         params: dict[type, dict[str, Sequence[Any]]],
         transformer: bool | None = None,
+        stopping_criterion: IfExecutor | None = None,
         key: str = "",
     ):
         super().__init__(executors, reporter, transformer, key)
         self._params = params
         self._flat_params: list[dict[type, dict[str, Any]]] = []
+        self.stopping_criterion = stopping_criterion
+
+    def _stopping_criterion_met(self, t_data: ExperimentData) -> bool:
+        if self.stopping_criterion is None:
+            return False
+        if_result = self.stopping_criterion.execute(t_data)
+        if_executor_id = if_result.get_one_id(
+            self.stopping_criterion.__class__, ExperimentDataEnum.variables
+        )
+        return bool(if_result.variables[if_executor_id]["response"])
 
     def generate_params_hash(self) -> str:
         return f"ParamsExperiment: {self.reporter.__class__.__name__}"
@@ -186,10 +198,11 @@ class ParamsExperiment(ExperimentWithReporter):
             for executor in self.executors:
                 executor.set_params(flat_param)
                 t_data = executor.execute(t_data)
-                report = self.reporter.report(t_data)
+            report = self.reporter.report(t_data)
             results.append(report)
-        result_data = self._set_result(data, results)
-        return result_data
+            if self._stopping_criterion_met(t_data):
+                break
+        return self._set_result(data, results)
 
 
 class IfParamsExperiment(ParamsExperiment):
@@ -202,8 +215,14 @@ class IfParamsExperiment(ParamsExperiment):
         transformer: bool | None = None,
         key: str = "",
     ):
-        self.stopping_criterion = stopping_criterion
-        super().__init__(executors, reporter, params, transformer, key)
+        super().__init__(
+            executors,
+            reporter,
+            params,
+            transformer,
+            stopping_criterion=stopping_criterion,
+            key=key,
+        )
 
     @timeit(level="PIPELINE", prefix="PARAMS")
     def execute(self, data: ExperimentData) -> ExperimentData:

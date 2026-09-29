@@ -57,18 +57,24 @@ class AATestReporter(DatasetReporter):
     def get_splitter_id(data: ExperimentData) -> str | None:
         """Retrieve the identifier of the splitter used in the experiment.
 
+        Searches for ``AASplitterWithStratification`` first (the more
+        specific class) to avoid a guaranteed miss-and-retry cycle when
+        stratification is enabled.
+
         Args:
             data: The experiment data container.
 
         Returns:
-            The ID of the ``AASplitter`` or ``AASplitterWithStratification`` instance, 
-            or ``None`` if no splitter is found.
+            The splitter ID string, or ``None`` if no splitter is found.
         """
-        for c in [AASplitter, AASplitterWithStratification]:
-            try:
-                return data.get_one_id(c, ExperimentDataEnum.additional_fields)
-            except NotFoundInExperimentDataError:
-                pass
+        for c in [AASplitterWithStratification, AASplitter]:
+            ids = data.get_ids(c, ExperimentDataEnum.additional_fields)
+            found = ids.get(c.__name__, {}).get(
+                ExperimentDataEnum.additional_fields.value, [],
+            )
+            if found:
+                return found[0]
+        return None
 
     def _build_dict_report(self, data: ExperimentData) -> dict[str, Any]:
         """Construct a dictionary report containing A/A test metrics.
