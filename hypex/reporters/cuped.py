@@ -49,12 +49,11 @@ class CupedReporter(Reporter):
         if not records:
             return SmallDataset.create_empty()
 
-        row = records[0]
         rows: list[dict[str, Any]] = []
-        for feature, reduction in row.items():
+        for record in records:
             rows.append({
-                "feature": feature,
-                "variance_reduction_pct": reduction,
+                "feature": record.get("feature"),
+                "variance_reduction_pct": record.get("variance_reduction_pct"),
             })
 
         return SmallDataset.from_dict(
