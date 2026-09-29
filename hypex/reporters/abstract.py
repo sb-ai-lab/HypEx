@@ -84,7 +84,6 @@ def _normalize_value(val: Any) -> Any:
         
     return val
 
-@staticmethod
 def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
     """Extract index values from a dataset in a backend-agnostic way.
 
