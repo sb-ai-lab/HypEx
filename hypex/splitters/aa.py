@@ -19,6 +19,10 @@ MISSING_CONST_LABELS = frozenset({"", "nan", "none", "nat", "<na>"})
 # tagged const column are the ones that take part in the random split.
 _FREE_CONST_SENTINEL = "__hypex_free_const_group__"
 
+# Safe column name for value_counts: prevents collision when the
+# user-supplied const-group column is literally named "count".
+_CONST_LABEL_COL = "__hypex_const_label__"
+
 
 class AASplitter(Calculator):
     """Splits data into control/test groups with optional pinned const groups.
@@ -128,6 +132,7 @@ class AASplitter(Calculator):
         const_group_field: str,
         label_map: dict[int, str],
         control_size: float,
+        sample_size: float = 1.0,
     ) -> tuple[dict[Any, str], int, float]:
         """Resolve the pinned constant groups in one aggregate pass.
 
@@ -143,46 +148,60 @@ class AASplitter(Calculator):
             label_map: Codes of the split itself, e.g.
                 ``{0: "control", 1: "test_1"}``.
             control_size: The requested TOTAL control share.
+            sample_size: Fraction of data that will actually be sampled.
+                Used to rescale ``control_size`` correctly when
+                ``sample_size < 1``.
 
         Returns:
             A tuple of ``(translation, free_size, control_size)``:
 
-            * ``translation`` maps every non-null value of the const column to
-            either its split label (pinned) or
-            :data:`_FREE_CONST_SENTINEL` (takes part in the split);
+            * ``translation`` maps every distinct value of the const column
+            (as its ``str`` representation) to either its split label
+            (pinned) or :data:`_FREE_CONST_SENTINEL` (takes part in the
+            split);
             * ``free_size`` is the number of rows left to split;
             * ``control_size`` is rescaled so that the TOTAL control share
-            (pinned + random) matches the requested one.
+            (pinned + random) matches the requested one, accounting for
+            ``sample_size``.
 
         Raises:
             ValueError: If a pinned label is not one of the split's groups.
         """
-        # One aggregate pass; the frame has one row per distinct label,
-        # including the null bucket, so it also gives the row total.
-        # to_dict() returns {"backend": ..., "roles": ..., "data": {"data": {...}, "index": [...]}}
-        # We need the inner "data" dict which maps column names to value lists.
-        counts = (
+        import warnings
+
+        # Rename to a safe name so that a column literally called "count"
+        # does not collide with the value_counts() result column.
+        vc = (
             data.select(const_group_field)
-            .value_counts(dropna=False)
-            .to_dict()["data"]["data"]
+            .rename({const_group_field: _CONST_LABEL_COL})
+            .value_counts(dropna=False, sort=False)
         )
+        # to_records() is a stable public API (unlike .to_dict()["data"]["data"]).
+        records = vc.to_records()
+
         codes = {label: code for code, label in label_map.items()}
         codes.setdefault("test", 1)
-
         translation: dict[Any, str] = {}
         n_total = 0
         n_pinned = 0
         n_pinned_control = 0
-        for label, count in zip(counts[const_group_field], counts["count"]):
-            count = int(count)
+
+        for rec in records:
+            label = rec[_CONST_LABEL_COL]
+            count = int(rec["count"])
             n_total += count
-            # A real missing value: fillna() turns it into the sentinel.
+
+            # Missing value (None, NaN): after astype(str) it becomes
+            # "None" / "nan", both covered by MISSING_CONST_LABELS.
             if label is None or (isinstance(label, float) and label != label):
+                translation[str(label)] = _FREE_CONST_SENTINEL
                 continue
+
             key = str(label)
             if key.strip().lower() in MISSING_CONST_LABELS:
-                translation[label] = _FREE_CONST_SENTINEL
+                translation[key] = _FREE_CONST_SENTINEL
                 continue
+
             code = codes.get(key)
             if code is None or code not in label_map:
                 raise ValueError(
@@ -191,20 +210,38 @@ class AASplitter(Calculator):
                     f"or a missing value (None / np.nan / 'nan') for a row "
                     f"that takes part in the split."
                 )
-            translation[label] = label_map[code]
+            translation[key] = label_map[code]
             n_pinned += count
             if key == "control":
                 n_pinned_control += count
 
         free_size = n_total - n_pinned
-        control_size = (
-            0.0
-            if free_size == 0
-            else max(
-                0.0, (n_total * control_size - n_pinned_control) / free_size
+
+        # Warn when pinned controls already exceed the requested quota.
+        if n_pinned_control > n_total * control_size:
+            warnings.warn(
+                f"Pinned control rows ({n_pinned_control}) exceed the "
+                f"requested control quota ({n_total * control_size:.0f}). "
+                f"The overall control share will be higher than "
+                f"{control_size}.",
+                UserWarning,
+                stacklevel=3,
             )
+
+        # Rescale control_size accounting for sample_size < 1.
+        # Pinned rows are never sampled; only free rows are sampled with
+        # probability `sample_size`. The target total control count among
+        # sampled rows is:
+        #   (n_pinned + free_size * sample_size) * control_size
+        n_sampled_total = n_pinned + free_size * sample_size
+        target_control_total = n_sampled_total * control_size
+        free_control_needed = max(0.0, target_control_total - n_pinned_control)
+        free_sampled = free_size * sample_size
+
+        adjusted_control_size = (
+            free_control_needed / free_sampled if free_sampled > 0 else 0.0
         )
-        return translation, free_size, control_size
+        return translation, free_size, adjusted_control_size
 
     @staticmethod
     def _inner_function(
