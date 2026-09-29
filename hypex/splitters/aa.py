@@ -18,6 +18,10 @@ from ..utils import BackendsEnum, ExperimentDataEnum, timeit
 
 MISSING_CONST_LABELS = frozenset({"", "nan", "none", "nat", "<na>"})
 
+# A value that cannot collide with a split label: rows carrying it in the
+# tagged const column are the ones that take part in the random split.
+_FREE_CONST_SENTINEL = "__hypex_free_const_group__"
+
 
 class AASplitter(Calculator):
     def __init__(
@@ -130,53 +134,15 @@ class AASplitter(Calculator):
 
         Returns:
             Dataset with a ``split`` column assigning each row to a group.
+            For ``sample_size`` of 1.0 the result holds exactly one row per
+            input row, with no duplicate index entries.
 
         Raises:
             ValueError: If an unknown constant group label is encountered.
         """
-        # ── 1. Separate pinned rows from free rows ──────────────────
+        # ── 1. labels of the split itself ───────────────────────────
         sample_size = sample_size if sample_size is not None else 1.0
-        control_indexes: list = []
-        const_data: dict[str, Dataset] = {}
-        free_size = len(data)
-
-        if const_group_field:
-            const_data = {
-                group: group_data
-                for group, group_data in data.groupby(const_group_field)
-                if str(group).strip().lower() not in MISSING_CONST_LABELS
-            }
-            # Extract pinned control rows to adjust random control_size
-            control_data = const_data.get("control")
-            if control_data is not None:
-                control_indexes = list(control_data.index)
-
-            free_size = len(data) - sum(
-                len(cd) for cd in const_data.values()
-            )
-
-            # Adjust control_size: account for already-pinned control rows
-            control_size = (
-                0.0
-                if free_size == 0
-                else max(
-                    0.0,
-                    (len(data) * control_size - len(control_indexes))
-                    / free_size,
-                )
-            )
-
-            pinned_indexes = {
-                index
-                for group_data in const_data.values()
-                for index in group_data.index
-            }
-        else:
-            pinned_indexes = set()
-
-        # ── 2. Determine edges and labels ───────────────────────────
         frac = sample_size
-        n_sampled = int(free_size * frac)
 
         MOD = 10_000_000
         effective_mod = int(frac * MOD) if frac < 1.0 else MOD
@@ -185,6 +151,22 @@ class AASplitter(Calculator):
             labels = ["control"] + [
                 f"test_{i+1}" for i in range(len(groups_sizes) - 1)
             ]
+        else:
+            labels = ["control", "test_1"]
+        label_map = {i: label for i, label in enumerate(labels)}
+
+        # ── 2. pinned groups: one aggregate pass, resolved on the driver ──
+        translation: dict[Any, str] = {}
+        if const_group_field:
+            translation, free_size, control_size = AASplitter._const_group_plan(
+                data, const_group_field, label_map, control_size
+            )
+        else:
+            free_size = len(data)
+
+        # ── 3. bucket edges ─────────────────────────────────────────
+        n_sampled = int(free_size * frac)
+        if groups_sizes:
             edges = []
             cumulative = 0.0
             for size_prop in groups_sizes:
@@ -199,41 +181,66 @@ class AASplitter(Calculator):
                 else 0,
                 effective_mod,
             ]
-            labels = ["control", "test_1"]
 
-        # Build label_map for _apply_const_groups
-        label_map = {i: label for i, label in enumerate(labels)}
+        # ── 4. free rows are split, pinned rows keep their label ────
+        parts: list[Dataset] = []
+        if const_group_field:
+            # A single-column view of the const column in which every free row
+            # holds the sentinel and every pinned row already holds its split
+            # label. Both subsets are then plain row filters on the same frame,
+            # which is what keeps the Spark plan join-free: a mask built with
+            # Dataset.isin() would come from a different pyspark.pandas anchor
+            # and turn each selection into a SortMergeJoin.
+            tagged = data.select(const_group_field).fillna(
+                values={const_group_field: _FREE_CONST_SENTINEL}
+            )
+            if translation:
+                tagged = tagged.replace(to_replace=translation)
+            if free_size > 0 and n_sampled > 0:
+                parts.append(
+                    tagged[tagged == _FREE_CONST_SENTINEL].random_split_labels(
+                        edges=edges,
+                        labels=labels,
+                        random_state=random_state,
+                        frac=frac,
+                        name="split",
+                    )
+                )
+            if any(
+                label != _FREE_CONST_SENTINEL for label in translation.values()
+            ):
+                pinned = tagged[tagged != _FREE_CONST_SENTINEL].rename(
+                    {const_group_field: "split"}
+                )
+                pinned.roles = {"split": StatisticRole()}
+                parts.append(pinned)
+        elif n_sampled > 0:
+            parts.append(
+                data.random_split_labels(
+                    edges=edges,
+                    labels=labels,
+                    random_state=random_state,
+                    frac=frac,
+                    name="split",
+                )
+            )
 
-        # ── 3. Random split on free rows only ───────────────────────
-        if free_size > 0 and n_sampled > 0:
-            experiment_data = (
-                data.filter(~data.index.isin(pinned_indexes))
-                if const_group_field
-                else data
-            )
-            split_ds = experiment_data.random_split_labels(
-                edges=edges,
-                labels=labels,
-                random_state=random_state,
-                frac=frac,
-                name="split",
-            )
-        else:
-            split_ds = Dataset.create_empty(
+        if not parts:
+            return Dataset.create_empty(
                 roles={"split": StatisticRole()},
                 backend=data.backend_type,
-                session=data.session if hasattr(data, "session") else None,
+                session=data.session,
             )
 
-        # ── 4. Append pinned groups ─────────────────────────────────
-        if const_group_field and const_data:
-            split_ds = AASplitter._apply_const_groups(
-                split_ds=split_ds,
-                const_data=const_data,
-                label_map=label_map,
-                const_group_field=const_group_field,
-            )
+        # random_split_labels names the index 'index' on the Spark backend
+        # (reset_index of an unnamed index), which makes ps.concat refuse to
+        # append the pinned part. Aligning every part with the source index is
+        # a no-op on pandas.
+        index_names = data.data.index.names
+        for part in parts:
+            part.data = part.data.rename_axis(index_names)  # type: ignore[operator]
 
+        split_ds = parts[0] if len(parts) == 1 else parts[0].append(parts[1:])
         split_ds.roles["split"] = StatisticRole()
         return split_ds
 
@@ -259,65 +266,85 @@ class AASplitter(Calculator):
         return data
 
     @staticmethod
-    def _apply_const_groups(
-        split_ds: Dataset,
-        const_data: dict[str, Dataset],
+    def _const_group_plan(
+        data: Dataset,
+        const_group_field: str,
         label_map: dict[int, str],
-        const_group_field: str | None,
-    ) -> Dataset:
-        """Write pinned groups over the split of free rows.
+        control_size: float,
+    ) -> tuple[dict[Any, str], int, float]:
+        """Resolve the pinned constant groups in one aggregate pass.
 
-        For each pinned group in *const_data*, creates a single-column
-        Dataset with the appropriate split label and appends it to the
-        random-split result.
+        ``control`` and ``test_N`` are the labels of the split itself, ``test``
+        is the documented alias for ``test_1`` of a two-group split. A value
+        that is missing, or whose stripped lower-case form is in
+        :data:`MISSING_CONST_LABELS`, means the row takes part in the split.
+        Anything else is a typo or a group that was not requested.
 
         Args:
-            split_ds: Dataset with split labels for free rows.
-            const_data: Dict mapping group label → Dataset of pinned rows.
-            label_map: Mapping from group codes to labels
-                (e.g. ``{0: "control", 1: "test_1"}``).
-            const_group_field: Name of the const group column.
+            data: The dataset being split.
+            const_group_field: Column holding the pinned group labels.
+            label_map: Codes of the split itself, e.g.
+                ``{0: "control", 1: "test_1"}``.
+            control_size: The requested TOTAL control share.
 
         Returns:
-            Dataset with both free and pinned rows labeled.
+            A tuple of (translation, free_size, control_size):
+
+            * ``translation`` maps every non-null value of the const column to
+              either its split label (pinned) or
+              :data:`_FREE_CONST_SENTINEL` (takes part in the split);
+            * ``free_size`` is the number of rows left to split;
+            * ``control_size`` is rescaled so that the TOTAL control share
+              (pinned + random) matches the requested one.
 
         Raises:
-            ValueError: If an unknown constant group label is found.
+            ValueError: If a pinned label is not one of the split's groups.
         """
-        # Build reverse mapping: label → code
+        # One aggregate pass. The frame has one row per distinct label,
+        # including the null bucket, so it also gives the row total.
+        # sort=False keeps the Spark plan at a single Exchange.
+        counts = (
+            data.select(const_group_field)
+            .value_counts(dropna=False, sort=False)
+            .to_dict()["data"]["data"]
+        )
         codes = {label: code for code, label in label_map.items()}
         codes.setdefault("test", 1)
 
-        pinned_rows = []
-        for group, group_data in const_data.items():
-            group_str = str(group).strip().lower()
-            code = codes.get(group_str)
-            if code is None:
+        translation: dict[Any, str] = {}
+        n_total = 0
+        n_pinned = 0
+        n_pinned_control = 0
+        for label, count in zip(counts[const_group_field], counts["count"]):
+            count = int(count)
+            n_total += count
+            # a real missing value: fillna() turns it into the sentinel
+            if label is None or (isinstance(label, float) and label != label):
+                continue
+            key = str(label)
+            if key.strip().lower() in MISSING_CONST_LABELS:
+                translation[label] = _FREE_CONST_SENTINEL
+                continue
+            code = codes.get(key)
+            if code is None or code not in label_map:
                 raise ValueError(
-                    f"Unknown constant group {str(group)!r} in column "
-                    f"'{const_group_field}'. Expected one of "
-                    f"{sorted(codes)}, or a missing value "
-                    f"(None / np.nan / 'nan') for a row that takes "
-                    f"part in the split."
+                    f"Unknown constant group {key!r} in column "
+                    f"'{const_group_field}'. Expected one of {sorted(codes)}, "
+                    f"or a missing value (None / np.nan / 'nan') for a row "
+                    f"that takes part in the split."
                 )
-            label = label_map.get(code, str(group))
-            # Create a single-column dataset with the split label
-            # matching the index of the pinned group data.
-            import pandas as pd
-            pinned_ds = Dataset.create_empty(
-                roles={"split": StatisticRole()},
-                backend=group_data.backend_type,
-                session=group_data.session if hasattr(group_data, "session") else None,
-            )
-            pinned_ds.data = pd.DataFrame(
-                {"split": [label] * len(group_data)},
-                index=group_data.index,
-            )
-            pinned_rows.append(pinned_ds)
+            translation[label] = label_map[code]
+            n_pinned += count
+            if key == "control":
+                n_pinned_control += count
 
-        if pinned_rows:
-            return split_ds.append(pinned_rows)
-        return split_ds
+        free_size = n_total - n_pinned
+        control_size = (
+            0.0
+            if free_size == 0
+            else max(0.0, (n_total * control_size - n_pinned_control) / free_size)
+        )
+        return translation, free_size, control_size
 
 
 class AASplitterWithStratification(AASplitter):
