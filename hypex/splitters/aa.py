@@ -480,6 +480,14 @@ class AASplitterWithStratification(AASplitter):
 
     @timeit(level="SPLIT", prefix="SPLITTER_STRAT")
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """Execute stratified split and truncate the Spark DAG.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            Updated ExperimentData with the split column appended.
+        """
         grouping_fields = data.ds.search_columns(StratificationRole())
         const_group_fields = data.ds.search_columns(ConstGroupRole())
         const_group_field = (
@@ -495,6 +503,11 @@ class AASplitterWithStratification(AASplitter):
             groups_sizes=self.groups_sizes,
             const_group_field=const_group_field,
         )
+        # Truncate the DAG after the stratified split to prevent
+        # exponential lineage growth in iterative A/A loops
+        # (principle 16).
+        if data.ds.backend_type == BackendsEnum.spark:
+            result.checkpoint(eager=True)
         if isinstance(result, Dataset):
             result = result.replace_roles({"split": AdditionalTreatmentRole()})
         data = self._set_value(data, result)
