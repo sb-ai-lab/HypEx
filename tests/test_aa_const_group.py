@@ -207,6 +207,51 @@ def test_inner_function_rejects_sentinel_const_value(make_dataset, backend):
     )
 
 
+def test_inner_function_categorical_const_column(make_dataset):
+    """A pandas `category` dtype const column must not crash fillna() with
+
+    ``TypeError: Cannot setitem on a Categorical with a new category``
+    (regression: review round 1, R1-01). dev/master returns a correct split
+    for the identical input, so this is a real regression, not an
+    unsupported case. Spark has no categorical dtype reachable on this
+    path, so this test is pandas-only.
+    """
+    pdf = _frame(["control"] * 8 + [None] * 12)
+    pdf[CONST_COLUMN] = pdf[CONST_COLUMN].astype("category")
+    dataset = make_dataset(pdf, _roles(), "pandas")
+
+    frame = _split_frame(_split(dataset))
+
+    assert len(frame) == 20
+    assert frame.index.nunique() == 20
+    assert set(frame.loc[0:7, "split"]) == {"control"}
+    assert set(frame["split"]) <= {"control", "test_1"}
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_inner_function_const_column_named_count(make_dataset, backend):
+    """A const column literally named 'count' must not collide with
+
+    ``value_counts()``'s own 'count' output column (regression: review
+    round 1, R1-02). dev/master handles the same input via ``groupby``.
+    """
+    pdf = _frame(["control"] * 5 + [None] * 5).rename(columns={CONST_COLUMN: "count"})
+    roles = _roles(with_const=False)
+    roles["count"] = ConstGroupRole()
+    dataset = make_dataset(pdf, roles, backend)
+
+    frame = _split_frame(
+        AASplitter._inner_function(
+            dataset, random_state=42, control_size=0.5, const_group_field="count"
+        )
+    )
+
+    assert len(frame) == 10
+    assert frame.index.nunique() == 10
+    assert set(frame.loc[0:4, "split"]) == {"control"}
+    assert set(frame["split"]) <= {"control", "test_1"}
+
+
 @pytest.mark.parametrize("backend", BACKENDS)
 def test_inner_function_three_groups_with_pinned(make_dataset, backend):
     values = (

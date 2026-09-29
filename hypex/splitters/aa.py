@@ -19,6 +19,13 @@ MISSING_CONST_LABELS = frozenset({"", "nan", "none", "nat", "<na>"})
 # tagged const column are the ones that take part in the random split.
 _FREE_CONST_SENTINEL = "__hypex_free_const_group__"
 
+# Name of the single-column view used to count distinct const labels. A
+# renamed view is counted instead of the column itself so a const column
+# literally named "count" cannot collide with value_counts()'s own "count"
+# output column (reset_index() would otherwise raise ValueError: cannot
+# insert count, already exists).
+_CONST_LABEL_COLUMN = "__hypex_const_label__"
+
 
 class AASplitter(Calculator):
     def __init__(
@@ -188,7 +195,15 @@ class AASplitter(Calculator):
             # which is what keeps the Spark plan join-free: a mask built with
             # Dataset.isin() would come from a different pyspark.pandas anchor
             # and turn each selection into a SortMergeJoin.
-            tagged = data.select(const_group_field).fillna(
+            selected = data.select(const_group_field)
+            # A pandas `category` dtype cannot be filled with a value that is
+            # not already one of its categories, so fillna(sentinel) below
+            # would raise TypeError: Cannot setitem on a Categorical with a
+            # new category. Widen to plain object first. Spark has no
+            # categorical dtype on this path, so the check is a no-op there.
+            if selected.data[const_group_field].dtype.name == "category":
+                selected = selected.astype({const_group_field: object})
+            tagged = selected.fillna(
                 values={const_group_field: _FREE_CONST_SENTINEL}
             )
             if translation:
@@ -235,6 +250,11 @@ class AASplitter(Calculator):
         # a no-op on pandas.
         index_names = data.data.index.names
         for part in parts:
+            # Dataset.data is annotated pd.DataFrame | spark.DataFrame
+            # (hypex/dataset/abstract.py:829), but pyspark.sql.DataFrame is
+            # the wrong half of that union -- at runtime this is always a
+            # pyspark.pandas.DataFrame, which does have rename_axis. The
+            # ignore is masking that wrong annotation, not a real type error.
             part.data = part.data.rename_axis(index_names)  # type: ignore[operator]
 
         split_ds = parts[0] if len(parts) == 1 else parts[0].append(parts[1:])
@@ -299,9 +319,12 @@ class AASplitter(Calculator):
         """
         # One aggregate pass. The frame has one row per distinct label,
         # including the null bucket, so it also gives the row total.
-        # sort=False keeps the Spark plan at a single Exchange.
+        # sort=False keeps the Spark plan at a single Exchange. The column is
+        # renamed first so a const column literally named "count" cannot
+        # collide with value_counts()'s own "count" output column.
         counts = (
             data.select(const_group_field)
+            .rename({const_group_field: _CONST_LABEL_COLUMN})
             .value_counts(dropna=False, sort=False)
             .to_dict()["data"]["data"]
         )
@@ -312,7 +335,7 @@ class AASplitter(Calculator):
         n_total = 0
         n_pinned = 0
         n_pinned_control = 0
-        for label, count in zip(counts[const_group_field], counts["count"]):
+        for label, count in zip(counts[_CONST_LABEL_COLUMN], counts["count"]):
             count = int(count)
             n_total += count
             # a real missing value: fillna() turns it into the sentinel
