@@ -295,7 +295,8 @@ class AASplitter(Calculator):
         if const_group_field:
             translation, free_size, control_size = (
                 AASplitter._const_group_plan(
-                    data, const_group_field, label_map, control_size
+                    data, const_group_field, label_map, control_size,
+                    sample_size=frac,
                 )
             )
         else:
