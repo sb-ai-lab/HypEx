@@ -266,18 +266,19 @@ class AASplitter(Calculator):
 
         # ── 3. bucket edges (always in MOD scale, frac handled separately)
         MOD = 10_000_000
+        frac_limit = int(frac * MOD)
 
         if groups_sizes:
-            edges = []
+            edges: list[int] = []
             cumulative = 0.0
             for size_prop in groups_sizes:
                 cumulative += size_prop
-                edges.append(int(cumulative * MOD))
-            edges[-1] = MOD
+                edges.append(int(cumulative * frac_limit))
+            edges[-1] = frac_limit
         else:
             edges = [
-                int(control_size * MOD),
-                MOD,
+                int(control_size * frac_limit),
+                frac_limit,
             ]
 
         # ── 4. free rows are split, pinned rows keep their label ────
