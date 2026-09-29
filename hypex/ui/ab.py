@@ -194,128 +194,6 @@ class ABOutput(Output):
             self._groups, role={"group": StatisticRole()},
         )
 
-    # ── CUPAC variance reductions ────────────────────────────────────
-
-    def _extract_variance_reductions(self, experiment_data: ExperimentData) -> None:
-        """Extract CUPAC variance reduction data from analysis_tables.
-
-        CUPACExecutor stores reports under keys like
-        ``CUPACExecutor┆hash┆target`` (not ``*_cupac_report``).
-        Each report is a SmallDataset with columns
-        ``cupac_best_model``, ``cupac_variance_reduction_cv``,
-        ``cupac_variance_reduction_real``.
-        """
-        from ..ml.cupac import CUPACExecutor
-
-        ids = experiment_data.get_ids(
-            CUPACExecutor,
-            searched_space=ExperimentDataEnum.analysis_tables,
-        )
-        all_ids = ids.get(CUPACExecutor.__name__, {}).get(
-            ExperimentDataEnum.analysis_tables.value, [],
-        )
-        # Filter out importance sub-reports
-        main_ids = [i for i in all_ids if not i.endswith("importances")]
-
-        if not main_ids:
-            self.cupac.variance_reductions = None
-            return
-
-        variance_data: list[dict[str, Any]] = []
-        for aid in main_ids:
-            table = experiment_data.analysis_tables.get(aid)
-            if table is None or table.is_empty():
-                continue
-            records = table.to_records()
-            if not records:
-                continue
-            rec = records[0]
-            # Extract target name from composite ID
-            target_name = aid.split(ID_SPLIT_SYMBOL)[-1]
-            variance_data.append({
-                "target": target_name,
-                "best_model": rec.get("cupac_best_model"),
-                "variance_reduction_cv": rec.get("cupac_variance_reduction_cv"),
-                "variance_reduction_real": rec.get("cupac_variance_reduction_real"),
-            })
-
-        if variance_data:
-            self.cupac.variance_reductions = SmallDataset.from_dict(
-                variance_data,
-                roles={
-                    "target": InfoRole(str),
-                    "best_model": InfoRole(str),
-                    "variance_reduction_cv": StatisticRole(float),
-                    "variance_reduction_real": StatisticRole(float),
-                },
-            )
-        else:
-            self.cupac.variance_reductions = None
-
-    # ── CUPAC feature importances ────────────────────────────────────
-
-    def _extract_feature_importances(self, experiment_data: ExperimentData) -> None:
-        """Extract CUPAC feature importances from analysis_tables.
-
-        CUPACExecutor stores importances under keys like
-        ``CUPACExecutor┆hash┆target┆importances``.
-        """
-        from ..ml.cupac import CUPACExecutor
-
-        ids = experiment_data.get_ids(
-            CUPACExecutor,
-            searched_space=ExperimentDataEnum.analysis_tables,
-        )
-        all_ids = ids.get(CUPACExecutor.__name__, {}).get(
-            ExperimentDataEnum.analysis_tables.value, [],
-        )
-        imp_ids = [i for i in all_ids if i.endswith("importances")]
-
-        if not imp_ids:
-            self.cupac.feature_importances = None
-            return
-
-        importance_data: list[dict[str, Any]] = []
-        for aid in imp_ids:
-            table = experiment_data.analysis_tables.get(aid)
-            if table is None or table.is_empty():
-                continue
-            records = table.to_records()
-            if not records:
-                continue
-            rec = records[0]
-            # Extract target from ID: CUPACExecutor┆hash┆target┆importances
-            parts = aid.split(ID_SPLIT_SYMBOL)
-            target_name = parts[-2] if len(parts) >= 2 else "unknown"
-            # Find model from the main report
-            main_id = ID_SPLIT_SYMBOL.join(parts[:-1])
-            main_table = experiment_data.analysis_tables.get(main_id)
-            model_name = None
-            if main_table and not main_table.is_empty():
-                main_records = main_table.to_records()
-                if main_records:
-                    model_name = main_records[0].get("cupac_best_model")
-            for feature, importance in rec.items():
-                importance_data.append({
-                    "target": target_name,
-                    "feature": feature,
-                    "importance": importance,
-                    "model": model_name,
-                })
-
-        if importance_data:
-            self.cupac.feature_importances = SmallDataset.from_dict(
-                importance_data,
-                roles={
-                    "target": InfoRole(str),
-                    "feature": InfoRole(str),
-                    "importance": StatisticRole(float),
-                    "model": InfoRole(str),
-                },
-            )
-        else:
-            self.cupac.feature_importances = None
-
     # ── Variance reduction report property ───────────────────────────
 
     @property
@@ -332,8 +210,6 @@ class ABOutput(Output):
             )
         return "No experiment data available."
 
-    # ── Main extract ─────────────────────────────────────────────────
-
     def extract(self, experiment_data: ExperimentData) -> None:
         """Extract all A/B test outputs including CUPED/CUPAC.
 
@@ -344,8 +220,18 @@ class ABOutput(Output):
         self._extract_differences(experiment_data)
         self._extract_multitest_result(experiment_data)
         self._extract_sizes(experiment_data)
-        self._extract_variance_reductions(experiment_data)
-        self._extract_feature_importances(experiment_data)
-
+        self._extract_cupac(experiment_data)
         if self.cuped is not None:
             self.cuped.extract(experiment_data)
+
+    def _extract_cupac(self, experiment_data: ExperimentData) -> None:
+        """Delegate CUPAC extraction to CupacReporter (DRY).
+
+        Args:
+            experiment_data: The experiment data container.
+        """
+        from ..reporters.cupac import CupacReporter
+
+        report = CupacReporter().report(experiment_data)
+        self.cupac.variance_reductions = report.get("variance_reductions")
+        self.cupac.feature_importances = report.get("feature_importances")
