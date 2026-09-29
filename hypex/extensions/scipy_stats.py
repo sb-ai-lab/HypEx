@@ -394,3 +394,12 @@ class NormCDF(GroupStatTest):
             {"p-value": 2 * (1 - result)},
             StatisticRole(),
         )
+
+class UniformCheck(GroupStatTest):
+    def calc(
+        self, data: Dataset, other: Dataset | None = None, **kwargs
+    ) -> Dataset:
+        data = data.data.to_numpy().flatten()
+        res = kstest(data, "uniform")
+
+        return self._form_results(res[1], res[0], self.reliability)

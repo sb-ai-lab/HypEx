@@ -3,11 +3,14 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+from .analyzers.aa import AADryTestAnalyzer, AAScoreAnalyzer, OneAAStatAnalyzer
+from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
 from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from .comparators.abstract import Comparator
 from .dataset import AdditionalTreatmentRole, TargetRole
 from .executor import Executor
+from .dataset import AdditionalTreatmentRole, FeatureRole, TargetRole
 from .experiments.base import Experiment, OnRoleExperiment
 from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from .forks.aa import IfAAExecutor
@@ -59,11 +62,11 @@ class AATest(ExperimentShell):
         additional_params: dict[str, Any] | None,
         random_states: Iterable[int] | None,
         groups_sizes: list[float] | None,
+        dry_test: bool,
         float32: bool = False,
         early_stopping: bool = False,
     ) -> Experiment:
         """Builds the experiment pipeline for A/A testing."""
-        
         aa_metrics = Experiment(
             executors=[
                 GroupSizes(grouping_role=AdditionalTreatmentRole()),
@@ -78,14 +81,14 @@ class AATest(ExperimentShell):
                             reliability=0.05
                         ),
                         KSTest(
-                            compare_by="groups", 
+                            compare_by="groups",
                             grouping_role=AdditionalTreatmentRole()
                         ),
                         Chi2Test(
                             compare_by="groups", grouping_role=AdditionalTreatmentRole()
                         ),
                     ],
-                    role=TargetRole(),
+                    role=[TargetRole(), FeatureRole()],
                 ),
                 OneAAStatAnalyzer(),
             ]
@@ -97,15 +100,15 @@ class AATest(ExperimentShell):
 
         one_aa_base = Experiment(executors=[*pre_executors, AASplitter(), aa_metrics])
         one_aa_strat = Experiment(executors=[*pre_executors, AASplitterWithStratification(), aa_metrics])
-        
-        
+
+
         base_experiment = one_aa_strat if stratification else one_aa_base
-        
+
         params = AATest._prepare_params(
             n_iterations, control_size, random_states, sample_size,
             additional_params, groups_sizes
         )
-        
+
         experiment_params = [
             ParamsExperiment(
                 executors=[base_experiment],
@@ -119,7 +122,7 @@ class AATest(ExperimentShell):
                 ),
             )
         ]
-        
+
         if sample_size:
             params_no_sample = AATest._prepare_params(
                 n_iterations, control_size, random_states,
@@ -135,9 +138,11 @@ class AATest(ExperimentShell):
                     stopping_criterion=IfAAExecutor(sample_size=sample_size),
                 )
             )
-        
+
+        if dry_test:
+            experiment_params.append(AADryTestAnalyzer())
         experiment_params.append(AAScoreAnalyzer())
-        
+
         return Experiment(experiment_params, key="AATest")
 
     @staticmethod
@@ -195,6 +200,7 @@ class AATest(ExperimentShell):
         float32: bool = False,
         early_stopping: bool = False,
         t_test_equal_var: bool | None = None,
+        dry_test: bool = False
     ):
         import warnings
 
@@ -222,6 +228,7 @@ class AATest(ExperimentShell):
                 groups_sizes=groups_sizes,
                 float32=float32,
                 early_stopping=early_stopping,
+                dry_test=dry_test
              ),
             output=AAOutput(),
          )

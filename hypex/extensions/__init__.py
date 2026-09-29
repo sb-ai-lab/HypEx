@@ -18,7 +18,8 @@ from .scipy_stats import (
     PandasKSTestExtension,
     PandasChi2TestExtension,
     SparkKSTestExtension,
-    SparkChi2TestExtension
+    SparkChi2TestExtension,
+    UniformCheck
 )
 
 from .statsmodels import MultiTest, MultitestQuantile
@@ -50,6 +51,7 @@ __all__ = [
     "PandasChi2TestExtension",
     "SparkKSTestExtension",
     "SparkChi2TestExtension",
+    "UniformCheck",
     "MultiTest",
     "MultitestQuantile",
     "BiasExtension",

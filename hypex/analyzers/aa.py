@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Sequence
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd  # type: ignore
 
@@ -21,11 +22,13 @@ from ..dataset import (
     SmallDataset,
     StatisticRole,
     StratificationRole,
+    TargetRole
 )
 from ..executor import Executor
 from ..experiments import IfParamsExperiment, ParamsExperiment
+from ..extensions import UniformCheck
 from ..splitters import AASplitter, AASplitterWithStratification
-from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, timeit
+from ..utils import ID_SPLIT_SYMBOL, Adapter, ExperimentDataEnum, timeit
 from ..utils.constants import NAME_BORDER_SYMBOL
 from ..utils.naming import _parse_metric_col, normalize_test_name
 
@@ -298,6 +301,17 @@ class AAScoreAnalyzer(Executor):
                 "score": weight,
                 "pass": weight >= self.threshold,
             })
+
+        dry_score = self._get_dry_score(data)
+        if dry_score is not None and not dry_score.is_empty():
+            for row in aa_rows:
+                try:
+                    dry_pass = dry_score.get_values(row=row["_idx"], column="pass")
+                    if dry_pass is not None:
+                        row["pass"] = row["pass"] and bool(dry_pass)
+                except Exception:
+                    pass
+
         result_ds = self._build_aa_score_dataset(aa_rows)
         self.key = "aa score"
         return self._set_value(data, result_ds)
@@ -440,3 +454,134 @@ class AAScoreAnalyzer(Executor):
         if not table_ids:
             return None
         return data.analysis_tables[table_ids[0]]
+
+    @staticmethod
+    def _get_dry_score(data: ExperimentData) -> Dataset | None:
+        dry_ids = data.get_ids("AADryTestAnalyzer", ExperimentDataEnum.analysis_tables)
+        dry_table_ids = dry_ids.get("AADryTestAnalyzer", {}).get("analysis_tables", [])
+        if not dry_table_ids:
+            return None
+        return data.analysis_tables[dry_table_ids[0]]
+
+class AADryTestAnalyzer(Executor):
+
+    def __init__(
+            self,
+            alpha: int = 0.05,
+            key = ""
+        ):
+        super().__init__(key)
+        self.alpha = alpha
+        self._fig: plt.Figure | None = None
+
+    # ── Storage ───────────────────────────────────────────────────────────
+
+    def _set_value(
+        self, data: ExperimentData, value: Any, space: ExperimentDataEnum, key: Any = None
+    ) -> ExperimentData:
+        """Stores analysis results in the experiment data."""
+        return data.set_value(
+            space,
+            executor_id=self.id,
+            key=self.key,
+            value=value,
+        )
+
+    # ── Public API ────────────────────────────────────────────────────────
+
+    def execute(self, data: ExperimentData) -> ExperimentData:
+        param_id = data.get_one_id(ParamsExperiment, ExperimentDataEnum.analysis_tables)
+        score_table = data.analysis_tables[param_id]
+        target_columns = data.field_search(TargetRole())
+
+        p_val_dist = self._uniform_test(score_table, target_columns)
+        output = self._set_value(data, p_val_dist, ExperimentDataEnum.analysis_tables)
+        return self._set_value(output, self._fig, ExperimentDataEnum.variables)
+
+    # ── Uniform Test ──────────────────────────────────────────────────────
+
+    @staticmethod
+    def _build_dry_score_dataset(rows: dict[str, Any]) -> SmallDataset:
+        if not rows:
+            return SmallDataset.from_dict([{}], roles={})
+        df = pd.DataFrame(rows).set_index("_idx")
+        return SmallDataset(
+            roles={
+                "p-value": StatisticRole(),
+                "pass": StatisticRole()
+            },
+            data=df,
+        )
+
+    def _uniform_test(self, score_table: Dataset, target_cols: list[str]) -> Dataset:
+        if target_cols is None:
+            return SmallDataset.create_empty()
+        dry_cols = [
+                col for col in score_table.columns
+                if "TTest p-value" in col
+                and "mean" not in col
+                and any(t_col in col for t_col in target_cols)
+            ]
+        data = score_table[dry_cols]
+        rows = {"p-value": [], "pass": [], "_idx": []}
+        for col in dry_cols:
+            tmp_dict = UniformCheck(self.alpha).calc(data[col]).to_dict()['data']['data']
+            feature, raw_test, group = _resolve_column_parts(col)
+            test_name = normalize_test_name(raw_test)
+            tmp_dict["_idx"] = [f"{feature} {test_name} {group}".strip()]
+            for key in rows.keys():
+                if key == "pass":
+                    tmp_dict[key] = [bool(1 - int(tmp_dict[key][0]))]
+                rows[key].extend(tmp_dict[key])
+
+        self._plot_results(data, target_cols, dry_cols)
+        results = self._build_dry_score_dataset(rows)
+
+        return results
+
+    def _plot_results(
+            self,
+            score_table: Dataset,
+            target_cols: str | list[str],
+            dry_cols: str | list[str]
+        ):
+        target_cols = Adapter.to_list(target_cols)
+        dry_cols = Adapter.to_list(dry_cols)
+        fig, axs = plt.subplots(1, len(target_cols))
+        fig.suptitle(
+            "AA-test: diagnostic with zero effect",
+            fontsize=15, fontweight="bold"
+        )
+
+        for idx, (col, d_col) in enumerate(zip(target_cols, dry_cols)):
+            # --- p-values  gist ---
+            p_vals = score_table[d_col].data
+            if isinstance(axs, np.ndarray):
+                ax = axs[idx]
+            else:
+                ax = axs
+
+            ax.hist(p_vals, bins=30, density=True, alpha=0.7,
+                    color="steelblue", edgecolor="black")
+            ax.axhline(y=1.0, color="red", linestyle="--", linewidth=2,
+                        label="Uniform(0,1)")
+            ax.axvline(x=self.alpha, color="green", linestyle=":", linewidth=2,
+                        label=f"α = {self.alpha}")
+
+            ax.set_title(f"{col}: p-values distribution")
+            ax.set_xlabel("p-value")
+            ax.set_ylabel("Density")
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+
+            fpr = np.mean(p_vals < self.alpha)
+            ax.text(
+                0.5, 0.95,
+                f"FPR = {fpr:.1%}\n(expected: {self.alpha:.0%})",
+                transform=ax.transAxes, ha="center", va="top",
+                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+                fontsize=11,
+            )
+
+        plt.close(fig)
+        self._fig = fig
