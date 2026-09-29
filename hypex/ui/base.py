@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from ..dataset import Dataset, ExperimentData
@@ -198,7 +199,15 @@ class ExperimentShell:
             :class:`ExperimentShell`: Constructor accepting ``auto_persist`` flag.
         """
         if isinstance(data, Dataset):
-            data = ExperimentData(data)
+            # Deep-copy to prevent in-place mutation of the user's Dataset.
+            # Without this, executors that write to additional_fields
+            # (e.g. AASplitter in _set_best_split) would modify the
+            # original object via DatasetBase.add_column().
+            data = ExperimentData(deepcopy(data))
+        elif isinstance(data, ExperimentData):
+            # Copy the container so that set_value() calls do not leak
+            # back into the caller's ExperimentData.
+            data = data.copy()
 
         # ── Auto-persist for Spark backend ──────────────────────────
         original_ds = data.ds
