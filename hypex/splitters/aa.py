@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from ..dataset import (
@@ -196,13 +197,46 @@ class AASplitter(Calculator):
             # Dataset.isin() would come from a different pyspark.pandas anchor
             # and turn each selection into a SortMergeJoin.
             selected = data.select(const_group_field)
-            # A pandas `category` dtype cannot be filled with a value that is
-            # not already one of its categories, so fillna(sentinel) below
-            # would raise TypeError: Cannot setitem on a Categorical with a
-            # new category. Widen to plain object first. Spark has no
-            # categorical dtype on this path, so the check is a no-op there.
-            if selected.data[const_group_field].dtype.name == "category":
-                selected = selected.astype({const_group_field: object})
+            # fillna(sentinel) below writes a Python str into the const
+            # column. Any dtype that cannot hold a str value breaks: a
+            # pandas `category` dtype raises TypeError: Cannot setitem on a
+            # Categorical with a new category; `float64`/`Int64`/`boolean`
+            # raise ValueError/TypeError ("could not convert string to
+            # float", "Invalid value ... for dtype Int64/boolean"). Widen
+            # the throwaway view first, unless it already holds
+            # objects/strings -- the view is discarded right after `tagged`
+            # is built below, so widening it costs nothing and cannot leak.
+            #
+            # pandas: `Dataset.astype({..: object})` does the widening for
+            # real (category -> its raw values, numeric NaN/pd.NA stay
+            # NaN/pd.NA but repackaged as objects), and fillna's own
+            # null-detection then fills them correctly.
+            #
+            # Spark: `Dataset.astype({..: object})` itself raises (pyspark.
+            # pandas has no `object` dtype to cast to), and `.astype(str)`
+            # is no better -- Spark's CAST(NaN AS STRING) turns a missing
+            # float into the literal, non-null string "NaN" *before*
+            # fillna ever runs, so fillna then finds nothing left to fill.
+            # The actual defect is one level up: `selected.data.fillna(...)`
+            # on its own already widens and fills correctly (verified); it
+            # is `Dataset.fillna()`'s reconstruction, using the *stale*
+            # role that still declares the original numeric/boolean dtype,
+            # that then tries to cast the freshly-filled string column back
+            # to that stale dtype -- and Spark's CAST(non-numeric string AS
+            # DOUBLE) returns NULL instead of raising, which is exactly how
+            # a real split silently comes back all-null. So on Spark,
+            # declare the role as `str` *before* calling fillna instead of
+            # touching the data: `selected.roles = ...` only replaces role
+            # metadata (`DatasetBase._set_roles`), it does not read or
+            # touch `selected.data`, so this costs no Spark job either.
+            dtype = selected.data[const_group_field].dtype
+            if not (dtype == object or dtype.name == "string"):
+                if data.backend_type == BackendsEnum.spark:
+                    widened_role = deepcopy(selected.roles[const_group_field])
+                    widened_role.data_type = str
+                    selected.roles = {const_group_field: widened_role}
+                else:
+                    selected = selected.astype({const_group_field: object})
             tagged = selected.fillna(
                 values={const_group_field: _FREE_CONST_SENTINEL}
             )

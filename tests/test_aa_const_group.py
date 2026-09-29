@@ -225,7 +225,53 @@ def test_inner_function_categorical_const_column(make_dataset):
     assert len(frame) == 20
     assert frame.index.nunique() == 20
     assert set(frame.loc[0:7, "split"]) == {"control"}
-    assert set(frame["split"]) <= {"control", "test_1"}
+    assert set(frame["split"]) == {"control", "test_1"}
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_inner_function_all_missing_float_const_column(make_dataset, backend):
+    """An all-missing ``float64`` const column must produce a correct split.
+
+    On pandas the unfixed code crashed fillna() with ``ValueError: could not
+    convert string to float``; on Spark it did not crash at all --
+    ``pyspark.pandas``' ``fillna`` silently drops a string fill value on a
+    double column, so every free row's split label came back null with no
+    exception and no warning (regression: review round 2, R2-01). Both
+    dev/master and the base commit return a correct, fully-labelled split
+    for the identical input, so this is a real regression, not an
+    unsupported case.
+    """
+    pdf = _frame([None] * 20)
+    pdf[CONST_COLUMN] = pdf[CONST_COLUMN].astype("float64")
+    dataset = make_dataset(pdf, _roles(), backend)
+
+    frame = _split_frame(_split(dataset))
+
+    assert len(frame) == 20
+    assert frame.index.nunique() == 20
+    assert frame["split"].isna().sum() == 0
+    assert set(frame["split"]) == {"control", "test_1"}
+
+
+@pytest.mark.parametrize("dtype", ["Int64", "boolean"])
+def test_inner_function_all_missing_nullable_const_column(make_dataset, dtype):
+    """An all-missing pandas nullable ``Int64``/``boolean`` const column must
+
+    produce a correct split rather than crash fillna() with ``TypeError:
+    Invalid value ... for dtype Int64/boolean`` (regression: review round 2,
+    R2-01). Neither dtype survives ``to_backend(spark)`` (a pre-existing,
+    unrelated limitation), so this test is pandas-only.
+    """
+    pdf = _frame([None] * 20)
+    pdf[CONST_COLUMN] = pdf[CONST_COLUMN].astype(dtype)
+    dataset = make_dataset(pdf, _roles(), "pandas")
+
+    frame = _split_frame(_split(dataset))
+
+    assert len(frame) == 20
+    assert frame.index.nunique() == 20
+    assert frame["split"].isna().sum() == 0
+    assert set(frame["split"]) == {"control", "test_1"}
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
@@ -249,7 +295,7 @@ def test_inner_function_const_column_named_count(make_dataset, backend):
     assert len(frame) == 10
     assert frame.index.nunique() == 10
     assert set(frame.loc[0:4, "split"]) == {"control"}
-    assert set(frame["split"]) <= {"control", "test_1"}
+    assert set(frame["split"]) == {"control", "test_1"}
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
