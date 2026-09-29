@@ -76,17 +76,22 @@ class GroupStatTest(CompareExtension):
         other = self.check_data(data, other)
         if self.test_function is None:
             raise ValueError("test_function is needed for execution")
-        
         import inspect
         sig = inspect.signature(self.test_function)
         valid_params = set(sig.parameters.keys())
-        
         merged_kwargs = {**self.default_kwargs, **kwargs}
-        
         invalid_keys = set(merged_kwargs.keys()) - valid_params
         if invalid_keys:
+            import warnings
+            warnings.warn(
+                f"The following kwargs are not accepted by "
+                f"{self.test_function.__name__} and will be ignored: "
+                f"{sorted(invalid_keys)}. "
+                f"Valid parameters: {sorted(valid_params)}.",
+                UserWarning,
+                stacklevel=2,
+            )
             merged_kwargs = {k: v for k, v in merged_kwargs.items() if k in valid_params}
-        
         res = self.test_function(
             data._to_numpy(), other._to_numpy(), **merged_kwargs
         )
@@ -100,6 +105,14 @@ class GroupTTestExtension(GroupStatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(self.test_function, reliability)
         self.default_kwargs = {"nan_policy": "omit", "equal_var": False}
+
+    def calc(
+        self, data: Dataset, other: Dataset | None = None, **kwargs
+    ) -> SmallDataset | float:
+        # Map the library-level 'equal_variance' to scipy's 'equal_var'
+        if "equal_variance" in kwargs:
+            kwargs["equal_var"] = kwargs.pop("equal_variance")
+        return super().calc(data, other, **kwargs)
 
 class GroupKSTestExtension(GroupStatTest):
     """

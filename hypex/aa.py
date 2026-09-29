@@ -23,12 +23,7 @@ from .utils import SpaceEnum
 
 class AATest(ExperimentShell):
     """A class for conducting A/A tests with configurable parameters.
-
-    This class provides functionality to run A/A tests with options for stratification,
-    precision control (fast or with type 1 error control), and sample size specification.
-    It sets up the experiment pipeline with appropriate parameters, performs homogeneity
-    tests for each split in order to evaluate their quality and to identify the best one.
-
+    ...
     Args:
         precision_mode (bool, optional): If True, runs more iterations (2000) in order to tackle type 1 error.
             If False, runs fewer iterations (10) for quicker results. Defaults to False.
@@ -44,33 +39,15 @@ class AATest(ExperimentShell):
             experiment pipeline. Defaults to None.
         random_states (Iterable[int], optional): Random seeds to use for each iteration.
             If None, uses range(n_iterations). Defaults to None.
-        t_test_equal_var (bool, optional): If True (default), perform a standard independent 2 sample
-            test that assumes equal population variances. If False, perform Welch's t-test,
-            which does not assume equal population variance.
+        equal_variance (bool | None, optional): Assume equal variance in t-test.
+            If True, use Student's t-test. If False, use Welch's t-test.
+            If None (default), Welch's t-test is used.
         groups_sizes (list[float] | None, optional): Custom group size proportions. Defaults to None.
-
-    Examples
-    --------
-    .. code-block:: python
-
-        # Basic A/A test with default parameters
-        aa_test = AATest()
-        results = aa_test.execute(data)
-
-        # High precision A/A test with stratification
-        aa_test = AATest(
-            precision_mode=True,
-            stratification=True,
-            control_size=0.5
-        )
-        results = aa_test.execute(data)
-
-        # A/A test with custom sample size and iterations
-        aa_test = AATest(
-            sample_size=0.8,
-            n_iterations=100
-        )
-        results = aa_test.execute(data)
+        float32 (bool, optional): Cast float columns to float32 for memory savings. Defaults to False.
+        early_stopping (bool, optional): Stop when all features pass (no differences
+            detected) on any iteration. Defaults to False.
+        t_test_equal_var (bool | None, optional): Deprecated alias for ``equal_variance``.
+    ...
     """
 
     @staticmethod
@@ -251,5 +228,5 @@ class AATest(ExperimentShell):
 
         if equal_variance is not None:
             self.experiment.set_params(
-                {TTest: {"calc_kwargs": {"equal_var": equal_variance}}}
+                {TTest: {"calc_kwargs": {"equal_variance": equal_variance}}}
             )

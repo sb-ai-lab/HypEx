@@ -189,15 +189,6 @@ class ParamsExperiment(ExperimentWithReporter):
         self._params = params
         self._update_flat_params()
 
-    def _stopping_criterion_met(self, t_data: ExperimentData) -> bool:
-        if self.stopping_criterion is None:
-            return False
-        if_result = self.stopping_criterion.execute(t_data)
-        if_executor_id = if_result.get_one_id(
-            self.stopping_criterion.__class__, ExperimentDataEnum.variables
-        )
-        return bool(if_result.variables[if_executor_id]["response"])
-
     @timeit(level="PIPELINE", prefix="PARAMS")
     def execute(self, data: ExperimentData) -> ExperimentData:
         results = []

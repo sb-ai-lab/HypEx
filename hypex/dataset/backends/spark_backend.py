@@ -1924,7 +1924,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         seed = random_state if random_state is not None else 42
         mod = 10_000_000
 
-        if edges and edges[-1] < mod * 0.5:
+        frac_limit = int(frac * mod)
+        if edges and edges[-1] < frac_limit * 0.5:
             warnings.warn(
                 f"edges={edges} look like absolute row counts, not MOD-scaled values. "
                 f"Expected last edge ≈ {mod}. Auto-scaling.",

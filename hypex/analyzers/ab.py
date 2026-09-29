@@ -22,7 +22,7 @@ from ..dataset import (
 from ..dataset.dataset import SmallDataset
 from ..experiments.base import Executor
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
-from ..utils import ABNTestMethodsEnum, ExperimentDataEnum, timeit
+from ..utils import ABNTestMethodsEnum, Adapter, ExperimentDataEnum, timeit
 from ..utils.constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
 
 
@@ -174,20 +174,8 @@ class ABAnalyzer(Executor):
 
     @staticmethod
     def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
-        """Extract index values from a dataset in a backend-agnostic way.
-
-        Args:
-            table: The dataset instance.
-
-        Returns:
-            A list of index values.
-        """
-        index_obj = table.data.index
-        if hasattr(index_obj, "to_list"):
-            return index_obj.to_list()
-        if hasattr(index_obj, "tolist"):
-            return index_obj.tolist()
-        return list(index_obj)
+        """Extract index values from a dataset in a backend-agnostic way."""
+        return Adapter.to_list(table.data.index)
 
     @staticmethod
     def _extract_id_prefix(analysis_id: str) -> str:
@@ -381,22 +369,32 @@ class ABAnalyzer(Executor):
                 t_data.data.index = row_index
 
                 # ── Aggregate per-group statistics ──────────────────────────
+                # Group rows by the trailing group label parsed from the
+                # composite index (Test┆hash┆target┆group) instead of
+                # slicing by position.  This is correct regardless of
+                # whether rows are target-major or group-major.
+                index_values = self._get_index_values(t_data)
+                group_positions: dict[str, list[int]] = {
+                    str(g[0]): [] for g in groups[1:]
+                }
+                for pos, idx_val in enumerate(index_values):
+                    parts = str(idx_val).split(ID_SPLIT_SYMBOL)
+                    grp_label = parts[-1] if len(parts) > 3 else ""
+                    if grp_label in group_positions:
+                        group_positions[grp_label].append(pos)
+
                 for f in ["p-value", "pass"]:
-                    step = len(t_data) // num_groups if num_groups > 0 else 1
-                    if step == 0:
-                        step = 1
-                    for i in range(0, len(t_data), step):
-                        slice_start = i
-                        slice_end = min(i + step, len(t_data))
-                        value = t_data.iloc[slice_start:slice_end][f]
-                        multitest_pvalues = self._add_pvalues(
-                            multitest_pvalues, value, f
-                        )
-                        group_idx = i // step + 1
-                        if group_idx >= len(groups):
-                            group_idx = len(groups) - 1
+                    all_positions = list(range(len(t_data)))
+                    value_all = t_data.iloc[all_positions][f]
+                    multitest_pvalues = self._add_pvalues(
+                        multitest_pvalues, value_all, f
+                    )
+                    for grp_label, positions in group_positions.items():
+                        if not positions:
+                            continue
+                        value = t_data.iloc[positions][f]
                         analysis_data[
-                            f"{c} {f} {groups[group_idx][0]}"
+                            f"{c} {f} {grp_label}"
                         ] = value.mean()
 
         analysis_dataset = SmallDataset.from_dict(

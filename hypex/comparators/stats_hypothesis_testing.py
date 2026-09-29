@@ -313,7 +313,8 @@ class StatsChi2Test(StatsHypothesisTesting):
 
         # Edge case: only one category across all groups
         if len(full_key_set) < 2:
-            return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+            # Only one category → no difference → pass=False
+            return {"p-value": 1.0, "statistic": 0.0, "pass": False}
 
         contingency_table = np.zeros((2, len(full_key_set)))
         for idx, key in enumerate(full_key_set):
@@ -332,7 +333,8 @@ class StatsChi2Test(StatsHypothesisTesting):
             non_zero_cols = col_sums > 0
             contingency_table = contingency_table[:, non_zero_cols]
             if contingency_table.shape[1] < 2:
-                return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+                # Only one non-zero column → no difference → pass=False
+                return {"p-value": 1.0, "statistic": 0.0, "pass": False}
 
         try:
             statistics = chi2_contingency(contingency_table, **kwargs)
@@ -343,7 +345,8 @@ class StatsChi2Test(StatsHypothesisTesting):
                 }
         except ValueError:
             # For example, when all values in the table are identical
-            return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+            # No difference detected → pass=False
+            return {"p-value": 1.0, "statistic": 0.0, "pass": False}
 
         return result
 
@@ -708,7 +711,7 @@ class StatsKSTest(StatsHypothesisTesting):
         d_stat = float(d_stat)
 
         if d_stat == 0.0:
-            return {"p-value": 1.0, "statistic": 0.0, "pass": True}
+            return {"p-value": 1.0, "statistic": 0.0, "pass": False}
 
         try:
             en = np.sqrt(n1 * n2 / (n1 + n2))

@@ -38,6 +38,10 @@ from .abstract import (
     ResultKey,
     TestDictReporter,
 )
+from .cupac import CupacReporter
+from .cuped import CupedReporter
+from .homo import HomogeneityReporter
+from .matching import MatchingQualityReporter, MatchingReporter
 from .homo import (
     HomoDatasetReporter,
     HomoDictReporter,
@@ -65,6 +69,7 @@ __all__ = [
     "ABTestReporter",
     "CupacReporter",
     # Abstract / base reporters
+    "CupedReporter",
     "DatasetReporter",
     "DictReporter",
     # Homogeneity reporters
