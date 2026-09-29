@@ -101,6 +101,14 @@ class GroupTTestExtension(GroupStatTest):
         super().__init__(self.test_function, reliability)
         self.default_kwargs = {"nan_policy": "omit", "equal_var": False}
 
+    def calc(
+        self, data: Dataset, other: Dataset | None = None, **kwargs
+    ) -> SmallDataset | float:
+        # Map the library-level 'equal_variance' to scipy's 'equal_var'
+        if "equal_variance" in kwargs:
+            kwargs["equal_var"] = kwargs.pop("equal_variance")
+        return super().calc(data, other, **kwargs)
+
 class GroupKSTestExtension(GroupStatTest):
     """
     Master-backend class for statistic test calculation.
