@@ -323,8 +323,9 @@ class AASplitter(Calculator):
             )
         else:
             # Avoid triggering a Spark count() action just for a boolean check.
-            # We only need to know if data is non-empty; use is_empty() which
-            # checks shape metadata without a full scan.
+            # free_size = -1 is a sentinel meaning "unknown, assume non-empty".
+            # The actual emptiness check is deferred to random_split_labels
+            # which handles empty data gracefully.
             free_size = -1  # sentinel: means "unknown, assume non-empty"
 
         # ── 3. bucket edges (always in MOD scale, frac handled separately)
