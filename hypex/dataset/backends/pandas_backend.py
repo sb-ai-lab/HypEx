@@ -15,6 +15,9 @@ import pandas as pd  # type: ignore
 import pyspark.pandas as ps  # type: ignore
 import pyspark.sql as spark  # type: ignore
 import pyspark.sql.functions as F  # type: ignore
+
+# pandas.util.hash_array — C-level vectorized hash
+from pandas.util import hash_array
 from pyspark.ml.feature import StringIndexer  # type: ignore
 
 from ...config import DatasetConfig
@@ -1688,7 +1691,10 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             hash_val = int(hashlib.md5(index_str.encode()).hexdigest(), 16)
             return hash_val % mod
 
-        df_with_index["_hash"] = df_with_index.apply(compute_hash, axis=1)
+        hash_input = df_with_index[index_cols].astype(str).agg("_".join, axis=1).values
+        df_with_index["_hash"] = (
+            hash_array(hash_input, encoding="utf8") % mod
+        ).astype(np.int64)
 
         # Assign labels in reverse order so that the smallest threshold
         # wins (matching Spark CASE WHEN semantics).
