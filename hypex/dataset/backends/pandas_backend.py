@@ -1647,10 +1647,21 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
         Note:
             The hash function differs from the Spark backend (MD5 vs
-            Murmur3), so the *exact* split assignment may differ across
-            backends for the same seed.  Determinism is guaranteed
-            *within* each backend.
-        ...
+            Murmur3), so the exact split assignment may differ across
+            backends for the same seed. Determinism is guaranteed
+            within each backend.
+
+        Args:
+            edges: Cumulative upper bounds for each label on the MOD scale.
+            labels: Label strings corresponding to ``edges``.
+            random_state: Seed for the hash function. Defaults to 42.
+            frac: Fraction of data to label. Rows with
+                ``hash >= frac * MOD`` are left unlabeled.
+            name: Name of the resulting label column.
+
+        Returns:
+            A ``pd.DataFrame`` containing only the original index
+            and the new label column.
         """
         import hashlib
 
