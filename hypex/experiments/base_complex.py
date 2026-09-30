@@ -107,12 +107,16 @@ class GroupExperiment(ExperimentWithReporter):
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field = data.ds.search_columns(self.searching_role)
         clean_ds = data._clean_ds_for_iteration()
+
         results = []
         for group, group_data in tqdm(clean_ds.groupby(group_field)):
-            # pandas >= 2.0 yields a 1-element tuple; < 2.0 yields scalar
             key = str(group[0] if isinstance(group, tuple) else group)
-            res = self.one_iteration(ExperimentData(group_data), key, set_key_as_index=False)
-            results.append((key, res))
+            self.key = key
+            t_data = ExperimentData(group_data)
+            t_data = super(ExperimentWithReporter, self).execute(t_data)
+            report = self.reporter.report(t_data)
+            results.append((key, report))
+
         return self._set_result(data, results)
 
     def _set_result(self, data: ExperimentData, results: list[tuple[str, Dataset | dict]]) -> ExperimentData:
