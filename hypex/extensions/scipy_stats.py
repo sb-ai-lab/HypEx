@@ -12,6 +12,7 @@ from pyspark.sql import Window
 from scipy.stats import (  # type: ignore
     chi2_contingency,
     ks_2samp,
+    kstest,
     kstwo,
     kstwobign,
     mannwhitneyu,
@@ -168,9 +169,7 @@ class PandasKSTestExtension(GroupKSTestExtension):
 
 @backend_factory.register(GroupChi2TestExtension, PandasDataset)
 class PandasChi2TestExtension(GroupChi2TestExtension):
-    """
-    Slave-backend class for statistical test calculation.
-    """
+    """Slave-backend class for Chi2 statistical test calculation on Pandas."""
 
     @staticmethod
     def mini_category_replace(counts: Dataset) -> Dataset:
@@ -193,7 +192,7 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
                 if col == cat_col:
                     new_role.data_type = str
                 new_roles[col] = new_role
-
+                
             counts = counts.append(
                 DatasetAdapter.to_dataset(
                     {
@@ -202,13 +201,24 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
                     },
                     roles=new_roles,
                     small=False,
-                )
+                ),
+                reset_index=True,  # FIX: prevent duplicate index labels
             )
-            counts = counts[counts["count"] >= 7]
+        counts = counts[counts["count"] >= 7]
         return counts
 
     def matrix_preparation(self, data: Dataset, other: Dataset) -> Dataset | None:
+        """Build a 2×K contingency table from two categorical samples.
+
+        Args:
+            data: Baseline group dataset (single categorical column).
+            other: Compared group dataset (single categorical column).
+
+        Returns:
+            Contingency table as a Dataset, or None if degenerate.
+        """
         proportion = len(data) / (len(data) + len(other))
+
         counted_data = data.value_counts()
         counted_data = self.mini_category_replace(counted_data)
         data_vc = counted_data["count"] * (1 - proportion)
@@ -219,6 +229,7 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
 
         if len(counted_data) < 2:
             return None
+
         col_name = str(counted_data.columns[0])
         col_role = counted_data.roles.get(col_name, StatisticRole())
 
@@ -226,10 +237,12 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
             counted_data[col_name].data,
             role={col_name: col_role},
         )
+
         other_vc = other_vc.add_column(
-            counted_data[col_name].data,
+            counted_other[col_name].data,  # FIX: was counted_data (typo)
             role={col_name: col_role},
         )
+
         return data_vc.merge(other_vc, on=col_name)[["count_x", "count_y"]].fillna(0)
 
 @backend_factory.register(GroupKSTestExtension, SparkDataset)
