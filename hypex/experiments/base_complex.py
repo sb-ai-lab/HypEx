@@ -227,8 +227,13 @@ class IfParamsExperiment(ParamsExperiment):
     @timeit(level="PIPELINE", prefix="PARAMS")
     def execute(self, data: ExperimentData) -> ExperimentData:
         self._update_flat_params()
+
+        # Hoist invariant computation above the loop to avoid
+        # redundant checkpoints and column drops per iteration.
+        clean_ds = data._clean_ds_for_iteration()
+
         for flat_param in tqdm(self._flat_params):
-            t_data = ExperimentData(data._clean_ds_for_iteration())
+            t_data = ExperimentData(clean_ds)
             for executor in self.executors:
                 cur_executer = self._get_executor_backend(executor, t_data)
                 cur_executer.set_params(flat_param)
