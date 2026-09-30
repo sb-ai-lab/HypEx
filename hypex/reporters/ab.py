@@ -125,10 +125,15 @@ class ABDatasetReporter(ABTestReporter):
     Deprecated: Use ``ABTestReporter()`` instead.
     """
     def __init__(self):
-        """Initialize the legacy dataset reporter."""
         super().__init__(
             DictReporter(),
             output_format="dataset",
-            invert_pass=True,  # AB: significant effect = OK
+            invert_pass=True,
         )
-        warnings.warn("ABDatasetReporter is deprecated.", DeprecationWarning, stacklevel=2)
+        warnings.warn(
+            "ABDatasetReporter is deprecated. "
+            "Use ABTestReporter(dict_reporter=DictReporter(), "
+            "output_format='dataset', invert_pass=True) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
