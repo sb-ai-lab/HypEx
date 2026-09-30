@@ -537,17 +537,25 @@ class AASplitterWithStratification(AASplitter):
         const_group_field = (
             const_group_fields[0] if len(const_group_fields) > 0 else None
         )
+
+        persisted_locally = False
         if data.ds.backend_type == BackendsEnum.spark and not data.ds.is_persisted:
             data.ds.persist(storage_level="MEMORY_AND_DISK", action="count")
-        result = self.calc(
-            data.ds,
-            random_state=self.random_state,
-            control_size=self.control_size,
-            grouping_fields=grouping_fields,
-            sample_size=self.sample_size,
-            groups_sizes=self.groups_sizes,
-            const_group_field=const_group_field,
-        )
+            persisted_locally = True
+        try:
+             result = self.calc(
+                data.ds,
+                random_state=self.random_state,
+                control_size=self.control_size,
+                grouping_fields=grouping_fields,
+                sample_size=self.sample_size,
+                groups_sizes=self.groups_sizes,
+                const_group_field=const_group_field,
+            )
+        finally:
+            if persisted_locally:
+                data.ds.unpersist()
+        
         # Truncate the DAG after the stratified split to prevent
         # exponential lineage growth in iterative A/A loops
         # (principle 16).
