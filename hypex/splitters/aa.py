@@ -321,17 +321,41 @@ class AASplitter(Calculator):
         # ── 3. bucket edges (always in MOD scale, frac handled separately)
         MOD = 10_000_000
         frac_limit = int(frac * MOD)
-
         if groups_sizes:
+            # When const groups are present, _const_group_plan returns an
+            # adjusted control_size that accounts for pinned rows.  We must
+            # apply it to the FIRST entry of groups_sizes (the control group)
+            # and redistribute the remaining share proportionally.
+            adjusted_groups_sizes = list(groups_sizes)
+            if const_group_field:
+                adjusted_control = max(0.0, min(1.0, control_size))
+                adjusted_groups_sizes[0] = adjusted_control
+                remaining = 1.0 - adjusted_control
+                original_remaining = 1.0 - groups_sizes[0]
+                if original_remaining > 0 and remaining > 0:
+                    for i in range(1, len(adjusted_groups_sizes)):
+                        adjusted_groups_sizes[i] = (
+                            groups_sizes[i] / original_remaining * remaining
+                        )
+                elif remaining > 0:
+                    # Degenerate case: original control share was 0 or 1.
+                    # Distribute remaining evenly across non-control groups.
+                    n_test = len(adjusted_groups_sizes) - 1
+                    if n_test > 0:
+                        for i in range(1, len(adjusted_groups_sizes)):
+                            adjusted_groups_sizes[i] = remaining / n_test
             edges: list[int] = []
             cumulative = 0.0
-            for size_prop in groups_sizes:
+            for size_prop in adjusted_groups_sizes:
                 cumulative += size_prop
                 edges.append(int(cumulative * frac_limit))
             edges[-1] = frac_limit
         else:
+            # Clamp control_size to [0, 1] to guard against
+            # adjusted_control_size > 1.0 from _const_group_plan.
+            clamped = max(0.0, min(1.0, control_size))
             edges = [
-                int(control_size * frac_limit),
+                int(clamped * frac_limit),
                 frac_limit,
             ]
 
@@ -350,7 +374,13 @@ class AASplitter(Calculator):
             )
             if translation:
                 tagged = tagged.replace(to_replace=translation)
-            if free_size != 0:
+            # Pre-compute the set of pinned (non-free) labels once.
+            pinned_labels = {
+                v for v in translation.values()
+                if v != _FREE_CONST_SENTINEL
+            }
+
+            if free_size > 0:
                 parts.append(
                     tagged[tagged == _FREE_CONST_SENTINEL].random_split_labels(
                         edges=edges,
@@ -360,9 +390,7 @@ class AASplitter(Calculator):
                         name="split",
                     )
                 )
-            if any(
-                label != _FREE_CONST_SENTINEL for label in translation.values()
-            ):
+            if pinned_labels:
                 pinned = tagged[tagged != _FREE_CONST_SENTINEL].rename(
                     {const_group_field: "split"}
                 )
