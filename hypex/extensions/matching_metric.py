@@ -348,13 +348,22 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         """
         neighbors_cols = Adapter.to_list(neighbors_cols)
         numeric_cols = Adapter.to_list(numeric_cols)
-
         t_data = data[numeric_cols].data
         indexes = data[neighbors_cols].data
 
         # "expand" the neighbor indexes from a wide format to a long one
         melted = indexes.stack().reset_index()
         melted.columns = ['initial_index', 'neighbor_col', 'match_index']
+
+        # filter out dummy match markers (-1)
+        melted = melted[melted['match_index'] != -1]
+
+        if melted.empty:
+            # No valid matches — return empty frame with expected columns
+            result = pd.DataFrame(
+                columns=[f"{col}_matched" for col in numeric_cols] + ['bias']
+            )
+            return result
 
         # adjusting the features of our neighbors according to their indexes
         matched_features = t_data.loc[melted['match_index']].copy()
@@ -363,7 +372,7 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
 
         # calc mean by initial index
         matched_data = matched_features.groupby(level=0).mean()
-        matched_data = matched_data.reset_index() # reset is nessesary because 'initial index' will be used as data index soon
+        matched_data = matched_data.reset_index()
         matched_data = matched_data.rename(columns={col: f"{col}_matched" for col in numeric_cols})
 
         # add zero bias if Bias extension didn't execute
