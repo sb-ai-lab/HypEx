@@ -92,14 +92,16 @@ class AATest(ExperimentShell):
         )
         
         pre_executors: list[Executor] = [NaDropper()]
-        if float32:
-            pre_executors.append(Float32Caster())
 
         one_aa_base = Experiment(executors=[*pre_executors, AASplitter(), aa_metrics])
         one_aa_strat = Experiment(executors=[*pre_executors, AASplitterWithStratification(), aa_metrics])
-
-
         base_experiment = one_aa_strat if stratification else one_aa_base
+        
+        # Float32Caster is applied ONCE before the iterative ParamsExperiment,
+        # not inside each iteration.
+        outer_executors: list[Executor] = []
+        if float32:
+            outer_executors.append(Float32Caster())
 
         params = AATest._prepare_params(
             n_iterations, control_size, random_states, sample_size,
@@ -144,7 +146,7 @@ class AATest(ExperimentShell):
             experiment_params.append(AADryTestAnalyzer())
         experiment_params.append(AAScoreAnalyzer())
 
-        return Experiment(experiment_params, key="AATest")
+        return Experiment([*outer_executors, *experiment_params], key="AATest")
 
     @staticmethod
     def _prepare_params(
