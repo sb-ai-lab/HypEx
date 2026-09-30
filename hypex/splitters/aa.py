@@ -310,13 +310,13 @@ class AASplitter(Calculator):
         translation: dict[Any, str] = {}
         if const_group_field:
             translation, free_size, control_size = (
-                AASplitter._const_group_plan(
-                    data, const_group_field, label_map, control_size,
-                    sample_size=frac,
-                )
+                AASplitter._const_group_plan(...)
             )
         else:
-            free_size = len(data)
+            # Avoid triggering a Spark count() action just for a boolean check.
+            # We only need to know if data is non-empty; use is_empty() which
+            # checks shape metadata without a full scan.
+            free_size = -1  # sentinel: means "unknown, assume non-empty"
 
         # ── 3. bucket edges (always in MOD scale, frac handled separately)
         MOD = 10_000_000
@@ -350,7 +350,7 @@ class AASplitter(Calculator):
             )
             if translation:
                 tagged = tagged.replace(to_replace=translation)
-            if free_size > 0:
+            if free_size != 0:
                 parts.append(
                     tagged[tagged == _FREE_CONST_SENTINEL].random_split_labels(
                         edges=edges,
