@@ -122,6 +122,12 @@ class ABOutput(Output):
     # ── Multitest ────────────────────────────────────────────────────
 
     def _extract_multitest_result(self, experiment_data: ExperimentData) -> None:
+        """Extract multiple testing correction results from analysis tables.
+
+        The correction is applied when the total number of comparisons
+        ``(num_groups - 1) * num_target_fields`` exceeds 1 AND a
+        correction method is configured.
+        """
         multitest_id = experiment_data.get_one_id(
             ABAnalyzer, ExperimentDataEnum.analysis_tables,
         )
@@ -129,8 +135,8 @@ class ABOutput(Output):
             self.multitest = experiment_data.analysis_tables[multitest_id]
         else:
             self.multitest = (
-                "Multiple testing correction was not applied: fewer than 2 "
-                "comparisons detected ((groups-1) × targets ≤ 1) or "
+                "Multiple testing correction was not applied: total "
+                "comparisons ((groups-1) × targets) ≤ 1 or "
                 "multitest_method was not provided."
             )
 
