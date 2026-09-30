@@ -11,7 +11,7 @@ from .executor import Executor
 from .experiments.base import Experiment, OnRoleExperiment
 from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from .forks.aa import IfAAExecutor
-from .reporters import DatasetReporter
+from .reporters import AATestReporter, DatasetReporter, DictReporter
 from .reporters.aa import OneAADictReporter
 from .splitters import AASplitter, AASplitterWithStratification
 from .transformers.float32_caster import Float32Caster
@@ -111,7 +111,11 @@ class AATest(ExperimentShell):
                 executors=[base_experiment],
                 params=params,
                 reporter=DatasetReporter(
-                    OneAADictReporter(front=False), single_row=True
+                    AATestReporter(
+                        dict_reporter=DictReporter(front=False),
+                        output_format="dict",
+                    ),
+                    single_row=True,
                 ),
                 stopping_criterion=(
                     IfAAExecutor(all_features_passed=True)
