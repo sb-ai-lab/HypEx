@@ -1921,10 +1921,10 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             columns and the new label column.
 
         Note:
-        The hash function differs from the Spark backend (MD5 vs
-        Murmur3), so the *exact* split assignment may differ across
-        backends for the same seed.  Determinism is guaranteed
-        *within* each backend.
+        The hash function differs from the Pandas backend (Murmur3 vs
+        MD5), so the exact split assignment may differ across
+        backends for the same seed. Determinism is guaranteed
+        within each backend.
         """
         seed = random_state if random_state is not None else 42
         mod = 10_000_000
