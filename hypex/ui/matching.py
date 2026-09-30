@@ -224,6 +224,62 @@ class MatchingOutput(Output):
         matched_data = matched_data.drop(columns=["_hypex_lookup", idx_col])
         return matched_data
     
+    def _match_pandas(
+        self,
+        experiment_data: ExperimentData,
+        t_indexes: Dataset,
+        col_name: str,
+    ) -> Dataset:
+        """Build matched data via pandas label-based lookup.
+
+        For each position in *t_indexes*, looks up the corresponding row
+        in ``experiment_data.ds`` by the match-index value.  Positions
+        with value ``-1`` (unmatched) are excluded from the result.
+
+        The returned dataset's index is set to the **positional** indices
+        so that the downstream ``merge(left_index=True, right_index=True)``
+        in ``_extract_full_data`` aligns matched columns with the correct
+        original rows.
+
+        Args:
+            experiment_data: The experiment data container holding the
+                original dataset in ``experiment_data.ds``.
+            t_indexes: Single-column ``Dataset`` with match indices.
+            col_name: Name of the match-index column in *t_indexes*.
+
+        Returns:
+            A ``Dataset`` containing the matched rows, indexed by the
+            original observation positions.
+        """
+        from ..utils.adapter import Adapter
+
+        # Extract match-index values and positional indices.
+        index_values: list = Adapter.to_list(t_indexes[col_name].data)
+        positional_indices: list = Adapter.to_list(t_indexes.data.index)
+
+        # Filter out unmatched rows (value == -1).
+        valid_positions: list = []
+        valid_lookups: list = []
+        for pos, idx in zip(positional_indices, index_values):
+            if idx != -1:
+                valid_positions.append(pos)
+                valid_lookups.append(idx)
+
+        if not valid_positions:
+            return Dataset.create_empty(
+                roles={},
+                backend=experiment_data.ds.backend_type,
+            )
+
+        # Look up matched rows from the original dataset by label.
+        matched_data: Dataset = experiment_data.ds.loc[valid_lookups]
+
+        # Set index to positional indices so the subsequent
+        # merge(left_index=True, right_index=True) aligns correctly.
+        matched_data.index = valid_positions
+
+        return matched_data
+    
     @staticmethod
     def _reformat_resume(resume: dict[str, Any]) -> dict[str, Any]:
         """Reformat a flat resume dictionary with composite keys into a nested structure.
