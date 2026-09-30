@@ -1641,24 +1641,16 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     ) -> pd.DataFrame:
         """Deterministic split using a hash of the index.
 
-        Produces identical results to the Spark backend for the same seed
-        and index values. Uses MD5 hashing of the stringified index
-        concatenated with the seed to assign each row to a bucket in
-        ``[0, MOD)``, then maps buckets to labels via the ``edges``
-        thresholds.
+        Uses MD5 hashing of the stringified index concatenated with the
+        seed to assign each row to a bucket in ``[0, MOD)``, then maps
+        buckets to labels via the ``edges`` thresholds.
 
-        Args:
-            edges: Cumulative upper bounds for each label on the MOD scale.
-            labels: Label strings corresponding to ``edges``.
-            random_state: Seed for reproducibility. Defaults to 42.
-            frac: Fraction of data to label. Rows outside this fraction
-                are excluded from the result.
-            name: Name of the resulting label column.
-
-        Returns:
-            A ``pd.DataFrame`` with the original index and the new label
-            column. Rows outside ``frac`` or beyond the last edge are
-            excluded.
+        Note:
+            The hash function differs from the Spark backend (MD5 vs
+            Murmur3), so the *exact* split assignment may differ across
+            backends for the same seed.  Determinism is guaranteed
+            *within* each backend.
+        ...
         """
         import hashlib
 
