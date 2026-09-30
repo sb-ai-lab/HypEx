@@ -12,6 +12,7 @@ from ..dataset import (
 )
 from ..reporters.ab import ABTestReporter, DictReporter
 from ..reporters.abstract import _get_index_values
+from ..reporters.cuped import CupedReporter
 from ..utils import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL, ExperimentDataEnum
 from .base import Output
 
@@ -34,8 +35,8 @@ class CupedOutput:
         Args:
             experiment_data: The experiment data container.
         """
-        report = ABTestReporter.report_variance_reductions(experiment_data)
-        if isinstance(report, str):
+        report = CupedReporter().report(experiment_data)
+        if report.is_empty():
             self.variance_reductions = None
         else:
             self.variance_reductions = report
