@@ -3,9 +3,11 @@ from .aa import (
     AADatasetReporter,
     AAPassedReporter,
     AATestReporter,
+    DatasetReporter,
     OneAADictReporter,
 )
 from .ab import ABDatasetReporter, ABDictReporter, ABTestReporter
+from .abstract import DictReporter, Reporter
 from .homo import HomoDatasetReporter, HomoDictReporter, HomogeneityReporter
 from .matching import (
     MatchingDatasetReporter,
