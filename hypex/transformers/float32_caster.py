@@ -66,21 +66,31 @@ class Float32Caster(Transformer):
         """Only float64 columns are eligible for downcasting."""
         return [float]
 
-    # hypex/transformers/float32_caster.py
     @staticmethod
     def _inner_function(data: Dataset, target_cols: list[str]) -> Dataset:
+        """Cast float64 columns to float32 via the public Dataset API.
+
+        Roles intentionally keep ``data_type=float`` so that downstream
+        ``search_columns(search_types=[float])`` continues to match
+        these columns.  The actual storage type is float32 regardless.
+
+        Args:
+            data: Input dataset.
+            target_cols: Columns to downcast.
+
+        Returns:
+            Dataset with float32 storage but unchanged role types.
+        """
         if not target_cols:
             return data
         if data.backend_type == BackendsEnum.spark:
             dtype_map = {col: "float32" for col in target_cols}
         else:
             dtype_map = {col: np.float32 for col in target_cols}
-
-        # Фикс: кастуем данные, но НЕ меняем data_type в ролях
-        new_data = data._backend_data.astype(dtype_map)
-        new_roles = deepcopy(data.roles)
-        # data_type остаётся float — не записываем np.float32
-        return data.__class__(roles=new_roles, data=new_data)
+        # Use the public Dataset.astype() to stay within the Dataset API
+        # (architecture principle #11). Roles are NOT updated: keeping
+        # data_type=float preserves search_types compatibility.
+        return data.astype(dtype_map)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Run float32 downcasting on the experiment dataset.
