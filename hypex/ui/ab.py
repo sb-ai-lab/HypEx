@@ -129,7 +129,9 @@ class ABOutput(Output):
             self.multitest = experiment_data.analysis_tables[multitest_id]
         else:
             self.multitest = (
-                "There was less than three groups or multitest method wasn't provided"
+                "Multiple testing correction was not applied: fewer than 2 "
+                "comparisons detected ((groups-1) × targets ≤ 1) or "
+                "multitest_method was not provided."
             )
 
     # ── Differences ──────────────────────────────────────────────────
