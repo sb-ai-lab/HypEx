@@ -223,7 +223,7 @@ class MatchingOutput(Output):
         matched_data = matched_data.set_index("_hypex_pos", drop=True)
         matched_data = matched_data.drop(columns=["_hypex_lookup", idx_col])
         return matched_data
-    
+
     def _match_pandas(
         self,
         experiment_data: ExperimentData,
@@ -253,8 +253,12 @@ class MatchingOutput(Output):
         """
         from ..utils.adapter import Adapter
 
-        # Extract match-index values and positional indices.
-        index_values: list = Adapter.to_list(t_indexes[col_name].data)
+        # ── FIX: use get_values(column=...) which returns a flat list of
+        #    scalars via PandasDataset.get_values(), instead of
+        #    Adapter.to_list(Dataset.data) which wraps a DataFrame into [df].
+        index_values: list = Adapter.to_list(
+            t_indexes.get_values(column=col_name)
+        )
         positional_indices: list = Adapter.to_list(t_indexes.data.index)
 
         # Filter out unmatched rows (value == -1).
