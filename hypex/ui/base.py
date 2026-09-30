@@ -199,11 +199,12 @@ class ExperimentShell:
             :class:`ExperimentShell`: Constructor accepting ``auto_persist`` flag.
         """
         if isinstance(data, Dataset):
-            # Deep-copy to prevent in-place mutation of the user's Dataset.
-            # Without this, executors that write to additional_fields
-            # (e.g. AASplitter in _set_best_split) would modify the
-            # original object via DatasetBase.add_column().
-            data = ExperimentData(deepcopy(data))
+            # Shallow-wrap for Spark (immutable lazy frames);
+            # deepcopy for Pandas to prevent mutation of user data.
+            if data.backend_type == BackendsEnum.spark:
+                data = ExperimentData(data)
+            else:
+                data = ExperimentData(deepcopy(data))
         elif isinstance(data, ExperimentData):
             # Copy the container so that set_value() calls do not leak
             # back into the caller's ExperimentData.
