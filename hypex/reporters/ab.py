@@ -57,54 +57,6 @@ class ABTestReporter(DatasetReporter):
         result.update(extract_analyzer_data(data, ABAnalyzer))
         return result
 
-    @staticmethod
-    def report_variance_reductions(data: ExperimentData) -> Dataset | str:
-        """Extract variance reduction metrics from CUPED results in analysis_tables.
-
-        Args:
-            data: The experiment data container.
-
-        Returns:
-            A ``SmallDataset`` with columns ``Transformed Metric Name``
-            and ``Variance Reduction (%)``, or a descriptive string if
-            no variance reduction data is available.
-        """
-        from ..transformers.cuped import CUPEDTransformer
-
-        ids = data.get_ids(
-            CUPEDTransformer,
-            searched_space=ExperimentDataEnum.analysis_tables,
-        )
-        table_ids = ids.get(CUPEDTransformer.__name__, {}).get(
-            ExperimentDataEnum.analysis_tables.value, [],
-        )
-        if not table_ids:
-            return (
-                "No variance reduction data available. "
-                "Ensure CUPED or CUPAC was applied."
-            )
-
-        table = data.analysis_tables[table_ids[0]]
-        if table.is_empty():
-            return "No variance reduction data available."
-
-        records = table.to_records()
-        report_data = [
-            {
-                "Transformed Metric Name": row["feature"],
-                "Variance Reduction (%)": row["variance_reduction_pct"],
-            }
-            for row in records
-        ]
-
-        return SmallDataset.from_dict(
-            report_data,
-            roles={
-                "Transformed Metric Name": StatisticRole(str),
-                "Variance Reduction (%)": StatisticRole(float),
-            },
-        )
-
 class ABDictReporter(ABTestReporter):
     """Legacy reporter wrapper for dictionary output.
 
