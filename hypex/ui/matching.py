@@ -381,6 +381,8 @@ class MatchingOutput(Output):
                     {"indexes": list(map(int, indexes_data))},
                     roles={"indexes": AdditionalMatchingRole()},
                 )
+                if len(indexes) == len(experiment_data.ds):
+                    indexes.index = list(experiment_data.ds.index)
             else:
                 indexes = SmallDataset.create_empty()
 
