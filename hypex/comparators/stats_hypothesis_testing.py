@@ -23,12 +23,15 @@ from .comparators import Chi2Test, KSTest, TTest, ZTest
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 @backend_factory.register(TTest, SparkDataset)
 class StatsTTest(StatsHypothesisTesting):
-    """Two-sample t-test with automatic variance homogeneity check.
+    """Two-sample t-test on pre-aggregated statistics.
 
-    Dynamically selects between Student's t-test (equal variances) and
-    Welch's t-test (unequal variances) based on the ratio of standard
-    deviations. Uses the base ``StatsComparator.execute()`` pipeline,
-    which already handles per-column result storage emulation.
+    By default uses Welch's t-test (unequal variances), consistent
+    with ``GroupTTestExtension`` on the Pandas backend.
+    Pass ``equal_variance=True`` to force Student's pooled-variance
+    t-test.
+
+    Uses the base ``StatsComparator.execute()`` pipeline, which
+    already handles per-column result storage emulation.
     """
     REQUIRED_STATS: ClassVar[list[str]] = ["mean", "std", "count"]
 
