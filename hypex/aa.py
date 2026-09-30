@@ -91,55 +91,21 @@ class AATest(ExperimentShell):
             ]
         )
         
-        # ── Pre-processing: runs ONCE before the iteration loop ─────────
         pre_executors: list[Executor] = [NaDropper()]
         if float32:
             pre_executors.append(Float32Caster())
 
-        # ── Inner experiment: runs PER ITERATION (no transformers) ──────
-        one_aa_base_inner = Experiment(executors=[AASplitter(), aa_metrics])
-        one_aa_strat_inner = Experiment(executors=[AASplitterWithStratification(), aa_metrics])
-        base_experiment_inner = one_aa_strat_inner if stratification else one_aa_base_inner
+        one_aa_base = Experiment(executors=[*pre_executors, AASplitter(), aa_metrics])
+        one_aa_strat = Experiment(executors=[*pre_executors, AASplitterWithStratification(), aa_metrics])
+
+
+        base_experiment = one_aa_strat if stratification else one_aa_base
 
         params = AATest._prepare_params(
             n_iterations, control_size, random_states, sample_size,
             additional_params, groups_sizes
         )
 
-        # ── Outer experiment: pre_executors + iterative pipeline ────────
-        one_aa_base = Experiment(
-            executors=[
-                *pre_executors,
-                ParamsExperiment(
-                    executors=[base_experiment_inner],
-                    params=params,
-                    reporter=DatasetReporter(
-                        OneAADictReporter(front=False), single_row=True
-                    ),
-                    stopping_criterion=(
-                        IfAAExecutor(all_features_passed=True)
-                        if early_stopping else None
-                    ),
-                ),
-            ]
-        )
-        one_aa_strat = Experiment(
-            executors=[
-                *pre_executors,
-                ParamsExperiment(
-                    executors=[base_experiment_inner],
-                    params=params,
-                    reporter=DatasetReporter(
-                        OneAADictReporter(front=False), single_row=True
-                    ),
-                    stopping_criterion=(
-                        IfAAExecutor(all_features_passed=True)
-                        if early_stopping else None
-                    ),
-                ),
-            ]
-        )
-        base_experiment = one_aa_strat if stratification else one_aa_base
         experiment_params = [
             ParamsExperiment(
                 executors=[base_experiment],
