@@ -310,7 +310,13 @@ class AASplitter(Calculator):
         translation: dict[Any, str] = {}
         if const_group_field:
             translation, free_size, control_size = (
-                AASplitter._const_group_plan(...)
+                AASplitter._const_group_plan(
+                    data=data,
+                    const_group_field=const_group_field,
+                    label_map=label_map,
+                    control_size=control_size,
+                    sample_size=sample_size,
+                )
             )
         else:
             # Avoid triggering a Spark count() action just for a boolean check.
