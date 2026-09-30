@@ -544,6 +544,7 @@ class AASplitterWithStratification(AASplitter):
             random_state=self.random_state,
             control_size=self.control_size,
             grouping_fields=grouping_fields,
+            sample_size=self.sample_size,
             groups_sizes=self.groups_sizes,
             const_group_field=const_group_field,
         )
