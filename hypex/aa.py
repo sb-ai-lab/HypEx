@@ -137,7 +137,13 @@ class AATest(ExperimentShell):
                 IfParamsExperiment(
                     executors=[base_experiment],
                     params=params_no_sample,
-                    reporter=DatasetReporter(OneAADictReporter(front=False)),
+                    reporter=DatasetReporter(
+                        AATestReporter(
+                            dict_reporter=DictReporter(front=False),
+                            output_format="dict",
+                        ),
+                        single_row=True,
+                    ),
                     stopping_criterion=IfAAExecutor(sample_size=sample_size),
                 )
             )
