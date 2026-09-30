@@ -926,45 +926,6 @@ class StatsComparator(BaseComparator, ABC):
             ]
         return result_ds_list
 
-    @staticmethod
-    def _prepare_data(
-        compare_by: str,
-        target_fields_data: Dataset | None = None,
-        group_field_data: Dataset | None = None,
-        baseline_fields_data: Dataset | None = None,
-    ) -> GroupedDataset:
-        if compare_by == "groups":
-            group_col = group_field_data.columns[0]
-            if group_col in target_fields_data.columns:
-                grouped: GroupedDataset = target_fields_data.groupby(
-                    by=group_field_data.columns
-                )
-            else:
-                grouped: GroupedDataset = (
-                    target_fields_data
-                    .merge(group_field_data, left_index=True, right_index=True)
-                    .groupby(by=group_field_data.columns)
-                )
-        elif compare_by == "matched_pairs":
-            best_match_col = baseline_fields_data.columns[0]
-            group_col = group_field_data.columns[0]
-            baseline_fields = baseline_fields_data[best_match_col]
-            tmp_data = group_field_data.merge(
-                right=target_fields_data, left_index=True, right_index=True
-            )
-            tmp_data = tmp_data.merge(
-                right=baseline_fields, right_index=True, left_index=True
-            )
-            tmp_data = tmp_data.merge(
-                right=tmp_data, right_index=True, left_on=best_match_col,
-                suffixes=("", "_matched"),
-            )
-            prepeared_data = tmp_data.drop(
-                columns=[best_match_col, best_match_col + "_matched", group_col + "_matched"]
-            )
-            grouped: GroupedDataset = prepeared_data.groupby(by=group_col)
-        return grouped
-
     @timeit(level="COMPARATOR", prefix="STATS")
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Execute the stats-based comparator on the given experiment data.
