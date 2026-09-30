@@ -5,12 +5,9 @@ from typing import Any
 
 from .analyzers.aa import AADryTestAnalyzer, AAScoreAnalyzer, OneAAStatAnalyzer
 from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
-from .analyzers.aa import AAScoreAnalyzer, OneAAStatAnalyzer
-from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
 from .comparators.abstract import Comparator
-from .dataset import AdditionalTreatmentRole, TargetRole
-from .executor import Executor
 from .dataset import AdditionalTreatmentRole, FeatureRole, TargetRole
+from .executor import Executor
 from .experiments.base import Experiment, OnRoleExperiment
 from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from .forks.aa import IfAAExecutor
@@ -250,6 +247,25 @@ class AATest(ExperimentShell):
 
         if n_iterations is None:
             n_iterations = 2000 if precision_mode else 10
+        if early_stopping and precision_mode:
+            import warnings
+            warnings.warn(
+                "early_stopping=True combined with precision_mode=True may "
+                "stop after very few iterations, making AA-score and FPR "
+                "estimates unreliable. Consider disabling one of them.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        if early_stopping and dry_test:
+            import warnings
+            warnings.warn(
+                "early_stopping=True combined with dry_test=True may produce "
+                "a p-value distribution from too few iterations for "
+                "meaningful uniformity diagnostics.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         super().__init__(
             experiment=self._make_experiment(
