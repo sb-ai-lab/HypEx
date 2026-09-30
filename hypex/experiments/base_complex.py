@@ -205,10 +205,18 @@ class ParamsExperiment(ExperimentWithReporter):
 
     @timeit(level="PIPELINE", prefix="PARAMS")
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """Execute parameter sweep with pre-computed clean dataset.
+
+        Hoists ``_clean_ds_for_iteration`` above the loop to avoid
+        redundant AdditionalRole column drops and Spark checkpoints
+        on every iteration.
+        """
         results = []
         self._update_flat_params()
+        # Hoist invariant computation above the loop.
+        clean_ds = data._clean_ds_for_iteration()
         for flat_param in tqdm(self._flat_params):
-            t_data = ExperimentData(data._clean_ds_for_iteration())
+            t_data = ExperimentData(clean_ds)
             for executor in self.executors:
                 executor.set_params(flat_param)
                 t_data = executor.execute(t_data)
