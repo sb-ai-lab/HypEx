@@ -1,21 +1,17 @@
 """UI output handlers for A/B test results including CUPED and CUPAC."""
 from __future__ import annotations
 
-from typing import Any
-
 from ..analyzers.ab import ABAnalyzer
 from ..comparators import GroupDifference, GroupSizes
 from ..dataset import (
     Dataset,
     ExperimentData,
-    InfoRole,
     SmallDataset,
     StatisticRole,
     TreatmentRole,
 )
-from ..reporters.ab import ABDatasetReporter, ABTestReporter
+from ..reporters.ab import ABTestReporter, DictReporter
 from ..reporters.abstract import _get_index_values
-from ..transformers.cuped import CUPEDTransformer
 from ..utils import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL, ExperimentDataEnum
 from .base import Output
 
@@ -117,7 +113,13 @@ class ABOutput(Output):
         self._groups: list[str] = []
         self.cuped = CupedOutput() if enable_cuped else None
         self.cupac = CupacOutput()
-        super().__init__(resume_reporter=ABDatasetReporter())
+        super().__init__(
+            resume_reporter=ABTestReporter(
+                dict_reporter=DictReporter(),
+                output_format="dataset",
+                invert_pass=True,
+            )
+        )
 
     # ── Multitest ────────────────────────────────────────────────────
 
