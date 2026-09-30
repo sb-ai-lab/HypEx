@@ -73,9 +73,19 @@ class CycledExperiment(ExperimentWithReporter):
 
     @timeit(level="PIPELINE", prefix="CYCLED")
     def execute(self, data: ExperimentData) -> ExperimentData:
-        result: list[Dataset] = [
-            self.one_iteration(data, str(i)) for i in tqdm(range(self.n_iterations))
-        ]
+        # Hoist invariant computation above the loop to avoid
+        # redundant checkpoints and column drops per iteration.
+        clean_ds = data._clean_ds_for_iteration()
+
+        result: list[Dataset] = []
+        for i in tqdm(range(self.n_iterations)):
+            self.key = str(i)
+            t_data = ExperimentData(clean_ds)
+            t_data = super(ExperimentWithReporter, self).execute(t_data)
+            report = self.reporter.report(t_data)
+            report.index = [str(i)]
+            result.append(report)
+
         return self._set_result(data, result)
 
 
