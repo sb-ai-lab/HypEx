@@ -309,12 +309,15 @@ class AASplitter(Calculator):
         # ── 2. pinned groups: one aggregate pass, on the driver ─────
         translation: dict[Any, str] = {}
         if const_group_field:
+            effective_control_size = (
+                groups_sizes[0] if groups_sizes else control_size
+            )
             translation, free_size, control_size = (
                 AASplitter._const_group_plan(
                     data=data,
                     const_group_field=const_group_field,
                     label_map=label_map,
-                    control_size=control_size,
+                    control_size=effective_control_size,
                     sample_size=sample_size,
                 )
             )
@@ -328,10 +331,6 @@ class AASplitter(Calculator):
         MOD = 10_000_000
         frac_limit = int(frac * MOD)
         if groups_sizes:
-            # When const groups are present, _const_group_plan returns an
-            # adjusted control_size that accounts for pinned rows.  We must
-            # apply it to the FIRST entry of groups_sizes (the control group)
-            # and redistribute the remaining share proportionally.
             adjusted_groups_sizes = list(groups_sizes)
             if const_group_field:
                 adjusted_control = max(0.0, min(1.0, control_size))
@@ -344,8 +343,6 @@ class AASplitter(Calculator):
                             groups_sizes[i] / original_remaining * remaining
                         )
                 elif remaining > 0:
-                    # Degenerate case: original control share was 0 or 1.
-                    # Distribute remaining evenly across non-control groups.
                     n_test = len(adjusted_groups_sizes) - 1
                     if n_test > 0:
                         for i in range(1, len(adjusted_groups_sizes)):
