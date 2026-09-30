@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from copy import deepcopy
 from typing import Any
 
 import numpy as np
@@ -65,32 +66,21 @@ class Float32Caster(Transformer):
         """Only float64 columns are eligible for downcasting."""
         return [float]
 
+    # hypex/transformers/float32_caster.py
     @staticmethod
-    def _inner_function(
-        data: Dataset,
-        target_cols: list[str],
-    ) -> Dataset:
-        """Cast *target_cols* to float32.
-
-        Args:
-            data: Input dataset.
-            target_cols: Column names to downcast.
-
-        Returns:
-            Dataset with float32 columns and updated role types.
-        """
+    def _inner_function(data: Dataset, target_cols: list[str]) -> Dataset:
         if not target_cols:
             return data
-
-        # Build per-column cast mapping.
-        # np.float32 works for pandas; "float32" string is safer for
-        # pyspark.pandas.
         if data.backend_type == BackendsEnum.spark:
-            dtype_map: dict[str, Any] = {col: "float32" for col in target_cols}
+            dtype_map = {col: "float32" for col in target_cols}
         else:
             dtype_map = {col: np.float32 for col in target_cols}
 
-        return data.astype(dtype=dtype_map)
+        # Фикс: кастуем данные, но НЕ меняем data_type в ролях
+        new_data = data._backend_data.astype(dtype_map)
+        new_roles = deepcopy(data.roles)
+        # data_type остаётся float — не записываем np.float32
+        return data.__class__(roles=new_roles, data=new_data)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Run float32 downcasting on the experiment dataset.
