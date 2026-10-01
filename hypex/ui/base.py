@@ -80,11 +80,7 @@ class Output:
         result = data
         if mode in (RenameEnum.all, RenameEnum.columns):
             rename_map = {c: c.replace(ID_SPLIT_SYMBOL, " ") for c in result.columns}
-            try:
-                result.raw_data = result.raw_data.rename(columns=rename_map)
-            except Exception:
-                if hasattr(result._backend_data, 'data'):
-                    result._backend_data.data = result._backend_data.data.rename(columns=rename_map)
+            result.raw_data = result.raw_data.rename(columns=rename_map)
             result._roles = {rename_map.get(c, c): role for c, role in result._roles.items()}
             
         if mode in (RenameEnum.all, RenameEnum.index):
