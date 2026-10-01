@@ -565,11 +565,6 @@ class AASplitterWithStratification(AASplitter):
             if persisted_locally:
                 data.ds.unpersist()
 
-        # Truncate the DAG after the stratified split to prevent
-        # exponential lineage growth in iterative A/A loops
-        # (principle 16).
-        if data.ds.backend_type == BackendsEnum.spark:
-            result.checkpoint(eager=True)
         if isinstance(result, Dataset):
             result = result.replace_roles({"split": AdditionalTreatmentRole()})
         data = self._set_value(data, result)
