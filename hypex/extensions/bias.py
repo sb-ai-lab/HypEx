@@ -357,28 +357,29 @@ class PandasBisaExtesion(BiasExtension):
         initial_data = initial_data.join(matched_data, how="left")
 
         # if ALL matched columns are NaN (no valid matches at
-        #    all), skip regression and return zero bias.
+        #    all), skip regression and return NaN matched_target
+        #    so downstream metrics exclude all observations.
         matched_cols = [f"{c}_matched" for c in numeric_cols]
         if matched_data.empty or initial_data[matched_cols].isna().all().all():
+            import warnings
+            warnings.warn(
+                "BiasExtension: no valid matches found for any observation. "
+                "Treatment effect estimation will produce NaN results.",
+                UserWarning,
+                stacklevel=2,
+            )
             final_data = pd.DataFrame(
                 {
                     "index": initial_data.index,
-                    "bias": 0.0,
-                    "matched_target": initial_data[self.target_field].values,
-                }
-            ).set_index("index")
+                    "bias": np.nan,
+                    "matched_target": np.nan,
+                },
+                index=initial_data.index,
+            )
             return Dataset(
                 roles={"bias": InfoRole(), "matched_target": InfoRole()},
                 data=final_data,
             )
-
-        coefficients_1, coefficients_2 = self._calc_coefs(initial_data)
-        final_data = self._calc_bias(initial_data, coefficients_1, coefficients_2)
-
-        return Dataset(
-            roles={"bias": InfoRole(), "matched_target": InfoRole()},
-            data=final_data,
-        )
 
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 @backend_factory.register(BiasExtension, SparkDataset)
