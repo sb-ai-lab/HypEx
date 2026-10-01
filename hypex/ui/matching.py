@@ -391,20 +391,7 @@ class MatchingOutput(Output):
                         roles={f"indexes_{group}": StatisticRole()},
                     )
                     if len(ds) == ds_len:
-                        if is_spark:
-                            # Avoid collecting the full index to the
-                            # driver.  Use positional RangeIndex as a
-                            # safe fallback for contiguous datasets.
-                            warnings.warn(
-                                "Index alignment on Spark backend uses "
-                                "positional RangeIndex. Ensure the "
-                                "dataset has a contiguous integer index.",
-                                UserWarning,
-                                stacklevel=2,
-                            )
-                            ds.index = list(range(ds_len))
-                        else:
-                            ds.index = list(experiment_data.ds.index)
+                        ds.index = list(experiment_data.ds.index)
                     else:
                         warnings.warn(
                             f"Matched indexes length ({len(ds)}) != "
@@ -431,18 +418,10 @@ class MatchingOutput(Output):
                     roles={"indexes": AdditionalMatchingRole()},
                 )
                 if len(indexes) == ds_len:
-                    if is_spark:
-                        # Avoid collecting the full index to the driver.
-                        warnings.warn(
-                            "Index alignment on Spark backend uses "
-                            "positional RangeIndex to avoid driver "
-                            "collect().",
-                            UserWarning,
-                            stacklevel=2,
-                        )
-                        indexes.index = list(range(ds_len))
-                    else:
-                        indexes.index = list(experiment_data.ds.index)
+                    # The matched indexes are already on the driver (parsed from
+                    # the resume string).  Collecting the dataset index costs the
+                    # same, so use a single code path for both backends.
+                    indexes.index = list(experiment_data.ds.index)
                 else:
                     warnings.warn(
                         f"Matched indexes length ({len(indexes)}) != "
