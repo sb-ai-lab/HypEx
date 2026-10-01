@@ -87,9 +87,10 @@ class Float32Caster(Transformer):
             dtype_map = {col: "float32" for col in target_cols}
         else:
             dtype_map = {col: np.float32 for col in target_cols}
-        # Use the public Dataset.astype() to stay within the Dataset API
-        # (architecture principle #11). Roles are NOT updated: keeping
-        # data_type=float preserves search_types compatibility.
+        # Restore data_type=float in roles so that downstream
+        # search_columns(search_types=[float]) continues to match.
+        # DatasetBase.astype overwrites role.data_type with the cast
+        # target (np.float32 / "float32"), which would break lookup.
         return data.astype(dtype_map)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
