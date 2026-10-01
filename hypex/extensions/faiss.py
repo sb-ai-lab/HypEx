@@ -1490,7 +1490,7 @@ class SparkFaissExtension(FaissExtension):
                 .agg(
                     F.min(F.struct(F.col("dists"), F.col("nids"))).alias("_1")
                 )
-                .select(F.col("index"), F.col("_1").alias("1"))
+                .select(F.col("index"), F.col("_1")["nids"].alias("1"))
             )
         else:
             result_df = (
