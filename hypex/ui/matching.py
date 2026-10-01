@@ -252,8 +252,6 @@ class MatchingOutput(Output):
             A ``Dataset`` containing the matched rows, indexed by the
             original observation positions.
         """
-        from ..utils.adapter import Adapter
-
         # ── FIX: use get_values(column=...) which returns a flat list of
         #    scalars via PandasDataset.get_values(), instead of
         #    Adapter.to_list(Dataset.data) which wraps a DataFrame into [df].
@@ -334,9 +332,11 @@ class MatchingOutput(Output):
                 },
                 roles={"indexes": StatisticRole()},
             )
-            ds.index = experiment_data.ds[
-                experiment_data.ds[group_indexes_id] == group_name
-            ].index
+            ds.index = Adapter.to_list(
+                experiment_data.ds[
+                    experiment_data.ds[group_indexes_id] == group_name
+                ].index
+            )
             indexes.append(ds)
         return indexes[0].append(indexes[1:]).sort()
 
@@ -362,7 +362,6 @@ class MatchingOutput(Output):
         reformatted_resume = self._reformat_resume(resume)
 
         ds_len = len(experiment_data.ds)
-        is_spark = experiment_data.ds.backend_type == BackendsEnum.spark
 
         if "indexes" in reformatted_resume.keys():
             indexes_items = reformatted_resume.pop("indexes")
