@@ -199,12 +199,7 @@ class ExperimentShell:
             :class:`ExperimentShell`: Constructor accepting ``auto_persist`` flag.
         """
         if isinstance(data, Dataset):
-            # Shallow-wrap for Spark (immutable lazy frames);
-            # deepcopy for Pandas to prevent mutation of user data.
-            if data.backend_type == BackendsEnum.spark:
-                data = ExperimentData(data)
-            else:
-                data = ExperimentData(deepcopy(data))
+            data = ExperimentData(deepcopy(data))
         elif isinstance(data, ExperimentData):
             # Copy the container so that set_value() calls do not leak
             # back into the caller's ExperimentData.
