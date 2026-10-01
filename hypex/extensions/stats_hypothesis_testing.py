@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 from typing import Any
 
 import numpy as np
@@ -8,22 +9,27 @@ from .abstract import Extension
 from ..utils import timeit, NAME_BORDER_SYMBOL
 
 
+def _is_null(value) -> bool:
+    return value is None or (isinstance(value, float) and math.isnan(value))
+
+
 def _sort_by_group_key(result: dict) -> dict:
     """Return ``result`` re-inserted in ascending group-key order.
 
     Spark ``collect()`` order depends on partitioning, while pandas ``groupby``
     yields sorted keys; consumers treat the first key as the baseline group.
-    Null key components sort last. ``StatsKSTestExtension`` is not routed
+    Null key components (``None`` or float NaN) sort last. ``StatsKSTestExtension`` is not routed
     through here because its consumer sorts keys itself.
     """
 
     def _key(item):
         key = item[0]
         parts = key if isinstance(key, tuple) else (key,)
-        return tuple((v is None, v) for v in parts)
+        return tuple(
+            (True, None) if _is_null(v) else (False, v) for v in parts
+        )
 
     return dict(sorted(result.items(), key=_key))
-
 
 
 class StatsAggregationExtension(Extension):

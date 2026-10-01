@@ -76,3 +76,31 @@ def test_iter_groups_spark_sorted(spark_session, layout):
     expected = [k for k, _ in pandas_ds.groupby("g")]
     actual = [k for k, _ in spark_ds.groupby("g")]
     assert actual == expected == sorted(set(g.tolist()))
+
+
+def _nan_group_pdf():
+    g = np.tile([1.0, np.nan, 0.0, 2.0], 15)
+    return pd.DataFrame({"g": g, "y": np.arange(60.0) % 4})
+
+
+def _assert_nan_last(keys):
+    keys = list(keys)
+    assert keys[:3] == [0.0, 1.0, 2.0]
+    assert all(isinstance(k, float) and np.isnan(k) for k in keys[3:])
+    assert len(keys) > 3
+
+
+def test_stats_aggregation_spark_group_order_nan_key(spark_session):
+    _, spark_ds = _datasets(spark_session, _nan_group_pdf())
+    actual = StatsAggregationExtension().calc(
+        spark_ds, ["g"], ["y"], stats=["mean", "count"]
+    )
+    _assert_nan_last(actual)
+
+
+def test_stats_chi2_spark_group_order_nan_key(spark_session):
+    _, spark_ds = _datasets(spark_session, _nan_group_pdf())
+    actual = StatsChi2TestExtension().calc(
+        data=spark_ds, group_col="g", target_cols=["y"]
+    )
+    _assert_nan_last(actual)
