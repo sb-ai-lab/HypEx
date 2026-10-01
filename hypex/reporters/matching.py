@@ -76,7 +76,7 @@ class MatchingReporter(DatasetReporter):
             A flat dictionary mapping composite keys to metric values.
         """
         analyzer_id = data.get_one_id(self.searching_class, ExperimentDataEnum.analysis_tables)
-        table = data.analysis_tables[analyzer_id].data
+        table = data.analysis_tables[analyzer_id].raw_data
         return {
             f"{col}{ID_SPLIT_SYMBOL}{idx}": val 
             for col in table.columns 

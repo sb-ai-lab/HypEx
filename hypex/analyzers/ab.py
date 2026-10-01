@@ -175,7 +175,7 @@ class ABAnalyzer(Executor):
     @staticmethod
     def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
         """Extract index values from a dataset in a backend-agnostic way."""
-        return Adapter.to_list(table.data.index)
+        return Adapter.to_list(table.raw_data.index)
 
     @staticmethod
     def _extract_id_prefix(analysis_id: str) -> str:
@@ -308,11 +308,7 @@ class ABAnalyzer(Executor):
         if group_field not in data.groups:
             combined_data = data.ds
             if group_field in combined_data.columns:
-                inner_df = (
-                    combined_data.data
-                    if hasattr(combined_data, "data")
-                    else combined_data.backend_data.data
-                )
+                inner_df = combined_data.raw_data
                 initial_len = len(inner_df)
                 inner_df = inner_df.dropna(subset=[group_field])
                 dropped = initial_len - len(inner_df)
@@ -366,7 +362,7 @@ class ABAnalyzer(Executor):
                 row_index = self._build_row_index(
                     t_data, analysis_ids, num_groups, group_labels
                 )
-                t_data.data.index = row_index
+                t_data.raw_data.index = row_index
 
                 # ── Aggregate per-group statistics ──────────────────────────
                 # Group rows by the trailing group label parsed from the

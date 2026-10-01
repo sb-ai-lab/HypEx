@@ -28,7 +28,7 @@ class PandasDummyEncoderExtension(DummyEncoderExtension):
     ):
         target_cols = Adapter.to_list(target_cols)
         dummies_df = pd.get_dummies(
-            data=data[target_cols].data, drop_first=True, dtype=int
+            data=data[target_cols].raw_data, drop_first=True, dtype=int
         )
         # Setting roles to the dummies in additional fields based on the original
         # roles by searching based on the part of the dummy column name
@@ -52,7 +52,7 @@ class SparkDummyEncoderExtension(DummyEncoderExtension):
     ):
         target_cols = Adapter.to_list(target_cols)
         dummies_df = ps.get_dummies(
-            data=data[target_cols].data, drop_first=True, dtype=int
+            data=data[target_cols].raw_data, drop_first=True, dtype=int
         )
 
         roles = {
