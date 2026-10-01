@@ -601,6 +601,10 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
                 )
             )
 
+            # Join scaled_counts BEFORE filtering so that donor weights
+            # are preserved even for observations without their own match.
+            # F.count / F.mean / F.std automatically skip NULLs, so
+            # removing the explicit .filter() is both correct and simpler.
             stats = (
                 new_data
                 .select(
@@ -610,6 +614,8 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
                     self.new_target_field,
                     self.bias_field
                 )
+                .join(scaled_counts, on='index', how='left')
+                .fillna(0, subset=['scaled_counts'])
                 .withColumn(
                     '_it',
                     F.when(
@@ -633,9 +639,6 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
                     )
                     .otherwise(F.lit(None).cast("double"))
                 )
-                .filter(F.col('_it').isNotNull())
-                .join(scaled_counts, on='index', how='left')
-                .fillna(0, subset=['scaled_counts'])
                 .groupBy(self.group_field)
                 .agg(
                     F.count('_it').alias('count'),
