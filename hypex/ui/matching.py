@@ -1,10 +1,10 @@
 # hypex/ui/matching.py
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 import pandas as pd
-
 
 from ..analyzers.matching import MatchingAnalyzer
 from ..dataset import (
@@ -15,12 +15,12 @@ from ..dataset import (
     InfoRole,
     SmallDataset,
     StatisticRole,
-    TargetRole,
 )
 from ..reporters.matching import MatchingDictReporter, MatchingQualityDatasetReporter
-from ..utils import BackendsEnum, ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL
+from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL, BackendsEnum
 from ..utils.logger import logger
 from .base import Output
+
 
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 class MatchingOutput(Output):
@@ -339,11 +339,20 @@ class MatchingOutput(Output):
             indexes.append(ds)
         return indexes[0].append(indexes[1:]).sort()
 
-    def extract(self, experiment_data: ExperimentData):
+    def extract(self, experiment_data: ExperimentData) -> None:
         """Extract and format all matching results from experiment data.
 
+        Handles three branches of index extraction:
+        1. Nested grouped indexes (``are_nested=True``): alignment is done
+        inside ``_collect_grouped_indexes`` per group.
+        2. Flat grouped indexes (``are_nested=False``): alignment to the
+        original dataset index is applied here.
+        3. Single (non-grouped) indexes: alignment with length-mismatch
+        guard and Spark-safe positional fallback.
+
         Args:
-            experiment_data: The experiment data container with matching results.
+            experiment_data: The experiment data container with matching
+                results stored in ``analysis_tables`` and ``variables``.
         """
         # Let the base class handle additional_reporters (like quality_results)
         super().extract(experiment_data)
@@ -351,10 +360,17 @@ class MatchingOutput(Output):
         resume = self.resume_reporter.report(experiment_data)
         reformatted_resume = self._reformat_resume(resume)
 
+        ds_len = len(experiment_data.ds)
+        is_spark = experiment_data.ds.backend_type == BackendsEnum.spark
+
         if "indexes" in reformatted_resume.keys():
             indexes_items = reformatted_resume.pop("indexes")
             are_nested = all(isinstance(v, dict) for v in indexes_items.values())
+
             if are_nested:
+                # ── Branch 1: nested grouped indexes ──────────────────
+                # Alignment is handled inside _collect_grouped_indexes
+                # via filtering the original ds by group mask.
                 indexes = [
                     self._collect_grouped_indexes(experiment_data, values).rename(
                         {"indexes": f"indexes_{group}"}
@@ -362,31 +378,82 @@ class MatchingOutput(Output):
                     for group, values in indexes_items.items()
                 ]
             else:
-                indexes = [
-                    SmallDataset.from_dict(
-                        {
-                            f"indexes_{group}": list(
-                                map(int, values.split(MATCHING_INDEXES_SPLITTER_SYMBOL))
-                            )
-                        },
+                # ── Branch 2: flat grouped indexes ────────────────────
+                # Values are strings; SmallDataset.from_dict creates a
+                # RangeIndex.  Must align to the original ds index.
+                indexes = []
+                for group, values in indexes_items.items():
+                    idx_values = list(
+                        map(int, values.split(MATCHING_INDEXES_SPLITTER_SYMBOL))
+                    )
+                    ds = SmallDataset.from_dict(
+                        {f"indexes_{group}": idx_values},
                         roles={f"indexes_{group}": StatisticRole()},
                     )
-                    for group, values in indexes_items.items()
-                ]
-            indexes = indexes[0].append(other=indexes[1:], axis=1).sort()
+                    if len(ds) == ds_len:
+                        if is_spark:
+                            # Avoid collecting the full index to the
+                            # driver.  Use positional RangeIndex as a
+                            # safe fallback for contiguous datasets.
+                            warnings.warn(
+                                "Index alignment on Spark backend uses "
+                                "positional RangeIndex. Ensure the "
+                                "dataset has a contiguous integer index.",
+                                UserWarning,
+                                stacklevel=2,
+                            )
+                            ds.index = list(range(ds_len))
+                        else:
+                            ds.index = list(experiment_data.ds.index)
+                    else:
+                        warnings.warn(
+                            f"Matched indexes length ({len(ds)}) != "
+                            f"dataset length ({ds_len}) for group "
+                            f"'{group}'. Alignment skipped.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                    indexes.append(ds)
+
+            if indexes:
+                indexes = indexes[0].append(other=indexes[1:], axis=1).sort()
+            else:
+                indexes = SmallDataset.create_empty()
+
         else:
-            indexes_data = resume.get("indexes", "").split(MATCHING_INDEXES_SPLITTER_SYMBOL)
+            # ── Branch 3: single (non-grouped) indexes ────────────────
+            indexes_data = resume.get("indexes", "").split(
+                MATCHING_INDEXES_SPLITTER_SYMBOL
+            )
             if indexes_data and indexes_data[0]:
                 indexes = SmallDataset.from_dict(
                     {"indexes": list(map(int, indexes_data))},
                     roles={"indexes": AdditionalMatchingRole()},
                 )
-                if len(indexes) == len(experiment_data.ds):
-                    indexes.index = list(experiment_data.ds.index)
+                if len(indexes) == ds_len:
+                    if is_spark:
+                        # Avoid collecting the full index to the driver.
+                        warnings.warn(
+                            "Index alignment on Spark backend uses "
+                            "positional RangeIndex to avoid driver "
+                            "collect().",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                        indexes.index = list(range(ds_len))
+                    else:
+                        indexes.index = list(experiment_data.ds.index)
+                else:
+                    warnings.warn(
+                        f"Matched indexes length ({len(indexes)}) != "
+                        f"dataset length ({ds_len}). Alignment skipped.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
             else:
                 indexes = SmallDataset.create_empty()
 
-
+        # ── Build resume table from remaining metrics ─────────────────
         if reformatted_resume:
             first_key = next(iter(reformatted_resume.keys()))
             group_keys = list(reformatted_resume[first_key].keys())
@@ -404,8 +471,5 @@ class MatchingOutput(Output):
         else:
             self.resume = SmallDataset.create_empty()
 
-        self._extract_full_data(
-            experiment_data,
-            indexes,
-        )
+        self._extract_full_data(experiment_data, indexes)
         self.resume.data = self.resume.data.round(2)
