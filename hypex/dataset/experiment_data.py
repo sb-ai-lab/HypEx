@@ -315,7 +315,8 @@ class ExperimentData:
         #     col for col, role in self._data.roles.items()
         #     if isinstance(role, AdditionalRole)
         # ]
-        additional_cols = list(set(self._data.columns) - set(self._initial_cols))
+        initial = set(self._initial_cols)
+        additional_cols = [c for c in self._data.columns if c not in initial]
         if not additional_cols:
             return self._data.create_empty(
                 backend=self._data.backend_type,
