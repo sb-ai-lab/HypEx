@@ -3,24 +3,25 @@ from __future__ import annotations
 try:
     from typing import Self  # Python >= 3.11
 except ImportError:
-    from typing_extensions import Self  # Python < 3.11
+    from typing_extensions import Self  # pyright: ignore[reportMissingModuleSource]
 
-import warnings
-
-from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Sequence, Sized, TYPE_CHECKING
 import copy
+import warnings
+from pathlib import Path
+from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
 import numpy as np
 import pandas as pd  # type: ignore
-import pyspark.sql as spark
-import pyspark.sql.functions as F
+import pyspark.pandas as ps  # type: ignore
+import pyspark.sql as spark  # type: ignore
+import pyspark.sql.functions as F  # type: ignore
 
-import pyspark.pandas as ps
+# pandas.util.hash_array — C-level vectorized hash
+from pandas.util import hash_array
+from pyspark.ml.feature import StringIndexer  # type: ignore
 
-from pyspark.ml.feature import StringIndexer
-
-from ...utils import FromDictTypes, MergeOnError, ScalarType
+from ...config import DatasetConfig
+from ...utils import BackendsEnum, FromDictTypes, MergeOnError, ScalarType
 from ...utils.adapter import Adapter
 from ...utils.constants import UTILITY_INDEX_COL_NAME
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
@@ -37,6 +38,60 @@ class PandasNavigation(DatasetBackendNavigation):
             return self.__class__(data=result.to_frame())
 
         return result
+
+    def to_backend(
+        self,
+        target_backend: BackendsEnum,
+        session: spark.SparkSession | None = None,
+    ) -> Self:
+        """Convert pandas backend to another backend with index preservation.
+
+        When converting to Spark, the pandas index is explicitly saved as a
+        temporary column (``DatasetConfig.BACKEND_CONVERSION_INDEX_COL``)
+        before ``createDataFrame``, then restored via ``set_index`` on the
+        resulting ``pyspark.pandas.DataFrame``.
+
+        Args:
+            target_backend: Target backend enum value.
+            session: Spark session. Required for ``BackendsEnum.spark``.
+
+        Returns:
+            A new backend instance with converted data, or ``self`` when
+            already on the target backend.
+
+        Raises:
+            ValueError: If *target_backend* is unsupported or *session*
+                is ``None`` for spark conversion.
+        """
+        if target_backend == BackendsEnum.pandas:
+            return self
+
+        if target_backend == BackendsEnum.spark:
+            if session is None:
+                raise ValueError(
+                    "Spark session is required for pandas → spark conversion"
+                )
+
+            idx_col = DatasetConfig.BACKEND_CONVERSION_INDEX_COL
+
+            # Preserve index as an explicit column before the round-trip.
+            pdf = self.data.copy()
+            pdf.index.name = idx_col
+            pdf = pdf.reset_index()
+
+            # pd.DataFrame → spark.DataFrame → ps.DataFrame
+            spark_df = session.createDataFrame(pdf)
+            ps_df = ps.DataFrame(spark_df)
+
+            # Restore the index on the Spark side.
+            from .spark_backend import SparkDataset  # lazy to avoid circular import
+
+            result = SparkDataset(data=ps_df, session=session)
+            result.data = result.data.set_index(idx_col)
+            result.data.index.name = None
+            return result
+
+        raise ValueError(f"Unsupported target backend: {target_backend!r}")
 
     def _data_compression(
         self,
@@ -769,9 +824,11 @@ class PandasNavigation(DatasetBackendNavigation):
         """Return the column labels of the DataFrame.
 
         Returns:
-            pd.Index: DataFrame columns.
+            list[str]: Column names as a plain list, consistent
+            with the ``DatasetBase.columns`` interface and the
+            ``SparkNavigation.columns`` implementation.
         """
-        return self.data.columns
+        return self.data.columns.tolist()
 
     @property
     def session(self):
@@ -850,7 +907,7 @@ class PandasNavigation(DatasetBackendNavigation):
                 dtypes[k] = float
             elif pd.api.types.is_object_dtype(v):
                 if len(self.data) > 0 and pd.api.types.is_list_like(
-                    self.data[column_name].iloc[0]
+                    self.data[k].iloc[0]
                 ):
                     dtypes[k] = object
                 else:
@@ -1587,31 +1644,33 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     ) -> pd.DataFrame:
         """Deterministic split using a hash of the index.
 
-        Produces identical results to the Spark backend for the same seed
-        and index values. Uses MD5 hashing of the stringified index
-        concatenated with the seed to assign each row to a bucket in
-        ``[0, MOD)``, then maps buckets to labels via the ``edges``
-        thresholds.
+        Uses SipHash via pandas.util.hash_array hashing of the stringified index concatenated with the
+        seed to assign each row to a bucket in ``[0, MOD)``, then maps
+        buckets to labels via the ``edges`` thresholds.
+
+        Note:
+            The hash function differs from the Spark backend (MD5 vs
+            Murmur3), so the exact split assignment may differ across
+            backends for the same seed. Determinism is guaranteed
+            within each backend.
 
         Args:
             edges: Cumulative upper bounds for each label on the MOD scale.
             labels: Label strings corresponding to ``edges``.
-            random_state: Seed for reproducibility. Defaults to 42.
-            frac: Fraction of data to label. Rows outside this fraction
-                are excluded from the result.
+            random_state: Seed for the hash function. Defaults to 42.
+            frac: Fraction of data to label. Rows with
+                ``hash >= frac * MOD`` are left unlabeled.
             name: Name of the resulting label column.
 
         Returns:
-            A ``pd.DataFrame`` with the original index and the new label
-            column. Rows outside ``frac`` or beyond the last edge are
-            excluded.
+            A ``pd.DataFrame`` containing only the original index
+            and the new label column.
         """
-        import hashlib
-
         seed = random_state if random_state is not None else 42
         mod = 10_000_000
 
-        if edges and edges[-1] < mod * 0.5:
+        frac_limit = int(frac * mod)
+        if edges and edges[-1] < frac_limit * 0.5:
             warnings.warn(
                 f"edges={edges} look like absolute row counts, not MOD-scaled values. "
                 f"Expected last edge ≈ {mod}. Auto-scaling.",
@@ -1625,12 +1684,18 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         df_with_index = self.data.reset_index()
         index_cols = df_with_index.columns[: self.data.index.nlevels]
 
-        def compute_hash(row):
-            index_str = "_".join(str(row[c]) for c in index_cols) + f"_{seed}"
-            hash_val = int(hashlib.md5(index_str.encode()).hexdigest(), 16)
-            return hash_val % mod
-
-        df_with_index["_hash"] = df_with_index.apply(compute_hash, axis=1)
+        seed = random_state if random_state is not None else 42
+        # Mix seed into the hash input so different seeds produce
+        # different splits.  hash_array uses SipHash internally;
+        # appending the seed to the string is the simplest way to
+        # parameterise it without changing the hashing backend.
+        hash_input = (
+            df_with_index[index_cols].astype(str).agg("_".join, axis=1)
+            + f"_{seed}"
+        ).values
+        df_with_index["_hash"] = (
+            hash_array(hash_input, encoding="utf8") % mod
+        ).astype(np.int64)
 
         # Assign labels in reverse order so that the smallest threshold
         # wins (matching Spark CASE WHEN semantics).

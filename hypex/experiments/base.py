@@ -15,8 +15,7 @@ from ..dataset import (
     TempTargetRole,
 )
 from ..executor import Executor
-from ..utils import BackendsEnum, ExperimentDataEnum, timeit
-from ..utils import ExperimentDataEnum, HypExLogger
+from ..utils import BackendsEnum, ExperimentDataEnum, HypExLogger, timeit
 from ..utils.registry import backend_factory
 
 
@@ -145,28 +144,37 @@ class Experiment(Executor):
 
     @staticmethod
     def _get_executor_backend(executor: Executor, ds: Dataset):
-        """
-        Class for selecting backend-dependent realization for direct executor
+        """Resolve the backend-specific implementation for *executor*.
+
+        Extracts constructor parameters from the master executor and
+        forwards them to the backend class.  ``calc_kwargs`` (e.g.
+        ``equal_variance``) are **unwrapped** to the top level so that
+        they land as named arguments in the backend constructor rather
+        than as a nested ``{"calc_kwargs": {...}}`` dict.
+
+        Args:
+            executor: Master executor instance.
+            ds: Dataset used to determine the active backend.
+
+        Returns:
+            A backend-specific executor instance, or *executor* itself
+            when no backend implementation is registered.
         """
         executor_cls = type(executor)
         backend_cls = backend_factory.resolve_backend(executor_cls, ds)
         if backend_cls is None:
-             return executor
-
+            return executor
         sig = inspect.signature(backend_cls.__init__)
         expected_params = {p.name for p in sig.parameters.values() if p.name != 'self'}
-
         init_kwargs = {k: getattr(executor, k) for k in expected_params if hasattr(executor, k)}
-
         has_var_keyword = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
         if has_var_keyword and hasattr(executor, 'calc_kwargs'):
-            init_kwargs['calc_kwargs'] = executor.calc_kwargs
-
+            # Unwrap calc_kwargs to the top level so keys like
+            # "equal_variance" reach the backend constructor directly.
+            init_kwargs.update(executor.calc_kwargs)
         new_executor = backend_cls(**init_kwargs)
-
         if hasattr(executor, 'key'):
             new_executor.key = executor.key
-
         return new_executor
 
 

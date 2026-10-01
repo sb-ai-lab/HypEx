@@ -1,43 +1,38 @@
 from __future__ import annotations
 
-import warnings
-import copy
-from copy import deepcopy
 import json
-from abc import ABC
+import warnings
 from collections.abc import Iterable as IterableABC
+from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any, Iterable, Callable, Hashable, Literal, Optional, Sequence
+from typing import Any, Callable, Hashable, Iterable, Literal, Sequence
 
 try:
     from typing import Self  # Python >= 3.11
 except ImportError:
-    from typing_extensions import Self  # Python < 3.11
+    from typing_extensions import Self  # type: ignore # Python < 3.11
 
 
 import pandas as pd  # type: ignore
+import pyspark.pandas as ps  # type: ignore
+import pyspark.sql as spark  # type: ignore
 from numpy import ndarray
 
-import pyspark.sql as spark
-import pyspark.pandas as ps
-
-from .backends import PandasDataset, SparkDataset
-from .groupby_dataset import GroupedDataset
+from ..config import DatasetConfig
 from ..utils import (
     BackendsEnum,
     BackendTypeError,
     ConcatBackendError,
     ConcatDataError,
     DataTypeError,
+    GenericManager,
     RoleColumnError,
     ScalarType,
     SourceDataTypes,
-    GenericManager
 )
-from ..config import DatasetConfig
 from ..utils.adapter import Adapter
-from .groupby_dataset import GroupedDataset
 from .backends import PandasDataset, SparkDataset
+from .groupby_dataset import GroupedDataset
 from .roles import (
     ABCRole,
     DefaultRole,
@@ -123,6 +118,68 @@ class DatasetBase:
             else:
                 raise TypeError("Value type does not match the expected data type.")
 
+    def to_backend(
+        self,
+        backend: BackendsEnum,
+        session: spark.SparkSession | None = None,
+    ) -> Self:
+        """Convert dataset to the specified backend with index preservation.
+
+        Delegates the actual conversion to the backend-specific
+        ``to_backend()`` implementation. Semantic roles are deep-copied
+        so the original dataset remains untouched.
+
+        For ``BackendsEnum.spark`` targets the pandas index is explicitly
+        saved as a temporary column before ``createDataFrame`` (which would
+        otherwise drop it), then restored after conversion.
+
+        Args:
+            backend: Target backend enum value.
+            session: Spark session. Required when converting to
+                ``BackendsEnum.spark``. When ``None``, falls back to
+                ``self.session``.
+
+        Returns:
+            A new ``Dataset`` instance with converted backend and preserved
+            roles. Returns ``self`` when already on the target backend.
+
+        Raises:
+            ValueError: If *backend* is unsupported, *session* is missing
+                for spark conversion, or the conversion would exceed
+                memory limits (spark → pandas with large datasets).
+
+        Example:
+            >>> spark_ds = pandas_ds.to_backend(
+            ...     backend=BackendsEnum.spark,
+            ...     session=spark_session,
+            ... )
+            >>> pandas_ds = spark_ds.to_backend(backend=BackendsEnum.pandas)
+        """
+        # No-op when already on the target backend.
+        if self.backend_type == backend:
+            return self
+
+        # Resolve session for spark targets.
+        if backend == BackendsEnum.spark:
+            if session is None:
+                session = self.session
+            if session is None:
+                raise ValueError(
+                    "Spark session is required for spark backend conversion. "
+                    "Pass the session argument or ensure the dataset has one."
+                )
+
+        new_backend_data = self._backend_data.to_backend(
+            target_backend=backend,
+            session=session,
+        )
+
+        return self.__class__(
+            roles=deepcopy(self.roles),
+            data=new_backend_data,
+            session=session,
+        )
+
     @staticmethod
     def _select_backend_from_data(
         data: Any,
@@ -180,20 +237,14 @@ class DatasetBase:
         return roles
 
     def _set_empty_types(self, roles):
-        colunms_dtypes = self._backend_data.get_column_type(self._backend_data.columns)
+        columns_dtypes = self._backend_data.get_column_type(self._backend_data.columns)
         new_types = {}
         for column, role in roles.items():
             if role.data_type is None:
-                role.data_type = colunms_dtypes[column]
-            elif role.data_type != colunms_dtypes[column]:
+                role.data_type = columns_dtypes[column]
+            elif role.data_type != columns_dtypes[column]:
                 new_types[column] = role.data_type
-                
-        if new_types:
-            for c in new_types:
-                try:
-                    na = int(self._backend_data.data[c].isna().sum())
-                except Exception:
-                    na = -1
+
         self._backend_data = self._backend_data.update_column_type(new_types)
 
     def __init__(
@@ -202,7 +253,7 @@ class DatasetBase:
         data: spark.DataFrame | pd.DataFrame | str | Self | None = None,
         backend: BackendsEnum | None = None,
         default_role: ABCRole | None = None,
-        session: Optional[spark.SparkSession] = None,
+        session: spark.SparkSession | None = None,
         data_compression: Literal[
             "downcasting", "encoding", "auto", "disable"
         ] = "auto",
@@ -214,7 +265,7 @@ class DatasetBase:
             )
         elif data is not None:
             if isinstance(data, DatasetBase):
-                self._backend_data = deepcopy(data._backend)
+                self._backend_data = deepcopy(data._backend_data)
             elif isinstance(data, (PandasDataset, SparkDataset)):
                 self._backend_data = data
             elif any(
@@ -234,7 +285,7 @@ class DatasetBase:
                 self._backend_data = PandasDataset(data)
 
         self.default_role = default_role
-        if roles is None and data.hasattr("roles") and data.roles is not None:
+        if roles is None and hasattr(data, "roles") and data.roles is not None:
             roles = data.roles
         elif roles is None:
             roles = {}
@@ -638,7 +689,7 @@ class DatasetBase:
             session=self.session,
         )
 
-    def __bool__(self) -> Self:
+    def __bool__(self) -> bool:
         return not self._backend_data.is_empty()
 
     # Binary math operators:

@@ -1,7 +1,21 @@
 from __future__ import annotations
+
 import warnings
-from ..comparators import GroupChi2Test, GroupDifference, GroupSizes, GroupKSTest, GroupTTest
-from .abstract import DatasetReporter, DictReporter, extract_group_sizes, extract_group_difference, extract_tests
+
+from ..comparators import (
+    GroupChi2Test,
+    GroupKSTest,
+    GroupTTest,
+)
+from ..dataset import ExperimentData
+from .abstract import (
+    DatasetReporter,
+    DictReporter,
+    extract_group_difference,
+    extract_group_sizes,
+    extract_tests,
+)
+
 
 class HomogeneityReporter(DatasetReporter):
     def _report(self, data: ExperimentData) -> dict:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import Literal
 
 from .analyzers.ab import ABAnalyzer
@@ -7,7 +8,6 @@ from .comparators import (
     Chi2Test,
     GroupDifference,
     GroupSizes,
-    GroupTTest,
     KSTest,
     TTest,
     UTest,
@@ -16,7 +16,8 @@ from .dataset import AdditionalTargetRole, TargetRole, TreatmentRole
 from .executor.executor import Executor
 from .experiments.base import Experiment, OnRoleExperiment
 from .transformers import CUPEDTransformer
-from .ui.ab import ABOutput
+from .transformers.float32_caster import Float32Caster
+from .ui.ab import ABOutput, CupacOutput, CupedOutput
 from .ui.base import ExperimentShell
 from .utils import ABNTestMethodsEnum, ABTestTypesEnum
 
@@ -63,6 +64,7 @@ class ABTest(ExperimentShell):
         cuped_features: dict[str, str] | None,
         cupac_models: str | list[str] | None,
         enable_cupac: bool,
+        float32: bool = False,
     ) -> Experiment:
         test_mapping: dict[str, Executor] = {
             "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
@@ -76,14 +78,13 @@ class ABTest(ExperimentShell):
         additional_tests = (
             [ABTestTypesEnum.t_test] if additional_tests is None else additional_tests
         )
-        multitest_method = (
-            ABNTestMethodsEnum(multitest_method)
-            if (
-                multitest_method is not None
-                and multitest_method in ABNTestMethodsEnum.__members__.values()
-            )
-            else ABNTestMethodsEnum.holm
-        )
+        if (
+            multitest_method is not None
+            and multitest_method in ABNTestMethodsEnum._value2member_map_
+        ):
+            multitest_method = ABNTestMethodsEnum(multitest_method)
+        else:
+            multitest_method = ABNTestMethodsEnum.holm
         if additional_tests:
             if isinstance(additional_tests, list):
                 additional_tests = [
@@ -121,13 +122,16 @@ class ABTest(ExperimentShell):
                 )
             ),
         ]
+        insert_pos = 0
         if cuped_features:
-            executors.insert(0, CUPEDTransformer(cuped_features=cuped_features))
-
+            executors.insert(insert_pos, CUPEDTransformer(cuped_features=cuped_features))
+            insert_pos += 1
         if enable_cupac:
             from .ml import CUPACExecutor
-
-            executors.insert(0, CUPACExecutor(cupac_models=cupac_models))
+            executors.insert(insert_pos, CUPACExecutor(cupac_models=cupac_models))
+            insert_pos += 1
+        if float32:
+            executors.insert(insert_pos, Float32Caster()) 
 
         return Experiment(executors=executors)
 
@@ -138,24 +142,18 @@ class ABTest(ExperimentShell):
         ) = None,
         multitest_method: (
             Literal[
-                "bonferroni",
-                "sidak",
-                "holm-sidak",
-                "holm",
-                "simes-hochberg",
-                "hommel",
-                "fdr_bh",
-                "fdr_by",
-                "fdr_tsbh",
-                "fdr_tsbhy",
-                "quantile",
+                "bonferroni", "sidak", "holm-sidak", "holm",
+                "simes-hochberg", "hommel", "fdr_bh", "fdr_by",
+                "fdr_tsbh", "fdr_tsbhy", "quantile",
             ]
             | None
         ) = "holm",
-        t_test_equal_var: bool | None = None,
+        equal_variance: bool | None = None,
         cuped_features: dict[str, str] | None = None,
         cupac_models: str | list[str] | None = None,
         enable_cupac: bool = False,
+        float32: bool = False,
+        t_test_equal_var: bool | None = None,
     ):
         """
         Args:
@@ -166,6 +164,16 @@ class ABTest(ExperimentShell):
             cupac_models: str | list[str] — model name (e.g. 'linear', 'ridge', 'lasso', 'catboost') or list of model names to try. If None, all available models will be tried and the best will be selected by variance reduction.
             enable_cupac: bool — Enable CUPAC variance reduction. CUPAC configuration is extracted from dataset.features_mapping.
         """
+        if t_test_equal_var is not None:
+            warnings.warn(
+                "t_test_equal_var is deprecated and will be removed in a "
+                "future version. Use equal_variance instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if equal_variance is None:
+            equal_variance = t_test_equal_var
+
         super().__init__(
             experiment=self._make_experiment(
                 additional_tests,
@@ -173,10 +181,15 @@ class ABTest(ExperimentShell):
                 cuped_features,
                 cupac_models,
                 enable_cupac,
+                float32=float32,
             ),
-            output=ABOutput(),
+            output=ABOutput(
+                enable_cuped=cuped_features is not None,
+                enable_cupac=enable_cupac,
+            ),
         )
-        if t_test_equal_var is not None:
+
+        if equal_variance is not None:
             self.experiment.set_params(
-                {GroupTTest: {"calc_kwargs": {"equal_var": t_test_equal_var}}}
+                {TTest: {"calc_kwargs": {"equal_variance": equal_variance}}}
             )

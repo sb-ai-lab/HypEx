@@ -32,73 +32,124 @@ class MultiTest(Extension):
             return self._calc_spark(data, **kwargs)
         return self._calc_pandas(data, **kwargs)
 
+    @staticmethod
+    def _index_parts(index) -> tuple[list[str], list[str], list[str]]:
+        """Split composite p-value IDs into test, field and group labels.
+
+        An id is ``test<sep>params<sep>field`` and, when the p-value
+        belongs to a particular test group, ``<sep>group`` on top.
+        """
+        parts = [str(i).split(ID_SPLIT_SYMBOL) for i in index]
+        tests = [part[0] for part in parts]
+        fields = [part[2] if len(part) > 2 else "" for part in parts]
+        groups = [part[3] if len(part) > 3 else "" for part in parts]
+        return tests, fields, groups
+
     def _calc_pandas(self, data: Dataset, **kwargs):
-        """Apply multiple-testing correction on a Pandas-backed dataset.
-
-        The index of *data* is expected to carry composite identifiers
-        (``ClassName┆params_hash┆field``) so that the corrected results
-        can be mapped back to individual tests and target fields.  When
-        the index contains non-string values (e.g. integers produced by
-        ``pd.concat`` on an empty ``SmallDataset``), each element is
-        safely converted to ``str`` before parsing.
-
+        """Apply multiple testing correction to a Pandas-backed collection of p-values.
+        
+        Parses the composite index of *data* to identify which statistical test
+        family (e.g. TTest, KSTest, Chi2Test) each p-value belongs to, then
+        applies ``statsmodels.stats.multitest.multipletests`` **independently
+        within each family**.  This ensures that corrections such as Holm or
+        Bonferroni control the family-wise error rate per test type rather
+        than across all heterogeneous comparisons simultaneously.
+        
+        The workflow is:
+        1. Flatten the p-value matrix into a 1-D array.
+        2. Decompose each index label into ``(test, field, group)`` via
+           :meth:`_index_parts`.
+        3. Normalize raw test class names (e.g. ``StatsTTest`` → ``TTest``)
+           using :data:`~hypex.utils.constants.TEST_NAME_NORMALIZATION`.
+        4. For every unique test family, collect the corresponding p-values
+           and call ``multipletests(..., method=self.method.value,
+           alpha=self.alpha)``.
+        5. Assemble the results into a :class:`Dataset` with one row per
+           original p-value.
+        
         Args:
-            data: A ``Dataset`` whose single column holds raw p-values
-                and whose index encodes the test/field identifiers.
-            **kwargs: Extra keyword arguments forwarded to
-                ``statsmodels.stats.multitest.multipletests``.
-
+            data: A Pandas-backed ``Dataset`` whose values are raw,
+                uncorrected p-values.  The index must follow the composite
+                format ``test<sep>params<sep>field[<sep>group]`` (see
+                :data:`~hypex.utils.constants.ID_SPLIT_SYMBOL`).
+            **kwargs: Additional keyword arguments forwarded directly to
+                ``statsmodels.stats.multitest.multipletests`` (e.g.
+                ``maxiter`` for iterative methods).
+        
         Returns:
-            A ``Dataset`` with columns ``field``, ``test``,
-            ``old p-value``, ``new p-value``, ``correction``, and
-            ``rejected``.
+            Dataset: A new ``Dataset`` (via ``DatasetAdapter.to_dataset``)
+            with the following columns, all assigned
+            :class:`~hypex.dataset.StatisticRole`:
+            
+            - ``"field"`` – the metric / feature name extracted from the
+              index.
+            - ``"test"`` – the normalized test family name (e.g.
+              ``"TTest"``).
+            - ``"old p-value"`` – the original, uncorrected p-value.
+            - ``"new p-value"`` – the p-value after correction.
+            - ``"correction"`` – the ratio ``old / new`` (``0.0`` when the
+              old p-value is zero).
+            - ``"rejected"`` – boolean flag indicating whether the null
+              hypothesis is rejected at ``self.alpha`` after correction.
+            - ``"group"`` – the compared-group label extracted from the
+              index (empty string when not applicable).
+        
+        Raises:
+            ValueError: If ``data`` contains no p-values or the index
+                format is incompatible with :meth:`_index_parts`.
+        
+        Example:
+            .. code-block:: python
+            
+                multitest = MultiTest(method=ABNTestMethodsEnum.holm, alpha=0.05)
+                corrected_ds = multitest._calc_pandas(p_value_dataset)
+                print(corrected_ds[["test", "old p-value", "new p-value", "rejected"]])
         """
         p_values = data.data.values.flatten()
-        new_pvalues = multipletests(
-            p_values, method=self.method.value, alpha=self.alpha, **kwargs
-        )
-        fields: list[str] = []
-        tests: list[str] = []
-        for idx in data.index:
-            s = str(idx)
-            parts = s.split(ID_SPLIT_SYMBOL)
-            fields.append(parts[2] if len(parts) > 2 else s)
-
-            test_name = parts[0] if len(parts) > 0 else s
-            tests.append(TEST_NAME_NORMALIZATION.get(test_name, test_name))
-
+        tests_raw, fields, groups = self._index_parts(data.index)
+        
+        # Normalize BEFORE grouping into families
+        tests = [TEST_NAME_NORMALIZATION.get(t, t) for t in tests_raw]
+        
+        corrected = np.empty(len(p_values), dtype=float)
+        rejected = np.empty(len(p_values), dtype=bool)
+        
+        # Correction per statistical test family
+        for test in dict.fromkeys(tests):
+            positions = [i for i, name in enumerate(tests) if name == test]
+            test_rejected, test_corrected = multipletests(
+                [p_values[i] for i in positions],
+                method=self.method.value,
+                alpha=self.alpha,
+                **kwargs,
+            )[:2]
+            corrected[positions] = test_corrected
+            rejected[positions] = test_rejected
+        
         return DatasetAdapter.to_dataset(
             {
                 "field": fields,
                 "test": tests,
                 "old p-value": p_values,
-                "new p-value": new_pvalues[1],
+                "new p-value": corrected,
                 "correction": [
-                    j / i if i != 0 else 0.0
-                    for i, j in zip(new_pvalues[1], p_values)
+                    old / new if old != 0 else 0.0
+                    for new, old in zip(corrected, p_values)
                 ],
-                "rejected": new_pvalues[0],
+                "rejected": rejected,
+                "group": groups,
             },
             StatisticRole(),
         )
 
     def _calc_spark(self, data: Dataset, **kwargs):
-        """Delegate to the Pandas implementation.
+        """Delegate to the Pandas implementation via to_backend().
 
         Multiple-testing correction operates on a small, already-collected
         array of p-values (one per test × group), so converting to Pandas
-        on the driver is safe and avoids reimplementing statsmodels logic
-        in Spark.
-
-        Args:
-            data: A Spark-backed ``Dataset`` with raw p-values.
-            **kwargs: Forwarded to ``_calc_pandas``.
-
-        Returns:
-            Corrected ``Dataset`` (Pandas-backed).
+        on the driver is safe.
         """
-        pdf = data.data.toPandas() if hasattr(data.data, "toPandas") else data.data
-        pandas_ds = Dataset(roles=data.roles, data=pdf)
+        pandas_ds = data.to_backend(BackendsEnum.pandas)
         return self._calc_pandas(pandas_ds, **kwargs)
 
 

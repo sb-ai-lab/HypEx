@@ -8,6 +8,7 @@ from sklearn.base import clone
 from sklearn.model_selection import KFold
 
 from ..dataset import AdditionalTargetRole, Dataset
+from ..utils.cuped_theta import cuped_theta
 from ..utils.models import CUPAC_MODELS
 from .abstract import MLExtension
 
@@ -22,6 +23,64 @@ class CupacExtension(MLExtension):
         super().__init__()
         self.n_folds = n_folds
         self.random_state = random_state
+
+    def calc(
+        self,
+        data: Dataset,
+        mode: Literal["auto", "kfold_fit", "fit", "predict"] | None = None,
+        model: str | Any = None,
+        Y: Dataset | None = None,
+        **kwargs,
+    ) -> Any:
+        """Route to the appropriate internal method based on mode.
+
+        Args:
+            data: Feature dataset (X).
+            mode: Operation mode. One of "kfold_fit", "fit", "predict".
+            model: Model name (str) for fit modes, or fitted model
+                object for predict.
+            Y: Target dataset. Required for "kfold_fit" and "fit".
+            **kwargs: Additional arguments (unused).
+
+        Returns:
+            - "kfold_fit": (variance_reduction, feature_importances)
+            - "fit": fitted model object
+            - "predict": Dataset with predictions
+        """
+        if mode == "kfold_fit":
+            return self._kfold_fit_pandas(model, data, Y)
+        if mode == "fit":
+            return self._fit_pandas(model, data, Y)
+        if mode == "predict":
+            return self._predict_pandas(model, data)
+        raise ValueError(f"Unsupported mode: {mode!r}")
+
+    def fit(self, X: Dataset, Y: Dataset | None = None, **kwargs) -> Any:
+        """Train model on full data. Delegates to _fit_pandas.
+
+        Args:
+            X: Feature dataset.
+            Y: Target dataset.
+            **kwargs: Must contain 'model' key.
+
+        Returns:
+            Fitted model object.
+        """
+        model = kwargs.get("model")
+        return self._fit_pandas(model, X, Y)
+    
+    def predict(self, X: Dataset, **kwargs) -> Dataset:
+        """Generate predictions using a fitted model.
+
+        Args:
+            X: Feature dataset.
+            **kwargs: Must contain 'model' key (fitted model object).
+
+        Returns:
+            Dataset with a 'predict' column.
+        """
+        model = kwargs.get("model")
+        return self._predict_pandas(model, X)
 
     def _calc_pandas(
         self,
@@ -47,54 +106,36 @@ class CupacExtension(MLExtension):
     def _kfold_fit_pandas(
         self, model: str, X: Dataset, Y: Dataset
     ) -> tuple[float, dict[str, float]]:
-        """
-        Perform K-fold cross-validation and return variance reduction and feature importances.
-
-        Returns:
-            tuple: (mean_variance_reduction, mean_feature_importances)
-        """
         model_proto = CUPAC_MODELS[model]["pandasdataset"]
-
         X_df = X.data
         Y_df = Y.data
-
         y_values = Y_df.iloc[:, 0] if len(Y_df.columns) > 0 else Y_df
-
         kf = KFold(n_splits=self.n_folds, shuffle=True, random_state=self.random_state)
-        fold_var_reductions = []
+
         fold_feature_importances = []
-
         feature_names = X_df.columns.tolist()
-
+        # OOF cross-fitting: theta estimated on out-of-fold predictions
+        y_original = y_values.to_numpy()
+        oof_pred = np.full(len(y_original), np.nan)
         for train_idx, val_idx in kf.split(X_df):
             X_train, X_val = X_df.iloc[train_idx], X_df.iloc[val_idx]
-            y_train, y_val = y_values.iloc[train_idx], y_values.iloc[val_idx]
-
+            y_train = y_values.iloc[train_idx]
             m = clone(model_proto)
             m.fit(X_train, y_train)
-
-            pred = m.predict(X_val)
-
-            y_original = y_val.to_numpy()
-            y_adjusted = y_original - pred + y_train.mean()
-
-            var_reduction = self._calculate_variance_reduction(y_original, y_adjusted)
-            fold_var_reductions.append(var_reduction)
-
-            # Extract feature importances for this fold
+            oof_pred[val_idx] = m.predict(X_val)
             fold_importances = self._extract_fold_importances(m, model, feature_names)
             fold_feature_importances.append(fold_importances)
 
-        mean_var_reduction = float(np.nanmean(fold_var_reductions))
+        theta = cuped_theta(y_original, oof_pred)
+        y_adjusted = y_original - theta * (oof_pred - oof_pred.mean())
+        mean_var_reduction = self._calculate_variance_reduction(y_original, y_adjusted)
 
-        # Average feature importances across folds: convert to dict with mean values
         mean_importances = {
             feature: float(
                 np.mean([fold_imp[feature] for fold_imp in fold_feature_importances])
             )
             for feature in feature_names
         }
-
         return mean_var_reduction, mean_importances
 
     def _fit_pandas(self, model: str, X: Dataset, Y: Dataset) -> Any:

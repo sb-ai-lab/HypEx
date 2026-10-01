@@ -238,7 +238,7 @@ class PandasFaissExtension(FaissExtension):
             data: Dataset,
             test_data: Dataset,
             X: np.ndarray
-    ) -> pd.Series:
+    ) -> Dataset:
         """
         Perform the FAISS search on the query vectors.
 
@@ -983,5 +983,7 @@ class SparkFaissExtension(FaissExtension):
 
 def get_executor_cache() -> CachingIndex:
     if not hasattr(builtins, "_faiss_index_cache"):
-        builtins._faiss_index_cache = CachingIndex()
+        builtins._faiss_index_cache = CachingIndex(
+            max_index=MatchingConfig.CACHING_INDEX_MAX_SIZE
+        )
     return builtins._faiss_index_cache

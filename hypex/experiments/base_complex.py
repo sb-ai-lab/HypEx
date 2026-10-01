@@ -73,9 +73,19 @@ class CycledExperiment(ExperimentWithReporter):
 
     @timeit(level="PIPELINE", prefix="CYCLED")
     def execute(self, data: ExperimentData) -> ExperimentData:
-        result: list[Dataset] = [
-            self.one_iteration(data, str(i)) for i in tqdm(range(self.n_iterations))
-        ]
+        # Hoist invariant computation above the loop to avoid
+        # redundant checkpoints and column drops per iteration.
+        clean_ds = data._clean_ds_for_iteration()
+
+        result: list[Dataset] = []
+        for i in tqdm(range(self.n_iterations)):
+            self.key = str(i)
+            t_data = ExperimentData(clean_ds)
+            t_data = super(ExperimentWithReporter, self).execute(t_data)
+            report = self.reporter.report(t_data)
+            report.index = [str(i)]
+            result.append(report)
+
         return self._set_result(data, result)
 
 
@@ -97,11 +107,16 @@ class GroupExperiment(ExperimentWithReporter):
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field = data.ds.search_columns(self.searching_role)
         clean_ds = data._clean_ds_for_iteration()
+
         results = []
         for group, group_data in tqdm(clean_ds.groupby(group_field)):
-            key = str(group[0])
-            res = self.one_iteration(ExperimentData(group_data), key, set_key_as_index=False)
-            results.append((key, res))
+            key = str(group[0] if isinstance(group, tuple) else group)
+            self.key = key
+            t_data = ExperimentData(group_data)
+            t_data = super(ExperimentWithReporter, self).execute(t_data)
+            report = self.reporter.report(t_data)
+            results.append((key, report))
+
         return self._set_result(data, results)
 
     def _set_result(self, data: ExperimentData, results: list[tuple[str, Dataset | dict]]) -> ExperimentData:
@@ -114,14 +129,14 @@ class GroupExperiment(ExperimentWithReporter):
             new_cols = {col: f"{key} {col}" for col in ds.columns}
             ds = ds.rename(new_cols)
             datasets.append(ds)
-            
+
         if not datasets:
             return data
-            
+
         combined = datasets[0]
         for ds in datasets[1:]:
             combined = combined.merge(ds, left_index=True, right_index=True, how="outer")
-            
+
         data.analysis_tables[self.id] = combined
         return data
 
@@ -133,11 +148,22 @@ class ParamsExperiment(ExperimentWithReporter):
         reporter: DatasetReporter,
         params: dict[type, dict[str, Sequence[Any]]],
         transformer: bool | None = None,
+        stopping_criterion: IfExecutor | None = None,
         key: str = "",
     ):
         super().__init__(executors, reporter, transformer, key)
         self._params = params
         self._flat_params: list[dict[type, dict[str, Any]]] = []
+        self.stopping_criterion = stopping_criterion
+
+    def _stopping_criterion_met(self, t_data: ExperimentData) -> bool:
+        if self.stopping_criterion is None:
+            return False
+        if_result = self.stopping_criterion.execute(t_data)
+        if_executor_id = if_result.get_one_id(
+            self.stopping_criterion.__class__, ExperimentDataEnum.variables
+        )
+        return bool(if_result.variables[if_executor_id]["response"])
 
     def generate_params_hash(self) -> str:
         return f"ParamsExperiment: {self.reporter.__class__.__name__}"
@@ -179,17 +205,26 @@ class ParamsExperiment(ExperimentWithReporter):
 
     @timeit(level="PIPELINE", prefix="PARAMS")
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """Execute parameter sweep with pre-computed clean dataset.
+
+        Hoists ``_clean_ds_for_iteration`` above the loop to avoid
+        redundant AdditionalRole column drops and Spark checkpoints
+        on every iteration.
+        """
         results = []
         self._update_flat_params()
+        # Hoist invariant computation above the loop.
+        clean_ds = data._clean_ds_for_iteration()
         for flat_param in tqdm(self._flat_params):
-            t_data = ExperimentData(data._clean_ds_for_iteration())
+            t_data = ExperimentData(clean_ds)
             for executor in self.executors:
                 executor.set_params(flat_param)
                 t_data = executor.execute(t_data)
-                report = self.reporter.report(t_data)
+            report = self.reporter.report(t_data)
             results.append(report)
-        result_data = self._set_result(data, results)
-        return result_data
+            if self._stopping_criterion_met(t_data):
+                break
+        return self._set_result(data, results)
 
 
 class IfParamsExperiment(ParamsExperiment):
@@ -202,14 +237,25 @@ class IfParamsExperiment(ParamsExperiment):
         transformer: bool | None = None,
         key: str = "",
     ):
-        self.stopping_criterion = stopping_criterion
-        super().__init__(executors, reporter, params, transformer, key)
+        super().__init__(
+            executors,
+            reporter,
+            params,
+            transformer,
+            stopping_criterion=stopping_criterion,
+            key=key,
+        )
 
     @timeit(level="PIPELINE", prefix="PARAMS")
     def execute(self, data: ExperimentData) -> ExperimentData:
         self._update_flat_params()
+
+        # Hoist invariant computation above the loop to avoid
+        # redundant checkpoints and column drops per iteration.
+        clean_ds = data._clean_ds_for_iteration()
+
         for flat_param in tqdm(self._flat_params):
-            t_data = ExperimentData(data._clean_ds_for_iteration())
+            t_data = ExperimentData(clean_ds)
             for executor in self.executors:
                 cur_executer = self._get_executor_backend(executor, t_data)
                 cur_executer.set_params(flat_param)

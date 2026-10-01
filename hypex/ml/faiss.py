@@ -73,7 +73,7 @@ class FaissNearestNeighbors(MLExecutor):
     @classmethod
     def _set_global_match_indexes(
         cls, local_indexes: Dataset, data: tuple[str, Dataset]
-    ) -> list[int, list[int]]:
+    ) -> list[int] | list[list[int]]:
         """
         Map local group indexes to global dataset indexes.
 
