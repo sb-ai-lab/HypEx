@@ -18,6 +18,7 @@ from ..dataset import (
 )
 from ..reporters.matching import MatchingDictReporter, MatchingQualityDatasetReporter
 from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL, BackendsEnum
+from ..utils.adapter import Adapter
 from ..utils.logger import logger
 from .base import Output
 
@@ -391,7 +392,7 @@ class MatchingOutput(Output):
                         roles={f"indexes_{group}": StatisticRole()},
                     )
                     if len(ds) == ds_len:
-                        ds.index = list(experiment_data.ds.index)
+                        ds.index = Adapter.to_list(experiment_data.ds.index)
                     else:
                         warnings.warn(
                             f"Matched indexes length ({len(ds)}) != "
@@ -421,7 +422,7 @@ class MatchingOutput(Output):
                     # The matched indexes are already on the driver (parsed from
                     # the resume string).  Collecting the dataset index costs the
                     # same, so use a single code path for both backends.
-                    indexes.index = list(experiment_data.ds.index)
+                    indexes.index = Adapter.to_list(experiment_data.ds.index)
                 else:
                     warnings.warn(
                         f"Matched indexes length ({len(indexes)}) != "
