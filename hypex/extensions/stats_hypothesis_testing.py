@@ -8,6 +8,24 @@ from .abstract import Extension
 from ..utils import timeit, NAME_BORDER_SYMBOL
 
 
+def _sort_by_group_key(result: dict) -> dict:
+    """Return ``result`` re-inserted in ascending group-key order.
+
+    Spark ``collect()`` order depends on partitioning, while pandas ``groupby``
+    yields sorted keys; consumers treat the first key as the baseline group.
+    Null key components sort last. ``StatsKSTestExtension`` is not routed
+    through here because its consumer sorts keys itself.
+    """
+
+    def _key(item):
+        key = item[0]
+        parts = key if isinstance(key, tuple) else (key,)
+        return tuple((v is None, v) for v in parts)
+
+    return dict(sorted(result.items(), key=_key))
+
+
+
 class StatsAggregationExtension(Extension):
     """Extension that computes aggregated statistics per group for hypothesis testing.
 
@@ -188,7 +206,7 @@ class StatsAggregationExtension(Extension):
                     alias = f"{col}{NAME_BORDER_SYMBOL}{stat}"
                     result[group_key][col][stat] = row[alias]
 
-        return result
+        return _sort_by_group_key(result)
 
 
 class StatsKSTestExtension(Extension):
@@ -501,4 +519,4 @@ class StatsChi2TestExtension(Extension):
             result.setdefault(grp, {}).setdefault(col, {"value_counts": {}})
             result[grp][col]["value_counts"][val] = cnt
 
-        return result
+        return _sort_by_group_key(result)
