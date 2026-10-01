@@ -39,6 +39,22 @@ class PandasNavigation(DatasetBackendNavigation):
 
         return result
 
+    def to_public_data(self) -> pd.DataFrame:
+        """Return the underlying ``pandas.DataFrame`` (same object, no copy).
+
+        Returns:
+            The raw ``pandas.DataFrame``.
+        """
+        return self.data
+
+    def set_public_data(self, value: Any) -> None:
+        """Replace the underlying data without validation or conversion.
+
+        Args:
+            value: New ``pandas.DataFrame``.
+        """
+        self.data = value
+
     def to_backend(
         self,
         target_backend: BackendsEnum,
