@@ -70,16 +70,18 @@ class Float32Caster(Transformer):
     def _inner_function(data: Dataset, target_cols: list[str]) -> Dataset:
         """Cast float64 columns to float32 via the public Dataset API.
 
-        Roles intentionally keep ``data_type=float`` so that downstream
-        ``search_columns(search_types=[float])`` continues to match
-        these columns.  The actual storage type is float32 regardless.
+        After ``DatasetBase.astype`` overwrites ``role.data_type`` with the
+        cast target (``np.float32`` on Pandas, ``"float32"`` string on
+        Spark), the original ``float`` type is explicitly restored so that
+        downstream ``search_columns(search_types=[float])`` continues to
+        match these columns.
 
         Args:
             data: Input dataset.
             target_cols: Columns to downcast.
 
         Returns:
-            Dataset with float32 storage but unchanged role types.
+            Dataset with float32 storage but ``data_type=float`` in roles.
         """
         if not target_cols:
             return data
@@ -87,11 +89,15 @@ class Float32Caster(Transformer):
             dtype_map = {col: "float32" for col in target_cols}
         else:
             dtype_map = {col: np.float32 for col in target_cols}
-        # Restore data_type=float in roles so that downstream
-        # search_columns(search_types=[float]) continues to match.
-        # DatasetBase.astype overwrites role.data_type with the cast
-        # target (np.float32 / "float32"), which would break lookup.
-        return data.astype(dtype_map)
+
+        result = data.astype(dtype_map)
+
+        # DatasetBase.astype overwrites role.data_type with the cast target.
+        # Restore float so search_columns(search_types=[float]) still matches.
+        for col in target_cols:
+            if col in result.roles:
+                result.roles[col].data_type = float
+        return result
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Run float32 downcasting on the experiment dataset.
