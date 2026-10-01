@@ -299,14 +299,24 @@ class PandasBisaExtesion(BiasExtension):
         _dot_safe(mask_1, coefficients_1)
         _dot_safe(mask_2, coefficients_2)
 
-        # ── matched_target: replace NaN with the original target value
-        #    so downstream MatchingMetrics does not break.
+        # ── matched_target: keep NaN for unmatched observations.
+        #    Downstream MatchingMetrics will exclude them from
+        #    the treatment effect estimation.
         matched_target_col = self.target_field + "_matched"
         matched_target = data[matched_target_col].values.copy()
         nan_mask = ~np.isfinite(matched_target)
-        matched_target[nan_mask] = data.loc[
-            nan_mask, self.target_field
-        ].values
+
+        n_unmatched = int(nan_mask.sum())
+        if n_unmatched > 0:
+            import warnings
+            warnings.warn(
+                f"BiasExtension: {n_unmatched} of {len(data)} observations "
+                f"have no valid match. They will be excluded from the "
+                f"treatment effect estimation. "
+                f"Match rate: {1 - n_unmatched / len(data):.1%}.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         final_data = pd.DataFrame(
             {
