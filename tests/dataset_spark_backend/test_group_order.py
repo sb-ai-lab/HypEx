@@ -57,3 +57,22 @@ def test_stats_chi2_spark_group_order(spark_session):
         exp_vc = {float(k): int(v) for k, v in expected[key]["y"]["value_counts"].items()}
         act_vc = {float(k): int(v) for k, v in actual[key]["y"]["value_counts"].items()}
         assert act_vc == exp_vc
+
+
+def _layout(name):
+    if name == "cyclic":
+        return np.arange(60) % 6
+    if name == "reversed":
+        return (np.arange(60) % 6)[::-1]
+    return np.random.default_rng(1).integers(0, 10, 500)
+
+
+@pytest.mark.parametrize("layout", ["cyclic", "reversed", "random"])
+def test_iter_groups_spark_sorted(spark_session, layout):
+    """Guard test: iter_groups order matches pandas groupby (passes at base)."""
+    g = _layout(layout)
+    pdf = pd.DataFrame({"g": g, "y": np.arange(len(g), dtype=float)})
+    pandas_ds, spark_ds = _datasets(spark_session, pdf)
+    expected = [k for k, _ in pandas_ds.groupby("g")]
+    actual = [k for k, _ in spark_ds.groupby("g")]
+    assert actual == expected == sorted(set(g.tolist()))
