@@ -16,8 +16,14 @@ from ..dataset import (
     SmallDataset,
     StatisticRole,
 )
+from ..ml import FaissNearestNeighbors
 from ..reporters.matching import MatchingDictReporter, MatchingQualityDatasetReporter
-from ..utils import ID_SPLIT_SYMBOL, MATCHING_INDEXES_SPLITTER_SYMBOL, BackendsEnum
+from ..utils import (
+    ID_SPLIT_SYMBOL,
+    MATCHING_INDEXES_SPLITTER_SYMBOL,
+    BackendsEnum,
+    ExperimentDataEnum,
+)
 from ..utils.adapter import Adapter
 from ..utils.logger import logger
 from .base import Output
@@ -340,27 +346,74 @@ class MatchingOutput(Output):
             indexes.append(ds)
         return indexes[0].append(indexes[1:]).sort()
 
-    def extract(self, experiment_data: ExperimentData) -> None:
-        """Extract and format all matching results from experiment data.
+    @staticmethod
+    def _get_spark_indexes(experiment_data: ExperimentData) -> Dataset:
+        """Select matched-index columns lazily from the experiment dataset.
 
-        Handles three branches of index extraction:
+        ``FaissNearestNeighbors`` stores matched indices as
+        ``AdditionalMatchingRole`` columns merged directly into
+        ``experiment_data.ds`` (see ``ExperimentData._set_additional_fields``),
+        already aligned to the dataset index with ``-1`` for unmatched
+        observations. Selecting these columns is a lazy Spark
+        transformation — no data is collected to the driver.
+
+        Args:
+            experiment_data: The experiment data container.
+
+        Returns:
+            A lazy Spark-backed ``Dataset`` with one ``indexes_{i}`` column
+            per neighbor position, or an empty Dataset when no matched
+            indices were stored.
+        """
+        ids = experiment_data.get_ids(
+            FaissNearestNeighbors, ExperimentDataEnum.additional_fields
+        )[FaissNearestNeighbors.__name__][ExperimentDataEnum.additional_fields.value]
+        additional = experiment_data.additional_fields
+        available = sorted(
+            (col for col in ids if col in additional.columns),
+            key=lambda c: int(str(c).split(ID_SPLIT_SYMBOL)[-1]),
+        )
+        if not available:
+            return Dataset.create_empty(
+                roles={},
+                backend=BackendsEnum.spark,
+                session=experiment_data.ds.session,
+            )
+        indexes = additional[available]
+        return indexes.rename(
+            {col: f"indexes_{col.split(ID_SPLIT_SYMBOL)[-1]}" for col in indexes.columns}
+        )
+
+    def _extract_driver_indexes(
+        self,
+        experiment_data: ExperimentData,
+        reformatted_resume: dict[str, Any],
+    ) -> Dataset | SmallDataset:
+        """Parse matched indexes from the resume string on the driver.
+
+        Legacy extraction path used only for the Pandas backend, where the
+        data already resides in driver memory. Handles three branches of
+        index extraction:
+
         1. Nested grouped indexes (``are_nested=True``): alignment is done
-        inside ``_collect_grouped_indexes`` per group.
+           inside ``_collect_grouped_indexes`` per group.
         2. Flat grouped indexes (``are_nested=False``): alignment to the
-        original dataset index is applied here.
-        3. Single (non-grouped) indexes: alignment with length-mismatch
-        guard and Spark-safe positional fallback.
+           original dataset index is applied here.
+        3. Single (non-grouped) indexes: alignment with a length-mismatch
+           guard.
 
         Args:
             experiment_data: The experiment data container with matching
                 results stored in ``analysis_tables`` and ``variables``.
+            reformatted_resume: Flat resume dictionary regrouped by
+                ``_reformat_resume``. The ``indexes`` entry is popped from
+                it as a side effect.
+
+        Returns:
+            A ``Dataset`` or ``SmallDataset`` with matched index columns,
+            aligned to the original dataset index when lengths match.
+            Returns an empty ``SmallDataset`` when no indexes are found.
         """
-        # Let the base class handle additional_reporters (like quality_results)
-        super().extract(experiment_data)
-
-        resume = self.resume_reporter.report(experiment_data)
-        reformatted_resume = self._reformat_resume(resume)
-
         ds_len = len(experiment_data.ds)
 
         if "indexes" in reformatted_resume.keys():
@@ -371,7 +424,7 @@ class MatchingOutput(Output):
                 # ── Branch 1: nested grouped indexes ──────────────────
                 # Alignment is handled inside _collect_grouped_indexes
                 # via filtering the original ds by group mask.
-                indexes = [
+                index_parts = [
                     self._collect_grouped_indexes(experiment_data, values).rename(
                         {"indexes": f"indexes_{group}"}
                     )
@@ -381,7 +434,7 @@ class MatchingOutput(Output):
                 # ── Branch 2: flat grouped indexes ────────────────────
                 # Values are strings; SmallDataset.from_dict creates a
                 # RangeIndex.  Must align to the original ds index.
-                indexes = []
+                index_parts = []
                 for group, values in indexes_items.items():
                     idx_values = list(
                         map(int, values.split(MATCHING_INDEXES_SPLITTER_SYMBOL))
@@ -400,16 +453,16 @@ class MatchingOutput(Output):
                             UserWarning,
                             stacklevel=2,
                         )
-                    indexes.append(ds)
+                    index_parts.append(ds)
 
-            if indexes:
-                indexes = indexes[0].append(other=indexes[1:], axis=1).sort()
+            if index_parts:
+                indexes = index_parts[0].append(other=index_parts[1:], axis=1).sort()
             else:
                 indexes = SmallDataset.create_empty()
 
         else:
             # ── Branch 3: single (non-grouped) indexes ────────────────
-            indexes_data = resume.get("indexes", "").split(
+            indexes_data = self.resume.get("indexes", "").split(
                 MATCHING_INDEXES_SPLITTER_SYMBOL
             )
             if indexes_data and indexes_data[0]:
@@ -418,9 +471,9 @@ class MatchingOutput(Output):
                     roles={"indexes": AdditionalMatchingRole()},
                 )
                 if len(indexes) == ds_len:
-                    # The matched indexes are already on the driver (parsed from
-                    # the resume string).  Collecting the dataset index costs the
-                    # same, so use a single code path for both backends.
+                    # The matched indexes are already on the driver (parsed
+                    # from the resume string).  Collecting the dataset index
+                    # costs the same, so a single code path is kept here.
                     indexes.index = Adapter.to_list(experiment_data.ds.index)
                 else:
                     warnings.warn(
@@ -431,6 +484,36 @@ class MatchingOutput(Output):
                     )
             else:
                 indexes = SmallDataset.create_empty()
+
+        return indexes
+
+    def extract(self, experiment_data: ExperimentData) -> None:
+        """Extract and format all matching results from experiment data.
+
+        For the Spark backend, matched indexes are taken directly from the
+        lazy ``additional_fields`` columns of ``experiment_data.ds`` — the
+        resume-string round trip and any driver-side index collection are
+        skipped entirely. For the Pandas backend, the legacy string-based
+        extraction is preserved.
+
+        Args:
+            experiment_data: The experiment data container with matching
+                results stored in ``analysis_tables`` and ``variables``.
+        """
+        # Let the base class handle additional_reporters (like quality_results)
+        super().extract(experiment_data)
+
+        reformatted_resume = self._reformat_resume(self.resume)
+
+        if experiment_data.ds.backend_type == BackendsEnum.spark:
+            # ── Spark: indexes stay lazy columns of ds ────────────────
+            # No string parsing, no Adapter.to_list(ds.index) — the index
+            # never leaves the cluster. Alignment is native (same index).
+            reformatted_resume.pop("indexes", None)
+            indexes = self._get_spark_indexes(experiment_data)
+        else:
+            # ── Pandas: legacy string-based extraction (branches 1–3) ──
+            indexes = self._extract_driver_indexes(experiment_data, reformatted_resume)
 
         # ── Build resume table from remaining metrics ─────────────────
         if reformatted_resume:
