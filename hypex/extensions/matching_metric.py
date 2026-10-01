@@ -583,6 +583,13 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
             .withColumn(
                 '_it',
                 F.when(
+                    F.col(self.new_target_field).isNull()
+                    | F.col(self.bias_field).isNull()
+                    | F.isnan(F.col(self.new_target_field))
+                    | F.isnan(F.col(self.bias_field)),
+                    F.lit(None).cast("double"),
+                )
+                .when(
                     F.col(self.group_field) == group_1,
                     F.col(self.new_target_field) - F.col(self.target_field) - F.col(self.bias_field)
                 )
@@ -590,10 +597,11 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
                     F.col(self.group_field) == group_2,
                     F.col(self.target_field) - F.col(self.new_target_field) + F.col(self.bias_field)
                 )
-                .otherwise(0)
+                .otherwise(F.lit(None).cast("double"))
             )
+            .filter(F.col('_it').isNotNull())
             .join(scaled_counts, on='index', how='left')
-            .fillna(0)
+            .fillna(0, subset=['scaled_counts'])
             .groupBy(self.group_field)
             .agg(
                 F.count('_it').alias('count'),
