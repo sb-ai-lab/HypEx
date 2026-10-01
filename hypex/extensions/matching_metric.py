@@ -411,44 +411,45 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         return scaled_counts
 
     def _calc_stats_and_weights(self, data: Dataset) -> tuple[dict[str, float], dict[str, float]]:
-        """Compute individual treatment effects and group statistics using Pandas.
-
-        Calculates the Individual Treatment effect (_it) vectorized via NumPy masks, 
-        joins with neighbor weights, and aggregates statistics (mean, variance, sum) 
-        per group.
-
-        Args:
-            data: The dataset containing targets, matched targets, bias, and groups.
-
-        Returns:
-            A tuple of two dictionaries containing statistics for group 1 (control) 
-            and group 2 (treatment).
-        """
         new_data: pd.DataFrame = data.data.copy()
         scaled_counts = self._calc_scaled_counts(new_data, self.neighbors_cols, self.n_neighbors)
-
         group_1, group_2, *_ = sorted(new_data[self.group_field].unique())
-
-        # Individual Treatment effect (_it) vectorized calc using numpy!
-        _it = np.zeros(len(new_data))
-
-        mask_1 = new_data[self.group_field] == group_1
-        mask_2 = new_data[self.group_field] == group_2
 
         target_vals = new_data[self.target_field].values
         new_target_vals = new_data[self.new_target_field].values
         bias_vals = new_data[self.bias_field].values
 
-        # control (group_1): matched_target -target - bias
+        # ── Маска валидных наблюдений: есть и matched_target, и bias ──
+        valid_mask = np.isfinite(new_target_vals) & np.isfinite(bias_vals)
+
+        n_excluded = int((~valid_mask).sum())
+        if n_excluded > 0:
+            import warnings
+            warnings.warn(
+                f"MatchingMetrics: {n_excluded} of {len(new_data)} "
+                f"observations have no valid match and are excluded "
+                f"from treatment effect estimation. "
+                f"Effective sample size: {int(valid_mask.sum())}.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        # Individual Treatment effect (_it) vectorized calc using numpy!
+        _it = np.full(len(new_data), np.nan)  # ← NaN вместо 0
+        mask_1 = (new_data[self.group_field] == group_1) & valid_mask
+        mask_2 = (new_data[self.group_field] == group_2) & valid_mask
+
+        # control (group_1): matched_target - target - bias
         _it[mask_1] = new_target_vals[mask_1] - target_vals[mask_1] - bias_vals[mask_1]
         # test (group_2): target - matched_target + bias
         _it[mask_2] = target_vals[mask_2] - new_target_vals[mask_2] + bias_vals[mask_2]
 
         new_data['_it'] = _it
+        # ── Исключаем несматченные строки из агрегации ──
+        new_data = new_data[valid_mask].copy()
 
         new_data = new_data.join(scaled_counts, how='left')
         new_data['scaled_counts'] = new_data['scaled_counts'].fillna(0)
-
 
         stats = (
             new_data
