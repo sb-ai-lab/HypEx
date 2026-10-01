@@ -411,6 +411,25 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         return scaled_counts
 
     def _calc_stats_and_weights(self, data: Dataset) -> tuple[dict[str, float], dict[str, float]]:
+        def _safe_group_stats(
+            stats: pd.DataFrame, group_field: str, group_val
+        ) -> dict[str, float]:
+            """Extract stats for a single group, returning NaN-filled
+            defaults when the group is empty after filtering."""
+            _EMPTY_STATS: dict[str, float] = {
+                "count": 0,
+                "mean": float("nan"),
+                "var": float("nan"),
+                "sum": 0.0,
+                "sq_sum": 0.0,
+            }
+            subset = stats[stats[group_field] == group_val]
+            if subset.empty:
+                return dict(_EMPTY_STATS)
+            row = subset.iloc[0].to_dict()
+            row.pop(group_field, None)
+            return row
+
         new_data: pd.DataFrame = data.data.copy()
         scaled_counts = self._calc_scaled_counts(new_data, self.neighbors_cols, self.n_neighbors)
         group_1, group_2, *_ = sorted(new_data[self.group_field].unique())
@@ -419,7 +438,6 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         new_target_vals = new_data[self.new_target_field].values
         bias_vals = new_data[self.bias_field].values
 
-        # ── Маска валидных наблюдений: есть и matched_target, и bias ──
         valid_mask = np.isfinite(new_target_vals) & np.isfinite(bias_vals)
 
         n_excluded = int((~valid_mask).sum())
@@ -435,7 +453,7 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
             )
 
         # Individual Treatment effect (_it) vectorized calc using numpy!
-        _it = np.full(len(new_data), np.nan)  # ← NaN вместо 0
+        _it = np.full(len(new_data), np.nan)
         mask_1 = (new_data[self.group_field] == group_1) & valid_mask
         mask_2 = (new_data[self.group_field] == group_2) & valid_mask
 
@@ -445,7 +463,7 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         _it[mask_2] = target_vals[mask_2] - new_target_vals[mask_2] + bias_vals[mask_2]
 
         new_data['_it'] = _it
-        # ── Исключаем несматченные строки из агрегации ──
+
         new_data = new_data[valid_mask].copy()
 
         new_data = new_data.join(scaled_counts, how='left')
@@ -464,12 +482,8 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
             .reset_index()
         )
 
-        stats_dict_1 = stats[stats[self.group_field] == group_1].iloc[0].to_dict()
-        stats_dict_1.pop(self.group_field, None)
-
-        stats_dict_2 = stats[stats[self.group_field] == group_2].iloc[0].to_dict()
-        stats_dict_2.pop(self.group_field, None)
-
+        stats_dict_1 = _safe_group_stats(stats, self.group_field, group_1)
+        stats_dict_2 = _safe_group_stats(stats, self.group_field, group_2)
         return stats_dict_1, stats_dict_2
 
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
