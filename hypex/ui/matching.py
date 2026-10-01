@@ -358,8 +358,7 @@ class MatchingOutput(Output):
         # Let the base class handle additional_reporters (like quality_results)
         super().extract(experiment_data)
 
-        resume = self.resume_reporter.report(experiment_data)
-        reformatted_resume = self._reformat_resume(resume)
+        reformatted_resume = self._reformat_resume(self.resume)
 
         ds_len = len(experiment_data.ds)
 
@@ -409,7 +408,7 @@ class MatchingOutput(Output):
 
         else:
             # ── Branch 3: single (non-grouped) indexes ────────────────
-            indexes_data = resume.get("indexes", "").split(
+            indexes_data = self.resume.get("indexes", "").split(
                 MATCHING_INDEXES_SPLITTER_SYMBOL
             )
             if indexes_data and indexes_data[0]:
