@@ -651,12 +651,8 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
             )
 
             # ── Safe extraction: empty group → NaN defaults ──────────
-            stats_dict_1 = self._safe_group_stats(
-                stats, self.group_field, group_1
-            )
-            stats_dict_2 = self._safe_group_stats(
-                stats, self.group_field, group_2
-            )
+            stats_dict_1 = _safe_group_stats(stats, self.group_field, group_1)
+            stats_dict_2 = _safe_group_stats(stats, self.group_field, group_2)
 
         finally:
             scaled_counts.unpersist()
