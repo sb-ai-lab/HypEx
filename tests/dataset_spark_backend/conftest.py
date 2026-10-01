@@ -10,7 +10,6 @@ def spark_session():
     spark = (
         SparkSession.builder.appName("Hypex-Pytest")
         .master("local[*]")
-        .config("spark.sql.shuffle.partitions", "2")
         .config("spark.ui.enabled", "false")
         .getOrCreate()
     )
