@@ -827,10 +827,19 @@ class DatasetBase:
 
     @property
     def data(self) -> pd.DataFrame | spark.DataFrame:
-        return self._backend_data.data
+        return self._backend_data.to_public_data()
 
     @data.setter
     def data(self, value: pd.DataFrame | spark.DataFrame) -> None:
+        self._backend_data.set_public_data(value)
+
+    @property
+    def raw_data(self) -> Any:
+        """Raw backend frame (``pd.DataFrame`` or ``pyspark.pandas.DataFrame``)."""
+        return self._backend_data.data
+
+    @raw_data.setter
+    def raw_data(self, value: Any) -> None:
         self._backend_data.data = value
 
     @property
