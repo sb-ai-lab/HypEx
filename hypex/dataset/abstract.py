@@ -402,7 +402,7 @@ class DatasetBase:
         self, item: str | int | Iterable[str | int] | slice | DatasetBase
     ) -> Self:
         if isinstance(item, DatasetBase):
-            item = item.data
+            item = item.raw_data
         elif isinstance(item, slice):
             result = self._backend_data.__getitem__(item)
             return self.__class__(roles=self.roles, data=result)
@@ -469,14 +469,14 @@ class DatasetBase:
                     key: str,
                     value: Any) -> None:
         if isinstance(value, DatasetBase):
-            value = value.iselect(0).data
+            value = value.iselect(0).raw_data
         if key not in self.columns and isinstance(key, str):
             self.add_column(value, {key: InfoRole()})
             warnings.warn(
                 "Column must be added by using add_column method.",
                 category=SyntaxWarning,
             )
-            self.data[key] = value
+            self.raw_data[key] = value
         else:
             column_data_type = self.roles[key].data_type
             if (
@@ -487,7 +487,7 @@ class DatasetBase:
                 )
                 or isinstance(value, column_data_type)
             ):
-                self.data[key] = value
+                self.raw_data[key] = value
             else:
                 raise TypeError("Value type does not match the expected data type.")
 
@@ -536,7 +536,6 @@ class DatasetBase:
         columns = list(roles.keys())
         ds = cls(roles=roles, backend=backend, session=session)
         ds._backend_data = ds._backend_data.create_empty(index, columns)
-        ds.data = ds._backend_data.data
         return ds
 
     @staticmethod
@@ -913,7 +912,7 @@ class DatasetBase:
                 raise ValueError("Columns with the same name already exist")
             self.roles.update(data.roles)
             self._backend_data.add_column(
-                data.data,
+                data.raw_data,
                 data.columns,
                 index,
             )
@@ -925,7 +924,7 @@ class DatasetBase:
             ):
                 raise TypeError("Role values must be of type ABCRole")
             if isinstance(data, self.__class__):
-                data = data.data
+                data = data.raw_data
             self.roles.update(role)
             self._backend_data.add_column(data, list(role.keys()), index)
         return self
@@ -977,7 +976,9 @@ class DatasetBase:
         return self.__class__(
             roles=new_roles,
             data=self.backend_data.append(
-                other=other, reset_index=reset_index, axis=axis
+                other=[o._backend_data for o in other],
+                reset_index=reset_index,
+                axis=axis,
             ),
         )
 
