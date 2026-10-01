@@ -1644,7 +1644,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
     ) -> pd.DataFrame:
         """Deterministic split using a hash of the index.
 
-        Uses MD5 hashing of the stringified index concatenated with the
+        Uses SipHash via pandas.util.hash_array hashing of the stringified index concatenated with the
         seed to assign each row to a bucket in ``[0, MOD)``, then maps
         buckets to labels via the ``edges`` thresholds.
 
@@ -1666,8 +1666,6 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             A ``pd.DataFrame`` containing only the original index
             and the new label column.
         """
-        import hashlib
-
         seed = random_state if random_state is not None else 42
         mod = 10_000_000
 
@@ -1686,12 +1684,15 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         df_with_index = self.data.reset_index()
         index_cols = df_with_index.columns[: self.data.index.nlevels]
 
-        def compute_hash(row):
-            index_str = "_".join(str(row[c]) for c in index_cols) + f"_{seed}"
-            hash_val = int(hashlib.md5(index_str.encode()).hexdigest(), 16)
-            return hash_val % mod
-
-        hash_input = df_with_index[index_cols].astype(str).agg("_".join, axis=1).values
+        seed = random_state if random_state is not None else 42
+        # Mix seed into the hash input so different seeds produce
+        # different splits.  hash_array uses SipHash internally;
+        # appending the seed to the string is the simplest way to
+        # parameterise it without changing the hashing backend.
+        hash_input = (
+            df_with_index[index_cols].astype(str).agg("_".join, axis=1)
+            + f"_{seed}"
+        ).values
         df_with_index["_hash"] = (
             hash_array(hash_input, encoding="utf8") % mod
         ).astype(np.int64)
