@@ -212,9 +212,10 @@ class MultitestQuantile(Extension):
         """Delegates to the Pandas implementation.
 
         Quantile-based multitest runs Monte Carlo simulation on the driver,
-        so data must already be small. Converting to Pandas is acceptable.
+        so data must already be small. ``raw_data`` is passed on as is; it
+        keeps the index needed by ``_index_parts``.
         """
-        pdf = data.raw_data.toPandas() if hasattr(data.raw_data, "toPandas") else data.raw_data
+        pdf = data.raw_data
         pandas_ds = Dataset(
             roles=data.roles,
             data=pdf,
