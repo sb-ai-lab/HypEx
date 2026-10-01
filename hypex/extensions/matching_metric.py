@@ -25,12 +25,28 @@ from ..dataset import (
 )
 from ..dataset.backends import PandasDataset, SparkDataset
 from ..utils import Adapter
-
-# TODO: logger
 from ..utils.logger import logger
 from ..utils.registry import backend_factory
 from .abstract import Extension
 from .scipy_stats import NormCDF
+
+
+def _safe_group_stats(stats: pd.DataFrame, group_field: str, group_val) -> dict[str, float]:
+    """Extract stats for a single group, returning NaN-filled
+    defaults when the group is empty after filtering."""
+    _EMPTY_GROUP_STATS: dict[str, float] = {
+        "count": 0,
+        "mean": float("nan"),
+        "var": float("nan"),
+        "sum": 0.0,
+        "sq_sum": 0.0,
+    }
+    subset = stats[stats[group_field] == group_val]
+    if subset.empty:
+        return dict(_EMPTY_GROUP_STATS)
+    row = subset.iloc[0].to_dict()
+    row.pop(group_field, None)
+    return row
 
 
 class MatchingMetricsExtension(Extension):
@@ -411,25 +427,6 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         return scaled_counts
 
     def _calc_stats_and_weights(self, data: Dataset) -> tuple[dict[str, float], dict[str, float]]:
-        def _safe_group_stats(
-            stats: pd.DataFrame, group_field: str, group_val
-        ) -> dict[str, float]:
-            """Extract stats for a single group, returning NaN-filled
-            defaults when the group is empty after filtering."""
-            _EMPTY_STATS: dict[str, float] = {
-                "count": 0,
-                "mean": float("nan"),
-                "var": float("nan"),
-                "sum": 0.0,
-                "sq_sum": 0.0,
-            }
-            subset = stats[stats[group_field] == group_val]
-            if subset.empty:
-                return dict(_EMPTY_STATS)
-            row = subset.iloc[0].to_dict()
-            row.pop(group_field, None)
-            return row
-
         new_data: pd.DataFrame = data.data.copy()
         scaled_counts = self._calc_scaled_counts(new_data, self.neighbors_cols, self.n_neighbors)
         group_1, group_2, *_ = sorted(new_data[self.group_field].unique())
@@ -464,23 +461,33 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
 
         new_data['_it'] = _it
 
-        new_data = new_data[valid_mask].copy()
+        # Join scaled_counts to the FULL dataset BEFORE filtering,
+        # so donor weights are preserved even for unmatched units.
+        full_with_counts = new_data.join(scaled_counts, how='left')
+        full_with_counts['scaled_counts'] = full_with_counts['scaled_counts'].fillna(0)
 
-        new_data = new_data.join(scaled_counts, how='left')
-        new_data['scaled_counts'] = new_data['scaled_counts'].fillna(0)
+        # Filter only for _it statistics (mean, var, count).
+        filtered = full_with_counts[valid_mask].copy()
 
-        stats = (
-            new_data
-            .groupby(self.group_field)
+        # _it stats on filtered data
+        it_stats = (
+            filtered.groupby(self.group_field)
+            .agg(count=('_it', 'count'), mean=('_it', 'mean'), var=('_it', 'var'))
+            .reset_index()
+        )
+
+        # scaled_counts stats on FULL (unfiltered) data per group
+        sc_stats = (
+            full_with_counts.groupby(self.group_field)
             .agg(
-                count=('_it', 'count'),
-                mean=('_it', 'mean'),
-                var=('_it', 'var'),
                 sum=('scaled_counts', 'sum'),
-                sq_sum=('scaled_counts', lambda x: (x ** 2).sum())
+                sq_sum=('scaled_counts', lambda x: (x ** 2).sum()),
             )
             .reset_index()
         )
+
+        stats = it_stats.merge(sc_stats, on=self.group_field, how='left')
+        stats[['sum', 'sq_sum']] = stats[['sum', 'sq_sum']].fillna(0)
 
         stats_dict_1 = _safe_group_stats(stats, self.group_field, group_1)
         stats_dict_2 = _safe_group_stats(stats, self.group_field, group_2)
@@ -562,77 +569,93 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
             # .withColumnRenamed('count', 'scaled_counts')
         )
 
-    def _calc_stats_and_weights(self, data: Dataset) -> tuple[dict[str, float]]:
+    def _calc_stats_and_weights(self, data: Dataset) -> tuple[dict[str, float], dict[str, float]]:
         """Compute individual treatment effects and group statistics using PySpark.
 
-        Calculates the Individual Treatment effect (_it) using Spark SQL conditional 
-        expressions, joins with neighbor weights, and aggregates statistics per group.
+        Calculates the Individual Treatment effect (_it) using Spark SQL
+        conditional expressions, joins with neighbor weights, and aggregates
+        statistics per group.  When a group becomes empty after filtering
+        unmatched observations, NaN-filled stats are returned so that
+        downstream ``_calc_metrics`` can handle the degenerate case via its
+        existing ``m == 0 or n == 0`` guard.
 
         Args:
-            data: The dataset containing targets, matched targets, bias, and groups.
+            data: The dataset containing targets, matched targets, bias,
+                and groups.
 
         Returns:
-            A tuple of two dictionaries containing statistics for group 1 (control) 
-            and group 2 (treatment).
+            A tuple of two dictionaries containing statistics for group 1
+            (control) and group 2 (treatment).
         """
         new_data: SparkDF = data.data.to_spark(index_col='index')
-        scaled_counts = self._calc_scaled_counts(new_data, self.neighbors_cols, self.n_neighbors)
+        scaled_counts = self._calc_scaled_counts(
+            new_data, self.neighbors_cols, self.n_neighbors
+        )
         scaled_counts.persist(self.PERSIST_POLITIC)
-        # First group is `control`, second one is `test`
-        group_1, group_2, *_ = sorted(
-            map(
-                lambda row: row[0],
-                new_data.select(self.group_field).distinct().collect()
-            )
-        )
-        stats = (
-            new_data
-            .select(
-                'index',
-                self.group_field,
-                self.target_field,
-                self.new_target_field,
-                self.bias_field
-            )
-            .withColumn(
-                '_it',
-                F.when(
-                    F.col(self.new_target_field).isNull()
-                    | F.col(self.bias_field).isNull()
-                    | F.isnan(F.col(self.new_target_field))
-                    | F.isnan(F.col(self.bias_field)),
-                    F.lit(None).cast("double"),
-                )
-                .when(
-                    F.col(self.group_field) == group_1,
-                    F.col(self.new_target_field) - F.col(self.target_field) - F.col(self.bias_field)
-                )
-                .when(
-                    F.col(self.group_field) == group_2,
-                    F.col(self.target_field) - F.col(self.new_target_field) + F.col(self.bias_field)
-                )
-                .otherwise(F.lit(None).cast("double"))
-            )
-            .filter(F.col('_it').isNotNull())
-            .join(scaled_counts, on='index', how='left')
-            .fillna(0, subset=['scaled_counts'])
-            .groupBy(self.group_field)
-            .agg(
-                F.count('_it').alias('count'),
-                F.mean('_it').alias('mean'),
-                (F.std('_it') ** 2).alias('var'),
-                F.sum('scaled_counts').alias('sum'),
-                (F.sum(F.col('scaled_counts') ** 2)).alias('sq_sum')
-            )
-            .toPandas()
-        )
 
-        stats_dict_1 = stats[stats[self.group_field] == group_1].iloc[0].to_dict()
-        # Del group column
-        stats_dict_1.pop(self.group_field, None)
+        try:
+            group_1, group_2, *_ = sorted(
+                map(
+                    lambda row: row[0],
+                    new_data.select(self.group_field).distinct().collect()
+                )
+            )
 
-        stats_dict_2 = stats[stats[self.group_field] == group_2].iloc[0].to_dict()
-        stats_dict_2.pop(self.group_field, None)
+            stats = (
+                new_data
+                .select(
+                    'index',
+                    self.group_field,
+                    self.target_field,
+                    self.new_target_field,
+                    self.bias_field
+                )
+                .withColumn(
+                    '_it',
+                    F.when(
+                        F.col(self.new_target_field).isNull()
+                        | F.col(self.bias_field).isNull()
+                        | F.isnan(F.col(self.new_target_field))
+                        | F.isnan(F.col(self.bias_field)),
+                        F.lit(None).cast("double"),
+                    )
+                    .when(
+                        F.col(self.group_field) == group_1,
+                        F.col(self.new_target_field)
+                        - F.col(self.target_field)
+                        - F.col(self.bias_field)
+                    )
+                    .when(
+                        F.col(self.group_field) == group_2,
+                        F.col(self.target_field)
+                        - F.col(self.new_target_field)
+                        + F.col(self.bias_field)
+                    )
+                    .otherwise(F.lit(None).cast("double"))
+                )
+                .filter(F.col('_it').isNotNull())
+                .join(scaled_counts, on='index', how='left')
+                .fillna(0, subset=['scaled_counts'])
+                .groupBy(self.group_field)
+                .agg(
+                    F.count('_it').alias('count'),
+                    F.mean('_it').alias('mean'),
+                    (F.std('_it') ** 2).alias('var'),
+                    F.sum('scaled_counts').alias('sum'),
+                    (F.sum(F.col('scaled_counts') ** 2)).alias('sq_sum')
+                )
+                .toPandas()
+            )
 
-        scaled_counts.unpersist()
+            # ── Safe extraction: empty group → NaN defaults ──────────
+            stats_dict_1 = self._safe_group_stats(
+                stats, self.group_field, group_1
+            )
+            stats_dict_2 = self._safe_group_stats(
+                stats, self.group_field, group_2
+            )
+
+        finally:
+            scaled_counts.unpersist()
+
         return stats_dict_1, stats_dict_2
