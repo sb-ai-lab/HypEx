@@ -178,8 +178,7 @@ class CachingIndex:
     def get(
         self,
         reference: str,
-        storage: FaissIndexStorage,
-        nprobe: int,
+        storage: FaissIndexStorage
     ) -> faiss.Index:
         """Retrieve a FAISS index from cache or load it from storage.
 
@@ -194,8 +193,6 @@ class CachingIndex:
             reference: File reference name for the index.
             storage: The :class:`FaissIndexStorage` instance used to load
                 the index if it is not cached.
-            nprobe: Number of IVF clusters to probe during search.
-                Applied to the inner index if it supports the attribute.
 
         Returns:
             The loaded or cached FAISS index ready for search.
@@ -211,9 +208,6 @@ class CachingIndex:
                 gc.collect()
 
             tmp_index: faiss.Index = storage.load_index(reference)
-            inner: faiss.Index = faiss.downcast_index(tmp_index)
-            if hasattr(inner, "nprobe"):
-                inner.nprobe = nprobe
 
             self._cache[reference] = tmp_index
             return tmp_index
