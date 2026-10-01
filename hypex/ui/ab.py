@@ -1,21 +1,18 @@
 """UI output handlers for A/B test results including CUPED and CUPAC."""
 from __future__ import annotations
 
-from typing import Any
-
 from ..analyzers.ab import ABAnalyzer
 from ..comparators import GroupDifference, GroupSizes
 from ..dataset import (
     Dataset,
     ExperimentData,
-    InfoRole,
     SmallDataset,
     StatisticRole,
     TreatmentRole,
 )
-from ..reporters.ab import ABDatasetReporter, ABTestReporter
+from ..reporters.ab import ABTestReporter, DictReporter
 from ..reporters.abstract import _get_index_values
-from ..transformers.cuped import CUPEDTransformer
+from ..reporters.cuped import CupedReporter
 from ..utils import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL, ExperimentDataEnum
 from .base import Output
 
@@ -38,8 +35,8 @@ class CupedOutput:
         Args:
             experiment_data: The experiment data container.
         """
-        report = ABTestReporter.report_variance_reductions(experiment_data)
-        if isinstance(report, str):
+        report = CupedReporter().report(experiment_data)
+        if report.is_empty():
             self.variance_reductions = None
         else:
             self.variance_reductions = report
@@ -117,11 +114,23 @@ class ABOutput(Output):
         self._groups: list[str] = []
         self.cuped = CupedOutput() if enable_cuped else None
         self.cupac = CupacOutput()
-        super().__init__(resume_reporter=ABDatasetReporter())
+        super().__init__(
+            resume_reporter=ABTestReporter(
+                dict_reporter=DictReporter(),
+                output_format="dataset",
+                invert_pass=True,
+            )
+        )
 
     # ── Multitest ────────────────────────────────────────────────────
 
     def _extract_multitest_result(self, experiment_data: ExperimentData) -> None:
+        """Extract multiple testing correction results from analysis tables.
+
+        The correction is applied when the total number of comparisons
+        ``(num_groups - 1) * num_target_fields`` exceeds 1 AND a
+        correction method is configured.
+        """
         multitest_id = experiment_data.get_one_id(
             ABAnalyzer, ExperimentDataEnum.analysis_tables,
         )
@@ -129,7 +138,9 @@ class ABOutput(Output):
             self.multitest = experiment_data.analysis_tables[multitest_id]
         else:
             self.multitest = (
-                "There was less than three groups or multitest method wasn't provided"
+                "Multiple testing correction was not applied: total "
+                "comparisons ((groups-1) × targets) ≤ 1 or "
+                "multitest_method was not provided."
             )
 
     # ── Differences ──────────────────────────────────────────────────

@@ -73,9 +73,19 @@ class CycledExperiment(ExperimentWithReporter):
 
     @timeit(level="PIPELINE", prefix="CYCLED")
     def execute(self, data: ExperimentData) -> ExperimentData:
-        result: list[Dataset] = [
-            self.one_iteration(data, str(i)) for i in tqdm(range(self.n_iterations))
-        ]
+        # Hoist invariant computation above the loop to avoid
+        # redundant checkpoints and column drops per iteration.
+        clean_ds = data._clean_ds_for_iteration()
+
+        result: list[Dataset] = []
+        for i in tqdm(range(self.n_iterations)):
+            self.key = str(i)
+            t_data = ExperimentData(clean_ds)
+            t_data = super(ExperimentWithReporter, self).execute(t_data)
+            report = self.reporter.report(t_data)
+            report.index = [str(i)]
+            result.append(report)
+
         return self._set_result(data, result)
 
 
@@ -97,12 +107,16 @@ class GroupExperiment(ExperimentWithReporter):
     def execute(self, data: ExperimentData) -> ExperimentData:
         group_field = data.ds.search_columns(self.searching_role)
         clean_ds = data._clean_ds_for_iteration()
+
         results = []
         for group, group_data in tqdm(clean_ds.groupby(group_field)):
-            # pandas >= 2.0 yields a 1-element tuple; < 2.0 yields scalar
             key = str(group[0] if isinstance(group, tuple) else group)
-            res = self.one_iteration(ExperimentData(group_data), key, set_key_as_index=False)
-            results.append((key, res))
+            self.key = key
+            t_data = ExperimentData(group_data)
+            t_data = super(ExperimentWithReporter, self).execute(t_data)
+            report = self.reporter.report(t_data)
+            results.append((key, report))
+
         return self._set_result(data, results)
 
     def _set_result(self, data: ExperimentData, results: list[tuple[str, Dataset | dict]]) -> ExperimentData:
@@ -191,10 +205,18 @@ class ParamsExperiment(ExperimentWithReporter):
 
     @timeit(level="PIPELINE", prefix="PARAMS")
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """Execute parameter sweep with pre-computed clean dataset.
+
+        Hoists ``_clean_ds_for_iteration`` above the loop to avoid
+        redundant AdditionalRole column drops and Spark checkpoints
+        on every iteration.
+        """
         results = []
         self._update_flat_params()
+        # Hoist invariant computation above the loop.
+        clean_ds = data._clean_ds_for_iteration()
         for flat_param in tqdm(self._flat_params):
-            t_data = ExperimentData(data._clean_ds_for_iteration())
+            t_data = ExperimentData(clean_ds)
             for executor in self.executors:
                 executor.set_params(flat_param)
                 t_data = executor.execute(t_data)
@@ -227,8 +249,13 @@ class IfParamsExperiment(ParamsExperiment):
     @timeit(level="PIPELINE", prefix="PARAMS")
     def execute(self, data: ExperimentData) -> ExperimentData:
         self._update_flat_params()
+
+        # Hoist invariant computation above the loop to avoid
+        # redundant checkpoints and column drops per iteration.
+        clean_ds = data._clean_ds_for_iteration()
+
         for flat_param in tqdm(self._flat_params):
-            t_data = ExperimentData(data._clean_ds_for_iteration())
+            t_data = ExperimentData(clean_ds)
             for executor in self.executors:
                 cur_executer = self._get_executor_backend(executor, t_data)
                 cur_executer.set_params(flat_param)

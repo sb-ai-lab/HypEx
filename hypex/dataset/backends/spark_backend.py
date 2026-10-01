@@ -465,10 +465,10 @@ class SparkNavigation(DatasetBackendNavigation):
                 else original_index_names
             )
 
-            # if blocking:
-            #     self.data.to_spark().unpersist(blocking=True)
-            # else:
-            #     self.data.spark.unpersist()
+            if blocking:
+                self.data.to_spark().unpersist(blocking=True)
+            else:
+                self.data.to_spark().unpersist()
             self.data.to_spark().unpersist(blocking=blocking)
 
             if isinstance(original_index_name, str):
@@ -1895,13 +1895,6 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     ) -> ps.DataFrame:
         """Assign deterministic group labels to rows based on a hash of the index.
 
-        The previous implementation used global ``orderBy`` + ``zipWithIndex``
-        which materializes the entire dataset on a single executor and causes
-        OOM on datasets with tens of millions of rows. This implementation
-        replaces that approach with a ``hash(index_columns, seed) % MOD``
-        modulo operation that runs entirely in a distributed fashion without
-        any global shuffle or sort.
-
         The split is approximately proportional to the requested ``edges``
         (within +/- 0.01% for ``MOD = 10_000_000``), which is statistically
         indistinguishable for AA/AB testing purposes.
@@ -1920,6 +1913,12 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         Returns:
             A ``pyspark.pandas.DataFrame`` containing only the original index
             columns and the new label column.
+
+        Note:
+        The hash function differs from the Pandas backend (Murmur3 vs
+        MD5), so the exact split assignment may differ across
+        backends for the same seed. Determinism is guaranteed
+        within each backend.
         """
         seed = random_state if random_state is not None else 42
         mod = 10_000_000

@@ -23,12 +23,15 @@ from .comparators import Chi2Test, KSTest, TTest, ZTest
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 @backend_factory.register(TTest, SparkDataset)
 class StatsTTest(StatsHypothesisTesting):
-    """Two-sample t-test with automatic variance homogeneity check.
+    """Two-sample t-test on pre-aggregated statistics.
 
-    Dynamically selects between Student's t-test (equal variances) and
-    Welch's t-test (unequal variances) based on the ratio of standard
-    deviations. Uses the base ``StatsComparator.execute()`` pipeline,
-    which already handles per-column result storage emulation.
+    By default uses Welch's t-test (unequal variances), consistent
+    with ``GroupTTestExtension`` on the Pandas backend.
+    Pass ``equal_variance=True`` to force Student's pooled-variance
+    t-test.
+
+    Uses the base ``StatsComparator.execute()`` pipeline, which
+    already handles per-column result storage emulation.
     """
     REQUIRED_STATS: ClassVar[list[str]] = ["mean", "std", "count"]
 
@@ -109,8 +112,6 @@ class StatsTTest(StatsHypothesisTesting):
         current_means = (baseline_stats["mean"], compared_stats["mean"])
         current_sizes = (n1, n2)
 
-        equal_variance: bool | None = kwargs.get("equal_variance")
-
         # Edge case: both variances are zero
         if current_variances[0] == 0 and current_variances[1] == 0:
             if current_means[0] == current_means[1]:
@@ -119,14 +120,16 @@ class StatsTTest(StatsHypothesisTesting):
             else:
                 return {"p-value": 0.0, "statistic": float("inf"), "pass": True}
 
+        equal_variance: bool | None = kwargs.get("equal_variance")
         # Edge case: one of the variances is zero
         if current_variances[0] == 0 or current_variances[1] == 0:
             similar_var = False
         elif equal_variance is not None:
             similar_var = equal_variance
         else:
-            similar_var = (current_variances[0] < 2 * current_variances[1] and
-                           current_variances[0] > 0.5 * current_variances[1])
+            # Default: Welch's t-test (unequal variances), consistent with
+            # GroupTTestExtension which uses equal_var=False by default.
+            similar_var = False
 
         t_stat = cls._t_statistics(
                         n_list=current_sizes,

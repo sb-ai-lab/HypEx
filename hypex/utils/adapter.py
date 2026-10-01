@@ -16,16 +16,24 @@ class Adapter:
         - objects with ``.tolist()`` (pandas Index/Series, numpy arrays)
         - objects with ``.to_array()`` (legacy arrays)
         - ``Sequence`` subclasses → ``list(data)``
+        - scalars (int, float, bool, np.integer, np.floating) → ``[data]``
         - anything else → ``[data]``
         """
         if data is None:
             return []
         if isinstance(data, str):
             return [data]
+        # Scalars: numpy scalars (.tolist() returns a plain scalar, not list)
+        if isinstance(data, (int, float, bool)):
+            return [data]
         if hasattr(data, 'to_list'):
             return data.to_list()
         if hasattr(data, 'tolist'):
-            return data.tolist()
+            result = data.tolist()
+            # Guard: numpy scalar .tolist() returns non-list
+            if not isinstance(result, (list, tuple)):
+                return [result]
+            return list(result)
         if hasattr(data, 'to_array'):
             return data.to_array()
         return list(data) if isinstance(data, Sequence) else [data]

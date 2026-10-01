@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from ..dataset import Dataset, ExperimentData
@@ -198,7 +199,11 @@ class ExperimentShell:
             :class:`ExperimentShell`: Constructor accepting ``auto_persist`` flag.
         """
         if isinstance(data, Dataset):
-            data = ExperimentData(data)
+            data = ExperimentData(deepcopy(data))
+        elif isinstance(data, ExperimentData):
+            # Copy the container so that set_value() calls do not leak
+            # back into the caller's ExperimentData.
+            data = data.copy()
 
         # ── Auto-persist for Spark backend ──────────────────────────
         original_ds = data.ds
@@ -208,20 +213,16 @@ class ExperimentShell:
             and original_ds.backend_type == BackendsEnum.spark
             and not original_ds.is_persisted
         ):
-            original_ds.persist(
-                storage_level="MEMORY_AND_DISK", action="count"
-            )
+            original_ds.persist(storage_level="MEMORY_AND_DISK", action="count")
             persisted_by_us = True
-        # ─────────────────────────────────────────────────────────────
 
-        result_experiment_data = self._experiment.execute(data)
-        self._out.extract(result_experiment_data)
-
-        # Unpersist only if WE persisted it (not the user)
-        if persisted_by_us and original_ds.is_persisted:
-            original_ds.unpersist()
-
-        return self._out
+        try:
+            result_experiment_data = self._experiment.execute(data)
+            self._out.extract(result_experiment_data)
+            return self._out
+        finally:
+            if persisted_by_us and original_ds.is_persisted:
+                original_ds.unpersist()
 
     @property
     def experiment(self):

@@ -25,12 +25,28 @@ from ..dataset import (
 )
 from ..dataset.backends import PandasDataset, SparkDataset
 from ..utils import Adapter
-
-# TODO: logger
 from ..utils.logger import logger
 from ..utils.registry import backend_factory
 from .abstract import Extension
 from .scipy_stats import NormCDF
+
+
+def _safe_group_stats(stats: pd.DataFrame, group_field: str, group_val) -> dict[str, float]:
+    """Extract stats for a single group, returning NaN-filled
+    defaults when the group is empty after filtering."""
+    _EMPTY_GROUP_STATS: dict[str, float] = {
+        "count": 0,
+        "mean": float("nan"),
+        "var": float("nan"),
+        "sum": 0.0,
+        "sq_sum": 0.0,
+    }
+    subset = stats[stats[group_field] == group_val]
+    if subset.empty:
+        return dict(_EMPTY_GROUP_STATS)
+    row = subset.iloc[0].to_dict()
+    row.pop(group_field, None)
+    return row
 
 
 class MatchingMetricsExtension(Extension):
@@ -348,13 +364,22 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         """
         neighbors_cols = Adapter.to_list(neighbors_cols)
         numeric_cols = Adapter.to_list(numeric_cols)
-
         t_data = data[numeric_cols].data
         indexes = data[neighbors_cols].data
 
         # "expand" the neighbor indexes from a wide format to a long one
         melted = indexes.stack().reset_index()
         melted.columns = ['initial_index', 'neighbor_col', 'match_index']
+
+        # filter out dummy match markers (-1)
+        melted = melted[melted['match_index'] != -1]
+
+        if melted.empty:
+            # No valid matches — return empty frame with expected columns
+            result = pd.DataFrame(
+                columns=[f"{col}_matched" for col in numeric_cols] + ['bias']
+            )
+            return result
 
         # adjusting the features of our neighbors according to their indexes
         matched_features = t_data.loc[melted['match_index']].copy()
@@ -363,7 +388,7 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
 
         # calc mean by initial index
         matched_data = matched_features.groupby(level=0).mean()
-        matched_data = matched_data.reset_index() # reset is nessesary because 'initial index' will be used as data index soon
+        matched_data = matched_data.reset_index()
         matched_data = matched_data.rename(columns={col: f"{col}_matched" for col in numeric_cols})
 
         # add zero bias if Bias extension didn't execute
@@ -402,64 +427,70 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         return scaled_counts
 
     def _calc_stats_and_weights(self, data: Dataset) -> tuple[dict[str, float], dict[str, float]]:
-        """Compute individual treatment effects and group statistics using Pandas.
-
-        Calculates the Individual Treatment effect (_it) vectorized via NumPy masks, 
-        joins with neighbor weights, and aggregates statistics (mean, variance, sum) 
-        per group.
-
-        Args:
-            data: The dataset containing targets, matched targets, bias, and groups.
-
-        Returns:
-            A tuple of two dictionaries containing statistics for group 1 (control) 
-            and group 2 (treatment).
-        """
         new_data: pd.DataFrame = data.data.copy()
         scaled_counts = self._calc_scaled_counts(new_data, self.neighbors_cols, self.n_neighbors)
-
         group_1, group_2, *_ = sorted(new_data[self.group_field].unique())
-
-        # Individual Treatment effect (_it) vectorized calc using numpy!
-        _it = np.zeros(len(new_data))
-
-        mask_1 = new_data[self.group_field] == group_1
-        mask_2 = new_data[self.group_field] == group_2
 
         target_vals = new_data[self.target_field].values
         new_target_vals = new_data[self.new_target_field].values
         bias_vals = new_data[self.bias_field].values
 
-        # control (group_1): matched_target -target - bias
+        valid_mask = np.isfinite(new_target_vals) & np.isfinite(bias_vals)
+
+        n_excluded = int((~valid_mask).sum())
+        if n_excluded > 0:
+            import warnings
+            warnings.warn(
+                f"MatchingMetrics: {n_excluded} of {len(new_data)} "
+                f"observations have no valid match and are excluded "
+                f"from treatment effect estimation. "
+                f"Effective sample size: {int(valid_mask.sum())}.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        # Individual Treatment effect (_it) vectorized calc using numpy!
+        _it = np.full(len(new_data), np.nan)
+        mask_1 = (new_data[self.group_field] == group_1) & valid_mask
+        mask_2 = (new_data[self.group_field] == group_2) & valid_mask
+
+        # control (group_1): matched_target - target - bias
         _it[mask_1] = new_target_vals[mask_1] - target_vals[mask_1] - bias_vals[mask_1]
         # test (group_2): target - matched_target + bias
         _it[mask_2] = target_vals[mask_2] - new_target_vals[mask_2] + bias_vals[mask_2]
 
         new_data['_it'] = _it
 
-        new_data = new_data.join(scaled_counts, how='left')
-        new_data['scaled_counts'] = new_data['scaled_counts'].fillna(0)
+        # Join scaled_counts to the FULL dataset BEFORE filtering,
+        # so donor weights are preserved even for unmatched units.
+        full_with_counts = new_data.join(scaled_counts, how='left')
+        full_with_counts['scaled_counts'] = full_with_counts['scaled_counts'].fillna(0)
 
+        # Filter only for _it statistics (mean, var, count).
+        filtered = full_with_counts[valid_mask].copy()
 
-        stats = (
-            new_data
-            .groupby(self.group_field)
+        # _it stats on filtered data
+        it_stats = (
+            filtered.groupby(self.group_field)
+            .agg(count=('_it', 'count'), mean=('_it', 'mean'), var=('_it', 'var'))
+            .reset_index()
+        )
+
+        # scaled_counts stats on FULL (unfiltered) data per group
+        sc_stats = (
+            full_with_counts.groupby(self.group_field)
             .agg(
-                count=('_it', 'count'),
-                mean=('_it', 'mean'),
-                var=('_it', 'var'),
                 sum=('scaled_counts', 'sum'),
-                sq_sum=('scaled_counts', lambda x: (x ** 2).sum())
+                sq_sum=('scaled_counts', lambda x: (x ** 2).sum()),
             )
             .reset_index()
         )
 
-        stats_dict_1 = stats[stats[self.group_field] == group_1].iloc[0].to_dict()
-        stats_dict_1.pop(self.group_field, None)
+        stats = it_stats.merge(sc_stats, on=self.group_field, how='left')
+        stats[['sum', 'sq_sum']] = stats[['sum', 'sq_sum']].fillna(0)
 
-        stats_dict_2 = stats[stats[self.group_field] == group_2].iloc[0].to_dict()
-        stats_dict_2.pop(self.group_field, None)
-
+        stats_dict_1 = _safe_group_stats(stats, self.group_field, group_1)
+        stats_dict_2 = _safe_group_stats(stats, self.group_field, group_2)
         return stats_dict_1, stats_dict_2
 
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
@@ -538,69 +569,92 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
             # .withColumnRenamed('count', 'scaled_counts')
         )
 
-    def _calc_stats_and_weights(self, data: Dataset) -> tuple[dict[str, float]]:
+    def _calc_stats_and_weights(self, data: Dataset) -> tuple[dict[str, float], dict[str, float]]:
         """Compute individual treatment effects and group statistics using PySpark.
 
-        Calculates the Individual Treatment effect (_it) using Spark SQL conditional 
-        expressions, joins with neighbor weights, and aggregates statistics per group.
+        Calculates the Individual Treatment effect (_it) using Spark SQL
+        conditional expressions, joins with neighbor weights, and aggregates
+        statistics per group.  When a group becomes empty after filtering
+        unmatched observations, NaN-filled stats are returned so that
+        downstream ``_calc_metrics`` can handle the degenerate case via its
+        existing ``m == 0 or n == 0`` guard.
 
         Args:
-            data: The dataset containing targets, matched targets, bias, and groups.
+            data: The dataset containing targets, matched targets, bias,
+                and groups.
 
         Returns:
-            A tuple of two dictionaries containing statistics for group 1 (control) 
-            and group 2 (treatment).
+            A tuple of two dictionaries containing statistics for group 1
+            (control) and group 2 (treatment).
         """
         new_data: SparkDF = data.data.to_spark(index_col='index')
-        scaled_counts = self._calc_scaled_counts(new_data, self.neighbors_cols, self.n_neighbors)
+        scaled_counts = self._calc_scaled_counts(
+            new_data, self.neighbors_cols, self.n_neighbors
+        )
         scaled_counts.persist(self.PERSIST_POLITIC)
-        # First group is `control`, second one is `test`
-        group_1, group_2, *_ = sorted(
-            map(
-                lambda row: row[0],
-                new_data.select(self.group_field).distinct().collect()
-            )
-        )
-        stats = (
-            new_data
-            .select(
-                'index',
-                self.group_field,
-                self.target_field,
-                self.new_target_field,
-                self.bias_field
-            )
-            .withColumn(
-                '_it',
-                F.when(
-                    F.col(self.group_field) == group_1,
-                    F.col(self.new_target_field) - F.col(self.target_field) - F.col(self.bias_field)
+
+        try:
+            group_1, group_2, *_ = sorted(
+                map(
+                    lambda row: row[0],
+                    new_data.select(self.group_field).distinct().collect()
                 )
-                .when(
-                    F.col(self.group_field) == group_2,
-                    F.col(self.target_field) - F.col(self.new_target_field) + F.col(self.bias_field)
+            )
+
+            # Join scaled_counts BEFORE filtering so that donor weights
+            # are preserved even for observations without their own match.
+            # F.count / F.mean / F.std automatically skip NULLs, so
+            # removing the explicit .filter() is both correct and simpler.
+            stats = (
+                new_data
+                .select(
+                    'index',
+                    self.group_field,
+                    self.target_field,
+                    self.new_target_field,
+                    self.bias_field
                 )
-                .otherwise(0)
+                .join(scaled_counts, on='index', how='left')
+                .fillna(0, subset=['scaled_counts'])
+                .withColumn(
+                    '_it',
+                    F.when(
+                        F.col(self.new_target_field).isNull()
+                        | F.col(self.bias_field).isNull()
+                        | F.isnan(F.col(self.new_target_field))
+                        | F.isnan(F.col(self.bias_field)),
+                        F.lit(None).cast("double"),
+                    )
+                    .when(
+                        F.col(self.group_field) == group_1,
+                        F.col(self.new_target_field)
+                        - F.col(self.target_field)
+                        - F.col(self.bias_field)
+                    )
+                    .when(
+                        F.col(self.group_field) == group_2,
+                        F.col(self.target_field)
+                        - F.col(self.new_target_field)
+                        + F.col(self.bias_field)
+                    )
+                    .otherwise(F.lit(None).cast("double"))
+                )
+                .groupBy(self.group_field)
+                .agg(
+                    F.count('_it').alias('count'),
+                    F.mean('_it').alias('mean'),
+                    (F.std('_it') ** 2).alias('var'),
+                    F.sum('scaled_counts').alias('sum'),
+                    (F.sum(F.col('scaled_counts') ** 2)).alias('sq_sum')
+                )
+                .toPandas()
             )
-            .join(scaled_counts, on='index', how='left')
-            .fillna(0)
-            .groupBy(self.group_field)
-            .agg(
-                F.count('_it').alias('count'),
-                F.mean('_it').alias('mean'),
-                (F.std('_it') ** 2).alias('var'),
-                F.sum('scaled_counts').alias('sum'),
-                (F.sum(F.col('scaled_counts') ** 2)).alias('sq_sum')
-            )
-            .toPandas()
-        )
 
-        stats_dict_1 = stats[stats[self.group_field] == group_1].iloc[0].to_dict()
-        # Del group column
-        stats_dict_1.pop(self.group_field, None)
+            # ── Safe extraction: empty group → NaN defaults ──────────
+            stats_dict_1 = _safe_group_stats(stats, self.group_field, group_1)
+            stats_dict_2 = _safe_group_stats(stats, self.group_field, group_2)
 
-        stats_dict_2 = stats[stats[self.group_field] == group_2].iloc[0].to_dict()
-        stats_dict_2.pop(self.group_field, None)
+        finally:
+            scaled_counts.unpersist()
 
-        scaled_counts.unpersist()
         return stats_dict_1, stats_dict_2
