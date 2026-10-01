@@ -369,7 +369,10 @@ class MatchingOutput(Output):
             FaissNearestNeighbors, ExperimentDataEnum.additional_fields
         )[FaissNearestNeighbors.__name__][ExperimentDataEnum.additional_fields.value]
         additional = experiment_data.additional_fields
-        available = [col for col in ids if col in additional.columns]
+        available = sorted(
+            (col for col in ids if col in additional.columns),
+            key=lambda c: int(str(c).split(ID_SPLIT_SYMBOL)[-1]),
+        )
         if not available:
             return Dataset.create_empty(
                 roles={},
@@ -378,7 +381,7 @@ class MatchingOutput(Output):
             )
         indexes = additional[available]
         return indexes.rename(
-            {col: f"indexes_{i}" for i, col in enumerate(indexes.columns)}
+            {col: f"indexes_{col.split(ID_SPLIT_SYMBOL)[-1]}" for col in indexes.columns}
         )
 
     def _extract_driver_indexes(
