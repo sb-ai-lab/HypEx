@@ -217,6 +217,8 @@ class Matching(ExperimentShell):
         n_neighbors: int = 1,
         weights: dict[str, float] | None = None,
         encode_categories: bool = True,
+        extract_full_data: bool = False,
+        compute_indexes: bool = False,
     ):
         metric = "ate"
         super().__init__(
@@ -231,5 +233,9 @@ class Matching(ExperimentShell):
                 weights,
                 encode_categories,
             ),
-            output=MatchingOutput(GroupExperiment if group_match else MatchingAnalyzer),
+            output=MatchingOutput(
+                GroupExperiment if group_match else MatchingAnalyzer,
+                extract_full_data=extract_full_data,
+                compute_indexes=compute_indexes,
+            ),
         )
