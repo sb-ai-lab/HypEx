@@ -1,26 +1,26 @@
 # pytest -s -v tests/test_matching.py
-import pytest
-import pandas as pd
-import numpy as np
 from itertools import product
+
+import numpy as np
+import pandas as pd
+import pytest
+from causalinference import CausalModel
+from causalinference.utils import tools
 
 from hypex import Matching
 from hypex.dataset import (
     Dataset,
     FeatureRole,
+    GroupingRole,
     InfoRole,
     TargetRole,
     TreatmentRole,
-    GroupingRole,
 )
-
-from causalinference import CausalModel
-from causalinference.utils import tools
 
 
 @pytest.fixture
-def matching_data():
-    df = pd.read_csv("examples/tutorials/data.csv")
+def matching_data(data_csv):
+    df = pd.read_csv(data_csv)
     df = df.bfill().fillna(0)
     df["gender"] = df["gender"].astype("category").cat.codes
     df["industry"] = df["industry"].astype("category").cat.codes
@@ -41,8 +41,8 @@ def matching_data():
 
 
 @pytest.fixture
-def matching_data_with_group():
-    df = pd.read_csv("examples/tutorials/data.csv")
+def matching_data_with_group(data_csv):
+    df = pd.read_csv(data_csv)
     df = df.bfill().fillna(0)
     df["gender"] = df["gender"].astype("category").cat.codes
     df["industry"] = df["industry"].astype("category").cat.codes
@@ -138,6 +138,8 @@ def test_matching_scenario(
             data_subset.roles["gender"] = GroupingRole(int)
         elif "industry" in scenario:
             data_subset.roles["industry"] = GroupingRole(int)
+            # The fixture groups by gender; keep a single grouping column.
+            data_subset.roles["gender"] = FeatureRole(int)
     else:
         current_roles = {
             "user_id": InfoRole(),
@@ -159,8 +161,28 @@ def test_matching_scenario(
     )
 
     result_hypex = matcher_hypex.execute(data_subset)
-    pval_hypex = result_hypex.summary.data.loc["ATE", "P-value"]
+    summary = result_hypex.summary.data
 
+    if group_match_flag:
+        # Group matching reports one block of columns per group ("<group> P-value").
+        group_col = "gender" if "gender" in scenario else "industry"
+        features = [
+            col
+            for col, role in data_subset.roles.items()
+            if isinstance(role, FeatureRole) and col != group_col
+        ]
+        frame = matching_data_with_group.data
+        for group, group_df in frame.groupby(group_col):
+            pval_hypex = summary.loc["ATE", f"{group} P-value"]
+            pval_causal = get_causalinference_pvalue(group_df, features, k)
+            rel_ratio = calculate_relative_ratio(pval_hypex, pval_causal)
+            assert 0.95 <= rel_ratio <= 1.05, (
+                f"p-value relative ratio out of range: {rel_ratio:.2f} "
+                f"for group {group_col}={group}, scenario={scenario}, k={k}"
+            )
+        return
+
+    pval_hypex = summary.loc["ATE", "P-value"]
     pval_causal = get_causalinference_pvalue(matching_data.data, feature_subset, k)
     rel_ratio = calculate_relative_ratio(pval_hypex, pval_causal)
 

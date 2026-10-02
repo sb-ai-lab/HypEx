@@ -16,7 +16,6 @@ from hypex.utils import (
 
 
 class TestDataset(unittest.TestCase):
-
     def setUp(self):
         # Initialize test data and roles
         self.roles = {"col1": InfoRole(int), "col2": InfoRole(int)}

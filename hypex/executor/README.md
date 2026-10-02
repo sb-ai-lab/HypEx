@@ -159,7 +159,7 @@ role resolution, grouping and result storage for free. See those modules' docs.
 
 * **The id is a data structure.** Reporters split it on `ID_SPLIT_SYMBOL` and
   index into the parts. If you put separators inside `key` or `params_hash`, ids
-  become unparseable — `_generate_id` defensively replaces them with `|`.
+  become unparsable — `_generate_id` defensively replaces them with `|`.
 * **Set `key` before writing.** Blocks running per-column set
   `self.key = <column name>` so their results do not overwrite one another.
 * **`_generate_params_hash` should be stable and minimal** — it is part of the

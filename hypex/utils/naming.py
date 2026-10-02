@@ -11,15 +11,18 @@ METRIC_SUFFIXES: tuple[str, ...] = (
     "pass",
 )
 
+
 def normalize_test_name(raw: str) -> str:
     """Normalize internal test class name to display name."""
     return TEST_NAME_NORMALIZATION.get(raw, raw)
+
 
 # ── Metric column parser ──────────────────────────────────────────────────────
 
 #: Multi-word metric suffixes used in composite column names.
 #: Order matters: longer phrases must precede shorter ones
 #: (e.g. "control mean" before "difference").
+
 
 def _parse_metric_col(col: str) -> tuple[str, str, str, str]:
     """Parse ``'{feature} {TestName} {metric} {group}'`` → (feature, test, metric, group).

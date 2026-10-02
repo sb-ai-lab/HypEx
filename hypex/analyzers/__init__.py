@@ -5,5 +5,5 @@ __all__ = [
     "AADryTestAnalyzer",
     "AAScoreAnalyzer",
     "MatchingAnalyzer",
-    "OneAAStatAnalyzer"
+    "OneAAStatAnalyzer",
 ]

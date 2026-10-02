@@ -1,10 +1,9 @@
 """CUPED (Controlled-experiment Using Pre-Experiment Data) transformer."""
+
 from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any
-
-import numpy as np
 
 from ..dataset.dataset import Dataset, SmallDataset
 from ..dataset.experiment_data import ExperimentData
@@ -110,14 +109,14 @@ class CUPEDTransformer(Transformer):
             original_var = data.ds[target_feature].var()
             adjusted_var = new_ds[f"{target_feature}_cuped"].var()
             variance_reduction = (
-                (1 - adjusted_var / original_var) * 100
-                if original_var > 0
-                else 0.0
+                (1 - adjusted_var / original_var) * 100 if original_var > 0 else 0.0
             )
-            report_rows.append({
-                "feature": f"{target_feature}_cuped",
-                "variance_reduction_pct": variance_reduction,
-            })
+            report_rows.append(
+                {
+                    "feature": f"{target_feature}_cuped",
+                    "variance_reduction_pct": variance_reduction,
+                }
+            )
 
         # ── Store in analysis_tables (principle #9) ─────────────────
         report_ds = SmallDataset.from_dict(

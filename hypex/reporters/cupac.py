@@ -1,4 +1,5 @@
 """Reporters for CUPAC variance reduction results."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -50,7 +51,8 @@ class CupacReporter(Reporter):
             searched_space=ExperimentDataEnum.analysis_tables,
         )
         all_ids = ids.get(CUPACExecutor.__name__, {}).get(
-            ExperimentDataEnum.analysis_tables.value, [],
+            ExperimentDataEnum.analysis_tables.value,
+            [],
         )
 
         # Separate main reports from importance reports
@@ -93,12 +95,14 @@ class CupacReporter(Reporter):
             row = records[0]
             # Extract target name from the composite ID
             target = aid.split(ID_SPLIT_SYMBOL)[-1]
-            rows.append({
-                "target": target,
-                "best_model": row.get("cupac_best_model"),
-                "variance_reduction_cv": row.get("cupac_variance_reduction_cv"),
-                "variance_reduction_real": row.get("cupac_variance_reduction_real"),
-            })
+            rows.append(
+                {
+                    "target": target,
+                    "best_model": row.get("cupac_best_model"),
+                    "variance_reduction_cv": row.get("cupac_variance_reduction_cv"),
+                    "variance_reduction_real": row.get("cupac_variance_reduction_real"),
+                }
+            )
 
         if not rows:
             return None
@@ -152,12 +156,14 @@ class CupacReporter(Reporter):
                     model = main_records[0].get("cupac_best_model")
 
             for feature, importance in row.items():
-                rows.append({
-                    "target": target,
-                    "feature": feature,
-                    "importance": importance,
-                    "model": model,
-                })
+                rows.append(
+                    {
+                        "target": target,
+                        "feature": feature,
+                        "importance": importance,
+                        "model": model,
+                    }
+                )
 
         if not rows:
             return None

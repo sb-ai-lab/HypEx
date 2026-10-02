@@ -33,18 +33,19 @@ class StatsTTest(StatsHypothesisTesting):
     Uses the base ``StatsComparator.execute()`` pipeline, which
     already handles per-column result storage emulation.
     """
+
     REQUIRED_STATS: ClassVar[list[str]] = ["mean", "std", "count"]
 
     def __init__(
-            self, 
-            grouping_role: ABCRole | None = None,
-            compare_by: Literal["groups", "matched_pairs"] = "groups",
-            target_roles: ABCRole | None = None,
-            baseline_role: ABCRole | None = None,
-            reliability: float = 0.05,
-            equal_variance: bool | None = None,
-            key: Any = "",
-            **kwargs,
+        self,
+        grouping_role: ABCRole | None = None,
+        compare_by: Literal["groups", "matched_pairs"] = "groups",
+        target_roles: ABCRole | None = None,
+        baseline_role: ABCRole | None = None,
+        reliability: float = 0.05,
+        equal_variance: bool | None = None,
+        key: Any = "",
+        **kwargs,
     ):
         """
         Initialize StatsTTest with roles and significance level.
@@ -64,7 +65,8 @@ class StatsTTest(StatsHypothesisTesting):
             key=key,
             reliability=reliability,
             calc_kwargs={"equal_variance": equal_variance, **kwargs}
-            if equal_variance is not None else kwargs,
+            if equal_variance is not None
+            else kwargs,
         )
         self.equal_variance = equal_variance
 
@@ -89,7 +91,7 @@ class StatsTTest(StatsHypothesisTesting):
         """
         Execute t-test logic based on variance similarity heuristic.
 
-        Checks if variances are similar (ratio between 0.5 and 2.0). 
+        Checks if variances are similar (ratio between 0.5 and 2.0).
         If similar, uses pooled variance (Student's); otherwise uses Welch's approximation.
         Returns None values if variances are zero.
 
@@ -108,7 +110,7 @@ class StatsTTest(StatsHypothesisTesting):
         if n1 < 2 or n2 < 2:
             return {"p-value": None, "statistic": None, "pass": None}
 
-        current_variances = (baseline_stats["std"]**2, compared_stats["std"]**2)
+        current_variances = (baseline_stats["std"] ** 2, compared_stats["std"] ** 2)
         current_means = (baseline_stats["mean"], compared_stats["mean"])
         current_sizes = (n1, n2)
 
@@ -132,29 +134,28 @@ class StatsTTest(StatsHypothesisTesting):
             similar_var = False
 
         t_stat = cls._t_statistics(
-                        n_list=current_sizes,
-                        s_list=current_variances,
-                        mean_list=current_means,
-                        similar_var=similar_var
-                    )
+            n_list=current_sizes,
+            s_list=current_variances,
+            mean_list=current_means,
+            similar_var=similar_var,
+        )
 
         de_fr = cls._degrees_of_freedom(
-                    n_list=current_sizes,
-                    s_list=current_variances,
-                    similar_var=similar_var
+            n_list=current_sizes, s_list=current_variances, similar_var=similar_var
         )
 
         p_value = float(2 * t_dist.sf(abs(t_stat), de_fr))
 
-        return {"p-value": p_value,
-                "statistic": float(t_stat),
-                "pass": p_value < reliability,}
+        return {
+            "p-value": p_value,
+            "statistic": float(t_stat),
+            "pass": p_value < reliability,
+        }
 
     @staticmethod
-    def _t_statistics(n_list: tuple, 
-                      s_list: tuple, 
-                      mean_list: tuple, 
-                      similar_var: bool = True) -> float:
+    def _t_statistics(
+        n_list: tuple, s_list: tuple, mean_list: tuple, similar_var: bool = True
+    ) -> float:
         """
         Calculate t-statistic based on variance assumption.
 
@@ -169,22 +170,22 @@ class StatsTTest(StatsHypothesisTesting):
         """
         if similar_var:
             sp = sqrt(
-                (
-                    (n_list[0] - 1) * s_list[0] + 
-                    (n_list[1] - 1) * s_list[1] 
-                ) / ( n_list[0] + n_list[1] - 2)
+                ((n_list[0] - 1) * s_list[0] + (n_list[1] - 1) * s_list[1])
+                / (n_list[0] + n_list[1] - 2)
             )
-            t_stat = (mean_list[0] - mean_list[1]) / (sp * sqrt(1 / n_list[0] + 1 / n_list[1]))
+            t_stat = (mean_list[0] - mean_list[1]) / (
+                sp * sqrt(1 / n_list[0] + 1 / n_list[1])
+            )
         else:
-            s_delta =sqrt(s_list[0] / n_list[0] + s_list[1] / n_list[1])
+            s_delta = sqrt(s_list[0] / n_list[0] + s_list[1] / n_list[1])
             t_stat = (mean_list[0] - mean_list[1]) / s_delta
 
         return t_stat
 
     @staticmethod
-    def _degrees_of_freedom(n_list: tuple, 
-                       s_list: tuple = (0, 0), 
-                       similar_var: bool = True) -> float:
+    def _degrees_of_freedom(
+        n_list: tuple, s_list: tuple = (0, 0), similar_var: bool = True
+    ) -> float:
         """
         Calculate degrees of freedom for the t-distribution.
 
@@ -199,10 +200,12 @@ class StatsTTest(StatsHypothesisTesting):
         if similar_var:
             return n_list[0] + n_list[1] - 2
         else:
-            num = ((s_list[0] / n_list[0] + s_list[1] / n_list[1]) ** 2)
-            den = ((s_list[0] / n_list[0]) ** 2 / (n_list[0] - 1) + 
-                   (s_list[1] / n_list[1]) ** 2 / (n_list[1] - 1))
+            num = (s_list[0] / n_list[0] + s_list[1] / n_list[1]) ** 2
+            den = (s_list[0] / n_list[0]) ** 2 / (n_list[0] - 1) + (
+                s_list[1] / n_list[1]
+            ) ** 2 / (n_list[1] - 1)
             return num / den
+
 
 @backend_factory.register(Chi2Test, SparkDataset)
 class StatsChi2Test(StatsHypothesisTesting):
@@ -221,16 +224,17 @@ class StatsChi2Test(StatsHypothesisTesting):
     are p-value, statistic, pass — making StatsChi2Test a drop-in replacement for GroupTTest
     in pipelines where raw data transfer is expensive (e.g. Spark backend).
     """
+
     REQUIRED_STATS: ClassVar[list[str]] = ["value_counts"]
 
     def __init__(
-            self,
-            grouping_role: ABCRole | None = None,
-            compare_by: Literal["groups", "matched_pairs"] = "groups",
-            target_roles: ABCRole | None = None,
-            baseline_role: ABCRole | None = None,
-            reliability: float = 0.05,
-            key: Any = "",
+        self,
+        grouping_role: ABCRole | None = None,
+        compare_by: Literal["groups", "matched_pairs"] = "groups",
+        target_roles: ABCRole | None = None,
+        baseline_role: ABCRole | None = None,
+        reliability: float = 0.05,
+        key: Any = "",
     ):
         """
         Initialize StatsChi2Test with roles and reliability.
@@ -248,9 +252,10 @@ class StatsChi2Test(StatsHypothesisTesting):
             target_roles=target_roles,
             baseline_role=baseline_role,
             key=key,
-            reliability=reliability
+            reliability=reliability,
         )
         self.reliability = reliability
+
     @classmethod
     def _compute_stats(
         cls,
@@ -342,16 +347,17 @@ class StatsChi2Test(StatsHypothesisTesting):
         try:
             statistics = chi2_contingency(contingency_table, **kwargs)
             result = {
-                    "p-value": float(statistics[1]),
-                    "statistic": float(statistics[0]),
-                    "pass": statistics[1] < reliability,
-                }
+                "p-value": float(statistics[1]),
+                "statistic": float(statistics[0]),
+                "pass": statistics[1] < reliability,
+            }
         except ValueError:
             # For example, when all values in the table are identical
             # No difference detected → pass=False
             return {"p-value": 1.0, "statistic": 0.0, "pass": False}
 
         return result
+
 
 @backend_factory.register(ZTest, SparkDataset)
 class StatsZTest(StatsHypothesisTesting):
@@ -361,16 +367,17 @@ class StatsZTest(StatsHypothesisTesting):
 
     For continuous metrics (revenue, spends) use AggTTest instead.
     """
+
     REQUIRED_STATS: ClassVar[list[str]] = ["count", "sum"]
 
     def __init__(
-            self,
-            grouping_role: ABCRole | None = None,
-            compare_by: Literal["groups", "matched_pairs"] = "groups",
-            target_roles: ABCRole | None = None,
-            baseline_role: ABCRole | None = None,
-            reliability: float = 0.05,
-            key: Any = "",
+        self,
+        grouping_role: ABCRole | None = None,
+        compare_by: Literal["groups", "matched_pairs"] = "groups",
+        target_roles: ABCRole | None = None,
+        baseline_role: ABCRole | None = None,
+        reliability: float = 0.05,
+        key: Any = "",
     ):
         """
         Initialize Chi2Test (Z-test for proportions) with roles and reliability.
@@ -382,13 +389,13 @@ class StatsZTest(StatsHypothesisTesting):
             key: Optional identifier for the test instance.
         """
         super().__init__(
-            stats=self.REQUIRED_STATS, 
+            stats=self.REQUIRED_STATS,
             compare_by=compare_by,
             grouping_role=grouping_role,
             target_roles=target_roles,
             baseline_role=baseline_role,
-            key=key, 
-            reliability=reliability
+            key=key,
+            reliability=reliability,
         )
 
     @property
@@ -402,11 +409,13 @@ class StatsZTest(StatsHypothesisTesting):
         return NUMBER_TYPES_LIST
 
     @classmethod
-    def _inner_function(cls,
-                        baseline_stats: dict[str, Any],
-                        compared_stats: dict[str, Any],
-                        reliability: float = 0.05,
-                        **kwargs) -> dict[str, Any]:
+    def _inner_function(
+        cls,
+        baseline_stats: dict[str, Any],
+        compared_stats: dict[str, Any],
+        reliability: float = 0.05,
+        **kwargs,
+    ) -> dict[str, Any]:
         """
         Perform Z-test for two proportions using aggregated counts and sums.
 
@@ -434,14 +443,13 @@ class StatsZTest(StatsHypothesisTesting):
         p2 = s2 / n2
         p_pool = (s1 + s2) / (n1 + n2)
 
-
         if p_pool < 0 or p_pool > 1:
             return {"p-value": None, "statistic": None, "pass": None}
 
         if p_pool == 0 or p_pool == 1:
             return {"p-value": None, "statistic": None, "pass": None}
 
-        variance = p_pool * (1 - p_pool) * (1/n1 + 1/n2)
+        variance = p_pool * (1 - p_pool) * (1 / n1 + 1 / n2)
         se = math.sqrt(max(0, variance))
 
         if se == 0:
@@ -455,6 +463,7 @@ class StatsZTest(StatsHypothesisTesting):
             "statistic": [float(z_stat)],
             "pass": [p_value < reliability],
         }
+
 
 @backend_factory.register(KSTest, SparkDataset)
 class StatsKSTest(StatsHypothesisTesting):
@@ -521,7 +530,7 @@ class StatsKSTest(StatsHypothesisTesting):
             "Do not call _compute_stats directly."
         )
 
-    def execute(self, data) -> "ExperimentData":
+    def execute(self, data) -> ExperimentData:
         """Main entry point. Routes to Spark-optimized or Pandas-fallback path.
 
         For Spark, delegates to ``_execute_spark``. For Pandas, creates a
@@ -618,7 +627,7 @@ class StatsKSTest(StatsHypothesisTesting):
         """
         from ..extensions.stats_hypothesis_testing import StatsKSTestExtension
 
-        subset = data.ds[[group_col] + target_cols]
+        subset = data.ds[[group_col, *target_cols]]
 
         ext = StatsKSTestExtension(n_bins=self.n_bins, reliability=self.reliability)
         all_group_stats = ext.calc(
@@ -648,9 +657,7 @@ class StatsKSTest(StatsHypothesisTesting):
                 result = self._inner_function(
                     b_stats, c_stats, reliability=self.reliability
                 )
-                col_results.append(
-                    DatasetAdapter.to_dataset(result, StatisticRole())
-                )
+                col_results.append(DatasetAdapter.to_dataset(result, StatisticRole()))
             if col_results:
                 result_dataset = col_results[0].append(col_results[1:])
                 result_dataset.index = [str(g) for g in group_names[1:]]
@@ -822,7 +829,7 @@ class StatsUTest(StatsHypothesisTesting):
             "Do not call _compute_stats directly."
         )
 
-    def execute(self, data: "ExperimentData") -> "ExperimentData":
+    def execute(self, data: ExperimentData) -> ExperimentData:
         """Main entry point. Routes to Spark-optimized or Pandas-fallback.
 
         For Spark, delegates to ``_execute_spark``. For Pandas, creates
@@ -880,8 +887,8 @@ class StatsUTest(StatsHypothesisTesting):
 
     @timeit(level="SPARK", prefix="U_SPARK")
     def _execute_spark(
-        self, data: "ExperimentData", group_col: str, target_cols: list[str]
-    ) -> "ExperimentData":
+        self, data: ExperimentData, group_col: str, target_cols: list[str]
+    ) -> ExperimentData:
         """Execute the Mann-Whitney U test using the Spark-optimized path.
 
         Delegates histogram aggregation to ``StatsUTestExtension``, which
@@ -912,7 +919,7 @@ class StatsUTest(StatsHypothesisTesting):
         """
         from ..extensions.stats_hypothesis_testing import StatsUTestExtension
 
-        subset = data.ds[[group_col] + target_cols]
+        subset = data.ds[[group_col, *target_cols]]
         ext = StatsUTestExtension(n_bins=self.n_bins, reliability=self.reliability)
         all_group_stats = ext.calc(
             data=subset,
@@ -944,9 +951,7 @@ class StatsUTest(StatsHypothesisTesting):
                 result = self._inner_function(
                     b_stats, c_stats, reliability=self.reliability
                 )
-                col_results.append(
-                    DatasetAdapter.to_dataset(result, StatisticRole())
-                )
+                col_results.append(DatasetAdapter.to_dataset(result, StatisticRole()))
 
             if col_results:
                 result_dataset = col_results[0].append(col_results[1:])
@@ -1042,7 +1047,7 @@ class StatsUTest(StatsHypothesisTesting):
         for bucket in all_buckets:
             t = hist1.get(bucket, 0) + hist2.get(bucket, 0)
             if t > 1:
-                tie_sum += t ** 3 - t
+                tie_sum += t**3 - t
 
         # Variance: σ² = (n₁·n₂/12)·[(n₁+n₂+1) - Σ(t³-t)/((n₁+n₂)(n₁+n₂-1))]
         if n_total > 1:

@@ -138,9 +138,11 @@ class PerformanceTester:
             else:
                 experiment_params = {}
             data_params = params
-            yield all_params, self.dataProfiler.create_dataset(
-                data_params
-            ), self.experimentProfiler.get_experiment(experiment_params)
+            yield (
+                all_params,
+                self.dataProfiler.create_dataset(data_params),
+                self.experimentProfiler.get_experiment(experiment_params),
+            )
 
     def get_number_params(self):
         return len(self.iterable_params)
@@ -278,7 +280,7 @@ def performance_test_plot(
         axs[counter, 2].set_ylabel("MB")
     fig.suptitle(title)
     plt.subplots_adjust(hspace=0.5)
-    plt.savefig(f"{output_path[:output_path.rfind('.')]}.png")
+    plt.savefig(f"{output_path[: output_path.rfind('.')]}.png")
 
 
 def executor(config: dict, output_path: str):

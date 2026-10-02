@@ -27,20 +27,22 @@ class SMD(GroupOperator):
         test_data = cls._check_test_data(test_data=test_data)
         return (data.mean() + test_data.mean()) / data.std()
 
+
 class MatchingMetrics(GroupOperator):
     """
-    Calculator for estimating treatment effects (ATT, ATC, ATE) and their 
+    Calculator for estimating treatment effects (ATT, ATC, ATE) and their
     statistical significance after matching.
 
-    This class computes the Individual Treatment Effect on the Treated (ITT) 
-    and Control (ITC), applies optional bias correction, and calculates the 
-    final Average Treatment Effects along with their standard errors, p-values, 
-    and confidence intervals. It also handles the calculation of scaled counts 
+    This class computes the Individual Treatment Effect on the Treated (ITT)
+    and Control (ITC), applies optional bias correction, and calculates the
+    final Average Treatment Effects along with their standard errors, p-values,
+    and confidence intervals. It also handles the calculation of scaled counts
     (weights) to account for multiple matches or specific matching strategies.
 
     Inherits from:
         GroupOperator: The base class for group-based operators in the HypEx library.
     """
+
     def __init__(
         self,
         grouping_role: ABCRole | None = None,
@@ -53,17 +55,17 @@ class MatchingMetrics(GroupOperator):
         Initialize the matching metrics calculator.
 
         Args:
-            grouping_role (ABCRole | None, optional): The role defining the grouping 
+            grouping_role (ABCRole | None, optional): The role defining the grouping
                 column. Defaults to None.
-            target_roles (ABCRole | list[ABCRole] | None, optional): The role(s) 
+            target_roles (ABCRole | list[ABCRole] | None, optional): The role(s)
                 defining the target column(s). Defaults to None.
-            metric (Literal["auto", "atc", "att", "ate"] | None, optional): The type 
-                of treatment effect to estimate. "atc" = average treatment effect on 
-                controls, "att" = average treatment effect on treated, "ate" = average 
+            metric (Literal["auto", "atc", "att", "ate"] | None, optional): The type
+                of treatment effect to estimate. "atc" = average treatment effect on
+                controls, "att" = average treatment effect on treated, "ate" = average
                 treatment effect, "auto" = calculates all. Defaults to "auto".
-            n_neighbors (int, optional): The number of neighbors used in the matching 
+            n_neighbors (int, optional): The number of neighbors used in the matching
                 process, used for scaling counts. Defaults to 1.
-            key (Any, optional): Optional identifier for the operator instance. 
+            key (Any, optional): Optional identifier for the operator instance.
                 Defaults to "".
         """
         self.metric = metric or "auto"
@@ -101,15 +103,15 @@ class MatchingMetrics(GroupOperator):
         """
         Main execution method for calculating matching metrics.
 
-        Orchestrates the calculation process: retrieves fields, prepares targets 
-        if necessary (e.g., when a second target is missing), calculates the metrics 
+        Orchestrates the calculation process: retrieves fields, prepares targets
+        if necessary (e.g., when a second target is missing), calculates the metrics
         using the `calc` method, and stores the results in the `ExperimentData` object.
 
         Args:
             data (ExperimentData): The experiment data containing the matched dataset.
 
         Returns:
-            ExperimentData: The updated ExperimentData object with the calculated 
+            ExperimentData: The updated ExperimentData object with the calculated
             matching metrics stored in the `variables` space.
         """
         _, target_fields = self._get_fields(data=data)
@@ -122,9 +124,12 @@ class MatchingMetrics(GroupOperator):
             return data
 
         cls = backend_factory.resolve_backend(MatchingMetricsExtension, data.ds)
-        compare_result = cls(self.grouping_role, self.target_roles, self.metric, self.n_neighbors).calc(data.ds)
+        compare_result = cls(
+            self.grouping_role, self.target_roles, self.metric, self.n_neighbors
+        ).calc(data.ds)
 
         return self._set_value(data, compare_result)
+
 
 class Bias(GroupOperator):
     """
@@ -193,6 +198,7 @@ class Bias(GroupOperator):
         LstsqExtension: The backend-agnostic least-squares solver used
             to fit the regression coefficients.
     """
+
     def __init__(
         self,
         grouping_role: ABCRole | None = None,
@@ -215,7 +221,7 @@ class Bias(GroupOperator):
         )
 
     def _set_value(
-            self, data: ExperimentData, value: Dataset, key=None
+        self, data: ExperimentData, value: Dataset, key=None
     ) -> ExperimentData:
         """
         Store the calculated bias values into the ExperimentData object.
@@ -305,7 +311,9 @@ class Bias(GroupOperator):
         ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
             return data
         cls = backend_factory.resolve_backend(BiasExtension, data.ds)
-        compare_result: Dataset = cls(self.grouping_role, self.target_roles).calc(data.ds)
+        compare_result: Dataset = cls(self.grouping_role, self.target_roles).calc(
+            data.ds
+        )
         compare_result.roles["bias"] = AdditionalStatisticRole()
         compare_result.roles["matched_target"] = AdditionalTargetRole()
 

@@ -22,7 +22,7 @@ class GroupDifference(StatsComparator):
 
     Computes absolute and percentage differences between baseline and compared
     group means, along with the 95% Confidence Interval (CI) for the absolute
-    difference. Uses pre-aggregated statistics (mean, variance, count) to 
+    difference. Uses pre-aggregated statistics (mean, variance, count) to
     leverage vectorized Spark aggregation.
 
     Attributes:
@@ -83,25 +83,25 @@ class GroupDifference(StatsComparator):
         **kwargs,
     ) -> dict[str, Any]:
         """Computes mean difference metrics and 95% Confidence Interval.
-        
+
         Calculates the absolute difference, percentage change, and the 95% CI
         bounds using the standard error of the difference between two independent
         means.
-        
+
         Args:
             baseline_stats: Aggregated statistics dict for the baseline group.
                 Must contain "mean", "var", and "count".
             compared_stats: Aggregated statistics dict for the compared group.
                 Must contain "mean", "var", and "count".
             **kwargs: Additional keyword arguments (unused).
-            
+
         Returns:
             Dictionary with keys: "control mean", "test mean", "difference",
             "difference %", "ci lower", "ci upper".
         """
         control_mean = baseline_stats.get("mean")
         test_mean = compared_stats.get("mean")
-        
+
         if control_mean is None or test_mean is None:
             return {
                 "control mean": control_mean,
@@ -120,7 +120,7 @@ class GroupDifference(StatsComparator):
         # --- Confidence Interval Calculation ---
         ci_lower = None
         ci_upper = None
-        
+
         control_var = baseline_stats.get("var")
         test_var = compared_stats.get("var")
         control_n = baseline_stats.get("count")
@@ -128,9 +128,12 @@ class GroupDifference(StatsComparator):
 
         # Check if we have enough data to calculate Standard Error
         if (
-            control_var is not None and test_var is not None
-            and control_n is not None and test_n is not None
-            and control_n > 1 and test_n > 1
+            control_var is not None
+            and test_var is not None
+            and control_n is not None
+            and test_n is not None
+            and control_n > 1
+            and test_n > 1
         ):
             # Standard Error (SE) of the difference between two independent means
             se = math.sqrt((control_var / control_n) + (test_var / test_n))
@@ -265,22 +268,29 @@ class PSI(Comparator):
         psi = [(y - x) * np.log(y / x) for x, y in zip(data_psi, test_data_psi)]
         return {"PSI": sum(psi)}
 
+
 class StatTestMasterAbstract(BaseComparator):
     """
     Master-abstract class for stat-tests
     """
+
     def __init__(
-            self,
-            grouping_role: ABCRole | None = None,
-            target_roles: ABCRole | None = None,
-            baseline_role: ABCRole | None = None,
-            reliability: float = 0.05,
-            compare_by: Literal[
-                "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
-            ] = "groups",
-            key: Any = "",
+        self,
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | None = None,
+        baseline_role: ABCRole | None = None,
+        reliability: float = 0.05,
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+        ] = "groups",
+        key: Any = "",
     ):
-        super().__init__(grouping_role=grouping_role, target_roles=target_roles, baseline_role=baseline_role, key=key)
+        super().__init__(
+            grouping_role=grouping_role,
+            target_roles=target_roles,
+            baseline_role=baseline_role,
+            key=key,
+        )
         self.reliability = reliability
         self.compare_by = compare_by
 
@@ -295,26 +305,31 @@ class StatTestMasterAbstract(BaseComparator):
     def experiment_kwargs(self):
         return self._experiment_kwargs
 
+
 # Master-backend classes for stat-tests
 class TTest(StatTestMasterAbstract):
     """
     T-test master-backend class.
     """
 
+
 class Chi2Test(StatTestMasterAbstract):
     """
     Chi-square test master-backend class.
     """
+
 
 class KSTest(StatTestMasterAbstract):
     """
     KS-test master-backend class.
     """
 
+
 class UTest(StatTestMasterAbstract):
     """
     KS-test master-backend class.
     """
+
 
 class ZTest(StatTestMasterAbstract):
     """

@@ -207,7 +207,7 @@ class DatasetBase:
                 roles = self._parse_roles(roles)
             columns = []
             for column, role in roles.items():
-                if role.data_type == str:
+                if role.data_type is str:
                     columns.append(column)
         return columns
 
@@ -452,22 +452,17 @@ class DatasetBase:
 
         return self.__class__(roles=new_roles, data=new_data)
 
-    def set_index(self, 
-                  keys, 
-                  drop=True, 
-                  **kwargs) -> DatasetBase:
+    def set_index(self, keys, drop=True, **kwargs) -> DatasetBase:
         new_data = self._backend_data.set_index(keys=keys, drop=drop, **kwargs)
         new_roles = deepcopy(self.roles)
 
         if drop:
             for col in Adapter.to_list(keys):
                 del new_roles[col]
-        
+
         return self.__class__(roles=new_roles, data=new_data)
 
-    def __setitem__(self,
-                    key: str,
-                    value: Any) -> None:
+    def __setitem__(self, key: str, value: Any) -> None:
         if isinstance(value, DatasetBase):
             value = value.iselect(0).raw_data
         if key not in self.columns and isinstance(key, str):
@@ -492,12 +487,17 @@ class DatasetBase:
                 raise TypeError("Value type does not match the expected data type.")
 
     def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
-        display_limit = n_rows if n_rows <= DatasetConfig.DISPLAY_ROWS * 2 else DatasetConfig.DISPLAY_ROWS
+        display_limit = (
+            n_rows
+            if n_rows <= DatasetConfig.DISPLAY_ROWS * 2
+            else DatasetConfig.DISPLAY_ROWS
+        )
         head = self._backend_data._display_head_tail(
             rows_display_limit=display_limit,
             cols_display_limit=DatasetConfig.DISPLAY_COLS,
             n_cols=n_cols,
-            n_rows=n_rows)
+            n_rows=n_rows,
+        )
 
         if n_rows > DatasetConfig.DISPLAY_ROWS * 2:
             _tmp_tail = self._backend_data._display_head_tail(
@@ -505,7 +505,8 @@ class DatasetBase:
                 cols_display_limit=DatasetConfig.DISPLAY_COLS,
                 n_cols=n_cols,
                 n_rows=n_rows,
-                tail=True)
+                tail=True,
+            )
 
             tail = pd.concat(
                 [
@@ -613,24 +614,18 @@ class DatasetBase:
         func = getattr(self.backend_data, func_name)
         result_raw = func(other_raw)
 
-        result_raw = (
-            result_raw.data
-            if hasattr(result_raw, 'data')
-            else result_raw
-        )
+        result_raw = result_raw.data if hasattr(result_raw, "data") else result_raw
 
-        if hasattr(result_raw, 'to_frame') and not hasattr(result_raw, 'columns'):
+        if hasattr(result_raw, "to_frame") and not hasattr(result_raw, "columns"):
             col_name = (
                 result_raw.name
                 if result_raw.name is not None
-                else (self_raw.columns[0] if hasattr(self_raw, 'columns') else 'result')
+                else (self_raw.columns[0] if hasattr(self_raw, "columns") else "result")
             )
             result_raw = result_raw.to_frame(name=col_name)
 
         actual_columns = (
-            list(result_raw.columns)
-            if hasattr(result_raw, 'columns')
-            else []
+            list(result_raw.columns) if hasattr(result_raw, "columns") else []
         )
         new_roles = {}
         for col in actual_columns:
@@ -746,23 +741,25 @@ class DatasetBase:
 
     def __rpow__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__rpow__")
-    
+
     def __deepcopy__(self, memo):
         """deepcopy dataset"""
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
         for k, v in self.__dict__.items():
-            if k.startswith('_abc_'):
+            if k.startswith("_abc_"):
                 continue
             setattr(result, k, deepcopy(v, memo))
 
         return result
 
-    def search_columns(self,
-                       roles: ABCRole | Iterable[ABCRole],
-                       tmp_role: bool =False,
-                       search_types: list[type] | None = None) -> list[str]:
+    def search_columns(
+        self,
+        roles: ABCRole | Iterable[ABCRole],
+        tmp_role: bool = False,
+        search_types: list[type] | None = None,
+    ) -> list[str]:
         roles = roles if isinstance(roles, Iterable) else [roles]
         roles_for_search = self._tmp_roles if tmp_role else self.roles
         return [
@@ -1028,13 +1025,13 @@ class DatasetBase:
     def groupby(self, by: str | Iterable[str], **kwargs) -> GroupedDataset:
         if isinstance(by, str):
             by_list = [by]
-        elif hasattr(by, '__iter__'):
+        elif hasattr(by, "__iter__"):
             by_list = list(by)
         else:
             by_list = [by]
-            
+
         by_arg = by_list[0] if len(by_list) == 1 else by_list
-        
+
         return GroupedDataset(
             backend_groupby=self._backend_data.groupby(by=by_arg, **kwargs),
             dataset_class=self.__class__,
@@ -1155,10 +1152,10 @@ class DatasetBase:
         axis: Literal["index", "rows", "columns"] | int = 0,
     ) -> Self:
         new_data = self._backend_data.dropna(how=how, subset=subset, axis=axis)
-        
+
         if hasattr(new_data, "data"):
             new_data = new_data.data
-            
+
         new_roles = (
             self.roles
             if axis == 0
@@ -1323,7 +1320,7 @@ class DatasetBase:
         return self.__class__(
             roles={name: InfoRole()},
             data=result_df,
-            session=self.session if hasattr(self, 'session') else None
+            session=self.session if hasattr(self, "session") else None,
         )
 
     def cov(self) -> DatasetBase:
@@ -1425,7 +1422,4 @@ class DatasetBase:
         new_roles = deepcopy(self.roles)
         new_roles[column] = type(new_roles[column])()
 
-        return self.__class__(
-            new_roles,
-            data=result
-        )
+        return self.__class__(new_roles, data=result)

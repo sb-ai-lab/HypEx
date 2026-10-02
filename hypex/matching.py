@@ -187,7 +187,7 @@ class Matching(ExperimentShell):
                 dtype={int: float},
                 roles=[FeatureRole(), TargetRole()],
             ),
-            *executors
+            *executors,
         ]
         executors = executors if not encode_categories else [DummyEncoder(), *executors]
         return (

@@ -17,7 +17,7 @@ from .executor.executor import Executor
 from .experiments.base import Experiment, OnRoleExperiment
 from .transformers import CUPEDTransformer
 from .transformers.float32_caster import Float32Caster
-from .ui.ab import ABOutput, CupacOutput, CupedOutput
+from .ui.ab import ABOutput
 from .ui.base import ExperimentShell
 from .utils import ABNTestMethodsEnum, ABTestTypesEnum
 
@@ -124,14 +124,17 @@ class ABTest(ExperimentShell):
         ]
         insert_pos = 0
         if cuped_features:
-            executors.insert(insert_pos, CUPEDTransformer(cuped_features=cuped_features))
+            executors.insert(
+                insert_pos, CUPEDTransformer(cuped_features=cuped_features)
+            )
             insert_pos += 1
         if enable_cupac:
             from .ml import CUPACExecutor
+
             executors.insert(insert_pos, CUPACExecutor(cupac_models=cupac_models))
             insert_pos += 1
         if float32:
-            executors.insert(insert_pos, Float32Caster()) 
+            executors.insert(insert_pos, Float32Caster())
 
         return Experiment(executors=executors)
 
@@ -142,9 +145,17 @@ class ABTest(ExperimentShell):
         ) = None,
         multitest_method: (
             Literal[
-                "bonferroni", "sidak", "holm-sidak", "holm",
-                "simes-hochberg", "hommel", "fdr_bh", "fdr_by",
-                "fdr_tsbh", "fdr_tsbhy", "quantile",
+                "bonferroni",
+                "sidak",
+                "holm-sidak",
+                "holm",
+                "simes-hochberg",
+                "hommel",
+                "fdr_bh",
+                "fdr_by",
+                "fdr_tsbh",
+                "fdr_tsbhy",
+                "quantile",
             ]
             | None
         ) = "holm",

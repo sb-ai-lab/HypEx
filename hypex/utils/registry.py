@@ -243,10 +243,7 @@ class BackendFactory:
             and total registrations.
         """
         total = sum(len(v) for v in self._registry.values())
-        return (
-            f"<BackendFactory bases={len(self._registry)} "
-            f"registrations={total}>"
-        )
+        return f"<BackendFactory bases={len(self._registry)} registrations={total}>"
 
 
 # Singleton — single instance shared across the entire process.

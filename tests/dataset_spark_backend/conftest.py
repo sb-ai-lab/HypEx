@@ -1,3 +1,6 @@
+import os
+import sys
+
 import pytest
 
 pytest.importorskip("pyspark")
@@ -5,6 +8,12 @@ pytest.importorskip("pyspark")
 
 @pytest.fixture(scope="session")
 def spark_session():
+    # Spark launches Python workers by name. Without this they pick up whatever
+    # `python` is first on PATH -- not the interpreter (and virtualenv) running
+    # the tests -- and crash on the missing pandas/pyarrow, most visibly on
+    # Windows CI.
+    os.environ["PYSPARK_PYTHON"] = sys.executable
+    os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
     from pyspark.sql import SparkSession
 
     spark = (

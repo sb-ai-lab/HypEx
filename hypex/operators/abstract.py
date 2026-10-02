@@ -8,8 +8,8 @@ from ..dataset import (
     ABCRole,
     AdditionalTargetRole,
     Dataset,
-    GroupedDataset,
     ExperimentData,
+    GroupedDataset,
     GroupingRole,
     TargetRole,
 )

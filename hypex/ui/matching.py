@@ -4,8 +4,6 @@ from __future__ import annotations
 import warnings
 from typing import Any
 
-import pandas as pd
-
 from ..analyzers.matching import MatchingAnalyzer
 from ..dataset import (
     AdditionalMatchingRole,
@@ -110,13 +108,17 @@ class MatchingOutput(Output):
             # ── Build the matched subset for this neighbor position ─────
             if backend == BackendsEnum.spark:
                 matched_data = self._match_spark(
-                    experiment_data, t_indexes, col_name,
+                    experiment_data,
+                    t_indexes,
+                    col_name,
                     ds_reset=ds_reset,
                     idx_col=idx_col,
                 )
             else:
                 matched_data = self._match_pandas(
-                    experiment_data, t_indexes, col_name,
+                    experiment_data,
+                    t_indexes,
+                    col_name,
                 )
 
             # ── Rename matched columns with a position suffix ───────────
@@ -170,7 +172,6 @@ class MatchingOutput(Output):
             if backend == BackendsEnum.spark:
                 self.full_data.checkpoint(eager=True)
 
-
     def _match_spark(
         self,
         experiment_data: ExperimentData,
@@ -202,15 +203,15 @@ class MatchingOutput(Output):
 
         # 2. Expose the row index as a column so it survives the join.
         filtered_reset = filtered.reset_index(drop=False)
-        pos_col = next(
-            c for c in filtered_reset.columns if c not in filtered.columns
-        )
+        pos_col = next(c for c in filtered_reset.columns if c not in filtered.columns)
 
         # 3. Rename helper columns for the join.
-        mapping_ds = filtered_reset.rename({
-            pos_col: "_hypex_pos",
-            col_name: "_hypex_lookup",
-        })
+        mapping_ds = filtered_reset.rename(
+            {
+                pos_col: "_hypex_pos",
+                col_name: "_hypex_lookup",
+            }
+        )
 
         # 4. Use pre-computed ds_reset or fall back to computing it.
         if ds_reset is None:
@@ -261,9 +262,7 @@ class MatchingOutput(Output):
         # ── FIX: use get_values(column=...) which returns a flat list of
         #    scalars via PandasDataset.get_values(), instead of
         #    Adapter.to_list(Dataset.data) which wraps a DataFrame into [df].
-        index_values: list = Adapter.to_list(
-            t_indexes.get_values(column=col_name)
-        )
+        index_values: list = Adapter.to_list(t_indexes.get_values(column=col_name))
         positional_indices: list = Adapter.to_list(t_indexes.raw_data.index)
 
         # Filter out unmatched rows (value == -1).
@@ -288,7 +287,7 @@ class MatchingOutput(Output):
         matched_data.index = valid_positions
 
         return matched_data
-    
+
     @staticmethod
     def _reformat_summary(summary: dict[str, Any]) -> dict[str, Any]:
         """Reformat a flat summary dictionary with composite keys into a nested structure.
@@ -317,7 +316,9 @@ class MatchingOutput(Output):
         return reformatted_summary
 
     @staticmethod
-    def _collect_grouped_indexes(experiment_data: ExperimentData, group: dict) -> Dataset:
+    def _collect_grouped_indexes(
+        experiment_data: ExperimentData, group: dict
+    ) -> Dataset:
         """Collect matched indexes for grouped matching results.
 
         Args:
@@ -381,7 +382,10 @@ class MatchingOutput(Output):
             )
         indexes = additional[available]
         return indexes.rename(
-            {col: f"indexes_{col.split(ID_SPLIT_SYMBOL)[-1]}" for col in indexes.columns}
+            {
+                col: f"indexes_{col.split(ID_SPLIT_SYMBOL)[-1]}"
+                for col in indexes.columns
+            }
         )
 
     def _extract_driver_indexes(
