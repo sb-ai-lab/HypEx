@@ -5,7 +5,7 @@ import copy
 import pandas as pd  # type: ignore
 import pyspark.pandas as ps
 
-from ..dataset import Dataset, DatasetAdapter, ABCRole
+from ..dataset import ABCRole, Dataset, DatasetAdapter
 from ..dataset.backends import PandasDataset, SparkDataset
 from ..utils import Adapter
 from ..utils.registry import backend_factory
