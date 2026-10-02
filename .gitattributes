@@ -1,0 +1,16 @@
+# Normalise line endings so a Windows checkout cannot push CRLF back into the
+# repository. The CI matrix runs on Linux, macOS and Windows; mixed endings
+# make diffs and cross-platform test runs unreliable.
+* text=auto eol=lf
+
+# Binary / generated content must never be touched.
+*.png binary
+*.jpg binary
+*.pickle binary
+*.csv text eol=lf
+
+# Notebooks are JSON: keep them LF, and keep them out of noisy diffs.
+*.ipynb text eol=lf
+
+# Poetry lockfile is generated; mark it so reviews can collapse it.
+poetry.lock linguist-generated=true merge=binary
