@@ -630,6 +630,18 @@ six = "*"
 widget = ["ipython", "ipywidgets (>=7.0,<9.0)", "traitlets"]
 
 [[package]]
+name = "causalinference"
+version = "0.1.3.post1"
+description = "Causal Inference in Python"
+optional = false
+python-versions = "*"
+groups = ["dev"]
+files = [
+    {file = "causalinference-0.1.3.post1-py3-none-any.whl", hash = "sha256:4ae4251405d60d207051a228472be7e99490c92ebcb7d56688b3cf97ca64d4f1"},
+    {file = "causalinference-0.1.3.post1.tar.gz", hash = "sha256:3db64d9a3cbd506f9f5a59d177fc56f7f0ee14f3c4a51c99dae582534eff770a"},
+]
+
+[[package]]
 name = "certifi"
 version = "2026.7.22"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -4781,7 +4793,7 @@ description = "Python plotting package"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "python_version >= \"3.9\" and python_version < \"3.13\""
+markers = "python_version >= \"3.9\" and python_version <= \"3.12\""
 files = [
     {file = "matplotlib-3.9.0-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:2bcee1dffaf60fe7656183ac2190bd630842ff87b3153afb3e384d966b57fe56"},
     {file = "matplotlib-3.9.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:3f988bafb0fa39d1074ddd5bacd958c853e11def40800c5824556eb630f94d3b"},
@@ -5593,7 +5605,7 @@ description = "Fundamental package for array computing in Python"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "python_version >= \"3.9\" and python_version < \"3.13\""
+markers = "python_version >= \"3.9\" and python_version <= \"3.12\""
 files = [
     {file = "numpy-1.26.4-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:9ff0f4f29c51e2803569d7a51c2304de5554655a60c5d776e35b4a41413830d0"},
     {file = "numpy-1.26.4-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:2e4ee3380d6de9c9ec04745830fd9e2eccb3e6cf790d39d7b98ffd19b0dd754a"},
@@ -5706,7 +5718,7 @@ description = "A decorator to automatically detect mismatch when overriding a me
 optional = false
 python-versions = ">=3.6"
 groups = ["dev"]
-markers = "python_version <= \"3.11\""
+markers = "python_version < \"3.12\""
 files = [
     {file = "overrides-7.7.0-py3-none-any.whl", hash = "sha256:c7ed9d062f78b8e4c1a7b70bd8796b35ead4d9f510227ef9c5dc7626c60d7e49"},
     {file = "overrides-7.7.0.tar.gz", hash = "sha256:55158fa3d93b98cc75299b1e67078ad9003ca27945c76162c1c0766d6f91820a"},
@@ -8455,7 +8467,7 @@ description = "Fundamental algorithms for scientific computing in Python"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "python_version >= \"3.9\" and python_version < \"3.13\""
+markers = "python_version >= \"3.9\" and python_version <= \"3.12\""
 files = [
     {file = "scipy-1.13.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:20335853b85e9a49ff7572ab453794298bcf0354d8068c5f6775a0eabf350aca"},
     {file = "scipy-1.13.1-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:d605e9c23906d1994f55ace80e0125c587f96c020037ea6aa98d01b4bd2e222f"},
@@ -9878,4 +9890,4 @@ lgbm = ["lightgbm"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.8, <3.14"
-content-hash = "c9e6c39a5ce4ea4daa20f7239c7d1857c130aab3e4039a3afaa8fabf8554dd41"
+content-hash = "a0e5584d80adccdda8f4dd34a036605aa9716e11942991faffc42121a6cb12d3"
