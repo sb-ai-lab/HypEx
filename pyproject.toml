@@ -137,3 +137,8 @@ exclude = "^(docs|examples|dist)/"
 ignore_missing_imports = true
 warn_unused_ignores = true
 warn_redundant_casts = true
+
+[tool.pytest.ini_options]
+# Bare `pytest` used to import everything it could find, including
+# examples/experiments scripts that are not tests and break collection.
+testpaths = ["tests"]
