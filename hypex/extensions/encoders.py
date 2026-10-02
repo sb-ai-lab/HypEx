@@ -25,6 +25,7 @@ class PandasDummyEncoderExtension(DummyEncoderExtension):
     Slave-backend class on pandas for DummyEncoder.
     """
 
+    @staticmethod
     def calc(data: Dataset, target_cols: str | list[str] | None = None, **kwargs):
         target_cols = Adapter.to_list(target_cols)
         dummies_df = pd.get_dummies(
@@ -48,6 +49,7 @@ class SparkDummyEncoderExtension(DummyEncoderExtension):
     Slave-backend class on pyspark for DummyEncoder.
     """
 
+    @staticmethod
     def calc(data: Dataset, target_cols: str | list[str] | None = None, **kwargs):
         target_cols = Adapter.to_list(target_cols)
         dummies_df = ps.get_dummies(
