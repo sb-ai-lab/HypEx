@@ -89,7 +89,7 @@ class MatchingReporter(DatasetReporter):
         """Extract matched neighbor indices from additional fields.
 
         For the Pandas backend, values are collected to the driver and
-        joined into a splitter-delimited string (legacy resume format).
+        joined into a splitter-delimited string (legacy summary format).
 
         For the Spark backend, returns an empty dict: matched indices
         already exist as lazy ``AdditionalMatchingRole`` columns of
