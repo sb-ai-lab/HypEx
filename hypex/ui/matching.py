@@ -49,9 +49,9 @@ class MatchingOutput(Output):
             searching_class: The analyzer class used to search for results.
             extract_full_data: Whether to build the full matched dataset
                 via iterative merges. Set to ``False`` to skip the
-                expensive merge + checkpoint loop. Defaults to ``True``.
+                expensive merge + checkpoint loop. Defaults to ``False``.
             compute_indexes: Whether to extract matched indexes.
-                Set to ``False`` to skip index collection. Defaults to ``True``.
+                Set to ``False`` to skip index collection. Defaults to ``False``.
         """
         super().__init__(
             summary_reporter=MatchingDictReporter(searching_class),
