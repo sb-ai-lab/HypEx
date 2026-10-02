@@ -386,6 +386,8 @@ class TestDictReporter(DictReporter, ABC):
                         "test mean",
                         "difference",
                         "difference %",
+                        "ci lower",
+                        "ci upper",
                     ):
                         if k in metrics:
                             row[k] = metrics.get(k)
