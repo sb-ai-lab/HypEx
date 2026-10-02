@@ -10,9 +10,11 @@ from ..comparators import (
     GroupChi2Test,
     GroupKSTest,
     GroupTTest,
+    GroupUTest,
     StatsChi2Test,
     StatsKSTest,
     StatsTTest,
+    StatsUTest,
     StatsZTest,
 )
 from ..dataset import (
@@ -22,7 +24,7 @@ from ..dataset import (
     SmallDataset,
     StatisticRole,
     StratificationRole,
-    TargetRole
+    TargetRole,
 )
 from ..executor import Executor
 from ..experiments import IfParamsExperiment, ParamsExperiment
@@ -90,20 +92,22 @@ class OneAAStatAnalyzer(Executor):
         GroupTTest,
         GroupKSTest,
         GroupChi2Test,
+        GroupUTest,
         StatsTTest,
         StatsChi2Test,
         StatsZTest,
-        StatsKSTest]
-    )
+        StatsKSTest,
+        StatsUTest,
+    ])
 
     #: (preferred_class, fallback_class, weight) for composite score computation.
     #: Preferred = Spark-backed (Stats*), fallback = Pandas-backed (Group*).
     _SCORE_RULES: ClassVar[tuple[tuple[str, str, int], ...]] = tuple([
-            ("StatsTTest", "GroupTTest", 1),
-            ("StatsKSTest", "GroupKSTest", 2),
-            ("StatsChi2Test", "GroupChi2Test", 2),
-        ]
-    )
+        ("StatsTTest", "GroupTTest", 1),
+        ("StatsKSTest", "GroupKSTest", 2),
+        ("StatsChi2Test", "GroupChi2Test", 2),
+        ("StatsUTest", "GroupUTest", 1),
+    ])
 
     #: Weights for the final best-split scoring formula.
     PVALUE_WEIGHT: float = 2 / 3
