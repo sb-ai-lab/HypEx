@@ -72,12 +72,12 @@ tables straight out of `ExperimentData`.
 
 ### The four concrete outputs
 
-| Class | Attributes | Notes |
-|---|---|---|
-| `HomoOutput` | `resume` | The minimal example — one reporter, nothing else. |
-| `AAOutput` | `resume`, `best_split`, `experiments`, `aa_score`, `best_split_statistic` | `experiments` is the full per-iteration table pulled from the `ParamsExperiment` result; `aa_score` / `best_split_statistic` are located by matching the `AAScoreAnalyzer` id suffix (`"aa score"`, `"best split statistics"`). |
-| `ABOutput` | `resume`, `multitest`, `sizes`, `cupac`, plus `variance_reduction_report` | `multitest` falls back to an explanatory **string** when fewer than three groups were present or no correction method was set. `cupac` is a `CupacOutput` holding `variance_reductions` and `feature_importances`. |
-| `MatchingOutput` | `resume`, `full_data`, `indexes`, `quality_results` | **Enhanced**: `full_data` is the wide matched frame (each row joined with its counterpart); `indexes` is just the pair index, convenient for joining back to your own data. **New**: Significantly improved Spark backend support with optimized DAG handling. |
+| Class | Attributes                                                                 | Notes |
+|---|----------------------------------------------------------------------------|---|
+| `HomoOutput` | `resume`                                                                   | The minimal example — one reporter, nothing else. |
+| `AAOutput` | `resume`, `best_split`, `experiments`, `aa_score`, `best_split_statistics` | `experiments` is the full per-iteration table pulled from the `ParamsExperiment` result; `aa_score` / `best_split_statistic` are located by matching the `AAScoreAnalyzer` id suffix (`"aa score"`, `"best split statistics"`). |
+| `ABOutput` | `resume`, `multitest`, `sizes`, `cupac`, plus `variance_reduction_report`  | `multitest` falls back to an explanatory **string** when fewer than three groups were present or no correction method was set. `cupac` is a `CupacOutput` holding `variance_reductions` and `feature_importances`. |
+| `MatchingOutput` | `resume`, `full_data`, `indexes`, `quality_results`                        | **Enhanced**: `full_data` is the wide matched frame (each row joined with its counterpart); `indexes` is just the pair index, convenient for joining back to your own data. **New**: Significantly improved Spark backend support with optimized DAG handling. |
 
 ## Enhanced Features
 

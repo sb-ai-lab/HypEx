@@ -16,7 +16,7 @@ class AAOutput(Output):
     best_split: Dataset
     experiments: Dataset
     aa_score: Dataset
-    best_split_statistic: Dataset
+    best_split_statistics: Dataset
 
     def __init__(self):
         super().__init__(
@@ -24,7 +24,7 @@ class AAOutput(Output):
             additional_reporters={"best_split": AABestSplitReporter()},
         )
 
-    def _extract_best_split_statistic(self, experiment_data: ExperimentData):
+    def _extract_best_split_statistics(self, experiment_data: ExperimentData):
         aa_score_analyser_ids = experiment_data.get_ids(
             AAScoreAnalyzer, ExperimentDataEnum.analysis_tables
         )[AAScoreAnalyzer.__name__][ExperimentDataEnum.analysis_tables.value]
@@ -36,17 +36,17 @@ class AAOutput(Output):
                 break
 
         if best_split_id is None:
-            self.best_split_statistic = SmallDataset.create_empty()
+            self.best_split_statistics = SmallDataset.create_empty()
             return
 
         raw_table = experiment_data.analysis_tables[best_split_id]
         if raw_table.is_empty():
-            self.best_split_statistic = SmallDataset.create_empty()
+            self.best_split_statistics = SmallDataset.create_empty()
             return
 
         records = raw_table.to_records()
         if not records:
-            self.best_split_statistic = SmallDataset.create_empty()
+            self.best_split_statistics = SmallDataset.create_empty()
             return
 
         row = records[0]
@@ -115,7 +115,7 @@ class AAOutput(Output):
                 else:
                     roles[c] = StatisticRole()
 
-        self.best_split_statistic = SmallDataset.from_dict(result_rows, roles=roles)
+        self.best_split_statistics = SmallDataset.from_dict(result_rows, roles=roles)
 
     def _extract_experiments(self, experiment_data: ExperimentData):
         id_ = experiment_data.get_one_id(
@@ -200,24 +200,24 @@ class AAOutput(Output):
         self.aa_score = self._add_dry_score(experiment_data, self.aa_score)
         self.aa_score = self._replace_splitters(self.aa_score, RenameEnum.index)
 
-        self.best_split_statistic = experiment_data.analysis_tables[
+        self.best_split_statistics = experiment_data.analysis_tables[
             get_analyzer_id("best split statistics")
         ]
 
         rename_map = {}
-        for col in self.best_split_statistic.columns:
+        for col in self.best_split_statistics.columns:
             for raw, norm in TEST_NAME_NORMALIZATION.items():
                 if col.startswith(raw + " ") and raw != norm:
                     rename_map[col] = col.replace(raw, norm, 1)
                     break
         if rename_map:
             try:
-                self.best_split_statistic.raw_data = (
-                    self.best_split_statistic.raw_data.rename(columns=rename_map)
+                self.best_split_statistics.raw_data = (
+                    self.best_split_statistics.raw_data.rename(columns=rename_map)
                 )
-                self.best_split_statistic._roles = {
+                self.best_split_statistics._roles = {
                     rename_map.get(c, c): r
-                    for c, r in self.best_split_statistic._roles.items()
+                    for c, r in self.best_split_statistics._roles.items()
                 }
             except Exception:
                 pass
@@ -226,4 +226,4 @@ class AAOutput(Output):
         super().extract(experiment_data)
         self._extract_experiments(experiment_data)
         self._extract_aa_score(experiment_data)
-        self._extract_best_split_statistic(experiment_data)
+        self._extract_best_split_statistics(experiment_data)
