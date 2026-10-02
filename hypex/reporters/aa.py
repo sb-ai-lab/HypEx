@@ -11,6 +11,7 @@ from ..comparators import (
     StatsChi2Test,
     StatsKSTest,
     StatsTTest,
+    StatsUTest,
 )
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..dataset.dataset import SmallDataset
@@ -37,6 +38,7 @@ class AATestReporter(DatasetReporter):
     tests: ClassVar[list[type[BaseComparator]]] = [
         GroupTTest, GroupKSTest, GroupChi2Test,
         StatsTTest, StatsKSTest, StatsChi2Test,
+        StatsUTest,
     ]
 
     def __init__(self, 
