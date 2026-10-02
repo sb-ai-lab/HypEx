@@ -14,11 +14,19 @@ from ..utils import ID_SPLIT_SYMBOL, Adapter, ExperimentDataEnum
 from ..utils.constants import NAME_BORDER_SYMBOL, TEST_NAME_NORMALIZATION
 from ..utils.errors import AbstractMethodError
 
-REPORTABLE_METRICS = frozenset({
-    "pass", "p-value", "difference",
-    "difference %", "control mean", "test mean",
-    "ci lower", "ci upper",
-})
+REPORTABLE_METRICS = frozenset(
+    {
+        "pass",
+        "p-value",
+        "difference",
+        "difference %",
+        "control mean",
+        "test mean",
+        "ci lower",
+        "ci upper",
+    }
+)
+
 
 @dataclass(frozen=True)
 class ResultKey:
@@ -27,12 +35,13 @@ class ResultKey:
     Provides a structured and type-safe alternative to manually parsing
     IDs separated by ``ID_SPLIT_SYMBOL``.
     """
+
     executor: str
     params_hash: str
     field: str
 
     @classmethod
-    def from_id(cls, id_str: str) -> "ResultKey":
+    def from_id(cls, id_str: str) -> ResultKey:
         """Parse a composite ID string into a ``ResultKey`` instance.
 
         Args:
@@ -49,6 +58,7 @@ class ResultKey:
             return cls(executor=parts[0], params_hash=parts[1], field=parts[2])
         return cls(executor=id_str, params_hash="", field=id_str)
 
+
 def _normalize_value(val: Any) -> Any:
     """Normalize cell values to basic Python types.
 
@@ -64,13 +74,13 @@ def _normalize_value(val: Any) -> Any:
     """
     if val is None:
         return None
-        
+
     if isinstance(val, (int, float, str, bool)):
         if isinstance(val, float) and np.isnan(val):
             return None
         return val
-        
-    if hasattr(val, 'item'):
+
+    if hasattr(val, "item"):
         try:
             item_val = val.item()
             if isinstance(item_val, float) and np.isnan(item_val):
@@ -78,11 +88,12 @@ def _normalize_value(val: Any) -> Any:
             return item_val
         except (ValueError, TypeError, AttributeError):
             pass
-            
+
     if isinstance(val, (list, tuple, np.ndarray)) and len(val) > 0:
         return _normalize_value(val[0])
-        
+
     return val
+
 
 def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
     """Extract index values from a dataset in a backend-agnostic way.
@@ -99,6 +110,7 @@ def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
     """
     return Adapter.to_list(table.raw_data.index)
 
+
 def _normalize_group_name(group: str) -> str:
     """Normalize group names by stripping tuple notation.
 
@@ -113,17 +125,20 @@ def _normalize_group_name(group: str) -> str:
         '1'      -> '1'   (already normal)
     """
     stripped = group.strip()
-    if stripped.startswith('(') and stripped.endswith(')'):
+    if stripped.startswith("(") and stripped.endswith(")"):
         inner = stripped[1:-1]
         # Remove trailing comma for single-element tuples: "1," -> "1"
-        if inner.endswith(','):
+        if inner.endswith(","):
             inner = inner[:-1]
         # Only simplify if there's no remaining comma (single-element tuple)
-        if ',' not in inner:
+        if "," not in inner:
             return inner.strip()
     return group
 
-def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bool) -> dict[str, Any]:
+
+def _extract_from_comparator(
+    data: ExperimentData, comparator_id: str, front: bool
+) -> dict[str, Any]:
     """Extract and flatten metrics from a comparator's analysis table.
 
     Args:
@@ -158,7 +173,10 @@ def _extract_from_comparator(data: ExperimentData, comparator_id: str, front: bo
             result[full_key] = _normalize_value(val)
     return result
 
-def extract_tests(data: ExperimentData, test_classes: list[type], front: bool) -> dict[str, Any]:
+
+def extract_tests(
+    data: ExperimentData, test_classes: list[type], front: bool
+) -> dict[str, Any]:
     """Extract test outcomes (p-values and pass flags) for specified test classes.
 
     Args:
@@ -180,6 +198,7 @@ def extract_tests(data: ExperimentData, test_classes: list[type], front: bool) -
                         result[k] = v
     return result
 
+
 def extract_group_difference(data: ExperimentData, front: bool) -> dict[str, Any]:
     """Extract group difference metrics (e.g., means, differences).
 
@@ -190,11 +209,14 @@ def extract_group_difference(data: ExperimentData, front: bool) -> dict[str, Any
     Returns:
         A dictionary of group difference results.
     """
-    ids = data.get_ids(GroupDifference)[GroupDifference.__name__][ExperimentDataEnum.analysis_tables.value]
+    ids = data.get_ids(GroupDifference)[GroupDifference.__name__][
+        ExperimentDataEnum.analysis_tables.value
+    ]
     out = {}
     for cid in ids:
         out.update(_extract_from_comparator(data, cid, front))
     return out
+
 
 def extract_group_sizes(data: ExperimentData, front: bool) -> dict[str, Any]:
     """Extract group size information.
@@ -209,7 +231,10 @@ def extract_group_sizes(data: ExperimentData, front: bool) -> dict[str, Any]:
     cid = data.get_one_id(GroupSizes, ExperimentDataEnum.analysis_tables)
     return _extract_from_comparator(data, cid, front)
 
-def extract_analyzer_data(data: ExperimentData, analyzer_class: type | str) -> dict[str, Any]:
+
+def extract_analyzer_data(
+    data: ExperimentData, analyzer_class: type | str
+) -> dict[str, Any]:
     """Extract aggregated metrics from a specific analyzer.
 
     Args:
@@ -223,16 +248,18 @@ def extract_analyzer_data(data: ExperimentData, analyzer_class: type | str) -> d
     table = data.analysis_tables[cid]
     if table.is_empty():
         return {}
-        
+
     records = table.to_records()
     if not records:
         return {}
-        
+
     row_dict = records[0]
     return {col: _normalize_value(val) for col, val in row_dict.items()}
 
+
 class Reporter(ABC):
     """Abstract base class for all experiment reporters."""
+
     @abstractmethod
     def report(self, data: ExperimentData) -> Any:
         """Generate a report from the experiment data.
@@ -248,8 +275,10 @@ class Reporter(ABC):
         """
         raise AbstractMethodError
 
+
 class DictReporter(Reporter, ABC):
     """Base reporter that outputs results as a flat dictionary."""
+
     def __init__(self, front: bool = True):
         """Initialize the dictionary reporter.
 
@@ -283,9 +312,11 @@ class DictReporter(Reporter, ABC):
         """
         return self._report(data)
 
+
 class TestDictReporter(DictReporter, ABC):
     """Reporter specialized for statistical tests with dict-to-dataset conversion."""
-    tests: list[type] = []
+
+    tests: list[type] = []  # noqa: RUF012
 
     @staticmethod
     def _get_struct_dict(data: dict) -> dict:
@@ -298,7 +329,7 @@ class TestDictReporter(DictReporter, ABC):
             data: The flat dictionary with composite keys.
 
         Returns:
-            A nested dictionary structured as 
+            A nested dictionary structured as
             ``{field: {index: {executor: {metric: value}}}}``.
         """
         tree = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
@@ -328,6 +359,7 @@ class TestDictReporter(DictReporter, ABC):
         Returns:
             A ``SmallDataset`` containing the structured test results.
         """
+
         def _is_truthy(v) -> bool:
             """Return True iff v represents a truthy pass value.
 
@@ -346,20 +378,25 @@ class TestDictReporter(DictReporter, ABC):
         for feature, groups in data.items():
             for group, tests in groups.items():
                 row = {"feature": feature, "group": group}
-                
+
                 if "GroupDifference" in tests:
                     metrics = tests["GroupDifference"]
-                    for k in ("control mean", "test mean", "difference", "difference %"):
+                    for k in (
+                        "control mean",
+                        "test mean",
+                        "difference",
+                        "difference %",
+                    ):
                         if k in metrics:
                             row[k] = metrics.get(k)
-                            
+
                 for test_name, metrics in tests.items():
                     if test_name == "GroupDifference":
                         continue
                     norm_name = TEST_NAME_NORMALIZATION.get(test_name, test_name)
                     row[f"{norm_name} pass"] = metrics.get("pass")
                     row[f"{norm_name} p-value"] = metrics.get("p-value")
-                    
+
                 result.append(row)
 
         for row in result:
@@ -376,7 +413,7 @@ class TestDictReporter(DictReporter, ABC):
         if not result:
             return SmallDataset.from_dict(
                 {"feature": [], "group": []},
-                roles={"feature": InfoRole(), "group": TreatmentRole()}
+                roles={"feature": InfoRole(), "group": TreatmentRole()},
             )
         return SmallDataset.from_dict(
             result,
@@ -394,8 +431,10 @@ class TestDictReporter(DictReporter, ABC):
         """
         return extract_tests(data, self.tests, self.front)
 
+
 class DatasetReporter(Reporter):
     """Reporter that outputs results as a structured ``Dataset`` or dictionary."""
+
     def __init__(
         self,
         dict_reporter: DictReporter | None = None,
@@ -463,9 +502,7 @@ class DatasetReporter(Reporter):
             row[col] = _normalize_value(value)
         if not row:
             return SmallDataset.create_empty()
-        return SmallDataset.from_dict(
-            [row], roles={c: StatisticRole() for c in row}
-        )
+        return SmallDataset.from_dict([row], roles={c: StatisticRole() for c in row})
 
     @staticmethod
     def convert_to_dataset(data: dict) -> Dataset | SmallDataset:

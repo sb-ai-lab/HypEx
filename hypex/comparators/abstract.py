@@ -9,11 +9,9 @@ import numpy as np
 from ..dataset import (
     ABCRole,
     AdditionalTargetRole,
-    AdditionalTreatmentRole,
     Dataset,
     DatasetAdapter,
     ExperimentData,
-    GroupedDataset,
     GroupingRole,
     InfoRole,
     PreTargetRole,
@@ -209,7 +207,7 @@ class GroupsComparator(BaseComparator, ABC):
         def _safe_slice(ds, cols):
             if cols is None:
                 return ds
-            if hasattr(ds, '__getitem__'):
+            if hasattr(ds, "__getitem__"):
                 return ds[cols]
             return ds[cols] if isinstance(cols, str) else ds[list(cols)]
 
@@ -313,9 +311,13 @@ class GroupsComparator(BaseComparator, ABC):
 
         group_col = group_field_data.columns[0]
         if group_col not in baseline_field_data.columns:
-            baseline_field_data = baseline_field_data.merge(group_field_data, left_index=True, right_index=True, how="left")
+            baseline_field_data = baseline_field_data.merge(
+                group_field_data, left_index=True, right_index=True, how="left"
+            )
         if group_col not in target_fields_data.columns:
-            target_fields_data = target_fields_data.merge(group_field_data, left_index=True, right_index=True, how="left")
+            target_fields_data = target_fields_data.merge(
+                group_field_data, left_index=True, right_index=True, how="left"
+            )
 
         baseline_data = baseline_field_data.groupby(by=group_field_data.columns)
         compared_data = cls._split_ds_into_columns(
@@ -342,17 +344,23 @@ class GroupsComparator(BaseComparator, ABC):
 
         group_col = group_field_data.columns[0]
         if group_col not in baseline_field_data.columns:
-            baseline_field_data = baseline_field_data.merge(group_field_data, left_index=True, right_index=True, how="left")
+            baseline_field_data = baseline_field_data.merge(
+                group_field_data, left_index=True, right_index=True, how="left"
+            )
         if group_col not in target_fields_data.columns:
-            target_fields_data = target_fields_data.merge(group_field_data, left_index=True, right_index=True, how="left")
+            target_fields_data = target_fields_data.merge(
+                group_field_data, left_index=True, right_index=True, how="left"
+            )
 
         baseline_data = [
             sorted(
-                baseline_field_data.groupby(by=group_field_data.columns), key=lambda tup: tup[0]
+                baseline_field_data.groupby(by=group_field_data.columns),
+                key=lambda tup: tup[0],
             ).pop(0)
         ]
         compared_data = sorted(
-            target_fields_data.groupby(by=group_field_data.columns), key=lambda tup: tup[0]
+            target_fields_data.groupby(by=group_field_data.columns),
+            key=lambda tup: tup[0],
         )
         compared_data.pop(0)
         compared_data = cls._split_ds_into_columns(data=compared_data)
@@ -375,11 +383,17 @@ class GroupsComparator(BaseComparator, ABC):
             target_fields_data, "target_fields_data", "matched_pairs"
         )
 
-        baseline_indexes = baseline_field_data.merge(group_field_data, left_index=True, right_index=True).groupby(by=group_field_data.columns[0])
+        baseline_indexes = baseline_field_data.merge(
+            group_field_data, left_index=True, right_index=True
+        ).groupby(by=group_field_data.columns[0])
         baseline_data = []
         compared_data = []
-        for group, indexes in group_field_data.reset_index().groupby(group_field_data.columns[0]):
-            compared_data.append((group, target_fields_data.loc[indexes.iget_values(column=0), :]))
+        for group, indexes in group_field_data.reset_index().groupby(
+            group_field_data.columns[0]
+        ):
+            compared_data.append(
+                (group, target_fields_data.loc[indexes.iget_values(column=0), :])
+            )
 
         for group in baseline_indexes:
             name = group[0]
@@ -545,10 +559,14 @@ class GroupsComparator(BaseComparator, ABC):
                 if dropped > 0:
                     combined_data = type(combined_data)(
                         data=inner_df,
-                        roles={c: combined_data.roles.get(c, InfoRole()) for c in inner_df.columns},
+                        roles={
+                            c: combined_data.roles.get(c, InfoRole())
+                            for c in inner_df.columns
+                        },
                     )
             data.groups[group_field_data.columns[0]] = {
-                f"{group}": ds for group, ds in combined_data.groupby(group_field_data.columns[0])
+                f"{group}": ds
+                for group, ds in combined_data.groupby(group_field_data.columns[0])
             }
             grouping_data = self._grouping_data_split(
                 grouping_data=data.groups[group_field_data.columns[0]],
@@ -565,7 +583,9 @@ class GroupsComparator(BaseComparator, ABC):
                 ),
             )
 
-        if grouping_data is not None and (len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1):
+        if grouping_data is not None and (
+            len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1
+        ):
             raise NotSuitableFieldError(group_field_data, "Grouping")
 
         compare_result = self.calc(
@@ -631,6 +651,7 @@ class StatsComparator(BaseComparator, ABC):
     This design is particularly efficient for Spark backends, where Phase 1 runs
     as distributed aggregations and only small scalar dicts reach the driver.
     """
+
     STAT_FUNCTIONS: ClassVar[dict[str, Callable[[Dataset], Any]]] = {
         "mean": lambda d: d.mean(),
         "var": lambda d: d.var(),
@@ -854,7 +875,9 @@ class StatsComparator(BaseComparator, ABC):
                     right=baseline_fields, right_index=True, left_index=True
                 )
                 tmp_data = tmp_data.merge(
-                    right=tmp_data, right_index=True, left_on=best_match_col,
+                    right=tmp_data,
+                    right_index=True,
+                    left_on=best_match_col,
                     suffixes=("", "_matched"),
                 )
                 prepared_data = tmp_data.drop(
@@ -893,7 +916,7 @@ class StatsComparator(BaseComparator, ABC):
         cls,
         group_col_stats: dict[str, dict[str, dict[str, Any]]],
         compare_by: str,
-        **kwargs
+        **kwargs,
     ) -> list[Dataset | SmallDataset]:
         group_names = list(group_col_stats.keys())
         if len(group_names) < 2:
@@ -911,7 +934,7 @@ class StatsComparator(BaseComparator, ABC):
                     StatisticRole(),
                 )
                 for compared_name in group_names[1:]
-                for col in  group_col_stats[baseline_name]
+                for col in group_col_stats[baseline_name]
             ]
         elif compare_by == "matched_pairs":
             result_ds_list = [
@@ -924,7 +947,8 @@ class StatsComparator(BaseComparator, ABC):
                     StatisticRole(),
                 )
                 for groups_name in group_names
-                for col in group_col_stats[baseline_name] if not col.endswith('_matched')
+                for col in group_col_stats[baseline_name]
+                if not col.endswith("_matched")
             ]
         return result_ds_list
 
@@ -1015,7 +1039,7 @@ class StatsComparator(BaseComparator, ABC):
                 data=agg_data,
                 group_cols=[group_col],
                 target_columns=target_cols,
-                grouped=None,          # unused by StatsAggregationExtension
+                grouped=None,  # unused by StatsAggregationExtension
                 stats=self.stats,
             )
 
@@ -1053,9 +1077,7 @@ class StatsComparator(BaseComparator, ABC):
 
             # The target columns for aggregation include both original and
             # matched variants so that _inner_function can compare them.
-            matched_target_cols = target_cols + [
-                f"{c}_matched" for c in target_cols
-            ]
+            matched_target_cols = target_cols + [f"{c}_matched" for c in target_cols]
 
             group_col_stats = self._compute_stats(
                 data=prepared_data,
@@ -1125,9 +1147,7 @@ class StatsComparator(BaseComparator, ABC):
             ]
 
         # Restore the composite key before storing the final result.
-        self.key = str(
-            target_cols[0] if len(target_cols) == 1 else target_cols
-        )
+        self.key = str(target_cols[0] if len(target_cols) == 1 else target_cols)
         return self._set_value(data, result_dataset)
 
 
@@ -1164,6 +1184,7 @@ class StatsHypothesisTesting(StatsComparator, ABC):
         )
         self.reliability = reliability
 
+
 class AdaptiveHypothesisTest(BaseComparator):
     """
     Routes execute() to a backend-specific hypothesis test at runtime.
@@ -1187,7 +1208,9 @@ class AdaptiveHypothesisTest(BaseComparator):
         ] = "groups",
         key: Any = "",
     ):
-        super().__init__(grouping_role=grouping_role, target_roles=target_roles, key=key)
+        super().__init__(
+            grouping_role=grouping_role, target_roles=target_roles, key=key
+        )
         self.reliability = reliability
         self.compare_by = compare_by
 

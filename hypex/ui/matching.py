@@ -4,8 +4,6 @@ from __future__ import annotations
 import warnings
 from typing import Any
 
-import pandas as pd
-
 from ..analyzers.matching import MatchingAnalyzer
 from ..dataset import (
     AdditionalMatchingRole,
@@ -37,16 +35,28 @@ class MatchingOutput(Output):
     full_data: Dataset
     quality_results: Dataset
 
-    def __init__(self, searching_class: type = MatchingAnalyzer):
+    def __init__(
+        self,
+        searching_class: type = MatchingAnalyzer,
+        extract_full_data: bool = False,
+        compute_indexes: bool = False,
+    ):
         """Initialize matching output with summary and quality reporters.
 
         Args:
             searching_class: The analyzer class used to search for results.
+            extract_full_data: Whether to build the full matched dataset
+                via iterative merges. Set to ``False`` to skip the
+                expensive merge + checkpoint loop. Defaults to ``False``.
+            compute_indexes: Whether to extract matched indexes.
+                Set to ``False`` to skip index collection. Defaults to ``False``.
         """
         super().__init__(
             summary_reporter=MatchingDictReporter(searching_class),
             additional_reporters={"quality_results": MatchingQualityDatasetReporter()},
         )
+        self.extract_full_data = extract_full_data
+        self.compute_indexes = compute_indexes
 
     def _extract_full_data(
         self, experiment_data: ExperimentData, indexes: Dataset
@@ -110,13 +120,17 @@ class MatchingOutput(Output):
             # ── Build the matched subset for this neighbor position ─────
             if backend == BackendsEnum.spark:
                 matched_data = self._match_spark(
-                    experiment_data, t_indexes, col_name,
+                    experiment_data,
+                    t_indexes,
+                    col_name,
                     ds_reset=ds_reset,
                     idx_col=idx_col,
                 )
             else:
                 matched_data = self._match_pandas(
-                    experiment_data, t_indexes, col_name,
+                    experiment_data,
+                    t_indexes,
+                    col_name,
                 )
 
             # ── Rename matched columns with a position suffix ───────────
@@ -170,7 +184,6 @@ class MatchingOutput(Output):
             if backend == BackendsEnum.spark:
                 self.full_data.checkpoint(eager=True)
 
-
     def _match_spark(
         self,
         experiment_data: ExperimentData,
@@ -202,15 +215,15 @@ class MatchingOutput(Output):
 
         # 2. Expose the row index as a column so it survives the join.
         filtered_reset = filtered.reset_index(drop=False)
-        pos_col = next(
-            c for c in filtered_reset.columns if c not in filtered.columns
-        )
+        pos_col = next(c for c in filtered_reset.columns if c not in filtered.columns)
 
         # 3. Rename helper columns for the join.
-        mapping_ds = filtered_reset.rename({
-            pos_col: "_hypex_pos",
-            col_name: "_hypex_lookup",
-        })
+        mapping_ds = filtered_reset.rename(
+            {
+                pos_col: "_hypex_pos",
+                col_name: "_hypex_lookup",
+            }
+        )
 
         # 4. Use pre-computed ds_reset or fall back to computing it.
         if ds_reset is None:
@@ -261,9 +274,7 @@ class MatchingOutput(Output):
         # ── FIX: use get_values(column=...) which returns a flat list of
         #    scalars via PandasDataset.get_values(), instead of
         #    Adapter.to_list(Dataset.data) which wraps a DataFrame into [df].
-        index_values: list = Adapter.to_list(
-            t_indexes.get_values(column=col_name)
-        )
+        index_values: list = Adapter.to_list(t_indexes.get_values(column=col_name))
         positional_indices: list = Adapter.to_list(t_indexes.raw_data.index)
 
         # Filter out unmatched rows (value == -1).
@@ -288,7 +299,7 @@ class MatchingOutput(Output):
         matched_data.index = valid_positions
 
         return matched_data
-    
+
     @staticmethod
     def _reformat_summary(summary: dict[str, Any]) -> dict[str, Any]:
         """Reformat a flat summary dictionary with composite keys into a nested structure.
@@ -317,7 +328,9 @@ class MatchingOutput(Output):
         return reformatted_summary
 
     @staticmethod
-    def _collect_grouped_indexes(experiment_data: ExperimentData, group: dict) -> Dataset:
+    def _collect_grouped_indexes(
+        experiment_data: ExperimentData, group: dict
+    ) -> Dataset:
         """Collect matched indexes for grouped matching results.
 
         Args:
@@ -381,7 +394,10 @@ class MatchingOutput(Output):
             )
         indexes = additional[available]
         return indexes.rename(
-            {col: f"indexes_{col.split(ID_SPLIT_SYMBOL)[-1]}" for col in indexes.columns}
+            {
+                col: f"indexes_{col.split(ID_SPLIT_SYMBOL)[-1]}"
+                for col in indexes.columns
+            }
         )
 
     def _extract_driver_indexes(
@@ -505,15 +521,16 @@ class MatchingOutput(Output):
 
         reformatted_summary = self._reformat_summary(self.summary)
 
-        if experiment_data.ds.backend_type == BackendsEnum.spark:
-            # ── Spark: indexes stay lazy columns of ds ────────────────
-            # No string parsing, no Adapter.to_list(ds.index) — the index
-            # never leaves the cluster. Alignment is native (same index).
-            reformatted_summary.pop("indexes", None)
-            indexes = self._get_spark_indexes(experiment_data)
+        if self.compute_indexes:
+            if experiment_data.ds.backend_type == BackendsEnum.spark:
+                reformatted_summary.pop("indexes", None)
+                indexes = self._get_spark_indexes(experiment_data)
+            else:
+                indexes = self._extract_driver_indexes(experiment_data, reformatted_summary)
         else:
-            # ── Pandas: legacy string-based extraction (branches 1–3) ──
-            indexes = self._extract_driver_indexes(experiment_data, reformatted_summary)
+            reformatted_summary.pop("indexes", None)
+            indexes = SmallDataset.create_empty()
+            logger.debug("Skipping indexes extraction (compute_indexes=False).")
 
         # ── Build summary table from remaining metrics ─────────────────
         if reformatted_summary:
@@ -533,5 +550,18 @@ class MatchingOutput(Output):
         else:
             self.summary = SmallDataset.create_empty()
 
-        self._extract_full_data(experiment_data, indexes)
+        if self.extract_full_data:
+            self._extract_full_data(experiment_data, indexes)
+        else:
+            self.full_data = Dataset.create_empty(
+                roles={},
+                backend=experiment_data.ds.backend_type,
+                session=experiment_data.ds.session,
+            )
+            self.indexes = Dataset.create_empty(
+                roles={},
+                backend=experiment_data.ds.backend_type,
+                session=experiment_data.ds.session,
+            )
+            logger.debug("Skipping full_data extraction (extract_full_data=False).")
         self.summary.raw_data = self.summary.raw_data.round(2)

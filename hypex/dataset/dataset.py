@@ -1,34 +1,26 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-from copy import deepcopy
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd  # type: ignore
-import pyspark.sql as spark
 import pyspark.pandas as ps
+import pyspark.sql as spark
 
 from ..utils import (
-    ID_SPLIT_SYMBOL,
     BackendsEnum,
-    ExperimentDataEnum,
     FromDictTypes,
     MultiFieldKeyTypes,
-    NotFoundInExperimentDataError,
     ScalarType,
 )
 from ..utils.adapter import Adapter
 from ..utils.errors import InvalidArgumentError
 from .abstract import DatasetBase
+from .backends import PandasDataset, SparkDataset
 from .roles import (
     ABCRole,
-    AdditionalRole,
     DefaultRole,
 )
-from .backends import PandasDataset, SparkDataset
-
-from typing import Literal
 
 
 class Dataset(DatasetBase):
@@ -51,7 +43,7 @@ class Dataset(DatasetBase):
             data=self.raw_data,
             default_role=self.default_role,
         )
-    
+
     def sort(
         self,
         by: MultiFieldKeyTypes | None = None,
@@ -76,7 +68,7 @@ class SmallDataset(DatasetBase):
         data: pd.DataFrame | str | None = None,
         default_role: ABCRole | None = None,
         session: spark.SparkSession | None = None,
-        backend: BackendsEnum = None
+        backend: BackendsEnum = None,
     ):
         if isinstance(roles, dict) and data is not None:
             columns = None
@@ -92,7 +84,7 @@ class SmallDataset(DatasetBase):
                 and isinstance(data["data"], dict)
             ):
                 columns = list(data["data"].keys())
-                
+
             if columns:
                 new_roles = {}
                 for k, v in roles.items():
@@ -200,7 +192,15 @@ class SmallDataset(DatasetBase):
 class DatasetAdapter(Adapter):
     @staticmethod
     def to_dataset(
-        data: dict | Dataset | pd.DataFrame | spark.DataFrame | list | str | int | float | bool,
+        data: dict
+        | Dataset
+        | pd.DataFrame
+        | spark.DataFrame
+        | list
+        | str
+        | int
+        | float
+        | bool,
         roles: ABCRole | dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
@@ -208,10 +208,10 @@ class DatasetAdapter(Adapter):
         if isinstance(data, dict):
             return DatasetAdapter.dict_to_dataset(data, roles, small)
         elif (
-                isinstance(data, pd.DataFrame) or 
-                isinstance(data, spark.DataFrame) or 
-                isinstance(data, ps.DataFrame)
-            ):
+            isinstance(data, pd.DataFrame)
+            or isinstance(data, spark.DataFrame)
+            or isinstance(data, ps.DataFrame)
+        ):
             if isinstance(roles, ABCRole):
                 raise InvalidArgumentError("roles", "dict[str, ABCRole]")
             return DatasetAdapter.frame_to_dataset(data, roles, small)
@@ -281,7 +281,7 @@ class DatasetAdapter(Adapter):
 
     @staticmethod
     def frame_to_dataset(
-        data: pd.DataFrame | spark.DataFrame, 
+        data: pd.DataFrame | spark.DataFrame,
         roles: dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:

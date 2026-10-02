@@ -3,6 +3,7 @@
 theta = Cov(X, Y) / Var(X), computed with centered arithmetic to
 avoid catastrophic cancellation when the covariate has a large mean.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -33,15 +34,11 @@ def cuped_theta(y: np.ndarray, x: np.ndarray) -> float:
     x = x[valid]
 
     x_centered = x - np.mean(x)
-    var_x = float(np.mean(x_centered ** 2))
+    var_x = float(np.mean(x_centered**2))
 
     # Guard: variance must exceed floating-point rounding noise.
     eps = np.finfo(float).eps
-    noise_floor = (
-        (1e3 * eps * float(np.max(np.abs(x)))) ** 2
-        if len(x) > 0
-        else 0.0
-    )
+    noise_floor = (1e3 * eps * float(np.max(np.abs(x)))) ** 2 if len(x) > 0 else 0.0
     if not np.isfinite(var_x) or var_x <= noise_floor:
         return 0.0
 

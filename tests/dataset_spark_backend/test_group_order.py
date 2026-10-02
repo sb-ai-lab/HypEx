@@ -41,9 +41,7 @@ def test_stats_aggregation_spark_group_order(spark_session):
 
 
 def test_stats_chi2_spark_group_order(spark_session):
-    pdf = pd.DataFrame(
-        {"g": np.arange(60) % 6, "y": (np.arange(60) % 4).astype(float)}
-    )
+    pdf = pd.DataFrame({"g": np.arange(60) % 6, "y": (np.arange(60) % 4).astype(float)})
     pandas_ds, spark_ds = _datasets(spark_session, pdf)
     expected = StatsChi2TestExtension().calc(
         data=pandas_ds, group_col="g", target_cols=["y"]
@@ -54,7 +52,9 @@ def test_stats_chi2_spark_group_order(spark_session):
     assert list(actual) == [0, 1, 2, 3, 4, 5]
     assert list(actual) == list(expected)
     for key in expected:
-        exp_vc = {float(k): int(v) for k, v in expected[key]["y"]["value_counts"].items()}
+        exp_vc = {
+            float(k): int(v) for k, v in expected[key]["y"]["value_counts"].items()
+        }
         act_vc = {float(k): int(v) for k, v in actual[key]["y"]["value_counts"].items()}
         assert act_vc == exp_vc
 

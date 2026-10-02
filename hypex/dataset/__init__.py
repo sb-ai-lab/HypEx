@@ -56,6 +56,7 @@ __all__ = [
     "FilterRole",
     "GroupedDataset",
     "GroupingRole",
+    "IndexRole",
     "InfoRole",
     "PreTargetRole",
     "SmallDataset",
@@ -68,5 +69,4 @@ __all__ = [
     "TempTreatmentRole",
     "TreatmentRole",
     "default_roles",
-    "indexRole",
 ]

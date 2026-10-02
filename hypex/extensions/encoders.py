@@ -7,15 +7,15 @@ import pyspark.pandas as ps
 
 from ..dataset import Dataset, DatasetAdapter, ABCRole
 from ..dataset.backends import PandasDataset, SparkDataset
+from ..utils import Adapter
+from ..utils.registry import backend_factory
 from .abstract import Extension
 
-from ..utils.registry import backend_factory
-from ..utils import Adapter
 
 # TODO: needs to be removed due to migration to ml module.
 class DummyEncoderExtension(Extension):
     """
-    Master-backend class for DummyEncoder. 
+    Master-backend class for DummyEncoder.
     """
     @staticmethod
     def _resolve_source_column(
@@ -48,14 +48,15 @@ class DummyEncoderExtension(Extension):
             roles[col].data_type = bool
         return roles
 
+
 @backend_factory.register(DummyEncoderExtension, PandasDataset)
 class PandasDummyEncoderExtension(DummyEncoderExtension):
     """
-    Slave-backend class on pandas for DummyEncoder. 
+    Slave-backend class on pandas for DummyEncoder.
     """
-    def calc(
-        data: Dataset, target_cols: str | list[str] | None = None, **kwargs
-    ):
+
+    @staticmethod
+    def calc(data: Dataset, target_cols: str | list[str] | None = None, **kwargs):
         target_cols = Adapter.to_list(target_cols)
         dummies_df = pd.get_dummies(
             data=data[target_cols].raw_data, drop_first=True, dtype=int
@@ -72,15 +73,15 @@ class PandasDummyEncoderExtension(DummyEncoderExtension):
             role.data_type = bool
         return DatasetAdapter.to_dataset(dummies_df, roles=new_roles, small=False)
 
+
 @backend_factory.register(DummyEncoderExtension, SparkDataset)
 class SparkDummyEncoderExtension(DummyEncoderExtension):
     """
-    Slave-backend class on pyspark for DummyEncoder. 
+    Slave-backend class on pyspark for DummyEncoder.
     """
 
-    def calc(
-        data: Dataset, target_cols: str | list[str] | None = None, **kwargs
-    ):
+    @staticmethod
+    def calc(data: Dataset, target_cols: str | list[str] | None = None, **kwargs):
         target_cols = Adapter.to_list(target_cols)
         dummies_df = ps.get_dummies(
             data=data[target_cols].raw_data, drop_first=True, dtype=int

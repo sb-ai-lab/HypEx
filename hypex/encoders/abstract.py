@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 from collections.abc import Sequence
 from typing import Any
-from ..dataset import Dataset, ExperimentData, FeatureRole, DisabledRole
+
+from ..dataset import Dataset, DisabledRole, ExperimentData, FeatureRole
 from ..executor import Calculator
 from ..utils import (
     NAME_BORDER_SYMBOL,
@@ -164,7 +166,9 @@ class Encoder(Calculator):
         )
 
     @staticmethod
-    def _disable_target_cols(data: ExperimentData, target_cols: list[str]) -> ExperimentData:
+    def _disable_target_cols(
+        data: ExperimentData, target_cols: list[str]
+    ) -> ExperimentData:
         """Mark original categorical columns as disabled.
 
         Replaces the roles of the specified columns with ``DisableRole``,
@@ -179,7 +183,9 @@ class Encoder(Calculator):
         Returns:
             ExperimentData: The experiment data with updated roles.
         """
-        disable_roles = {col:  DisabledRole(initial_role=data.ds.roles[col]) for col in target_cols}
+        disable_roles = {
+            col: DisabledRole(initial_role=data.ds.roles[col]) for col in target_cols
+        }
         data.ds.replace_roles(new_roles_map=disable_roles)
         return data
 

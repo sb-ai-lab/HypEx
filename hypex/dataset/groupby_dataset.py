@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import copy
-
-from typing import Any, Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable
 
 from ..utils import NAME_BORDER_SYMBOL
-
 from .roles import ABCRole, InfoRole, StatisticRole
 
 if TYPE_CHECKING:
@@ -406,14 +404,14 @@ class GroupedDataset:
                 "Use Dataset.groupby() instead of constructing GroupedDataset directly."
             )
         for key, group in self._backend_data.iter_groups(self._group_cols):
-            group_cols = set(group.columns) if hasattr(group, 'columns') else set()
+            group_cols = set(group.columns) if hasattr(group, "columns") else set()
 
             filtered_roles = {
-             col: role for col, role in self.roles.items() if col in group_cols
+                col: role for col, role in self.roles.items() if col in group_cols
             }
 
             yield key, self._dataset_class(roles=filtered_roles, data=group)
-    
+
     def __len__(self):
         """
         Get number of groups in dataset.

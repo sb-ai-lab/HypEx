@@ -161,4 +161,12 @@ lama_venv/
 
 temp/
 
-poetry.lock
+# Tool caches
+.ruff_cache/
+
+# CatBoost writes training logs next to whatever runs it; the tutorials
+# regenerate these on every execution, so they are build output, not source.
+catboost_info/
+
+# Scratch notebooks in the repository root
+/*.ipynb
