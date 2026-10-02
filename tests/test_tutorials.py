@@ -211,11 +211,10 @@ def test_abtest(ab_data):
 
     for test_name in mapping.keys():
         res = mapping[test_name].execute(ab_data)
-        actual_data = (
-            res.summary.data.fillna(0)
-            .apply(pd.to_numeric, errors="ignore")
-            .iloc[:, 6::2]
-        )
+        summary = res.summary.data.fillna(0).apply(pd.to_numeric, errors="ignore")
+        # Select the verdict columns by name: the number of metric columns in
+        # front of them (means, differences, confidence interval) can change.
+        actual_data = summary[[c for c in summary.columns if c.endswith(" pass")]]
         expected_data = mapping_resume[test_name]
         pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)
 

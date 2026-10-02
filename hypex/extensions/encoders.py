@@ -17,6 +17,7 @@ class DummyEncoderExtension(Extension):
     """
     Master-backend class for DummyEncoder.
     """
+
     @staticmethod
     def _resolve_source_column(
         dummy_col: str,

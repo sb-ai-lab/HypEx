@@ -938,7 +938,9 @@ class SparkFaissExtension(FaissExtension):
 
     # Assign train data to cluster in "shuffle" mode
 
-    def _prepare_data_for_shuffle_mode(self, data: spark.DataFrame, model_name: str) -> None:
+    def _prepare_data_for_shuffle_mode(
+        self, data: spark.DataFrame, model_name: str
+    ) -> None:
         """
         Perform clustering and prepare data for shuffle mode.
 
@@ -1133,7 +1135,9 @@ class SparkFaissExtension(FaissExtension):
                 Defaults to None (uses "k-means").
         """
         features = ["index", "_features"]
-        self._prepare_data_for_shuffle_mode(vectorized_data.select(*features), model_name)
+        self._prepare_data_for_shuffle_mode(
+            vectorized_data.select(*features), model_name
+        )
         self.new_execution_flag = True
 
     # General RDD constructor
@@ -1166,12 +1170,9 @@ class SparkFaissExtension(FaissExtension):
             self.index = None
             gc.collect()
 
-        self._sharded_rdd = (
-            rdd.mapPartitions(
-                lambda it: partition_func(it, bc_index, bc_storage)
-            )
-            .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
-        )
+        self._sharded_rdd = rdd.mapPartitions(
+            lambda it: partition_func(it, bc_index, bc_storage)
+        ).persist(MatchingConfig.FAISS_PERSIST_POLITIC)
         self._sharded_rdd.count()
 
     # ==============================================================================

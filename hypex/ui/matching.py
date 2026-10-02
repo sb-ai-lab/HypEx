@@ -526,7 +526,9 @@ class MatchingOutput(Output):
                 reformatted_summary.pop("indexes", None)
                 indexes = self._get_spark_indexes(experiment_data)
             else:
-                indexes = self._extract_driver_indexes(experiment_data, reformatted_summary)
+                indexes = self._extract_driver_indexes(
+                    experiment_data, reformatted_summary
+                )
         else:
             reformatted_summary.pop("indexes", None)
             indexes = SmallDataset.create_empty()

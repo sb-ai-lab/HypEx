@@ -319,7 +319,7 @@ class SparkKSTestExtension(GroupKSTestExtension):
                 ).cast("int"),
             )
 
-        # Pandas vesion uses nan policy "omit"
+        # Pandas version uses nan policy "omit"
         nan_policy = kwargs.get("nan_policy", "omit")
         # Validate inputs and ensure both datasets are single-column and compatible
         other = self.check_data(data, other)
@@ -341,11 +341,10 @@ class SparkKSTestExtension(GroupKSTestExtension):
             null_count_1 = df1.filter(F.col(col).isNull() | F.isnan(F.col(col))).count()
             null_count_2 = df2.filter(F.col(col).isNull() | F.isnan(F.col(col))).count()
             if null_count_1 > 0 or null_count_2 > 0:
-                return SmallDataset.from_dict({
-                    "p-value": float('nan'),
-                    "statistic": float('nan'),
-                    "pass": None
-                }, StatisticRole())
+                return SmallDataset.from_dict(
+                    {"p-value": float("nan"), "statistic": float("nan"), "pass": None},
+                    StatisticRole(),
+                )
 
         # Get sample sizes
         n1 = df1.count()
