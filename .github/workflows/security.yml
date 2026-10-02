@@ -2,9 +2,9 @@ name: Security
 
 on:
   push:
-    branches: [ master, dev/spark_backend ]
+    branches: [ master, dev/master ]
   pull_request:
-    branches: [ master, dev/spark_backend ]
+    branches: [ master, dev/master ]
   schedule:
     # Monday 05:00 UTC: catches advisories published against code nobody has
     # touched in the meantime.

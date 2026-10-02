@@ -2,9 +2,9 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [ master, dev/master, dev/spark_backend ]
+    branches: [ master, dev/master ]
   pull_request:
-    branches: [ master, dev/master, dev/spark_backend ]
+    branches: [ master, dev/master ]
   workflow_dispatch:
 
 # Least privilege by default; no job here needs to write to the repository.
