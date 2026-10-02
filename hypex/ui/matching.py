@@ -37,16 +37,28 @@ class MatchingOutput(Output):
     full_data: Dataset
     quality_results: Dataset
 
-    def __init__(self, searching_class: type = MatchingAnalyzer):
+    def __init__(
+        self,
+        searching_class: type = MatchingAnalyzer,
+        extract_full_data: bool = False,
+        compute_indexes: bool = False,
+    ):
         """Initialize matching output with summary and quality reporters.
 
         Args:
             searching_class: The analyzer class used to search for results.
+            extract_full_data: Whether to build the full matched dataset
+                via iterative merges. Set to ``False`` to skip the
+                expensive merge + checkpoint loop. Defaults to ``True``.
+            compute_indexes: Whether to extract matched indexes.
+                Set to ``False`` to skip index collection. Defaults to ``True``.
         """
         super().__init__(
             summary_reporter=MatchingDictReporter(searching_class),
             additional_reporters={"quality_results": MatchingQualityDatasetReporter()},
         )
+        self.extract_full_data = extract_full_data
+        self.compute_indexes = compute_indexes
 
     def _extract_full_data(
         self, experiment_data: ExperimentData, indexes: Dataset
@@ -505,15 +517,16 @@ class MatchingOutput(Output):
 
         reformatted_summary = self._reformat_summary(self.summary)
 
-        if experiment_data.ds.backend_type == BackendsEnum.spark:
-            # ── Spark: indexes stay lazy columns of ds ────────────────
-            # No string parsing, no Adapter.to_list(ds.index) — the index
-            # never leaves the cluster. Alignment is native (same index).
-            reformatted_summary.pop("indexes", None)
-            indexes = self._get_spark_indexes(experiment_data)
+        if self.compute_indexes:
+            if experiment_data.ds.backend_type == BackendsEnum.spark:
+                reformatted_summary.pop("indexes", None)
+                indexes = self._get_spark_indexes(experiment_data)
+            else:
+                indexes = self._extract_driver_indexes(experiment_data, reformatted_summary)
         else:
-            # ── Pandas: legacy string-based extraction (branches 1–3) ──
-            indexes = self._extract_driver_indexes(experiment_data, reformatted_summary)
+            reformatted_summary.pop("indexes", None)
+            indexes = SmallDataset.create_empty()
+            logger.debug("Skipping indexes extraction (compute_indexes=False).")
 
         # ── Build summary table from remaining metrics ─────────────────
         if reformatted_summary:
@@ -533,5 +546,18 @@ class MatchingOutput(Output):
         else:
             self.summary = SmallDataset.create_empty()
 
-        self._extract_full_data(experiment_data, indexes)
+        if self.extract_full_data:
+            self._extract_full_data(experiment_data, indexes)
+        else:
+            self.full_data = Dataset.create_empty(
+                roles={},
+                backend=experiment_data.ds.backend_type,
+                session=experiment_data.ds.session,
+            )
+            self.indexes = Dataset.create_empty(
+                roles={},
+                backend=experiment_data.ds.backend_type,
+                session=experiment_data.ds.session,
+            )
+            logger.debug("Skipping full_data extraction (extract_full_data=False).")
         self.summary.raw_data = self.summary.raw_data.round(2)
