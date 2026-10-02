@@ -364,7 +364,9 @@ def create_test_data(
     Args:
         num_users: Number of synthetic users.
         na_step: Step interval(s) for NaN injection.
-        nan_cols: Column(s) to inject NaNs into.
+        nan_cols: Column(s) to inject NaNs into.  Defaults to all columns
+            except ``treat``, which is always kept complete so that group
+            assignment stays well defined.
         file_name: If provided, saves the CSV to *output_dir*.
         output_dir: Directory for CSV output.  Defaults to ``"."``.
         exact_ATT: Exact additive treatment effect to embed.
@@ -379,6 +381,8 @@ def create_test_data(
     panel = _apply_treatment_effect(panel, exact_ATT)
     data = _aggregate_spends(panel)
     data = _add_demographics(data, rng)
+    if nan_cols is None:
+        nan_cols = [col for col in data.columns if col != "treat"]
     data = set_nans(data, na_step, nan_cols)
 
     if file_name is not None:

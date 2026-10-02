@@ -11,7 +11,7 @@ It is built as a **pipeline of small, composable blocks** (`Executor`s) that rea
 from and write into a single shared state object (`ExperimentData`), on top of a
 backend-agnostic tabular structure (`Dataset`, pandas or Spark).
 
-## Current Version: 1.0.2
+## Current Version: 2.0.0a1
 
 **Architecture Status**: The new architecture is now **ACTIVE** and fully functional. 
 The library has successfully transitioned from the old 0.1.10 version to the new 
