@@ -10,7 +10,9 @@ authors = [
     "Ruslan Alsherov <ruslan-alsherov@yandex.ru>",
     "Ksenia Vasilieva <vasilievaxeniaa@gmail.com>",
     "Anastasiia Fedorova <fedorovanasty24@gmail.com>",
-    "Daria Vigovskaya <dasha.vig@yandex.ru>"
+    "Daria Vigovskaya <dasha.vig@yandex.ru>",
+    "Danil Shamsutdinov <a.danil.dark@gmail.com>",
+    "Eric Ulmaskulov <ulmaskuloverik@gmail.com>"
 ]
 readme = "README.md"
 license = "Apache-2.0"
