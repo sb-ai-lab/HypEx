@@ -122,7 +122,7 @@ class GroupKSTestExtension(GroupStatTest):
     test_function = staticmethod(ks_2samp)
     def __init__(self, reliability: float = 0.05):
         super().__init__(self.test_function, reliability)
-        self.default_kwargs = {}
+        self.default_kwargs = {"nan_policy": "omit"}
 
 class GroupUTestExtension(GroupStatTest):
     """
@@ -293,9 +293,8 @@ class SparkKSTestExtension(GroupKSTestExtension):
                 ).cast("int")
             )
 
-        # Pandas vesion doesn't use any parametr, so default one from scipy is used
-        # Default parament in scipy is "propagate"
-        nan_policy = kwargs.get("nan_policy", "propagate")
+        # Pandas vesion uses nan policy "omit"
+        nan_policy = kwargs.get("nan_policy", "omit")
         # Validate inputs and ensure both datasets are single-column and compatible
         other = self.check_data(data, other)
         df1 = data.raw_data.to_spark()
