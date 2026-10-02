@@ -502,3 +502,302 @@ class StatsChi2TestExtension(Extension):
             result[grp][col]["value_counts"][val] = cnt
 
         return result
+
+class StatsUTestExtension(Extension):
+    """Computes per-group histograms for the Mann-Whitney U test.
+
+    Mirrors ``StatsKSTestExtension`` exactly: 3 Spark jobs regardless
+    of the number of target columns. The produced histograms are then
+    consumed by ``StatsUTest._inner_function`` which calculates the
+    U statistic and p-value analytically from bucket counts — without
+    transferring raw observations to the driver.
+
+    Pipeline (Spark backend):
+    -------------------------
+    1. **Job 1 — Global bounds**: computes ``min`` and ``max`` for
+       every target column in a single ``agg()`` call.
+    2. **Unpivot**: uses ``F.explode(F.array(...))`` to reshape all
+       target columns into a long-format DataFrame with columns
+       ``(group, column_name, value)``.
+    3. **Job 2 — Counts**: counts non-null observations per
+       ``(group, column_name)`` pair.
+    4. **Bucket assignment**: assigns each observation to a bucket via
+       a nested ``CASE WHEN`` expression using
+       ``floor((value - min) / width)`` clamped to ``[0, n_bins - 1]``.
+    5. **Job 3 — Histograms**: groups by ``(group, column_name, bucket)``
+       and counts observations per bucket.
+
+    Returns:
+        A nested dictionary::
+
+            {
+                group_key: {
+                    column_name: {
+                        "histogram": {bucket_idx: count, ...},
+                        "count": total_non_null_count,
+                    },
+                    ...
+                },
+                ...
+            }
+
+    Attributes:
+        n_bins: Number of histogram bins. Higher values increase the
+            accuracy of the U-statistic approximation at the cost of
+            slightly larger shuffle volume. Defaults to 2000.
+        reliability: Significance level (alpha). Stored for interface
+            consistency with ``StatsKSTestExtension``; not directly
+            used in histogram computation. Defaults to 0.05.
+
+    Example:
+        >>> ext = StatsUTestExtension(n_bins=2000)
+        >>> stats = ext.calc(
+        ...     data=spark_dataset,
+        ...     group_col="treatment",
+        ...     target_cols=["revenue", "sessions"],
+        ... )
+        >>> stats["control"]["revenue"]["count"]
+        50000
+        >>> stats["control"]["revenue"]["histogram"][42]
+        137
+    """
+
+    def __init__(self, n_bins: int = 2000, reliability: float = 0.05):
+        """Initialize the U-test histogram extension.
+
+        Args:
+            n_bins: Number of histogram bins for discretizing continuous
+                values. Defaults to 2000.
+            reliability: Significance level (alpha) for downstream
+                hypothesis testing. Defaults to 0.05.
+        """
+        super().__init__()
+        self.n_bins = n_bins
+        self.reliability = reliability
+
+    def calc(
+        self,
+        data: Dataset,
+        group_col: str,
+        target_cols: list[str],
+        **kwargs,
+    ) -> dict[str, dict[str, dict[str, Any]]]:
+        """Route to the backend-specific histogram computation.
+
+        For Spark, delegates to ``_calc_spark`` which runs 3 distributed
+        jobs. For Pandas, delegates to ``_calc_pandas`` which returns
+        empty histograms (the Pandas path uses ``scipy.stats.mannwhitneyu``
+        directly via ``GroupUTest`` and does not need histograms).
+
+        Args:
+            data: The input dataset containing the grouping column and
+                all target columns.
+            group_col: Name of the column that defines group membership.
+            target_cols: List of numeric target column names for which
+                to compute histograms.
+            **kwargs: Additional keyword arguments (currently unused).
+
+        Returns:
+            A nested dictionary mapping
+            ``group_key -> column_name -> {"histogram": {...}, "count": n}``.
+        """
+        from ..utils import BackendsEnum
+
+        if data.backend_type == BackendsEnum.spark:
+            return self._calc_spark(
+                data=data,
+                group_col=group_col,
+                target_cols=target_cols,
+                **kwargs,
+            )
+        else:
+            return self._calc_pandas(
+                data=data,
+                group_col=group_col,
+                target_cols=target_cols,
+                **kwargs,
+            )
+
+    def _calc_pandas(
+        self,
+        data: Dataset,
+        group_col: str,
+        target_cols: list[str],
+        **kwargs,
+    ) -> dict[str, dict[str, dict[str, Any]]]:
+        """Fallback for Pandas backend: return empty histograms.
+
+        On Pandas the master ``UTest`` is routed to ``GroupUTest`` which
+        calls ``scipy.stats.mannwhitneyu`` directly on raw arrays.
+        Histograms are therefore not needed. This method returns the
+        correct structural skeleton (with accurate counts) so that
+        ``StatsUTest._execute_spark`` does not crash if ever invoked
+        on a Pandas backend, but the histograms will be empty.
+
+        Args:
+            data: The input dataset.
+            group_col: Name of the grouping column.
+            target_cols: List of target column names.
+            **kwargs: Additional keyword arguments (unused).
+
+        Returns:
+            A nested dictionary with empty histograms and correct counts.
+        """
+        result: dict[str, dict[str, dict[str, Any]]] = {}
+        grouped = data.raw_data.groupby(group_col)
+        for group_key, group_df in grouped:
+            result[group_key] = {}
+            for col in target_cols:
+                col_data = group_df[col].dropna()
+                result[group_key][col] = {
+                    "histogram": {},
+                    "count": len(col_data),
+                }
+        return result
+
+    @timeit(level="SPARK", prefix="U_EXT_SPARK")
+    def _calc_spark(
+        self,
+        data: Dataset,
+        group_col: str,
+        target_cols: list[str],
+        **kwargs,
+    ) -> dict[str, dict[str, dict[str, Any]]]:
+        """Compute per-group histograms using the Spark backend.
+
+        Executes exactly 3 Spark jobs regardless of the number of target
+        columns, mirroring the ``StatsKSTestExtension._calc_spark`` logic:
+
+        1. **Job 1 — Global bounds**: ``min``/``max`` for all target
+           columns in a single ``agg()`` call.
+        2. **Unpivot**: ``F.explode(F.array(...))`` reshapes all target
+           columns into ``(group, column_name, value)`` triples.
+        3. **Job 2 — Counts**: ``count`` per ``(group, column_name)``.
+        4. **Bucket assignment**: nested ``CASE WHEN`` with
+           ``floor((value - min) / width)`` clamped to ``n_bins - 1``.
+        5. **Job 3 — Histograms**: ``groupBy(group, column_name, bucket)``
+           followed by ``count()``.
+
+        The result is assembled into the nested dictionary format
+        expected by ``StatsUTest._inner_function``.
+
+        Args:
+            data: The input dataset (must contain ``group_col`` and all
+                ``target_cols``).
+            group_col: Name of the column defining group membership.
+            target_cols: List of numeric target column names.
+            **kwargs: Additional keyword arguments (currently unused).
+
+        Returns:
+            A nested dictionary mapping
+            ``group_key -> column_name -> {"histogram": {bucket: count}, "count": n}``.
+        """
+        import pyspark.sql.functions as F
+
+        sdf = data.raw_data.to_spark()
+
+        def safe_col(name: str):
+            """Create a Column reference with backtick-quoting."""
+            return F.col(f"`{name}`")
+
+        # ── Job 1: global bounds (min/max for all targets) ──────────
+        # A single aggregation job computes the range of every target
+        # column simultaneously.
+        agg_exprs = []
+        for col in target_cols:
+            col_ref = safe_col(col)
+            agg_exprs.extend([
+                F.min(col_ref).alias(f"{col}┆min"),
+                F.max(col_ref).alias(f"{col}┆max"),
+            ])
+        bounds_row = sdf.agg(*agg_exprs).collect()[0]
+
+        # ── Unpivot: all targets -> (column_name, value) ────────────
+        # Reshape from wide format (one column per target) to long
+        # format (column_name + value) using array + explode.
+        unpivoted = sdf.select(
+            safe_col(group_col),
+            F.explode(F.array([
+                F.struct(
+                    F.lit(col).alias("column_name"),
+                    safe_col(col).alias("value"),
+                )
+                for col in target_cols
+            ])).alias("data"),
+        ).select(
+            safe_col(group_col).alias(group_col),
+            F.col("data.column_name").alias("column_name"),
+            F.col("data.value").alias("value"),
+        )
+
+        # ── Job 2: counts per (group, column) ───────────────────────
+        # Count non-null observations for each (group, column) pair.
+        count_rows = (
+            unpivoted
+            .filter(F.col("value").isNotNull())
+            .groupBy(safe_col(group_col), F.col("column_name"))
+            .count()
+            .collect()
+        )
+        group_counts: dict[tuple, int] = {}
+        for row in count_rows:
+            group_counts[(row[group_col], row["column_name"])] = row["count"]
+
+        # ── Bucket assignment via nested CASE WHEN ──────────────────
+        # Build a single CASE WHEN expression that maps each value to
+        # its bucket index based on the column-specific min/max/width.
+        bucket_expr = F.lit(None).cast("int")
+        for col in target_cols:
+            col_min = bounds_row[f"{col}┆min"]
+            col_max = bounds_row[f"{col}┆max"]
+
+            # Edge case: column is entirely NULL or has zero variance.
+            # Assign all values to bucket 0.
+            if col_min is None or col_max is None or col_min == col_max:
+                bucket_expr = F.when(
+                    F.col("column_name") == F.lit(col),
+                    F.lit(0).cast("int"),
+                ).otherwise(bucket_expr)
+                continue
+
+            width = (col_max - col_min) / self.n_bins
+            bucket_expr = F.when(
+                (F.col("column_name") == F.lit(col)) & F.col("value").isNotNull(),
+                F.least(
+                    F.floor((F.col("value") - F.lit(col_min)) / F.lit(width)),
+                    F.lit(self.n_bins - 1),
+                ).cast("int"),
+            ).otherwise(bucket_expr)
+
+        # ── Job 3: histograms per (group, column, bucket) ───────────
+        hist_rows = (
+            unpivoted
+            .withColumn("_bucket", bucket_expr)
+            .filter(F.col("value").isNotNull() & F.col("_bucket").isNotNull())
+            .groupBy(safe_col(group_col), F.col("column_name"), F.col("_bucket"))
+            .count()
+            .collect()
+        )
+
+        # ── Assemble all_group_stats ────────────────────────────────
+        all_group_stats: dict[str, dict[str, dict[str, Any]]] = {}
+
+        # Populate histogram bucket counts.
+        for row in hist_rows:
+            grp = row[group_col]
+            col = row["column_name"]
+            bucket = int(row["_bucket"])
+            cnt = row["count"]
+            all_group_stats.setdefault(grp, {}).setdefault(
+                col, {"histogram": {}, "count": 0}
+            )
+            all_group_stats[grp][col]["histogram"][bucket] = cnt
+
+        # Populate total counts per (group, column).
+        for (grp, col), cnt in group_counts.items():
+            all_group_stats.setdefault(grp, {}).setdefault(
+                col, {"histogram": {}, "count": 0}
+            )
+            all_group_stats[grp][col]["count"] = cnt
+
+        return all_group_stats
