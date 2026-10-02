@@ -75,4 +75,3 @@ class MDEBySize(PowerTesting):
         s = np.sqrt(var_test / n_test + var_control / n_control)
 
         return m * s
-

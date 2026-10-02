@@ -111,9 +111,16 @@ extend-exclude = ["docs/_build", "docs/_autosummary", "*.md"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "C90", "UP", "RUF", "I"]
 # E501: line length is enforced by `ruff format`, not by the linter.
-# RUF002/RUF003: docstrings and comments use Greek and Cyrillic characters.
+# RUF001/RUF002/RUF003: strings, docstrings and comments use Greek letters and
+# typographic symbols (statistical notation, "×" in shapes).
 # C901: complexity is tracked, not gated.
-ignore = ["E501", "RUF002", "RUF003", "C901"]
+ignore = ["E501", "RUF001", "RUF002", "RUF003", "C901"]
+
+[tool.ruff.lint.per-file-ignores]
+# Package __init__ modules re-export names on purpose.
+"__init__.py" = ["F401"]
+# Tutorials start Spark in a bare try/except around optional environment setup.
+"*.ipynb" = ["E722"]
 
 [tool.codespell]
 skip = ".git,.tox,.venv,.mypy_cache,.ruff_cache,docs,_build,imgs,schemes,poetry.lock,*.ipynb"

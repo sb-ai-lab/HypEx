@@ -6,7 +6,7 @@ from .constants import (
     NUMBER_TYPES_LIST,
     UTILITY_COL_SYMBOL,
     UTILITY_INDEX_COL_NAME,
-    UTILITY_PHYSICAL_INDEX_COL_NAME
+    UTILITY_PHYSICAL_INDEX_COL_NAME,
 )
 from .enums import (
     ABNTestMethodsEnum,
@@ -29,8 +29,12 @@ from .errors import (
     RoleColumnError,
     SpaceError,
 )
+from .index_utils import CachingIndex, FaissIndexStorage
+from .logger import HypExLogger, ProcessContext, logger
 from .naming import _parse_metric_col, normalize_test_name
 from .profiling import ProfilingContext, disable_profiling, enable_profiling, timeit
+from .registry import BackendFactory
+from .spark_config import SparkSessionCalculator
 from .strict_abc import StrictABC, StrictABCMeta
 from .tutorial_data_creation import (
     create_test_data,
@@ -45,6 +49,7 @@ from .typings import (
     DocstringInheritDecorator,
     FeatureRoleTypes,
     FromDictTypes,
+    GenericManager,
     GroupingDataType,
     MultiFieldKeyTypes,
     RoleNameType,
@@ -54,22 +59,14 @@ from .typings import (
     SparkTypeMapper,
     StratificationRoleTypes,
     TargetRoleTypes,
-    GenericManager,
 )
-from .registry import BackendFactory
-from .logger import HypExLogger, ProcessContext, logger
-from .spark_config import SparkSessionCalculator
-from .index_utils import FaissIndexStorage, CachingIndex
 
 __all__ = [
-    "Adapter",
     "ID_SPLIT_SYMBOL",
     "MATCHING_INDEXES_SPLITTER_SYMBOL",
     "NAME_BORDER_SYMBOL",
     "NUMBER_TYPES_LIST",
     "UTILITY_COL_SYMBOL",
-    "UTILITY_INDEX_COL_NAME",
-    "NUMBER_TYPES_LIST",
     "UTILITY_INDEX_COL_NAME",
     "UTILITY_PHYSICAL_INDEX_COL_NAME",
     "ABNTestMethodsEnum",
@@ -79,25 +76,29 @@ __all__ = [
     "BackendFactory",
     "BackendTypeError",
     "BackendsEnum",
+    "CachingIndex",
     "CategoricalTypes",
     "ConcatBackendError",
     "ConcatDataError",
     "DataTypeError",
     "DecoratedType",
     "DefaultRoleTypes",
-    "SourceDataTypes",
     "DocstringInheritDecorator",
     "ExperimentDataEnum",
+    "FaissIndexStorage",
     "FeatureRoleTypes",
     "FromDictTypes",
     "GenericManager",
+    "GenericManagerStrictABCMeta",
     "GroupingDataType",
+    "HypExLogger",
     "MergeOnError",
     "MultiFieldKeyTypes",
     "NoColumnsError",
     "NoRequiredArgumentError",
     "NotFoundInExperimentDataError",
     "NotSuitableFieldError",
+    "ProcessContext",
     "ProfilingContext",
     "RoleColumnError",
     "RoleNameType",
@@ -106,6 +107,7 @@ __all__ = [
     "SourceDataTypes",
     "SpaceEnum",
     "SpaceError",
+    "SparkSessionCalculator",
     "StratificationRoleTypes",
     "StrictABC",
     "StrictABCMeta",
@@ -117,14 +119,5 @@ __all__ = [
     "gen_control_variates_df",
     "gen_oracle_df",
     "gen_special_medicine_df",
-    "BackendFactory",
-    "GenericManager"
-    "StrictABCMeta",
-    "StrictABC",
-    "HypExLogger",
-    "ProcessContext",
-    "SparkSessionCalculator",
     "logger",
-    "FaissIndexStorage",
-    "CachingIndex",
 ]

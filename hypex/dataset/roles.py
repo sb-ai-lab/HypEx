@@ -19,6 +19,7 @@ class ABCRole(ABC):
     transformation. Subclasses represent specific semantic meanings
     of columns (e.g., target, feature, grouping).
     """
+
     _role_name: RoleNameType = "Abstract"
 
     def __init__(self, data_type: DefaultRoleTypes | None = None):
@@ -143,28 +144,29 @@ class LagRole(ABCRole):
 
 class IndexRole(ABCRole):
     """Semantic role for index or identifier columns."""
+
     _role_name: RoleNameType = "Index"
 
 
 class InfoRole(ABCRole):
     """Semantic role for auxiliary or informational columns not used in statistical analysis."""
+
     _role_name: RoleNameType = "Info"
+
 
 class DisabledRole(ABCRole):
     """Semantic role for columns that have been "disabled" after preprocessing."""
+
     _role_name: RoleNameType = "Disable"
 
-    def __init__(self, initial_role: ABCRole | None = None, data_type = None):
-        super().__init__(
-            initial_role.data_type 
-            if initial_role 
-            else data_type
-        )
+    def __init__(self, initial_role: ABCRole | None = None, data_type=None):
+        super().__init__(initial_role.data_type if initial_role else data_type)
         self._initial_role = initial_role
 
     @property
     def initial_role(self):
         return self._initial_role
+
 
 class StratificationRole(ABCRole):
     """Semantic role for columns used to stratify data during sampling or splitting.
@@ -172,6 +174,7 @@ class StratificationRole(ABCRole):
     Typically represents categorical variables that ensure balanced group
     representation across experimental splits.
     """
+
     _role_name: RoleNameType = "Stratification"
 
     def __init__(self, data_type: CategoricalTypes | None = None):
@@ -183,6 +186,7 @@ class GroupingRole(ABCRole):
 
     Used in group-by operations, matching algorithms, or comparative analysis.
     """
+
     _role_name: RoleNameType = "Grouping"
 
     def __init__(self, data_type: CategoricalTypes | None = None):
@@ -196,6 +200,7 @@ class GroupingRole(ABCRole):
 
 class TreatmentRole(ABCRole):
     """Semantic role for columns indicating treatment assignment or group membership."""
+
     _role_name: RoleNameType = "Treatment"
 
 
@@ -204,6 +209,7 @@ class TargetRole(ABCRole):
 
     Represents the metric being analyzed, predicted, or compared in an experiment.
     """
+
     _role_name: RoleNameType = "Target"
 
     def __init__(
@@ -228,6 +234,7 @@ class FeatureRole(LagRole):
     Inherits from ``LagRole`` to support temporal feature engineering
     and lag-based dependencies.
     """
+
     _role_name: RoleNameType = "Feature"
 
     def __init__(
@@ -252,6 +259,7 @@ class PreTargetRole(LagRole):
     Used to adjust for baseline differences or apply CUPED-like variance reduction.
     Inherits from ``LagRole`` to handle temporal dependencies.
     """
+
     _role_name: RoleNameType = "PreTarget"
 
     def __init__(
@@ -275,93 +283,113 @@ class PreTargetRole(LagRole):
 
 class StatisticRole(ABCRole):
     """Semantic role for columns containing computed statistics or aggregated results."""
+
     _role_name: RoleNameType = "Statistic"
 
 
 class ResumeRole(ABCRole):
     """Semantic role for columns containing summary or report-level metrics."""
+
     _role_name = "Resume"
 
 
 class FilterRole(ABCRole):
     """Semantic role for boolean mask columns used for row filtering."""
+
     _role_name: RoleNameType = "Filter"
 
 
 class ConstGroupRole(ABCRole):
     """Semantic role for columns defining fixed, non-randomized group assignments."""
+
     _role_name: RoleNameType = "ConstGroup"
 
 
 # ___________________________________________________________________________________________
 class TempRole(ABCRole):
     """Base semantic role for temporary or transient columns during intermediate data processing."""
+
     _role_name: RoleNameType = "Temp"
 
 
 class TempTreatmentRole(TempRole, TreatmentRole):
     """Temporary role for treatment columns during intermediate processing steps."""
+
     _role_name: RoleNameType = "TempTreatment"
 
 
 class TempTargetRole(TempRole, TargetRole):
     """Temporary role for target columns during intermediate processing steps."""
+
     _role_name: RoleNameType = "TempTarget"
 
 
 class TempGroupingRole(TempRole, GroupingRole):
     """Temporary role for grouping columns during intermediate processing steps."""
+
     _role_name: RoleNameType = "TempGrouping"
 
 
 class DefaultRole(ABCRole):
     """Fallback semantic role assigned to columns with unspecified or unknown meanings."""
+
     _role_name: RoleNameType = "Default"
 
 
 class ReportRole(ABCRole):
     """Semantic role for columns specifically intended for reporting or output generation."""
+
     _role_name: RoleNameType = "Report"
 
 
 # ___________________________________________________________________________________________
 class AdditionalRole(ABCRole):
     """Base semantic role for derived, auxiliary, or supplementary columns."""
+
     _role_name: RoleNameType = "Additional"
 
 
 class AdditionalTreatmentRole(AdditionalRole, TreatmentRole):
     """Derived role for supplementary treatment assignment or group indicator columns."""
+
     _role_name: RoleNameType = "AdditionalTreatment"
 
 
 class AdditionalGroupingRole(AdditionalRole, GroupingRole):
     """Derived role for supplementary grouping or segmentation columns."""
+
     _role_name: RoleNameType = "AdditionalGrouping"
 
 
 class AdditionalTargetRole(AdditionalRole, TargetRole):
     """Derived role for auxiliary or transformed target variable columns."""
+
     _role_name: RoleNameType = "AdditionalTarget"
 
 
 class AdditionalFeatureRole(AdditionalRole, FeatureRole):
     """Derived role for supplementary or engineered predictor columns."""
+
     _role_name: RoleNameType = "AdditionalFeature"
 
 
 class AdditionalPreTargetRole(AdditionalRole, PreTargetRole):
     """Derived role for supplementary pre-treatment or baseline measurement columns."""
+
     _role_name: RoleNameType = "AdditionalPreTarget"
 
 
 class AdditionalMatchingRole(AdditionalRole):
     """Derived role for columns storing matching indices or nearest-neighbor results."""
+
     _role_name: RoleNameType = "AdditionalMatching"
-    
+
+
 class AdditionalVarianceReductionRole(AdditionalRole, StatisticRole):
     """For CUPED variance reductions."""
+
     _role_name: RoleNameType = "AdditionalVarianceReduction"
+
 
 class AdditionalStatisticRole(AdditionalRole, StatisticRole):
     _role_name: RoleNameType = "AdditionalStatistic"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from decimal import Decimal
 from collections.abc import Sequence
+from decimal import Decimal
 from typing import Any
 
 from ..dataset.dataset import Dataset
@@ -15,7 +15,7 @@ class TypeCaster(Transformer):
         self,
         dtype: dict[str, type] | dict[type, type],
         roles: ABCRole | Sequence[ABCRole] | None = None,
-        downcasting: bool=True,
+        downcasting: bool = True,
         key: Any = "",
     ):
         super().__init__(key=key)
@@ -35,7 +35,8 @@ class TypeCaster(Transformer):
         data: Dataset,
     ) -> Dataset:
         double_cols = [
-            col for col, c_type in data.roles.items()
+            col
+            for col, c_type in data.roles.items()
             if c_type.data_type is Decimal or c_type.data_type is float
         ]
         return data.astype({col: float for col in double_cols})

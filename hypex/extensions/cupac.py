@@ -14,7 +14,6 @@ from .abstract import MLExtension
 
 
 class CupacExtension(MLExtension):
-
     def __init__(
         self,
         n_folds: int = 5,
@@ -68,7 +67,7 @@ class CupacExtension(MLExtension):
         """
         model = kwargs.get("model")
         return self._fit_pandas(model, X, Y)
-    
+
     def predict(self, X: Dataset, **kwargs) -> Dataset:
         """Generate predictions using a fitted model.
 

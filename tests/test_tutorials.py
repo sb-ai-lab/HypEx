@@ -198,7 +198,14 @@ def test_abtest(ab_data):
                     4: 0,
                     5: 0,
                 },
-                "GroupChi2Test pass": {0: 0, 1: 0, 2: 0, 3: 0, 4: "NOT OK", 5: "NOT OK"},
+                "GroupChi2Test pass": {
+                    0: 0,
+                    1: 0,
+                    2: 0,
+                    3: 0,
+                    4: "NOT OK",
+                    5: "NOT OK",
+                },
             }
         ),
         "ab-n": pd.DataFrame(

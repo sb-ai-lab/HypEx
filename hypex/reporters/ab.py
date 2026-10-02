@@ -13,12 +13,10 @@ from ..comparators import (
     StatsKSTest,
     StatsTTest,
 )
-from ..dataset import Dataset, ExperimentData, SmallDataset, StatisticRole
-from ..dataset.experiment_data import ExperimentDataEnum
+from ..dataset import ExperimentData
 from .abstract import (
     DatasetReporter,
     DictReporter,
-    Reporter,
     extract_analyzer_data,
     extract_group_difference,
     extract_group_sizes,
@@ -34,14 +32,19 @@ class ABTestReporter(DatasetReporter):
     """
 
     tests: ClassVar[list] = [
-        GroupTTest, GroupKSTest, GroupUTest, GroupChi2Test,
-        StatsTTest, StatsKSTest, StatsChi2Test,
+        GroupTTest,
+        GroupKSTest,
+        GroupUTest,
+        GroupChi2Test,
+        StatsTTest,
+        StatsKSTest,
+        StatsChi2Test,
     ]
 
     def _report(self, data: ExperimentData) -> dict[str, Any]:
         """Generate the final A/B test report.
 
-        Ensures the ``front`` formatting flag is disabled before generating the report, 
+        Ensures the ``front`` formatting flag is disabled before generating the report,
         then returns the result in the configured format.
 
         Args:
@@ -57,11 +60,13 @@ class ABTestReporter(DatasetReporter):
         result.update(extract_analyzer_data(data, ABAnalyzer))
         return result
 
+
 class ABDictReporter(ABTestReporter):
     """Legacy reporter wrapper for dictionary output.
 
     Deprecated: Use ``ABTestReporter(output_format='dict')`` instead.
     """
+
     def __init__(self, front: bool = True):
         """Initialize the legacy dictionary reporter.
 
@@ -72,10 +77,12 @@ class ABDictReporter(ABTestReporter):
         super().__init__(DictReporter(front=front), output_format="dict")
         warnings.warn("ABDictReporter is deprecated.", DeprecationWarning, stacklevel=2)
 
+
 class ABDatasetReporter(ABTestReporter):
     """Legacy reporter wrapper for dataset output.
     Deprecated: Use ``ABTestReporter()`` instead.
     """
+
     def __init__(self):
         super().__init__(
             DictReporter(),

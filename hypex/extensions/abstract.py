@@ -4,21 +4,17 @@ from abc import ABC, abstractmethod
 from typing import Any, Literal
 
 from ..dataset import ABCRole, Dataset
-from ..dataset.backends import PandasDataset, SparkDataset
 from ..dataset.dataset import DatasetAdapter
-from ..utils.errors import AbstractMethodError
 
 
 class Extension(ABC):
     @staticmethod
     def result_to_dataset(
-        result: Any, roles: ABCRole | dict[str, ABCRole], small: bool=True
+        result: Any, roles: ABCRole | dict[str, ABCRole], small: bool = True
     ) -> Dataset:
-        return DatasetAdapter.to_dataset(result, roles=roles,small=small)
-    
-    def calc(
-            self, data: Dataset, **kwargs
-    ):
+        return DatasetAdapter.to_dataset(result, roles=roles, small=small)
+
+    def calc(self, data: Dataset, **kwargs):
         raise NotImplementedError
 
 

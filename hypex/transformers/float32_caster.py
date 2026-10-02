@@ -1,8 +1,8 @@
 """Transformer that downcasts float64 columns to float32 for memory efficiency."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
-from copy import deepcopy
 from typing import Any
 
 import numpy as np
@@ -109,9 +109,7 @@ class Float32Caster(Transformer):
             Updated ``ExperimentData`` with downcasted columns.
         """
         if self.columns is not None:
-            target_cols = [
-                c for c in self.columns if c in data.ds.columns
-            ]
+            target_cols = [c for c in self.columns if c in data.ds.columns]
         else:
             target_cols = data.ds.search_columns(
                 roles=self.target_roles,
@@ -127,7 +125,9 @@ class Float32Caster(Transformer):
         return result
 
     @classmethod
-    def calc(cls, data: Dataset, target_cols: list[str] | None = None, **kwargs) -> Dataset:
+    def calc(
+        cls, data: Dataset, target_cols: list[str] | None = None, **kwargs
+    ) -> Dataset:
         """Stateless entry point for use outside the pipeline.
 
         Args:

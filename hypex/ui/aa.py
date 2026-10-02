@@ -1,5 +1,3 @@
-import matplotlib.pyplot as plt
-
 from ..analyzers.aa import AADryTestAnalyzer, AAScoreAnalyzer
 from ..dataset import Dataset, ExperimentData, InfoRole, SmallDataset, StatisticRole
 from ..reporters.aa import AABestSplitReporter, AAPassedReporter
@@ -23,8 +21,8 @@ class AAOutput(Output):
     def __init__(self):
         super().__init__(
             summary_reporter=AAPassedReporter(),
-            additional_reporters={"best_split": AABestSplitReporter()}
-        ) 
+            additional_reporters={"best_split": AABestSplitReporter()},
+        )
 
     def _extract_best_split_statistic(self, experiment_data: ExperimentData):
         aa_score_analyser_ids = experiment_data.get_ids(
@@ -59,7 +57,7 @@ class AAOutput(Output):
         for k in row.keys():
             if NAME_BORDER_SYMBOL in k:
                 continue
-            feature, test, metric, group = _parse_metric_col(k)
+            feature, test, _metric, group = _parse_metric_col(k)
             if feature and feature != "mean":
                 feature_groups.add((feature, group))
                 if test and test != "GroupDifference":
@@ -98,7 +96,11 @@ class AAOutput(Output):
                     f, t, m, g = _parse_metric_col(k)
                     if f == feature and g == group and normalize_test_name(t) == tn:
                         if m == "pass":
-                            is_significant = str(v).strip().upper() in ("OK", "TRUE", "1")
+                            is_significant = str(v).strip().upper() in (
+                                "OK",
+                                "TRUE",
+                                "1",
+                            )
                             rec[f"{tn} pass"] = "NOT OK" if is_significant else "OK"
                         elif m == "p-value":
                             rec[f"{tn} p-value"] = v
@@ -158,9 +160,7 @@ class AAOutput(Output):
             self.experiments = SmallDataset.from_dict(
                 [{"feature": [], "group": []}], roles={}
             )
-        self.experiments = self._replace_splitters(
-            self.experiments, RenameEnum.columns
-        )
+        self.experiments = self._replace_splitters(self.experiments, RenameEnum.columns)
 
     @staticmethod
     def _add_dry_score(experiment_data: ExperimentData, aa_score: Dataset) -> Dataset:
@@ -172,15 +172,15 @@ class AAOutput(Output):
             return aa_score
 
         dry_score_analyser_ids = dry_score_analyser_ids[0]
-        table = (
-            aa_score.merge(
-                experiment_data.analysis_tables[dry_score_analyser_ids],
-                right_index=True,
-                left_index=True,
-                how='left'
-            )
+        table = aa_score.merge(
+            experiment_data.analysis_tables[dry_score_analyser_ids],
+            right_index=True,
+            left_index=True,
+            how="left",
         )
-        new_pass_col = (table["pass_x"].fillna(1) + table["pass_y"].fillna(1)).rename({"pass_x": "pass"})
+        new_pass_col = (table["pass_x"].fillna(1) + table["pass_y"].fillna(1)).rename(
+            {"pass_x": "pass"}
+        )
         table.add_column(new_pass_col)
         table = table.drop(columns=["pass_x", "pass_y"])
         return table

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import inspect
 import html
-
+import inspect
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -11,9 +10,9 @@ from ..dataset import (
     ABCRole,
     AdditionalMatchingRole,
     Dataset,
-    GroupedDataset,
     ExperimentData,
     FeatureRole,
+    GroupedDataset,
     GroupingRole,
     TargetRole,
 )
@@ -27,6 +26,7 @@ from ..utils import (
 from ..utils.adapter import Adapter
 from ..utils.constants import NAME_BORDER_SYMBOL
 
+
 class Executor(ABC):
     # Maximum number of list / dict elements expanded into separate
     # sub-cells before the rendered output is truncated.
@@ -36,7 +36,7 @@ class Executor(ABC):
         "border-collapse:collapse; margin:2px 0 2px 10px; "
         "font-family:monospace; font-size:12px;"
     )
-     # Inline CSS applied to every HTML table cell.
+    # Inline CSS applied to every HTML table cell.
     _HTML_CELL: str = (
         "border:1px solid #d0d0d0; padding:2px 8px; "
         "text-align:left; vertical-align:top;"
@@ -133,7 +133,7 @@ class Executor(ABC):
     def execute(self, data: ExperimentData) -> ExperimentData:
         raise AbstractMethodError
 
-    def get_params(self, deep: bool=False):
+    def get_params(self, deep: bool = False):
         """Return the initialization parameters of this executor.
 
         Mirrors the ``scikit-learn`` ``get_params`` API: the signature of
@@ -172,7 +172,9 @@ class Executor(ABC):
 
             if deep and hasattr(value, "get_params") and not isinstance(value, type):
                 deep_items = value.get_params().items()
-                out.update((name + NAME_BORDER_SYMBOL + k, val) for k, val in deep_items)
+                out.update(
+                    (name + NAME_BORDER_SYMBOL + k, val) for k, val in deep_items
+                )
 
             out[name] = value
 
@@ -395,7 +397,7 @@ class MLExecutor(Calculator, ABC):
         data: Dataset,
         group_field: Sequence[str] | str | None = None,
         # grouping_data: list[tuple[str, Dataset]] | None = None,
-        grouping_data: GroupedDataset | None = None, 
+        grouping_data: GroupedDataset | None = None,
         target_field: str | list[str] | None = None,
         features_fields: str | list[str] | None = None,
         **kwargs,

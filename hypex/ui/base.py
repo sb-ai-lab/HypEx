@@ -155,7 +155,7 @@ class Output:
         """
         annotations: dict[str, Any] = {}
         for cls in reversed(type(self).__mro__):
-            annotations.update(cls.__dict__.get("__annotations__", {}))
+            annotations.update(vars(cls).get("__annotations__", {}))
         fields = [
             name
             for name in annotations
@@ -190,20 +190,26 @@ class Output:
         self._experiment_data = experiment_data
 
     @staticmethod
-    def _replace_splitters(data: Dataset, mode: RenameEnum = RenameEnum.columns) -> Dataset:
+    def _replace_splitters(
+        data: Dataset, mode: RenameEnum = RenameEnum.columns
+    ) -> Dataset:
         if data.is_empty() or len(data.columns) == 0:
             return data
-            
+
         result = data
         if mode in (RenameEnum.all, RenameEnum.columns):
             rename_map = {c: c.replace(ID_SPLIT_SYMBOL, " ") for c in result.columns}
             try:
                 result.raw_data = result.raw_data.rename(columns=rename_map)
             except Exception:
-                if hasattr(result._backend_data, 'data'):
-                    result._backend_data.data = result._backend_data.data.rename(columns=rename_map)
-            result._roles = {rename_map.get(c, c): role for c, role in result._roles.items()}
-            
+                if hasattr(result._backend_data, "data"):
+                    result._backend_data.data = result._backend_data.data.rename(
+                        columns=rename_map
+                    )
+            result._roles = {
+                rename_map.get(c, c): role for c, role in result._roles.items()
+            }
+
         if mode in (RenameEnum.all, RenameEnum.index):
             result.index = [str(i).replace(ID_SPLIT_SYMBOL, " ") for i in result.index]
         return result

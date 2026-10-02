@@ -129,7 +129,9 @@ class ABAnalyzer(Executor):
 
         if self.multitest_method and num_comparisons > 1:
             if self.multitest_method != ABNTestMethodsEnum.quantile:
-                multitest_result = MultiTest(self.multitest_method, self.alpha).calc(p_values, **kwargs)
+                multitest_result = MultiTest(self.multitest_method, self.alpha).calc(
+                    p_values, **kwargs
+                )
             else:
                 multitest_result = SmallDataset.create_empty()
                 for target_field in target_fields:
@@ -295,8 +297,14 @@ class ABAnalyzer(Executor):
             KeyError: If the treatment column cannot be found in the dataset.
         """
         executor_ids = data.get_ids(
-            [GroupTTest, GroupUTest, GroupKSTest,
-             StatsTTest, StatsChi2Test, StatsKSTest]
+            [
+                GroupTTest,
+                GroupUTest,
+                GroupKSTest,
+                StatsTTest,
+                StatsChi2Test,
+                StatsKSTest,
+            ]
         )
 
         group_field = data.ds.search_columns(TreatmentRole())[0]
@@ -321,8 +329,7 @@ class ABAnalyzer(Executor):
                         },
                     )
                 data.groups[group_field] = {
-                    f"{group}": ds
-                    for group, ds in combined_data.groupby(group_field)
+                    f"{group}": ds for group, ds in combined_data.groupby(group_field)
                 }
 
         num_groups = len(data.groups[group_field]) - 1
@@ -334,7 +341,8 @@ class ABAnalyzer(Executor):
         for c, spaces in executor_ids.items():
             analysis_ids = spaces.get("analysis_tables", [])
             analysis_ids = [
-                aid for aid in analysis_ids
+                aid
+                for aid in analysis_ids
                 if not aid.endswith(f"{NAME_BORDER_SYMBOL}stats")
             ]
             if len(analysis_ids) == 0:
@@ -389,9 +397,7 @@ class ABAnalyzer(Executor):
                         if not positions:
                             continue
                         value = t_data.iloc[positions][f]
-                        analysis_data[
-                            f"{c} {f} {grp_label}"
-                        ] = value.mean()
+                        analysis_data[f"{c} {f} {grp_label}"] = value.mean()
 
         analysis_dataset = SmallDataset.from_dict(
             [analysis_data], {f: StatisticRole(float) for f in analysis_data}

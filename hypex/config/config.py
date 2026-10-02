@@ -13,6 +13,7 @@ Classes:
         matching pipeline, including persistence policies, sampling
         targets, and batch sizes.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -58,6 +59,7 @@ class DatasetConfig:
             across distributed operations.
             Defaults to "index".
     """
+
     DISPLAY_ROWS: ClassVar[int] = 5
     DISPLAY_COLS: ClassVar[int] = 10
     SPARK_PANDAS_CONVERSION_LIMIT: ClassVar[int] = 100_000
@@ -68,6 +70,7 @@ class DatasetConfig:
     #: ``pd.DataFrame → spark.DataFrame`` round-trips in
     #: ``Dataset.to_backend()``.
     BACKEND_CONVERSION_INDEX_COL: ClassVar[str] = "__hypex_temp_index__"
+
 
 @dataclass(frozen=False)
 class MatchingConfig:
@@ -176,11 +179,14 @@ class MatchingConfig:
             volume.
             Defaults to 250_000.
     """
+
     FAISS_PERSIST_POLITIC: ClassVar[StorageLevel] = StorageLevel.MEMORY_AND_DISK
     FAISS_SAMPLE_TARGET: ClassVar[int] = 5_000_000
     FAISS_DRIVER_INDEX_LIMIT: ClassVar[int] = 5_000_000
     FAISS_CHUNK_SIZE: ClassVar[int] = 4096
-    FAISS_FIT_MODE: ClassVar[Literal["sample", "cluster", "full", "shuffle"]] = "shuffle"
+    FAISS_FIT_MODE: ClassVar[Literal["sample", "cluster", "full", "shuffle"]] = (
+        "shuffle"
+    )
     CACHING_INDEX_MAX_SIZE: ClassVar[int] = 5
     FAISS_N_PROBES: int = 8
     BUCKET_SIZE: int = 250_000

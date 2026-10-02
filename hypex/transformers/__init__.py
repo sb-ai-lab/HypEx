@@ -13,7 +13,6 @@ from .type_caster import TypeCaster
 __all__ = [
     "CUPEDTransformer",
     "CVFilter",
-    "CVFilter",
     "CategoryAggregator",
     "ConstFilter",
     "CorrFilter",

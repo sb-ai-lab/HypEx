@@ -16,16 +16,16 @@ try:
 except ImportError:
     from typing_extensions import Self  # Python < 3.11
 
-from .dataset import Dataset, SmallDataset
 from ..utils import (
+    ID_SPLIT_SYMBOL,
     BackendsEnum,
     ExperimentDataEnum,
-    ID_SPLIT_SYMBOL,
     NotFoundInExperimentDataError,
 )
 from ..utils.adapter import Adapter
 from ..utils.logger import logger
-from .roles import AdditionalRole, ABCRole, DefaultRole, DisabledRole
+from .dataset import Dataset, SmallDataset
+from .roles import ABCRole, AdditionalRole, DefaultRole, DisabledRole
 
 _SUPPORTED_SPACES = frozenset(
     {
@@ -35,6 +35,7 @@ _SUPPORTED_SPACES = frozenset(
         ExperimentDataEnum.variables,
     }
 )
+
 
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 class ExperimentData:
@@ -239,7 +240,6 @@ class ExperimentData:
 
         raise ValueError(f"Unknown space: {space}")
 
-    
     def _set_additional_fields(self, exec_id: str, value: Any, role: Any) -> Self:
         """Handle storage in the additional_fields space.
 
@@ -263,18 +263,15 @@ class ExperimentData:
         if was_persisted:
             self._data.unpersist()
 
-
         if not isinstance(value, Dataset):
             # Raw data (list, scalar, etc.) — add as a single column
             new_data = self._data.add_column(
-                data=value, 
-                role={exec_id: normalized_role}
+                data=value, role={exec_id: normalized_role}
             )
         elif len(value.columns) == 1:
             # Single-column Dataset — extract the column and add with exec_id as name
             new_data = self._data.add_column(
-                data=value[value.columns[0]], 
-                role={exec_id: normalized_role}
+                data=value[value.columns[0]], role={exec_id: normalized_role}
             )
             # return self
         else:
@@ -282,9 +279,7 @@ class ExperimentData:
             rename_dict = {col: f"{exec_id}_{col}" for col in value.columns}
             renamed_value = value.rename(names=rename_dict)
             new_data = self._data.merge(
-                right=renamed_value,
-                left_index=True,
-                right_index=True
+                right=renamed_value, left_index=True, right_index=True
             )
             # Apply roles: the first column gets the normalized_role, others keep their original roles
             for i, col in enumerate(value.columns):
@@ -298,16 +293,16 @@ class ExperimentData:
             self._data.unpersist()
         self._data = new_data
         return self
-    
+
     @property
     def additional_fields(self) -> Dataset | SmallDataset:
         """Backwards-compatible view of ds filtered to AdditionalRole columns.
-        
+
         Returns a new Dataset containing only columns whose role is a subclass
         of AdditionalRole. This shim enables incremental migration: writers
         in Wave 3 can continue using data.additional_fields syntax while
         actual storage moves to ds.
-        
+
         WARNING: This is a READ-ONLY view. Writes through this property
         will modify a copy and NOT the underlying ds.
         """
@@ -319,9 +314,7 @@ class ExperimentData:
         additional_cols = [c for c in self._data.columns if c not in initial]
         if not additional_cols:
             return self._data.create_empty(
-                backend=self._data.backend_type,
-                session=self._data.session,
-                roles={}
+                backend=self._data.backend_type, session=self._data.session, roles={}
             )
         view = self._data[additional_cols]
         view.roles = {c: self._data.roles[c] for c in additional_cols}
@@ -329,7 +322,7 @@ class ExperimentData:
 
     def cleanup_additional(self) -> Self:
         """Remove all columns with AdditionalRole-derived roles from ds.
-        
+
         Called at the end of Output.extract() to ensure that public-facing
         experiment results do not leak internal/synthetic columns.
         """
@@ -337,7 +330,8 @@ class ExperimentData:
             self._data.unpersist()
 
         cols_to_drop = [
-            col for col, role in self._data.roles.items()
+            col
+            for col, role in self._data.roles.items()
             if isinstance(role, AdditionalRole)
         ]
         cols_to_enable = self._data.search_columns(DisabledRole())
@@ -351,21 +345,22 @@ class ExperimentData:
                 }
             )
         return self
-    
+
     def _clean_ds_for_iteration(self) -> Dataset | SmallDataset:
         """Return a copy of ds with AdditionalRole columns removed.
-        
+
         This restores the iteration isolation that was previously provided
         by the separate additional_fields dataset. Used by ParamsExperiment,
         CycledExperiment, and GroupExperiment to ensure each iteration
         starts with a clean dataset (no leftover synthetic columns from
         previous iterations).
-        
+
         Returns:
             A new Dataset without AdditionalRole columns.
         """
         additional_cols = [
-            col for col, role in self._data.roles.items()
+            col
+            for col, role in self._data.roles.items()
             if isinstance(role, AdditionalRole)
         ]
         if not additional_cols:

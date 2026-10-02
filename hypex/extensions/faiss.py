@@ -601,9 +601,9 @@ def _crossover_search(
     control_data = np.ascontiguousarray(
         np.vstack(control_df["_features"].to_numpy())
     ).astype(np.float32)
-    test_data = np.ascontiguousarray(
-        np.vstack(test_df["_features"].to_numpy())
-    ).astype(np.float32)
+    test_data = np.ascontiguousarray(np.vstack(test_df["_features"].to_numpy())).astype(
+        np.float32
+    )
 
     quantizer = faiss.IndexFlatL2(control_data.shape[1])
     quantizer.add(control_data)
@@ -745,9 +745,11 @@ class SparkFaissExtension(FaissExtension):
         """
         self.feature_cols = list(set(data.columns) - {"index"})
         if (
-            len(set(map(lambda x: x[1], data.dtypes)).intersection(
-                ["varchar", "string"]
-            ))
+            len(
+                set(map(lambda x: x[1], data.dtypes)).intersection(
+                    ["varchar", "string"]
+                )
+            )
             > 0
         ):
             raise TypeError("Unencoded categorical features are not allowed!")
@@ -908,8 +910,7 @@ class SparkFaissExtension(FaissExtension):
 
         for batch in (
             vectorized_data.select("_features")
-            .rdd
-            .mapPartitions(lambda it: _partition_load(it, batch_size))
+            .rdd.mapPartitions(lambda it: _partition_load(it, batch_size))
             .toLocalIterator()
         ):
             np_batch = np.array(batch, dtype=np.float32)
@@ -957,7 +958,7 @@ class SparkFaissExtension(FaissExtension):
         bc_clusters = session.sparkContext.broadcast(self._centroids)
 
         def _set_clusters(
-            it: Iterable[pd.DataFrame]
+            it: Iterable[pd.DataFrame],
         ) -> Generator[pd.DataFrame, None, None]:
             import faiss
             import numpy as np
@@ -969,9 +970,7 @@ class SparkFaissExtension(FaissExtension):
             for pdf in it:
                 # Ensure features are contiguous in memory
                 # vstack does not guarantee this
-                features = np.ascontiguousarray(
-                    np.vstack(pdf["_features"].to_numpy())
-                )
+                features = np.ascontiguousarray(np.vstack(pdf["_features"].to_numpy()))
                 _, row_cluster = cluster_index.search(features, 1)
 
                 output = pdf.loc[:, ["index", "_features"]].copy()
@@ -1035,9 +1034,7 @@ class SparkFaissExtension(FaissExtension):
             np.ndarray: Array of feature vectors with shape (n_samples, n_features)
                 and dtype float32.
         """
-        frac = min(
-            MatchingConfig.FAISS_SAMPLE_TARGET / max(self._data_size, 1), 1.0
-        )
+        frac = min(MatchingConfig.FAISS_SAMPLE_TARGET / max(self._data_size, 1), 1.0)
         sample_rows = (
             vectorized_data.sample(fraction=frac, seed=self.seed)
             .select("_features")
@@ -1172,17 +1169,13 @@ class SparkFaissExtension(FaissExtension):
             self.index = None
             gc.collect()
 
-            self._sharded_rdd = (
-                rdd.mapPartitions(
-                    lambda it: partition_func(it, bc_index, bc_storage)
-                )
-                .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
-            )
+            self._sharded_rdd = rdd.mapPartitions(
+                lambda it: partition_func(it, bc_index, bc_storage)
+            ).persist(MatchingConfig.FAISS_PERSIST_POLITIC)
         else:
-            self._sharded_rdd = (
-                rdd.mapPartitions(lambda it: partition_func(it, bc_storage))
-                .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
-            )
+            self._sharded_rdd = rdd.mapPartitions(
+                lambda it: partition_func(it, bc_storage)
+            ).persist(MatchingConfig.FAISS_PERSIST_POLITIC)
         self._sharded_rdd.count()
 
     # ==============================================================================
@@ -1309,8 +1302,7 @@ class SparkFaissExtension(FaissExtension):
             )
         )
         control = (
-            self._clustered_control
-            .join(clusters_frame, on="_cluster")
+            self._clustered_control.join(clusters_frame, on="_cluster")
             .withColumn(
                 "c_buckets", F.pmod(F.hash(F.col("index")), F.col("c_buckets"))
             )  # we use `hash` to guarantee uniform distribution into buckets
@@ -1322,8 +1314,9 @@ class SparkFaissExtension(FaissExtension):
         )
 
         test = (
-            self._clustered_test
-            .withColumn("_cluster", F.explode(F.col("_cluster")).alias("_cluster"))
+            self._clustered_test.withColumn(
+                "_cluster", F.explode(F.col("_cluster")).alias("_cluster")
+            )
             .join(clusters_frame, on="_cluster")
             .withColumn("t_buckets", F.pmod(F.hash(F.col("index")), F.col("t_buckets")))
             .withColumn(
@@ -1386,7 +1379,7 @@ class SparkFaissExtension(FaissExtension):
         )
 
         def _partition_search(
-            it: Iterable[pd.DataFrame]
+            it: Iterable[pd.DataFrame],
         ) -> Generator[pd.DataFrame, None, None]:
             import faiss
             import numpy as np
@@ -1398,9 +1391,7 @@ class SparkFaissExtension(FaissExtension):
             quantizer.add(clusters)
 
             for pdf in it:
-                features = np.ascontiguousarray(
-                    np.vstack(pdf["_features"].to_numpy())
-                )
+                features = np.ascontiguousarray(np.vstack(pdf["_features"].to_numpy()))
                 _, c_ids = quantizer.search(features, clusters_search)
 
                 output = pdf.loc[:, ["index", "_features"]]
@@ -1421,8 +1412,7 @@ class SparkFaissExtension(FaissExtension):
             _partition_search, schema=schema
         ).persist(MatchingConfig.FAISS_PERSIST_POLITIC)
         test_info = (
-            self._clustered_test
-            .select(F.explode(F.col("_cluster")).alias("_cluster"))
+            self._clustered_test.select(F.explode(F.col("_cluster")).alias("_cluster"))
             .groupBy("_cluster")
             .count()
             .collect()
@@ -1461,8 +1451,7 @@ class SparkFaissExtension(FaissExtension):
             ]
         )
         neighbors_pairs = (
-            control
-            .groupBy(*["_cluster", "c_buckets", "t_buckets"])
+            control.groupBy(*["_cluster", "c_buckets", "t_buckets"])
             .cogroup(test.groupBy(*["_cluster", "c_buckets", "t_buckets"]))
             .applyInPandas(
                 lambda c_df, t_df: _crossover_search(c_df, t_df, bc_n_neighbors),
@@ -1485,17 +1474,13 @@ class SparkFaissExtension(FaissExtension):
         """
         if self.n_neighbors == 1:
             result_df = (
-                neighbors_pairs
-                .groupBy("index")
-                .agg(
-                    F.min(F.struct(F.col("dists"), F.col("nids"))).alias("_1")
-                )
+                neighbors_pairs.groupBy("index")
+                .agg(F.min(F.struct(F.col("dists"), F.col("nids"))).alias("_1"))
                 .select(F.col("index"), F.col("_1").alias("1"))
             )
         else:
             result_df = (
-                neighbors_pairs
-                .groupBy("index")
+                neighbors_pairs.groupBy("index")
                 .agg(
                     F.slice(
                         F.array_sort(
@@ -1547,15 +1532,14 @@ class SparkFaissExtension(FaissExtension):
             )
         )
 
-        result_df = (
-            session.createDataFrame(result_rdd, schema=self.PREDICT_SCHEMA)
-            .select(
-                ["index"]
-                + [
-                    F.expr(f"index_list[{i}]").alias(f"{i + 1}")
-                    for i in range(self.n_neighbors)
-                ]
-            )
+        result_df = session.createDataFrame(
+            result_rdd, schema=self.PREDICT_SCHEMA
+        ).select(
+            ["index"]
+            + [
+                F.expr(f"index_list[{i}]").alias(f"{i + 1}")
+                for i in range(self.n_neighbors)
+            ]
         )
 
         result = self.result_to_dataset(result=result_df, roles={}, small=False)
@@ -1584,7 +1568,9 @@ class SparkFaissExtension(FaissExtension):
         return {
             "references": session.sparkContext.broadcast(index_references),
             "n_neighbors": session.sparkContext.broadcast(self.n_neighbors),
-            "chunk_size": session.sparkContext.broadcast(MatchingConfig.FAISS_CHUNK_SIZE),
+            "chunk_size": session.sparkContext.broadcast(
+                MatchingConfig.FAISS_CHUNK_SIZE
+            ),
             "storage": session.sparkContext.broadcast(self.storage),
         }
 
@@ -1627,8 +1613,9 @@ class SparkFaissExtension(FaissExtension):
         operating_data = (
             data._backend_data.data.to_spark(index_col="index")
             if self.mahalanobis is None
-            else self._mahalanobis_transform(data, self.mahalanobis)
-            ._backend_data.data.to_spark(index_col="index")
+            else self._mahalanobis_transform(
+                data, self.mahalanobis
+            )._backend_data.data.to_spark(index_col="index")
         )
 
         self._data_size = operating_data.count()
@@ -1642,13 +1629,16 @@ class SparkFaissExtension(FaissExtension):
             if test_data is None:
                 raise ValueError("test_data is needed for evaluation")
             if not self._fitted:
-                raise ValueError("Index is not created yet. Call 'fit' before 'predict'.")
+                raise ValueError(
+                    "Index is not created yet. Call 'fit' before 'predict'."
+                )
 
             test_operating_data = (
                 test_data._backend_data.data.to_spark(index_col="index")
                 if self.mahalanobis is None
-                else self._mahalanobis_transform(test_data, self.mahalanobis)
-                ._backend_data.data.to_spark(index_col="index")
+                else self._mahalanobis_transform(
+                    test_data, self.mahalanobis
+                )._backend_data.data.to_spark(index_col="index")
             )
             vectorized_test = self._vectorize_data(test_operating_data)
 
@@ -1682,7 +1672,7 @@ class SparkFaissExtension(FaissExtension):
         if clustered_test is not None:
             clustered_test.unpersist(blocking=True)
 
-    def __enter__(self) -> "SparkFaissExtension":
+    def __enter__(self) -> SparkFaissExtension:
         """
         Context manager entry point.
 

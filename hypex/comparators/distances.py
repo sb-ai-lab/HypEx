@@ -30,14 +30,15 @@ class MahalanobisDistance(Calculator):
     """
     Calculator for computing the Mahalanobis distance between groups.
 
-    This class is typically used in matching algorithms to find similar observations 
-    across treatment and control groups based on multiple features. It accounts for 
-    feature correlations by applying a linear transformation (via Cholesky decomposition 
+    This class is typically used in matching algorithms to find similar observations
+    across treatment and control groups based on multiple features. It accounts for
+    feature correlations by applying a linear transformation (via Cholesky decomposition
     of the pooled covariance matrix) and optionally applies user-defined feature weights.
 
     Inherits from:
         Calculator: The base class for stateless calculation executors.
     """
+
     def __init__(
         self,
         grouping_role: ABCRole | None = None,
@@ -48,12 +49,12 @@ class MahalanobisDistance(Calculator):
         Initialize the Mahalanobis distance calculator.
 
         Args:
-            grouping_role (ABCRole | None, optional): The role defining the grouping 
+            grouping_role (ABCRole | None, optional): The role defining the grouping
                 column (e.g., treatment assignment). Defaults to `GroupingRole()`.
-            key (Any, optional): Optional identifier for the calculator instance. 
+            key (Any, optional): Optional identifier for the calculator instance.
                 Defaults to "".
-            weights (dict[str, float] | None, optional): Optional dictionary mapping 
-                feature names to their relative importance weights. If None, all 
+            weights (dict[str, float] | None, optional): Optional dictionary mapping
+                feature names to their relative importance weights. If None, all
                 features are weighted equally. Defaults to None.
         """
         super().__init__(key=key)
@@ -70,13 +71,13 @@ class MahalanobisDistance(Calculator):
         """
         Execute the inner distance calculation logic on grouped data.
 
-        Iterates through the grouped data, treating the first group as the baseline 
-        (control) and subsequent group as compared (test) group, calculating the 
+        Iterates through the grouped data, treating the first group as the baseline
+        (control) and subsequent group as compared (test) group, calculating the
         Mahalanobis transformation matrix to both.
 
         Args:
             grouping_data: Grouped dataset containing baseline and compared data slices.
-            target_fields (list[str] | None, optional): Optional list of target field 
+            target_fields (list[str] | None, optional): Optional list of target field
                 names to compute the distance on. Defaults to None.
             **kwargs: Additional keyword arguments passed to `_inner_function`.
 
@@ -109,7 +110,7 @@ class MahalanobisDistance(Calculator):
             )
 
     def _set_value(
-            self, data: ExperimentData, value: Dataset | None = None, key: Any = None
+        self, data: ExperimentData, value: Dataset | None = None, key: Any = None
     ) -> ExperimentData:
         """
         Store the calculated distance results into the ExperimentData object.
@@ -122,12 +123,7 @@ class MahalanobisDistance(Calculator):
 
         Returns:
         """
-        data.set_value(
-            ExperimentDataEnum.variables,
-            self.id,
-            value,
-            self.key
-        )
+        data.set_value(ExperimentDataEnum.variables, self.id, value, self.key)
         return data
 
     def _get_fields(self, data: ExperimentData):
@@ -167,21 +163,21 @@ class MahalanobisDistance(Calculator):
         """
         Compute the Mahalanobis transformation for the given datasets.
 
-        Calculates the pooled covariance matrix, performs Cholesky decomposition, 
-        and applies the inverse transformation to project the data into a space 
-        where the covariance is the identity matrix. Optional feature weights are 
+        Calculates the pooled covariance matrix, performs Cholesky decomposition,
+        and applies the inverse transformation to project the data into a space
+        where the covariance is the identity matrix. Optional feature weights are
         applied via a diagonal matrix before the final projection.
 
         Args:
             data (Dataset): The baseline (control) dataset.
-            test_data (Dataset | None, optional): The compared (test) dataset. 
+            test_data (Dataset | None, optional): The compared (test) dataset.
                 Defaults to None.
-            weights (dict[str, float] | None, optional): Feature weights dictionary. 
+            weights (dict[str, float] | None, optional): Feature weights dictionary.
                 Defaults to None.
             **kwargs: Additional keyword arguments.
 
         Returns:
-            dict: A dictionary containing the transformed "control" dataset, and 
+            dict: A dictionary containing the transformed "control" dataset, and
             optionally the "test" dataset if `test_data` was provided.
         """
         test_data = cls._check_test_data(test_data)
@@ -215,17 +211,17 @@ class MahalanobisDistance(Calculator):
         """
         Stateless entry point to calculate Mahalanobis distance.
 
-        Allows the comparator to be run outside the experiment pipeline. Pass either 
-        pre-grouped `grouping_data` or the raw `data` and `group_field` to have the 
+        Allows the comparator to be run outside the experiment pipeline. Pass either
+        pre-grouped `grouping_data` or the raw `data` and `group_field` to have the
         data grouped here.
 
         Args:
             data (Dataset): The input dataset.
-            group_field (Sequence[str] | str | None, optional): Column name(s) to 
+            group_field (Sequence[str] | str | None, optional): Column name(s) to
                 group by. Defaults to None.
-            grouping_data (GroupedDataset | None, optional): Pre-grouped data. 
+            grouping_data (GroupedDataset | None, optional): Pre-grouped data.
                 Defaults to None.
-            target_fields (str | list[str] | None, optional): Target column(s) to 
+            target_fields (str | list[str] | None, optional): Target column(s) to
                 compute distance on. Defaults to None.
             weights (dict[str, float] | None, optional): Feature weights. Defaults to None.
             **kwargs: Additional keyword arguments.
@@ -258,15 +254,15 @@ class MahalanobisDistance(Calculator):
         """
         Execute the Mahalanobis distance calculation on the given experiment data.
 
-        Retrieves the appropriate fields, handles temporary roles if necessary, and 
-        delegates the calculation to `calc`. The results are then stored back into 
+        Retrieves the appropriate fields, handles temporary roles if necessary, and
+        delegates the calculation to `calc`. The results are then stored back into
         the `ExperimentData` object.
 
         Args:
             data (ExperimentData): The ExperimentData to execute the calculator on.
 
         Returns:
-            ExperimentData: The ExperimentData with the distance calculation results 
+            ExperimentData: The ExperimentData with the distance calculation results
             stored in the `groups` space.
         """
         group_field, target_fields = self._get_fields(data=data)

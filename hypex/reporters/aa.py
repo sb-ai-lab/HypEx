@@ -15,7 +15,7 @@ from ..comparators import (
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..dataset.dataset import SmallDataset
 from ..splitters import AASplitter, AASplitterWithStratification
-from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum, NotFoundInExperimentDataError
+from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
 from ..utils.constants import NAME_BORDER_SYMBOL
 from ..utils.naming import _parse_metric_col, normalize_test_name
 from .abstract import (
@@ -34,14 +34,19 @@ class AATestReporter(DatasetReporter):
     Extracts group differences, statistical test outcomes, and analyzer metadata,
     formatting them into a structured dataset or dictionary.
     """
+
     tests: ClassVar[list[type[BaseComparator]]] = [
-        GroupTTest, GroupKSTest, GroupChi2Test,
-        StatsTTest, StatsKSTest, StatsChi2Test,
+        GroupTTest,
+        GroupKSTest,
+        GroupChi2Test,
+        StatsTTest,
+        StatsKSTest,
+        StatsChi2Test,
     ]
 
-    def __init__(self, 
-                 dict_reporter: DictReporter | None = None, 
-                 output_format: str = "dataset"):
+    def __init__(
+        self, dict_reporter: DictReporter | None = None, output_format: str = "dataset"
+    ):
         """Initialize the A/A test reporter.
 
         Args:
@@ -70,7 +75,8 @@ class AATestReporter(DatasetReporter):
         for c in [AASplitterWithStratification, AASplitter]:
             ids = data.get_ids(c, ExperimentDataEnum.additional_fields)
             found = ids.get(c.__name__, {}).get(
-                ExperimentDataEnum.additional_fields.value, [],
+                ExperimentDataEnum.additional_fields.value,
+                [],
             )
             if found:
                 return found[0]
@@ -90,7 +96,7 @@ class AATestReporter(DatasetReporter):
         result.update(extract_group_difference(data, front_flag))
         result.update(extract_tests(data, self.tests, front_flag))
         result.update(extract_analyzer_data(data, "OneAAStatAnalyzer"))
-        
+
         return result
 
     def report(self, data: ExperimentData) -> dict[str, Any] | Dataset:
@@ -112,11 +118,13 @@ class AATestReporter(DatasetReporter):
         finally:
             self.dict_reporter.front = prev
 
+
 class OneAADictReporter(AATestReporter):
     """Legacy reporter wrapper for dictionary output.
 
     Deprecated: Use ``AATestReporter(output_format='dict')`` instead.
     """
+
     def __init__(self, front: bool = True):
         """Initialize the legacy dictionary reporter.
 
@@ -125,9 +133,11 @@ class OneAADictReporter(AATestReporter):
             Defaults to ``True``.
         """
         super().__init__(dict_reporter=DictReporter(front=front), output_format="dict")
-        warnings.warn("OneAADictReporter is deprecated. Use AATestReporter(output_format='dict')", 
-                      DeprecationWarning, 
-                      stacklevel=2)
+        warnings.warn(
+            "OneAADictReporter is deprecated. Use AATestReporter(output_format='dict')",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     @staticmethod
     def convert_flat_dataset(data: dict[str, Any]) -> SmallDataset:
@@ -141,17 +151,21 @@ class OneAADictReporter(AATestReporter):
         """
         return AATestReporter.convert_to_dataset(data)
 
+
 class AADatasetReporter(AATestReporter):
     """Legacy reporter wrapper for dataset output.
 
     Deprecated: Use ``AATestReporter()`` instead.
     """
+
     def __init__(self):
         """Initialize the legacy dataset reporter."""
         super().__init__(dict_reporter=DictReporter(), output_format="dataset")
-        warnings.warn("AADatasetReporter is deprecated. Use AATestReporter()", 
-                      DeprecationWarning, 
-                      stacklevel=2)
+        warnings.warn(
+            "AADatasetReporter is deprecated. Use AATestReporter()",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
 
 class AAPassedReporter(Reporter):
@@ -176,7 +190,7 @@ class AAPassedReporter(Reporter):
     def _collect_tables(data: ExperimentData):
         ids = data.get_ids("AAScoreAnalyzer", ExperimentDataEnum.analysis_tables)
         tables = {
-            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1:]: data.analysis_tables[id_]
+            id_[id_.rfind(ID_SPLIT_SYMBOL) + 1 :]: data.analysis_tables[id_]
             for id_ in ids.get("AAScoreAnalyzer", {}).get("analysis_tables", [])
         }
         aa_score = tables.get("aa score")
@@ -195,8 +209,7 @@ class AAPassedReporter(Reporter):
     def _ordered_test_names(aa_score: Dataset) -> list[str]:
         order_map = {"TTest": 0, "KSTest": 1, "Chi2Test": 2, "ZTest": 3}
         names = dict.fromkeys(
-            str(idx).split()[-2] if len(str(idx).split()) >= 3
-            else str(idx).split()[0]
+            str(idx).split()[-2] if len(str(idx).split()) >= 3 else str(idx).split()[0]
             for idx in aa_score.index
         )
         return sorted(names, key=lambda t: order_map.get(t, 99))
@@ -224,14 +237,12 @@ class AAPassedReporter(Reporter):
 
             rec[f"{tn} best split"] = self._best_split_pass(row, feature, tn, group)
 
-
         failed = any(
             rec.get(f"{tn} {sfx}") == "NOT OK"
             for tn in test_names
             for sfx in ("aa score", "best split")
         )
         rec["result"] = "NOT OK" if failed else "OK"
-
 
         for m in ("control mean", "test mean", "difference", "difference %"):
             rec[m] = self._metric(row, feature, "GroupDifference", m, group)
@@ -252,8 +263,15 @@ class AAPassedReporter(Reporter):
     def _best_split_pass(row: dict, feature: str, tn: str, group: str):
         for k, v in row.items():
             f, t, m, g = _parse_metric_col(k)
-            if f == feature and normalize_test_name(t) == tn and m == "pass" and g == group:
-                return "NOT OK" if str(v).strip().upper() in ("OK", "TRUE", "1") else "OK"
+            if (
+                f == feature
+                and normalize_test_name(t) == tn
+                and m == "pass"
+                and g == group
+            ):
+                return (
+                    "NOT OK" if str(v).strip().upper() in ("OK", "TRUE", "1") else "OK"
+                )
         return None
 
     @staticmethod
@@ -286,6 +304,7 @@ class AABestSplitReporter(Reporter):
     Identifies the optimal data split and merges its identifier back into
     the primary dataset for downstream analysis.
     """
+
     def report(self, data: ExperimentData) -> Dataset:
         """Merge the best split identifier into the main dataset.
 
@@ -301,7 +320,7 @@ class AABestSplitReporter(Reporter):
             None,
         )
         if best_split_id is None:
-           return data.ds
+            return data.ds
 
         markers = data.additional_fields.select([best_split_id])
         markers = markers.rename({best_split_id: "split"})

@@ -1,21 +1,21 @@
 # pytest -s -v tests/test_matching.py
-import pytest
-import pandas as pd
-import numpy as np
 from itertools import product
+
+import numpy as np
+import pandas as pd
+import pytest
+from causalinference import CausalModel
+from causalinference.utils import tools
 
 from hypex import Matching
 from hypex.dataset import (
     Dataset,
     FeatureRole,
+    GroupingRole,
     InfoRole,
     TargetRole,
     TreatmentRole,
-    GroupingRole,
 )
-
-from causalinference import CausalModel
-from causalinference.utils import tools
 
 
 @pytest.fixture

@@ -10,7 +10,6 @@ from ..dataset import (
     Dataset,
     ExperimentData,
     FeatureRole,
-    InfoRole,
 )
 from ..executor import MLExecutor
 from ..extensions.faiss import FaissExtension
@@ -32,6 +31,7 @@ class FaissNearestNeighbors(MLExecutor):
     Inherits from:
         MLExecutor: The base class for machine learning executors in the HypEx library.
     """
+
     def __init__(
         self,
         n_neighbors: int = 1,
@@ -45,19 +45,19 @@ class FaissNearestNeighbors(MLExecutor):
         Initialize the FAISS nearest neighbors executor.
 
         Args:
-            n_neighbors (int, optional): The number of nearest neighbors to find 
+            n_neighbors (int, optional): The number of nearest neighbors to find
                 for each observation. Defaults to 1.
-            two_sides (bool, optional): If True, performs matching in both directions 
+            two_sides (bool, optional): If True, performs matching in both directions
                 (treatment to control and control to treatment). Defaults to False.
-            test_pairs (bool, optional): If True, only matches test (treatment) 
+            test_pairs (bool, optional): If True, only matches test (treatment)
                 observations to control observations. Defaults to False.
-            grouping_role (ABCRole | None, optional): The role defining the grouping 
+            grouping_role (ABCRole | None, optional): The role defining the grouping
                 column (e.g., treatment assignment). Defaults to None.
-            key (Any, optional): Optional identifier for the executor instance. 
+            key (Any, optional): Optional identifier for the executor instance.
                 Defaults to "".
-            faiss_mode (Literal["base", "fast", "auto"], optional): The FAISS execution 
-                mode. "auto" automatically selects the best index type based on data 
-                size, "fast" forces an optimized index, and "base" uses a standard 
+            faiss_mode (Literal["base", "fast", "auto"], optional): The FAISS execution
+                mode. "auto" automatically selects the best index type based on data
+                size, "fast" forces an optimized index, and "base" uses a standard
                 flat index. Defaults to "auto".
         """
         self.n_neighbors = n_neighbors
@@ -86,7 +86,7 @@ class FaissNearestNeighbors(MLExecutor):
                 Dataset for that group, used to resolve the global index.
 
         Returns:
-            list[int] | list[list[int]] | Dataset: The updated dataset or list containing 
+            list[int] | list[list[int]] | Dataset: The updated dataset or list containing
             global match indices. Returns the input unchanged if it is empty.
         """
         if len(local_indexes) == 0:
@@ -102,7 +102,7 @@ class FaissNearestNeighbors(MLExecutor):
     def _execute_inner_function(
         cls,
         grouping_data,
-        tmp_roles, 
+        tmp_roles,
         target_field: str | None = None,
         n_neighbors: int | None = None,
         two_sides: bool | None = None,
@@ -130,7 +130,7 @@ class FaissNearestNeighbors(MLExecutor):
             dict: A dictionary containing the matched datasets. Keys can be "test" and/or "control"
             depending on the `two_sides` and `test_pairs` flags.
         """
-        (control_idx, _data), (test_idx, _test_data), *_ = grouping_data
+        (_control_idx, _data), (_test_idx, _test_data), *_ = grouping_data
         _data.tmp_roles = tmp_roles
         if test_pairs is not True:
             test_data = cls._inner_function(
@@ -204,11 +204,11 @@ class FaissNearestNeighbors(MLExecutor):
         Returns:
             Any: The result of the nearest neighbor search from the backend-specific FAISS extension.
         """
-        mahalanobis = kwargs.get('mahalanobis')
+        mahalanobis = kwargs.get("mahalanobis")
         faiss_cls = backend_factory.resolve_backend(FaissExtension, data)
-        return faiss_cls(n_neighbors=n_neighbors or 1, faiss_mode=faiss_mode, mahalanobis=mahalanobis).calc(
-            data=data, test_data=test_data
-        )
+        return faiss_cls(
+            n_neighbors=n_neighbors or 1, faiss_mode=faiss_mode, mahalanobis=mahalanobis
+        ).calc(data=data, test_data=test_data)
 
     def fit(self, X: Dataset, Y: Dataset | None = None) -> MLExecutor:
         """
@@ -265,12 +265,25 @@ class FaissNearestNeighbors(MLExecutor):
         if group_field[0] in data.groups:
             grouping_data = list(data.groups[group_field[0]].items())
         else:
-            grouping_data = list(data.ds[group_field + features_fields].groupby(group_field))
+            grouping_data = list(
+                data.ds[group_field + features_fields].groupby(group_field)
+            )
         mahalanobis = (
-            next(iter(data.variables[data.get_one_id(MahalanobisDistance, ExperimentDataEnum.variables)].values()))
+            next(
+                iter(
+                    data.variables[
+                        data.get_one_id(
+                            MahalanobisDistance, ExperimentDataEnum.variables
+                        )
+                    ].values()
+                )
+            )
             if len(
-                data.get_ids(MahalanobisDistance, ExperimentDataEnum.variables)["MahalanobisDistance"]["variables"]
-            ) > 0
+                data.get_ids(MahalanobisDistance, ExperimentDataEnum.variables)[
+                    "MahalanobisDistance"
+                ]["variables"]
+            )
+            > 0
             else None
         )
         compare_result = self.calc(
@@ -282,7 +295,7 @@ class FaissNearestNeighbors(MLExecutor):
             faiss_mode=self.faiss_mode,
             two_sides=self.two_sides,
             test_pairs=self.test_pairs,
-            mahalanobis=mahalanobis
+            mahalanobis=mahalanobis,
         )
         nans = 0
 
@@ -295,12 +308,11 @@ class FaissNearestNeighbors(MLExecutor):
                 UserWarning,
             )
         matched_indexes: Dataset = Dataset.create_empty(
-            backend=data.ds.backend_type,
-            session=data.ds.session
+            backend=data.ds.backend_type, session=data.ds.session
         )
         for res_k, res_v in compare_result.items():
             # res_v has index similar to group data
-            #`limit` may be removed
+            # `limit` may be removed
             t_index_field: Dataset = res_v
 
             # TODO: Similar comment as abobe: find more elegant solution
@@ -313,7 +325,7 @@ class FaissNearestNeighbors(MLExecutor):
                 {col: f"indexes_{i}" for i, col in enumerate(t_index_field.columns)}
             )
             t_index_field.roles = {
-                col: AdditionalMatchingRole() for col in  t_index_field.columns
+                col: AdditionalMatchingRole() for col in t_index_field.columns
             }
             matched_indexes = matched_indexes.append(t_index_field)
         # matched_indexes.checkpoint(eager=True)

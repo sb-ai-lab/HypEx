@@ -3,42 +3,41 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pyspark.sql.functions as F
-
-from pyspark.sql import DataFrame as SparkDF
 from pyspark import StorageLevel
 from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.regression import LinearRegression
-
-from .abstract import Extension
+from pyspark.sql import DataFrame as SparkDF
 
 from ..dataset import (
-    Dataset, 
-    ExperimentData, 
     ABCRole,
     AdditionalMatchingRole,
+    Dataset,
+    ExperimentData,
     FeatureRole,
+    InfoRole,
     TargetRole,
-    InfoRole
 )
 from ..dataset.backends import PandasDataset, SparkDataset
-from ..utils.registry import backend_factory
 from ..utils import Adapter
 from ..utils.logger import logger
+from ..utils.registry import backend_factory
+from .abstract import Extension
+
 
 class BiasExtension(Extension):
     """Base class for estimating selection bias after matching using linear regression.
-    
-    This extension quantifies the residual bias between treatment and control groups 
-    that remains after the matching procedure. It uses a linear regression model 
-    trained on the matched sample to predict the counterfactual outcome, then 
+
+    This extension quantifies the residual bias between treatment and control groups
+    that remains after the matching procedure. It uses a linear regression model
+    trained on the matched sample to predict the counterfactual outcome, then
     computes the difference between the observed and predicted values.
-    
+
     The bias is defined as:
         - For treatment group: bias_t = (X - X_matched) * coefficients_t
         - For control group:   bias_c = (X - X_matched) * coefficients_c
-        
+
     Subclasses must implement backend-specific logic for Pandas and Spark.
-    
+
     Attributes:
         grouping_role: Role defining the treatment assignment column.
         target_roles: Role(s) defining the target outcome column(s).
@@ -46,13 +45,14 @@ class BiasExtension(Extension):
         group_field: Resolved name of the grouping column.
         features: List of feature column names used for regression.
     """
+
     def __init__(
-            self,
-            grouping_role: ABCRole,
-            target_roles: list[ABCRole],
+        self,
+        grouping_role: ABCRole,
+        target_roles: list[ABCRole],
     ):
         """Initialize the BiasExtension.
-        
+
         Args:
             grouping_role: The role identifying the treatment/control grouping column.
             target_roles: The role(s) identifying the target outcome column(s).
@@ -67,10 +67,10 @@ class BiasExtension(Extension):
 
     def _set_columns(self, data: Dataset) -> list[str]:
         """Resolve and store target and group field names from the dataset.
-        
+
         Args:
             data: The input dataset to search for roles.
-            
+
         Returns:
             List of resolved column names (target and group).
         """
@@ -78,67 +78,64 @@ class BiasExtension(Extension):
         self.group_field = data.search_columns(self.grouping_role)[0]
 
     @staticmethod
-    def prepare_data(
-        data: ExperimentData
-    ) -> Dataset:
+    def prepare_data(data: ExperimentData) -> Dataset:
         """Prepare matched data from experiment data (backend-specific)."""
         raise NotImplementedError
 
     @staticmethod
-    def calc_bias(
-            X: Dataset, X_matched: Dataset, coefficients: np.ndarray[float]
-    ):
+    def calc_bias(X: Dataset, X_matched: Dataset, coefficients: np.ndarray[float]):
         """Calculate bias using feature differences and regression coefficients."""
         raise NotImplementedError
-    
+
     def calc(self, data: Dataset, **kwargs):
         """Execute the full bias estimation pipeline."""
         raise NotImplementedError
-    
+
     def _calc_coefs(self, data: Dataset) -> np.ndarray:
         """Compute linear regression coefficients for each group."""
         raise NotImplementedError
-    
+
     @staticmethod
     def _extract_info(data: Dataset) -> tuple[Dataset, list[str], list[str]]:
         """Extract neighbor indices and numeric columns from the dataset.
-        
+
         Args:
             data: The dataset containing matching results and features.
-            
+
         Returns:
             A tuple containing:
                 - List of column names containing neighbor indices.
                 - List of numeric column names (features and targets).
-                
+
         Raises:
             ValueError: If no matching index columns are found.
         """
         neighbors_cols = data.search_columns(AdditionalMatchingRole())
         if len(neighbors_cols) == 0:
             raise ValueError("No indexes were found")
-        
+
         numeric_cols = data.search_columns(
             roles=[
-                FeatureRole(), TargetRole(), 
-            ], 
-            search_types=[int, float]
+                FeatureRole(),
+                TargetRole(),
+            ],
+            search_types=[int, float],
         )
         return neighbors_cols, numeric_cols
+
 
 @backend_factory.register(BiasExtension, PandasDataset)
 class PandasBisaExtesion(BiasExtension):
     """Pandas backend implementation for bias estimation.
-    
-    Performs in-memory ordinary least squares (OLS) regression using 
-    `numpy.linalg.lstsq` to estimate coefficients, and vectorized 
+
+    Performs in-memory ordinary least squares (OLS) regression using
+    `numpy.linalg.lstsq` to estimate coefficients, and vectorized
     NumPy operations to compute the final bias adjustments.
     """
+
     @staticmethod
     def _prepare_data(
-        data: Dataset,
-        neighbors_cols: list[str] | str,
-        numeric_cols: list[str] | str
+        data: Dataset, neighbors_cols: list[str] | str, numeric_cols: list[str] | str
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Prepare matched features for bias estimation using Pandas.
 
@@ -163,12 +160,12 @@ class PandasBisaExtesion(BiasExtension):
 
         # Melt the neighbor indexes to long format
         melted = indexes.stack().reset_index()
-        melted.columns = ['initial_index', 'neighbor_col', 'match_index']
-        melted = melted.dropna(subset=['match_index'])
+        melted.columns = ["initial_index", "neighbor_col", "match_index"]
+        melted = melted.dropna(subset=["match_index"])
 
         # filter out dummy match markers (-1) that indicate
         #    "no valid match found". These are NOT valid row labels.
-        melted = melted[melted['match_index'] != -1]
+        melted = melted[melted["match_index"] != -1]
 
         if melted.empty:
             # No valid matches at all — return empty matched_data
@@ -178,12 +175,14 @@ class PandasBisaExtesion(BiasExtension):
             return indexes, empty_matched
 
         # Fetch the features of the matched units
-        matched_features = t_data.loc[melted['match_index']].copy()
-        matched_features.index = melted['initial_index'].values
+        matched_features = t_data.loc[melted["match_index"]].copy()
+        matched_features.index = melted["initial_index"].values
 
         # Group by original index and calculate mean
         matched_data = matched_features.groupby(level=0).mean()
-        matched_data = matched_data.rename(columns={col: f"{col}_matched" for col in numeric_cols})
+        matched_data = matched_data.rename(
+            columns={col: f"{col}_matched" for col in numeric_cols}
+        )
 
         return indexes, matched_data
 
@@ -212,7 +211,7 @@ class PandasBisaExtesion(BiasExtension):
         def _get_weights(group_data: pd.DataFrame) -> np.ndarray:
             """Fit OLS on a single group, tolerating NaN / inf rows."""
             # ── FIX: drop rows where ANY matched feature or target is NaN
-            valid_mask = group_data[features + [target]].notna().all(axis=1)
+            valid_mask = group_data[[*features, target]].notna().all(axis=1)
             group_data = group_data.loc[valid_mask]
 
             # Need at least (n_features + 1) rows for a full-rank system
@@ -233,9 +232,7 @@ class PandasBisaExtesion(BiasExtension):
 
             X_with_intercept = np.c_[np.ones(X.shape[0]), X]
             try:
-                weights, _, _, _ = np.linalg.lstsq(
-                    X_with_intercept, y, rcond=None
-                )
+                weights, _, _, _ = np.linalg.lstsq(X_with_intercept, y, rcond=None)
             except np.linalg.LinAlgError:
                 # Singular or non-convergent system → zero coefficients
                 return np.zeros(n_coefs)
@@ -282,9 +279,7 @@ class PandasBisaExtesion(BiasExtension):
         features = self.features
         matched_features = [col + "_matched" for col in features]
 
-        def _dot_safe(
-            mask: pd.Series, coefs: np.ndarray
-        ) -> None:
+        def _dot_safe(mask: pd.Series, coefs: np.ndarray) -> None:
             """Compute bias for the masked rows, replacing NaN with 0."""
             if not mask.any():
                 return
@@ -309,6 +304,7 @@ class PandasBisaExtesion(BiasExtension):
         n_unmatched = int(nan_mask.sum())
         if n_unmatched > 0:
             import warnings
+
             warnings.warn(
                 f"BiasExtension: {n_unmatched} of {len(data)} observations "
                 f"have no valid match. They will be excluded from the "
@@ -342,7 +338,8 @@ class PandasBisaExtesion(BiasExtension):
         self._set_columns(data)
         neighbors_cols, numeric_cols = self._extract_info(data)
         self.features = [
-            col for col in numeric_cols
+            col
+            for col in numeric_cols
             if col != self.group_field and col != self.target_field
         ]
 
@@ -352,14 +349,19 @@ class PandasBisaExtesion(BiasExtension):
             numeric_cols=numeric_cols,
         )
 
-        initial_data = data[numeric_cols + [self.group_field]].raw_data
+        initial_data = data[[*numeric_cols, self.group_field]].raw_data
         initial_data = initial_data.join(matched_data, how="left")
 
         # ── Early exit: no valid matches at all ──────────────────────
         matched_cols = [f"{c}_matched" for c in numeric_cols]
         has_matched_cols = all(c in initial_data.columns for c in matched_cols)
-        if not has_matched_cols or matched_data.empty or initial_data[matched_cols].isna().all().all():
+        if (
+            not has_matched_cols
+            or matched_data.empty
+            or initial_data[matched_cols].isna().all().all()
+        ):
             import warnings
+
             warnings.warn(
                 "BiasExtension: no valid matches found for any observation. "
                 "Treatment effect estimation will produce NaN results.",
@@ -386,21 +388,22 @@ class PandasBisaExtesion(BiasExtension):
             data=final_data,
         )
 
+
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 @backend_factory.register(BiasExtension, SparkDataset)
 class SparkBisaExtesion(BiasExtension):
     """Spark backend implementation for distributed bias estimation.
-    
-    Leverages PySpark's distributed DataFrame operations and MLlib's 
-    LinearRegression to fit models and compute bias adjustments across 
+
+    Leverages PySpark's distributed DataFrame operations and MLlib's
+    LinearRegression to fit models and compute bias adjustments across
     large-scale datasets partitioned by the grouping column.
-    
+
     Attributes:
-        STORAGE_DICT: dict with storages that are used in HypEx 
+        STORAGE_DICT: dict with storages that are used in HypEx
         for caching Datasets.
     """
 
-    STORAGE_DICT = {
+    STORAGE_DICT = {  # noqa: RUF012
         "MEMORY_ONLY": StorageLevel.MEMORY_ONLY,
         "MEMORY_AND_DISK": StorageLevel.MEMORY_AND_DISK,
         "DISK_ONLY": StorageLevel.DISK_ONLY,
@@ -408,32 +411,32 @@ class SparkBisaExtesion(BiasExtension):
 
     @staticmethod
     def _prepare_data(
-        data: Dataset, 
-        neighbors_cols: list[str] | str, 
+        data: Dataset,
+        neighbors_cols: list[str] | str,
         numeric_cols: list[str] | str,
         storage_level: str | None = None,
     ) -> SparkDF:
         """Prepare matched features for bias estimation using PySpark.
-        
-        Explodes the neighbor indices, joins with the original feature data, 
-        and aggregates by computing the mean of matched features for each 
+
+        Explodes the neighbor indices, joins with the original feature data,
+        and aggregates by computing the mean of matched features for each
         initial observation.
-        
+
         Args:
             data: The input dataset.
             neighbors_cols: Column name(s) containing neighbor indices.
             numeric_cols: Numeric columns to aggregate.
-            
+
         Returns:
             A SparkDF with aggregated matched features suffixed with '_matched'.
         """
         neighbors_cols = Adapter.to_list(neighbors_cols)
         numeric_cols = Adapter.to_list(numeric_cols)
         storage_level = storage_level or "MEMORY_AND_DISK"
-        
-        t_data: SparkDF = data[numeric_cols].raw_data.to_spark(index_col='index')
-        indexes: SparkDF = data[neighbors_cols].raw_data.to_spark(index_col='index')
-        working_columns = [col for col in indexes.columns if col != 'index']
+
+        t_data: SparkDF = data[numeric_cols].raw_data.to_spark(index_col="index")
+        indexes: SparkDF = data[neighbors_cols].raw_data.to_spark(index_col="index")
+        working_columns = [col for col in indexes.columns if col != "index"]
 
         t_data.persist(SparkBisaExtesion.STORAGE_DICT[storage_level])
         indexes.persist(SparkBisaExtesion.STORAGE_DICT[storage_level])
@@ -443,14 +446,18 @@ class SparkBisaExtesion(BiasExtension):
 
         matched_data = (
             indexes.select(
-                F.col('index').alias('initial_index'),
-                F.explode(F.array(*working_columns).alias("list_indexes")).alias('index')
+                F.col("index").alias("initial_index"),
+                F.explode(F.array(*working_columns).alias("list_indexes")).alias(
+                    "index"
+                ),
             )
-            .join(other=t_data, on='index')
-            .groupBy('initial_index')
+            .join(other=t_data, on="index")
+            .groupBy("initial_index")
             .agg(
                 *[
-                    F.mean(col).alias(col + "_matched") for col in t_data.columns if col != 'index'
+                    F.mean(col).alias(col + "_matched")
+                    for col in t_data.columns
+                    if col != "index"
                 ]
             )
         )
@@ -469,55 +476,50 @@ class SparkBisaExtesion(BiasExtension):
         indexes.unpersist()
 
         return matched_data
-    
+
     @classmethod
     def prepare_data(cls, data: Dataset) -> tuple[Dataset]:
         """Public wrapper for data preparation, returning Dataset objects.
-        
+
         Args:
             data: The input dataset.
-            
+
         Returns:
             A tuple containing the neighbor indices Dataset and the matched data Dataset.
         """
         neighbors_cols, numeric_cols = cls._extract_info(data)
         matched_data = cls._prepare_data(
-            data = data,
-            neighbors_cols=neighbors_cols,
-            numeric_cols=numeric_cols
+            data=data, neighbors_cols=neighbors_cols, numeric_cols=numeric_cols
         )
         matched_data = cls.result_to_dataset(matched_data, small=False)
-        matched_data = matched_data.set_index('initial_index')
+        matched_data = matched_data.set_index("initial_index")
         matched_data.index.name = None
-        
+
         indexes = data[neighbors_cols]
 
         return indexes, matched_data
-    
+
     def _calc_coefs(self, data: SparkDF) -> np.ndarray:
         """Distributed linear regression coefficient estimation using MLlib.
-        
-        Fits a separate Spark LinearRegression model for each group. Data is 
+
+        Fits a separate Spark LinearRegression model for each group. Data is
         repartitioned by the group field to optimize distributed training.
-        
+
         Args:
             data: SparkDF containing matched features and targets.
-            
+
         Returns:
             A numpy array of shape (2, n_features) with coefficients for both groups.
         """
         group_1, group_2, *_ = sorted(
-            map(
-                lambda row: row[0],
-                data.select(self.group_field).distinct().collect()
-            )
+            map(lambda row: row[0], data.select(self.group_field).distinct().collect())
         )
         features = [col + "_matched" for col in self.features]
-        assembler = VectorAssembler(inputCols=features, outputCol='_features')
+        assembler = VectorAssembler(inputCols=features, outputCol="_features")
         lr = LinearRegression(
-            featuresCol='_features', 
-            labelCol=self.target_field + "_matched", 
-            regParam=0.01
+            featuresCol="_features",
+            labelCol=self.target_field + "_matched",
+            regParam=0.01,
         )
         data = data.repartition(F.col(self.group_field))
 
@@ -536,37 +538,26 @@ class SparkBisaExtesion(BiasExtension):
         weights_1 = model_1.coefficients.toArray()
         weights_2 = model_2.coefficients.toArray()
 
-        return np.array(
-            [
-                [*weights_1],
-                [*weights_2]
-            ]
-        )
+        return np.array([[*weights_1], [*weights_2]])
 
     def _calc_bias(
-            self, 
-            data: SparkDF, 
-            coefficients_1: np.ndarray, 
-            coefficients_2: np.ndarray
+        self, data: SparkDF, coefficients_1: np.ndarray, coefficients_2: np.ndarray
     ) -> SparkDF:
         """Compute bias adjustments using Spark SQL expressions.
-        
-        Applies conditional logic based on group membership to calculate the 
+
+        Applies conditional logic based on group membership to calculate the
         dot product of feature differences and regression coefficients.
-        
+
         Args:
             data: SparkDF with original and matched features.
             coefficients_1: Coefficients for the control group.
             coefficients_2: Coefficients for the treatment group.
-            
+
         Returns:
             A SparkDF containing 'index', 'bias', and 'matched_target' columns.
         """
         group_1, group_2, *_ = sorted(
-            map(
-                lambda row: row[0],
-                data.select(self.group_field).distinct().collect()
-            )
+            map(lambda row: row[0], data.select(self.group_field).distinct().collect())
         )
         initial_data = data.withColumn(
             "bias",
@@ -577,7 +568,7 @@ class SparkBisaExtesion(BiasExtension):
                         (F.col(col + "_matched") - F.col(col)) * coefficients_1[idx]
                         for idx, col in enumerate(self.features)
                     ]
-                )
+                ),
             )
             .when(
                 F.col(self.group_field) == group_2,
@@ -586,28 +577,28 @@ class SparkBisaExtesion(BiasExtension):
                         (F.col(col + "_matched") - F.col(col)) * coefficients_2[idx]
                         for idx, col in enumerate(self.features)
                     ]
-                )
+                ),
             )
-            .otherwise(0)
+            .otherwise(0),
         )
 
         final_data = initial_data.select(
-            F.col('initial_index').alias("index"),
+            F.col("initial_index").alias("index"),
             F.col("bias"),
-            F.col(self.target_field + "_matched").alias("matched_target")
+            F.col(self.target_field + "_matched").alias("matched_target"),
         )
         return final_data
-        
+
     def calc(self, data: Dataset, **kwargs) -> Dataset:
         """Execute the full distributed bias estimation pipeline.
-        
-        Handles caching, model fitting, and bias computation across Spark 
+
+        Handles caching, model fitting, and bias computation across Spark
         partitions, ensuring resources are properly released after execution.
-        
+
         Args:
             data: The input dataset with matched indices and features.
             **kwargs: Additional arguments (ignored).
-            
+
         Returns:
             A persisted Dataset containing the 'bias' and 'matched_target' columns.
         """
@@ -615,26 +606,29 @@ class SparkBisaExtesion(BiasExtension):
         self._set_columns(data)
         neighbors_cols, numeric_cols = self._extract_info(data)
         self.features = [
-                col for col in numeric_cols 
-                if col != self.group_field and col != self.target_field
+            col
+            for col in numeric_cols
+            if col != self.group_field and col != self.target_field
         ]
 
         matched_data = self._prepare_data(
-            data = data,
-            neighbors_cols=neighbors_cols,
-            numeric_cols=numeric_cols
+            data=data, neighbors_cols=neighbors_cols, numeric_cols=numeric_cols
         )
         # matched_data.persist(self.STORAGE_DICT[storage_level])
         # matched_data.count()
 
-        initial_data: SparkDF = data[numeric_cols + [self.group_field]].raw_data.to_spark(index_col='initial_index')
-        initial_data = initial_data.join(matched_data, on='initial_index')
+        initial_data: SparkDF = data[
+            [*numeric_cols, self.group_field]
+        ].raw_data.to_spark(index_col="initial_index")
+        initial_data = initial_data.join(matched_data, on="initial_index")
         initial_data.persist(self.STORAGE_DICT[storage_level])
         initial_data.count()
 
-        coefficients_1, coefficients_2  = self._calc_coefs(initial_data)
+        coefficients_1, coefficients_2 = self._calc_coefs(initial_data)
         final_data = self._calc_bias(initial_data, coefficients_1, coefficients_2)
-        final_dataset: Dataset = self.result_to_dataset(final_data, {}, small=False).set_index("index")
+        final_dataset: Dataset = self.result_to_dataset(
+            final_data, {}, small=False
+        ).set_index("index")
         final_dataset.index.name = None
 
         final_dataset.persist(storage_level)

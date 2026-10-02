@@ -12,7 +12,6 @@ from .experiments.base import Experiment, OnRoleExperiment
 from .experiments.base_complex import IfParamsExperiment, ParamsExperiment
 from .forks.aa import IfAAExecutor
 from .reporters import AATestReporter, DatasetReporter, DictReporter
-from .reporters.aa import OneAADictReporter
 from .splitters import AASplitter, AASplitterWithStratification
 from .transformers.float32_caster import Float32Caster
 from .transformers.na_dropper import NaDropper
@@ -75,11 +74,10 @@ class AATest(ExperimentShell):
                         TTest(
                             grouping_role=AdditionalTreatmentRole(),
                             target_roles=TargetRole(),
-                            reliability=0.05
+                            reliability=0.05,
                         ),
                         KSTest(
-                            compare_by="groups",
-                            grouping_role=AdditionalTreatmentRole()
+                            compare_by="groups", grouping_role=AdditionalTreatmentRole()
                         ),
                         Chi2Test(
                             compare_by="groups", grouping_role=AdditionalTreatmentRole()
@@ -90,13 +88,15 @@ class AATest(ExperimentShell):
                 OneAAStatAnalyzer(),
             ]
         )
-        
+
         pre_executors: list[Executor] = [NaDropper()]
 
         one_aa_base = Experiment(executors=[*pre_executors, AASplitter(), aa_metrics])
-        one_aa_strat = Experiment(executors=[*pre_executors, AASplitterWithStratification(), aa_metrics])
+        one_aa_strat = Experiment(
+            executors=[*pre_executors, AASplitterWithStratification(), aa_metrics]
+        )
         base_experiment = one_aa_strat if stratification else one_aa_base
-        
+
         # Float32Caster is applied ONCE before the iterative ParamsExperiment,
         # not inside each iteration.
         outer_executors: list[Executor] = []
@@ -104,8 +104,12 @@ class AATest(ExperimentShell):
             outer_executors.append(Float32Caster())
 
         params = AATest._prepare_params(
-            n_iterations, control_size, random_states, sample_size,
-            additional_params, groups_sizes
+            n_iterations,
+            control_size,
+            random_states,
+            sample_size,
+            additional_params,
+            groups_sizes,
         )
 
         experiment_params = [
@@ -120,15 +124,16 @@ class AATest(ExperimentShell):
                     single_row=True,
                 ),
                 stopping_criterion=(
-                    IfAAExecutor(all_features_passed=True)
-                    if early_stopping else None
+                    IfAAExecutor(all_features_passed=True) if early_stopping else None
                 ),
             )
         ]
 
         if sample_size:
             params_no_sample = AATest._prepare_params(
-                n_iterations, control_size, random_states,
+                n_iterations,
+                control_size,
+                random_states,
                 sample_size=None,
                 additional_params=additional_params,
                 groups_sizes=groups_sizes,
@@ -209,7 +214,7 @@ class AATest(ExperimentShell):
         float32: bool = False,
         early_stopping: bool = False,
         t_test_equal_var: bool | None = None,
-        dry_test: bool = False
+        dry_test: bool = False,
     ):
         import warnings
 
@@ -227,6 +232,7 @@ class AATest(ExperimentShell):
             n_iterations = 2000 if precision_mode else 10
         if early_stopping and precision_mode:
             import warnings
+
             warnings.warn(
                 "early_stopping=True combined with precision_mode=True may "
                 "stop after very few iterations, making AA-score and FPR "
@@ -237,6 +243,7 @@ class AATest(ExperimentShell):
 
         if early_stopping and dry_test:
             import warnings
+
             warnings.warn(
                 "early_stopping=True combined with dry_test=True may produce "
                 "a p-value distribution from too few iterations for "
@@ -256,10 +263,10 @@ class AATest(ExperimentShell):
                 groups_sizes=groups_sizes,
                 float32=float32,
                 early_stopping=early_stopping,
-                dry_test=dry_test
-             ),
+                dry_test=dry_test,
+            ),
             output=AAOutput(),
-         )
+        )
 
         if equal_variance is not None:
             self.experiment.set_params(

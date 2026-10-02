@@ -10,7 +10,7 @@ from ..extensions.scipy_stats import (
 )
 from ..utils.constants import NUMBER_TYPES_LIST
 from ..utils.registry import backend_factory
-from .abstract import GroupHypothesisTesting, StatsComparator
+from .abstract import GroupHypothesisTesting
 from .comparators import Chi2Test, KSTest, TTest, UTest
 
 
@@ -28,6 +28,7 @@ class GroupTTest(GroupHypothesisTesting):
             data, other=test_data, **kwargs
         )
 
+
 @backend_factory.register(KSTest, PandasDataset)
 class GroupKSTest(GroupHypothesisTesting):
     @property
@@ -43,6 +44,7 @@ class GroupKSTest(GroupHypothesisTesting):
             data, other=test_data, **kwargs
         )
 
+
 @backend_factory.register(UTest, [PandasDataset, SparkDataset])
 class GroupUTest(GroupHypothesisTesting):
     @property
@@ -57,6 +59,7 @@ class GroupUTest(GroupHypothesisTesting):
         return GroupUTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
+
 
 @backend_factory.register(Chi2Test, PandasDataset)
 class GroupChi2Test(GroupHypothesisTesting):
