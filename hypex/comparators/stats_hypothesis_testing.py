@@ -829,7 +829,7 @@ class StatsUTest(StatsHypothesisTesting):
             "Do not call _compute_stats directly."
         )
 
-    def execute(self, data: "ExperimentData") -> "ExperimentData":
+    def execute(self, data: ExperimentData) -> ExperimentData:
         """Main entry point. Routes to Spark-optimized or Pandas-fallback.
 
         For Spark, delegates to ``_execute_spark``. For Pandas, creates
@@ -887,8 +887,8 @@ class StatsUTest(StatsHypothesisTesting):
 
     @timeit(level="SPARK", prefix="U_SPARK")
     def _execute_spark(
-        self, data: "ExperimentData", group_col: str, target_cols: list[str]
-    ) -> "ExperimentData":
+        self, data: ExperimentData, group_col: str, target_cols: list[str]
+    ) -> ExperimentData:
         """Execute the Mann-Whitney U test using the Spark-optimized path.
 
         Delegates histogram aggregation to ``StatsUTestExtension``, which
@@ -919,7 +919,7 @@ class StatsUTest(StatsHypothesisTesting):
         """
         from ..extensions.stats_hypothesis_testing import StatsUTestExtension
 
-        subset = data.ds[[group_col] + target_cols]
+        subset = data.ds[[group_col, *target_cols]]
         ext = StatsUTestExtension(n_bins=self.n_bins, reliability=self.reliability)
         all_group_stats = ext.calc(
             data=subset,
@@ -951,9 +951,7 @@ class StatsUTest(StatsHypothesisTesting):
                 result = self._inner_function(
                     b_stats, c_stats, reliability=self.reliability
                 )
-                col_results.append(
-                    DatasetAdapter.to_dataset(result, StatisticRole())
-                )
+                col_results.append(DatasetAdapter.to_dataset(result, StatisticRole()))
 
             if col_results:
                 result_dataset = col_results[0].append(col_results[1:])
@@ -1049,7 +1047,7 @@ class StatsUTest(StatsHypothesisTesting):
         for bucket in all_buckets:
             t = hist1.get(bucket, 0) + hist2.get(bucket, 0)
             if t > 1:
-                tie_sum += t ** 3 - t
+                tie_sum += t**3 - t
 
         # Variance: σ² = (n₁·n₂/12)·[(n₁+n₂+1) - Σ(t³-t)/((n₁+n₂)(n₁+n₂-1))]
         if n_total > 1:

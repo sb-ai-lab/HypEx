@@ -24,9 +24,7 @@ def _sort_by_group_key(result: dict) -> dict:
     def _key(item):
         key = item[0]
         parts = key if isinstance(key, tuple) else (key,)
-        return tuple(
-            (True, None) if _is_null(v) else (False, v) for v in parts
-        )
+        return tuple((True, None) if _is_null(v) else (False, v) for v in parts)
 
     return dict(sorted(result.items(), key=_key))
 

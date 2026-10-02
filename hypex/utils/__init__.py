@@ -89,7 +89,6 @@ __all__ = [
     "FeatureRoleTypes",
     "FromDictTypes",
     "GenericManager",
-    "GenericManagerStrictABCMeta",
     "GroupingDataType",
     "HypExLogger",
     "MergeOnError",

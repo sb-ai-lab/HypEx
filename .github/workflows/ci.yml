@@ -19,6 +19,9 @@ concurrency:
 env:
   FORCE_COLOR: "1"
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  # pyspark is a 300 MB sdist; a reset connection mid-download failed a whole leg.
+  PIP_RETRIES: "10"
+  PIP_DEFAULT_TIMEOUT: "60"
 
 jobs:
   # ---------------------------------------------------------------------------

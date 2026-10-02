@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..dataset import Dataset
-from ..dataset.backends import PandasDataset, SparkDataset
+from ..dataset.backends import PandasDataset
 from ..extensions.scipy_stats import (
     GroupChi2TestExtension,
     GroupKSTestExtension,

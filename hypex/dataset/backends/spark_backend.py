@@ -1371,9 +1371,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             tuple: (group_key, SparkNavigation) for each unique combination
                 of grouping column values.
         """
-        keys_df = (
-            self.data[by].drop_duplicates().dropna().to_pandas().sort_values(by)
-        )
+        keys_df = self.data[by].drop_duplicates().dropna().to_pandas().sort_values(by)
         for _, row in keys_df.iterrows():
             key = row[by[0]] if len(by) == 1 else tuple(row[col] for col in by)
             mask = None
