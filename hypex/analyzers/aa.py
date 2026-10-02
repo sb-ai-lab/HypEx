@@ -352,7 +352,7 @@ class AAScoreAnalyzer(Executor):
         best_index = self._find_best_index(score_table, if_param_scores)
         best_split_id = self._extract_splitter_id(score_table, best_index)
 
-        row_df = score_table.data.iloc[[best_index]]
+        row_df = score_table.raw_data.iloc[[best_index]]
         best_score_stat = SmallDataset(
             roles={col: score_table.roles.get(col, InfoRole()) for col in row_df.columns},
             data=row_df,
@@ -394,7 +394,7 @@ class AAScoreAnalyzer(Executor):
                 weight = self._feature_weights.get(test_name, 0)
             if weight <= 0:
                 continue
-            col_data = score_table.data[col].astype(float)
+            col_data = score_table.raw_data[col].astype(float)
             contribution = col_data * weight
             weighted = contribution if weighted is None else weighted + contribution
         if weighted is None:
@@ -405,14 +405,14 @@ class AAScoreAnalyzer(Executor):
     def _get_mean_test_score_column(score_table: Dataset) -> pd.Series | float:
         """Extract the 'mean test score' column or return 0."""
         if "mean test score" in score_table.columns:
-            return score_table.data["mean test score"].astype(float)
+            return score_table.raw_data["mean test score"].astype(float)
         return 0.0
 
     @staticmethod
     def _extract_splitter_id(score_table: Dataset, best_index: int) -> str:
         """Get the splitter ID for the best row."""
         if "splitter_id" in score_table.columns:
-            return score_table.data.loc[best_index, "splitter_id"]
+            return score_table.raw_data.loc[best_index, "splitter_id"]
         return f"AASplitter{ID_SPLIT_SYMBOL}rs {int(best_index)}{ID_SPLIT_SYMBOL}"
 
     def _set_best_split(
@@ -555,7 +555,7 @@ class AADryTestAnalyzer(Executor):
 
         for idx, (col, d_col) in enumerate(zip(target_cols, dry_cols)):
             # --- p-values  gist ---
-            p_vals = score_table[d_col].data
+            p_vals = score_table[d_col].raw_data
             if isinstance(axs, np.ndarray):
                 ax = axs[idx]
             else:

@@ -50,6 +50,28 @@ class DatasetBackendNavigation(ABC):
         """
         raise AbstractMethodError
 
+    @abstractmethod
+    def to_public_data(self) -> Any:
+        """Return the data in the form exposed by the public ``Dataset.data``.
+
+        Returns:
+            ``pandas.DataFrame`` for the pandas backend,
+            ``pyspark.sql.DataFrame`` (without index) for the spark backend.
+        """
+        raise AbstractMethodError
+
+    @abstractmethod
+    def set_public_data(self, value: Any) -> None:
+        """Set the backend data from a value given to the public ``Dataset.data``.
+
+        Args:
+            value: New data. Accepted types are backend-specific.
+
+        Raises:
+            TypeError: If the value type is not supported by the backend.
+        """
+        raise AbstractMethodError
+
     @property
     def name(self) -> str:
         """Return a canonical name derived from the class name."""

@@ -164,7 +164,7 @@ def test_aatest(aa_data):
             res = mapping[test_name].execute(aa_data[1])
         else:
             res = mapping[test_name].execute(aa_data[0])
-        actual_data = res.resume.data.iloc[:, 2:-4]
+        actual_data = res.summary.data.iloc[:, 2:-4]
         expected_data = mapping_resume[test_name]
         pdt.assert_frame_equal(expected_data, actual_data, check_dtype=False)
 
@@ -209,7 +209,7 @@ def test_abtest(ab_data):
     for test_name in mapping.keys():
         res = mapping[test_name].execute(ab_data)
         actual_data = (
-            res.resume.data.fillna(0)
+            res.summary.data.fillna(0)
             .apply(pd.to_numeric, errors="ignore")
             .iloc[:, 6::2]
         )
@@ -228,7 +228,7 @@ def test_matchingtest(matching_data):
 
     for test_name in mapping.keys():
         res = mapping[test_name].execute(matching_data)
-        actual_data = res.resume.data
+        actual_data = res.summary.data
         assert actual_data.index.isin(["ATT", "ATC", "ATE"]).all()
         assert all(
             actual_data.iloc[:, :-1].dtypes.apply(

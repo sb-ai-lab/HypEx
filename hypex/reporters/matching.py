@@ -18,6 +18,7 @@ from ..ml import FaissNearestNeighbors
 from ..utils import (
     ID_SPLIT_SYMBOL,
     MATCHING_INDEXES_SPLITTER_SYMBOL,
+    BackendsEnum,
     ExperimentDataEnum,
 )
 from ..utils.logger import logger
@@ -26,6 +27,7 @@ from .abstract import (
     DictReporter,
     extract_tests,
 )
+
 
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
 class MatchingReporter(DatasetReporter):
@@ -74,7 +76,7 @@ class MatchingReporter(DatasetReporter):
             A flat dictionary mapping composite keys to metric values.
         """
         analyzer_id = data.get_one_id(self.searching_class, ExperimentDataEnum.analysis_tables)
-        table = data.analysis_tables[analyzer_id].data
+        table = data.analysis_tables[analyzer_id].raw_data
         return {
             f"{col}{ID_SPLIT_SYMBOL}{idx}": val 
             for col in table.columns 
@@ -82,32 +84,39 @@ class MatchingReporter(DatasetReporter):
             for val in [row[col]]
         }
 
+
     def _extract_indexes(self, data: ExperimentData) -> dict[str, str]:
         """Extract matched neighbor indices from additional fields.
-        
-        Uses the backend-agnostic ``_to_numpy()`` method to safely collect 
-        values from single-column datasets. In the Spark backend, column 
-        selection returns a ``DataFrame`` (not a ``Series``), which lacks 
-        the ``.tolist()`` method and causes an ``AttributeError`` if 
-        accessed directly via ``.data.tolist()``.
-        
+
+        For the Pandas backend, values are collected to the driver and
+        joined into a splitter-delimited string (legacy summary format).
+
+        For the Spark backend, returns an empty dict: matched indices
+        already exist as lazy ``AdditionalMatchingRole`` columns of
+        ``data.ds`` (merged by ``ExperimentData._set_additional_fields``
+        and aligned to ``ds.index``). They are consumed directly by
+        ``MatchingOutput.extract`` without any driver collection.
+
         Args:
             data: The experiment data container.
-            
+
         Returns:
-            A dictionary mapping composite index keys to a string of 
-            neighbor indices joined by the matching splitter symbol.
+            A dictionary mapping composite index keys to joined index
+            strings, or an empty dict for the Spark backend.
         """
+        if data.ds.backend_type == BackendsEnum.spark:
+            return {}
+
         ids = data.get_ids(
             FaissNearestNeighbors, ExperimentDataEnum.additional_fields
         )[FaissNearestNeighbors.__name__][ExperimentDataEnum.additional_fields.value]
-        
+
         return {
-            f"indexes{ID_SPLIT_SYMBOL}{col.split(ID_SPLIT_SYMBOL)[3]}": 
+            f"indexes{ID_SPLIT_SYMBOL}{col.split(ID_SPLIT_SYMBOL)[3]}":
             MATCHING_INDEXES_SPLITTER_SYMBOL.join(
-                str(int(i)) if isinstance(i, float) and i.is_integer() else str(i) 
+                str(int(i)) if isinstance(i, float) and i.is_integer() else str(i)
                 for i in data.additional_fields[col]._to_numpy()
-            ) 
+            )
             for col in ids
         }
 

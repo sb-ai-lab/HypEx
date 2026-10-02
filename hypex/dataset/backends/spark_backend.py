@@ -60,6 +60,36 @@ class SparkNavigation(DatasetBackendNavigation):
         "int64": "long",
     }
     
+    def to_public_data(self) -> SparkDF:
+        """Return the data as ``pyspark.sql.DataFrame`` without the index.
+
+        The conversion is lazy (no Spark job is triggered).
+
+        Returns:
+            ``pyspark.sql.DataFrame`` with the columns the user loaded.
+        """
+        return self.data.to_spark()
+
+    def set_public_data(self, value: Any) -> None:
+        """Replace the underlying data, converting it to ``pyspark.pandas``.
+
+        Args:
+            value: ``pyspark.pandas.DataFrame`` (stored as is),
+                ``pyspark.sql.DataFrame`` (default index) or
+                ``pandas.DataFrame`` (index preserved).
+
+        Raises:
+            TypeError: If the value type is not supported.
+        """
+        if isinstance(value, ps.DataFrame):
+            self.data = value
+        elif isinstance(value, SparkDF):
+            self.data = ps.DataFrame(value)
+        elif isinstance(value, pd.DataFrame):
+            self.data = ps.from_pandas(value)
+        else:
+            raise TypeError(f"Unsupported data type for Spark backend: {type(value)}")
+
     def to_backend(
         self,
         target_backend: BackendsEnum,
@@ -1330,7 +1360,10 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.data.groupby(by=by, **kwargs)
 
     def iter_groups(self, by: list[str]):
-        """Iterate over groups defined by column(s).
+        """Iterate over groups defined by column(s), in ascending key order.
+
+        Like pandas ``groupby``, groups come out sorted by key, so the first
+        group is a deterministic baseline regardless of partitioning.
 
         Args:
             by (list[str]): Column names defining group keys.
@@ -1339,7 +1372,9 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             tuple: (group_key, SparkNavigation) for each unique combination
                 of grouping column values.
         """
-        keys_df = self.data[by].drop_duplicates().dropna().to_pandas()
+        keys_df = (
+            self.data[by].drop_duplicates().dropna().to_pandas().sort_values(by)
+        )
         for _, row in keys_df.iterrows():
             key = row[by[0]] if len(by) == 1 else tuple(row[col] for col in by)
             mask = None

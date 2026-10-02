@@ -538,7 +538,7 @@ class GroupsComparator(BaseComparator, ABC):
             combined_data = data.ds
             group_col_name = group_field_data.columns[0]
             if group_col_name in combined_data.columns:
-                inner_df = combined_data.data if hasattr(combined_data, 'data') else combined_data.backend_data.data
+                inner_df = combined_data.raw_data
                 initial_len = len(inner_df)
                 inner_df = inner_df.dropna(subset=[group_col_name])
                 dropped = initial_len - len(inner_df)

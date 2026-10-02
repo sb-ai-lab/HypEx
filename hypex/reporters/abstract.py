@@ -97,7 +97,7 @@ def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
     Returns:
         A list of index values.
     """
-    return Adapter.to_list(table.data.index)
+    return Adapter.to_list(table.raw_data.index)
 
 def _normalize_group_name(group: str) -> str:
     """Normalize group names by stripping tuple notation.
