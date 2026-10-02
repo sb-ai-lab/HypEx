@@ -10,6 +10,7 @@ from ..comparators import (
     StatsChi2Test,
     StatsKSTest,
     StatsTTest,
+    StatsUTest,
 )
 from ..dataset import (
     Dataset,
@@ -296,7 +297,8 @@ class ABAnalyzer(Executor):
         """
         executor_ids = data.get_ids(
             [GroupTTest, GroupUTest, GroupKSTest,
-             StatsTTest, StatsChi2Test, StatsKSTest]
+             StatsTTest, StatsChi2Test, StatsKSTest,
+             StatsUTest]
         )
 
         group_field = data.ds.search_columns(TreatmentRole())[0]
