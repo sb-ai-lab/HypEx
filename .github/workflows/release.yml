@@ -108,9 +108,26 @@ jobs:
             echo "::notice::${file} not found; using generated notes"
           fi
 
+      # PEP 440 pre-releases (2.0.0a1, 2.0.0b2, 2.0.0rc1, 2.0.0.dev3) are
+      # marked as such on GitHub. A substring test on the tag would misfire,
+      # so match the version segment itself.
+      - name: Detect a pre-release
+        id: prerelease
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          if [[ "${version}" =~ (a|b|rc)[0-9]+$ || "${version}" =~ \.dev[0-9]+$ ]]; then
+            pre=true
+          else
+            pre=false
+          fi
+          echo "prerelease=${pre}" >> "$GITHUB_OUTPUT"
+          echo "version=${version} prerelease=${pre}"
+
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          prerelease: ${{ steps.prerelease.outputs.prerelease }}
           body_path: ${{ steps.notes.outputs.path }}
           generate_release_notes: ${{ steps.notes.outputs.path == '' }}
           fail_on_unmatched_files: true
