@@ -143,22 +143,13 @@ class MultiTest(Extension):
         )
 
     def _calc_spark(self, data: Dataset, **kwargs):
-        """Delegate to the Pandas implementation.
+        """Delegate to the Pandas implementation via to_backend().
 
         Multiple-testing correction operates on a small, already-collected
         array of p-values (one per test × group), so converting to Pandas
-        on the driver is safe and avoids reimplementing statsmodels logic
-        in Spark.
-
-        Args:
-            data: A Spark-backed ``Dataset`` with raw p-values.
-            **kwargs: Forwarded to ``_calc_pandas``.
-
-        Returns:
-            Corrected ``Dataset`` (Pandas-backed).
+        on the driver is safe.
         """
-        pdf = data.data.toPandas() if hasattr(data.data, "toPandas") else data.data
-        pandas_ds = Dataset(roles=data.roles, data=pdf)
+        pandas_ds = data.to_backend(BackendsEnum.pandas)
         return self._calc_pandas(pandas_ds, **kwargs)
 
 

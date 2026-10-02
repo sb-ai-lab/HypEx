@@ -10,8 +10,8 @@ import numpy as np
 from ..comparators import GroupDifference, GroupSizes
 from ..dataset import Dataset, ExperimentData, SmallDataset
 from ..dataset.roles import InfoRole, StatisticRole, TreatmentRole
-from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
-from ..utils.constants import TEST_NAME_NORMALIZATION, NAME_BORDER_SYMBOL
+from ..utils import ID_SPLIT_SYMBOL, Adapter, ExperimentDataEnum
+from ..utils.constants import NAME_BORDER_SYMBOL, TEST_NAME_NORMALIZATION
 from ..utils.errors import AbstractMethodError
 
 REPORTABLE_METRICS = frozenset({
@@ -87,8 +87,9 @@ def _normalize_value(val: Any) -> Any:
 def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
     """Extract index values from a dataset in a backend-agnostic way.
 
-    Handles differences between pandas (``tolist``) and pyspark.pandas
-    (``to_list``) APIs.
+    Delegates to :meth:`Adapter.to_list` which handles ``pd.Index``
+    (``.tolist()``), ``ps.Index`` (``.to_list()``), and plain
+    iterables uniformly.
 
     Args:
         table: The dataset instance.
@@ -96,12 +97,7 @@ def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
     Returns:
         A list of index values.
     """
-    index_obj = table.index
-    if hasattr(index_obj, "to_list"):
-        return index_obj.to_list()
-    if hasattr(index_obj, "tolist"):
-        return index_obj.tolist()
-    return list(index_obj)
+    return Adapter.to_list(table.data.index)
 
 def _normalize_group_name(group: str) -> str:
     """Normalize group names by stripping tuple notation.
@@ -315,7 +311,11 @@ class TestDictReporter(DictReporter, ABC):
         return dict(tree)
 
     @staticmethod
-    def _convert_struct_dict_to_dataset(data: dict) -> SmallDataset:
+    def _convert_struct_dict_to_dataset(
+        data: dict,
+        *,
+        invert_pass: bool = False,
+    ) -> SmallDataset:
         """Transform a nested dictionary into a ``SmallDataset``.
 
         Flattens the hierarchical structure into rows, mapping metrics to
@@ -361,12 +361,17 @@ class TestDictReporter(DictReporter, ABC):
                     row[f"{norm_name} p-value"] = metrics.get("p-value")
                     
                 result.append(row)
-                
+
         for row in result:
             for k, v in list(row.items()):
                 if "pass" in k:
-                    # truthy pass = difference detected = NOT OK
-                    row[k] = "NOT OK" if _is_truthy(v) else "OK"
+                    truthy = _is_truthy(v)
+                    if invert_pass:
+                        # AB convention: significant effect = OK
+                        row[k] = "OK" if truthy else "NOT OK"
+                    else:
+                        # AA Convention: detected difference = NOT OK
+                        row[k] = "NOT OK" if truthy else "OK"
 
         if not result:
             return SmallDataset.from_dict(
@@ -391,16 +396,17 @@ class TestDictReporter(DictReporter, ABC):
 
 class DatasetReporter(Reporter):
     """Reporter that outputs results as a structured ``Dataset`` or dictionary."""
-
     def __init__(
         self,
         dict_reporter: DictReporter | None = None,
         output_format: Literal["dict", "dataset"] = "dataset",
         single_row: bool = False,
+        invert_pass: bool = False,
     ):
         self.dict_reporter = dict_reporter or DictReporter()
         self.output_format = output_format
         self.single_row = single_row
+        self._invert_pass = invert_pass
 
     @property
     def front(self) -> bool:
@@ -428,13 +434,15 @@ class DatasetReporter(Reporter):
             dict_result = self._report(data)
         finally:
             self.dict_reporter.front = old_front
-
         if self.output_format == "dict":
             return dict_result
         if self.single_row:
             return self._to_single_row_dataset(dict_result)
         struct_dict = TestDictReporter._get_struct_dict(dict_result)
-        return TestDictReporter._convert_struct_dict_to_dataset(struct_dict)
+        return TestDictReporter._convert_struct_dict_to_dataset(
+            struct_dict,
+            invert_pass=self._invert_pass,
+        )
 
     @staticmethod
     def _to_single_row_dataset(data: dict) -> SmallDataset:

@@ -515,7 +515,9 @@ class GroupsComparator(BaseComparator, ABC):
         if len(group_field_data.columns) != 1 and self.compare_by != "columns":
             raise NotSuitableFieldError(group_field_data, "Grouping")
 
-        if (
+        if self.compare_by == "matched_pairs":
+            grouping_data = None
+        elif (
             group_field_data.columns[0] in data.groups
         ) and self.compare_by != "matched_pairs":
             grouping_data = self._grouping_data_split(
@@ -534,7 +536,6 @@ class GroupsComparator(BaseComparator, ABC):
             )
         else:
             combined_data = data.ds
-
             group_col_name = group_field_data.columns[0]
             if group_col_name in combined_data.columns:
                 inner_df = combined_data.data if hasattr(combined_data, 'data') else combined_data.backend_data.data
@@ -546,7 +547,6 @@ class GroupsComparator(BaseComparator, ABC):
                         data=inner_df,
                         roles={c: combined_data.roles.get(c, InfoRole()) for c in inner_df.columns},
                     )
-
             data.groups[group_field_data.columns[0]] = {
                 f"{group}": ds for group, ds in combined_data.groupby(group_field_data.columns[0])
             }
@@ -564,7 +564,8 @@ class GroupsComparator(BaseComparator, ABC):
                     else None
                 ),
             )
-        if len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1:
+
+        if grouping_data is not None and (len(grouping_data[0]) < 1 or len(grouping_data[1]) < 1):
             raise NotSuitableFieldError(group_field_data, "Grouping")
 
         compare_result = self.calc(
@@ -575,6 +576,7 @@ class GroupsComparator(BaseComparator, ABC):
             group_field_data=group_field_data,
             grouping_data=grouping_data,
         )
+
         result_dataset = self._local_extract_dataset(
             compare_result, {key: StatisticRole() for key in compare_result}
         )
@@ -925,45 +927,6 @@ class StatsComparator(BaseComparator, ABC):
                 for col in group_col_stats[baseline_name] if not col.endswith('_matched')
             ]
         return result_ds_list
-
-    @staticmethod
-    def _prepare_data(
-        compare_by: str,
-        target_fields_data: Dataset | None = None,
-        group_field_data: Dataset | None = None,
-        baseline_fields_data: Dataset | None = None,
-    ) -> GroupedDataset:
-        if compare_by == "groups":
-            group_col = group_field_data.columns[0]
-            if group_col in target_fields_data.columns:
-                grouped: GroupedDataset = target_fields_data.groupby(
-                    by=group_field_data.columns
-                )
-            else:
-                grouped: GroupedDataset = (
-                    target_fields_data
-                    .merge(group_field_data, left_index=True, right_index=True)
-                    .groupby(by=group_field_data.columns)
-                )
-        elif compare_by == "matched_pairs":
-            best_match_col = baseline_fields_data.columns[0]
-            group_col = group_field_data.columns[0]
-            baseline_fields = baseline_fields_data[best_match_col]
-            tmp_data = group_field_data.merge(
-                right=target_fields_data, left_index=True, right_index=True
-            )
-            tmp_data = tmp_data.merge(
-                right=baseline_fields, right_index=True, left_index=True
-            )
-            tmp_data = tmp_data.merge(
-                right=tmp_data, right_index=True, left_on=best_match_col,
-                suffixes=("", "_matched"),
-            )
-            prepeared_data = tmp_data.drop(
-                columns=[best_match_col, best_match_col + "_matched", group_col + "_matched"]
-            )
-            grouped: GroupedDataset = prepeared_data.groupby(by=group_col)
-        return grouped
 
     @timeit(level="COMPARATOR", prefix="STATS")
     def execute(self, data: ExperimentData) -> ExperimentData:

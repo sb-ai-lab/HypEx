@@ -36,6 +36,8 @@ class GroupDifference(StatsComparator):
     """
 
     REQUIRED_STATS: ClassVar[list[str]] = ["mean", "var", "count"]
+    # Z-score for 95% confidence level
+    Z_SCORE_95: ClassVar[float] = 1.96
 
     def __init__(
         self,
@@ -132,12 +134,9 @@ class GroupDifference(StatsComparator):
         ):
             # Standard Error (SE) of the difference between two independent means
             se = math.sqrt((control_var / control_n) + (test_var / test_n))
-            
-            # Z-score for 95% confidence level
-            z_score = 1.96 
-            
-            ci_lower = difference - (z_score * se)
-            ci_upper = difference + (z_score * se)
+
+            ci_lower = difference - (cls.Z_SCORE_95 * se)
+            ci_upper = difference + (cls.Z_SCORE_95 * se)
 
         return {
             "control mean": control_mean,

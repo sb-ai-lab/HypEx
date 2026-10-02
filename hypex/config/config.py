@@ -19,7 +19,6 @@ from typing import ClassVar, Literal
 from pyspark import StorageLevel  # pyright: ignore[reportMissingImports]
 
 
-@dataclass(frozen=True)
 class DatasetConfig:
     """
     Configuration constants for dataset display and Spark operations.

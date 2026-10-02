@@ -12,6 +12,7 @@ from pyspark.sql import Window
 from scipy.stats import (  # type: ignore
     chi2_contingency,
     ks_2samp,
+    kstest,
     kstwo,
     kstwobign,
     mannwhitneyu,
@@ -76,17 +77,22 @@ class GroupStatTest(CompareExtension):
         other = self.check_data(data, other)
         if self.test_function is None:
             raise ValueError("test_function is needed for execution")
-        
         import inspect
         sig = inspect.signature(self.test_function)
         valid_params = set(sig.parameters.keys())
-        
         merged_kwargs = {**self.default_kwargs, **kwargs}
-        
         invalid_keys = set(merged_kwargs.keys()) - valid_params
         if invalid_keys:
+            import warnings
+            warnings.warn(
+                f"The following kwargs are not accepted by "
+                f"{self.test_function.__name__} and will be ignored: "
+                f"{sorted(invalid_keys)}. "
+                f"Valid parameters: {sorted(valid_params)}.",
+                UserWarning,
+                stacklevel=2,
+            )
             merged_kwargs = {k: v for k, v in merged_kwargs.items() if k in valid_params}
-        
         res = self.test_function(
             data._to_numpy(), other._to_numpy(), **merged_kwargs
         )
@@ -100,6 +106,14 @@ class GroupTTestExtension(GroupStatTest):
     def __init__(self, reliability: float = 0.05):
         super().__init__(self.test_function, reliability)
         self.default_kwargs = {"nan_policy": "omit", "equal_var": False}
+
+    def calc(
+        self, data: Dataset, other: Dataset | None = None, **kwargs
+    ) -> SmallDataset | float:
+        # Map the library-level 'equal_variance' to scipy's 'equal_var'
+        if "equal_variance" in kwargs:
+            kwargs["equal_var"] = kwargs.pop("equal_variance")
+        return super().calc(data, other, **kwargs)
 
 class GroupKSTestExtension(GroupStatTest):
     """
@@ -155,9 +169,7 @@ class PandasKSTestExtension(GroupKSTestExtension):
 
 @backend_factory.register(GroupChi2TestExtension, PandasDataset)
 class PandasChi2TestExtension(GroupChi2TestExtension):
-    """
-    Slave-backend class for statistical test calculation.
-    """
+    """Slave-backend class for Chi2 statistical test calculation on Pandas."""
 
     @staticmethod
     def mini_category_replace(counts: Dataset) -> Dataset:
@@ -180,7 +192,7 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
                 if col == cat_col:
                     new_role.data_type = str
                 new_roles[col] = new_role
-
+                
             counts = counts.append(
                 DatasetAdapter.to_dataset(
                     {
@@ -189,13 +201,24 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
                     },
                     roles=new_roles,
                     small=False,
-                )
+                ),
+                reset_index=True,  # FIX: prevent duplicate index labels
             )
-            counts = counts[counts["count"] >= 7]
+        counts = counts[counts["count"] >= 7]
         return counts
 
     def matrix_preparation(self, data: Dataset, other: Dataset) -> Dataset | None:
+        """Build a 2×K contingency table from two categorical samples.
+
+        Args:
+            data: Baseline group dataset (single categorical column).
+            other: Compared group dataset (single categorical column).
+
+        Returns:
+            Contingency table as a Dataset, or None if degenerate.
+        """
         proportion = len(data) / (len(data) + len(other))
+
         counted_data = data.value_counts()
         counted_data = self.mini_category_replace(counted_data)
         data_vc = counted_data["count"] * (1 - proportion)
@@ -206,6 +229,7 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
 
         if len(counted_data) < 2:
             return None
+
         col_name = str(counted_data.columns[0])
         col_role = counted_data.roles.get(col_name, StatisticRole())
 
@@ -213,10 +237,12 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
             counted_data[col_name].data,
             role={col_name: col_role},
         )
+
         other_vc = other_vc.add_column(
-            counted_data[col_name].data,
+            counted_other[col_name].data,  # FIX: was counted_data (typo)
             role={col_name: col_role},
         )
+
         return data_vc.merge(other_vc, on=col_name)[["count_x", "count_y"]].fillna(0)
 
 @backend_factory.register(GroupKSTestExtension, SparkDataset)
@@ -381,3 +407,12 @@ class NormCDF(GroupStatTest):
             {"p-value": 2 * (1 - result)},
             StatisticRole(),
         )
+
+class UniformCheck(GroupStatTest):
+    def calc(
+        self, data: Dataset, other: Dataset | None = None, **kwargs
+    ) -> Dataset:
+        data = data.data.to_numpy().flatten()
+        res = kstest(data, "uniform")
+
+        return self._form_results(res[1], res[0], self.reliability)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from copy import deepcopy
 from typing import Any
 
 import numpy as np
@@ -66,31 +67,37 @@ class Float32Caster(Transformer):
         return [float]
 
     @staticmethod
-    def _inner_function(
-        data: Dataset,
-        target_cols: list[str],
-    ) -> Dataset:
-        """Cast *target_cols* to float32.
+    def _inner_function(data: Dataset, target_cols: list[str]) -> Dataset:
+        """Cast float64 columns to float32 via the public Dataset API.
+
+        After ``DatasetBase.astype`` overwrites ``role.data_type`` with the
+        cast target (``np.float32`` on Pandas, ``"float32"`` string on
+        Spark), the original ``float`` type is explicitly restored so that
+        downstream ``search_columns(search_types=[float])`` continues to
+        match these columns.
 
         Args:
             data: Input dataset.
-            target_cols: Column names to downcast.
+            target_cols: Columns to downcast.
 
         Returns:
-            Dataset with float32 columns and updated role types.
+            Dataset with float32 storage but ``data_type=float`` in roles.
         """
         if not target_cols:
             return data
-
-        # Build per-column cast mapping.
-        # np.float32 works for pandas; "float32" string is safer for
-        # pyspark.pandas.
         if data.backend_type == BackendsEnum.spark:
-            dtype_map: dict[str, Any] = {col: "float32" for col in target_cols}
+            dtype_map = {col: "float32" for col in target_cols}
         else:
             dtype_map = {col: np.float32 for col in target_cols}
 
-        return data.astype(dtype=dtype_map)
+        result = data.astype(dtype_map)
+
+        # DatasetBase.astype overwrites role.data_type with the cast target.
+        # Restore float so search_columns(search_types=[float]) still matches.
+        for col in target_cols:
+            if col in result.roles:
+                result.roles[col].data_type = float
+        return result
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Run float32 downcasting on the experiment dataset.
