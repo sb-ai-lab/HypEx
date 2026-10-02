@@ -112,7 +112,12 @@ jobs:
           - { os: macos-15-intel, python-version: "3.8" }
           - { os: macos-latest, python-version: "3.12" }
           - { os: windows-latest, python-version: "3.8" }
-          - { os: windows-latest, python-version: "3.12" }
+          # Every Spark-backed test that ships a Python function to an executor
+          # crashes the Python worker on this leg ("Python worker exited
+          # unexpectedly"); the same tests pass on Linux and macOS 3.12 and on
+          # Windows 3.8. pyspark 3.5 does not officially support 3.12. Not
+          # reproducible locally. Make it blocking again once pyspark 4 is in.
+          - { os: windows-latest, python-version: "3.12", experimental: true }
 
     steps:
       - uses: actions/checkout@v4
