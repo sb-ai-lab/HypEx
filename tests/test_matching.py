@@ -159,7 +159,7 @@ def test_matching_scenario(
     )
 
     result_hypex = matcher_hypex.execute(data_subset)
-    pval_hypex = result_hypex.resume.data.loc["ATE", "P-value"]
+    pval_hypex = result_hypex.summary.data.loc["ATE", "P-value"]
 
     pval_causal = get_causalinference_pvalue(matching_data.data, feature_subset, k)
     rel_ratio = calculate_relative_ratio(pval_hypex, pval_causal)

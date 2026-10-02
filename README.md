@@ -100,7 +100,7 @@ test = Matching(metric="att")  # Calc only ATT
 test = Matching(distance="l2")  # Choose distance here
 
 result = test.execute(data)
-result.resume  # Resume of results 
+result.summary  # Resume of results 
 result.full_data  # old df_matched. Wide df with pairs
 result.indexes  # Only indexed pairs (good for join)
 
@@ -125,7 +125,7 @@ data = Dataset(
 aa = AATest(n_iterations=10)
 res = aa.execute(data)
 
-res.resume  # Resume for all test
+res.summary  # Resume for all test
 res.aa_score  # AA score 
 res.best_split  # The best homogeneity split
 res.best_split_statistic  # Statistics for best split 
@@ -154,7 +154,7 @@ test = ABTest(cuped_features={'post_spends': 'pre_spends'})  # CUPED variance re
 test = ABTest(cupac_features={'post_spends': ['pre_spends', 'feature1']})  # CUPAC variance reduction
 
 result = test.execute(data)
-result.resume  # Resume of results
+result.summary  # Resume of results
 result.variance_reduction_report  # Variance reduction report for CUPED/CUPAC
 ```
 More about A/B test [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/ABTestTutorial.ipynb)

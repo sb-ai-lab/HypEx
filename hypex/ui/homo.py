@@ -4,10 +4,10 @@ from .base import Output
 
 
 class HomoOutput(Output):
-    resume: Dataset
+    summary: Dataset
 
     def __init__(self):
-        super().__init__(resume_reporter=HomoDatasetReporter())
+        super().__init__(summary_reporter=HomoDatasetReporter())
 
     def extract(self, experiment_data: ExperimentData):
         super().extract(experiment_data)

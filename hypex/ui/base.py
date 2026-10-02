@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from copy import deepcopy
 from typing import Any
 
@@ -10,18 +11,78 @@ from ..utils import ID_SPLIT_SYMBOL, BackendsEnum
 from ..utils.enums import RenameEnum
 
 
+def _html_section(title: str) -> str:
+    """Generate an HTML section header."""
+    return (
+        '<div style="margin: 20px 0 8px 0; padding: 4px 0; '
+        'border-bottom: 2px solid #ddd;">'
+        f'<strong style="font-size: 1.1em;">{title}</strong></div>'
+    )
+
+
+def _html_content(value: Any) -> str:
+    """Generate HTML content for a value."""
+    if value is None:
+        return '<div style="color: #888;">None</div>'
+    if hasattr(value, "_repr_html_"):
+        return value._repr_html_()
+    return f"<pre>{value}</pre>"
+
+
+class _Report:
+    """Full report of an output: every table under its own titled section.
+
+    Renders as plain text in a console and as HTML tables in Jupyter.
+    """
+
+    def __init__(self, title: str, tables: dict[str, Any]):
+        self.title = title
+        self.tables = dict(tables)
+
+    def __repr__(self) -> str:
+        if not self.tables:
+            return f"{self.title}(no tables available)"
+        parts = [f"{self.title}:"]
+        for name, table in self.tables.items():
+            parts.append(f"\n{'=' * 60}")
+            parts.append(f"{name}:")
+            parts.append("=" * 60)
+            parts.append("None" if table is None else str(table))
+        return "\n".join(parts)
+
+    def _repr_html_(self) -> str:
+        if not self.tables:
+            return f"<div><b>{self.title}:</b> no tables available</div>"
+        return "\n".join(
+            _html_section(name) + _html_content(table)
+            for name, table in self.tables.items()
+        )
+
+
+def _warn_resume_deprecated(old: str, new: str) -> None:
+    warnings.warn(
+        f"`{old}` is deprecated and will be removed in a future release, "
+        f"use `{new}` instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
 class Output:
     """A class for handling experiment output reporting and formatting.
 
     This class manages the reporting and formatting of experiment results, allowing for both
-    a primary resume report and additional custom reports.
+    a primary summary report and additional custom reports. ``repr(output)``
+    shows the full report with every table.
 
     Attributes:
-        resume (Dataset): The main summary report of the experiment results.
+        summary (Dataset): The main summary table of the experiment results.
+            ``resume`` is a deprecated alias.
         _experiment_data (ExperimentData): Internal storage of the experiment data.
 
     Args:
-        resume_reporter (Reporter): The main reporter that generates the resume output.
+        summary_reporter (Reporter): The main reporter that generates the summary output.
+        resume_reporter (Reporter): Deprecated alias of ``summary_reporter``.
         additional_reporters (Optional[Dict[str, Reporter]]): Dictionary mapping attribute
             names to additional reporters for custom reporting. Defaults to None.
 
@@ -29,11 +90,11 @@ class Output:
     --------
     .. code-block:: python
 
-        # Basic usage with just a resume reporter
-        from my_reporters import MyResumeReporter
-        output = Output(resume_reporter=MyResumeReporter())
+        # Basic usage with just a summary reporter
+        from my_reporters import MySummaryReporter
+        output = Output(summary_reporter=MySummaryReporter())
         output.extract(experiment_data)
-        print(output.resume)
+        print(output.summary)
 
         # Using additional custom reporters
         from my_reporters import StatsReporter, PlotReporter
@@ -42,7 +103,7 @@ class Output:
             'plots': PlotReporter()
         }
         output = Output(
-            resume_reporter=MyResumeReporter(),
+            summary_reporter=MySummaryReporter(),
             additional_reporters=additional
         )
         output.extract(experiment_data)
@@ -50,16 +111,72 @@ class Output:
         print(output.plots)  # Access additional report
     """
 
-    resume: Dataset
+    summary: Dataset
     _experiment_data: ExperimentData
 
     def __init__(
         self,
-        resume_reporter: Reporter,
+        summary_reporter: Reporter | None = None,
         additional_reporters: dict[str, Reporter] | None = None,
+        *,
+        resume_reporter: Reporter | None = None,
     ):
-        self.resume_reporter = resume_reporter
+        if resume_reporter is not None:
+            _warn_resume_deprecated("resume_reporter", "summary_reporter")
+            if summary_reporter is None:
+                summary_reporter = resume_reporter
+        if summary_reporter is None:
+            raise TypeError("Output requires `summary_reporter`")
+        self.summary_reporter = summary_reporter
         self.additional_reporters = additional_reporters or {}
+
+    @property
+    def resume_reporter(self) -> Reporter:
+        """Deprecated alias of ``summary_reporter``."""
+        _warn_resume_deprecated("resume_reporter", "summary_reporter")
+        return self.summary_reporter
+
+    @property
+    def resume(self) -> Dataset:
+        """Deprecated alias of ``summary``."""
+        _warn_resume_deprecated("resume", "summary")
+        return self.summary
+
+    @resume.setter
+    def resume(self, value: Dataset) -> None:
+        _warn_resume_deprecated("resume", "summary")
+        self.summary = value
+
+    def _get_output_fields(self) -> list[str]:
+        """Names of the fields shown in ``repr``, ``summary`` first.
+
+        All annotated public attributes of the class hierarchy that are set on
+        the instance. Subclasses may override it for custom ordering.
+        """
+        annotations: dict[str, Any] = {}
+        for cls in reversed(type(self).__mro__):
+            annotations.update(cls.__dict__.get("__annotations__", {}))
+        fields = [
+            name
+            for name in annotations
+            if not name.startswith("_") and name in vars(self)
+        ]
+        if "summary" in fields:
+            fields.remove("summary")
+            fields.insert(0, "summary")
+        return fields
+
+    def _report(self) -> _Report:
+        return _Report(
+            type(self).__name__,
+            {name: getattr(self, name) for name in self._get_output_fields()},
+        )
+
+    def __repr__(self) -> str:
+        return repr(self._report())
+
+    def _repr_html_(self) -> str:
+        return self._report()._repr_html_()
 
     def _extract_by_reporters(self, experiment_data: ExperimentData):
         """Extracts reports from all configured reporters.
@@ -67,7 +184,7 @@ class Output:
         Args:
             experiment_data (ExperimentData): The experiment data to generate reports from.
         """
-        self.resume = self.resume_reporter.report(experiment_data)
+        self.summary = self.summary_reporter.report(experiment_data)
         for attribute, reporter in self.additional_reporters.items():
             setattr(self, attribute, reporter.report(experiment_data))
         self._experiment_data = experiment_data
@@ -80,7 +197,11 @@ class Output:
         result = data
         if mode in (RenameEnum.all, RenameEnum.columns):
             rename_map = {c: c.replace(ID_SPLIT_SYMBOL, " ") for c in result.columns}
-            result.raw_data = result.raw_data.rename(columns=rename_map)
+            try:
+                result.raw_data = result.raw_data.rename(columns=rename_map)
+            except Exception:
+                if hasattr(result._backend_data, 'data'):
+                    result._backend_data.data = result._backend_data.data.rename(columns=rename_map)
             result._roles = {rename_map.get(c, c): role for c, role in result._roles.items()}
             
         if mode in (RenameEnum.all, RenameEnum.index):
@@ -97,9 +218,9 @@ class Output:
         --------
         .. code-block:: python
 
-            output = Output(resume_reporter=MyReporter())
+            output = Output(summary_reporter=MyReporter())
             output.extract(experiment_data)
-            print(output.resume)  # Access the main report
+            print(output.summary)  # Access the main report
         """
         self._extract_by_reporters(experiment_data)
 
@@ -123,7 +244,7 @@ class ExperimentShell:
 
         # Basic usage with default parameters
         experiment = Experiment([...])  # Configure experiment
-        output = Output(resume_reporter=MyReporter())
+        output = Output(summary_reporter=MyReporter())
         shell = ExperimentShell(experiment, output)
         results = shell.execute(data)
 
@@ -179,7 +300,7 @@ class ExperimentShell:
 
         Returns:
             Output: The experiment output object containing the formatted
-            results (resume, multitest table, quality reports, etc.),
+            results (summary, multitest table, quality reports, etc.),
             populated by the configured :class:`Output` handler.
 
         Example:
@@ -187,7 +308,7 @@ class ExperimentShell:
 
                 ab_test = ABTest(multitest_method="bonferroni")
                 result = ab_test.execute(spark_dataset)
-                print(result.resume)
+                print(result.summary)
                 print(result.multitest)
 
         See Also:
