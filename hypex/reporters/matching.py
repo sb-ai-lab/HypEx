@@ -12,6 +12,7 @@ from ..comparators import (
     StatsChi2Test,
     StatsKSTest,
     StatsTTest,
+    StatsUTest,
 )
 from ..dataset import Dataset, ExperimentData
 from ..ml import FaissNearestNeighbors
@@ -125,8 +126,9 @@ class MatchingQualityReporter(DatasetReporter):
     """Reporter for matching quality tests (T-Test, KS-Test, Chi2-Test)."""
     
     tests: ClassVar[list[type[BaseComparator]]] = [
-        GroupTTest, GroupKSTest, GroupChi2Test, 
-        StatsTTest, StatsKSTest, StatsChi2Test
+        GroupTTest, GroupKSTest, GroupChi2Test,
+        StatsTTest, StatsKSTest, StatsChi2Test,
+        StatsUTest,
     ]
     
     def _report(self, data: ExperimentData) -> dict: 
