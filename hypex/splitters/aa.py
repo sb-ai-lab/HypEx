@@ -418,9 +418,9 @@ class AASplitter(Calculator):
                 session=data.session,
             )
 
-        index_names = data.data.index.names
+        index_names = data.raw_data.index.names
         for part in parts:
-            part.data = part.data.rename_axis(index_names)
+            part.raw_data = part.raw_data.rename_axis(index_names)
 
         split_ds = parts[0] if len(parts) == 1 else parts[0].append(parts[1:])
         split_ds.roles["split"] = StatisticRole()

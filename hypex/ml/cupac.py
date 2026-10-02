@@ -402,8 +402,8 @@ class CUPACExecutor(MLExecutor):
                 prediction = self.calc(mode="predict", model=fitted_model, X=X_predict)
 
                 theta = cuped_theta(
-                    data.ds[target].data.values.flatten(),
-                    prediction.data.values.flatten(),
+                    data.ds[target].raw_data.values.flatten(),
+                    prediction.raw_data.values.flatten(),
                 )
                 explained_variation = (prediction - prediction.mean()) * theta
                 target_cupac = data.ds[target] - explained_variation

@@ -198,7 +198,7 @@ class Output:
         if mode in (RenameEnum.all, RenameEnum.columns):
             rename_map = {c: c.replace(ID_SPLIT_SYMBOL, " ") for c in result.columns}
             try:
-                result.data = result.data.rename(columns=rename_map)
+                result.raw_data = result.raw_data.rename(columns=rename_map)
             except Exception:
                 if hasattr(result._backend_data, 'data'):
                     result._backend_data.data = result._backend_data.data.rename(columns=rename_map)

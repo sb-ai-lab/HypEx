@@ -85,7 +85,7 @@ class StatsAggregationExtension(Extension):
             A nested dictionary mapping ``group_key`` → ``column`` →
             ``statistic`` → ``value``.
         """
-        pdf = data.data  # pd.DataFrame
+        pdf = data.raw_data  # pd.DataFrame
         
         group_by_arg = group_cols if len(group_cols) > 1 else group_cols[0]
         grouped = pdf.groupby(group_by_arg)
@@ -138,7 +138,7 @@ class StatsAggregationExtension(Extension):
         """
         import pyspark.sql.functions as F
 
-        sdf = data.data.to_spark()
+        sdf = data.raw_data.to_spark()
 
         def safe_col(name: str):
             return F.col(f"`{name}`")
@@ -224,7 +224,7 @@ class StatsKSTestExtension(Extension):
 
     def _calc_pandas(self, data, group_col, target_cols, **kwargs):
         result = {}
-        grouped = data.data.groupby(group_col)
+        grouped = data.raw_data.groupby(group_col)
         for group_key, group_df in grouped:
             result[group_key] = {}
             group_ds = Dataset(
@@ -266,7 +266,7 @@ class StatsKSTestExtension(Extension):
         """
         import pyspark.sql.functions as F
 
-        sdf = data.data.to_spark()
+        sdf = data.raw_data.to_spark()
 
         def safe_col(name: str):
             return F.col(f"`{name}`")
@@ -429,7 +429,7 @@ class StatsChi2TestExtension(Extension):
             ``{"value_counts": {category: count, ...}}``.
         """
         result = {}
-        grouped = data.data.groupby(group_col)
+        grouped = data.raw_data.groupby(group_col)
         
         for group_key, group_df in grouped:
             result[group_key] = {}
@@ -464,7 +464,7 @@ class StatsChi2TestExtension(Extension):
         """
         import pyspark.sql.functions as F
 
-        sdf = data.data.to_spark()
+        sdf = data.raw_data.to_spark()
 
         def safe_col(name: str):
             return F.col(f"`{name}`")

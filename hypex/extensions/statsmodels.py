@@ -105,7 +105,7 @@ class MultiTest(Extension):
                 corrected_ds = multitest._calc_pandas(p_value_dataset)
                 print(corrected_ds[["test", "old p-value", "new p-value", "rejected"]])
         """
-        p_values = data.data.values.flatten()
+        p_values = data.raw_data.values.flatten()
         tests_raw, fields, groups = self._index_parts(data.index)
         
         # Normalize BEFORE grouping into families
@@ -214,7 +214,7 @@ class MultitestQuantile(Extension):
         Quantile-based multitest runs Monte Carlo simulation on the driver,
         so data must already be small. Converting to Pandas is acceptable.
         """
-        pdf = data.data.toPandas() if hasattr(data.data, "toPandas") else data.data
+        pdf = data.raw_data.toPandas() if hasattr(data.raw_data, "toPandas") else data.raw_data
         pandas_ds = Dataset(
             roles=data.roles,
             data=pdf,

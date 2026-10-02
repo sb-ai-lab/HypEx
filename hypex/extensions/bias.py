@@ -158,8 +158,8 @@ class PandasBisaExtesion(BiasExtension):
         """
         neighbors_cols = Adapter.to_list(neighbors_cols)
         numeric_cols = Adapter.to_list(numeric_cols)
-        t_data = data[numeric_cols].data
-        indexes = data[neighbors_cols].data
+        t_data = data[numeric_cols].raw_data
+        indexes = data[neighbors_cols].raw_data
 
         # Melt the neighbor indexes to long format
         melted = indexes.stack().reset_index()
@@ -352,7 +352,7 @@ class PandasBisaExtesion(BiasExtension):
             numeric_cols=numeric_cols,
         )
 
-        initial_data = data[numeric_cols + [self.group_field]].data
+        initial_data = data[numeric_cols + [self.group_field]].raw_data
         initial_data = initial_data.join(matched_data, how="left")
 
         # ── Early exit: no valid matches at all ──────────────────────
@@ -431,8 +431,8 @@ class SparkBisaExtesion(BiasExtension):
         numeric_cols = Adapter.to_list(numeric_cols)
         storage_level = storage_level or "MEMORY_AND_DISK"
         
-        t_data: SparkDF = data[numeric_cols].data.to_spark(index_col='index')
-        indexes: SparkDF = data[neighbors_cols].data.to_spark(index_col='index')
+        t_data: SparkDF = data[numeric_cols].raw_data.to_spark(index_col='index')
+        indexes: SparkDF = data[neighbors_cols].raw_data.to_spark(index_col='index')
         working_columns = [col for col in indexes.columns if col != 'index']
 
         t_data.persist(SparkBisaExtesion.STORAGE_DICT[storage_level])
@@ -627,7 +627,7 @@ class SparkBisaExtesion(BiasExtension):
         # matched_data.persist(self.STORAGE_DICT[storage_level])
         # matched_data.count()
 
-        initial_data: SparkDF = data[numeric_cols + [self.group_field]].data.to_spark(index_col='initial_index')
+        initial_data: SparkDF = data[numeric_cols + [self.group_field]].raw_data.to_spark(index_col='initial_index')
         initial_data = initial_data.join(matched_data, on='initial_index')
         initial_data.persist(self.STORAGE_DICT[storage_level])
         initial_data.count()

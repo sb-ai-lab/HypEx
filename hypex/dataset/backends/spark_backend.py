@@ -60,6 +60,36 @@ class SparkNavigation(DatasetBackendNavigation):
         "int64": "long",
     }
     
+    def to_public_data(self) -> SparkDF:
+        """Return the data as ``pyspark.sql.DataFrame`` without the index.
+
+        The conversion is lazy (no Spark job is triggered).
+
+        Returns:
+            ``pyspark.sql.DataFrame`` with the columns the user loaded.
+        """
+        return self.data.to_spark()
+
+    def set_public_data(self, value: Any) -> None:
+        """Replace the underlying data, converting it to ``pyspark.pandas``.
+
+        Args:
+            value: ``pyspark.pandas.DataFrame`` (stored as is),
+                ``pyspark.sql.DataFrame`` (default index) or
+                ``pandas.DataFrame`` (index preserved).
+
+        Raises:
+            TypeError: If the value type is not supported.
+        """
+        if isinstance(value, ps.DataFrame):
+            self.data = value
+        elif isinstance(value, SparkDF):
+            self.data = ps.DataFrame(value)
+        elif isinstance(value, pd.DataFrame):
+            self.data = ps.from_pandas(value)
+        else:
+            raise TypeError(f"Unsupported data type for Spark backend: {type(value)}")
+
     def to_backend(
         self,
         target_backend: BackendsEnum,

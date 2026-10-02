@@ -48,7 +48,7 @@ class Dataset(DatasetBase):
     def to_small_dataset(self) -> SmallDataset:
         return SmallDataset(
             roles=self.roles,
-            data=self.data,
+            data=self.raw_data,
             default_role=self.default_role,
         )
     
@@ -192,7 +192,7 @@ class SmallDataset(DatasetBase):
     def to_dataset(self) -> Dataset:
         return Dataset(
             roles=self.roles,
-            data=self.data,
+            data=self.raw_data,
             default_role=self.default_role,
         )
 

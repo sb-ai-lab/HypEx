@@ -534,4 +534,4 @@ class MatchingOutput(Output):
             self.summary = SmallDataset.create_empty()
 
         self._extract_full_data(experiment_data, indexes)
-        self.summary.data = self.summary.data.round(2)
+        self.summary.raw_data = self.summary.raw_data.round(2)
