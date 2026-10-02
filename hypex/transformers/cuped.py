@@ -59,8 +59,8 @@ class CUPEDTransformer(Transformer):
         result = deepcopy(data)
         for target_feature, pre_target_feature in cuped_features.items():
             theta = cuped_theta(
-                result[target_feature].data.values.flatten(),
-                result[pre_target_feature].data.values.flatten(),
+                result[target_feature].raw_data.values.flatten(),
+                result[pre_target_feature].raw_data.values.flatten(),
             )
             pre_target_mean = result[pre_target_feature].mean()
             new_values_ds = (

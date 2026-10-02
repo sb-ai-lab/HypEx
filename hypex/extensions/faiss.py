@@ -121,7 +121,7 @@ class FaissExtension(MLExtension):
             valid_cols = [col for col in data.columns if col in mahalanobis_index]
             if valid_cols and len(valid_cols) < len(data.columns):
                 data = data[valid_cols]
-            return data.dot(mahalanobis.data)
+            return data.dot(mahalanobis.raw_data)
 
     @abstractmethod
     def calc(
@@ -312,7 +312,7 @@ class PandasFaissExtension(FaissExtension):
             data (Dataset): The baseline dataset to index.
             test_data (Dataset): The query dataset (used for size heuristics).
         """
-        X = self._mahalanobis_transform(data, self.mahalanobis).data.values
+        X = self._mahalanobis_transform(data, self.mahalanobis).raw_data.values
         self.index = faiss.IndexIDMap(faiss.IndexFlatL2(X.shape[1]))
         if (
             (
@@ -374,9 +374,9 @@ class PandasFaissExtension(FaissExtension):
                 )
 
             X = (
-                self._mahalanobis_transform(test_data, self.mahalanobis).data.values
+                self._mahalanobis_transform(test_data, self.mahalanobis).raw_data.values
                 if mode == "auto"
-                else self._mahalanobis_transform(data, self.mahalanobis).data.values
+                else self._mahalanobis_transform(data, self.mahalanobis).raw_data.values
             )
             return self._predict(data, test_data, X)
         return self
@@ -1490,7 +1490,7 @@ class SparkFaissExtension(FaissExtension):
                 .agg(
                     F.min(F.struct(F.col("dists"), F.col("nids"))).alias("_1")
                 )
-                .select(F.col("index"), F.col("_1").alias("1"))
+                .select(F.col("index"), F.col("_1")["nids"].alias("1"))
             )
         else:
             result_df = (

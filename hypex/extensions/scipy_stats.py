@@ -157,7 +157,7 @@ class GroupChi2TestExtension(GroupStatTest):
                 StatisticRole(),
             )
         if isinstance(contingency_table, Dataset):
-            contingency_table = contingency_table.data.values
+            contingency_table = contingency_table.raw_data.values
         statistic, p_value, *_ = chi2_contingency(contingency_table, **kwargs)
         return self._form_results(statistic, p_value, self.reliability)
 
@@ -234,12 +234,12 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
         col_role = counted_data.roles.get(col_name, StatisticRole())
 
         data_vc = data_vc.add_column(
-            counted_data[col_name].data,
+            counted_data[col_name].raw_data,
             role={col_name: col_role},
         )
 
         other_vc = other_vc.add_column(
-            counted_other[col_name].data,  # FIX: was counted_data (typo)
+            counted_other[col_name].raw_data,  # FIX: was counted_data (typo)
             role={col_name: col_role},
         )
 
@@ -295,8 +295,8 @@ class SparkKSTestExtension(GroupKSTestExtension):
 
         # Validate inputs and ensure both datasets are single-column and compatible
         other = self.check_data(data, other)
-        df1 = data.data.to_spark()
-        df2 = other.data.to_spark()
+        df1 = data.raw_data.to_spark()
+        df2 = other.raw_data.to_spark()
         col = data.columns[0]
 
         # Get sample sizes
@@ -376,7 +376,7 @@ class SparkChi2TestExtension(GroupChi2TestExtension):
     def matrix_preparation(data: Dataset, other: Dataset) -> Dataset | None:
         other = np.array((
                             other
-                            .data
+                            .raw_data
                             .to_spark()
                             .rdd
                             .flatMap(lambda row: row)
@@ -384,7 +384,7 @@ class SparkChi2TestExtension(GroupChi2TestExtension):
                         ))
         data = np.array((
                             data
-                            .data
+                            .raw_data
                             .to_spark()
                             .rdd
                             .flatMap(lambda row: row)
@@ -412,7 +412,7 @@ class UniformCheck(GroupStatTest):
     def calc(
         self, data: Dataset, other: Dataset | None = None, **kwargs
     ) -> Dataset:
-        data = data.data.to_numpy().flatten()
+        data = data.raw_data.to_numpy().flatten()
         res = kstest(data, "uniform")
 
         return self._form_results(res[1], res[0], self.reliability)

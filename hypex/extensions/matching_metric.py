@@ -364,8 +364,8 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         """
         neighbors_cols = Adapter.to_list(neighbors_cols)
         numeric_cols = Adapter.to_list(numeric_cols)
-        t_data = data[numeric_cols].data
-        indexes = data[neighbors_cols].data
+        t_data = data[numeric_cols].raw_data
+        indexes = data[neighbors_cols].raw_data
 
         # "expand" the neighbor indexes from a wide format to a long one
         melted = indexes.stack().reset_index()
@@ -427,7 +427,7 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         return scaled_counts
 
     def _calc_stats_and_weights(self, data: Dataset) -> tuple[dict[str, float], dict[str, float]]:
-        new_data: pd.DataFrame = data.data.copy()
+        new_data: pd.DataFrame = data.raw_data.copy()
         scaled_counts = self._calc_scaled_counts(new_data, self.neighbors_cols, self.n_neighbors)
         group_1, group_2, *_ = sorted(new_data[self.group_field].unique())
 
@@ -521,8 +521,8 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
         neighbors_cols = Adapter.to_list(neighbors_cols)
         numeric_cols = Adapter.to_list(numeric_cols)
 
-        t_data: SparkDF = data[numeric_cols].data.to_spark(index_col='index')
-        indexes: SparkDF = data[neighbors_cols].data.to_spark(index_col='index')
+        t_data: SparkDF = data[numeric_cols].raw_data.to_spark(index_col='index')
+        indexes: SparkDF = data[neighbors_cols].raw_data.to_spark(index_col='index')
         working_columns = [col for col in indexes.columns if col != 'index']
 
         matched_data = (
@@ -587,7 +587,7 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
             A tuple of two dictionaries containing statistics for group 1
             (control) and group 2 (treatment).
         """
-        new_data: SparkDF = data.data.to_spark(index_col='index')
+        new_data: SparkDF = data.raw_data.to_spark(index_col='index')
         scaled_counts = self._calc_scaled_counts(
             new_data, self.neighbors_cols, self.n_neighbors
         )

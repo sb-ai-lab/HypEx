@@ -22,7 +22,7 @@ class AAOutput(Output):
 
     def __init__(self):
         super().__init__(
-            resume_reporter=AAPassedReporter(),
+            summary_reporter=AAPassedReporter(),
             additional_reporters={"best_split": AABestSplitReporter()}
         ) 
 
@@ -120,7 +120,7 @@ class AAOutput(Output):
             "ParamsExperiment", ExperimentDataEnum.analysis_tables
         )
         raw_table = experiment_data.analysis_tables[id_]
-        pdf = raw_table.data
+        pdf = raw_table.raw_data
         result_rows = []
         for row_idx in range(len(pdf)):
             row: dict = {}
@@ -212,8 +212,8 @@ class AAOutput(Output):
                     break
         if rename_map:
             try:
-                self.best_split_statistic.data = (
-                    self.best_split_statistic.data.rename(columns=rename_map)
+                self.best_split_statistic.raw_data = (
+                    self.best_split_statistic.raw_data.rename(columns=rename_map)
                 )
                 self.best_split_statistic._roles = {
                     rename_map.get(c, c): r

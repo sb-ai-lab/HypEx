@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 from typing import Any
 
 import numpy as np
@@ -6,6 +7,29 @@ import numpy as np
 from ..dataset import Dataset
 from .abstract import Extension
 from ..utils import timeit, NAME_BORDER_SYMBOL
+
+
+def _is_null(value) -> bool:
+    return value is None or (isinstance(value, float) and math.isnan(value))
+
+
+def _sort_by_group_key(result: dict) -> dict:
+    """Return ``result`` re-inserted in ascending group-key order.
+
+    Spark ``collect()`` order depends on partitioning, while pandas ``groupby``
+    yields sorted keys; consumers treat the first key as the baseline group.
+    Null key components (``None`` or float NaN) sort last. ``StatsKSTestExtension`` is not routed
+    through here because its consumer sorts keys itself.
+    """
+
+    def _key(item):
+        key = item[0]
+        parts = key if isinstance(key, tuple) else (key,)
+        return tuple(
+            (True, None) if _is_null(v) else (False, v) for v in parts
+        )
+
+    return dict(sorted(result.items(), key=_key))
 
 
 class StatsAggregationExtension(Extension):
@@ -85,7 +109,7 @@ class StatsAggregationExtension(Extension):
             A nested dictionary mapping ``group_key`` → ``column`` →
             ``statistic`` → ``value``.
         """
-        pdf = data.data  # pd.DataFrame
+        pdf = data.raw_data  # pd.DataFrame
         
         group_by_arg = group_cols if len(group_cols) > 1 else group_cols[0]
         grouped = pdf.groupby(group_by_arg)
@@ -138,7 +162,7 @@ class StatsAggregationExtension(Extension):
         """
         import pyspark.sql.functions as F
 
-        sdf = data.data.to_spark()
+        sdf = data.raw_data.to_spark()
 
         def safe_col(name: str):
             return F.col(f"`{name}`")
@@ -188,7 +212,7 @@ class StatsAggregationExtension(Extension):
                     alias = f"{col}{NAME_BORDER_SYMBOL}{stat}"
                     result[group_key][col][stat] = row[alias]
 
-        return result
+        return _sort_by_group_key(result)
 
 
 class StatsKSTestExtension(Extension):
@@ -224,7 +248,7 @@ class StatsKSTestExtension(Extension):
 
     def _calc_pandas(self, data, group_col, target_cols, **kwargs):
         result = {}
-        grouped = data.data.groupby(group_col)
+        grouped = data.raw_data.groupby(group_col)
         for group_key, group_df in grouped:
             result[group_key] = {}
             group_ds = Dataset(
@@ -266,7 +290,7 @@ class StatsKSTestExtension(Extension):
         """
         import pyspark.sql.functions as F
 
-        sdf = data.data.to_spark()
+        sdf = data.raw_data.to_spark()
 
         def safe_col(name: str):
             return F.col(f"`{name}`")
@@ -429,7 +453,7 @@ class StatsChi2TestExtension(Extension):
             ``{"value_counts": {category: count, ...}}``.
         """
         result = {}
-        grouped = data.data.groupby(group_col)
+        grouped = data.raw_data.groupby(group_col)
         
         for group_key, group_df in grouped:
             result[group_key] = {}
@@ -464,7 +488,7 @@ class StatsChi2TestExtension(Extension):
         """
         import pyspark.sql.functions as F
 
-        sdf = data.data.to_spark()
+        sdf = data.raw_data.to_spark()
 
         def safe_col(name: str):
             return F.col(f"`{name}`")
@@ -501,4 +525,4 @@ class StatsChi2TestExtension(Extension):
             result.setdefault(grp, {}).setdefault(col, {"value_counts": {}})
             result[grp][col]["value_counts"][val] = cnt
 
-        return result
+        return _sort_by_group_key(result)

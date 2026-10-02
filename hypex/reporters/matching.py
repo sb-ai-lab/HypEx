@@ -76,7 +76,7 @@ class MatchingReporter(DatasetReporter):
             A flat dictionary mapping composite keys to metric values.
         """
         analyzer_id = data.get_one_id(self.searching_class, ExperimentDataEnum.analysis_tables)
-        table = data.analysis_tables[analyzer_id].data
+        table = data.analysis_tables[analyzer_id].raw_data
         return {
             f"{col}{ID_SPLIT_SYMBOL}{idx}": val 
             for col in table.columns 
@@ -89,7 +89,7 @@ class MatchingReporter(DatasetReporter):
         """Extract matched neighbor indices from additional fields.
 
         For the Pandas backend, values are collected to the driver and
-        joined into a splitter-delimited string (legacy resume format).
+        joined into a splitter-delimited string (legacy summary format).
 
         For the Spark backend, returns an empty dict: matched indices
         already exist as lazy ``AdditionalMatchingRole`` columns of

@@ -33,18 +33,18 @@ from .base import Output
 class MatchingOutput(Output):
     """Output handler for matching experiment results."""
 
-    resume: Dataset
+    summary: Dataset
     full_data: Dataset
     quality_results: Dataset
 
     def __init__(self, searching_class: type = MatchingAnalyzer):
-        """Initialize matching output with resume and quality reporters.
+        """Initialize matching output with summary and quality reporters.
 
         Args:
             searching_class: The analyzer class used to search for results.
         """
         super().__init__(
-            resume_reporter=MatchingDictReporter(searching_class),
+            summary_reporter=MatchingDictReporter(searching_class),
             additional_reporters={"quality_results": MatchingQualityDatasetReporter()},
         )
 
@@ -140,7 +140,7 @@ class MatchingOutput(Output):
                 self.indexes = t_indexes
             else:
                 self.indexes = self.indexes.add_column(
-                    data=t_indexes.data,
+                    data=t_indexes.raw_data,
                     role={
                         col: t_indexes.roles.get(col, InfoRole())
                         for col in t_indexes.columns
@@ -264,7 +264,7 @@ class MatchingOutput(Output):
         index_values: list = Adapter.to_list(
             t_indexes.get_values(column=col_name)
         )
-        positional_indices: list = Adapter.to_list(t_indexes.data.index)
+        positional_indices: list = Adapter.to_list(t_indexes.raw_data.index)
 
         # Filter out unmatched rows (value == -1).
         valid_positions: list = []
@@ -290,31 +290,31 @@ class MatchingOutput(Output):
         return matched_data
     
     @staticmethod
-    def _reformat_resume(resume: dict[str, Any]) -> dict[str, Any]:
-        """Reformat a flat resume dictionary with composite keys into a nested structure.
+    def _reformat_summary(summary: dict[str, Any]) -> dict[str, Any]:
+        """Reformat a flat summary dictionary with composite keys into a nested structure.
 
         Args:
-            resume: Flat dictionary with composite keys separated by ID_SPLIT_SYMBOL.
+            summary: Flat dictionary with composite keys separated by ID_SPLIT_SYMBOL.
 
         Returns:
             Nested dictionary grouped by metric name and index.
         """
-        reformatted_resume: dict[str, Any] = {}
-        for key, value in resume.items():
+        reformatted_summary: dict[str, Any] = {}
+        for key, value in summary.items():
             if ID_SPLIT_SYMBOL not in key:
                 continue
             keys = key.split(ID_SPLIT_SYMBOL)
             if keys[0] == "indexes":
                 if len(keys) > 2:
-                    reformatted_resume.setdefault("indexes", {}).setdefault(
+                    reformatted_summary.setdefault("indexes", {}).setdefault(
                         keys[1], {}
                     )[keys[2]] = value
                 else:
-                    reformatted_resume.setdefault("indexes", {})[keys[1]] = value
+                    reformatted_summary.setdefault("indexes", {})[keys[1]] = value
             else:
                 l1_key = keys[0] if len(keys) < 3 else f"{keys[2]} {keys[0]}"
-                reformatted_resume.setdefault(l1_key, {})[keys[1]] = value
-        return reformatted_resume
+                reformatted_summary.setdefault(l1_key, {})[keys[1]] = value
+        return reformatted_summary
 
     @staticmethod
     def _collect_grouped_indexes(experiment_data: ExperimentData, group: dict) -> Dataset:
@@ -387,9 +387,9 @@ class MatchingOutput(Output):
     def _extract_driver_indexes(
         self,
         experiment_data: ExperimentData,
-        reformatted_resume: dict[str, Any],
+        reformatted_summary: dict[str, Any],
     ) -> Dataset | SmallDataset:
-        """Parse matched indexes from the resume string on the driver.
+        """Parse matched indexes from the summary string on the driver.
 
         Legacy extraction path used only for the Pandas backend, where the
         data already resides in driver memory. Handles three branches of
@@ -405,8 +405,8 @@ class MatchingOutput(Output):
         Args:
             experiment_data: The experiment data container with matching
                 results stored in ``analysis_tables`` and ``variables``.
-            reformatted_resume: Flat resume dictionary regrouped by
-                ``_reformat_resume``. The ``indexes`` entry is popped from
+            reformatted_summary: Flat summary dictionary regrouped by
+                ``_reformat_summary``. The ``indexes`` entry is popped from
                 it as a side effect.
 
         Returns:
@@ -416,8 +416,8 @@ class MatchingOutput(Output):
         """
         ds_len = len(experiment_data.ds)
 
-        if "indexes" in reformatted_resume.keys():
-            indexes_items = reformatted_resume.pop("indexes")
+        if "indexes" in reformatted_summary.keys():
+            indexes_items = reformatted_summary.pop("indexes")
             are_nested = all(isinstance(v, dict) for v in indexes_items.values())
 
             if are_nested:
@@ -462,7 +462,7 @@ class MatchingOutput(Output):
 
         else:
             # ── Branch 3: single (non-grouped) indexes ────────────────
-            indexes_data = self.resume.get("indexes", "").split(
+            indexes_data = self.summary.get("indexes", "").split(
                 MATCHING_INDEXES_SPLITTER_SYMBOL
             )
             if indexes_data and indexes_data[0]:
@@ -472,7 +472,7 @@ class MatchingOutput(Output):
                 )
                 if len(indexes) == ds_len:
                     # The matched indexes are already on the driver (parsed
-                    # from the resume string).  Collecting the dataset index
+                    # from the summary string).  Collecting the dataset index
                     # costs the same, so a single code path is kept here.
                     indexes.index = Adapter.to_list(experiment_data.ds.index)
                 else:
@@ -492,7 +492,7 @@ class MatchingOutput(Output):
 
         For the Spark backend, matched indexes are taken directly from the
         lazy ``additional_fields`` columns of ``experiment_data.ds`` — the
-        resume-string round trip and any driver-side index collection are
+        summary-string round trip and any driver-side index collection are
         skipped entirely. For the Pandas backend, the legacy string-based
         extraction is preserved.
 
@@ -503,35 +503,35 @@ class MatchingOutput(Output):
         # Let the base class handle additional_reporters (like quality_results)
         super().extract(experiment_data)
 
-        reformatted_resume = self._reformat_resume(self.resume)
+        reformatted_summary = self._reformat_summary(self.summary)
 
         if experiment_data.ds.backend_type == BackendsEnum.spark:
             # ── Spark: indexes stay lazy columns of ds ────────────────
             # No string parsing, no Adapter.to_list(ds.index) — the index
             # never leaves the cluster. Alignment is native (same index).
-            reformatted_resume.pop("indexes", None)
+            reformatted_summary.pop("indexes", None)
             indexes = self._get_spark_indexes(experiment_data)
         else:
             # ── Pandas: legacy string-based extraction (branches 1–3) ──
-            indexes = self._extract_driver_indexes(experiment_data, reformatted_resume)
+            indexes = self._extract_driver_indexes(experiment_data, reformatted_summary)
 
-        # ── Build resume table from remaining metrics ─────────────────
-        if reformatted_resume:
-            first_key = next(iter(reformatted_resume.keys()))
-            group_keys = list(reformatted_resume[first_key].keys())
-            transposed_resume = {
+        # ── Build summary table from remaining metrics ─────────────────
+        if reformatted_summary:
+            first_key = next(iter(reformatted_summary.keys()))
+            group_keys = list(reformatted_summary[first_key].keys())
+            transposed_summary = {
                 metric: [values[group] for group in group_keys]
-                for metric, values in reformatted_resume.items()
+                for metric, values in reformatted_summary.items()
             }
-            self.resume = SmallDataset.from_dict(
-                {"data": transposed_resume, "index": group_keys},
+            self.summary = SmallDataset.from_dict(
+                {"data": transposed_summary, "index": group_keys},
                 roles={
                     column: StatisticRole()
-                    for column in list(reformatted_resume.keys())
+                    for column in list(reformatted_summary.keys())
                 },
             )
         else:
-            self.resume = SmallDataset.create_empty()
+            self.summary = SmallDataset.create_empty()
 
         self._extract_full_data(experiment_data, indexes)
-        self.resume.data = self.resume.data.round(2)
+        self.summary.raw_data = self.summary.raw_data.round(2)
