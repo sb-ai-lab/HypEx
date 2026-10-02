@@ -133,7 +133,7 @@ class GroupKSTestExtension(GroupStatTest):
 
     def __init__(self, reliability: float = 0.05):
         super().__init__(self.test_function, reliability)
-        self.default_kwargs = {}
+        self.default_kwargs = {"nan_policy": "omit"}
 
 
 class GroupUTestExtension(GroupStatTest):
@@ -319,11 +319,33 @@ class SparkKSTestExtension(GroupKSTestExtension):
                 ).cast("int"),
             )
 
+        # Pandas vesion uses nan policy "omit"
+        nan_policy = kwargs.get("nan_policy", "omit")
         # Validate inputs and ensure both datasets are single-column and compatible
         other = self.check_data(data, other)
         df1 = data.raw_data.to_spark()
         df2 = other.raw_data.to_spark()
         col = data.columns[0]
+
+        # ── NaN processing in accordance with nan_policy in scipy ──────────────────────────────
+        if nan_policy == "raise":
+            null_count_1 = df1.filter(F.col(col).isNull() | F.isnan(F.col(col))).count()
+            null_count_2 = df2.filter(F.col(col).isNull() | F.isnan(F.col(col))).count()
+            if null_count_1 > 0 or null_count_2 > 0:
+                raise ValueError(
+                    f"NaN values found in data (dataset1: {null_count_1}, dataset2: {null_count_2}). "
+                    "Use nan_policy='omit' to remove them or nan_policy='propagate' to return NaN."
+                )
+
+        elif nan_policy == "propagate":
+            null_count_1 = df1.filter(F.col(col).isNull() | F.isnan(F.col(col))).count()
+            null_count_2 = df2.filter(F.col(col).isNull() | F.isnan(F.col(col))).count()
+            if null_count_1 > 0 or null_count_2 > 0:
+                return SmallDataset.from_dict({
+                    "p-value": float('nan'),
+                    "statistic": float('nan'),
+                    "pass": None
+                }, StatisticRole())
 
         # Get sample sizes
         n1 = df1.count()

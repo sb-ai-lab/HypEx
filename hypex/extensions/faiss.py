@@ -29,8 +29,6 @@ from ..dataset import AdditionalMatchingRole, Dataset
 from ..dataset.backends import PandasDataset, SparkDataset
 from ..utils.errors import AbstractMethodError
 from ..utils.index_utils import CachingIndex, FaissIndexStorage
-
-# TODO: Logger
 from ..utils.logger import logger
 from ..utils.registry import backend_factory
 from .abstract import MLExtension
@@ -355,8 +353,7 @@ class PandasFaissExtension(FaissExtension):
             **kwargs: Additional keyword arguments.
 
         Returns:
-            PandasFaissExtension or Dataset: The fitted extension (for "fit" mode)
-                or the matched indices (for "predict"/"auto" modes).
+                Dataset of matched indices.
 
         Raises:
             ValueError: If ``test_data`` is None when prediction is required,
@@ -440,6 +437,7 @@ def _spark_partition_fit(
 
 def _spark_full_partition_fit(
     iterator: Iterable,
+    bc_index: Broadcast,
     bc_storage: Broadcast,
 ) -> Generator[bytes, None, None]:
     """
@@ -940,7 +938,7 @@ class SparkFaissExtension(FaissExtension):
 
     # Assign train data to cluster in "shuffle" mode
 
-    def _shuffle_fit(self, data: spark.DataFrame, model_name: str) -> None:
+    def _prepare_data_for_shuffle_mode(self, data: spark.DataFrame, model_name: str) -> None:
         """
         Perform clustering and prepare data for shuffle mode.
 
@@ -1135,7 +1133,7 @@ class SparkFaissExtension(FaissExtension):
                 Defaults to None (uses "k-means").
         """
         features = ["index", "_features"]
-        self._shuffle_fit(vectorized_data.select(*features), model_name)
+        self._prepare_data_for_shuffle_mode(vectorized_data.select(*features), model_name)
         self.new_execution_flag = True
 
     # General RDD constructor
@@ -1162,20 +1160,18 @@ class SparkFaissExtension(FaissExtension):
         features = ["index", "_features"]
 
         rdd = vectorized_data.select(*features).rdd
-
+        bc_index = session.sparkContext.broadcast(self.index)
         if broadcast_index:
-            bc_index = session.sparkContext.broadcast(self.index)
             del self.index
             self.index = None
             gc.collect()
 
-            self._sharded_rdd = rdd.mapPartitions(
+        self._sharded_rdd = (
+            rdd.mapPartitions(
                 lambda it: partition_func(it, bc_index, bc_storage)
-            ).persist(MatchingConfig.FAISS_PERSIST_POLITIC)
-        else:
-            self._sharded_rdd = rdd.mapPartitions(
-                lambda it: partition_func(it, bc_storage)
-            ).persist(MatchingConfig.FAISS_PERSIST_POLITIC)
+            )
+            .persist(MatchingConfig.FAISS_PERSIST_POLITIC)
+        )
         self._sharded_rdd.count()
 
     # ==============================================================================
@@ -1366,7 +1362,7 @@ class SparkFaissExtension(FaissExtension):
         """
         sc = data.sparkSession.sparkContext
         bc_clusters = sc.broadcast(self._centroids)
-        # TODO
+
         bc_clusters_search = sc.broadcast(
             min(
                 (
