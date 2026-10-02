@@ -30,9 +30,6 @@ jobs:
     name: Lint and spelling
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # The tree has not been through `ruff format` on this branch yet. Drop this
-    # line once a dedicated formatting commit lands (`tox -e format`).
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -110,7 +107,7 @@ jobs:
           - { os: ubuntu-latest, python-version: "3.13", experimental: true }
           # macos-latest is arm64 and setup-python has no arm64 build of 3.8,
           # so the oldest interpreter has to run on the x86_64 runner.
-          - { os: macos-13, python-version: "3.8" }
+          - { os: macos-15-intel, python-version: "3.8" }
           - { os: macos-latest, python-version: "3.13", experimental: true }
           - { os: windows-latest, python-version: "3.8" }
           # 3.13 on Windows segfaulted; revisit once the Linux/macOS 3.13 legs
@@ -136,7 +133,7 @@ jobs:
             hashFiles('tox.ini', 'pyproject.toml') }}
 
       # Spark-backed tests start a local JVM.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -168,7 +165,7 @@ jobs:
           cache-dependency-path: poetry.lock
 
       # Spark-backed tests start a local JVM.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
