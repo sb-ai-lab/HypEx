@@ -12,6 +12,7 @@ from ..comparators import (
     StatsChi2Test,
     StatsKSTest,
     StatsTTest,
+    StatsUTest,
 )
 from ..dataset import Dataset, ExperimentData, SmallDataset, StatisticRole
 from ..dataset.experiment_data import ExperimentDataEnum
@@ -36,6 +37,7 @@ class ABTestReporter(DatasetReporter):
     tests: ClassVar[list] = [
         GroupTTest, GroupKSTest, GroupUTest, GroupChi2Test,
         StatsTTest, StatsKSTest, StatsChi2Test,
+        StatsUTest,
     ]
 
     def _report(self, data: ExperimentData) -> dict[str, Any]:
