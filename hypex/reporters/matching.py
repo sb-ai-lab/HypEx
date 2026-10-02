@@ -12,6 +12,7 @@ from ..comparators import (
     StatsChi2Test,
     StatsKSTest,
     StatsTTest,
+    StatsUTest,
 )
 from ..dataset import Dataset, ExperimentData
 from ..ml import FaissNearestNeighbors
@@ -132,6 +133,7 @@ class MatchingQualityReporter(DatasetReporter):
         StatsTTest,
         StatsKSTest,
         StatsChi2Test,
+        StatsUTest,
     ]
 
     def _report(self, data: ExperimentData) -> dict:

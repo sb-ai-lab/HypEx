@@ -1359,7 +1359,10 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.data.groupby(by=by, **kwargs)
 
     def iter_groups(self, by: list[str]):
-        """Iterate over groups defined by column(s).
+        """Iterate over groups defined by column(s), in ascending key order.
+
+        Like pandas ``groupby``, groups come out sorted by key, so the first
+        group is a deterministic baseline regardless of partitioning.
 
         Args:
             by (list[str]): Column names defining group keys.
@@ -1368,7 +1371,9 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             tuple: (group_key, SparkNavigation) for each unique combination
                 of grouping column values.
         """
-        keys_df = self.data[by].drop_duplicates().dropna().to_pandas()
+        keys_df = (
+            self.data[by].drop_duplicates().dropna().to_pandas().sort_values(by)
+        )
         for _, row in keys_df.iterrows():
             key = row[by[0]] if len(by) == 1 else tuple(row[col] for col in by)
             mask = None

@@ -17,7 +17,7 @@ from ..utils.errors import NotSuitableFieldError
 from ..utils.logger import logger
 from ..utils.registry import backend_factory
 from .abstract import StatsHypothesisTesting
-from .comparators import Chi2Test, KSTest, TTest, ZTest
+from .comparators import Chi2Test, KSTest, TTest, UTest, ZTest
 
 
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
@@ -732,5 +732,356 @@ class StatsKSTest(StatsHypothesisTesting):
         return {
             "p-value": p_value,
             "statistic": d_stat,
+            "pass": p_value < reliability,
+        }
+
+
+@backend_factory.register(UTest, SparkDataset)
+class StatsUTest(StatsHypothesisTesting):
+    """Mann-Whitney U test on aggregated histograms (Spark-optimized).
+
+    Computes per-group histograms via ``StatsUTestExtension`` in a fixed
+    number of Spark jobs, then calculates the U statistic and p-value
+    analytically from the histogram buckets — without transferring raw
+    data to the driver.
+
+    For Pandas backend, delegates to ``GroupUTest`` (scipy
+    ``mannwhitneyu``) which is exact and faster for small data.
+
+    Algorithm (histogram approximation)
+    ------------------------------------
+    For each bucket pair (i, j):
+      - if i < j: all h₁[i] observations are "less than" all h₂[j]
+        → contribute h₁[i] · h₂[j] to U₁.
+      - if i == j: ties → contribute 0.5 · h₁[i] · h₂[j] to U₁.
+
+    U₁ = Σ_{i<j} h₁[i]·h₂[j] + 0.5·Σ_i h₁[i]·h₂[i]
+    U₂ = n₁·n₂ − U₁
+    U  = min(U₁, U₂)
+
+    Normal approximation with tie correction:
+      μ  = n₁·n₂ / 2
+      σ² = (n₁·n₂/12)·[(n₁+n₂+1) − Σ(t³−t)/((n₁+n₂)(n₁+n₂−1))]
+      z  = (U − μ) / σ
+      p  = 2·Φ(−|z|)   (two-sided)
+
+    where t_i = h₁[i] + h₂[i] for each bucket with observations
+    from both groups (approximate tie groups).
+
+    Attributes:
+        n_bins: Number of histogram bins for the Spark path.
+    """
+
+    REQUIRED_STATS: ClassVar[list[str]] = ["histogram", "count"]
+
+    def __init__(
+        self,
+        n_bins: int = 2000,
+        grouping_role: ABCRole | None = None,
+        target_roles: ABCRole | None = None,
+        reliability: float = 0.05,
+        key: Any = "",
+    ):
+        """Initialize the stats-based Mann-Whitney U test.
+
+        Args:
+            n_bins: Number of histogram bins for the Spark path.
+                Higher values increase accuracy of the histogram
+                approximation at the cost of one additional Spark
+                shuffle. Defaults to 2000.
+            grouping_role: Role identifying the grouping column.
+            target_roles: Role(s) identifying numeric target columns.
+            reliability: Significance level (alpha) for the test.
+            key: Optional identifier key for storing results.
+        """
+        super().__init__(
+            stats=self.REQUIRED_STATS,
+            compare_by="groups",
+            grouping_role=grouping_role,
+            target_roles=target_roles,
+            key=key,
+            reliability=reliability,
+        )
+        self.n_bins = n_bins
+
+    @property
+    def search_types(self) -> list[type] | None:
+        """Returns the expected data types for target columns.
+
+        Returns:
+            A list containing ``int`` and ``float``, since the
+            U test operates on numeric (at least ordinal) data.
+        """
+        return NUMBER_TYPES_LIST
+
+    @classmethod
+    def _compute_stats(cls, grouped, target_columns, stats=None, **kwargs):
+        """Raises ``NotImplementedError``.
+
+        All aggregation for ``StatsUTest`` happens inside ``execute()``
+        via ``StatsUTestExtension``. Do not call this method directly.
+
+        Raises:
+            NotImplementedError: Always raised.
+        """
+        raise NotImplementedError(
+            "StatsUTest uses custom execute() logic. "
+            "Do not call _compute_stats directly."
+        )
+
+    def execute(self, data: "ExperimentData") -> "ExperimentData":
+        """Main entry point. Routes to Spark-optimized or Pandas-fallback.
+
+        For Spark, delegates to ``_execute_spark``. For Pandas, creates
+        a ``GroupUTest`` delegate with the same ID so pipeline lookups
+        remain consistent.
+
+        Args:
+            data: The ``ExperimentData`` container.
+
+        Returns:
+            The updated ``ExperimentData`` with test results stored in
+            ``analysis_tables``.
+
+        Raises:
+            NoColumnsError: If no target columns are found.
+            NotSuitableFieldError: If the grouping field is not suitable.
+        """
+        fields = self._get_fields_data(data)
+        group_field_data = fields["group_field"]
+        target_fields_data = fields["target_fields"]
+
+        if len(target_fields_data.columns) == 0:
+            if data.ds.tmp_roles:
+                return data
+            raise NoColumnsError(TargetRole().role_name)
+
+        if len(group_field_data.columns) != 1:
+            raise NotSuitableFieldError(group_field_data, "Grouping")
+
+        self.key = str(
+            target_fields_data.columns[0]
+            if len(target_fields_data.columns) == 1
+            else list(target_fields_data.columns)
+        )
+
+        if data.ds.backend_type == BackendsEnum.spark:
+            return self._execute_spark(
+                data,
+                group_col=group_field_data.columns[0],
+                target_cols=list(target_fields_data.columns),
+            )
+        else:
+            # Pandas fallback: scipy mannwhitneyu is exact and faster
+            from .hypothesis_testing import GroupUTest
+
+            delegate = GroupUTest(
+                compare_by="groups",
+                grouping_role=self.grouping_role,
+                target_role=self.target_roles,
+                reliability=self.reliability,
+                key=self.key,
+            )
+            delegate._id = self._id  # Preserve ID for pipeline lookups
+            return delegate.execute(data)
+
+    @timeit(level="SPARK", prefix="U_SPARK")
+    def _execute_spark(
+        self, data: "ExperimentData", group_col: str, target_cols: list[str]
+    ) -> "ExperimentData":
+        """Execute the Mann-Whitney U test using the Spark-optimized path.
+
+        Delegates histogram aggregation to ``StatsUTestExtension``, which
+        computes per-group histograms for all target columns in a fixed
+        number of Spark jobs (global bounds → counts → bucket histograms).
+        The U statistic and p-value are then calculated from the
+        pre-aggregated histograms via ``_inner_function``.
+
+        Steps:
+        1. Compute per-group histograms and observation counts for every
+           target column via ``StatsUTestExtension.calc()``.
+        2. If fewer than two groups, store empty results and return early.
+        3. For each target column, run ``_inner_function`` pairwise
+           (baseline vs. each compared group) and append results into
+           a single ``SmallDataset`` whose index is set to the compared
+           group names.
+        4. Store the per-column result under ``self.key`` in
+           ``analysis_tables``.
+
+        Args:
+            data: The ``ExperimentData`` container holding the datasets.
+            group_col: Name of the column that defines group membership.
+            target_cols: List of numeric target column names to test.
+
+        Returns:
+            The updated ``ExperimentData`` with U test results stored in
+            ``analysis_tables`` under per-column keys.
+        """
+        from ..extensions.stats_hypothesis_testing import StatsUTestExtension
+
+        subset = data.ds[[group_col] + target_cols]
+        ext = StatsUTestExtension(n_bins=self.n_bins, reliability=self.reliability)
+        all_group_stats = ext.calc(
+            data=subset,
+            group_col=group_col,
+            target_cols=target_cols,
+        )
+
+        group_names = sorted(all_group_stats.keys(), key=str)
+
+        if len(group_names) < 2:
+            for col in target_cols:
+                self.key = str(col)
+                self._set_value(data, SmallDataset.create_empty())
+            return data
+
+        baseline_name = group_names[0]
+
+        for col in target_cols:
+            self.key = str(col)
+            col_results = []
+
+            for compared_name in group_names[1:]:
+                b_stats = all_group_stats.get(baseline_name, {}).get(
+                    col, {"histogram": {}, "count": 0}
+                )
+                c_stats = all_group_stats.get(compared_name, {}).get(
+                    col, {"histogram": {}, "count": 0}
+                )
+                result = self._inner_function(
+                    b_stats, c_stats, reliability=self.reliability
+                )
+                col_results.append(
+                    DatasetAdapter.to_dataset(result, StatisticRole())
+                )
+
+            if col_results:
+                result_dataset = col_results[0].append(col_results[1:])
+                result_dataset.index = [str(g) for g in group_names[1:]]
+                self._set_value(data, result_dataset)
+
+        self.key = str(target_cols if len(target_cols) > 1 else target_cols[0])
+        return data
+
+    @classmethod
+    def _inner_function(
+        cls,
+        baseline_stats: dict[str, Any],
+        compared_stats: dict[str, Any],
+        reliability: float = 0.05,
+        **kwargs,
+    ) -> dict[str, Any]:
+        """Compute the Mann-Whitney U statistic from pre-aggregated histograms.
+
+        Iterates through the union of histogram buckets, accumulating:
+        - U₁: the number of (baseline, compared) pairs where the baseline
+          observation is less than the compared observation.
+        - Tie correction: for buckets shared by both groups.
+
+        The p-value is computed via the normal approximation with
+        continuity correction and tie-adjusted variance.
+
+        Args:
+            baseline_stats: Dictionary with ``histogram`` (bucket -> count)
+                and ``count`` for the baseline group.
+            compared_stats: Dictionary with ``histogram`` and ``count``
+                for the compared group.
+            reliability: Significance level (alpha) used to compute the
+                ``pass`` flag.
+            **kwargs: Additional keyword arguments (currently unused).
+
+        Returns:
+            A dictionary with keys ``p-value``, ``statistic``, and ``pass``.
+            Returns ``None`` values when either group has zero observations.
+            Returns ``(1.0, 0.0, False)`` when distributions are identical.
+        """
+        hist1 = baseline_stats.get("histogram", {})
+        hist2 = compared_stats.get("histogram", {})
+        n1 = baseline_stats.get("count", 0)
+        n2 = compared_stats.get("count", 0)
+
+        # Edge case: one or both groups are empty
+        if n1 == 0 or n2 == 0:
+            return {"p-value": None, "statistic": None, "pass": None}
+
+        all_buckets = sorted(set(hist1.keys()) | set(hist2.keys()))
+
+        if len(all_buckets) == 0:
+            return {"p-value": 1.0, "statistic": 0.0, "pass": False}
+
+        # ── Compute U₁ ──────────────────────────────────────────────
+        # U₁ counts pairs (x₁, x₂) where x₁ < x₂.
+        # For histogram buckets: if bucket_i < bucket_j, all h1[i]
+        # observations are less than all h2[j] observations.
+        # For same bucket (ties): contribute 0.5 * h1[i] * h2[j].
+        u1 = 0.0
+        cum2 = 0  # cumulative count of hist2 up to (but not including) current bucket
+
+        for bucket in all_buckets:
+            h1 = hist1.get(bucket, 0)
+            h2 = hist2.get(bucket, 0)
+
+            # All hist2 observations in previous buckets are < current hist1
+            u1 += h1 * cum2
+            # Ties within the same bucket: half credit
+            u1 += 0.5 * h1 * h2
+
+            cum2 += h2
+
+        # U₂ is the complement
+        n_product = n1 * n2
+        u2 = n_product - u1
+        u_stat = min(u1, u2)
+
+        # Edge case: identical distributions → U = n₁·n₂/2, p = 1
+        if u_stat == n_product / 2.0 and u1 == u2:
+            # Check if all observations are in the same single bucket
+            if len(all_buckets) == 1:
+                return {"p-value": 1.0, "statistic": 0.0, "pass": False}
+
+        # ── Normal approximation with tie correction ─────────────────
+        mu = n_product / 2.0
+
+        # Tie correction: for each bucket, t = h1[i] + h2[i]
+        # Σ(t³ - t) over all buckets with observations from both groups
+        tie_sum = 0.0
+        n_total = n1 + n2
+        for bucket in all_buckets:
+            t = hist1.get(bucket, 0) + hist2.get(bucket, 0)
+            if t > 1:
+                tie_sum += t ** 3 - t
+
+        # Variance: σ² = (n₁·n₂/12)·[(n₁+n₂+1) - Σ(t³-t)/((n₁+n₂)(n₁+n₂-1))]
+        if n_total > 1:
+            variance = (n_product / 12.0) * (
+                (n_total + 1) - tie_sum / (n_total * (n_total - 1))
+            )
+        else:
+            variance = 0.0
+
+        # Edge case: zero variance (all values identical)
+        if variance <= 0:
+            return {"p-value": 1.0, "statistic": 0.0, "pass": False}
+
+        sigma = math.sqrt(variance)
+
+        # z-score with continuity correction
+        z_stat = (abs(u_stat - mu) - 0.5) / sigma
+
+        # Two-sided p-value from standard normal
+        try:
+            from scipy.stats import norm as _norm
+
+            p_value = float(2.0 * _norm.sf(abs(z_stat)))
+        except Exception:
+            # Fallback: use t-distribution approximation (like StatsZTest)
+            p_value = float(2 * t_dist.sf(abs(z_stat), n_total - 2))
+
+        # Clamp p-value to [0, 1]
+        p_value = max(0.0, min(1.0, p_value))
+
+        return {
+            "p-value": p_value,
+            "statistic": float(u_stat),
             "pass": p_value < reliability,
         }

@@ -63,7 +63,7 @@ class AAOutput(Output):
                 if test and test != "GroupDifference":
                     test_names.add(normalize_test_name(test))
 
-        order_map = {"TTest": 0, "KSTest": 1, "Chi2Test": 2, "ZTest": 3}
+        order_map = {"TTest": 0, "KSTest": 1, "Chi2Test": 2, "UTest": 3, "ZTest": 4}
         ordered_tests = sorted(test_names, key=lambda x: order_map.get(x, 99))
 
         result_rows = []

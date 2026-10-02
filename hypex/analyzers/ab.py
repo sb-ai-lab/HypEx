@@ -10,6 +10,7 @@ from ..comparators import (
     StatsChi2Test,
     StatsKSTest,
     StatsTTest,
+    StatsUTest,
 )
 from ..dataset import (
     Dataset,
@@ -304,6 +305,7 @@ class ABAnalyzer(Executor):
                 StatsTTest,
                 StatsChi2Test,
                 StatsKSTest,
+                StatsUTest,
             ]
         )
 

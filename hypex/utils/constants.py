@@ -20,6 +20,7 @@ TEST_NAME_NORMALIZATION: dict[str, str] = {
     "StatsKSTest": "KSTest",
     "StatsChi2Test": "Chi2Test",
     "StatsZTest": "ZTest",
+    "StatsUTest": "UTest",
     "GroupTTest": "TTest",
     "GroupKSTest": "KSTest",
     "GroupChi2Test": "Chi2Test",

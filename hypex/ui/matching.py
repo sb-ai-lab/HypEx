@@ -142,7 +142,7 @@ class MatchingOutput(Output):
                 self.indexes = t_indexes
             else:
                 self.indexes = self.indexes.add_column(
-                    data=t_indexes.data,
+                    data=t_indexes.raw_data,
                     role={
                         col: t_indexes.roles.get(col, InfoRole())
                         for col in t_indexes.columns
@@ -263,7 +263,7 @@ class MatchingOutput(Output):
         #    scalars via PandasDataset.get_values(), instead of
         #    Adapter.to_list(Dataset.data) which wraps a DataFrame into [df].
         index_values: list = Adapter.to_list(t_indexes.get_values(column=col_name))
-        positional_indices: list = Adapter.to_list(t_indexes.data.index)
+        positional_indices: list = Adapter.to_list(t_indexes.raw_data.index)
 
         # Filter out unmatched rows (value == -1).
         valid_positions: list = []

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,9 +10,11 @@ from ..comparators import (
     GroupChi2Test,
     GroupKSTest,
     GroupTTest,
+    GroupUTest,
     StatsChi2Test,
     StatsKSTest,
     StatsTTest,
+    StatsUTest,
     StatsZTest,
 )
 from ..dataset import (
@@ -96,10 +98,12 @@ class OneAAStatAnalyzer(Executor):
             GroupTTest,
             GroupKSTest,
             GroupChi2Test,
+            GroupUTest,
             StatsTTest,
             StatsChi2Test,
             StatsZTest,
             StatsKSTest,
+            StatsUTest,
         ]
     )
 
@@ -110,6 +114,7 @@ class OneAAStatAnalyzer(Executor):
             ("StatsTTest", "GroupTTest", 1),
             ("StatsKSTest", "GroupKSTest", 2),
             ("StatsChi2Test", "GroupChi2Test", 2),
+            ("StatsUTest", "GroupUTest", 1),
         ]
     )
 

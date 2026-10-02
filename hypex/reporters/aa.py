@@ -11,6 +11,7 @@ from ..comparators import (
     StatsChi2Test,
     StatsKSTest,
     StatsTTest,
+    StatsUTest,
 )
 from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
 from ..dataset.dataset import SmallDataset
@@ -42,6 +43,7 @@ class AATestReporter(DatasetReporter):
         StatsTTest,
         StatsKSTest,
         StatsChi2Test,
+        StatsUTest,
     ]
 
     def __init__(
@@ -207,7 +209,7 @@ class AAPassedReporter(Reporter):
 
     @staticmethod
     def _ordered_test_names(aa_score: Dataset) -> list[str]:
-        order_map = {"TTest": 0, "KSTest": 1, "Chi2Test": 2, "ZTest": 3}
+        order_map = {"TTest": 0, "KSTest": 1, "Chi2Test": 2, "UTest": 3, "ZTest": 4}
         names = dict.fromkeys(
             str(idx).split()[-2] if len(str(idx).split()) >= 3 else str(idx).split()[0]
             for idx in aa_score.index

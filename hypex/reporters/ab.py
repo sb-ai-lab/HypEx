@@ -12,6 +12,7 @@ from ..comparators import (
     StatsChi2Test,
     StatsKSTest,
     StatsTTest,
+    StatsUTest,
 )
 from ..dataset import ExperimentData
 from .abstract import (
@@ -39,6 +40,7 @@ class ABTestReporter(DatasetReporter):
         StatsTTest,
         StatsKSTest,
         StatsChi2Test,
+        StatsUTest,
     ]
 
     def _report(self, data: ExperimentData) -> dict[str, Any]:
