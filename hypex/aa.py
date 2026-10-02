@@ -22,7 +22,7 @@ from .utils import SpaceEnum
 
 class AATest(ExperimentShell):
     """A class for conducting A/A tests with configurable parameters.
-    ...
+
     Args:
         precision_mode (bool, optional): If True, runs more iterations (2000) in order to tackle type 1 error.
             If False, runs fewer iterations (10) for quicker results. Defaults to False.

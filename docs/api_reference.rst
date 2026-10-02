@@ -74,7 +74,7 @@ Extend these to implement custom comparators.
    :template: autosummary/class.rst
 
    comparators.Comparator
-   comparators.StatHypothesisTesting
+   comparators.StatsHypothesisTesting
 
 Splitters
 ---------

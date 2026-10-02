@@ -47,7 +47,6 @@ class ExperimentData:
 
     Attributes:
         _data: Primary dataset wrapper.
-        additional_fields: Auxiliary dataset for extra columns.
         variables: Nested dict for scalar experiment parameters.
         groups: Nested dict for categorized dataset collections.
         analysis_tables: Dict mapping IDs to precomputed SmallDataset results.
