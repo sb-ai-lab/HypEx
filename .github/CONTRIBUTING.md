@@ -242,17 +242,32 @@ Each change in the code will be reflected in the library inside the environment.
 
 ### Style Guide
 
-We follow [PEP8 standards](https://www.python.org/dev/peps/pep-0008/). Automated code quality checks are in progress.
+We follow [PEP8 standards](https://www.python.org/dev/peps/pep-0008/), enforced by
+[Ruff](https://docs.astral.sh/ruff/). Its configuration lives in `pyproject.toml`
+under `[tool.ruff]`, and it is the only linter and formatter the project uses.
 
-#### Automated code checking (in progress)
+#### Fixing your code automatically
 
-In order to automate checking of the code quality, we use
-[pre-commit](https://pre-commit.com/). For more details, see the documentation,
-here we will give a quick-start guide:
+Ruff can repair most of what it reports. To rewrite the whole tree at once:
+
+```console
+tox -e format
+```
+
+That runs `ruff check --fix` followed by `ruff format`. The `lint` environment CI
+runs is the same Ruff with the same configuration, only read-only
+(`ruff check` and `ruff format --check`), so anything `format` leaves behind is a
+genuine finding that needs a human.
+
+#### Automated code checking
+
+To have the same fixes applied to each commit, install the
+[pre-commit](https://pre-commit.com/) hooks:
 
 1. Install and configure:
 
 ```console
+poetry install --with dev
 poetry run pre-commit install
 ```
 
@@ -270,6 +285,10 @@ poetry run pre-commit install
    resolved.
    If you experience any issues with pre-commit, please ask for support on the
    usual help channels.
+
+The hooks pin the same Ruff and codespell versions as `tox.ini`, so a commit the
+hooks accept is a commit CI accepts. When you bump one, bump the other --
+`.github/workflows/ci.yml` fails the lint job if the two pins drift apart.
 
 ### Testing
 (in progress)
@@ -403,7 +422,7 @@ def generator_func(n: int):
     """Generator have a ``Yields`` section instead of ``Returns``.
 
     Args:
-        n: Number of interations.
+        n: Number of iterations.
 
     Yields:
         The next number in the range of ``0`` to ``n-1``.
