@@ -115,7 +115,7 @@ class ABOutput(Output):
         self.cuped = CupedOutput() if enable_cuped else None
         self.cupac = CupacOutput()
         super().__init__(
-            resume_reporter=ABTestReporter(
+            summary_reporter=ABTestReporter(
                 dict_reporter=DictReporter(),
                 output_format="dataset",
                 invert_pass=True,
@@ -216,7 +216,7 @@ class ABOutput(Output):
             transformed metric, or a descriptive string if unavailable.
         """
         if hasattr(self, "_experiment_data"):
-            return self.resume_reporter.report_variance_reductions(
+            return self.summary_reporter.report_variance_reductions(
                 self._experiment_data,
             )
         return "No experiment data available."

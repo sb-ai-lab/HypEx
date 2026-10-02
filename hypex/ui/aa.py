@@ -22,7 +22,7 @@ class AAOutput(Output):
 
     def __init__(self):
         super().__init__(
-            resume_reporter=AAPassedReporter(),
+            summary_reporter=AAPassedReporter(),
             additional_reporters={"best_split": AABestSplitReporter()}
         ) 
 
