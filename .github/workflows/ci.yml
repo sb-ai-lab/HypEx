@@ -107,14 +107,11 @@ jobs:
           - { os: ubuntu-latest, python-version: "3.10" }
           - { os: ubuntu-latest, python-version: "3.11" }
           - { os: ubuntu-latest, python-version: "3.12" }
-          - { os: ubuntu-latest, python-version: "3.13", experimental: true }
           # macos-latest is arm64 and setup-python has no arm64 build of 3.8,
           # so the oldest interpreter has to run on the x86_64 runner.
           - { os: macos-15-intel, python-version: "3.8" }
-          - { os: macos-latest, python-version: "3.13", experimental: true }
+          - { os: macos-latest, python-version: "3.12" }
           - { os: windows-latest, python-version: "3.8" }
-          # 3.13 on Windows segfaulted; revisit once the Linux/macOS 3.13 legs
-          # are green on numpy 2.x.
           - { os: windows-latest, python-version: "3.12" }
 
     steps:

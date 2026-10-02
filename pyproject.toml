@@ -22,7 +22,6 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
     "Development Status :: 4 - Beta",
@@ -34,7 +33,9 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.8, <3.14"
+# 3.13 is not supported yet: pyspark 3.5 imports np.NaN, which numpy 2 removed,
+# and numpy has no 3.13 wheels below 2.1. Revisit with pyspark 4.
+python = ">=3.8, <3.13"
 tqdm = "*"
 scikit-learn = "*"
 
@@ -47,21 +48,17 @@ pandas = [
 
 numpy = [
     { version = ">=1.17.0, <=1.24.4", python = "<3.9" },
-    { version = ">=1.17.0, <=1.26.4", python = ">=3.9, <3.13" },
-    # numpy gained CPython 3.13 wheels in 2.1; 1.26.4 predates 3.13 entirely.
-    { version = ">=2.1.0, <2.3.0", python = ">=3.13" }
+    { version = ">=1.17.0, <=1.26.4", python = ">=3.9" }
 ]
 
 scipy = [
     { version = ">=1.5.0, <=1.10.1", python = "<3.9" },
-    { version = ">=1.5.0, <=1.13.1", python = ">=3.9, <3.13" },
-    { version = ">=1.14.1, <=1.16.0", python = ">=3.13" }
+    { version = ">=1.5.0, <=1.13.1", python = ">=3.9" }
 ]
 
 matplotlib = [
     { version = ">=3.0.0, <=3.7.3", python = "<3.9" },
-    { version = ">=3.0.0, <=3.9.0", python = ">=3.9, <3.13" },
-    { version = ">=3.10.0, <=3.11.0", python = ">=3.13" }
+    { version = ">=3.0.0, <=3.9.0", python = ">=3.9" }
 ]
 
 faiss-cpu = [
