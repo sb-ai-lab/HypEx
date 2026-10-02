@@ -6,6 +6,12 @@ on:
     # scientific stack, so it does not belong on the pull-request path.
     - cron: "0 3 * * *"
   workflow_dispatch:
+  push:
+    branches: [ master, dev/master ]
+    paths:
+      - "examples/tutorials/**"
+      - "hypex/**"
+      - ".github/workflows/notebooks.yml"
   pull_request:
     branches: [ master, dev/master ]
     paths:

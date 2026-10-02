@@ -1,6 +1,8 @@
 name: Security
 
 on:
+  push:
+    branches: [ master, dev/master ]
   pull_request:
     branches: [ master, dev/master ]
   schedule:
