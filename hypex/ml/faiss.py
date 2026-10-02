@@ -140,7 +140,7 @@ class FaissNearestNeighbors(MLExecutor):
                 faiss_mode=faiss_mode,
                 **kwargs,
             )
-            # This isn't nessesary due to `IndexIDMap`
+            # This isn't necessary due to `IndexIDMap`
             # test_data = cls._set_global_match_indexes(test_data, (control_idx, _data))
             if two_sides is not True:
                 return {"test": test_data}
@@ -151,7 +151,7 @@ class FaissNearestNeighbors(MLExecutor):
                 faiss_mode=faiss_mode,
                 **kwargs,
             )
-            # This isn't nessesary due to `IndexIDMap`
+            # This isn't necessary due to `IndexIDMap`
             # control_data = cls._set_global_match_indexes(control_data, (test_idx, _test_data))
             return {
                 "test": test_data,
@@ -299,7 +299,6 @@ class FaissNearestNeighbors(MLExecutor):
             session=data.ds.session
         )
         for res_k, res_v in compare_result.items():
-            group = grouping_data[1][1] if res_k == "test" else grouping_data[0][1]
             # res_v has index similar to group data
             #`limit` may be removed
             t_index_field: Dataset = res_v
@@ -324,7 +323,7 @@ class FaissNearestNeighbors(MLExecutor):
             raise PairsNotFoundError
         result = self._set_value(data, matched_indexes, key="matched")
         result.ds.checkpoint(eager=True)
-        # unpersist `contol` and `test` indexes as they are
+        # unpersist `control` and `test` indexes as they are
         # already persisted in `ds` using  `_set_value`
         for res_v in compare_result.values():
             if res_v.is_persisted:

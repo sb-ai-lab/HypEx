@@ -513,7 +513,7 @@ class SparkBisaExtesion(BiasExtension):
             )
         )
         features = [col + "_matched" for col in self.features]
-        asembler = VectorAssembler(inputCols=features, outputCol='_features')
+        assembler = VectorAssembler(inputCols=features, outputCol='_features')
         lr = LinearRegression(
             featuresCol='_features', 
             labelCol=self.target_field + "_matched", 
@@ -522,13 +522,13 @@ class SparkBisaExtesion(BiasExtension):
         data = data.repartition(F.col(self.group_field))
 
         fit_data_1 = data.filter(F.col(self.group_field) == group_1)
-        fit_data_1 = asembler.transform(fit_data_1)
+        fit_data_1 = assembler.transform(fit_data_1)
         fit_data_1.persist()
         model_1 = lr.fit(fit_data_1)
         fit_data_1.unpersist()
 
         fit_data_2 = data.filter(F.col(self.group_field) == group_2)
-        fit_data_2 = asembler.transform(fit_data_2)
+        fit_data_2 = assembler.transform(fit_data_2)
         fit_data_2.persist()
         model_2 = lr.fit(fit_data_2)
         fit_data_2.unpersist()

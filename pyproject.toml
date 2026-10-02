@@ -120,7 +120,7 @@ skip = ".git,.tox,.venv,.mypy_cache,.ruff_cache,docs,_build,imgs,schemes,poetry.
 check-hidden = true
 # dotA: a column name in the test fixtures. TE/te: treatment effect.
 # TTest/ttest: the class name and the statistic.
-ignore-words-list = "dotA,TE,te,TTest,ttest"
+ignore-words-list = "dotA,TE,te,TTest,ttest,fpr"
 
 [tool.mypy]
 python_version = "3.10"

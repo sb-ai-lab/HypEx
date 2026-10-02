@@ -122,10 +122,10 @@ class SparkLstsqExtension(LstsqExtension):
             self, data: SparkDataset, other: Dataset | None = None, **kwargs
     ):
         target, *features = self.get_columns(data)
-        asembler = VectorAssembler(inputCols=features,
+        assembler = VectorAssembler(inputCols=features,
                                    outputCol='_features')
         
-        transformed_data = asembler.transform(data.raw_data.to_spark()).select(target, '_features')
+        transformed_data = assembler.transform(data.raw_data.to_spark()).select(target, '_features')
         lr = LinearRegression(featuresCol='_features', labelCol=target, regParam=0.01)
         model = lr.fit(transformed_data)
         

@@ -115,7 +115,7 @@ class PandasNavigation(DatasetBackendNavigation):
         data_compression: Literal["downcasting", "encoding", "auto", "disable"],
         non_compresion_cols: list[str] | None,
     ) -> pd.DataFrame:
-        """Compress data before convertation `spark.DataFrame` to pandas.DataFrame.
+        """Compress data before conversion `spark.DataFrame` to pandas.DataFrame.
 
         Args:
             data: `spark.DataFrame data` copressing data.
@@ -688,7 +688,7 @@ class PandasNavigation(DatasetBackendNavigation):
             tail: flag of direction. If False, head rows returned.
         Return:
             pd.DataFrame: head or tail part of dataframe.
-            If downcasting is applyed, repr substitutes encoded values to real one.
+            If downcasting is applied, repr substitutes encoded values to real one.
         """
         if tail:
             head_tail = self.data.tail(rows_display_limit)

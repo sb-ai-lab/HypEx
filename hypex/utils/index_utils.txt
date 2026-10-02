@@ -324,7 +324,7 @@ class FaissIndexStorage:
         except:
             pass
 
-        # Second appraoch
+        # Second approach
         try:
             return session.conf.get(
                 "spark.hadoop.fs.defaultFS",

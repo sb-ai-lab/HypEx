@@ -36,7 +36,6 @@ from pyspark.sql.types import (
     ShortType,
     ByteType,
 )
-from typing import TYPE_CHECKING, Any, TypeVar, Callable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -117,7 +116,7 @@ class GenericManager:
             except TypeError:
                 return False
 
-        # Union ot Optional type
+        # Union or Optional type
         if origin is Union:
             return any(GenericManager.check_type(obj, arg, strict) for arg in args)
         

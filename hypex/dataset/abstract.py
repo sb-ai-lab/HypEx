@@ -207,7 +207,7 @@ class DatasetBase:
                 roles = self._parse_roles(roles)
             columns = []
             for column, role in roles.items():
-                if role.data_type == str:
+                if role.data_type is str:
                     columns.append(column)
         return columns
 

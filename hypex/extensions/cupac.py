@@ -97,12 +97,6 @@ class CupacExtension(MLExtension):
         elif mode == "predict":
             return self._predict_pandas(model, data)
 
-    def fit(self, model: str, X: Dataset, Y: Dataset) -> Any:
-        pass
-
-    def predict(self, model: Any, X: Dataset) -> Dataset:
-        pass
-
     def _kfold_fit_pandas(
         self, model: str, X: Dataset, Y: Dataset
     ) -> tuple[float, dict[str, float]]:
