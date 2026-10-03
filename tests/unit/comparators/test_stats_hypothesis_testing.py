@@ -243,3 +243,15 @@ def test_chi2_empty_inputs_return_none(a, b) -> None:
 def test_chi2_single_category_returns_identical() -> None:
     res = StatsChi2Test._inner_function({"value_counts": {"u": 5}}, {"value_counts": {"u": 9}})
     assert res["p-value"] == 1.0 and res["statistic"] == 0.0
+
+
+def test_count_stat_function_equals_len() -> None:
+    """``STAT_FUNCTIONS["count"]`` is plain ``len``; behaviour must equal ``len(data)``.
+
+    Behaviour is identical to the former ``lambda d: len(d)``, so this guards the
+    contract rather than a regression.
+    """
+    df = pd.DataFrame({"y": [1.0, 2.0, 3.0, 4.0]})
+    ds = build_dataset(df, {"y": TargetRole()})
+    assert StatsTTest.STAT_FUNCTIONS["count"](ds) == len(ds) == 4
+    assert StatsTTest.STAT_FUNCTIONS["count"] is len

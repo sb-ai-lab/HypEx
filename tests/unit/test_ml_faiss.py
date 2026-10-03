@@ -302,3 +302,25 @@ def test_execute_two_sides_neighbours_come_from_opposite_group() -> None:
 
 def test_pairs_not_found_error_is_exception() -> None:
     assert issubclass(PairsNotFoundError, Exception)
+
+
+# ---------------------------------------------------------------------------
+# NaN in the faiss result must still be reported as PairsNotFoundError
+# ---------------------------------------------------------------------------
+@pytest.mark.filterwarnings("ignore::FutureWarning", "ignore::UserWarning")
+def test_execute_nan_matches_raise_pairs_not_found(monkeypatch) -> None:
+    """The warning loop only counts NaNs; the later per-group check must still raise."""
+    df, data = _experiment()
+    executor = FaissNearestNeighbors(grouping_role=TreatmentRole())
+    n_test = int((df.t == 1).sum())
+    nan_matches = Dataset(
+        roles={"indexes": AdditionalMatchingRole()},
+        data=pd.DataFrame(
+            {"indexes": [np.nan, *range(n_test - 1)]},
+            index=df[df.t == 1].index,
+        ),
+        backend=BackendsEnum.pandas,
+    )
+    monkeypatch.setattr(executor, "calc", lambda **kwargs: {"test": nan_matches})
+    with pytest.warns(UserWarning, match="nans"), pytest.raises(PairsNotFoundError):
+        executor.execute(data)

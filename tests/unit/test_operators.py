@@ -260,3 +260,16 @@ def test_bias_correction_reduces_matching_discrepancy(matched) -> None:
 def test_group_operator_requires_two_targets() -> None:
     with pytest.raises(ValueError, match="2 targets"):
         SMD._execute_inner_function([], target_fields=["only_one"])
+
+
+# ---------------------------------------------------------------------------
+# MatchingMetrics._write_log is a staticmethod
+# ---------------------------------------------------------------------------
+def test_write_log_is_callable_on_instance_and_class(tmp_path) -> None:
+    """Without @staticmethod the instance call would pass ``self`` as ``file``."""
+    metrics = MatchingMetrics()
+    log = tmp_path / "log.txt"
+    metrics._write_log(str(log), "first", "1.5s", "w")
+    MatchingMetrics._write_log(str(log), "second", "2.5s")
+    assert log.read_text() == "first: 1.5s\nsecond: 2.5s\n"
+    assert isinstance(MatchingMetrics.__dict__["_write_log"], staticmethod)
