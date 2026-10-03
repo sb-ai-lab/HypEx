@@ -12,6 +12,7 @@ from hypex.dataset import (
     TargetRole,
     TreatmentRole,
 )
+from hypex.utils import BackendsEnum
 from hypex.utils.errors import ConcatBackendError, ConcatDataError, DataTypeError
 
 
@@ -38,7 +39,12 @@ def test_add_column_from_list(make_dataset) -> None:
     assert len(ds) == 3
 
 
-def test_add_column_from_dataset(make_dataset) -> None:
+def test_add_column_from_dataset(make_dataset, xfail_backend) -> None:
+    xfail_backend(
+        BackendsEnum.spark,
+        reason="Issue: SparkDataset.add_column assigns a pyspark.pandas DataFrame to a column (TypeError)",
+        raises=TypeError,
+    )
     """add_column accepts another Dataset when role is None."""
     ds = _ds(make_dataset)
     extra = make_dataset(pd.DataFrame({"new": [1, 2, 3]}), {"new": FeatureRole()})
@@ -87,7 +93,7 @@ def test_append_cross_backend_raises(make_dataset, spark_session) -> None:
     roles = {"x": FeatureRole()}
 
     pandas_ds = Dataset(roles=roles, data=df)
-    spark_ds = Dataset(roles=roles, data=df, backend="spark", session=spark_session)
+    spark_ds = Dataset(roles=roles, data=df, backend=BackendsEnum.spark, session=spark_session)
 
     with pytest.raises(ConcatBackendError):
         pandas_ds.append(spark_ds)

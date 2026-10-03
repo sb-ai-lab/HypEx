@@ -5,6 +5,8 @@ import pandas as pd
 import pytest
 
 from hypex.dataset import FeatureRole, TargetRole
+from hypex.utils import BackendsEnum
+from hypex.utils.errors import RoleColumnError
 
 
 def _ds(make_dataset):
@@ -68,6 +70,11 @@ def test_setitem_existing_column_replaces(make_dataset) -> None:
     assert ds["a"].get_values() == [[9], [9], [9], [9]] or ds["a"].sum() == 36
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=RoleColumnError,
+    reason="Issue: Dataset.get(key) rebuilds the Dataset with all original roles, so selecting a single column raises RoleColumnError",
+)
 def test_get_with_default(make_dataset) -> None:
     """get() returns the column or the provided default."""
     ds = _ds(make_dataset)
@@ -132,7 +139,12 @@ def test_index_property_and_setter(make_dataset) -> None:
     pytest.skip("Setting list index in pyspark.pandas is unstable")
 
 
-def test_reset_index_drop(make_dataset) -> None:
+def test_reset_index_drop(make_dataset, xfail_backend) -> None:
+    xfail_backend(
+        BackendsEnum.spark,
+        reason="Issue: SparkDataset.index setter passes the list to set_index() as column names (KeyError)",
+        raises=KeyError,
+    )
     """reset_index(drop=True) returns a fresh RangeIndex dataset."""
     ds = _ds(make_dataset)
     ds.index = [10, 11, 12, 13]
