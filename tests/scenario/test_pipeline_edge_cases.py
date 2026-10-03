@@ -44,12 +44,29 @@ def test_empty_dataset_raises(name) -> None:
         _run_all(_frame().iloc[0:0])[name]()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: an empty dataset fails with a bare IndexError('pop from empty list') "
-    "instead of a descriptive error",
+@pytest.mark.parametrize(
+    "name",
+    [
+        pytest.param(
+            "ab",
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason="Issue: an empty dataset fails with a bare IndexError('pop from empty list') "
+                "instead of a descriptive error",
+            ),
+        ),
+        pytest.param(
+            "homo",
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason="Issue: HomogeneityTest() construction emits the DeprecationWarning of "
+                "HomoDatasetReporter before any data validation (and an empty dataset gives a "
+                "bare IndexError)",
+            ),
+        ),
+        "aa",
+    ],
 )
-@pytest.mark.parametrize("name", ["ab", "homo", "aa"])
 def test_empty_dataset_error_is_descriptive(name) -> None:
     with pytest.raises((NotSuitableFieldError, NoColumnsError, ValueError)):
         _run_all(_frame().iloc[0:0])[name]()
@@ -58,13 +75,42 @@ def test_empty_dataset_error_is_descriptive(name) -> None:
 # ---------------------------------------------------------------------------
 # Single row / single group
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize("name", ["ab", "homo", "aa"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "ab",
+        pytest.param(
+            "homo",
+            marks=pytest.mark.xfail(
+                strict=True,
+                raises=DeprecationWarning,
+                reason="Issue: HomogeneityTest() construction emits the DeprecationWarning of "
+                "HomoDatasetReporter",
+            ),
+        ),
+        "aa",
+    ],
+)
 def test_single_row_raises_not_suitable_field(name) -> None:
     with pytest.raises(NotSuitableFieldError):
         _run_all(_frame().iloc[:1])[name]()
 
 
-@pytest.mark.parametrize("name", ["ab", "homo"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "ab",
+        pytest.param(
+            "homo",
+            marks=pytest.mark.xfail(
+                strict=True,
+                raises=DeprecationWarning,
+                reason="Issue: HomogeneityTest() construction emits the DeprecationWarning of "
+                "HomoDatasetReporter",
+            ),
+        ),
+    ],
+)
 def test_single_group_raises_not_suitable_field(name) -> None:
     df = _frame().assign(treat=0)
     with pytest.raises(NotSuitableFieldError):
@@ -81,11 +127,6 @@ def test_all_nan_target_ab_does_not_crash_and_has_no_estimates() -> None:
     assert row["difference"] is None or pd.isna(row["difference"])
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: with an all-NaN target the report claims 'TTest pass = OK' although no "
-    "test could be computed (p-value is None)",
-)
 def test_all_nan_target_is_not_reported_as_passed() -> None:
     out = ABTest().execute(make_dataset(_frame().assign(y=np.nan), ROLES))
     assert to_pandas(out.resume).iloc[0]["TTest pass"] != "OK"

@@ -27,9 +27,11 @@ def _run(df=None, roles=None, **kwargs):
 
 def test_homogeneous_data_passes_aa() -> None:
     output = _run(n_iterations=20, random_states=range(20))
-    row = to_pandas(output.resume).iloc[0]
-    assert row["result"] == "OK"
-    assert row["TTest aa test"] == "OK" and row["KSTest aa test"] == "OK"
+    resume = to_pandas(output.resume)
+    # resume has one row per target/feature column
+    assert (resume["result"] == "OK").all()
+    for column in ("TTest aa score", "KSTest aa score", "TTest best split", "KSTest best split"):
+        assert (resume[column] == "OK").all(), column
 
 
 def test_pass_rate_over_iterations_is_close_to_alpha() -> None:
@@ -61,7 +63,8 @@ def test_different_random_states_give_different_splits() -> None:
 
 def test_group_sizes_follow_control_size() -> None:
     output = _run(_homogeneous(2000), n_iterations=3, random_states=range(3), control_size=0.3)
-    row = to_pandas(output.resume).iloc[0]
+    resume = to_pandas(output.resume)
+    row = resume[resume["feature"] == "y"].iloc[0]
     assert float(row["control mean"]) == pytest.approx(10.0, abs=0.6)
     best = to_pandas(output.best_split)
     assert len(best) >= 1

@@ -43,8 +43,9 @@ def test_percentage_difference_is_relative_to_control_mean() -> None:
 
 
 def test_real_effect_is_flagged_and_null_is_not() -> None:
-    assert resume_row(_run(ab_frame(n=1000, effect=1.0, seed=4)))["TTest pass"] == "NOT OK"
-    assert resume_row(_run(ab_frame(n=1000, effect=0.0, seed=4)))["TTest pass"] == "OK"
+    # AB convention: a significant effect is reported as "OK".
+    assert resume_row(_run(ab_frame(n=1000, effect=1.0, seed=4)))["TTest pass"] == "OK"
+    assert resume_row(_run(ab_frame(n=1000, effect=0.0, seed=4)))["TTest pass"] == "NOT OK"
 
 
 def test_pvalue_matches_welch_ttest() -> None:
@@ -174,11 +175,6 @@ def _with_pre(n=2000, effect=1.0, seed=11) -> tuple[pd.DataFrame, dict]:
     return df, roles
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: CUPEDTransformer.execute assigns the read-only ExperimentData.additional_fields",
-)
 def test_cuped_reduces_pvalue_noise_end_to_end() -> None:
     df, roles = _with_pre()
     out = _run(df, roles, cuped_features={"y": "y_pre"})

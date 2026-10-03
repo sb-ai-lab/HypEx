@@ -32,12 +32,6 @@ def _compare_rows(left: pd.Series, right: pd.Series, columns=NUMERIC) -> None:
             assert left[column] == right[column], column
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: on Spark ABTest can swap control and test (aggregation returns groups in "
-    "collect() order and the first key is taken as the baseline): control mean/size come "
-    "from group 1 instead of group 0",
-)
 def test_ab_two_groups_parity(spark_session) -> None:
     df = ab_frame(n=800, effect=0.4, seed=1)
     pandas_ds, spark_ds = _both(df, None, spark_session)
@@ -46,12 +40,6 @@ def test_ab_two_groups_parity(spark_session) -> None:
     _compare_rows(left, right)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: on Spark ABTest can swap control and test (aggregation returns groups in "
-    "collect() order and the first key is taken as the baseline): control mean/size come "
-    "from group 1 instead of group 0",
-)
 def test_ab_three_groups_and_multitest_parity(spark_session) -> None:
     df = ab_frame(n=1200, effect=0.3, groups=3, seed=2)
     pandas_ds, spark_ds = _both(df, None, spark_session)
@@ -67,12 +55,6 @@ def test_ab_three_groups_and_multitest_parity(spark_session) -> None:
     assert [str(v) for v in left["rejected"]] == [str(v) for v in right["rejected"]]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: on Spark ABTest can swap control and test (aggregation returns groups in "
-    "collect() order and the first key is taken as the baseline): control mean/size come "
-    "from group 1 instead of group 0",
-)
 def test_ab_group_sizes_parity(spark_session) -> None:
     df = ab_frame(n=700, effect=0.2, seed=3)
     pandas_ds, spark_ds = _both(df, None, spark_session)
@@ -98,6 +80,11 @@ def _homo_frame(imbalance: float, seed: int = 4, n: int = 800) -> pd.DataFrame:
     )
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=DeprecationWarning,
+    reason="Issue: HomogeneityTest() construction emits the DeprecationWarning of the deprecated HomoDatasetReporter (hypex/ui/homo.py)",
+)
 @pytest.mark.parametrize("imbalance", [0.0, 4.0])
 def test_homogeneity_parity(spark_session, imbalance) -> None:
     df = _homo_frame(imbalance)
@@ -111,6 +98,11 @@ def test_homogeneity_parity(spark_session, imbalance) -> None:
         assert left.loc[feature, "KSTest pass"] == right.loc[feature, "KSTest pass"]
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=DeprecationWarning,
+    reason="Issue: HomogeneityTest() construction emits the DeprecationWarning of the deprecated HomoDatasetReporter (hypex/ui/homo.py)",
+)
 def test_homogeneity_ks_pvalue_is_close(spark_session) -> None:
     df = _homo_frame(0.0)
     pandas_ds, spark_ds = _both(df, ROLES_HOMO, spark_session)

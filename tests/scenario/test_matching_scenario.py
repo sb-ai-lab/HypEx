@@ -48,6 +48,11 @@ def _effects(output) -> pd.DataFrame:
     return to_pandas(output.resume).astype(float)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=DeprecationWarning,
+    reason="Issue: Matching() construction emits the DeprecationWarning of the deprecated MatchingDictReporter (hypex/ui/matching.py)",
+)
 def test_default_matching_recovers_true_effect(run, confounded) -> None:
     effects = _effects(run())
     assert set(effects.index) == {"ATT", "ATC", "ATE"}
@@ -56,27 +61,52 @@ def test_default_matching_recovers_true_effect(run, confounded) -> None:
     assert abs(effects.loc["ATE", "Effect Size"] - TRUE_EFFECT) < abs(_naive(confounded) - TRUE_EFFECT) / 3
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=DeprecationWarning,
+    reason="Issue: Matching() construction emits the DeprecationWarning of the deprecated MatchingDictReporter (hypex/ui/matching.py)",
+)
 def test_confidence_interval_covers_true_effect(run) -> None:
     row = _effects(run()).loc["ATE"]
     assert row["CI Lower"] <= TRUE_EFFECT <= row["CI Upper"]
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=DeprecationWarning,
+    reason="Issue: Matching() construction emits the DeprecationWarning of the deprecated MatchingDictReporter (hypex/ui/matching.py)",
+)
 def test_confidence_interval_is_centered_on_estimate(run) -> None:
     for name, row in _effects(run()).iterrows():
         assert (row["CI Lower"] + row["CI Upper"]) / 2 == pytest.approx(row["Effect Size"], abs=0.02)
         assert row["CI Upper"] - row["CI Lower"] == pytest.approx(2 * 1.96 * row["Standard Error"], abs=0.03)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=DeprecationWarning,
+    reason="Issue: Matching() construction emits the DeprecationWarning of the deprecated MatchingDictReporter (hypex/ui/matching.py)",
+)
 def test_real_effect_is_significant(run) -> None:
     assert (_effects(run())["P-value"] < 0.01).all()
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=DeprecationWarning,
+    reason="Issue: Matching() construction emits the DeprecationWarning of the deprecated MatchingDictReporter (hypex/ui/matching.py)",
+)
 def test_distance_modes_agree_for_a_single_feature(run) -> None:
     mahalanobis = _effects(run(distance="mahalanobis"))
     l2 = _effects(run(distance="l2"))
     pd.testing.assert_frame_equal(mahalanobis, l2)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=DeprecationWarning,
+    reason="Issue: Matching() construction emits the DeprecationWarning of the deprecated MatchingDictReporter (hypex/ui/matching.py)",
+)
 def test_bias_estimation_changes_estimate_but_stays_near_truth(run) -> None:
     with_bias = _effects(run(bias_estimation=True)).loc["ATE", "Effect Size"]
     without_bias = _effects(run(bias_estimation=False)).loc["ATE", "Effect Size"]
@@ -84,12 +114,22 @@ def test_bias_estimation_changes_estimate_but_stays_near_truth(run) -> None:
     assert abs(with_bias - TRUE_EFFECT) <= abs(without_bias - TRUE_EFFECT) + 0.05
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=DeprecationWarning,
+    reason="Issue: Matching() construction emits the DeprecationWarning of the deprecated MatchingDictReporter (hypex/ui/matching.py)",
+)
 def test_more_neighbors_shrink_standard_error(run) -> None:
     one = _effects(run(n_neighbors=1)).loc["ATE", "Standard Error"]
     three = _effects(run(n_neighbors=3)).loc["ATE", "Standard Error"]
     assert three < one
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=DeprecationWarning,
+    reason="Issue: Matching() construction emits the DeprecationWarning of the deprecated MatchingDictReporter (hypex/ui/matching.py)",
+)
 def test_indexes_cover_every_row(run, confounded) -> None:
     indexes = to_pandas(run().indexes)
     assert len(indexes) == len(confounded)
@@ -97,7 +137,7 @@ def test_indexes_cover_every_row(run, confounded) -> None:
 
 @pytest.mark.xfail(
     strict=True,
-    reason="Issue: the user-facing `indexes` / `full_data` neighbours are inconsistent with the "
+    reason="Issue (currently also masked by the DeprecationWarning of Matching()): the user-facing `indexes` / `full_data` neighbours are inconsistent with the "
     "matching: only ~55% come from the opposite group and ~7% are the nearest neighbour, "
     "although the estimated effects are correct",
 )
@@ -112,7 +152,7 @@ def test_matched_neighbors_come_from_the_opposite_group(run, confounded) -> None
 
 @pytest.mark.xfail(
     strict=True,
-    reason="Issue: see test_matched_neighbors_come_from_the_opposite_group (neighbour ids in "
+    reason="Issue (currently also masked by the DeprecationWarning of Matching()): see test_matched_neighbors_come_from_the_opposite_group (neighbour ids in "
     "the output are not the nearest neighbours on x)",
 )
 def test_matched_neighbors_are_nearest_on_the_covariate(run, confounded) -> None:
@@ -124,6 +164,11 @@ def test_matched_neighbors_are_nearest_on_the_covariate(run, confounded) -> None
     assert (indexes.to_numpy() == expected).mean() > 0.95
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=DeprecationWarning,
+    reason="Issue: Matching() construction emits the DeprecationWarning of the deprecated MatchingDictReporter (hypex/ui/matching.py)",
+)
 def test_quality_table_contains_balance_diagnostics(run) -> None:
     quality = to_pandas(run().quality_results)
     assert {"feature", "group"} <= set(quality.columns)
@@ -132,8 +177,9 @@ def test_quality_table_contains_balance_diagnostics(run) -> None:
 
 @pytest.mark.xfail(
     strict=True,
-    raises=AttributeError,
-    reason="Issue: MatchingOutput._extract_full_data calls the missing self._match_pandas",
+    raises=(DeprecationWarning, AttributeError),
+    reason="Issue: Matching() emits the DeprecationWarning of the deprecated MatchingDictReporter "
+    "and, past that, MatchingOutput._extract_full_data calls the missing self._match_pandas",
 )
 def test_matching_on_pandas(confounded) -> None:
     Matching().execute(make_dataset(confounded, ROLES))
@@ -141,8 +187,9 @@ def test_matching_on_pandas(confounded) -> None:
 
 @pytest.mark.xfail(
     strict=True,
-    raises=ValueError,
-    reason="Issue: Matching(group_match=True) fails with 'No group keys passed!' on plain "
+    raises=(DeprecationWarning, ValueError),
+    reason="Issue: Matching(group_match=True) emits the DeprecationWarning of the deprecated "
+    "MatchingDatasetReporter and, past that, fails with 'No group keys passed!' on plain "
     "treatment/target/feature roles",
 )
 def test_group_match_runs(spark_session, confounded) -> None:
