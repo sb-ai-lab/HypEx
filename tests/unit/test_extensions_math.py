@@ -18,6 +18,7 @@ from hypex.extensions import (
     SparkLstsqExtension,
     UniteCovExtension,
 )
+from hypex.extensions.scipy_stats import GroupTTestExtension
 from hypex.utils import ABNTestMethodsEnum, BackendsEnum
 from hypex.utils.constants import ID_SPLIT_SYMBOL as S
 
@@ -348,3 +349,53 @@ def test_spark_lstsq_close_to_pandas(spark_session) -> None:
     got = np.ravel(SparkLstsqExtension().calc(spark_ds))
     # Spark uses regParam=0.01 (ridge), so only approximate agreement is expected
     np.testing.assert_allclose(got, expected, atol=0.05)
+
+
+# ---------------------------------------------------------------------------
+# GroupTTestExtension: equal_variance -> equal_var mapping
+# ---------------------------------------------------------------------------
+def _ttest_samples() -> tuple[Dataset, Dataset, np.ndarray, np.ndarray]:
+    rng = np.random.RandomState(0)
+    a, b = rng.normal(0, 1, 30), rng.normal(0, 4, 20)
+
+    def make(values):
+        return Dataset(
+            roles={"y": TargetRole()},
+            data=pd.DataFrame({"y": values}),
+            backend=BackendsEnum.pandas,
+        )
+
+    return make(a), make(b), a, b
+
+
+def test_group_ttest_calc_does_not_mutate_callers_kwargs() -> None:
+    """Behavioural guard: ``**kwargs`` unpacking already copies, so this cannot
+    fail on the old in-place ``kwargs.pop`` implementation; it pins the contract."""
+    first, second, _, _ = _ttest_samples()
+    caller_kwargs = {"equal_variance": True}
+    GroupTTestExtension().calc(first, second, **caller_kwargs)
+    assert caller_kwargs == {"equal_variance": True}
+
+
+@pytest.mark.parametrize("flag", [True, False])
+def test_group_ttest_equal_variance_maps_to_scipy_equal_var(flag) -> None:
+    from scipy.stats import ttest_ind
+
+    first, second, a, b = _ttest_samples()
+    result = GroupTTestExtension().calc(first, second, equal_variance=flag)
+    expected = ttest_ind(a, b, equal_var=flag)
+    row = result.backend_data.data
+    assert row["p-value"].iloc[0] == pytest.approx(expected.pvalue)
+    assert row["statistic"].iloc[0] == pytest.approx(expected.statistic)
+
+
+@pytest.mark.parametrize("flag", [True, False])
+def test_group_ttest_equal_variance_beats_equal_var(flag) -> None:
+    from scipy.stats import ttest_ind
+
+    first, second, a, b = _ttest_samples()
+    result = GroupTTestExtension().calc(
+        first, second, equal_variance=flag, equal_var=not flag
+    )
+    expected = ttest_ind(a, b, equal_var=flag)
+    assert result.backend_data.data["p-value"].iloc[0] == pytest.approx(expected.pvalue)
