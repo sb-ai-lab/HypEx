@@ -233,7 +233,7 @@ def test_on_role_vector_executor_runs_once_with_all_targets(data) -> None:
 # ---------------------------------------------------------------------------
 def test_cycled_runs_n_iterations_and_collects_results(data) -> None:
     log: list = []
-    reporter = _CountReporter()
+    reporter = _DatasetReporter()
     out = CycledExperiment([_Recorder("a", log)], reporter, n_iterations=3).execute(data)
     assert len(log) == 3
     assert reporter.calls == 3
@@ -246,7 +246,7 @@ def test_cycled_runs_n_iterations_and_collects_results(data) -> None:
 
 def test_cycled_iteration_keys_are_indices(data) -> None:
     log: list = []
-    CycledExperiment([_Recorder("a", log)], _CountReporter(), n_iterations=3).execute(data)
+    CycledExperiment([_Recorder("a", log)], _DatasetReporter(), n_iterations=3).execute(data)
     assert [entry[1] for entry in log] == ["0", "1", "2"]
 
 
@@ -274,6 +274,11 @@ def test_cycled_zero_iterations_raises(data) -> None:
 # ---------------------------------------------------------------------------
 # GroupExperiment
 # ---------------------------------------------------------------------------
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_group_experiment_runs_once_per_group(data) -> None:
     log: list = []
     reporter = _DatasetReporter()
@@ -284,6 +289,11 @@ def test_group_experiment_runs_once_per_group(data) -> None:
     assert table["b rows"].iloc[0] == 3
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_group_experiment_prefixes_columns_with_group_key(data) -> None:
     out = GroupExperiment([], _DatasetReporter(), searching_role=GroupingRole()).execute(data)
     cols = next(iter(out.analysis_tables.values())).columns

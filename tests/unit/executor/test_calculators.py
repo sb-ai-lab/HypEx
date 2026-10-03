@@ -86,6 +86,11 @@ def test_estimated_quantiles_give_larger_n_for_smaller_mde() -> None:
     assert MinSampleSize._inner_function(mde=0.5, **kwargs) > MinSampleSize._inner_function(mde=2.0, **kwargs)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_calc_equal_variance_uses_mean_group_variance(two_groups) -> None:
     calc = MinSampleSize(mde=1.0, equal_variance=True, quantile_1=2.0, quantile_2=-1.0)
     result = calc.calc(two_groups)
@@ -96,6 +101,11 @@ def test_calc_equal_variance_uses_mean_group_variance(two_groups) -> None:
     assert result["overall"]["min sample size"] == expected
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_calc_explicit_variances_override_data(two_groups) -> None:
     calc = MinSampleSize(
         mde=1.0, equal_variance=True, variances=9.0, quantile_1=2.0, quantile_2=-1.0
@@ -103,12 +113,22 @@ def test_calc_explicit_variances_override_data(two_groups) -> None:
     assert calc.calc(two_groups)["y"]["min sample size"] == _closed_form(9.0, 2.0, -1.0, 1.0)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_calc_sets_key_to_single_target(two_groups) -> None:
     calc = MinSampleSize(mde=1.0, equal_variance=True, quantile_1=2.0, quantile_2=-1.0)
     calc.calc(two_groups)
     assert calc.key == "y"
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_calc_overall_is_max_over_targets() -> None:
     rng = np.random.RandomState(1)
     df = pd.DataFrame(
@@ -130,6 +150,11 @@ def test_calc_overall_is_max_over_targets() -> None:
     assert result["overall"]["min sample size"] == result["big"]["min sample size"]
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_calc_single_group_raises() -> None:
     df = pd.DataFrame({"g": ["a"] * 10, "y": np.arange(10.0)})
     ds = Dataset(

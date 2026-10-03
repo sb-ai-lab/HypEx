@@ -181,3 +181,23 @@ def pytest_collection_modifyitems(config, items):
                 marker.name == "spark" for marker in item.iter_markers()
             ):
                 item.add_marker(pytest.mark.spark)
+
+
+# ---------------------------------------------------------------------------
+# Per-backend strict xfail helper
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def xfail_backend(request, backend):
+    """Mark the running test as a strict xfail for the given backends only.
+
+    Usage inside a test: ``xfail_backend(BackendsEnum.spark, reason="...")``.
+    Other backends run the test normally.
+    """
+
+    def _apply(*backends, reason, raises=None):
+        if backend in backends:
+            request.applymarker(
+                pytest.mark.xfail(strict=True, reason=reason, raises=raises)
+            )
+
+    return _apply

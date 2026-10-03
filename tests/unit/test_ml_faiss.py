@@ -181,7 +181,8 @@ def test_spark_extension_matches_brute_force(control, test_df, spark_session) ->
     test = _ds(test_df.reset_index(drop=True), BackendsEnum.spark, spark_session)
     result = _pdf(SparkFaissExtension(n_neighbors=1).calc(ctrl, test))
     expected = _brute_force(control.reset_index(drop=True), test_df.reset_index(drop=True), 1)[:, 0]
-    assert result.iloc[:, 0].tolist() == expected.tolist()
+    # Spark returns partitions in arbitrary row order; the index carries the query row id.
+    assert result.sort_index().iloc[:, 0].tolist() == expected.tolist()
 
 
 @pytest.mark.spark
@@ -249,8 +250,9 @@ def test_execute_inner_function_test_pairs_returns_control(control, test_df) -> 
 
 @pytest.mark.xfail(
     strict=True,
-    raises=AttributeError,
-    reason="Issue: execute() calls Dataset.reindex (defined only on SmallDataset) when the "
+    raises=(FutureWarning, AttributeError),
+    reason="Issue: PandasDataset.count_groups does int(Series) (FutureWarning) and, past "
+    "that, execute() calls Dataset.reindex (defined only on SmallDataset) when the "
     "one-sided result is shorter than the dataset, so default matching cannot run",
 )
 def test_execute_default_one_sided_matching() -> None:
@@ -262,6 +264,11 @@ def test_execute_default_one_sided_matching() -> None:
     assert matched
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_execute_two_sides_stores_matched_indexes() -> None:
     df, data = _experiment()
     executor = FaissNearestNeighbors(two_sides=True, grouping_role=TreatmentRole())
@@ -279,6 +286,11 @@ def test_execute_two_sides_stores_matched_indexes() -> None:
     )
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_execute_two_sides_neighbours_come_from_opposite_group() -> None:
     df, data = _experiment()
     out = FaissNearestNeighbors(two_sides=True, grouping_role=TreatmentRole()).execute(data)

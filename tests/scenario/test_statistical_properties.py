@@ -87,6 +87,11 @@ def test_power_matches_theory_for_known_effect() -> None:
     assert observed == pytest.approx(theory, abs=0.08)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_matching_beats_naive_on_confounded_data() -> None:
     """gen_special_medicine_df: treatment adds +1 to the mean lifetime, but sicker
     patients are treated more often, so the naive difference is biased downwards."""

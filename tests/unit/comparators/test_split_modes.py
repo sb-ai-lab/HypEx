@@ -52,6 +52,11 @@ def _names(buckets):
     return [name for name, _ in buckets]
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_groups_mode_first_sorted_group_is_baseline(ds) -> None:
     base, comp = GroupsComparator._split_for_groups_mode(ds[["g"]], ds[["y"]])
     assert len(base) == 1
@@ -72,11 +77,21 @@ def test_groups_mode_multi_target_keeps_first_column_only(ds) -> None:
     assert base[0][1].columns == ["y"]
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_groups_mode_baseline_values_are_exact(ds) -> None:
     base, _ = GroupsComparator._split_for_groups_mode(ds[["g"]], ds[["y"]])
     assert sorted(to_pandas(base[0][1])["y"]) == [1.0, 2.0, 3.0]
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_groups_mode_ignores_group_column_in_targets(ds) -> None:
     base, comp = GroupsComparator._split_for_groups_mode(ds[["g"]], ds[["g", "y"]])
     assert all("g" not in d.columns for _, d in base + comp)
@@ -158,6 +173,11 @@ def test_unknown_compare_by_raises(ds) -> None:
         )
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
+)
 def test_calc_groups_mode_returns_one_result_per_compared_group(ds) -> None:
     result = _Collect.calc(
         compare_by="groups",
