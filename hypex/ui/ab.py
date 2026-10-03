@@ -207,21 +207,46 @@ class ABOutput(Output):
             role={"group": StatisticRole()},
         )
 
-    # ── Variance reduction report property ───────────────────────────
-
     @property
     def variance_reduction_report(self) -> Dataset | str:
-        """Get variance reduction report for CUPED/CUPAC transformations.
+        """Get a unified variance-reduction report for CUPED and CUPAC.
+
+        Aggregates per-target variance-reduction percentages from
+        both CUPED (if enabled) and CUPAC (if enabled) into a
+        single ``SmallDataset``.
 
         Returns:
-            A ``SmallDataset`` with variance reduction percentages per
-            transformed metric, or a descriptive string if unavailable.
+            A ``SmallDataset`` with variance reduction percentages
+            per transformed metric, or a descriptive string when
+            no variance reduction was applied or data is unavailable.
         """
-        if hasattr(self, "_experiment_data"):
-            return self.summary_reporter.report_variance_reductions(
-                self._experiment_data,
-            )
-        return "No experiment data available."
+        if not hasattr(self, "_experiment_data"):
+            return "No experiment data available."
+
+        reports: list[SmallDataset] = []
+
+        # CUPED
+        if (
+            self.cuped is not None
+            and self.cuped.variance_reductions is not None
+            and not self.cuped.variance_reductions.is_empty()
+        ):
+            reports.append(self.cuped.variance_reductions)
+
+        # CUPAC
+        if (
+            self.cupac.variance_reductions is not None
+            and not self.cupac.variance_reductions.is_empty()
+        ):
+            reports.append(self.cupac.variance_reductions)
+
+        if not reports:
+            return "No variance reduction was applied."
+
+        combined = reports[0]
+        for r in reports[1:]:
+            combined = combined.append(r, reset_index=True)
+        return combined
 
     def extract(self, experiment_data: ExperimentData) -> None:
         """Extract all A/B test outputs including CUPED/CUPAC.
