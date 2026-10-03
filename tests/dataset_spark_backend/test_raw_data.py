@@ -82,6 +82,36 @@ def test_spark_replace_with_series(spark_ds):
     assert result.raw_data["a"].to_list() == [1, 0, 3]
 
 
+def test_spark_replace_with_multi_element_series(spark_ds):
+    result = spark_ds.replace(to_replace=ps.Series([1, 3]), value=0)
+    assert result.raw_data["a"].to_list() == [0, 2, 0]
+
+
+def test_spark_replace_with_dict(spark_ds):
+    result = spark_ds.replace(to_replace={"a": {2: 20}, "b": {4.0: 40.0}})
+    assert result.raw_data["a"].to_list() == [1, 20, 3]
+    assert result.raw_data["b"].to_list() == [40.0, 5.0, 6.0]
+
+
+@pytest.mark.parametrize(
+    ("spark_arg", "pandas_arg", "kwargs"),
+    [
+        (lambda: ps.Series([2]), [2], {"value": 0}),
+        (lambda: ps.Series([1, 3]), [1, 3], {"value": 0}),
+        (lambda: ps.DataFrame({"x": [2]}), [2], {"value": 0}),
+        (lambda: {"a": {2: 0}}, {"a": {2: 0}}, {}),
+        (lambda: 2, 2, {"value": 0}),
+    ],
+    ids=["series", "series-multi", "single-column-frame", "dict", "scalar"],
+)
+def test_spark_replace_matches_pandas(spark_ds, spark_arg, pandas_arg, kwargs):
+    spark_result = spark_ds.replace(to_replace=spark_arg(), **kwargs).raw_data
+    expected = _pdf().replace(to_replace=pandas_arg, **kwargs)
+    pd.testing.assert_frame_equal(
+        spark_result.to_pandas().reset_index(drop=True), expected, check_dtype=False
+    )
+
+
 def test_spark_replace_with_single_column_frame(spark_ds):
     result = spark_ds.replace(to_replace=ps.DataFrame({"x": [2]}), value=0)
     assert result.raw_data["a"].to_list() == [1, 0, 3]
