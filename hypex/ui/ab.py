@@ -199,6 +199,7 @@ class ABOutput(Output):
             try:
                 idx_str = str(int(float(idx_str)))
             except (ValueError, TypeError):
+                # non-numeric index: keep the string as is
                 pass
             new_index.append(idx_str)
         table.index = new_index

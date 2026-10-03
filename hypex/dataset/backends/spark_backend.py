@@ -363,10 +363,12 @@ class SparkNavigation(DatasetBackendNavigation):
                             logger_name
                         ).setLevel(sc._jvm.org.apache.log4j.Level.ERROR)
                     except Exception:
+                        # best-effort: a logger that cannot be silenced is not an error
                         pass
 
                 SparkNavigation._SPARK_WARN_SUPPRESED = True
             except Exception:
+                # best-effort: log-level suppression is optional
                 pass
 
         if isinstance(data, ps.DataFrame):
@@ -1444,9 +1446,6 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 for col, dtype in types.items()
                 if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]
             ]
-
-            # if len(numeric_cols) == 0:
-            #     return None
 
             data_to_agg = self.data[numeric_cols]
 

@@ -148,7 +148,7 @@ class TestDataset(unittest.TestCase):
     def test_getitem_empty_result(self):
         # Test getting empty subset with condition
         subset = self.dataset[self.dataset["col1"] > 3]
-        self.assertTrue(len(subset) == 0)
+        self.assertEqual(len(subset), 0)
 
     def test_rename_single_column(self):
         # Test renaming single column
@@ -573,8 +573,8 @@ class TestDataset(unittest.TestCase):
         other_roles = {"col3": InfoRole(), "col4": InfoRole()}
         other_dataset = Dataset(roles=other_roles, data=other_data)
         result = self.dataset.append(other_dataset)
-        self.assertTrue(result.data["col3"].isna().sum() == len(self.dataset))
-        self.assertTrue(result.data["col1"].isna().sum() == 1)
+        self.assertEqual(result.data["col3"].isna().sum(), len(self.dataset))
+        self.assertEqual(result.data["col1"].isna().sum(), 1)
 
         # Test append with invalid type
         with self.assertRaises(ConcatDataError):
@@ -618,25 +618,25 @@ class TestDataset(unittest.TestCase):
     def test_astype(self):
         # Test single column type conversion
         result = self.dataset.astype({"col1": str})
-        self.assertTrue(result.data["col1"].dtype == "object")
+        self.assertEqual(result.data["col1"].dtype, "object")
 
         # Test multiple column type conversion
         result = self.dataset.astype({"col1": float, "col2": str})
-        self.assertTrue(result.data["col1"].dtype == "float64")
-        self.assertTrue(result.data["col2"].dtype == "object")
+        self.assertEqual(result.data["col1"].dtype, "float64")
+        self.assertEqual(result.data["col2"].dtype, "object")
 
         # Test with errors='ignore'
         invalid_dataset = Dataset(
             roles={"col1": InfoRole()}, data=pd.DataFrame({"col1": ["a", "b", "c"]})
         )
         result = invalid_dataset.astype({"col1": int}, errors="ignore")
-        self.assertTrue(result.data["col1"].dtype == "object")
+        self.assertEqual(result.data["col1"].dtype, "object")
 
         invalid_dataset = Dataset(
             roles={"col1": InfoRole()}, data=pd.DataFrame({"col1": ["a", "b", "c"]})
         )
         result = invalid_dataset.astype({"col1": str}, errors="ignore")
-        self.assertTrue(result.data["col1"].dtype == "object")
+        self.assertEqual(result.data["col1"].dtype, "object")
 
         # Edge cases
         # Test with non-existent column
@@ -675,7 +675,7 @@ class TestDataset(unittest.TestCase):
         # Test with negative values
         self.dataset.data["col1"] = [-1, -2, -3]
         cv = self.dataset.coefficient_of_variation()
-        self.assertTrue(cv["col1"] < 0)
+        self.assertLess(cv["col1"], 0)
 
         # Test with NaN values
         self.dataset.data["col1"] = [1, None, 3]
@@ -1135,7 +1135,7 @@ class TestDataset(unittest.TestCase):
 
         # Test with mixed types
         self.dataset.data["col1"] = [1, "two", 3]
-        result = self._extracted_from_test_isin_3("two", 1, "col1")
+        self._extracted_from_test_isin_3("two", 1, "col1")
 
     # TODO Rename this here and in `test_isin`
     def _extracted_from_test_isin_3(self, arg0, arg1, arg2):
@@ -1179,7 +1179,7 @@ class TestDataset(unittest.TestCase):
         # Test with mixed types
         self.dataset.data["col1"] = [1, "two", 3]
         with self.assertRaises(TypeError):
-            result = self.dataset.max()
+            self.dataset.max()
 
     def test_min(self):
         # Test basic min
@@ -1189,7 +1189,7 @@ class TestDataset(unittest.TestCase):
         # Test with mixed types
         self.dataset.data["col1"] = [1, "two", 3]
         with self.assertRaises(TypeError):
-            result = self.dataset.min()
+            self.dataset.min()
 
     def test_mode(self):
         # Test basic mode
@@ -1288,7 +1288,7 @@ class TestDataset(unittest.TestCase):
         # Edge cases
         # Test with invalid quantile values
         with self.assertRaises(ValueError):
-            result = self.dataset.quantile(1.5)
+            self.dataset.quantile(1.5)
 
     def test_reindex(self):
         # Test columns reindex
@@ -1331,7 +1331,7 @@ class TestDataset(unittest.TestCase):
 
         # Test with duplicate names
         with self.assertRaises(ValueError):
-            result = self.dataset.rename({"col1": "col2"})
+            self.dataset.rename({"col1": "col2"})
 
     def test_replace(self):
         # Test replace single value
@@ -1469,7 +1469,7 @@ class TestDataset(unittest.TestCase):
         # Test with mixed types
         self.dataset.data["col1"] = [1, "two", 3]
         with self.assertRaises(TypeError):
-            result = self.dataset.sum()
+            self.dataset.sum()
 
     def test_transpose(self):
         # Test basic transpose

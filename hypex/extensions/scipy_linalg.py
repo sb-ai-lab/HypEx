@@ -11,15 +11,6 @@ from ..dataset.roles import FeatureRole, InfoRole, TargetRole
 from ..utils.registry import backend_factory
 from .abstract import Extension
 
-# class CholeskyExtension(Extension):
-#     def _calc_pandas(self, data: Dataset, epsilon: float = 1e-3, **kwargs):
-#         cov = data.data.to_numpy()
-#         cov = cov + np.eye(cov.shape[0]) * epsilon
-#         return self.result_to_dataset(
-#             pd.DataFrame(np.linalg.cholesky(cov), columns=data.columns),
-#             {column: FeatureRole() for column in data.columns},
-#         )
-
 
 class UniteCovExtension(Extension):
     def calc(self, data: Dataset, test_data: Dataset | None = None, **kwargs):

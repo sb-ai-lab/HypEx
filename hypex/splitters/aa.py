@@ -318,12 +318,6 @@ class AASplitter(Calculator):
                 control_size=effective_control_size,
                 sample_size=sample_size,
             )
-        else:
-            # Avoid triggering a Spark count() action just for a boolean check.
-            # free_size = -1 is a sentinel meaning "unknown, assume non-empty".
-            # The actual emptiness check is deferred to random_split_labels
-            # which handles empty data gracefully.
-            free_size = -1  # sentinel: means "unknown, assume non-empty"
 
         # ── 3. bucket edges (always in MOD scale, frac handled separately)
         MOD = 10_000_000

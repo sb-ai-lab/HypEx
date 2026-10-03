@@ -224,6 +224,7 @@ class AAOutput(Output):
                     for c, r in self.best_split_statistics._roles.items()
                 }
             except Exception:
+                # best-effort rename: keep the original column names on failure
                 pass
 
     def extract(self, experiment_data: ExperimentData):
