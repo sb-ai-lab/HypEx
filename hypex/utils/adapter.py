@@ -26,15 +26,15 @@ class Adapter:
         # Scalars: numpy scalars (.tolist() returns a plain scalar, not list)
         if isinstance(data, (int, float, bool)):
             return [data]
-        if hasattr(data, 'to_list'):
+        if hasattr(data, "to_list"):
             return data.to_list()
-        if hasattr(data, 'tolist'):
+        if hasattr(data, "tolist"):
             result = data.tolist()
             # Guard: numpy scalar .tolist() returns non-list
             if not isinstance(result, (list, tuple)):
                 return [result]
             return list(result)
-        if hasattr(data, 'to_array'):
+        if hasattr(data, "to_array"):
             return data.to_array()
         return list(data) if isinstance(data, Sequence) else [data]
 
@@ -47,3 +47,4 @@ class Adapter:
                 return data[0]
             else:
                 raise ValueError("Only a list of a single item can be accepted")
+        return None

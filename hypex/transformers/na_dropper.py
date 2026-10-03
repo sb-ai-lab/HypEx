@@ -1,21 +1,25 @@
 from __future__ import annotations
+
 from collections.abc import Sequence
 from typing import Any
+
 from ..dataset.dataset import Dataset
 from ..dataset.experiment_data import ExperimentData
-from ..dataset.roles import TargetRole, ABCRole
+from ..dataset.roles import ABCRole, TargetRole
 from .abstract import Transformer
+
 
 class NaDropper(Transformer):
     """Transformer that drops rows with NaN values in target columns.
-    
-    This is useful for preparing data for statistical tests that cannot handle 
+
+    This is useful for preparing data for statistical tests that cannot handle
     missing values (e.g., scipy.stats.ks_2samp).
-    
+
     Args:
         target_roles: Roles to search for target columns. Defaults to TargetRole().
         how: Whether to drop rows if 'any' or 'all' targets are NaN. Defaults to 'any'.
     """
+
     def __init__(
         self,
         target_roles: ABCRole | Sequence[ABCRole] | None = None,
@@ -40,10 +44,10 @@ class NaDropper(Transformer):
     def execute(self, data: ExperimentData) -> ExperimentData:
         # Find all columns matching the target roles
         target_cols = data.ds.search_columns(roles=self.target_roles)
-        
+
         if not target_cols:
             return data
-            
+
         result = data.copy(
             data=self.calc(
                 data=data.ds,

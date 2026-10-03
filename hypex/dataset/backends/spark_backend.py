@@ -49,17 +49,48 @@ class SparkNavigation(DatasetBackendNavigation):
         data (ps.DataFrame): The underlying pyspark.pandas DataFrame.
         session (SparkSession): Active Spark session for distributed operations.
     """
+
     _SPARK_WARN_SUPPRESED: bool = False
 
     PANDAS_CONVERSION_LIMIT: int = 100_000
-    
+
     _SPARK_TYPE_MAP: ClassVar[dict[str, str]] = {
         "float32": "float",
         "float64": "double",
         "int32": "int",
         "int64": "long",
     }
-    
+
+    def to_public_data(self) -> SparkDF:
+        """Return the data as ``pyspark.sql.DataFrame`` without the index.
+
+        The conversion is lazy (no Spark job is triggered).
+
+        Returns:
+            ``pyspark.sql.DataFrame`` with the columns the user loaded.
+        """
+        return self.data.to_spark()
+
+    def set_public_data(self, value: Any) -> None:
+        """Replace the underlying data, converting it to ``pyspark.pandas``.
+
+        Args:
+            value: ``pyspark.pandas.DataFrame`` (stored as is),
+                ``pyspark.sql.DataFrame`` (default index) or
+                ``pandas.DataFrame`` (index preserved).
+
+        Raises:
+            TypeError: If the value type is not supported.
+        """
+        if isinstance(value, ps.DataFrame):
+            self.data = value
+        elif isinstance(value, SparkDF):
+            self.data = ps.DataFrame(value)
+        elif isinstance(value, pd.DataFrame):
+            self.data = ps.from_pandas(value)
+        else:
+            raise TypeError(f"Unsupported data type for Spark backend: {type(value)}")
+
     def to_backend(
         self,
         target_backend: BackendsEnum,
@@ -109,17 +140,18 @@ class SparkNavigation(DatasetBackendNavigation):
         exists on this process (driver). Safe inside serialized UDF closures running on executors.
         """
         from pyspark.sql import SparkSession
+
         if SparkSession.getActiveSession() is None:
             yield
             return
-        
-        cur_option = ps.get_option('compute.ops_on_diff_frames')
-        ps.set_option('compute.ops_on_diff_frames', True)
+
+        cur_option = ps.get_option("compute.ops_on_diff_frames")
+        ps.set_option("compute.ops_on_diff_frames", True)
 
         try:
             yield
         finally:
-            ps.set_option('compute.ops_on_diff_frames', cur_option)
+            ps.set_option("compute.ops_on_diff_frames", cur_option)
 
     def checkpoint(self, eager: bool = True) -> Self:
         """Truncate the computation graph by creating a checkpoint.
@@ -140,7 +172,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
         sc = self.session.sparkContext
         checkpoin_dir = sc.getCheckpointDir()
-        if checkpoin_dir is not None:            
+        if checkpoin_dir is not None:
             self.data = self.data.spark.checkpoint(eager=eager)
         else:
             warnings.warn(
@@ -327,14 +359,16 @@ class SparkNavigation(DatasetBackendNavigation):
 
                 for logger_name in logger_names:
                     try:
-                        sc._jvm.org.apache.log4j.LogManager.getLogger(logger_name).setLevel(
-                            sc._jvm.org.apache.log4j.Level.ERROR
-                        )
+                        sc._jvm.org.apache.log4j.LogManager.getLogger(
+                            logger_name
+                        ).setLevel(sc._jvm.org.apache.log4j.Level.ERROR)
                     except Exception:
+                        # best-effort: a logger that cannot be silenced is not an error
                         pass
 
                 SparkNavigation._SPARK_WARN_SUPPRESED = True
             except Exception:
+                # best-effort: log-level suppression is optional
                 pass
 
         if isinstance(data, ps.DataFrame):
@@ -866,16 +900,15 @@ class SparkNavigation(DatasetBackendNavigation):
     def index(self) -> ps.Index:
         """Return the index of the underlying DataFrame."""
         return self.data.index
-    
+
     @index.setter
     def index(self, value):
         """Set the index of the underlying DataFrame."""
         self.data = self.data.set_index(value)
-    
-    def reset_index(self, 
-                    drop: bool = False,
-                    inplace: bool = False,
-                    **kwargs) -> "SparkNavigation" | None:
+
+    def reset_index(
+        self, drop: bool = False, inplace: bool = False, **kwargs
+    ) -> SparkNavigation | None:
         """Reset the index to default integer index.
 
         Args:
@@ -891,11 +924,8 @@ class SparkNavigation(DatasetBackendNavigation):
 
         result = self.data.reset_index(drop=drop, **kwargs)
         return self._wrap_result(result)
-    
-    def set_index(self,
-                  keys, 
-                  drop=True,
-                  **kwargs) -> "SparkNavigation":
+
+    def set_index(self, keys, drop=True, **kwargs) -> SparkNavigation:
         """
         Set the DataFrame index (row labels) using one or more existing columns.
 
@@ -905,12 +935,12 @@ class SparkNavigation(DatasetBackendNavigation):
             drop: `bool`, default True
                 Delete columns to be used as the new index.
         """
-        if 'append' not in kwargs:
-            kwargs['append'] = False
+        if "append" not in kwargs:
+            kwargs["append"] = False
 
-        if 'inplace' not in kwargs:
-            kwargs['inplace'] = False
-        
+        if "inplace" not in kwargs:
+            kwargs["inplace"] = False
+
         return self._wrap_result(self.data.set_index(keys=keys, drop=drop, **kwargs))
 
     @property
@@ -998,7 +1028,6 @@ class SparkNavigation(DatasetBackendNavigation):
             t_str = getattr(t, "__name__", str(t))
             normalized[col] = self._SPARK_TYPE_MAP.get(t_str, t)
         return self._wrap_result(self.data.astype(dtype=normalized))
-
 
     def update_column_type(
         self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
@@ -1179,6 +1208,7 @@ class SparkNavigation(DatasetBackendNavigation):
         """
         return self.data.to_spark().rdd.flatMap(lambda row: row).collect()
 
+
 class SparkDataset(SparkNavigation, DatasetBackendCalc):
     """Calculation-focused interface for PySpark-backed datasets.
 
@@ -1187,7 +1217,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     science operations while leveraging Spark's distributed computing capabilities.
 
     Inherits all navigation and indexing capabilities from SparkNavigation.
-    """  
+    """
+
     @staticmethod
     def _convert_agg_result(result: ps.Series | ps.DataFrame) -> Self | float:
         """Convert aggregation results to appropriate return type.
@@ -1330,7 +1361,10 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self.data.groupby(by=by, **kwargs)
 
     def iter_groups(self, by: list[str]):
-        """Iterate over groups defined by column(s).
+        """Iterate over groups defined by column(s), in ascending key order.
+
+        Like pandas ``groupby``, groups come out sorted by key, so the first
+        group is a deterministic baseline regardless of partitioning.
 
         Args:
             by (list[str]): Column names defining group keys.
@@ -1339,7 +1373,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             tuple: (group_key, SparkNavigation) for each unique combination
                 of grouping column values.
         """
-        keys_df = self.data[by].drop_duplicates().dropna().to_pandas()
+        keys_df = self.data[by].drop_duplicates().dropna().to_pandas().sort_values(by)
         for _, row in keys_df.iterrows():
             key = row[by[0]] if len(by) == 1 else tuple(row[col] for col in by)
             mask = None
@@ -1347,17 +1381,18 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 col_mask = self.data[col] == row[col]
                 mask = col_mask if mask is None else mask & col_mask
             yield key, self.data[mask]
-    
+
     def count_groups(self, group_cols: list[str]) -> int:
         """Count unique combinations of group_cols"""
         if not group_cols:
             return 1
         return int(self.data[group_cols].nunique())
 
-
-    def grouped_value_counts(self, by: list[str], feature_cols: list[str] | None=None):
+    def grouped_value_counts(
+        self, by: list[str], feature_cols: list[str] | None = None
+    ):
         from functools import reduce
-        
+
         if feature_cols is None:
             feature_cols = [col for col in self.data.columns if col not in set(by)]
         sdf = self.data.to_spark()
@@ -1398,20 +1433,25 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             SparkDataset | float: Aggregated results, or scalar for single-value results.
         """
         subset = kwargs.pop("subset", None)
-        if isinstance(func, str):
-            func = "variance" if func == "var" else "stddev" if func == "std" else func
-        elif isinstance(func, list):
-            func = ["variance" if f == "var" else "stddev" if f == "std" else f for f in func]
-
         func = func if isinstance(func, (list, dict)) else [func]
+
         if subset is not None:
-            if isinstance(subset, str): subset = [subset]
+            if isinstance(subset, str):
+                subset = [subset]
             data_to_agg = self.data[subset]
         else:
             types = self.get_column_type()
-            numeric_cols = [col for col, dtype in types.items() if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]]
+            numeric_cols = [
+                col
+                for col, dtype in types.items()
+                if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]
+            ]
+
             data_to_agg = self.data[numeric_cols]
             if data_to_agg is None or len(data_to_agg.columns) == 0: return None
+
+        if data_to_agg is None or len(data_to_agg.columns) == 0:
+            return None
 
         if isinstance(func, dict):
             agg_dict = func
@@ -1422,7 +1462,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         result = data_to_agg.agg(agg_dict, **kwargs)
         converted = self._convert_agg_result(result)
-        if isinstance(converted, ps.DataFrame): 
+
+        if isinstance(converted, ps.DataFrame):
             return self._wrap_result(converted)
         return self._wrap_result(converted)
 
@@ -1660,7 +1701,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             SparkDataset: DataFrame with value counts, reset to column format.
         """
 
-        col = list(self.data.columns)[0]
+        col = next(iter(self.data.columns))
         series = self.data[col]
 
         result = series.value_counts(
@@ -1691,18 +1732,12 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     def count_nulls(self) -> dict[str, int]:
         sp_df = self.data.to_spark()
         cols = sp_df.columns
-        nulls_row = (
-            sp_df.select(
-                *[
-                    F.count(F.when(F.col(col).isNull() | F.isnan(col), 1))
-                    for col in cols
-                ]
-            )
-            .first()
-        )
+        nulls_row = sp_df.select(
+            *[F.count(F.when(F.col(col).isNull() | F.isnan(col), 1)) for col in cols]
+        ).first()
         return {cols[idx]: nulls_row[idx] for idx in range(len(cols))}
 
-    def dot(self, other: "SparkDataset" | np.ndarray | pd.DataFrame) -> Self | float:
+    def dot(self, other: SparkDataset | np.ndarray | pd.DataFrame) -> Self | float:
         """Compute dot product with another dataset or array.
 
         Handles multiple input types with appropriate dimension validation.
@@ -1719,10 +1754,12 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         """
         if hasattr(other, "__len__"):
             if len(other) > DatasetConfig.SPARK_MAX_ROWS_FOR_DOT:
-                raise ValueError(f"dot method works fine only with rows number in right matrix <= {DatasetConfig.SPARK_MAX_ROWS_FOR_DOT}")
+                raise ValueError(
+                    f"dot method works fine only with rows number in right matrix <= {DatasetConfig.SPARK_MAX_ROWS_FOR_DOT}"
+                )
         else:
             raise TypeError("input data type should have attr `__len__`")
-        
+
         if isinstance(other, np.ndarray):
             if other.ndim == 1:
                 if len(other) != len(self.data.columns):
@@ -1760,22 +1797,28 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 f"Unsupported type for dot: {type(other)}. "
                 f"Expected SparkDataset, np.ndarray, or pd.DataFrame"
             )
-        
+
         result_spark = (
-            self.data.reset_index().to_spark()
+            self.data.reset_index()
+            .to_spark()
             .mapInPandas(
-                lambda it: (pdf.drop(columns="index").dot(pd_other).assign(index=pdf["index"]) for pdf in it),
-                schema=schema + ', `index` int'
+                lambda it: (
+                    pdf.drop(columns="index").dot(pd_other).assign(index=pdf["index"])
+                    for pdf in it
+                ),
+                schema=schema + ", `index` int",
             )
         )
         result_ps = ps.DataFrame(result_spark).set_index("index")
         result_ps.index.name = None
         return self._wrap_result(result_ps)
 
-    def dropna(self,
-               how: Literal["any", "all"] = "any",
-               subset: str | Iterable[str] | None = None,
-               axis: Literal["index", "rows", "columns"] | int = 0) -> SparkDataset:
+    def dropna(
+        self,
+        how: Literal["any", "all"] = "any",
+        subset: str | Iterable[str] | None = None,
+        axis: Literal["index", "rows", "columns"] | int = 0,
+    ) -> SparkDataset:
         """Remove missing values.
 
         Args:
@@ -1807,8 +1850,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     @staticmethod
     def _reproducible_sample(
         df: ps.DataFrame,
-        n: int = None,
-        frac: float = None,
+        n: int | None = None,
+        frac: float | None = None,
         replace: bool = False,
         seed: int = 42,
     ) -> ps.DataFrame:
@@ -1953,16 +1996,16 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         case_expr = F.lit(None).cast("string")
         for edge, label in reversed(list(zip(edges, labels))):
             threshold = min(edge, mod)
-            case_expr = F.when(
-                hash_expr < F.lit(threshold), F.lit(label)
-            ).otherwise(case_expr)
+            case_expr = F.when(hash_expr < F.lit(threshold), F.lit(label)).otherwise(
+                case_expr
+            )
 
         # Apply the frac filter before returning.
         if frac < 1.0:
             frac_threshold = int(frac * mod)
-            case_expr = F.when(
-                hash_expr < F.lit(frac_threshold), case_expr
-            ).otherwise(F.lit(None))
+            case_expr = F.when(hash_expr < F.lit(frac_threshold), case_expr).otherwise(
+                F.lit(None)
+            )
 
         sdf = sdf.withColumn(name, case_expr)
         sdf = sdf.filter(F.col(name).isNotNull())
@@ -2113,14 +2156,16 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             SparkDataset: Dataset with replaced values.
         """
         if isinstance(to_replace, ps.DataFrame) and len(to_replace.columns) == 1:
-            to_replace = to_replace.iloc[:, 0]
+            to_replace = to_replace.iloc[:, 0].to_list()
         elif isinstance(to_replace, ps.Series):
             to_replace = to_replace.to_list()
         elif isinstance(to_replace, dict):
-            result = self.data.replace(to_replace=to_replace, regex=regex)
-        else:
-            result = self.data.replace(to_replace=to_replace, value=value, regex=regex)
-        return self._wrap_result(result)
+            return self._wrap_result(
+                self.data.replace(to_replace=to_replace, regex=regex)
+            )
+        return self._wrap_result(
+            self.data.replace(to_replace=to_replace, value=value, regex=regex)
+        )
 
     def reindex(self, labels: str = "", fill_value: str | None = None) -> SparkDataset:
         """Conform dataset to new index with optional fill value.
@@ -2197,8 +2242,10 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 Column to explode.
 
         Return
-        ------  
+        ------
             DataFrame:
                 Exploded lists to rows of the subset columns; index will be duplicated for these rows.
         """
-        return self._wrap_result(self.data.explode(column=column, ignore_index=ignore_index))
+        return self._wrap_result(
+            self.data.explode(column=column, ignore_index=ignore_index)
+        )

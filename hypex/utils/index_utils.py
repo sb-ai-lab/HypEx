@@ -114,9 +114,7 @@ class FaissIndexStorage:
                 partition_index,
                 f"{self._local_tmp_dir}/{index_file_name}",
             )
-            self.sp_s.sparkContext.addFile(
-                f"{self._local_tmp_dir}/{index_file_name}"
-            )
+            self.sp_s.sparkContext.addFile(f"{self._local_tmp_dir}/{index_file_name}")
             index_refs.append(index_file_name)
             del partition_index
             gc.collect()
@@ -148,6 +146,7 @@ class FaissIndexStorage:
                 try:
                     shutil.rmtree(directory)
                 except Exception:
+                    # best-effort cleanup: directory may already be removed
                     pass
         FaissIndexStorage.LOCAL_DIRS = []
 
@@ -175,12 +174,7 @@ class CachingIndex:
         self._cache: OrderedDict[str, faiss.Index] = OrderedDict()
         self._lock: threading.Lock = threading.Lock()
 
-    def get(
-        self,
-        reference: str,
-        storage: FaissIndexStorage,
-        nprobe: int,
-    ) -> faiss.Index:
+    def get(self, reference: str, storage: FaissIndexStorage) -> faiss.Index:
         """Retrieve a FAISS index from cache or load it from storage.
 
         If the index identified by ``reference`` is already cached, it is
@@ -194,8 +188,6 @@ class CachingIndex:
             reference: File reference name for the index.
             storage: The :class:`FaissIndexStorage` instance used to load
                 the index if it is not cached.
-            nprobe: Number of IVF clusters to probe during search.
-                Applied to the inner index if it supports the attribute.
 
         Returns:
             The loaded or cached FAISS index ready for search.
@@ -211,9 +203,6 @@ class CachingIndex:
                 gc.collect()
 
             tmp_index: faiss.Index = storage.load_index(reference)
-            inner: faiss.Index = faiss.downcast_index(tmp_index)
-            if hasattr(inner, "nprobe"):
-                inner.nprobe = nprobe
 
             self._cache[reference] = tmp_index
             return tmp_index

@@ -19,7 +19,13 @@ from .comparators import (
 from .distances import MahalanobisDistance
 from .hypothesis_testing import GroupChi2Test, GroupKSTest, GroupTTest, GroupUTest
 from .power_testing import MDEBySize, PowerTesting
-from .stats_hypothesis_testing import StatsChi2Test, StatsKSTest, StatsTTest, StatsZTest
+from .stats_hypothesis_testing import (
+    StatsChi2Test,
+    StatsKSTest,
+    StatsTTest,
+    StatsUTest,
+    StatsZTest,
+)
 
 __all__ = [
     "PSI",
@@ -43,6 +49,7 @@ __all__ = [
     "StatsHypothesisTesting",
     "StatsKSTest",
     "StatsTTest",
+    "StatsUTest",
     "StatsZTest",
     "TTest",
     "UTest",

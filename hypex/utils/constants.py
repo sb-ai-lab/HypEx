@@ -5,11 +5,6 @@ NAME_BORDER_SYMBOL = "\u2506"
 MATCHING_INDEXES_SPLITTER_SYMBOL = "\u256f"
 UTILITY_COL_SYMBOL = "\u23e3"
 UTILITY_INDEX_COL_NAME = "\u23e3index"
-
-UTILITY_INDEX_COL_NAME = "\u23e3index"
-UTILITY_PHYSICAL_INDEX_COL_NAME = "\u23e3_physical_index"
-
-UTILITY_INDEX_COL_NAME = "\u23e3index"
 UTILITY_PHYSICAL_INDEX_COL_NAME = "\u23e3_physical_index"
 
 NUMBER_TYPES_LIST = [int, float]
@@ -20,6 +15,7 @@ TEST_NAME_NORMALIZATION: dict[str, str] = {
     "StatsKSTest": "KSTest",
     "StatsChi2Test": "Chi2Test",
     "StatsZTest": "ZTest",
+    "StatsUTest": "UTest",
     "GroupTTest": "TTest",
     "GroupKSTest": "KSTest",
     "GroupChi2Test": "Chi2Test",

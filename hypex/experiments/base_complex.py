@@ -37,7 +37,10 @@ class ExperimentWithReporter(Experiment):
         return result
 
     def _set_result(
-        self, data: ExperimentData, results: list[Dataset | dict], reset_index: bool = True
+        self,
+        data: ExperimentData,
+        results: list[Dataset | dict],
+        reset_index: bool = True,
     ):
         if not isinstance(results, list):
             results = [results]
@@ -50,7 +53,11 @@ class ExperimentWithReporter(Experiment):
             elif isinstance(res, (Dataset, SmallDataset)):
                 datasets.append(res)
 
-        combined = datasets[0].append(datasets[1:], reset_index=reset_index) if len(datasets) > 1 else datasets[0]
+        combined = (
+            datasets[0].append(datasets[1:], reset_index=reset_index)
+            if len(datasets) > 1
+            else datasets[0]
+        )
 
         data.analysis_tables[self.id] = combined
         return data
@@ -81,7 +88,7 @@ class CycledExperiment(ExperimentWithReporter):
         for i in tqdm(range(self.n_iterations)):
             self.key = str(i)
             t_data = ExperimentData(clean_ds)
-            t_data = super(ExperimentWithReporter, self).execute(t_data)
+            t_data = Experiment.execute(self, t_data)
             report = self.reporter.report(t_data)
             report.index = [str(i)]
             result.append(report)
@@ -113,13 +120,15 @@ class GroupExperiment(ExperimentWithReporter):
             key = str(group[0] if isinstance(group, tuple) else group)
             self.key = key
             t_data = ExperimentData(group_data)
-            t_data = super(ExperimentWithReporter, self).execute(t_data)
+            t_data = Experiment.execute(self, t_data)
             report = self.reporter.report(t_data)
             results.append((key, report))
 
         return self._set_result(data, results)
 
-    def _set_result(self, data: ExperimentData, results: list[tuple[str, Dataset | dict]]) -> ExperimentData:
+    def _set_result(
+        self, data: ExperimentData, results: list[tuple[str, Dataset | dict]]
+    ) -> ExperimentData:
         datasets = []
         for key, res in results:
             if isinstance(res, dict):
@@ -135,7 +144,9 @@ class GroupExperiment(ExperimentWithReporter):
 
         combined = datasets[0]
         for ds in datasets[1:]:
-            combined = combined.merge(ds, left_index=True, right_index=True, how="outer")
+            combined = combined.merge(
+                ds, left_index=True, right_index=True, how="outer"
+            )
 
         data.analysis_tables[self.id] = combined
         return data

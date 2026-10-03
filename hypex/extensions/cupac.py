@@ -14,7 +14,6 @@ from .abstract import MLExtension
 
 
 class CupacExtension(MLExtension):
-
     def __init__(
         self,
         n_folds: int = 5,
@@ -68,7 +67,7 @@ class CupacExtension(MLExtension):
         """
         model = kwargs.get("model")
         return self._fit_pandas(model, X, Y)
-    
+
     def predict(self, X: Dataset, **kwargs) -> Dataset:
         """Generate predictions using a fitted model.
 
@@ -96,19 +95,14 @@ class CupacExtension(MLExtension):
             return self._fit_pandas(model, data, Y)
         elif mode == "predict":
             return self._predict_pandas(model, data)
-
-    def fit(self, model: str, X: Dataset, Y: Dataset) -> Any:
-        pass
-
-    def predict(self, model: Any, X: Dataset) -> Dataset:
-        pass
+        return None
 
     def _kfold_fit_pandas(
         self, model: str, X: Dataset, Y: Dataset
     ) -> tuple[float, dict[str, float]]:
         model_proto = CUPAC_MODELS[model]["pandasdataset"]
-        X_df = X.data
-        Y_df = Y.data
+        X_df = X.raw_data
+        Y_df = Y.raw_data
         y_values = Y_df.iloc[:, 0] if len(Y_df.columns) > 0 else Y_df
         kf = KFold(n_splits=self.n_folds, shuffle=True, random_state=self.random_state)
 
@@ -141,15 +135,15 @@ class CupacExtension(MLExtension):
     def _fit_pandas(self, model: str, X: Dataset, Y: Dataset) -> Any:
         model_proto = CUPAC_MODELS[model]["pandasdataset"]
         final_model = clone(model_proto)
-        X_df = X.data
-        Y_df = Y.data
+        X_df = X.raw_data
+        Y_df = Y.raw_data
         y_values = Y_df.iloc[:, 0] if len(Y_df.columns) > 0 else Y_df
         final_model.fit(X_df, y_values)
         return final_model
 
     def _predict_pandas(self, model: Any, X: Dataset) -> Dataset:
         """Make predictions using pandas backend."""
-        X_df = X.data
+        X_df = X.raw_data
         predictions = pd.DataFrame(model.predict(X_df), columns=["predict"])
         return Dataset(roles={"predict": AdditionalTargetRole()}, data=predictions)
 

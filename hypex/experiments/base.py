@@ -37,6 +37,7 @@ class Experiment(Executor):
             ``execute`` deep-copies the input ``ExperimentData`` before
             running the executors.
     """
+
     def _detect_transformer(self) -> bool:
         """Detect whether any executor in the pipeline is a transformer.
 
@@ -165,18 +166,21 @@ class Experiment(Executor):
         if backend_cls is None:
             return executor
         sig = inspect.signature(backend_cls.__init__)
-        expected_params = {p.name for p in sig.parameters.values() if p.name != 'self'}
-        init_kwargs = {k: getattr(executor, k) for k in expected_params if hasattr(executor, k)}
-        has_var_keyword = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
-        if has_var_keyword and hasattr(executor, 'calc_kwargs'):
+        expected_params = {p.name for p in sig.parameters.values() if p.name != "self"}
+        init_kwargs = {
+            k: getattr(executor, k) for k in expected_params if hasattr(executor, k)
+        }
+        has_var_keyword = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        )
+        if has_var_keyword and hasattr(executor, "calc_kwargs"):
             # Unwrap calc_kwargs to the top level so keys like
             # "equal_variance" reach the backend constructor directly.
             init_kwargs.update(executor.calc_kwargs)
         new_executor = backend_cls(**init_kwargs)
-        if hasattr(executor, 'key'):
+        if hasattr(executor, "key"):
             new_executor.key = executor.key
         return new_executor
-
 
     @timeit(level="PIPELINE", prefix="EXPERIMENT")
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -201,7 +205,7 @@ class Experiment(Executor):
             with self.logger.process(
                 name=executor.__class__.__name__,
                 backend=experiment_data.ds.backend_type.value,
-                log_spark=False  # можно включить для детального логирования Spark-процессов
+                log_spark=False,  # можно включить для детального логирования Spark-процессов
             ):
                 cur_executor = self._get_executor_backend(executor, experiment_data.ds)
                 cur_executor.key = self.key
@@ -229,6 +233,7 @@ class OnRoleExperiment(Experiment):
     This split minimizes the number of Spark jobs while preserving
     correctness for executors that expect a single-column input.
     """
+
     def __init__(
         self,
         executors: list[Executor],
@@ -293,7 +298,6 @@ class OnRoleExperiment(Experiment):
         target_fields = data.field_search(self.role)
         if not target_fields:
             return data
-
 
         vector_executors = []
         iterative_executors = []

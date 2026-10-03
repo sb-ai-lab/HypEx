@@ -10,6 +10,7 @@ from ..comparators import (
     StatsChi2Test,
     StatsKSTest,
     StatsTTest,
+    StatsUTest,
 )
 from ..dataset import (
     Dataset,
@@ -129,7 +130,9 @@ class ABAnalyzer(Executor):
 
         if self.multitest_method and num_comparisons > 1:
             if self.multitest_method != ABNTestMethodsEnum.quantile:
-                multitest_result = MultiTest(self.multitest_method, self.alpha).calc(p_values, **kwargs)
+                multitest_result = MultiTest(self.multitest_method, self.alpha).calc(
+                    p_values, **kwargs
+                )
             else:
                 multitest_result = SmallDataset.create_empty()
                 for target_field in target_fields:
@@ -175,7 +178,7 @@ class ABAnalyzer(Executor):
     @staticmethod
     def _get_index_values(table: Dataset | SmallDataset) -> list[Any]:
         """Extract index values from a dataset in a backend-agnostic way."""
-        return Adapter.to_list(table.data.index)
+        return Adapter.to_list(table.raw_data.index)
 
     @staticmethod
     def _extract_id_prefix(analysis_id: str) -> str:
@@ -295,8 +298,15 @@ class ABAnalyzer(Executor):
             KeyError: If the treatment column cannot be found in the dataset.
         """
         executor_ids = data.get_ids(
-            [GroupTTest, GroupUTest, GroupKSTest,
-             StatsTTest, StatsChi2Test, StatsKSTest]
+            [
+                GroupTTest,
+                GroupUTest,
+                GroupKSTest,
+                StatsTTest,
+                StatsChi2Test,
+                StatsKSTest,
+                StatsUTest,
+            ]
         )
 
         group_field = data.ds.search_columns(TreatmentRole())[0]
@@ -308,11 +318,7 @@ class ABAnalyzer(Executor):
         if group_field not in data.groups:
             combined_data = data.ds
             if group_field in combined_data.columns:
-                inner_df = (
-                    combined_data.data
-                    if hasattr(combined_data, "data")
-                    else combined_data.backend_data.data
-                )
+                inner_df = combined_data.raw_data
                 initial_len = len(inner_df)
                 inner_df = inner_df.dropna(subset=[group_field])
                 dropped = initial_len - len(inner_df)
@@ -325,8 +331,7 @@ class ABAnalyzer(Executor):
                         },
                     )
                 data.groups[group_field] = {
-                    f"{group}": ds
-                    for group, ds in combined_data.groupby(group_field)
+                    f"{group}": ds for group, ds in combined_data.groupby(group_field)
                 }
 
         num_groups = len(data.groups[group_field]) - 1
@@ -338,7 +343,8 @@ class ABAnalyzer(Executor):
         for c, spaces in executor_ids.items():
             analysis_ids = spaces.get("analysis_tables", [])
             analysis_ids = [
-                aid for aid in analysis_ids
+                aid
+                for aid in analysis_ids
                 if not aid.endswith(f"{NAME_BORDER_SYMBOL}stats")
             ]
             if len(analysis_ids) == 0:
@@ -366,7 +372,7 @@ class ABAnalyzer(Executor):
                 row_index = self._build_row_index(
                     t_data, analysis_ids, num_groups, group_labels
                 )
-                t_data.data.index = row_index
+                t_data.raw_data.index = row_index
 
                 # ── Aggregate per-group statistics ──────────────────────────
                 # Group rows by the trailing group label parsed from the
@@ -393,9 +399,7 @@ class ABAnalyzer(Executor):
                         if not positions:
                             continue
                         value = t_data.iloc[positions][f]
-                        analysis_data[
-                            f"{c} {f} {grp_label}"
-                        ] = value.mean()
+                        analysis_data[f"{c} {f} {grp_label}"] = value.mean()
 
         analysis_dataset = SmallDataset.from_dict(
             [analysis_data], {f: StatisticRole(float) for f in analysis_data}

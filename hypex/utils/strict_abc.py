@@ -1,6 +1,5 @@
 import inspect
-import unittest
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, ABCMeta
 
 
 class StrictABCMeta(ABCMeta):
@@ -123,27 +122,27 @@ class StrictABCMeta(ABCMeta):
     def __new__(mcls, name: str, bases: tuple, namespace: dict, **kwargs):
         cls = super().__new__(mcls, name, bases, namespace, **kwargs)
 
-        options = getattr(cls, '__strict_options__', {})
-        check_names = options.get('check_names', False)
-        check_defaults = options.get('check_defaults', True)
-        check_types = options.get('check_types', False)
-        check_return_type = options.get('check_return_type', False)
+        options = getattr(cls, "__strict_options__", {})
+        check_names = options.get("check_names", False)
+        check_defaults = options.get("check_defaults", True)
+        check_types = options.get("check_types", False)
+        check_return_type = options.get("check_return_type", False)
 
         # Collect unresolved abstract methods from direct parents
         parent_abstracts = set()
         for base in bases:
-            parent_abstracts.update(getattr(base, '__abstractmethods__', frozenset()))
+            parent_abstracts.update(getattr(base, "__abstractmethods__", frozenset()))
 
         for meth_name in parent_abstracts:
             concrete = cls.__dict__.get(meth_name)
-            if concrete is None or getattr(concrete, '__isabstractmethod__', False):
+            if concrete is None or getattr(concrete, "__isabstractmethod__", False):
                 continue
 
             # Find the abstract definition via MRO
             parent_attr = None
             for base in cls.__mro__[1:]:
                 attr = base.__dict__.get(meth_name)
-                if attr is not None and getattr(attr, '__isabstractmethod__', False):
+                if attr is not None and getattr(attr, "__isabstractmethod__", False):
                     parent_attr = attr
                     break
             if parent_attr is None:
@@ -156,19 +155,32 @@ class StrictABCMeta(ABCMeta):
                 continue
 
             mcls._validate_signature(
-                meth_name, sig_parent, sig_child, parent_attr, concrete,
-                check_names, check_defaults, check_types, check_return_type,
-                cls.__name__
+                meth_name,
+                sig_parent,
+                sig_child,
+                parent_attr,
+                concrete,
+                check_names,
+                check_defaults,
+                check_types,
+                check_return_type,
+                cls.__name__,
             )
 
         return cls
 
     @staticmethod
     def _validate_signature(
-        meth_name: str, sig_parent: inspect.Signature, sig_child: inspect.Signature,
-        parent_attr: object, concrete: object,
-        check_names: bool, check_defaults: bool, check_types: bool,
-        check_return_type: bool, class_name: str
+        meth_name: str,
+        sig_parent: inspect.Signature,
+        sig_child: inspect.Signature,
+        parent_attr: object,
+        concrete: object,
+        check_names: bool,
+        check_defaults: bool,
+        check_types: bool,
+        check_return_type: bool,
+        class_name: str,
     ) -> None:
         def _descriptor_type(obj):
             if isinstance(obj, staticmethod):
@@ -197,13 +209,17 @@ class StrictABCMeta(ABCMeta):
         # ------------------------------------------------------------------
         # LSP-compliant variadic policy (handles *args / **kwargs correctly)
         # ------------------------------------------------------------------
-        p_has_var_pos = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in p_params)
-        p_has_var_kw  = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in p_params)
-        c_has_var_pos = any(c.kind == inspect.Parameter.VAR_POSITIONAL for c in c_params)
-        c_has_var_kw  = any(c.kind == inspect.Parameter.VAR_KEYWORD for c in c_params)
+        p_has_var_pos = any(
+            p.kind == inspect.Parameter.VAR_POSITIONAL for p in p_params
+        )
+        p_has_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in p_params)
+        c_has_var_pos = any(
+            c.kind == inspect.Parameter.VAR_POSITIONAL for c in c_params
+        )
+        c_has_var_kw = any(c.kind == inspect.Parameter.VAR_KEYWORD for c in c_params)
 
         parent_has_variadic = p_has_var_pos or p_has_var_kw
-        child_has_variadic  = c_has_var_pos or c_has_var_kw
+        child_has_variadic = c_has_var_pos or c_has_var_kw
 
         # Case 1: Parent has variadic, child removed it entirely -> narrowing (violation)
         if parent_has_variadic and not child_has_variadic:
@@ -253,7 +269,10 @@ class StrictABCMeta(ABCMeta):
 
         # Allowed kind transitions (from more restrictive to less restrictive)
         ALLOWED_KIND_EXPANSIONS = {
-            (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD),
+            (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            ),
             (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD),
         }
 
@@ -287,27 +306,35 @@ class StrictABCMeta(ABCMeta):
         if check_return_type:
             p_ret = sig_parent.return_annotation
             c_ret = sig_child.return_annotation
-            if p_ret is not inspect.Signature.empty and c_ret is inspect.Signature.empty:
+            if (
+                p_ret is not inspect.Signature.empty
+                and c_ret is inspect.Signature.empty
+            ):
                 raise TypeError(
                     f"{class_name}.{meth_name}: missing return type annotation"
                 )
-            if p_ret is not inspect.Signature.empty and c_ret is not inspect.Signature.empty:
+            if (
+                p_ret is not inspect.Signature.empty
+                and c_ret is not inspect.Signature.empty
+            ):
                 is_covariant = False
                 if isinstance(p_ret, type) and isinstance(c_ret, type):
                     try:
                         is_covariant = issubclass(c_ret, p_ret)
                     except TypeError:
+                        # annotation is not a class: treat as non-covariant
                         pass
                 if not is_covariant and c_ret != p_ret:
                     raise TypeError(
                         f"{class_name}.{meth_name}: return type not covariant "
                         f"(expected {p_ret}, got {c_ret})"
                     )
-                    
+
+
 class StrictABC(ABC, metaclass=StrictABCMeta):
-    __strict_options__ = {
-        'check_names': False,
-        'check_defaults': True,
-        'check_types': False,
-        'check_return_type': False
+    __strict_options__ = {  # noqa: RUF012
+        "check_names": False,
+        "check_defaults": True,
+        "check_types": False,
+        "check_return_type": False,
     }

@@ -1,4 +1,5 @@
 """UI output handlers for A/B test results including CUPED and CUPAC."""
+
 from __future__ import annotations
 
 from ..analyzers.ab import ABAnalyzer
@@ -76,9 +77,7 @@ class CupacOutput:
                 f"variance_reductions: {len(self.variance_reductions)} target(s)"
             )
         if has_fi:
-            parts.append(
-                f"feature_importances: {len(self.feature_importances)} rows"
-            )
+            parts.append(f"feature_importances: {len(self.feature_importances)} rows")
         return f"CupacOutput({', '.join(parts)})"
 
 
@@ -115,7 +114,7 @@ class ABOutput(Output):
         self.cuped = CupedOutput() if enable_cuped else None
         self.cupac = CupacOutput()
         super().__init__(
-            resume_reporter=ABTestReporter(
+            summary_reporter=ABTestReporter(
                 dict_reporter=DictReporter(),
                 output_format="dataset",
                 invert_pass=True,
@@ -132,7 +131,8 @@ class ABOutput(Output):
         correction method is configured.
         """
         multitest_id = experiment_data.get_one_id(
-            ABAnalyzer, ExperimentDataEnum.analysis_tables,
+            ABAnalyzer,
+            ExperimentDataEnum.analysis_tables,
         )
         if multitest_id and "MultiTest" in multitest_id:
             self.multitest = experiment_data.analysis_tables[multitest_id]
@@ -174,7 +174,8 @@ class ABOutput(Output):
             targets.append(cid.split(ID_SPLIT_SYMBOL)[-1])
 
         return diff.add_column(groups, role={"group": StatisticRole()}).add_column(
-            targets * len(self._groups), role={"feature": StatisticRole()},
+            targets * len(self._groups),
+            role={"feature": StatisticRole()},
         )
 
     # ── Sizes ────────────────────────────────────────────────────────
@@ -198,11 +199,13 @@ class ABOutput(Output):
             try:
                 idx_str = str(int(float(idx_str)))
             except (ValueError, TypeError):
+                # non-numeric index: keep the string as is
                 pass
             new_index.append(idx_str)
         table.index = new_index
         self.sizes = table.add_column(
-            self._groups, role={"group": StatisticRole()},
+            self._groups,
+            role={"group": StatisticRole()},
         )
 
     # ── Variance reduction report property ───────────────────────────
@@ -216,7 +219,7 @@ class ABOutput(Output):
             transformed metric, or a descriptive string if unavailable.
         """
         if hasattr(self, "_experiment_data"):
-            return self.resume_reporter.report_variance_reductions(
+            return self.summary_reporter.report_variance_reductions(
                 self._experiment_data,
             )
         return "No experiment data available."

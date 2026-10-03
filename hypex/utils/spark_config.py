@@ -175,7 +175,7 @@ class SparkSessionCalculator:
         tasks_per_executor = self.target_executor_cores
         base_executors = max(1, num_partitions // tasks_per_executor)
         num_executors = base_executors * self.EXECUTOR_REDUNDANCY_FACTOR
-        min_executors = 4   # increased for production stability
+        min_executors = 4  # increased for production stability
         max_executors = 50
         return max(min_executors, min(num_executors, max_executors))
 
@@ -207,7 +207,9 @@ class SparkSessionCalculator:
 
         # Query batch buffers (FAISS_CHUNK_SIZE rows × features × 4 bytes float32)
         chunk_buffer_bytes = (
-            MatchingConfig.FAISS_CHUNK_SIZE * self.num_columns * self.BYTES_PER_FLOAT
+            MatchingConfig.FAISS_CHUNK_SIZE
+            * self.num_columns
+            * self.BYTES_PER_FLOAT
             * parallel_tasks
         )
 
@@ -220,12 +222,12 @@ class SparkSessionCalculator:
             + chunk_buffer_bytes
             + native_overhead_bytes
         )
-        total_memory_gb = total_memory_bytes / (1024 ** 3)
+        total_memory_gb = total_memory_bytes / (1024**3)
 
         # Round up with safety margin, enforce minimum
         memory_gb = max(
             self.MIN_EXECUTOR_MEMORY_GB,
-            int(total_memory_gb) + 2,   # +2 GB safety margin
+            int(total_memory_gb) + 2,  # +2 GB safety margin
         )
         return f"{memory_gb}g"
 
@@ -260,14 +262,14 @@ class SparkSessionCalculator:
         sample_bytes = (
             MatchingConfig.FAISS_SAMPLE_TARGET * self.num_columns * self.BYTES_PER_FLOAT
         )
-        sample_gb = sample_bytes / (1024 ** 3)
+        sample_gb = sample_bytes / (1024**3)
 
         # 2. Index collect() bug impact: each row contributes 8 bytes (int64 index)
         if self.num_rows is not None:
             index_collect_bytes = self.num_rows * 8
         else:
             index_collect_bytes = data_size_bytes // self.num_columns
-        index_collect_gb = index_collect_bytes / (1024 ** 3)
+        index_collect_gb = index_collect_bytes / (1024**3)
 
         # 3. Base overhead (catalyst, broadcast, Arrow)
         base_gb = 4
@@ -289,9 +291,9 @@ class SparkSessionCalculator:
         """
         if self.num_rows is not None:
             index_collect_bytes = self.num_rows * 8
-            index_collect_gb = index_collect_bytes / (1024 ** 3)
+            index_collect_gb = index_collect_bytes / (1024**3)
         else:
-            index_collect_gb = self._estimate_data_size() / (1024 ** 3)
+            index_collect_gb = self._estimate_data_size() / (1024**3)
 
         # At least 2x the expected collect size, minimum 8 GB
         result_size_gb = max(
@@ -310,6 +312,7 @@ class SparkSessionCalculator:
             if file_sys == "file:///":
                 file_sys = None
         except Exception:
+            # best-effort: fall back to the default file system
             pass
         if file_sys is None:
             try:
@@ -377,9 +380,7 @@ class SparkSessionCalculator:
         )
         return settings
 
-    def check_current_settings(
-        self, spark_session: SparkSession
-    ) -> dict[str, Any]:
+    def check_current_settings(self, spark_session: SparkSession) -> dict[str, Any]:
         """Check current Spark session settings.
 
         Args:
@@ -401,15 +402,9 @@ class SparkSessionCalculator:
             "driver_memory": conf.get("spark.driver.memory", "unknown"),
             "driver_cores": int(conf.get("spark.driver.cores", "0")),
             # FIXED: added maxResultSize check
-            "driver_max_result_size": conf.get(
-                "spark.driver.maxResultSize", "1g"
-            ),
-            "shuffle_partitions": int(
-                conf.get("spark.sql.shuffle.partitions", "200")
-            ),
-            "default_parallelism": int(
-                conf.get("spark.default.parallelism", "0")
-            ),
+            "driver_max_result_size": conf.get("spark.driver.maxResultSize", "1g"),
+            "shuffle_partitions": int(conf.get("spark.sql.shuffle.partitions", "200")),
+            "default_parallelism": int(conf.get("spark.default.parallelism", "0")),
             "max_partition_bytes": conf.get(
                 "spark.sql.files.maxPartitionBytes", "128m"
             ),
@@ -451,10 +446,7 @@ class SparkSessionCalculator:
                 )
             )
 
-        if (
-            current_settings.get("executor_cores", 0)
-            > optimal_settings.executor_cores
-        ):
+        if current_settings.get("executor_cores", 0) > optimal_settings.executor_cores:
             recommendations.append(
                 SparkRecommendation(
                     parameter="spark.executor.cores",
@@ -481,9 +473,7 @@ class SparkSessionCalculator:
             )
 
         # FIXED: added driver memory recommendation
-        current_driver_memory = current_settings.get(
-            "driver_memory", "unknown"
-        )
+        current_driver_memory = current_settings.get("driver_memory", "unknown")
         if current_driver_memory != optimal_settings.driver_memory:
             recommendations.append(
                 SparkRecommendation(
@@ -499,9 +489,7 @@ class SparkSessionCalculator:
             )
 
         # FIXED: added maxResultSize recommendation
-        current_max_result = current_settings.get(
-            "driver_max_result_size", "unknown"
-        )
+        current_max_result = current_settings.get("driver_max_result_size", "unknown")
         if current_max_result != optimal_settings.driver_max_result_size:
             recommendations.append(
                 SparkRecommendation(
@@ -687,8 +675,7 @@ class SparkSessionCalculator:
             current_config = {key: value for key, value in config.getAll()}
         else:
             raise TypeError(
-                f"config must be SparkConf, dict, or None, "
-                f"received: {type(config)}"
+                f"config must be SparkConf, dict, or None, received: {type(config)}"
             )
 
         # Create a new configuration based on the original

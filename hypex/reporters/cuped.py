@@ -1,13 +1,14 @@
 """Reporters for CUPED variance reduction results."""
+
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any
 
 from ..dataset import ExperimentData, SmallDataset
 from ..dataset.roles import InfoRole, StatisticRole
 from ..transformers.cuped import CUPEDTransformer
 from ..utils import ExperimentDataEnum
-from .abstract import DatasetReporter, DictReporter, Reporter
+from .abstract import Reporter
 
 
 class CupedReporter(Reporter):
@@ -39,7 +40,8 @@ class CupedReporter(Reporter):
             searched_space=ExperimentDataEnum.analysis_tables,
         )
         table_ids = ids.get(CUPEDTransformer.__name__, {}).get(
-            ExperimentDataEnum.analysis_tables.value, [],
+            ExperimentDataEnum.analysis_tables.value,
+            [],
         )
         if not table_ids:
             return SmallDataset.create_empty()
@@ -51,10 +53,12 @@ class CupedReporter(Reporter):
 
         rows: list[dict[str, Any]] = []
         for record in records:
-            rows.append({
-                "feature": record.get("feature"),
-                "variance_reduction_pct": record.get("variance_reduction_pct"),
-            })
+            rows.append(
+                {
+                    "feature": record.get("feature"),
+                    "variance_reduction_pct": record.get("variance_reduction_pct"),
+                }
+            )
 
         return SmallDataset.from_dict(
             rows,

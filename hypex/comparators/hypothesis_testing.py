@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..dataset import Dataset
-from ..dataset.backends import PandasDataset, SparkDataset
+from ..dataset.backends import PandasDataset
 from ..extensions.scipy_stats import (
     GroupChi2TestExtension,
     GroupKSTestExtension,
@@ -10,7 +10,7 @@ from ..extensions.scipy_stats import (
 )
 from ..utils.constants import NUMBER_TYPES_LIST
 from ..utils.registry import backend_factory
-from .abstract import GroupHypothesisTesting, StatsComparator
+from .abstract import GroupHypothesisTesting
 from .comparators import Chi2Test, KSTest, TTest, UTest
 
 
@@ -28,6 +28,7 @@ class GroupTTest(GroupHypothesisTesting):
             data, other=test_data, **kwargs
         )
 
+
 @backend_factory.register(KSTest, PandasDataset)
 class GroupKSTest(GroupHypothesisTesting):
     @property
@@ -43,8 +44,19 @@ class GroupKSTest(GroupHypothesisTesting):
             data, other=test_data, **kwargs
         )
 
-@backend_factory.register(UTest, [PandasDataset, SparkDataset])
+
+@backend_factory.register(UTest, PandasDataset)
 class GroupUTest(GroupHypothesisTesting):
+    """Mann-Whitney U test for Pandas backend.
+
+    Uses ``scipy.stats.mannwhitneyu`` on raw arrays collected to the
+    driver.  For the Spark backend, ``StatsUTest`` (registered via
+    ``@backend_factory.register(UTest, SparkDataset)`` in
+    ``stats_hypothesis_testing.py``) is used instead — it computes
+    the U statistic from pre-aggregated histograms without collecting
+    raw data.
+    """
+
     @property
     def search_types(self) -> list[type] | None:
         return NUMBER_TYPES_LIST
@@ -53,10 +65,10 @@ class GroupUTest(GroupHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        # test_cls = backend_factory.resolve_backend(GroupUTestExtension, data)
         return GroupUTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
+
 
 @backend_factory.register(Chi2Test, PandasDataset)
 class GroupChi2Test(GroupHypothesisTesting):

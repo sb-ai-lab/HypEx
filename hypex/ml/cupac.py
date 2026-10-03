@@ -121,8 +121,10 @@ class CUPACExecutor(MLExecutor):
             #    so field_search picks them up). These columns have no
             #    lag metadata and must not be treated as real targets.
             from ..dataset.roles import AdditionalRole
+
             searched_fields = [
-                f for f in searched_fields
+                f
+                for f in searched_fields
                 if not isinstance(data.ds.roles.get(f), AdditionalRole)
             ]
             # ──────────────────────────────────────────────────────────
@@ -165,14 +167,10 @@ class CUPACExecutor(MLExecutor):
             for i, cofounder in enumerate(cofounders[target]):
                 if lag in [1, max_lags[target]]:
                     # First or last lag → create a new entry for this feature.
-                    cupac_data[target][mode].append(
-                        [features[cofounder][lag]]
-                    )
+                    cupac_data[target][mode].append([features[cofounder][lag]])
                 else:
                     # Intermediate lag → append to the existing entry.
-                    cupac_data[target][mode][i].append(
-                        features[cofounder][lag]
-                    )
+                    cupac_data[target][mode][i].append(features[cofounder][lag])
 
             # ── Target as autoregressive feature ──────────────────────
             # The target entry sits at a fixed index right after all
@@ -183,14 +181,10 @@ class CUPACExecutor(MLExecutor):
             target_idx = len(cofounders[target])
             if target_idx >= len(cupac_data[target][mode]):
                 # Entry does not exist yet → create it.
-                cupac_data[target][mode].append(
-                    [targets[target][lag]]
-                )
+                cupac_data[target][mode].append([targets[target][lag]])
             else:
                 # Entry already exists → append the new lag column.
-                cupac_data[target][mode][target_idx].append(
-                    targets[target][lag]
-                )
+                cupac_data[target][mode][target_idx].append(targets[target][lag])
 
         cupac_data: dict[str, dict[str, list]] = {}
         targets = agg_temporal_fields(TargetRole(), data)
@@ -204,9 +198,7 @@ class CUPACExecutor(MLExecutor):
             else:
                 # For virtual targets, get cofounders from the earliest lag
                 min_lag = min(targets[target].keys())
-                cofounders[target] = data.ds.roles[
-                    targets[target][min_lag]
-                ].cofounders
+                cofounders[target] = data.ds.roles[targets[target][min_lag]].cofounders
             if cofounders[target] is None:
                 raise ValueError(
                     f"Cofounders must be defined in the first lag for "
@@ -239,9 +231,7 @@ class CUPACExecutor(MLExecutor):
             # Build training data: iterate from max_lag down to 2
             for lag in range(max_lags[target], 1, -1):
                 agg_train_predict_x("X_train", lag)
-                cupac_data[target]["Y_train"].append(
-                    targets[target][lag - 1]
-                )
+                cupac_data[target]["Y_train"].append(targets[target][lag - 1])
 
             # Build prediction data for current period (lag=1)
             if "X_predict" in cupac_data[target].keys():
@@ -266,6 +256,7 @@ class CUPACExecutor(MLExecutor):
             return self.fit(model, X, Y)
         elif mode == "predict":
             return self.predict(model, X)
+        return None
 
     def kfold_fit(
         self, model: str, X: Dataset, Y: Dataset
@@ -355,7 +346,8 @@ class CUPACExecutor(MLExecutor):
         #    Without this cleanup, re-running .execute(data) raises
         #    "Columns with the same name already exist".
         existing_cupac_cols = [
-            col for col in data.ds.columns
+            col
+            for col in data.ds.columns
             if col.endswith("_cupac")
             and isinstance(data.ds.roles.get(col), AdditionalTargetRole)
         ]
@@ -376,7 +368,10 @@ class CUPACExecutor(MLExecutor):
 
             for model in self.cupac_models:
                 var_red, fold_importances = self.calc(
-                    mode="kfold_fit", model=model, X=X_train, Y=Y_train,
+                    mode="kfold_fit",
+                    model=model,
+                    X=X_train,
+                    Y=Y_train,
                 )
                 if best_var_red is None or var_red > best_var_red:
                     best_model, best_var_red = model, var_red
@@ -394,16 +389,20 @@ class CUPACExecutor(MLExecutor):
 
             if "X_predict" in target_data:
                 fitted_model = self.calc(
-                    mode="fit", model=best_model, X=X_train, Y=Y_train,
+                    mode="fit",
+                    model=best_model,
+                    X=X_train,
+                    Y=Y_train,
                 )
                 X_predict = self._agg_data_from_cupac_data(
-                    data, target_data["X_predict"],
+                    data,
+                    target_data["X_predict"],
                 )
                 prediction = self.calc(mode="predict", model=fitted_model, X=X_predict)
 
                 theta = cuped_theta(
-                    data.ds[target].data.values.flatten(),
-                    prediction.data.values.flatten(),
+                    data.ds[target].raw_data.values.flatten(),
+                    prediction.raw_data.values.flatten(),
                 )
                 explained_variation = (prediction - prediction.mean()) * theta
                 target_cupac = data.ds[target] - explained_variation
@@ -418,7 +417,8 @@ class CUPACExecutor(MLExecutor):
 
                 cupac_variance_reduction_real = (
                     self.extension._calculate_variance_reduction(
-                        data.ds[target], target_cupac,
+                        data.ds[target],
+                        target_cupac,
                     )
                 )
 

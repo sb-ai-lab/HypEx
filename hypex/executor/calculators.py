@@ -53,9 +53,11 @@ class MinSampleSize(Calculator):
         random_state (int | None, optional): Random seed for reproducibility of Monte Carlo simulation
             and quantile estimation. Defaults to 42.
         variances (list[float] | float | None, optional): Variance specification. If provided:
+
             - when `equal_variance=True`, may be a single float (common variance) or a list (first/pooled
               usage depends on implementation).
             - when `equal_variance=False`, must be a list of variances per group (order matching grouping).
+
             If None, variances are estimated from the grouped data for each target metric. Defaults to None.
 
     Examples

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import math
 from typing import Any
+
+import pandas as pd
 
 from ..dataset import (
     AdditionalTreatmentRole,
@@ -11,7 +14,7 @@ from ..dataset import (
 )
 from ..dataset.roles import ConstGroupRole
 from ..executor import Calculator
-from ..utils import Adapter, BackendsEnum, ExperimentDataEnum, timeit
+from ..utils import BackendsEnum, ExperimentDataEnum, timeit
 
 MISSING_CONST_LABELS = frozenset({"", "nan", "none", "nat", "<na>"})
 
@@ -124,10 +127,8 @@ class AASplitter(Calculator):
             unique_vals = data.ds[splitter_col].unique()
             group_keys = list(unique_vals[splitter_col].to_dict().values())
             for group_key in group_keys:
-                # NaN != NaN is the standard Python check for float/np.nan.
-                # Also catches pd.NaT and any other "not equal to self" value.
-                # The previous `group_key is None` check did NOT catch NaN.
-                if group_key is None or group_key != group_key:
+                # pd.isna catches None, NaN and pd.NaT.
+                if pd.isna(group_key):
                     continue
                 mask = data.ds[splitter_col] == group_key
                 group_data = data.ds[mask]
@@ -209,7 +210,7 @@ class AASplitter(Calculator):
 
             # Missing value (None, NaN): after astype(str) it becomes
             # "None" / "nan", both covered by MISSING_CONST_LABELS.
-            if label is None or (isinstance(label, float) and label != label):
+            if label is None or (isinstance(label, float) and math.isnan(label)):
                 translation[str(label)] = _FREE_CONST_SENTINEL
                 continue
 
@@ -300,7 +301,7 @@ class AASplitter(Calculator):
 
         if groups_sizes:
             labels = ["control"] + [
-                f"test_{i+1}" for i in range(len(groups_sizes) - 1)
+                f"test_{i + 1}" for i in range(len(groups_sizes) - 1)
             ]
         else:
             labels = ["control", "test_1"]
@@ -309,24 +310,14 @@ class AASplitter(Calculator):
         # ── 2. pinned groups: one aggregate pass, on the driver ─────
         translation: dict[Any, str] = {}
         if const_group_field:
-            effective_control_size = (
-                groups_sizes[0] if groups_sizes else control_size
+            effective_control_size = groups_sizes[0] if groups_sizes else control_size
+            translation, free_size, control_size = AASplitter._const_group_plan(
+                data=data,
+                const_group_field=const_group_field,
+                label_map=label_map,
+                control_size=effective_control_size,
+                sample_size=sample_size,
             )
-            translation, free_size, control_size = (
-                AASplitter._const_group_plan(
-                    data=data,
-                    const_group_field=const_group_field,
-                    label_map=label_map,
-                    control_size=effective_control_size,
-                    sample_size=sample_size,
-                )
-            )
-        else:
-            # Avoid triggering a Spark count() action just for a boolean check.
-            # free_size = -1 is a sentinel meaning "unknown, assume non-empty".
-            # The actual emptiness check is deferred to random_split_labels
-            # which handles empty data gracefully.
-            free_size = -1  # sentinel: means "unknown, assume non-empty"
 
         # ── 3. bucket edges (always in MOD scale, frac handled separately)
         MOD = 10_000_000
@@ -373,15 +364,12 @@ class AASplitter(Calculator):
             col_role = tagged.roles.get(const_group_field)
             if col_role is None or col_role.data_type is not str:
                 tagged = tagged.astype({const_group_field: str})
-            tagged = tagged.fillna(
-                values={const_group_field: _FREE_CONST_SENTINEL}
-            )
+            tagged = tagged.fillna(values={const_group_field: _FREE_CONST_SENTINEL})
             if translation:
                 tagged = tagged.replace(to_replace=translation)
             # Pre-compute the set of pinned (non-free) labels once.
             pinned_labels = {
-                v for v in translation.values()
-                if v != _FREE_CONST_SENTINEL
+                v for v in translation.values() if v != _FREE_CONST_SENTINEL
             }
 
             if free_size > 0:
@@ -418,9 +406,9 @@ class AASplitter(Calculator):
                 session=data.session,
             )
 
-        index_names = data.data.index.names
+        index_names = data.raw_data.index.names
         for part in parts:
-            part.data = part.data.rename_axis(index_names)
+            part.raw_data = part.raw_data.rename_axis(index_names)
 
         split_ds = parts[0] if len(parts) == 1 else parts[0].append(parts[1:])
         split_ds.roles["split"] = StatisticRole()

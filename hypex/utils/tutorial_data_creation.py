@@ -128,9 +128,7 @@ def set_nans(
 
     # Align lengths: pad shorter, truncate longer.
     if len(na_step_list) < len(nan_cols_list):
-        na_step_list += [na_step_list[-1]] * (
-            len(nan_cols_list) - len(na_step_list)
-        )
+        na_step_list += [na_step_list[-1]] * (len(nan_cols_list) - len(na_step_list))
     else:
         na_step_list = na_step_list[: len(nan_cols_list)]
 
@@ -249,10 +247,7 @@ class DataGenerator:
             var = params["std"] ** 2
             cov = [[var, rho * var], [rho * var, var]]
             mean = [params["mean"], params["mean"]]
-            return (
-                self.rng.multivariate_normal(mean, cov, self.n_samples).T
-                + u_shift
-            )
+            return self.rng.multivariate_normal(mean, cov, self.n_samples).T + u_shift
 
         if dist_type == "bernoulli":
             return self._bernoulli_pair(params["p"], rho)
@@ -324,7 +319,9 @@ class DataGenerator:
         if y_spec["type"] == "normal":
             chain = self._correlated_chain(y_spec, y_rho, n_points=3)
             data["y0"], data["y0_lag_1"], data["y0_lag_2"] = (
-                chain[2], chain[1], chain[0]
+                chain[2],
+                chain[1],
+                chain[0],
             )
         else:
             current, lag1 = self._correlated_pair(y_spec["type"], y_spec, y_rho)
@@ -367,7 +364,9 @@ def create_test_data(
     Args:
         num_users: Number of synthetic users.
         na_step: Step interval(s) for NaN injection.
-        nan_cols: Column(s) to inject NaNs into.
+        nan_cols: Column(s) to inject NaNs into.  Defaults to all columns
+            except ``treat``, which is always kept complete so that group
+            assignment stays well defined.
         file_name: If provided, saves the CSV to *output_dir*.
         output_dir: Directory for CSV output.  Defaults to ``"."``.
         exact_ATT: Exact additive treatment effect to embed.
@@ -382,6 +381,8 @@ def create_test_data(
     panel = _apply_treatment_effect(panel, exact_ATT)
     data = _aggregate_spends(panel)
     data = _add_demographics(data, rng)
+    if nan_cols is None:
+        nan_cols = [col for col in data.columns if col != "treat"]
     data = set_nans(data, na_step, nan_cols)
 
     if file_name is not None:
@@ -401,9 +402,9 @@ def _build_panel(num_users: int, rng: np.random.Generator) -> pd.DataFrame:
     Returns:
         Long-format panel DataFrame.
     """
-    signup_months = rng.choice(
-        np.arange(1, _NUM_MONTHS), num_users
-    ) * rng.integers(0, 2, size=num_users)
+    signup_months = rng.choice(np.arange(1, _NUM_MONTHS), num_users) * rng.integers(
+        0, 2, size=num_users
+    )
 
     panel = pd.DataFrame(
         {
@@ -460,9 +461,7 @@ def _aggregate_spends(panel: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def _add_demographics(
-    data: pd.DataFrame, rng: np.random.Generator
-) -> pd.DataFrame:
+def _add_demographics(data: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
     """Attach random demographic columns.
 
     Args:

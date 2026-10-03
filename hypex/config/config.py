@@ -13,6 +13,9 @@ Classes:
         matching pipeline, including persistence policies, sampling
         targets, and batch sizes.
 """
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import ClassVar, Literal
 
@@ -56,6 +59,7 @@ class DatasetConfig:
             across distributed operations.
             Defaults to "index".
     """
+
     DISPLAY_ROWS: ClassVar[int] = 5
     DISPLAY_COLS: ClassVar[int] = 10
     SPARK_PANDAS_CONVERSION_LIMIT: ClassVar[int] = 100_000
@@ -66,6 +70,7 @@ class DatasetConfig:
     #: ``pd.DataFrame → spark.DataFrame`` round-trips in
     #: ``Dataset.to_backend()``.
     BACKEND_CONVERSION_INDEX_COL: ClassVar[str] = "__hypex_temp_index__"
+
 
 @dataclass(frozen=False)
 class MatchingConfig:
@@ -105,21 +110,37 @@ class MatchingConfig:
             additional iteration overhead.
             Defaults to 4096.
 
-        FAISS_FIT_MODE (Literal["full", "sample"]): Strategy for training
-            the IVF quantizer during the distributed fit phase.
-            - ``"sample"``: trains the quantizer on a random subset of
-              the data (up to ``FAISS_SAMPLE_TARGET`` rows). Faster but
-              may produce less accurate clusters for highly non-uniform
-              distributions.
-            - ``"cluster"``: trains the quantizer on the entire dataset
+        FAISS_FIT_MODE (Literal["sample", "cluster", "full", "shuffle"]):
+            Strategy for building the search structures during the
+            distributed fit phase.
+
+            - ``"sample"``: trains the IVF quantizer on a random subset
+              of the data (up to ``FAISS_SAMPLE_TARGET`` rows). Each data
+              partition builds a local ``IndexIDMap`` on top of the shared
+              quantizer. Faster but may produce less accurate clusters for
+              highly non-uniform distributions.
+
+            - ``"cluster"``: trains the IVF quantizer on the entire dataset
               using iterative mini-batch clustering (MiniBatchKMeans or
-              BIRCH) via ``_prefit``. Slower but yields higher-quality
-              clusters.
+              BIRCH) via ``_prefit``. Each partition then builds a local
+              ``IndexIDMap``. Slower but yields higher-quality clusters.
+
             - ``"full"``: exact search; each partition gets its own flat
               ``IndexFlatL2`` index (no shared quantizer). Slower than
-              `"sample"`` but it has the highest accuracy according
-              to the `pandas` realization.
-            Defaults to ``"sample"``.
+              ``"sample"`` but provides the highest accuracy according
+              to the ``pandas`` realization.
+
+            - ``"shuffle"``: cross partitions mode. The quantizer is trained
+              via ``_prefit``, then every control row is assigned to its
+              nearest centroid and every query is routed to its
+              ``FAISS_N_PROBES`` nearest clusters. The two sides are
+              co-grouped on ``(cluster, c_bucket, t_bucket)`` so that each task
+              holds only one cluster's data, bounding per-task memory.
+              Clusters larger than ``BUCKET_SIZE`` rows are split into
+              sub-groups buckets. No index files are distributed; the
+              driver only collects centroids and per-cluster counters.
+
+            Defaults to ``"shuffle"``.
 
         CACHING_INDEX_MAX_SIZE (int): Maximum number of serialized FAISS
             partition indexes that can be simultaneously held in the
@@ -134,11 +155,38 @@ class MatchingConfig:
             ``hypex/extensions/faiss.py`` and passed to the
             ``CachingIndex`` constructor in ``hypex/utils/index_utils.py``.
             Defaults to 5.
+
+        FAISS_N_PROBES (int): Number of nearest clusters each query is
+            routed to during the predict phase in ``"shuffle"`` mode.
+            Analogous to the ``nprobe`` parameter of FAISS IVF indexes -
+            a higher value increases recall at the cost of more computation
+            per query. When set to ``-1``, the number of probes
+            is determined automatically as
+            ``min(n_neighbors, number_of_clusters)``. Setting this to a
+            value equal to the total number of clusters reproduces exact
+            search within the copartitioned framework.
+            Defaults to 8.
+
+        BUCKET_SIZE (int): Maximum number of rows allowed in a single
+            co-grouped task during the ``"shuffle"`` fit and predict phases.
+            When a cluster (on either the control or query side) exceeds
+            this threshold, it is split into multiple salted sub-groups
+            (``n_salt`` or ``n_bucket`` = ``ceil(cluster_size / BUCKET_SIZE)``),
+            and the opposite side is duplicated across them to preserve
+            search completeness. A larger value reduces data duplication
+            overhead but increases per-task memory; a smaller value improves
+            parallelism and memory safety at the cost of additional shuffle
+            volume.
+            Defaults to 250_000.
     """
+
     FAISS_PERSIST_POLITIC: ClassVar[StorageLevel] = StorageLevel.MEMORY_AND_DISK
     FAISS_SAMPLE_TARGET: ClassVar[int] = 5_000_000
     FAISS_DRIVER_INDEX_LIMIT: ClassVar[int] = 5_000_000
     FAISS_CHUNK_SIZE: ClassVar[int] = 4096
-    FAISS_FIT_MODE: ClassVar[Literal["sample", "cluster", "full"]] = "sample"
-
+    FAISS_FIT_MODE: ClassVar[Literal["sample", "cluster", "full", "shuffle"]] = (
+        "shuffle"
+    )
     CACHING_INDEX_MAX_SIZE: ClassVar[int] = 5
+    FAISS_N_PROBES: int = 8
+    BUCKET_SIZE: int = 250_000

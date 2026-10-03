@@ -207,7 +207,7 @@ class DatasetBase:
                 roles = self._parse_roles(roles)
             columns = []
             for column, role in roles.items():
-                if role.data_type == str:
+                if role.data_type is str:
                     columns.append(column)
         return columns
 
@@ -402,7 +402,7 @@ class DatasetBase:
         self, item: str | int | Iterable[str | int] | slice | DatasetBase
     ) -> Self:
         if isinstance(item, DatasetBase):
-            item = item.data
+            item = item.raw_data
         elif isinstance(item, slice):
             result = self._backend_data.__getitem__(item)
             return self.__class__(roles=self.roles, data=result)
@@ -452,31 +452,26 @@ class DatasetBase:
 
         return self.__class__(roles=new_roles, data=new_data)
 
-    def set_index(self, 
-                  keys, 
-                  drop=True, 
-                  **kwargs) -> DatasetBase:
+    def set_index(self, keys, drop=True, **kwargs) -> DatasetBase:
         new_data = self._backend_data.set_index(keys=keys, drop=drop, **kwargs)
         new_roles = deepcopy(self.roles)
 
         if drop:
             for col in Adapter.to_list(keys):
                 del new_roles[col]
-        
+
         return self.__class__(roles=new_roles, data=new_data)
 
-    def __setitem__(self,
-                    key: str,
-                    value: Any) -> None:
+    def __setitem__(self, key: str, value: Any) -> None:
         if isinstance(value, DatasetBase):
-            value = value.iselect(0).data
+            value = value.iselect(0).raw_data
         if key not in self.columns and isinstance(key, str):
             self.add_column(value, {key: InfoRole()})
             warnings.warn(
                 "Column must be added by using add_column method.",
                 category=SyntaxWarning,
             )
-            self.data[key] = value
+            self.raw_data[key] = value
         else:
             column_data_type = self.roles[key].data_type
             if (
@@ -487,17 +482,22 @@ class DatasetBase:
                 )
                 or isinstance(value, column_data_type)
             ):
-                self.data[key] = value
+                self.raw_data[key] = value
             else:
                 raise TypeError("Value type does not match the expected data type.")
 
     def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
-        display_limit = n_rows if n_rows <= DatasetConfig.DISPLAY_ROWS * 2 else DatasetConfig.DISPLAY_ROWS
+        display_limit = (
+            n_rows
+            if n_rows <= DatasetConfig.DISPLAY_ROWS * 2
+            else DatasetConfig.DISPLAY_ROWS
+        )
         head = self._backend_data._display_head_tail(
             rows_display_limit=display_limit,
             cols_display_limit=DatasetConfig.DISPLAY_COLS,
             n_cols=n_cols,
-            n_rows=n_rows)
+            n_rows=n_rows,
+        )
 
         if n_rows > DatasetConfig.DISPLAY_ROWS * 2:
             _tmp_tail = self._backend_data._display_head_tail(
@@ -505,7 +505,8 @@ class DatasetBase:
                 cols_display_limit=DatasetConfig.DISPLAY_COLS,
                 n_cols=n_cols,
                 n_rows=n_rows,
-                tail=True)
+                tail=True,
+            )
 
             tail = pd.concat(
                 [
@@ -536,7 +537,6 @@ class DatasetBase:
         columns = list(roles.keys())
         ds = cls(roles=roles, backend=backend, session=session)
         ds._backend_data = ds._backend_data.create_empty(index, columns)
-        ds.data = ds._backend_data.data
         return ds
 
     @staticmethod
@@ -614,24 +614,18 @@ class DatasetBase:
         func = getattr(self.backend_data, func_name)
         result_raw = func(other_raw)
 
-        result_raw = (
-            result_raw.data
-            if hasattr(result_raw, 'data')
-            else result_raw
-        )
+        result_raw = result_raw.data if hasattr(result_raw, "data") else result_raw
 
-        if hasattr(result_raw, 'to_frame') and not hasattr(result_raw, 'columns'):
+        if hasattr(result_raw, "to_frame") and not hasattr(result_raw, "columns"):
             col_name = (
                 result_raw.name
                 if result_raw.name is not None
-                else (self_raw.columns[0] if hasattr(self_raw, 'columns') else 'result')
+                else (self_raw.columns[0] if hasattr(self_raw, "columns") else "result")
             )
             result_raw = result_raw.to_frame(name=col_name)
 
         actual_columns = (
-            list(result_raw.columns)
-            if hasattr(result_raw, 'columns')
-            else []
+            list(result_raw.columns) if hasattr(result_raw, "columns") else []
         )
         new_roles = {}
         for col in actual_columns:
@@ -747,23 +741,25 @@ class DatasetBase:
 
     def __rpow__(self, other: Any) -> Self:
         return self.__binary_magic_operator(other=other, func_name="__rpow__")
-    
+
     def __deepcopy__(self, memo):
         """deepcopy dataset"""
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
         for k, v in self.__dict__.items():
-            if k.startswith('_abc_'):
+            if k.startswith("_abc_"):
                 continue
             setattr(result, k, deepcopy(v, memo))
 
         return result
 
-    def search_columns(self,
-                       roles: ABCRole | Iterable[ABCRole],
-                       tmp_role: bool =False,
-                       search_types: list[type] | None = None) -> list[str]:
+    def search_columns(
+        self,
+        roles: ABCRole | Iterable[ABCRole],
+        tmp_role: bool = False,
+        search_types: list[type] | None = None,
+    ) -> list[str]:
         roles = roles if isinstance(roles, Iterable) else [roles]
         roles_for_search = self._tmp_roles if tmp_role else self.roles
         return [
@@ -827,10 +823,19 @@ class DatasetBase:
 
     @property
     def data(self) -> pd.DataFrame | spark.DataFrame:
-        return self._backend_data.data
+        return self._backend_data.to_public_data()
 
     @data.setter
     def data(self, value: pd.DataFrame | spark.DataFrame) -> None:
+        self._backend_data.set_public_data(value)
+
+    @property
+    def raw_data(self) -> Any:
+        """Raw backend frame (``pd.DataFrame`` or ``pyspark.pandas.DataFrame``)."""
+        return self._backend_data.data
+
+    @raw_data.setter
+    def raw_data(self, value: Any) -> None:
         self._backend_data.data = value
 
     @property
@@ -904,7 +909,7 @@ class DatasetBase:
                 raise ValueError("Columns with the same name already exist")
             self.roles.update(data.roles)
             self._backend_data.add_column(
-                data.data,
+                data.raw_data,
                 data.columns,
                 index,
             )
@@ -916,7 +921,7 @@ class DatasetBase:
             ):
                 raise TypeError("Role values must be of type ABCRole")
             if isinstance(data, self.__class__):
-                data = data.data
+                data = data.raw_data
             self.roles.update(role)
             self._backend_data.add_column(data, list(role.keys()), index)
         return self
@@ -968,7 +973,9 @@ class DatasetBase:
         return self.__class__(
             roles=new_roles,
             data=self.backend_data.append(
-                other=other, reset_index=reset_index, axis=axis
+                other=[o._backend_data for o in other],
+                reset_index=reset_index,
+                axis=axis,
             ),
         )
 
@@ -1018,13 +1025,13 @@ class DatasetBase:
     def groupby(self, by: str | Iterable[str], **kwargs) -> GroupedDataset:
         if isinstance(by, str):
             by_list = [by]
-        elif hasattr(by, '__iter__'):
+        elif hasattr(by, "__iter__"):
             by_list = list(by)
         else:
             by_list = [by]
-            
+
         by_arg = by_list[0] if len(by_list) == 1 else by_list
-        
+
         return GroupedDataset(
             backend_groupby=self._backend_data.groupby(by=by_arg, **kwargs),
             dataset_class=self.__class__,
@@ -1145,10 +1152,10 @@ class DatasetBase:
         axis: Literal["index", "rows", "columns"] | int = 0,
     ) -> Self:
         new_data = self._backend_data.dropna(how=how, subset=subset, axis=axis)
-        
+
         if hasattr(new_data, "data"):
             new_data = new_data.data
-            
+
         new_roles = (
             self.roles
             if axis == 0
@@ -1313,7 +1320,7 @@ class DatasetBase:
         return self.__class__(
             roles={name: InfoRole()},
             data=result_df,
-            session=self.session if hasattr(self, 'session') else None
+            session=self.session if hasattr(self, "session") else None,
         )
 
     def cov(self) -> DatasetBase:
@@ -1415,7 +1422,4 @@ class DatasetBase:
         new_roles = deepcopy(self.roles)
         new_roles[column] = type(new_roles[column])()
 
-        return self.__class__(
-            new_roles,
-            data=result
-        )
+        return self.__class__(new_roles, data=result)

@@ -1,5 +1,11 @@
 from .analyzers.aa import OneAAStatAnalyzer
-from .comparators import GroupChi2Test, GroupDifference, GroupSizes, GroupKSTest, GroupTTest
+from .comparators import (
+    GroupChi2Test,
+    GroupDifference,
+    GroupKSTest,
+    GroupSizes,
+    GroupTTest,
+)
 from .dataset import TargetRole, TreatmentRole
 from .experiments.base import Experiment, OnRoleExperiment
 from .ui.base import ExperimentShell
@@ -48,7 +54,7 @@ class HomogeneityTest(ExperimentShell):
         # Accessing specific test results
         homo_test = HomogeneityTest()
         results = homo_test.execute(data)
-        output = results.resume
+        output = results.summary
 
         # Running test on dataset with roles
         from hypex.dataset import Dataset, TargetRole, TreatmentRole

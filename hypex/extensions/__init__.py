@@ -1,63 +1,64 @@
-from .encoders import DummyEncoderExtension, PandasDummyEncoderExtension, SparkDummyEncoderExtension
-
-from .faiss import FaissExtension, SparkFaissExtension, PandasFaissExtension
+from .bias import BiasExtension, PandasBisaExtesion, SparkBisaExtesion
+from .encoders import (
+    DummyEncoderExtension,
+    PandasDummyEncoderExtension,
+    SparkDummyEncoderExtension,
+)
+from .faiss import FaissExtension, PandasFaissExtension, SparkFaissExtension
+from .matching_metric import (
+    MatchingMetricsExtension,
+    PandasMatchingMetricsExtension,
+    SparkMatchingMetricsExtension,
+)
 from .scipy_linalg import (
-    UniteCovExtension,
     CholeskyExtension,
     InverseExtension,
     LstsqExtension,
+    PandasLstsqExtension,
     SparkLstsqExtension,
-    PandasLstsqExtension
+    UniteCovExtension,
 )
-
 from .scipy_stats import (
     GroupChi2TestExtension,
     GroupKSTestExtension,
     GroupTTestExtension,
     GroupUTestExtension,
-    PandasKSTestExtension,
     PandasChi2TestExtension,
-    SparkKSTestExtension,
+    PandasKSTestExtension,
     SparkChi2TestExtension,
-    UniformCheck
+    SparkKSTestExtension,
+    UniformCheck,
 )
-
 from .statsmodels import MultiTest, MultitestQuantile
-from .bias import BiasExtension, PandasBisaExtesion, SparkBisaExtesion
-from .matching_metric import (
-    MatchingMetricsExtension,
-    PandasMatchingMetricsExtension,
-    SparkMatchingMetricsExtension
-)
 
 __all__ = [
-    "DummyEncoderExtension",
-    "PandasDummyEncoderExtension",
-    "SparkDummyEncoderExtension",
-    "FaissExtension",
-    "SparkFaissExtension",
-    "PandasFaissExtension",
-    "UniteCovExtension",
+    "BiasExtension",
     "CholeskyExtension",
-    "InverseExtension",
-    "LstsqExtension",
-    "PandasLstsqExtension",
-    "SparkLstsqExtension",
-    "GroupTTestExtension",
-    "GroupUTestExtension",
+    "DummyEncoderExtension",
+    "FaissExtension",
     "GroupChi2TestExtension",
     "GroupKSTestExtension",
-    "PandasKSTestExtension",
-    "PandasChi2TestExtension",
-    "SparkKSTestExtension",
-    "SparkChi2TestExtension",
-    "UniformCheck",
+    "GroupTTestExtension",
+    "GroupUTestExtension",
+    "InverseExtension",
+    "LstsqExtension",
+    "MatchingMetricsExtension",
     "MultiTest",
     "MultitestQuantile",
-    "BiasExtension",
     "PandasBisaExtesion",
-    "SparkBisaExtesion",
-    "MatchingMetricsExtension",
+    "PandasChi2TestExtension",
+    "PandasDummyEncoderExtension",
+    "PandasFaissExtension",
+    "PandasKSTestExtension",
+    "PandasLstsqExtension",
     "PandasMatchingMetricsExtension",
+    "SparkBisaExtesion",
+    "SparkChi2TestExtension",
+    "SparkDummyEncoderExtension",
+    "SparkFaissExtension",
+    "SparkKSTestExtension",
+    "SparkLstsqExtension",
     "SparkMatchingMetricsExtension",
+    "UniformCheck",
+    "UniteCovExtension",
 ]

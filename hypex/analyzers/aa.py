@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar, Sequence
+from typing import Any, ClassVar
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,9 +10,11 @@ from ..comparators import (
     GroupChi2Test,
     GroupKSTest,
     GroupTTest,
+    GroupUTest,
     StatsChi2Test,
     StatsKSTest,
     StatsTTest,
+    StatsUTest,
     StatsZTest,
 )
 from ..dataset import (
@@ -22,7 +24,7 @@ from ..dataset import (
     SmallDataset,
     StatisticRole,
     StratificationRole,
-    TargetRole
+    TargetRole,
 )
 from ..executor import Executor
 from ..experiments import IfParamsExperiment, ParamsExperiment
@@ -34,9 +36,12 @@ from ..utils.naming import _parse_metric_col, normalize_test_name
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _mean_key(class_name: str, field: str) -> str:
     """Build the composite key used in analysis_data."""
-    return f"mean{ID_SPLIT_SYMBOL}{class_name}{ID_SPLIT_SYMBOL}{field}{ID_SPLIT_SYMBOL}all"
+    return (
+        f"mean{ID_SPLIT_SYMBOL}{class_name}{ID_SPLIT_SYMBOL}{field}{ID_SPLIT_SYMBOL}all"
+    )
 
 
 def _is_passed(value: Any) -> bool:
@@ -79,29 +84,37 @@ def _resolve_column_parts(col: str) -> tuple[str, str, str] | None:
 
 # ── OneAAStatAnalyzer ─────────────────────────────────────────────────────────
 
+
 class OneAAStatAnalyzer(Executor):
     """Aggregates statistical test results across multiple A/A test splits.
 
     Computes average p-values, pass rates, and a weighted composite quality
     score to evaluate the overall consistency of data splitting configurations.
     """
+
     #: Registered test classes whose results are aggregated by OneAAStatAnalyzer.
-    ANALYSIS_TEST_CLASSES: ClassVar[tuple[type, ...]] = tuple([
-        GroupTTest,
-        GroupKSTest,
-        GroupChi2Test,
-        StatsTTest,
-        StatsChi2Test,
-        StatsZTest,
-        StatsKSTest]
+    ANALYSIS_TEST_CLASSES: ClassVar[tuple[type, ...]] = tuple(
+        [
+            GroupTTest,
+            GroupKSTest,
+            GroupChi2Test,
+            GroupUTest,
+            StatsTTest,
+            StatsChi2Test,
+            StatsZTest,
+            StatsKSTest,
+            StatsUTest,
+        ]
     )
 
     #: (preferred_class, fallback_class, weight) for composite score computation.
     #: Preferred = Spark-backed (Stats*), fallback = Pandas-backed (Group*).
-    _SCORE_RULES: ClassVar[tuple[tuple[str, str, int], ...]] = tuple([
+    _SCORE_RULES: ClassVar[tuple[tuple[str, str, int], ...]] = tuple(
+        [
             ("StatsTTest", "GroupTTest", 1),
             ("StatsKSTest", "GroupKSTest", 2),
             ("StatsChi2Test", "GroupChi2Test", 2),
+            ("StatsUTest", "GroupUTest", 1),
         ]
     )
 
@@ -191,6 +204,7 @@ class OneAAStatAnalyzer(Executor):
 
 
 # ── AAScoreAnalyzer ───────────────────────────────────────────────────────────
+
 
 class AAScoreAnalyzer(Executor):
     """Evaluates A/A test split quality and identifies the optimal splitting configuration.
@@ -296,11 +310,13 @@ class AAScoreAnalyzer(Executor):
             weight = 1 - abs(self.alpha - pass_rate)
             index_label = f"{feature} {test_name} {group}".strip()
             self._feature_weights[index_label] = weight
-            aa_rows.append({
-                "_idx": index_label,
-                "score": weight,
-                "pass": weight >= self.threshold,
-            })
+            aa_rows.append(
+                {
+                    "_idx": index_label,
+                    "score": weight,
+                    "pass": weight >= self.threshold,
+                }
+            )
 
         dry_score = self._get_dry_score(data)
         if dry_score is not None and not dry_score.is_empty():
@@ -310,6 +326,7 @@ class AAScoreAnalyzer(Executor):
                     if dry_pass is not None:
                         row["pass"] = row["pass"] and bool(dry_pass)
                 except Exception:
+                    # best-effort: keep the existing pass flag if the dry score is unavailable
                     pass
 
         result_ds = self._build_aa_score_dataset(aa_rows)
@@ -335,7 +352,9 @@ class AAScoreAnalyzer(Executor):
         if_param_scores: Dataset | None = None,
     ) -> ExperimentData:
         """Orchestrates identification and application of the best split."""
-        best_split_id, best_data = self._get_best_split(data, score_table, if_param_scores)
+        best_split_id, best_data = self._get_best_split(
+            data, score_table, if_param_scores
+        )
         return self._set_best_split(best_data, best_split_id)
 
     def _get_best_split(
@@ -352,9 +371,11 @@ class AAScoreAnalyzer(Executor):
         best_index = self._find_best_index(score_table, if_param_scores)
         best_split_id = self._extract_splitter_id(score_table, best_index)
 
-        row_df = score_table.data.iloc[[best_index]]
+        row_df = score_table.raw_data.iloc[[best_index]]
         best_score_stat = SmallDataset(
-            roles={col: score_table.roles.get(col, InfoRole()) for col in row_df.columns},
+            roles={
+                col: score_table.roles.get(col, InfoRole()) for col in row_df.columns
+            },
             data=row_df,
         )
         self.key = "best split statistics"
@@ -394,7 +415,7 @@ class AAScoreAnalyzer(Executor):
                 weight = self._feature_weights.get(test_name, 0)
             if weight <= 0:
                 continue
-            col_data = score_table.data[col].astype(float)
+            col_data = score_table.raw_data[col].astype(float)
             contribution = col_data * weight
             weighted = contribution if weighted is None else weighted + contribution
         if weighted is None:
@@ -405,14 +426,14 @@ class AAScoreAnalyzer(Executor):
     def _get_mean_test_score_column(score_table: Dataset) -> pd.Series | float:
         """Extract the 'mean test score' column or return 0."""
         if "mean test score" in score_table.columns:
-            return score_table.data["mean test score"].astype(float)
+            return score_table.raw_data["mean test score"].astype(float)
         return 0.0
 
     @staticmethod
     def _extract_splitter_id(score_table: Dataset, best_index: int) -> str:
         """Get the splitter ID for the best row."""
         if "splitter_id" in score_table.columns:
-            return score_table.data.loc[best_index, "splitter_id"]
+            return score_table.raw_data.loc[best_index, "splitter_id"]
         return f"AASplitter{ID_SPLIT_SYMBOL}rs {int(best_index)}{ID_SPLIT_SYMBOL}"
 
     def _set_best_split(
@@ -463,13 +484,9 @@ class AAScoreAnalyzer(Executor):
             return None
         return data.analysis_tables[dry_table_ids[0]]
 
-class AADryTestAnalyzer(Executor):
 
-    def __init__(
-            self,
-            alpha: int = 0.05,
-            key = ""
-        ):
+class AADryTestAnalyzer(Executor):
+    def __init__(self, alpha: int = 0.05, key=""):
         super().__init__(key)
         self.alpha = alpha
         self._fig: plt.Figure | None = None
@@ -477,7 +494,11 @@ class AADryTestAnalyzer(Executor):
     # ── Storage ───────────────────────────────────────────────────────────
 
     def _set_value(
-        self, data: ExperimentData, value: Any, space: ExperimentDataEnum, key: Any = None
+        self,
+        data: ExperimentData,
+        value: Any,
+        space: ExperimentDataEnum,
+        key: Any = None,
     ) -> ExperimentData:
         """Stores analysis results in the experiment data."""
         return data.set_value(
@@ -506,10 +527,7 @@ class AADryTestAnalyzer(Executor):
             return SmallDataset.from_dict([{}], roles={})
         df = pd.DataFrame(rows).set_index("_idx")
         return SmallDataset(
-            roles={
-                "p-value": StatisticRole(),
-                "pass": StatisticRole()
-            },
+            roles={"p-value": StatisticRole(), "pass": StatisticRole()},
             data=df,
         )
 
@@ -517,15 +535,18 @@ class AADryTestAnalyzer(Executor):
         if target_cols is None:
             return SmallDataset.create_empty()
         dry_cols = [
-                col for col in score_table.columns
-                if "TTest p-value" in col
-                and "mean" not in col
-                and any(t_col in col for t_col in target_cols)
-            ]
+            col
+            for col in score_table.columns
+            if "TTest p-value" in col
+            and "mean" not in col
+            and any(t_col in col for t_col in target_cols)
+        ]
         data = score_table[dry_cols]
         rows = {"p-value": [], "pass": [], "_idx": []}
         for col in dry_cols:
-            tmp_dict = UniformCheck(self.alpha).calc(data[col]).to_dict()['data']['data']
+            tmp_dict = (
+                UniformCheck(self.alpha).calc(data[col]).to_dict()["data"]["data"]
+            )
             feature, raw_test, group = _resolve_column_parts(col)
             test_name = normalize_test_name(raw_test)
             tmp_dict["_idx"] = [f"{feature} {test_name} {group}".strip()]
@@ -540,33 +561,44 @@ class AADryTestAnalyzer(Executor):
         return results
 
     def _plot_results(
-            self,
-            score_table: Dataset,
-            target_cols: str | list[str],
-            dry_cols: str | list[str]
-        ):
+        self,
+        score_table: Dataset,
+        target_cols: str | list[str],
+        dry_cols: str | list[str],
+    ):
         target_cols = Adapter.to_list(target_cols)
         dry_cols = Adapter.to_list(dry_cols)
         fig, axs = plt.subplots(1, len(target_cols))
         fig.suptitle(
-            "AA-test: diagnostic with zero effect",
-            fontsize=15, fontweight="bold"
+            "AA-test: diagnostic with zero effect", fontsize=15, fontweight="bold"
         )
 
         for idx, (col, d_col) in enumerate(zip(target_cols, dry_cols)):
             # --- p-values  gist ---
-            p_vals = score_table[d_col].data
+            p_vals = score_table[d_col].raw_data
             if isinstance(axs, np.ndarray):
                 ax = axs[idx]
             else:
                 ax = axs
 
-            ax.hist(p_vals, bins=30, density=True, alpha=0.7,
-                    color="steelblue", edgecolor="black")
-            ax.axhline(y=1.0, color="red", linestyle="--", linewidth=2,
-                        label="Uniform(0,1)")
-            ax.axvline(x=self.alpha, color="green", linestyle=":", linewidth=2,
-                        label=f"α = {self.alpha}")
+            ax.hist(
+                p_vals,
+                bins=30,
+                density=True,
+                alpha=0.7,
+                color="steelblue",
+                edgecolor="black",
+            )
+            ax.axhline(
+                y=1.0, color="red", linestyle="--", linewidth=2, label="Uniform(0,1)"
+            )
+            ax.axvline(
+                x=self.alpha,
+                color="green",
+                linestyle=":",
+                linewidth=2,
+                label=f"α = {self.alpha}",
+            )
 
             ax.set_title(f"{col}: p-values distribution")
             ax.set_xlabel("p-value")
@@ -576,9 +608,12 @@ class AADryTestAnalyzer(Executor):
 
             fpr = np.mean(p_vals < self.alpha)
             ax.text(
-                0.5, 0.95,
+                0.5,
+                0.95,
                 f"FPR = {fpr:.1%}\n(expected: {self.alpha:.0%})",
-                transform=ax.transAxes, ha="center", va="top",
+                transform=ax.transAxes,
+                ha="center",
+                va="top",
                 bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
                 fontsize=11,
             )
