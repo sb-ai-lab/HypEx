@@ -334,3 +334,34 @@ def test_matching_output_structure_on_spark(spark_session) -> None:
 )
 def test_matching_output_on_pandas() -> None:
     Matching().execute(_dataset())
+
+
+# ---------------------------------------------------------------------------
+# AAOutput: NaN in a "pass" column
+# ---------------------------------------------------------------------------
+def test_aa_output_extract_experiments_keeps_nan_pass_and_casts_others() -> None:
+    """A float NaN pass value is left as NaN (math.isnan guard); the rest become bool.
+
+    Equivalent to the former ``val != val`` check, so this is a behaviour guard.
+    """
+    table = Dataset(
+        roles={},
+        data=pd.DataFrame(
+            {
+                f"TTest{S}x{S}pass": [np.nan, 1.0, 0.0],
+                f"KSTest{S}x{S}pass": ["True", "no", "ok"],
+                "n": [1, 2, 3],
+            }
+        ),
+        backend=BackendsEnum.pandas,
+        default_role=InfoRole(),
+    )
+    experiment_data = ExperimentData(_dataset())
+    experiment_data.analysis_tables[f"ParamsExperiment{S}a"] = table
+    output = AAOutput()
+    output._extract_experiments(experiment_data)
+    frame = _frame(output.experiments)
+    assert np.isnan(frame["TTest x pass"].iloc[0])
+    assert frame["TTest x pass"].tolist()[1:] == [True, False]
+    assert frame["KSTest x pass"].tolist() == [True, False, True]
+    assert frame["n"].tolist() == [1, 2, 3]
