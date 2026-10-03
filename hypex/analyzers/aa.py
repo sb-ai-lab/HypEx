@@ -326,6 +326,7 @@ class AAScoreAnalyzer(Executor):
                     if dry_pass is not None:
                         row["pass"] = row["pass"] and bool(dry_pass)
                 except Exception:
+                    # best-effort: keep the existing pass flag if the dry score is unavailable
                     pass
 
         result_ds = self._build_aa_score_dataset(aa_rows)

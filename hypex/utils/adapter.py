@@ -47,3 +47,4 @@ class Adapter:
                 return data[0]
             else:
                 raise ValueError("Only a list of a single item can be accepted")
+        return None

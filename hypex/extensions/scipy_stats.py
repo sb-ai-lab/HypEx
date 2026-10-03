@@ -120,7 +120,10 @@ class GroupTTestExtension(GroupStatTest):
     ) -> SmallDataset | float:
         # Map the library-level 'equal_variance' to scipy's 'equal_var'
         if "equal_variance" in kwargs:
-            kwargs["equal_var"] = kwargs.pop("equal_variance")
+            kwargs = {
+                **{k: v for k, v in kwargs.items() if k != "equal_variance"},
+                "equal_var": kwargs["equal_variance"],
+            }
         return super().calc(data, other, **kwargs)
 
 

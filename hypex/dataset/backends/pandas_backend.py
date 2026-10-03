@@ -961,9 +961,6 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         for column_name, type_name in dtype.items():
             if not self.data[column_name].isna().any():
-                # if isinstance(type_name, str):
-                #     self.data = self.data.replace({column_name : self.labels_dict[column_name]})
-                #     self.labels_dict.pop(column_name)
                 self.data = self.astype({column_name: type_name})
         return self
 
