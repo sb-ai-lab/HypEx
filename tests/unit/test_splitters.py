@@ -214,3 +214,66 @@ def test_stratified_execute_uses_stratification_role(ds) -> None:
     out = splitter.execute(ExperimentData(ds))
     assert splitter.id in out.additional_fields.columns
     assert splitter.id.startswith("AASplitterWithStratification")
+
+
+# ---------------------------------------------------------------------------
+# Missing group keys in _set_value / const-group column
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("missing", [None, float("nan"), pd.NA], ids=["None", "nan", "NA"])
+def test_set_value_skips_missing_group_keys(ds, missing, monkeypatch) -> None:
+    """Group keys that are None / NaN / pd.NA are skipped (``bool(pd.NA)`` raises)."""
+    splitter = AASplitter(random_state=1)
+    labels = ["control", missing, "test_1"] + ["control"] * (N - 3)
+    value = Dataset(
+        roles={"split": StatisticRole()},
+        data=pd.DataFrame({"split": labels}),
+        backend=BackendsEnum.pandas,
+    )
+
+    class _Unique:
+        # The backend normally turns pd.NA into None in unique(); feed the raw key.
+        def __getitem__(self, _col):
+            return self
+
+        def to_dict(self):
+            return dict(enumerate(["control", missing, "test_1"]))
+
+    monkeypatch.setattr(Dataset, "unique", lambda self, *a, **k: _Unique())
+    out = splitter._set_value(ExperimentData(ds), value)
+    assert set(out.groups[splitter.id]) == {"control", "test_1"}
+
+
+@pytest.mark.parametrize("missing", [None, np.nan, pd.NA], ids=["None", "nan", "NA"])
+def test_set_value_missing_keys_end_to_end(missing) -> None:
+    frame = _frame()
+    dataset = Dataset(roles=dict(ROLES), data=frame, backend=BackendsEnum.pandas)
+    splitter = AASplitter(random_state=1)
+    labels = pd.Series(["control", "test_1"] * (N // 2), dtype=object)
+    labels.iloc[:3] = missing
+    value = Dataset(
+        roles={"split": StatisticRole()},
+        data=pd.DataFrame({"split": labels}),
+        backend=BackendsEnum.pandas,
+    )
+    out = splitter._set_value(ExperimentData(dataset), value)
+    assert set(out.groups[splitter.id]) == {"control", "test_1"}
+    assert sum(len(v) for v in out.groups[splitter.id].values()) == N - 3
+
+
+@pytest.mark.parametrize("missing", [None, np.nan], ids=["None", "nan"])
+def test_const_group_plan_treats_missing_label_as_free(missing) -> None:
+    """None / float NaN labels go through the ``math.isnan`` guard as free rows."""
+    data = Dataset(
+        roles={"c": InfoRole()},
+        data=pd.DataFrame({"c": pd.Series(["control", "test", missing, missing], dtype=object)}),
+        backend=BackendsEnum.pandas,
+    )
+    translation, free_size, _ = AASplitter._const_group_plan(
+        data=data,
+        const_group_field="c",
+        label_map={0: "control", 1: "test"},
+        control_size=0.5,
+        sample_size=1.0,
+    )
+    assert list(translation.values()).count("__hypex_free_const_group__") == 1
+    assert free_size == 2
