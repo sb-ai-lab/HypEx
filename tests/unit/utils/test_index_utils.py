@@ -158,65 +158,64 @@ class _CountingStorage:
 
 def test_cache_loads_once_per_reference() -> None:
     cache, storage = CachingIndex(), _CountingStorage()
-    first = cache.get("a", storage, nprobe=1)
-    second = cache.get("a", storage, nprobe=1)
+    first = cache.get("a", storage)
+    second = cache.get("a", storage)
     assert first is second
     assert storage.loads == ["a"]
 
 
 def test_cache_returns_distinct_indexes_for_distinct_references() -> None:
     cache, storage = CachingIndex(), _CountingStorage()
-    assert cache.get("a", storage, 1) is not cache.get("b", storage, 1)
+    assert cache.get("a", storage) is not cache.get("b", storage)
     assert storage.loads == ["a", "b"]
 
 
 def test_cache_evicts_least_recently_used() -> None:
     cache, storage = CachingIndex(max_index=2), _CountingStorage()
-    cache.get("a", storage, 1)
-    cache.get("b", storage, 1)
-    cache.get("a", storage, 1)       # refresh "a" -> "b" becomes LRU
-    cache.get("c", storage, 1)       # evicts "b"
+    cache.get("a", storage)
+    cache.get("b", storage)
+    cache.get("a", storage)       # refresh "a" -> "b" becomes LRU
+    cache.get("c", storage)       # evicts "b"
     assert list(cache._cache) == ["a", "c"]
-    cache.get("b", storage, 1)       # must be reloaded
+    cache.get("b", storage)       # must be reloaded
     assert storage.loads == ["a", "b", "c", "b"]
 
 
 def test_cache_unbounded_when_max_is_none() -> None:
     cache, storage = CachingIndex(max_index=None), _CountingStorage()
     for i in range(20):
-        cache.get(f"i{i}", storage, 1)
+        cache.get(f"i{i}", storage)
     assert len(cache._cache) == 20
 
 
 def test_cache_limit_of_one_keeps_only_latest() -> None:
     cache, storage = CachingIndex(max_index=1), _CountingStorage()
-    cache.get("a", storage, 1)
-    cache.get("b", storage, 1)
+    cache.get("a", storage)
+    cache.get("b", storage)
     assert list(cache._cache) == ["b"]
 
 
-def test_nprobe_is_applied_to_ivf_indexes() -> None:
+def test_cache_leaves_ivf_nprobe_untouched() -> None:
+    # nprobe is no longer configured by CachingIndex (it is set by the faiss
+    # extension on the index itself); the cache must return the loaded index as is.
     cache, storage = CachingIndex(), _CountingStorage(_ivf_index)
-    index = cache.get("ivf", storage, nprobe=3)
-    assert faiss.downcast_index(index).nprobe == 3
+    expected = faiss.downcast_index(_ivf_index()).nprobe
+    index = cache.get("ivf", storage)
+    assert faiss.downcast_index(index).nprobe == expected
 
 
-def test_nprobe_is_ignored_for_flat_indexes() -> None:
+def test_cache_returns_flat_index_unchanged() -> None:
     cache, storage = CachingIndex(), _CountingStorage(_flat_index)
-    index = cache.get("flat", storage, nprobe=3)
+    index = cache.get("flat", storage)
     assert not hasattr(faiss.downcast_index(index), "nprobe")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: nprobe is applied only on the first load; a later get() of a cached "
-    "index with a different nprobe silently keeps the old value",
-)
-def test_nprobe_updates_for_cached_index() -> None:
+def test_cached_index_is_reused_on_repeated_get() -> None:
     cache, storage = CachingIndex(), _CountingStorage(_ivf_index)
-    cache.get("ivf", storage, nprobe=1)
-    index = cache.get("ivf", storage, nprobe=5)
-    assert faiss.downcast_index(index).nprobe == 5
+    first = cache.get("ivf", storage)
+    index = cache.get("ivf", storage)
+    assert index is first
+    assert storage.loads == ["ivf"]
 
 
 def test_cache_is_thread_safe_for_concurrent_gets() -> None:
@@ -224,6 +223,6 @@ def test_cache_is_thread_safe_for_concurrent_gets() -> None:
 
     cache, storage = CachingIndex(max_index=3), _CountingStorage()
     with ThreadPoolExecutor(max_workers=8) as pool:
-        results = list(pool.map(lambda i: cache.get(f"i{i % 5}", storage, 1), range(100)))
+        results = list(pool.map(lambda i: cache.get(f"i{i % 5}", storage), range(100)))
     assert all(r is not None for r in results)
     assert len(cache._cache) <= 3
