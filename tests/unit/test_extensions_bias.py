@@ -1,4 +1,5 @@
 """Tests for BiasExtension pandas / Spark implementations."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -210,4 +211,6 @@ def test_spark_prepare_data_returns_indexes_and_matched(spark_session) -> None:
     mdf = matched.raw_data
     mdf = mdf.to_pandas() if hasattr(mdf, "to_pandas") else mdf
     mdf = mdf.sort_index()
-    np.testing.assert_allclose(mdf["x_matched"].to_numpy(), df.x.to_numpy()[df.nn.to_numpy()])
+    np.testing.assert_allclose(
+        mdf["x_matched"].to_numpy(), df.x.to_numpy()[df.nn.to_numpy()]
+    )

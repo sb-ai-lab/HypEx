@@ -324,3 +324,133 @@ def test_execute_nan_matches_raise_pairs_not_found(monkeypatch) -> None:
     monkeypatch.setattr(executor, "calc", lambda **kwargs: {"test": nan_matches})
     with pytest.warns(UserWarning, match="nans"), pytest.raises(PairsNotFoundError):
         executor.execute(data)
+
+
+# ---------------------------------------------------------------------------
+# FaissNearestNeighbors.execute with pre-built groups (bypasses count_groups)
+# ---------------------------------------------------------------------------
+def _with_groups(n_each: int = 20, seed: int = 0):
+    df, data = _experiment(n_each, seed)
+    ctrl, test = df[df.t == 0][["f1", "f2"]], df[df.t == 1][["f1", "f2"]]
+    data.groups["t"] = {0: _ds(ctrl), 1: _ds(test)}
+    return df, ctrl, test, data
+
+
+def _matched(out) -> pd.DataFrame:
+    cols = [c for c in out.ds.columns if isinstance(out.ds.roles[c], AdditionalMatchingRole)]
+    return out.ds.backend_data.data[cols]
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AttributeError,
+    reason="Issue: execute() calls Dataset.reindex (defined only on SmallDataset) when "
+    "the one-sided result is shorter than the dataset",
+)
+def test_execute_with_groups_one_sided_fills_control_with_dummy() -> None:
+    df, ctrl, test, data = _with_groups()
+    out = FaissNearestNeighbors(grouping_role=TreatmentRole()).execute(data)
+    found = _matched(out)
+    assert found.shape == (len(df), 1)
+    np.testing.assert_array_equal(
+        found.loc[test.index].iloc[:, 0].to_numpy(), _brute_force(ctrl, test, 1)[:, 0]
+    )
+    assert (found.loc[ctrl.index].iloc[:, 0] == -1).all()
+
+
+def test_execute_with_groups_two_sided() -> None:
+    df, ctrl, test, data = _with_groups()
+    out = FaissNearestNeighbors(
+        two_sides=True, grouping_role=TreatmentRole()
+    ).execute(data)
+    found = _matched(out).iloc[:, 0]
+    np.testing.assert_array_equal(
+        found.loc[test.index].to_numpy(), _brute_force(ctrl, test, 1)[:, 0]
+    )
+    np.testing.assert_array_equal(
+        found.loc[ctrl.index].to_numpy(), _brute_force(test, ctrl, 1)[:, 0]
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AttributeError,
+    reason="Issue: execute() calls Dataset.reindex (defined only on SmallDataset) when "
+    "the one-sided result is shorter than the dataset",
+)
+def test_execute_with_groups_test_pairs_matches_control_rows() -> None:
+    df, ctrl, test, data = _with_groups()
+    out = FaissNearestNeighbors(
+        test_pairs=True, grouping_role=TreatmentRole()
+    ).execute(data)
+    found = _matched(out).iloc[:, 0]
+    np.testing.assert_array_equal(
+        found.loc[ctrl.index].to_numpy(), _brute_force(test, ctrl, 1)[:, 0]
+    )
+    assert (found.loc[test.index] == -1).all()
+
+
+def test_execute_inner_function_test_pairs_two_sides() -> None:
+    ctrl, test = _points(20, 0), _points(10, 1, start=100)
+    grouping = [("0", _ds(ctrl)), ("1", _ds(test))]
+    result = FaissNearestNeighbors._execute_inner_function(
+        grouping, tmp_roles={}, n_neighbors=1, two_sides=True, test_pairs=True
+    )
+    assert set(result) == {"control", "test"}
+    assert len(_pdf(result["control"])) == len(ctrl)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="Issue: with test_pairs=True and two_sides=True the 'test' entry repeats the "
+    "control query (grouping_data[1] indexed, grouping_data[0] queried) instead of "
+    "matching test rows to control rows",
+)
+def test_execute_inner_function_test_pairs_two_sides_test_entry_has_test_rows() -> None:
+    ctrl, test = _points(20, 0), _points(10, 1, start=100)
+    grouping = [("0", _ds(ctrl)), ("1", _ds(test))]
+    result = FaissNearestNeighbors._execute_inner_function(
+        grouping, tmp_roles={}, n_neighbors=1, two_sides=True, test_pairs=True
+    )
+    assert len(_pdf(result["test"])) == len(test)
+
+
+def test_execute_with_groups_n_neighbors_two_gives_two_columns() -> None:
+    df, ctrl, test, data = _with_groups()
+    out = FaissNearestNeighbors(
+        n_neighbors=2, two_sides=True, grouping_role=TreatmentRole()
+    ).execute(data)
+    found = _matched(out)
+    assert found.shape == (len(df), 2)
+    assert len(set(found.columns)) == 2
+
+
+def test_set_global_match_indexes_maps_positions_to_labels() -> None:
+    local = Dataset(
+        roles={"m": AdditionalMatchingRole()},
+        data=pd.DataFrame({"m": [0, 2]}),
+        backend=BackendsEnum.pandas,
+    )
+    group = _ds(pd.DataFrame({"f1": [1.0, 2.0, 3.0], "f2": [0.0, 0.0, 0.0]}, index=[10, 20, 30]))
+    result = FaissNearestNeighbors._set_global_match_indexes(local, ("0", group))
+    assert list(_pdf(result)["m"]) == [10, 30]
+
+
+def test_set_global_match_indexes_empty_returned_unchanged() -> None:
+    empty = Dataset(
+        roles={"m": AdditionalMatchingRole()},
+        data=pd.DataFrame({"m": pd.Series(dtype=int)}),
+        backend=BackendsEnum.pandas,
+    )
+    assert FaissNearestNeighbors._set_global_match_indexes(empty, ("0", empty)) is empty
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=TypeError,
+    reason="Issue: FaissExtension.fit forwards target_data= to MLExtension.calc, which "
+    "has no such parameter",
+)
+def test_executor_fit_builds_index(control) -> None:
+    fitted = FaissNearestNeighbors().fit(_ds(control))
+    assert fitted.index.ntotal == len(control)

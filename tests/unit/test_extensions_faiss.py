@@ -1,4 +1,5 @@
 """Additional tests for hypex.extensions.faiss (Pandas IVF path, Spark fit modes)."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -7,12 +8,12 @@ import pytest
 
 pytest.importorskip("faiss")
 
-from hypex.config import MatchingConfig  # noqa: E402
-from hypex.dataset import Dataset, FeatureRole  # noqa: E402
-from hypex.extensions import PandasFaissExtension, SparkFaissExtension  # noqa: E402
-from hypex.extensions.faiss import FaissExtension, get_executor_cache  # noqa: E402
-from hypex.utils import BackendsEnum  # noqa: E402
-from hypex.utils.registry import backend_factory  # noqa: E402
+from hypex.config import MatchingConfig
+from hypex.dataset import Dataset, FeatureRole
+from hypex.extensions import PandasFaissExtension, SparkFaissExtension
+from hypex.extensions.faiss import FaissExtension, get_executor_cache
+from hypex.utils import BackendsEnum
+from hypex.utils.registry import backend_factory
 
 
 def _points(n, seed, offset=0.0):
@@ -53,7 +54,9 @@ def test_mahalanobis_transform_selects_matching_columns_only() -> None:
     df["extra"] = 1.0
     matrix = Dataset(
         roles={"a": FeatureRole(), "b": FeatureRole()},
-        data=pd.DataFrame([[2.0, 0.0], [0.0, 3.0]], index=["f1", "f2"], columns=["a", "b"]),
+        data=pd.DataFrame(
+            [[2.0, 0.0], [0.0, 3.0]], index=["f1", "f2"], columns=["a", "b"]
+        ),
         backend=BackendsEnum.pandas,
     )
     out = FaissExtension._mahalanobis_transform(_ds(df), matrix)
@@ -71,7 +74,9 @@ def test_mahalanobis_scaling_changes_nearest_neighbour() -> None:
     # equal distances in raw space are resolved in favour of f2-heavy scaling:
     matrix = Dataset(
         roles={"a": FeatureRole(), "b": FeatureRole()},
-        data=pd.DataFrame([[10.0, 0.0], [0.0, 1.0]], index=["f1", "f2"], columns=["a", "b"]),
+        data=pd.DataFrame(
+            [[10.0, 0.0], [0.0, 1.0]], index=["f1", "f2"], columns=["a", "b"]
+        ),
         backend=BackendsEnum.pandas,
     )
     ext = PandasFaissExtension(mahalanobis=matrix)

@@ -1,4 +1,5 @@
 """Tests for hypex.extensions.scipy_stats test extensions."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -247,6 +248,6 @@ def test_spark_chi2_matches_scipy_on_counts(spark_ds) -> None:
     table = ext.matrix_preparation(data, other)
     assert table.shape == (2, 2)
     assert sorted(table.sum(axis=1)) == [60.0, 60.0]
-    stat, p, *_ = chi2_contingency(table)
+    _, p, *_ = chi2_contingency(table)
     res = _res(ext.calc(data, other))
     assert res["p-value"] == pytest.approx(p)
