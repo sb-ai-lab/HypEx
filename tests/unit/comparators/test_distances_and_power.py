@@ -152,3 +152,114 @@ def test_mahalanobis_single_group_raises() -> None:
 
 def test_mahalanobis_search_types() -> None:
     assert MahalanobisDistance().search_types == [int, float]
+
+
+# ---------------------------------------------------------------------------
+# MahalanobisDistance with pre-grouped data (bypasses PandasDataset.count_groups)
+# ---------------------------------------------------------------------------
+def _pregrouped(ds):
+    df = to_pandas(ds)
+    roles = {"f1": FeatureRole(), "f2": FeatureRole(), "g": GroupingRole()}
+    return [
+        ((g,), build_dataset(part.reset_index(drop=True), roles))
+        for g, part in df.groupby("g")
+    ]
+
+
+def test_mahalanobis_pregrouped_matches_numpy_cholesky(two_group_features) -> None:
+    ds, a, b = two_group_features
+    result = MahalanobisDistance.calc(
+        ds,
+        group_field="g",
+        grouping_data=_pregrouped(ds),
+        target_fields=["f1", "f2"],
+    )
+    pooled = (np.cov(a.T) + np.cov(b.T)) / 2 + 1e-3 * np.eye(2)
+    expected = np.linalg.inv(np.linalg.cholesky(pooled)).T
+    np.testing.assert_allclose(
+        to_pandas(result).to_numpy(dtype=float), expected, atol=TOL
+    )
+
+
+def test_mahalanobis_pregrouped_single_group_raises(two_group_features) -> None:
+    ds, _, _ = two_group_features
+    with pytest.raises(NotSuitableFieldError):
+        MahalanobisDistance.calc(
+            ds,
+            group_field="g",
+            grouping_data=_pregrouped(ds)[:1],
+            target_fields=["f1", "f2"],
+        )
+
+
+def test_mahalanobis_execute_inner_function_single_group_requires_test_data(
+    two_group_features,
+) -> None:
+    ds, _, _ = two_group_features
+    with pytest.raises(ValueError, match="test_data"):
+        MahalanobisDistance._execute_inner_function(
+            _pregrouped(ds)[:1], target_fields=["f1", "f2"]
+        )
+
+
+def test_mahalanobis_get_fields_and_set_value(two_group_features) -> None:
+    from hypex.dataset import ExperimentData
+
+    ds, _, _ = two_group_features
+    data = ExperimentData(ds)
+    op = MahalanobisDistance()
+    group_field, target_fields = op._get_fields(data)
+    assert group_field == ["g"]
+    assert sorted(target_fields) == ["f1", "f2"]
+
+    transform = MahalanobisDistance.calc(
+        ds, group_field="g", grouping_data=_pregrouped(ds), target_fields=target_fields
+    )
+    op.key = "k"
+    out = op._set_value(data, transform)
+    assert out is data
+    stored = out.variables[op.id]["k"]
+    np.testing.assert_allclose(
+        to_pandas(stored).to_numpy(dtype=float),
+        to_pandas(transform).to_numpy(dtype=float),
+    )
+
+
+def test_mahalanobis_stores_weights_and_grouping_role() -> None:
+    op = MahalanobisDistance(weights={"f1": 2.0})
+    assert op.weights == {"f1": 2.0}
+    assert isinstance(op.grouping_role, GroupingRole)
+
+
+def test_mahalanobis_execute_uses_precomputed_groups(two_group_features) -> None:
+    from hypex.dataset import ExperimentData
+    from hypex.utils import ExperimentDataEnum
+
+    ds, a, b = two_group_features
+    data = ExperimentData(ds)
+    for key, part in _pregrouped(ds):
+        data.set_value(ExperimentDataEnum.groups, "g", part, key=key[0])
+    op = MahalanobisDistance()
+    out = op.execute(data)
+
+    stored = out.variables[op.id]
+    assert op.key == str(["f1", "f2"])
+    pooled = (np.cov(a.T) + np.cov(b.T)) / 2 + 1e-3 * np.eye(2)
+    expected = np.linalg.inv(np.linalg.cholesky(pooled)).T
+    np.testing.assert_allclose(
+        to_pandas(next(iter(stored.values()))).to_numpy(dtype=float),
+        expected,
+        atol=TOL,
+    )
+
+
+def test_mahalanobis_execute_without_targets_and_tmp_roles_is_noop() -> None:
+    from hypex.dataset import ExperimentData
+
+    df = pd.DataFrame({"t": [1.0, 2.0, 3.0, 4.0], "g": [0, 0, 1, 1]})
+    ds = build_dataset(df, {"t": TargetRole(), "g": GroupingRole()})
+    ds.tmp_roles = {"t": TargetRole()}
+    data = ExperimentData(ds)
+    op = MahalanobisDistance()
+    assert op.execute(data) is data
+    assert op.id not in data.variables
