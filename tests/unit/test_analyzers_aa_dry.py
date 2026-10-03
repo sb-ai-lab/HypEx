@@ -196,3 +196,108 @@ def test_no_dry_score_leaves_pass_flag_untouched() -> None:
     out = analyzer._analyze_aa_score(_experiment_data(_score_table()), _score_table())
     frame = _frame(out.analysis_tables[analyzer.id])
     assert bool(frame.loc["y TTest test_1", "pass"]) is True
+
+
+# ---------------------------------------------------------------------------
+# AAScoreAnalyzer best split selection / application
+# ---------------------------------------------------------------------------
+def _split_data(n: int = 200, strat_nan: int = 0) -> ExperimentData:
+    from hypex.dataset import StratificationRole
+
+    strat = np.array(["a", "b"] * (n // 2), dtype=object)
+    if strat_nan:
+        strat[:strat_nan] = None
+    df = pd.DataFrame({"x": np.arange(n, dtype=float), "s": strat})
+    ds = Dataset(
+        roles={"x": FeatureRole(), "s": StratificationRole()},
+        data=df,
+        backend=BackendsEnum.pandas,
+    )
+    return ExperimentData(ds)
+
+
+def test_set_best_split_applies_rebuilt_splitter() -> None:
+    analyzer = AAScoreAnalyzer()
+    splitter_id = f"AASplitter{S}rs 7{S}"
+    out = analyzer._set_best_split(_split_data(), splitter_id)
+    assert out.variables[analyzer.id]["best splitter"] == splitter_id
+    split_cols = [c for c in out.additional_fields.columns if c.endswith("best")]
+    assert len(split_cols) == 1
+    labels = out.additional_fields.backend_data.data[split_cols[0]]
+    assert set(labels) == {"control", "test_1"}
+    assert len(labels) == 200
+    # best splitter does not store per-group subsets
+    assert not any(k.endswith("best") for k in out.groups)
+
+
+def test_set_best_split_is_reproducible_for_same_id() -> None:
+    splitter_id = f"AASplitter{S}rs 7{S}"
+    a = AAScoreAnalyzer()._set_best_split(_split_data(), splitter_id)
+    b = AAScoreAnalyzer()._set_best_split(_split_data(), splitter_id)
+    col_a = next(c for c in a.additional_fields.columns if c.endswith("best"))
+    col_b = next(c for c in b.additional_fields.columns if c.endswith("best"))
+    assert (
+        a.additional_fields.backend_data.data[col_a].tolist()
+        == b.additional_fields.backend_data.data[col_b].tolist()
+    )
+
+
+def test_set_best_split_drops_rows_with_missing_stratification() -> None:
+    splitter_id = f"AASplitterWithStratification{S}rs 3{S}"
+    out = AAScoreAnalyzer()._set_best_split(_split_data(strat_nan=10), splitter_id)
+    assert len(out.ds) == 190
+    col = next(c for c in out.additional_fields.columns if c.endswith("best"))
+    assert out.additional_fields.backend_data.data[col].notna().sum() == 190
+
+
+def test_get_best_split_stores_statistics_row_and_returns_id() -> None:
+    table = _table(
+        splitter_id=[f"AASplitter{S}rs 1{S}", f"AASplitter{S}rs 2{S}"],
+        **{"mean test score": [0.2, 0.9]},
+    )
+    analyzer = AAScoreAnalyzer()
+    # no per-feature weights -> the first row wins
+    split_id, data = analyzer._get_best_split(_split_data(), table)
+    assert split_id == f"AASplitter{S}rs 1{S}"
+    stored = next(
+        v for k, v in data.analysis_tables.items() if k.startswith("AAScoreAnalyzer")
+    )
+    assert stored.backend_data.data["mean test score"].tolist() == [0.2]
+
+
+def test_get_best_split_uses_weighted_score_when_weights_exist() -> None:
+    table = _table(
+        splitter_id=[f"AASplitter{S}rs 1{S}", f"AASplitter{S}rs 2{S}"],
+        **{
+            "mean test score": [0.1, 0.9],
+            "y GroupTTest p-value test_1": [0.3, 0.8],
+        },
+    )
+    analyzer = AAScoreAnalyzer()
+    analyzer._feature_weights = {"y TTest test_1": 1.0}
+    split_id, _ = analyzer._get_best_split(_split_data(), table)
+    assert split_id == f"AASplitter{S}rs 2{S}"
+
+
+def test_analyze_best_split_runs_selection_and_application() -> None:
+    table = _table(
+        splitter_id=[f"AASplitter{S}rs 4{S}", f"AASplitter{S}rs 5{S}"],
+        **{"mean test score": [0.9, 0.1]},
+    )
+    out = AAScoreAnalyzer()._analyze_best_split(_split_data(), table)
+    assert any(c.endswith("best") for c in out.additional_fields.columns)
+
+
+def test_get_if_param_scores_absent_returns_none() -> None:
+    assert AAScoreAnalyzer._get_if_param_scores(_split_data()) is None
+
+
+def test_get_if_param_scores_returns_stored_table() -> None:
+    table = _table(a=[1, 2])
+    data = _split_data().set_value(
+        ExperimentDataEnum.analysis_tables, f"IfParamsExperiment{S}h{S}", table, key=""
+    )
+    assert (
+        AAScoreAnalyzer._get_if_param_scores(data)
+        is data.analysis_tables[f"IfParamsExperiment{S}h{S}"]
+    )
