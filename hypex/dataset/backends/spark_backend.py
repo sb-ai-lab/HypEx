@@ -2154,14 +2154,16 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             SparkDataset: Dataset with replaced values.
         """
         if isinstance(to_replace, ps.DataFrame) and len(to_replace.columns) == 1:
-            to_replace = to_replace.iloc[:, 0]
+            to_replace = to_replace.iloc[:, 0].to_list()
         elif isinstance(to_replace, ps.Series):
             to_replace = to_replace.to_list()
         elif isinstance(to_replace, dict):
-            result = self.data.replace(to_replace=to_replace, regex=regex)
-        else:
-            result = self.data.replace(to_replace=to_replace, value=value, regex=regex)
-        return self._wrap_result(result)
+            return self._wrap_result(
+                self.data.replace(to_replace=to_replace, regex=regex)
+            )
+        return self._wrap_result(
+            self.data.replace(to_replace=to_replace, value=value, regex=regex)
+        )
 
     def reindex(self, labels: str = "", fill_value: str | None = None) -> SparkDataset:
         """Conform dataset to new index with optional fill value.

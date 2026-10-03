@@ -259,6 +259,8 @@ class DatasetAdapter(Adapter):
             result = SmallDataset.from_dict(
                 data=data, roles={name: roles for name in roles_names}
             )
+        else:
+            raise InvalidArgumentError("roles", "dict, ABCRole")
         if not small:
             result = result.to_dataset()
         return result

@@ -76,6 +76,16 @@ def test_spark_append_and_mask(spark_ds):
     assert len(spark_ds[spark_ds["a"] > 1]) == 2
 
 
+def test_spark_replace_with_series(spark_ds):
+    result = spark_ds.replace(to_replace=ps.Series([2]), value=0)
+    assert result.raw_data["a"].to_list() == [1, 0, 3]
+
+
+def test_spark_replace_with_single_column_frame(spark_ds):
+    result = spark_ds.replace(to_replace=ps.DataFrame({"x": [2]}), value=0)
+    assert result.raw_data["a"].to_list() == [1, 0, 3]
+
+
 def test_pandas_data_unchanged():
     ds = Dataset(roles=_roles(), data=_pdf())
     assert type(ds.data) is pd.DataFrame
