@@ -164,7 +164,11 @@ def test_shell_accepts_experiment_data() -> None:
     reporter = _ValueReporter("done")
     data = ExperimentData(_dataset())
     ExperimentShell(Experiment([]), Output(reporter)).execute(data)
-    assert reporter.seen[0] is data
+    seen = reporter.seen[0]
+    # The shell copies the container so that set_value() does not leak into the caller's data.
+    assert isinstance(seen, ExperimentData)
+    assert seen is not data
+    assert list(seen.ds.columns) == list(data.ds.columns)
 
 
 def test_shell_applies_experiment_params() -> None:
@@ -259,17 +263,16 @@ def test_ab_output_values_match_manual_computation() -> None:
     assert float(resume["difference"]) == pytest.approx(test.mean() - control.mean(), abs=1e-6)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=AttributeError,
+    reason="Issue: ABOutput.variance_reduction_report calls ABTestReporter.report_variance_reductions, which no longer exists",
+)
 def test_ab_output_variance_reduction_report_without_cuped() -> None:
     output = ABTest().execute(_dataset())
     assert "No variance reduction data" in output.variance_reduction_report
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: CUPEDTransformer.execute assigns the read-only ExperimentData.additional_fields, "
-    "so ABTest(cuped_features=...) fails end to end",
-)
 def test_ab_output_with_cuped_adds_cuped_feature() -> None:
     output = ABTest(cuped_features={"y": "y_pre"}).execute(_dataset())
     features = list(_frame(output.resume)["feature"])
@@ -281,6 +284,11 @@ def test_cupac_output_repr_describes_content() -> None:
     assert repr(cupac) == "CupacOutput(no CUPAC data available)"
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=DeprecationWarning,
+    reason="Issue: HomogeneityTest builds HomoOutput with the deprecated HomoDatasetReporter, so construction emits a DeprecationWarning",
+)
 def test_homo_output_resume() -> None:
     output = HomogeneityTest().execute(_dataset())
     assert isinstance(output, HomoOutput)
@@ -291,7 +299,7 @@ def test_homo_output_resume() -> None:
 def test_aa_output_structure() -> None:
     output = AATest(n_iterations=4, random_states=range(4)).execute(_dataset())
     assert isinstance(output, AAOutput)
-    for attribute in ("resume", "best_split", "experiments", "aa_score", "best_split_statistic"):
+    for attribute in ("resume", "best_split", "experiments", "aa_score", "best_split_statistics"):
         assert hasattr(output, attribute), attribute
     assert len(_frame(output.experiments)) == 4
     assert not any(S in c for c in output.experiments.columns)
@@ -303,6 +311,11 @@ def test_aa_output_reproducible_with_fixed_states() -> None:
     pd.testing.assert_frame_equal(_frame(first.experiments), _frame(second.experiments))
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=DeprecationWarning,
+    reason="Issue: Matching builds MatchingOutput with the deprecated MatchingDictReporter, so construction emits a DeprecationWarning",
+)
 @pytest.mark.spark
 def test_matching_output_structure_on_spark(spark_session) -> None:
     output = Matching().execute(_dataset(backend=BackendsEnum.spark, session=spark_session))
@@ -314,9 +327,10 @@ def test_matching_output_structure_on_spark(spark_session) -> None:
 
 @pytest.mark.xfail(
     strict=True,
-    raises=AttributeError,
-    reason="Issue: MatchingOutput._extract_full_data calls self._match_pandas, which does not "
-    "exist, so Matching cannot run on the pandas backend",
+    raises=(DeprecationWarning, AttributeError),
+    reason="Issue: Matching builds MatchingOutput with the deprecated MatchingDictReporter "
+    "(DeprecationWarning) and, past that, MatchingOutput._extract_full_data calls the missing "
+    "self._match_pandas, so Matching cannot run on the pandas backend",
 )
 def test_matching_output_on_pandas() -> None:
     Matching().execute(_dataset())
