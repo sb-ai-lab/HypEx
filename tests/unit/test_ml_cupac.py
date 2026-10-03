@@ -51,11 +51,6 @@ def test_cuped_theta_zero_variance_covariate() -> None:
     assert cuped_theta([1.0, 2.0, 3.0], [4.0, 4.0, 4.0]) == 0.0
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: the degeneracy guard var_x <= 1e-12 * mean(x^2) treats a covariate with "
-    "unit variance but a 1e9 mean as constant and returns theta=0",
-)
 def test_cuped_theta_is_stable_for_large_mean() -> None:
     rng = np.random.RandomState(1)
     x = 1e9 + rng.normal(0, 1, 1000)
@@ -281,13 +276,6 @@ def test_execute_adds_cupac_report_and_adjusted_target() -> None:
     assert report["cupac_variance_reduction_cv"] > 50
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=TypeError,
-    reason="Issue: CupacExtension.calc comes from MLExtension and dispatches to the stub "
-    "fit/predict methods instead of _calc_pandas, so the public API (used by "
-    "CUPACExecutor) raises TypeError",
-)
 def test_public_calc_dispatches_to_pandas_implementation() -> None:
     X, y = _frames()
     CupacExtension(random_state=0).calc(

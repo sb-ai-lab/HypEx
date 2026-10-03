@@ -183,11 +183,6 @@ def test_spark_aggregation_skips_nan_like_pandas(frame, spark_session) -> None:
 
 
 @pytest.mark.spark
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: Spark aggregation returns groups in collect() order, but StatsComparator "
-    "treats the first key as baseline ('alphabetically smallest')",
-)
 def test_spark_aggregation_orders_groups_alphabetically(spark_session) -> None:
     keys = [f"g{i:02d}" for i in range(12)]
     frame = pd.DataFrame({"g": keys * 5, "x": np.arange(60, dtype=float)})

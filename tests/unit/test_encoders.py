@@ -79,11 +79,6 @@ def test_roles_are_derived_from_original_roles(frame) -> None:
     assert type(result.roles["color_red"]).__name__ == "AdditionalTargetRole"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: dummy extensions set data_type=bool on the original `roles` dict instead "
-    "of the deep-copied `new_roles`, so encoded columns keep data_type int",
-)
 def test_encoded_roles_have_bool_data_type(frame, roles) -> None:
     result = DummyEncoder._inner_function(_build(frame, roles), target_cols=["color"])
     assert all(r.data_type is bool for r in result.roles.values())
@@ -95,12 +90,6 @@ def test_no_target_cols_returns_empty_dataset(frame, roles) -> None:
     assert list(DummyEncoder._inner_function(_build(frame, roles), target_cols=[]).columns) == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=KeyError,
-    reason="Issue: source column is recovered with col[:col.rfind('_')], which breaks when "
-    "a category value contains an underscore",
-)
 def test_underscore_in_category_value_resolves_role() -> None:
     df = pd.DataFrame({"c": ["a_b", "c_d", "a_b"]})
     result = PandasDummyEncoderExtension.calc(_build(df, {"c": FeatureRole(str)}), ["c"])

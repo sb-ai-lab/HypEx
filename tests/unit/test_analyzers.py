@@ -279,11 +279,6 @@ def test_ab_aggregates_mean_pvalue_two_groups_single_comparison() -> None:
     assert float(row["GroupTTest p-value b"]) == pytest.approx(expected_p, abs=TOL)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: with several targets and groups, rows are target-major but are sliced "
-    "as if group-major, so per-group means mix targets and groups",
-)
 def test_ab_aggregates_mean_pvalue_and_pass_per_group() -> None:
     df, experiment_data = _grouped_experiment()
     analyzer = ABAnalyzer()

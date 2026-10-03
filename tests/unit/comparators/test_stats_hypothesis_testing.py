@@ -196,11 +196,6 @@ def test_kstest_empty_group_returns_none(n1, n2) -> None:
     assert res == {"p-value": None, "statistic": None, "pass": None}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: identical distributions give p=1.0 but pass=True; 'pass' elsewhere "
-    "means p < reliability (difference detected)",
-)
 def test_kstest_identical_distributions_do_not_pass() -> None:
     h = {"histogram": {0: 5, 1: 5}, "count": 10}
     assert StatsKSTest._inner_function(h, dict(h))["pass"] is False
