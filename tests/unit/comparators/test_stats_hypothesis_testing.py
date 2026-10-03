@@ -36,9 +36,18 @@ def unequal_var_samples():
 # StatsTTest
 # ---------------------------------------------------------------------------
 def test_ttest_similar_variances_uses_pooled_student(equal_var_samples) -> None:
+    # Welch is the default now; the pooled Student test needs equal_variance=True.
+    a, b = equal_var_samples
+    res = StatsTTest._inner_function(_agg(a), _agg(b), equal_variance=True)
+    ref = stats.ttest_ind(a, b, equal_var=True)
+    assert res["statistic"] == pytest.approx(ref.statistic, abs=TOL)
+    assert res["p-value"] == pytest.approx(ref.pvalue, abs=TOL)
+
+
+def test_ttest_default_is_welch_even_for_similar_variances(equal_var_samples) -> None:
     a, b = equal_var_samples
     res = StatsTTest._inner_function(_agg(a), _agg(b))
-    ref = stats.ttest_ind(a, b, equal_var=True)
+    ref = stats.ttest_ind(a, b, equal_var=False)
     assert res["statistic"] == pytest.approx(ref.statistic, abs=TOL)
     assert res["p-value"] == pytest.approx(ref.pvalue, abs=TOL)
 
