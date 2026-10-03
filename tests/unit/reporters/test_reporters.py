@@ -23,6 +23,7 @@ from hypex.reporters import (
     ABDatasetReporter,
     ABDictReporter,
     ABTestReporter,
+    CupedReporter,
     DatasetReporter,
     DictReporter,
     HomoDatasetReporter,
@@ -385,8 +386,9 @@ def test_ab_reporter_requires_analyzer_table(executed) -> None:
         ABTestReporter(DictReporter(), output_format="dict").report(executed)
 
 
-def test_report_variance_reductions_message_when_missing(executed) -> None:
-    assert "No variance reduction data" in ABTestReporter.report_variance_reductions(executed)
+def test_cuped_reporter_is_empty_when_no_cuped_data(executed) -> None:
+    # ABTestReporter.report_variance_reductions was replaced by CupedReporter.
+    assert CupedReporter().report(executed).is_empty()
 
 
 # ---------------------------------------------------------------------------
