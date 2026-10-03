@@ -72,7 +72,8 @@ def test_spark_setitem_writes_raw(spark_ds):
 
 
 def test_spark_append_and_mask(spark_ds):
-    assert len(spark_ds.append([spark_ds])) == 6
+    appended = spark_ds.append([spark_ds])
+    assert len(appended) == 6
     assert len(spark_ds[spark_ds["a"] > 1]) == 2
 
 

@@ -939,7 +939,7 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(list(result.columns), ["col1"])
 
         # Test with like
-        result = self.dataset.filter(like="col")
+        result = self.dataset.filter(regex="col")
         self.assertEqual(len(result.columns), 2)
 
         # Edge cases
@@ -953,7 +953,7 @@ class TestDataset(unittest.TestCase):
 
         # Test with empty dataset
         empty_dataset = Dataset.create_empty(self.roles)
-        result = empty_dataset.filter(like="col")
+        result = empty_dataset.filter(regex="col")
         self.assertEqual(len(result.columns), 2)
 
         # Test with multiple filter criteria
@@ -1703,7 +1703,6 @@ def test_operators(self):
                 "rdiv2": lambda self, other: other / self.dataset,
             }
 
-            operator = operator  # Assuming operator is defined somewhere in the code
             result = operator_functions.get(operator, lambda self, other: other)(
                 self, other_dataset
             )
