@@ -407,3 +407,36 @@ def test_if_params_experiment_returns_data_when_never_satisfied(data) -> None:
     out = experiment.execute(data)
     assert out is data
     assert len(out.analysis_tables) == 0
+
+
+# ---------------------------------------------------------------------------
+# Dispatch to Experiment.execute (not the ExperimentWithReporter MRO hop)
+# ---------------------------------------------------------------------------
+def test_cycled_dispatches_each_iteration_to_experiment_execute(data, monkeypatch) -> None:
+    """Behaviour is identical to ``super(ExperimentWithReporter, self).execute``
+    (the class adds no ``execute``); this pins the explicit dispatch."""
+    calls: list = []
+    original = Experiment.execute
+
+    def spy(self, d):
+        calls.append(self)
+        return original(self, d)
+
+    monkeypatch.setattr(Experiment, "execute", spy)
+    experiment = CycledExperiment([], _DatasetReporter(), n_iterations=3)
+    experiment.execute(data)
+    assert calls == [experiment] * 3
+
+
+@pytest.mark.filterwarnings("ignore::FutureWarning")
+def test_group_experiment_dispatches_each_group_to_experiment_execute(data, monkeypatch) -> None:
+    calls: list = []
+    original = Experiment.execute
+
+    def spy(self, d):
+        calls.append(self.key)
+        return original(self, d)
+
+    monkeypatch.setattr(Experiment, "execute", spy)
+    GroupExperiment([], _DatasetReporter(), searching_role=GroupingRole()).execute(data)
+    assert calls == ["a", "b"]
