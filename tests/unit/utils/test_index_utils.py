@@ -226,3 +226,16 @@ def test_cache_is_thread_safe_for_concurrent_gets() -> None:
         results = list(pool.map(lambda i: cache.get(f"i{i % 5}", storage), range(100)))
     assert all(r is not None for r in results)
     assert len(cache._cache) <= 3
+
+
+def test_cleanup_swallows_rmtree_errors(monkeypatch) -> None:
+    storage = FaissIndexStorage(_FakeSession())
+    directory = storage._local_tmp_dir
+
+    def boom(path, *args, **kwargs):
+        raise OSError("cannot remove")
+
+    monkeypatch.setattr("hypex.utils.index_utils.shutil.rmtree", boom)
+    FaissIndexStorage.cleanup()
+    assert FaissIndexStorage.LOCAL_DIRS == []
+    assert os.path.exists(directory)
