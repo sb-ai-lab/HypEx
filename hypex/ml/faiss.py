@@ -299,9 +299,8 @@ class FaissNearestNeighbors(MLExecutor):
         )
         nans = 0
 
-        for group, result in compare_result.items():
+        for result in compare_result.values():
             nans += sum(result.count_nulls().values())
-            result = result.fillna(-1).astype({col: int for col in result.columns})
         if nans > 0:
             warn(
                 f"Faiss returned {nans} nans, which were replaced with dummy matches. Check if the data is suitable for the test.",

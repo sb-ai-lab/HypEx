@@ -1120,7 +1120,7 @@ class TestDataset(unittest.TestCase):
         self.assertTrue(result.data.loc[2, "col1"])
 
     def test_isin(self):
-        result = self._extracted_from_test_isin_3(4, 0, "col2")
+        self._extracted_from_test_isin_3(4, 0, "col2")
         # Test with dict
         result = self.dataset.isin({"col1": [1, 2], "col2": [4]})
         self.assertTrue(result.data.loc[0, "col1"])
@@ -1398,11 +1398,11 @@ class TestDataset(unittest.TestCase):
         # Edge cases
         # Test with empty include list
         with self.assertRaises(ValueError):
-            result = self.dataset.select_dtypes(include=[])
+            self.dataset.select_dtypes(include=[])
 
         # Test with non-existent dtype
         with self.assertRaises(TypeError):
-            result = self.dataset.select_dtypes(include=["non_existent_dtype"])
+            self.dataset.select_dtypes(include=["non_existent_dtype"])
 
         # Test with mixed types
         self.dataset.data["col3"] = ["a", "b", "c"]
@@ -1425,7 +1425,7 @@ class TestDataset(unittest.TestCase):
 
         # Test with non-existent column
         with self.assertRaises(KeyError):
-            result = self.dataset.sort(by="non_existent")
+            self.dataset.sort(by="non_existent")
 
         # Test with all NaN values
         self.dataset.data[:] = None
