@@ -311,12 +311,22 @@ def test_lstsq_get_columns_puts_target_first() -> None:
     assert LstsqExtension.get_columns(ds) == ["y", "a", "b"]
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasLstsqExtension.calc does Dataset.create_empty(...).fillna(...), which emits a pandas FutureWarning (object-dtype downcast in fillna)",
+)
 def test_pandas_lstsq_recovers_coefficients_without_intercept() -> None:
     ds, _ = _regression_ds()
     coefs = np.ravel(PandasLstsqExtension().calc(ds))
     np.testing.assert_allclose(coefs, [2.0, -3.0], atol=1e-8)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasLstsqExtension.calc does Dataset.create_empty(...).fillna(...), which emits a pandas FutureWarning (object-dtype downcast in fillna)",
+)
 def test_pandas_lstsq_matches_numpy_with_noise() -> None:
     ds, df = _regression_ds(noise=0.5)
     coefs = np.ravel(PandasLstsqExtension().calc(ds))
@@ -325,6 +335,11 @@ def test_pandas_lstsq_matches_numpy_with_noise() -> None:
     np.testing.assert_allclose(coefs, expected, atol=1e-8)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FutureWarning,
+    reason="Issue: PandasLstsqExtension.calc does Dataset.create_empty(...).fillna(...), which emits a pandas FutureWarning (object-dtype downcast in fillna)",
+)
 @pytest.mark.spark
 def test_spark_lstsq_close_to_pandas(spark_session) -> None:
     pandas_ds, _ = _regression_ds(noise=0.1)

@@ -17,7 +17,7 @@ from hypex.dataset import (
 )
 from hypex.extensions.cupac import CupacExtension
 from hypex.ml import CUPACExecutor
-from hypex.utils import BackendsEnum
+from hypex.utils import ID_SPLIT_SYMBOL, BackendsEnum
 from hypex.utils.cuped_theta import cuped_theta
 from hypex.utils.models import CUPAC_MODELS
 
@@ -262,18 +262,14 @@ def test_agg_data_standardises_column_names() -> None:
     assert len(X) == 300
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=ValueError,
-    reason="Issue: _agg_data_from_cupac_data adds a second Dataset column via add_column, "
-    "which raises 'Columns must be same length as key', so execute() cannot run",
-)
 def test_execute_adds_cupac_report_and_adjusted_target() -> None:
     ed = _temporal_experiment()
-    out = CUPACExecutor(cupac_models=["linear"], random_state=0).execute(ed)
-    report = out.analysis_tables["y_cupac_report"]
-    assert report["cupac_best_model"] == "linear"
-    assert report["cupac_variance_reduction_cv"] > 50
+    executor = CUPACExecutor(cupac_models=["linear"], random_state=0)
+    out = executor.execute(ed)
+    report = out.analysis_tables[f"{executor.id}{ID_SPLIT_SYMBOL}y"]
+    row = report.backend_data.data.iloc[0]
+    assert row["cupac_best_model"] == "linear"
+    assert row["cupac_variance_reduction_cv"] > 50
 
 
 def test_public_calc_dispatches_to_pandas_implementation() -> None:
