@@ -94,32 +94,26 @@ def test_cuped_multiple_features() -> None:
     assert out["y2_cuped"].var() < df.y2.var() * 0.05
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: CUPEDTransformer.execute assigns ExperimentData.additional_fields, "
-    "which is a read-only property",
-)
+def _reduction(out, executor, feature: str = "y_cuped") -> float:
+    """variance_reduction_pct of ``feature`` from the executor's analysis table."""
+    report = to_pandas(out.analysis_tables[executor.id])
+    return float(report.loc[report["feature"] == feature, "variance_reduction_pct"].iloc[0])
+
+
 def test_cuped_execute_stores_variance_reduction(frame) -> None:
     ed = make_ed(frame, ROLES)
-    out = CUPEDTransformer(cuped_features={"y": "x"}).execute(ed)
+    executor = CUPEDTransformer(cuped_features={"y": "x"})
+    out = executor.execute(ed)
     assert "y_cuped" in out.ds.columns
-    assert "y_cuped_variance_reduction" in out.additional_fields.columns
-    reduction = float(to_pandas(out.additional_fields)["y_cuped_variance_reduction"].iloc[0])
     expected = (1 - np.var(_expected(frame), ddof=1) / frame.y.var()) * 100
-    assert reduction == pytest.approx(expected, abs=1e-4)
+    assert _reduction(out, executor) == pytest.approx(expected, abs=1e-4)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: CUPEDTransformer.execute assigns ExperimentData.additional_fields, "
-    "which is a read-only property",
-)
 def test_cuped_execute_zero_variance_target_gives_zero_reduction() -> None:
     df = pd.DataFrame({"y": [2.0, 2.0, 2.0, 2.0], "x": [1.0, 2.0, 3.0, 4.0]})
-    out = CUPEDTransformer(cuped_features={"y": "x"}).execute(make_ed(df, ROLES))
-    assert float(to_pandas(out.additional_fields)["y_cuped_variance_reduction"].iloc[0]) == 0.0
+    executor = CUPEDTransformer(cuped_features={"y": "x"})
+    out = executor.execute(make_ed(df, ROLES))
+    assert _reduction(out, executor) == 0.0
 
 
 def test_cuped_is_transformer() -> None:
