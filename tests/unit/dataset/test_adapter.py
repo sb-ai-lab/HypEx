@@ -101,3 +101,14 @@ def test_list_to_single_multiple_raises() -> None:
     """list_to_single rejects multi-element lists."""
     with pytest.raises(ValueError):
         Adapter.list_to_single([1, 2])
+
+@pytest.mark.parametrize("bad_roles", ["feature", 5, None, ["a"]])
+def test_to_dataset_dict_with_wrong_roles_type_raises(bad_roles) -> None:
+    """Valid dict data with roles of an unsupported type is rejected explicitly."""
+    with pytest.raises(InvalidArgumentError):
+        DatasetAdapter.to_dataset({"a": [1, 2]}, roles=bad_roles)
+
+
+def test_dict_to_dataset_with_wrong_roles_type_raises() -> None:
+    with pytest.raises(InvalidArgumentError):
+        DatasetAdapter.dict_to_dataset({"a": [1, 2]}, roles="feature")
