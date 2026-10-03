@@ -69,9 +69,11 @@ def test_create_test_data_exact_att_shifts_post_spends() -> None:
 # ── set_nans ──────────────────────────────────────────────────────────────
 def test_set_nans_injects_missing_values() -> None:
     """set_nans inserts NaNs at the configured step interval."""
-    df = pd.DataFrame({"a": range(1, 11), "b": range(1, 11)})
+    # NaNs go to row labels 5, 10, ... (``loc[step::step]``), so 11 rows -> labels 5 and 10.
+    df = pd.DataFrame({"a": range(1, 12), "b": range(1, 12)})
     result = set_nans(df, na_step=5, nan_cols="a")
     assert result["a"].isna().sum() == 2
+    assert result["b"].isna().sum() == 0
 
 
 def test_set_nans_does_not_mutate_input() -> None:
