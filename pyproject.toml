@@ -141,9 +141,6 @@ warn_redundant_casts = true
 # Bare `pytest` used to import everything it could find, including
 # examples/experiments scripts that are not tests and break collection.
 testpaths = ["tests"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
 markers = [
     "spark: requires local Spark session (slow)",
     "slow: full pipeline on large data or statistical properties",
