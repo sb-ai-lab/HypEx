@@ -114,12 +114,6 @@ def test_n_neighbors_two_returns_two_columns() -> None:
     assert (found.iloc[:, 0] != found.iloc[:, 1]).all()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=TypeError,
-    reason="FaissExtension.fit forwards target_data= to MLExtension.calc, which "
-    "has no such parameter (and would recurse into self.fit)",
-)
 def test_public_fit_builds_index() -> None:
     ext = PandasFaissExtension()
     ext.fit(_ds(_points(5, 0)))

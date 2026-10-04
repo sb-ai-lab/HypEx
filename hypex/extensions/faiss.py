@@ -162,7 +162,7 @@ class FaissExtension(MLExtension):
         Returns:
             FaissExtension: The fitted extension instance with a populated index.
         """
-        return super().calc(X, target_data=Y, mode="fit", **kwargs)
+        return self.calc(data=X, mode="fit", **kwargs)
 
     def predict(self, X: Dataset, **kwargs) -> Dataset:
         """

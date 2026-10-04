@@ -405,12 +405,6 @@ def test_execute_inner_function_test_pairs_two_sides() -> None:
     assert len(_pdf(result["control"])) == len(ctrl)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: with test_pairs=True and two_sides=True the 'test' entry repeats the "
-    "control query (grouping_data[1] indexed, grouping_data[0] queried) instead of "
-    "matching test rows to control rows",
-)
 def test_execute_inner_function_test_pairs_two_sides_test_entry_has_test_rows() -> None:
     ctrl, test = _points(20, 0), _points(10, 1, start=100)
     grouping = [("0", _ds(ctrl)), ("1", _ds(test))]
@@ -418,6 +412,7 @@ def test_execute_inner_function_test_pairs_two_sides_test_entry_has_test_rows() 
         grouping, tmp_roles={}, n_neighbors=1, two_sides=True, test_pairs=True
     )
     assert len(_pdf(result["test"])) == len(test)
+    assert len(_pdf(result["control"])) == len(ctrl)
 
 
 def test_execute_with_groups_n_neighbors_two_gives_two_columns() -> None:
@@ -452,12 +447,6 @@ def test_set_global_match_indexes_empty_returned_unchanged() -> None:
     assert FaissNearestNeighbors._set_global_match_indexes(empty, ("0", empty)) is empty
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=TypeError,
-    reason="Issue: FaissExtension.fit forwards target_data= to MLExtension.calc, which "
-    "has no such parameter",
-)
 def test_executor_fit_builds_index(control) -> None:
     fitted = FaissNearestNeighbors().fit(_ds(control))
     assert fitted.index.ntotal == len(control)

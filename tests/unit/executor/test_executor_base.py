@@ -296,12 +296,6 @@ def test_mlexecutor_get_fields() -> None:
     assert group == ["t"] and target == ["y"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(KeyError, ValueError),
-    reason="Issue: MLExecutor._execute_inner_function calls _data.drop(target_field) "
-    "without axis=1/columns=, so pandas tries to drop a row label",
-)
 def test_execute_inner_function_with_target_field_splits_target() -> None:
     ctrl = Dataset(
         roles={"f": FeatureRole(), "y": TargetRole()},
