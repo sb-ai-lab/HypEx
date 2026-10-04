@@ -342,7 +342,6 @@ class DatasetBase:
         return False
 
     def get_storage_level(self) -> str | None:
-
         if self.backend_type == BackendsEnum.spark:
             return self._backend_data.get_storage_level()
         return None
@@ -552,9 +551,18 @@ class DatasetBase:
                 new_roles[roles[role]] = deepcopy(r)
         return new_roles or roles
 
-    def get(self, key: Any, default: Any = None) -> Self:
+    def get(self, key: Any, default: Any = None) -> Any:
+        result = self._backend_data.get(key, default)
+        if isinstance(result, (pd.Series, ps.Series)):
+            result = result.to_frame()
+        if not isinstance(
+            result, (pd.DataFrame, spark.DataFrame, ps.DataFrame)
+        ) and not isinstance(result, (PandasDataset, SparkDataset)):
+            return result
+        columns = list(result.columns)
         return self.__class__(
-            data=self._backend_data.get(key, default), roles=deepcopy(self.roles)
+            data=result,
+            roles={k: deepcopy(v) for k, v in self.roles.items() if k in columns},
         )
 
     def take(

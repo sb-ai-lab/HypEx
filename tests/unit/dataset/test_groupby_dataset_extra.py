@@ -205,12 +205,6 @@ def test_apply_unsupported_groupby_type_raises() -> None:
         grouped.apply(lambda x: x)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: list-of-groups branch uses dataset_class._backend.concat, but "
-    "Dataset has no _backend attribute",
-)
 def test_list_groupby_agg_concatenates_group_results() -> None:
     parts = [("a", _df().iloc[:2][["v"]]), ("b", _df().iloc[2:][["v"]])]
     grouped = GroupedDataset(parts, Dataset, {"v": FeatureRole()}, {})
@@ -224,12 +218,6 @@ def test_list_groupby_empty_agg_returns_empty_dataset() -> None:
     assert len(result) == 0
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: list-of-groups branch uses dataset_class._backend.concat, but "
-    "Dataset has no _backend attribute",
-)
 def test_list_groupby_apply_concatenates_group_results() -> None:
     parts = [("a", _df().iloc[:2][["v"]]), ("b", _df().iloc[2:][["v"]])]
     grouped = GroupedDataset(parts, Dataset, {"v": FeatureRole()}, {})

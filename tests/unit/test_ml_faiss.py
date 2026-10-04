@@ -274,12 +274,6 @@ def test_execute_inner_function_test_pairs_returns_control(control, test_df) -> 
     assert set(result) == {"control"}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: execute() calls Dataset.reindex (defined only on SmallDataset) when "
-    "the one-sided result is shorter than the dataset, so default matching cannot run",
-)
 def test_execute_default_one_sided_matching() -> None:
     _df, data = _experiment()
     out = FaissNearestNeighbors(grouping_role=TreatmentRole()).execute(data)
@@ -364,12 +358,6 @@ def _matched(out) -> pd.DataFrame:
     return out.ds.backend_data.data[cols]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: execute() calls Dataset.reindex (defined only on SmallDataset) when "
-    "the one-sided result is shorter than the dataset",
-)
 def test_execute_with_groups_one_sided_fills_control_with_dummy() -> None:
     df, ctrl, test, data = _with_groups()
     out = FaissNearestNeighbors(grouping_role=TreatmentRole()).execute(data)
@@ -395,12 +383,6 @@ def test_execute_with_groups_two_sided() -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: execute() calls Dataset.reindex (defined only on SmallDataset) when "
-    "the one-sided result is shorter than the dataset",
-)
 def test_execute_with_groups_test_pairs_matches_control_rows() -> None:
     _df, ctrl, test, data = _with_groups()
     out = FaissNearestNeighbors(test_pairs=True, grouping_role=TreatmentRole()).execute(

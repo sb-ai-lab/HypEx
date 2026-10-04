@@ -60,6 +60,11 @@ class Dataset(DatasetBase):
             data=self.backend_data.sort_values(by=by, ascending=ascending, **kwargs),
         )
 
+    def reindex(self, labels, fill_value: Any | None = None) -> Dataset:
+        return Dataset(
+            self.roles, data=self._backend_data.reindex(labels, fill_value=fill_value)
+        )
+
 
 class SmallDataset(DatasetBase):
     def __init__(
@@ -279,8 +284,6 @@ class DatasetAdapter(Adapter):
                 data=data, columns=[next(iter(roles.keys()))] if len(roles) > 0 else [0]
             ),
         )
-        if not small:
-            result = result.to_dataset()
         return result
 
     @staticmethod
@@ -313,6 +316,4 @@ class DatasetAdapter(Adapter):
             roles=roles,
             data=data,
         )
-        if not small:
-            result = result.to_dataset()
         return result

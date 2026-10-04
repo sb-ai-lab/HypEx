@@ -1766,7 +1766,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                     raise ValueError(
                         f"Vector length ({len(other)}) must match number of columns ({len(self.data.columns)})"
                     )
-                pd_other = pd.Series(other, index=self.data.columns)
+                pd_other = pd.DataFrame({"0": other}, index=self.data.columns)
                 schema = "`0` double"
             else:
                 pd_other = pd.DataFrame(other)

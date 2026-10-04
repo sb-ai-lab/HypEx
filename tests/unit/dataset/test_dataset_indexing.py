@@ -7,7 +7,6 @@ import pytest
 
 from hypex.dataset import FeatureRole, TargetRole
 from hypex.utils import BackendsEnum
-from hypex.utils.errors import RoleColumnError
 
 
 def _ds(make_dataset):
@@ -71,11 +70,6 @@ def test_setitem_existing_column_replaces(make_dataset) -> None:
     assert ds["a"].get_values() == [[9], [9], [9], [9]] or ds["a"].sum() == 36
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=RoleColumnError,
-    reason="Issue: Dataset.get(key) rebuilds the Dataset with all original roles, so selecting a single column raises RoleColumnError",
-)
 def test_get_with_default(make_dataset) -> None:
     """get() returns the column or the provided default."""
     ds = _ds(make_dataset)

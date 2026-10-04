@@ -1584,9 +1584,10 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
                     index=self.columns if other.shape[0] == self.shape[1] else None,
                 )
             result = self.data.dot(other_df)
-            result.columns = (
-                self.columns if other.shape[1] == self.shape[1] else result.columns
-            )
+            if other.ndim != 1:
+                result.columns = (
+                    self.columns if other.shape[1] == self.shape[1] else result.columns
+                )
         elif isinstance(other, pd.DataFrame):
             result = self.data.dot(other)
         else:

@@ -12,10 +12,10 @@
 
 ## 2. Dataset / adapter
 
-- `DatasetAdapter.list_to_dataset` / `ndarray_to_dataset` с `small=False` вызывают несуществующий `Dataset.to_dataset()`.
-- `Dataset.get(key)` пересоздаёт Dataset со всеми исходными ролями → `RoleColumnError`.
-- `Dataset.dot` с 1-D вектором: pandas — `IndexError`, Spark — `.assign` на Series.
-- `GroupedDataset` со списком групп использует `dataset_class._backend.concat`, у `Dataset` нет `_backend` → `AttributeError` в `agg` и `apply`.
+- ИСПРАВЛЕНО: `DatasetAdapter.list_to_dataset` / `ndarray_to_dataset` с `small=False` вызывают несуществующий `Dataset.to_dataset()`.
+- ИСПРАВЛЕНО: `Dataset.get(key)` пересоздаёт Dataset со всеми исходными ролями → `RoleColumnError`.
+- ИСПРАВЛЕНО: `Dataset.dot` с 1-D вектором: pandas — `IndexError`, Spark — `.assign` на Series.
+- ИСПРАВЛЕНО: `GroupedDataset` со списком групп использует `dataset_class._backend.concat`, у `Dataset` нет `_backend` → `AttributeError` в `agg` и `apply`.
 - `GroupedDataset.apply` на pandas: DeprecationWarning о группирующих колонках.
 
 ## 3. Spark-бэкенд
@@ -43,7 +43,7 @@
 ## 5. ML / matching / faiss
 
 - `FaissExtension.fit` (публичный) передаёт `target_data=` в `MLExtension.calc`, такого параметра нет (`TypeError`); то же на уровне `FaissNearestNeighbors.fit`.
-- `FaissNearestNeighbors.execute` в режимах one-sided и `test_pairs` вызывает `Dataset.reindex` (есть только у `SmallDataset`) — `AttributeError`, `hypex/ml/faiss.py:~332`.
+- ИСПРАВЛЕНО (`Dataset.reindex` добавлен): `FaissNearestNeighbors.execute` в режимах one-sided и `test_pairs` вызывает `Dataset.reindex` (есть только у `SmallDataset`) — `AttributeError`, `hypex/ml/faiss.py:~332`.
 - `FaissNearestNeighbors._execute_inner_function` при `test_pairs=True, two_sides=True`: запись "test" повторяет запрос control вместо сопоставления test→control.
 - Текст предупреждения "nans ... replaced with dummy matches" неверен: NaN по-прежнему вызывают `PairsNotFoundError`.
 - `MLExecutor._execute_inner_function` с `target_field` вызывает `_data.drop(target_field)` без `axis=1` — pandas пытается удалить строку.

@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 from typing import TYPE_CHECKING, Any, Callable
 
+import pandas as pd  # type: ignore
+
 from ..utils import NAME_BORDER_SYMBOL
 from .roles import ABCRole, InfoRole, StatisticRole
 
@@ -76,6 +78,15 @@ class GroupedDataset:
                 new_roles[col] = StatisticRole()
         return new_roles
 
+    @staticmethod
+    def _concat_groups(parts: list[Any]) -> Any:
+        """Concatenate per-group results with the library matching their type."""
+        if isinstance(parts[0], (pd.DataFrame, pd.Series)):
+            return pd.concat(parts)
+        import pyspark.pandas as ps  # type: ignore
+
+        return ps.concat(parts)
+
     def _execute_agg(self, func: str | dict[str, str] | list[str]) -> Any:
         """
         Execute the aggregation function on the backend groupby object.
@@ -106,7 +117,7 @@ class GroupedDataset:
 
             if not aggregated_groups:
                 return None
-            result_data = self._dataset_class._backend.concat(aggregated_groups)
+            result_data = self._concat_groups(aggregated_groups)
             return result_data
 
         else:
@@ -193,7 +204,7 @@ class GroupedDataset:
                 results.append(res)
             if not results:
                 return None
-            result_data = self._dataset_class._backend.concat(results)
+            result_data = self._concat_groups(results)
         else:
             raise NotImplementedError("Apply not supported for this groupby type")
 
