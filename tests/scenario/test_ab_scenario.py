@@ -164,12 +164,6 @@ def test_two_groups_do_not_need_multitest() -> None:
     assert isinstance(out.multitest, str)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=Exception,
-    reason="Issue: ABTest(multitest_method='quantile') always fails because "
-    "MultitestQuantile has no calc()",
-)
 def test_quantile_multitest_runs(three_groups) -> None:
     _run(three_groups, multitest_method="quantile")
 

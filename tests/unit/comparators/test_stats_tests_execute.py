@@ -286,17 +286,15 @@ def test_spark_kstest_single_group_gives_empty_result(spark_session) -> None:
 
 
 @pytest.mark.spark
-@pytest.mark.xfail(
-    strict=True,
-    raises=ImportError,
-    reason="Issue: StatsUTest._execute_spark imports StatsUTestExtension, which does "
-    "not exist in hypex.extensions.stats_hypothesis_testing",
-)
 def test_spark_utest_execute(spark_session) -> None:
     df = _frame()
     ex = StatsUTest(grouping_role=TreatmentRole())
     out = ex.execute(_data(df, "y", BackendsEnum.spark, spark_session))
-    assert list(_table(out, ex.id).index) == ["b", "c"]
+    table = _table(out, ex.id)
+    assert list(table.index) == ["b", "c"]
+    for grp in ("b", "c"):
+        ref = stats.mannwhitneyu(df.y[df.g == "a"], df.y[df.g == grp])
+        assert table.loc[grp, "p-value"] == pytest.approx(ref.pvalue, abs=0.05)
 
 
 def test_chi2_execute_matches_scipy(backend, spark_session) -> None:

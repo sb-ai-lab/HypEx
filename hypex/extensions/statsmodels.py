@@ -167,16 +167,21 @@ class MultitestQuantile(Extension):
         self.random_state = random_state
         super().__init__()
 
+    def calc(self, data: Dataset, **kwargs):
+        if data.backend_type == BackendsEnum.spark:
+            return self._calc_spark(data, **kwargs)
+        return self._calc_pandas(data, **kwargs)
+
     def _calc_pandas(self, data: Dataset, **kwargs):
         group_field = kwargs.get("group_field")
         target_field = kwargs.get("target_field")
         quantiles = kwargs.get("quantiles")
         num_samples = len(data.unique()[group_field])
         sample_size = len(data)
-        grouped_data = data.groupby(by=group_field, fields_list=target_field)
-        means = [sample[1].agg("mean") for sample in grouped_data]
+        grouped_data = list(data[[group_field, target_field]].groupby(group_field))
+        means = [sample[1][target_field].agg("mean") for sample in grouped_data]
         variances = [
-            sample[1].agg("var") * sample_size / (sample_size - 1)
+            sample[1][target_field].agg("var") * sample_size / (sample_size - 1)
             for sample in grouped_data
         ]
         if num_samples != len(means) or num_samples != len(variances):

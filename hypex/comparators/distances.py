@@ -84,30 +84,21 @@ class MahalanobisDistance(Calculator):
         Returns:
             Dataset:  The corr matrix Dataset to transform into Mahalanobis metric.
         """
-        if len(grouping_data) > 1:
-            return cls._inner_function(
-                data=(
-                    grouping_data[0][1][target_fields]
-                    if target_fields
-                    else grouping_data[0][1]
-                ),
-                test_data=(
-                    grouping_data[1][1][target_fields]
-                    if target_fields
-                    else grouping_data[1][1]
-                ),
-                **kwargs,
-            )
-        else:
-            return cls._inner_function(
-                data=(
-                    grouping_data[0][1][target_fields]
-                    if target_fields
-                    else grouping_data[0][1]
-                ),
-                test_data=None,
-                **kwargs,
-            )
+        if len(grouping_data) < 2:
+            raise ValueError("test_data is needed: at least two groups are required")
+        return cls._inner_function(
+            data=(
+                grouping_data[0][1][target_fields]
+                if target_fields
+                else grouping_data[0][1]
+            ),
+            test_data=(
+                grouping_data[1][1][target_fields]
+                if target_fields
+                else grouping_data[1][1]
+            ),
+            **kwargs,
+        )
 
     def _set_value(
         self, data: ExperimentData, value: Dataset | None = None, key: Any = None

@@ -740,8 +740,8 @@ class StatsKSTest(StatsHypothesisTesting):
 class StatsUTest(StatsHypothesisTesting):
     """Mann-Whitney U test on aggregated histograms (Spark-optimized).
 
-    Computes per-group histograms via ``StatsUTestExtension`` in a fixed
-    number of Spark jobs, then calculates the U statistic and p-value
+    Computes per-group histograms via ``StatsKSTestExtension`` (same histogram format as the KS test) in a
+    fixed number of Spark jobs, then calculates the U statistic and p-value
     analytically from the histogram buckets — without transferring raw
     data to the driver.
 
@@ -819,7 +819,7 @@ class StatsUTest(StatsHypothesisTesting):
         """Raises ``NotImplementedError``.
 
         All aggregation for ``StatsUTest`` happens inside ``execute()``
-        via ``StatsUTestExtension``. Do not call this method directly.
+        via ``StatsKSTestExtension``. Do not call this method directly.
 
         Raises:
             NotImplementedError: Always raised.
@@ -891,7 +891,8 @@ class StatsUTest(StatsHypothesisTesting):
     ) -> ExperimentData:
         """Execute the Mann-Whitney U test using the Spark-optimized path.
 
-        Delegates histogram aggregation to ``StatsUTestExtension``, which
+        Delegates histogram aggregation to ``StatsKSTestExtension`` (same histogram
+        format as the KS test), which
         computes per-group histograms for all target columns in a fixed
         number of Spark jobs (global bounds → counts → bucket histograms).
         The U statistic and p-value are then calculated from the
@@ -899,7 +900,7 @@ class StatsUTest(StatsHypothesisTesting):
 
         Steps:
         1. Compute per-group histograms and observation counts for every
-           target column via ``StatsUTestExtension.calc()``.
+           target column via ``StatsKSTestExtension.calc()``.
         2. If fewer than two groups, store empty results and return early.
         3. For each target column, run ``_inner_function`` pairwise
            (baseline vs. each compared group) and append results into
@@ -917,10 +918,10 @@ class StatsUTest(StatsHypothesisTesting):
             The updated ``ExperimentData`` with U test results stored in
             ``analysis_tables`` under per-column keys.
         """
-        from ..extensions.stats_hypothesis_testing import StatsUTestExtension
+        from ..extensions.stats_hypothesis_testing import StatsKSTestExtension
 
         subset = data.ds[[group_col, *target_cols]]
-        ext = StatsUTestExtension(n_bins=self.n_bins, reliability=self.reliability)
+        ext = StatsKSTestExtension(n_bins=self.n_bins, reliability=self.reliability)
         all_group_stats = ext.calc(
             data=subset,
             group_col=group_col,

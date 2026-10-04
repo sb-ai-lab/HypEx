@@ -231,12 +231,6 @@ def test_quantile_without_variances_forces_equal_variance() -> None:
     assert len(set(q)) == 1
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=TypeError,
-    reason="Issue: MultitestQuantile._calc_pandas calls Dataset.groupby(fields_list=...), "
-    "which the pandas backend forwards to DataFrame.groupby and rejects",
-)
 def test_quantile_calc_accepts_best_hypothesis() -> None:
     rng = np.random.RandomState(0)
     n = 200
@@ -253,15 +247,9 @@ def test_quantile_calc_accepts_best_hypothesis() -> None:
     )
     mtq = MultitestQuantile(alpha=0.05, iteration_size=1000, random_state=0)
     result = mtq._calc_pandas(ds, group_field="g", target_field="y")
-    assert _frame(result).iloc[0]["accepted hypothesis"] == 3
+    assert int(_frame(result).iloc[0]["accepted hypothesis"]) == 3
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=TypeError,
-    reason="Issue: MultitestQuantile._calc_pandas calls Dataset.groupby(fields_list=...), "
-    "which the pandas backend forwards to DataFrame.groupby and rejects",
-)
 def test_quantile_calc_rejects_when_groups_equal() -> None:
     rng = np.random.RandomState(1)
     n = 200
@@ -273,7 +261,7 @@ def test_quantile_calc_rejects_when_groups_equal() -> None:
     )
     mtq = MultitestQuantile(alpha=0.05, iteration_size=1000, random_state=0)
     result = mtq._calc_pandas(ds, group_field="g", target_field="y", quantiles=5.0)
-    assert _frame(result).iloc[0]["accepted hypothesis"] == 0
+    assert int(_frame(result).iloc[0]["accepted hypothesis"]) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -359,22 +347,12 @@ def test_lstsq_get_columns_puts_target_first() -> None:
     assert LstsqExtension.get_columns(ds) == ["y", "a", "b"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FutureWarning,
-    reason="Issue: PandasLstsqExtension.calc does Dataset.create_empty(...).fillna(...), which emits a pandas FutureWarning (object-dtype downcast in fillna)",
-)
 def test_pandas_lstsq_recovers_coefficients_without_intercept() -> None:
     ds, _ = _regression_ds()
     coefs = np.ravel(PandasLstsqExtension().calc(ds))
     np.testing.assert_allclose(coefs, [2.0, -3.0], atol=1e-8)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FutureWarning,
-    reason="Issue: PandasLstsqExtension.calc does Dataset.create_empty(...).fillna(...), which emits a pandas FutureWarning (object-dtype downcast in fillna)",
-)
 def test_pandas_lstsq_matches_numpy_with_noise() -> None:
     ds, df = _regression_ds(noise=0.5)
     coefs = np.ravel(PandasLstsqExtension().calc(ds))
@@ -383,11 +361,6 @@ def test_pandas_lstsq_matches_numpy_with_noise() -> None:
     np.testing.assert_allclose(coefs, expected, atol=1e-8)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FutureWarning,
-    reason="Issue: PandasLstsqExtension.calc does Dataset.create_empty(...).fillna(...), which emits a pandas FutureWarning (object-dtype downcast in fillna)",
-)
 @pytest.mark.spark
 def test_spark_lstsq_close_to_pandas(spark_session) -> None:
     pandas_ds, _ = _regression_ds(noise=0.1)

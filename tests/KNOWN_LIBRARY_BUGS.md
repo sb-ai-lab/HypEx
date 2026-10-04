@@ -29,15 +29,15 @@
 - `SparkKSTestExtension` с `nan_policy="omit"` не отбрасывает NaN (результат 1.0 / 0.0, в pandas иначе).
 - ИСПРАВЛЕНО: `SparkFaissExtension` определяет `__enter__`, но не `__exit__`.
 - `MultiTest._calc_spark` теряет составной строковый индекс при `to_backend` — поправка ничего не делает.
-- `StatsUTest._execute_spark` → `ImportError`: `StatsUTestExtension` не существует (строки ~922–962 не покрыты).
+- ИСПРАВЛЕНО: `StatsUTest._execute_spark` → `ImportError`: `StatsUTestExtension` не существует (строки ~922–962 не покрыты).
 
 ## 4. Статистика / comparators / extensions
 
 - `GroupChi2TestExtension.calc` передаёт `_form_results(p_value, statistic, ...)` в перепутанном порядке (pandas и Spark).
 - `StatsKSTest` / `StatsUTest` на pandas: код ставит `delegate._id`, а результаты лежат под `GroupKSTest┴┴y` / `GroupUTest┴┴y` — поиск по id Stats-исполнителя не находит.
-- `PandasLstsqExtension.calc` через `create_empty().fillna()` даёт pandas FutureWarning (3 теста lstsq).
-- `MultitestQuantile._calc_pandas` не тестируется: вызов `groupby(fields_list=...)` падает дальше, т.к. в группах остаётся строковая колонка группы.
-- `MahalanobisDistance` при одной группе всегда бросает `ValueError("test_data is needed ...")` — ветка `test_data=None` не может сработать.
+- ИСПРАВЛЕНО: `PandasLstsqExtension.calc` через `create_empty().fillna()` даёт pandas FutureWarning (3 теста lstsq).
+- ИСПРАВЛЕНО (добавлен и `calc`-диспетчер): `MultitestQuantile._calc_pandas` не тестируется: вызов `groupby(fields_list=...)` падает дальше, т.к. в группах остаётся строковая колонка группы.
+- ИСПРАВЛЕНО: `MahalanobisDistance` — недостижимая ветка `test_data=None` удалена; при одной группе `_execute_inner_function` явно бросает `ValueError("test_data is needed ...")`, а `calc` — `NotSuitableFieldError`.
 - Сопоставление ролей игнорирует `data_type`: `Float32Caster(target_roles=InfoRole(int))` выбирает float-колонку Info.
 
 ## 5. ML / matching / faiss
