@@ -1153,6 +1153,14 @@ class DatasetBase:
     def isna(self) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.isna())
 
+    def reindex(self, labels, fill_value: Any | None = None):
+        """Conform to new index labels; returns a full ``Dataset`` (both kinds)."""
+        from .dataset import Dataset
+
+        return Dataset(
+            self.roles, data=self._backend_data.reindex(labels, fill_value=fill_value)
+        )
+
     def dropna(
         self,
         how: Literal["any", "all"] = "any",
