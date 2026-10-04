@@ -1246,7 +1246,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         """Count unique combinations of group_cols"""
         if not group_cols:
             return 1
-        return int(self.data[group_cols].nunique())
+        by_arg = group_cols[0] if len(group_cols) == 1 else group_cols
+        return int(self.data.groupby(by_arg, observed=False).ngroups)
 
     def iter_groups(self, by: list[str]):
         by_arg = by[0] if len(by) == 1 else by

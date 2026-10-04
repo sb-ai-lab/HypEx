@@ -1386,7 +1386,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         """Count unique combinations of group_cols"""
         if not group_cols:
             return 1
-        return int(self.data[group_cols].nunique())
+        return len(self.data[group_cols].drop_duplicates().dropna())
 
     def grouped_value_counts(
         self, by: list[str], feature_cols: list[str] | None = None

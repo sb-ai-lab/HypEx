@@ -22,11 +22,6 @@ def _grouped(make_dataset):
     return make_dataset(df, roles)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(FutureWarning, TypeError),
-    reason="Issue: count_groups does int(df[cols].nunique()) on a Series: FutureWarning on pandas, TypeError on Spark, so len(GroupedDataset) breaks",
-)
 def test_groupby_returns_grouped_dataset(make_dataset) -> None:
     """groupby yields a GroupedDataset with the correct group count."""
     ds = _grouped(make_dataset)
@@ -85,11 +80,6 @@ def test_grouped_value_counts(make_dataset) -> None:
     assert len(result) == 2
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(FutureWarning, TypeError),
-    reason="Issue: count_groups does int(df[cols].nunique()) on a Series: FutureWarning on pandas, TypeError on Spark, so len(GroupedDataset) breaks",
-)
 def test_grouped_size_len_iter(make_dataset) -> None:
     """size, __len__ and iteration are consistent."""
     grouped = _grouped(make_dataset).groupby("g")
@@ -100,11 +90,6 @@ def test_grouped_size_len_iter(make_dataset) -> None:
     assert sorted(keys) == ["a", "b"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(FutureWarning, TypeError),
-    reason="Issue: count_groups does int(df[cols].nunique()) on a Series: FutureWarning on pandas, TypeError on Spark, so len(GroupedDataset) breaks",
-)
 def test_groupby_single_group(make_dataset) -> None:
     """groupby works when all rows belong to one group."""
     df = pd.DataFrame({"g": ["a", "a"], "v": [1.0, 2.0]})

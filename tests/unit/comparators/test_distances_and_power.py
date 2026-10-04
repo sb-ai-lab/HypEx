@@ -100,11 +100,6 @@ def two_group_features():
     return build_dataset(df, roles), a, b
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FutureWarning,
-    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
-)
 def test_mahalanobis_whitens_pooled_covariance(two_group_features) -> None:
     ds, a, b = two_group_features
     result = MahalanobisDistance.calc(ds, group_field="g", target_fields=["f1", "f2"])
@@ -114,11 +109,6 @@ def test_mahalanobis_whitens_pooled_covariance(two_group_features) -> None:
     np.testing.assert_allclose(w.T @ pooled @ w, np.eye(2), atol=5e-3)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FutureWarning,
-    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
-)
 def test_mahalanobis_matches_numpy_cholesky(two_group_features) -> None:
     ds, a, b = two_group_features
     result = MahalanobisDistance.calc(ds, group_field="g", target_fields=["f1", "f2"])
@@ -129,11 +119,6 @@ def test_mahalanobis_matches_numpy_cholesky(two_group_features) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: Dataset.dot(ndarray) returns an empty-role dataset, so weighted "
-    "transform collapses to shape (0, 0)",
-)
 def test_mahalanobis_weights_change_transform(two_group_features) -> None:
     ds, _, _ = two_group_features
     plain = to_pandas(
@@ -150,11 +135,6 @@ def test_mahalanobis_weights_change_transform(two_group_features) -> None:
     assert not np.allclose(plain.to_numpy(dtype=float), weighted.to_numpy(dtype=float))
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FutureWarning,
-    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
-)
 def test_mahalanobis_single_group_raises() -> None:
     df = pd.DataFrame({"f1": [1.0, 2.0, 3.0], "f2": [2.0, 1.0, 5.0], "g": [0, 0, 0]})
     ds = build_dataset(

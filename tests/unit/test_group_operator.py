@@ -128,12 +128,6 @@ def test_set_value_stores_result_in_variables() -> None:
     assert data.variables[op.id] == {"a": 1.0}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FutureWarning,
-    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, "
-    "emitting a FutureWarning, so Dataset.groupby fails under the project's warning filter",
-)
 def test_calc_groups_data_itself() -> None:
     result = MeanGap.calc(_ds(), group_field="g", target_fields=["t1", "t2"])
     assert result == {"a": pytest.approx(1.0), "b": pytest.approx(9.0)}

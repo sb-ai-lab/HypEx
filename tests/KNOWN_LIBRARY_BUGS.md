@@ -6,7 +6,7 @@
 
 | Ошибка | Где | Эффект |
 |---|---|---|
-| `PandasDataset.count_groups` делает `int(df[cols].nunique())` | `hypex/dataset/backends/pandas_backend.py` | FutureWarning (в pandas), `TypeError` при нескольких колонках групп и на Spark; ломает любой `list(groupby)`: `GroupedDataset`, `GroupOperator.calc`, `GroupExperiment`, `MahalanobisDistance`, split-modes, calculators, `MLExecutor`, `MinSampleSize` |
+| ИСПРАВЛЕНО: `PandasDataset.count_groups` делает `int(df[cols].nunique())` | `hypex/dataset/backends/pandas_backend.py` | FutureWarning (в pandas), `TypeError` при нескольких колонках групп и на Spark; ломает любой `list(groupby)`: `GroupedDataset`, `GroupOperator.calc`, `GroupExperiment`, `MahalanobisDistance`, split-modes, calculators, `MLExecutor`, `MinSampleSize` |
 | `HomogeneityTest()` создаёт deprecated `HomoDatasetReporter` | `hypex/ui/homo.py` | DeprecationWarning → ошибка из-за `filterwarnings` в `pyproject.toml`; фасад нельзя вызвать в тестах |
 | `Matching()` / `MatchingOutput()` создают deprecated `MatchingDictReporter` / `MatchingDatasetReporter` / `MatchingQualityDatasetReporter` | `hypex/matching.py`, `hypex/ui/matching.py` | то же; старые xfail-причины Matching (соседи из противоположной группы, ближайший по ковариате, `_match_pandas`, `group_match`) нельзя перепроверить, пока репортёры deprecated |
 
@@ -48,7 +48,6 @@
 - Текст предупреждения "nans ... replaced with dummy matches" неверен: NaN по-прежнему вызывают `PairsNotFoundError`.
 - `MLExecutor._execute_inner_function` с `target_field` вызывает `_data.drop(target_field)` без `axis=1` — pandas пытается удалить строку.
 - `MLExecutor.execute` передаёт `target_fields=`, а `calc` принимает `target_field` — таргет не доходит до `_inner_function` (теста нет).
-- `MatchingOutput._collect_grouped_indexes` ищет колонку группы через `GroupingRole()`, а `Matching` использует `TreatmentRole` — фильтр по группе, вероятно, пуст (не подтверждено end-to-end).
 
 ## 6. UI / reporters
 

@@ -276,10 +276,9 @@ def test_execute_inner_function_test_pairs_returns_control(control, test_df) -> 
 
 @pytest.mark.xfail(
     strict=True,
-    raises=(FutureWarning, AttributeError),
-    reason="Issue: PandasDataset.count_groups does int(Series) (FutureWarning) and, past "
-    "that, execute() calls Dataset.reindex (defined only on SmallDataset) when the "
-    "one-sided result is shorter than the dataset, so default matching cannot run",
+    raises=AttributeError,
+    reason="Issue: execute() calls Dataset.reindex (defined only on SmallDataset) when "
+    "the one-sided result is shorter than the dataset, so default matching cannot run",
 )
 def test_execute_default_one_sided_matching() -> None:
     _df, data = _experiment()
@@ -290,11 +289,6 @@ def test_execute_default_one_sided_matching() -> None:
     assert matched
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FutureWarning,
-    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
-)
 def test_execute_two_sides_stores_matched_indexes() -> None:
     df, data = _experiment()
     executor = FaissNearestNeighbors(two_sides=True, grouping_role=TreatmentRole())
@@ -314,11 +308,6 @@ def test_execute_two_sides_stores_matched_indexes() -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FutureWarning,
-    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
-)
 def test_execute_two_sides_neighbours_come_from_opposite_group() -> None:
     df, data = _experiment()
     out = FaissNearestNeighbors(two_sides=True, grouping_role=TreatmentRole()).execute(
