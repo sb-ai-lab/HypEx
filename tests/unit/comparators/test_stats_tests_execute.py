@@ -220,7 +220,9 @@ def test_pandas_execute_delegates_to_group_test(cls) -> None:
     ex = cls(grouping_role=TreatmentRole())
     out = ex.execute(_data(df, "y", BackendsEnum.pandas, None))
     name = "GroupKSTest" if cls is StatsKSTest else "GroupUTest"
-    table = _table(out, f"{name}┴┴y")
+    # the delegate's table is filed under the Stats* executor id only
+    assert f"{name}┴┴y" not in out.analysis_tables
+    table = _table(out, ex.id)
     scipy_fn = stats.ks_2samp if cls is StatsKSTest else stats.mannwhitneyu
     for grp in ("b", "c"):
         ref = scipy_fn(df.y[df.g == "a"], df.y[df.g == grp])
@@ -228,13 +230,6 @@ def test_pandas_execute_delegates_to_group_test(cls) -> None:
         assert table.loc[grp, "statistic"] == pytest.approx(ref.statistic, abs=1e-9)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="Issue: StatsKSTest/StatsUTest pandas path sets delegate._id but the "
-    "results are stored under the delegate's own id (GroupKSTest.../GroupUTest...), "
-    "so lookup by the Stats* executor id fails",
-)
 @pytest.mark.parametrize("cls", [StatsKSTest, StatsUTest], ids=["ks", "u"])
 def test_pandas_execute_stores_result_under_own_id(cls) -> None:
     ex = cls(grouping_role=TreatmentRole())

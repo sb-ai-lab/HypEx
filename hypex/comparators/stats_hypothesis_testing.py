@@ -465,6 +465,23 @@ class StatsZTest(StatsHypothesisTesting):
         }
 
 
+def _execute_pandas_delegate(
+    owner: Any, delegate: Any, data: ExperimentData
+) -> ExperimentData:
+    """Run a pandas ``Group*`` delegate and file its result under ``owner.id``.
+
+    ``Stats*`` executors fall back to their ``Group*`` counterpart on pandas.
+    The delegate stores its table under its own id (``GroupKSTest┴...``); the
+    table is moved under the id of the ``Stats*`` executor so that pandas and
+    Spark runs address the result the same way.
+    """
+    result = delegate.execute(data)
+    tables = result.analysis_tables
+    if delegate.id != owner.id and delegate.id in tables:
+        tables[owner.id] = tables.pop(delegate.id)
+    return result
+
+
 @backend_factory.register(KSTest, SparkDataset)
 class StatsKSTest(StatsHypothesisTesting):
     """Kolmogorov-Smirnov test on aggregated histograms.
@@ -583,8 +600,7 @@ class StatsKSTest(StatsHypothesisTesting):
                 reliability=self.reliability,
                 key=self.key,
             )
-            delegate._id = self._id  # Preserve ID for pipeline lookups
-            return delegate.execute(data)
+            return _execute_pandas_delegate(self, delegate, data)
 
     @timeit(level="SPARK", prefix="KS_SPARK")
     def _execute_spark(self, data, group_col: str, target_cols: list[str]):
@@ -882,8 +898,7 @@ class StatsUTest(StatsHypothesisTesting):
                 reliability=self.reliability,
                 key=self.key,
             )
-            delegate._id = self._id  # Preserve ID for pipeline lookups
-            return delegate.execute(data)
+            return _execute_pandas_delegate(self, delegate, data)
 
     @timeit(level="SPARK", prefix="U_SPARK")
     def _execute_spark(

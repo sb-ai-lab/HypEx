@@ -34,7 +34,7 @@
 ## 4. Статистика / comparators / extensions
 
 - ИСПРАВЛЕНО (числа изменились, см. «Изменения численных результатов»): `GroupChi2TestExtension.calc` передаёт `_form_results(p_value, statistic, ...)` в перепутанном порядке (pandas и Spark).
-- `StatsKSTest` / `StatsUTest` на pandas: код ставит `delegate._id`, а результаты лежат под `GroupKSTest┴┴y` / `GroupUTest┴┴y` — поиск по id Stats-исполнителя не находит.
+- ИСПРАВЛЕНО (вариант a: таблица кладётся под id самого `Stats*`-исполнителя, как на Spark; нигде в фасадах не используется, имена в отчётах не меняются): `StatsKSTest` / `StatsUTest` на pandas: код ставит `delegate._id`, а результаты лежат под `GroupKSTest┴┴y` / `GroupUTest┴┴y` — поиск по id Stats-исполнителя не находит.
 - ИСПРАВЛЕНО: `PandasLstsqExtension.calc` через `create_empty().fillna()` даёт pandas FutureWarning (3 теста lstsq).
 - ИСПРАВЛЕНО (добавлен и `calc`-диспетчер): `MultitestQuantile._calc_pandas` не тестируется: вызов `groupby(fields_list=...)` падает дальше, т.к. в группах остаётся строковая колонка группы.
 - ИСПРАВЛЕНО: `MahalanobisDistance` — недостижимая ветка `test_data=None` удалена; при одной группе `_execute_inner_function` явно бросает `ValueError("test_data is needed ...")`, а `calc` — `NotSuitableFieldError`.
