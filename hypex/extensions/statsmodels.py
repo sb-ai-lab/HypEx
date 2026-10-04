@@ -4,7 +4,7 @@ import numpy as np
 from scipy.stats import norm  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
 
-from ..dataset import Dataset, DatasetAdapter, StatisticRole
+from ..dataset import Dataset, DatasetAdapter, InfoRole, StatisticRole
 from ..utils import ID_SPLIT_SYMBOL, ABNTestMethodsEnum, BackendsEnum
 from ..utils.constants import TEST_NAME_NORMALIZATION
 from .abstract import Extension
@@ -143,19 +143,14 @@ class MultiTest(Extension):
         )
 
     def _calc_spark(self, data: Dataset, **kwargs):
-        """Delegate to the Pandas implementation on the driver.
+        """Delegate to the Pandas implementation via to_backend().
 
         Multiple-testing correction operates on a small, already-collected
         array of p-values (one per test × group), so converting to Pandas
-        on the driver is safe. The composite string index (``test<sep>params
-        <sep>field[<sep>group]``) is kept: it defines the test families and
-        field labels used by ``_calc_pandas``.
+        on the driver is safe. The composite string index must be present on
+        the Spark dataset (it is lost by ``Dataset(pd.DataFrame, spark)``).
         """
-        pandas_ds = Dataset(
-            roles=data.roles,
-            data=data.raw_data.to_pandas(),
-            backend=BackendsEnum.pandas,
-        )
+        pandas_ds = data.to_backend(BackendsEnum.pandas)
         return self._calc_pandas(pandas_ds, **kwargs)
 
 
@@ -213,25 +208,28 @@ class MultitestQuantile(Extension):
             if min_t_value > quantiles[j]:
                 return DatasetAdapter.to_dataset(
                     {"field": target_field, "accepted hypothesis": j + 1},
-                    StatisticRole(),
+                    {"field": InfoRole(str), "accepted hypothesis": StatisticRole(int)},
                 )
         return DatasetAdapter.to_dataset(
-            {"field": target_field, "accepted hypothesis": 0}, StatisticRole()
+            {"field": target_field, "accepted hypothesis": 0},
+            {"field": InfoRole(str), "accepted hypothesis": StatisticRole(int)},
         )
 
     def _calc_spark(self, data: Dataset, **kwargs):
-        """Delegates to the Pandas implementation.
+        """Not supported on Spark.
 
-        Quantile-based multitest runs Monte Carlo simulation on the driver,
-        so data must already be small. ``raw_data`` is passed on as is; it
-        keeps the index needed by ``_index_parts``.
+        The pandas implementation needs per-group mean and variance of the raw
+        target, which pyspark.pandas groups cannot provide here, and collecting
+        the raw data to the driver is not acceptable.
+
+        Raises:
+            NotImplementedError: Always.
         """
-        pdf = data.raw_data
-        pandas_ds = Dataset(
-            roles=data.roles,
-            data=pdf,
+        raise NotImplementedError(
+            "MultitestQuantile is not supported on the Spark backend. "
+            "Use the pandas backend or another multitest_method "
+            "(e.g. 'holm', 'bonferroni')."
         )
-        return self._calc_pandas(pandas_ds, **kwargs)
 
     def quantile_of_marginal_distribution(
         self,

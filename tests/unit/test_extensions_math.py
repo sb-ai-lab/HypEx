@@ -247,7 +247,7 @@ def test_quantile_calc_accepts_best_hypothesis() -> None:
     )
     mtq = MultitestQuantile(alpha=0.05, iteration_size=1000, random_state=0)
     result = mtq._calc_pandas(ds, group_field="g", target_field="y")
-    assert int(_frame(result).iloc[0]["accepted hypothesis"]) == 3
+    assert _frame(result).iloc[0]["accepted hypothesis"] == 3
 
 
 def test_quantile_calc_rejects_when_groups_equal() -> None:
@@ -261,7 +261,7 @@ def test_quantile_calc_rejects_when_groups_equal() -> None:
     )
     mtq = MultitestQuantile(alpha=0.05, iteration_size=1000, random_state=0)
     result = mtq._calc_pandas(ds, group_field="g", target_field="y", quantiles=5.0)
-    assert int(_frame(result).iloc[0]["accepted hypothesis"]) == 0
+    assert _frame(result).iloc[0]["accepted hypothesis"] == 0
 
 
 # ---------------------------------------------------------------------------

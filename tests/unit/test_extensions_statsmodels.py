@@ -68,17 +68,9 @@ def test_quantile_unequal_variance_returns_one_value_per_group() -> None:
     )  # different variances -> different quantiles
 
 
-def test_quantile_spark_wrapper_delegates_with_raw_data(monkeypatch) -> None:
+def test_quantile_spark_path_raises_clear_error(spark_session) -> None:
     from hypex.extensions import MultitestQuantile
 
-    seen = {}
-
-    def fake(self, data, **kwargs):
-        seen["rows"] = len(data)
-        seen["kwargs"] = kwargs
-        return "ok"
-
-    monkeypatch.setattr(MultitestQuantile, "_calc_pandas", fake)
-    ds = _pvalues(RAW_P)
-    assert MultitestQuantile()._calc_spark(ds, group_field="g") == "ok"
-    assert seen == {"rows": len(RAW_P), "kwargs": {"group_field": "g"}}
+    ds = _pvalues(RAW_P, BackendsEnum.spark, spark_session)
+    with pytest.raises(NotImplementedError, match="Spark"):
+        MultitestQuantile().calc(ds, group_field="g", target_field="p-value")
