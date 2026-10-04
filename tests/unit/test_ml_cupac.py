@@ -1,4 +1,5 @@
 """Tests for CUPACExecutor and CupacExtension."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -33,7 +34,9 @@ def _frames(n: int = 400, noise: float = 0.5, seed: int = 0):
 
 def _ds(df: pd.DataFrame, role) -> Dataset:
     return Dataset(
-        roles={c: role() for c in df.columns}, data=df.copy(), backend=BackendsEnum.pandas
+        roles={c: role() for c in df.columns},
+        data=df.copy(),
+        backend=BackendsEnum.pandas,
     )
 
 
@@ -44,7 +47,9 @@ def test_cuped_theta_is_cov_over_var() -> None:
     rng = np.random.RandomState(0)
     x = rng.normal(5, 2, 500)
     y = 1.5 * x + rng.normal(0, 1, 500)
-    assert cuped_theta(y, x) == pytest.approx(np.cov(y, x, ddof=0)[0, 1] / x.var(), abs=TOL)
+    assert cuped_theta(y, x) == pytest.approx(
+        np.cov(y, x, ddof=0)[0, 1] / x.var(), abs=TOL
+    )
 
 
 def test_cuped_theta_zero_variance_covariate() -> None:
@@ -63,7 +68,9 @@ def test_cuped_theta_is_stable_for_large_mean() -> None:
 # ---------------------------------------------------------------------------
 def test_variance_reduction_percentage() -> None:
     y = np.array([1.0, 2.0, 3.0, 4.0])
-    assert CupacExtension._calculate_variance_reduction(y, y * 0.5) == pytest.approx(75.0)
+    assert CupacExtension._calculate_variance_reduction(y, y * 0.5) == pytest.approx(
+        75.0
+    )
 
 
 def test_variance_reduction_never_negative() -> None:
@@ -87,7 +94,10 @@ def test_linear_models_report_coefficients(name) -> None:
 
     fitted = clone(model).fit(X, y["t"])
     imp = CupacExtension._extract_fold_importances(fitted, name, ["0", "1"])
-    assert imp == {"0": pytest.approx(float(fitted.coef_[0])), "1": pytest.approx(float(fitted.coef_[1]))}
+    assert imp == {
+        "0": pytest.approx(float(fitted.coef_[0])),
+        "1": pytest.approx(float(fitted.coef_[1])),
+    }
 
 
 def test_unknown_model_gives_no_importances() -> None:
@@ -141,7 +151,10 @@ def test_kfold_fit_is_reproducible_with_seed() -> None:
     X, y = _frames()
     results = [
         CupacExtension(random_state=7)._calc_pandas(
-            data=_ds(X, FeatureRole), mode="kfold_fit", model="ridge", Y=_ds(y, TargetRole)
+            data=_ds(X, FeatureRole),
+            mode="kfold_fit",
+            model="ridge",
+            Y=_ds(y, TargetRole),
         )
         for _ in range(2)
     ]
@@ -152,7 +165,9 @@ def test_kfold_fit_is_reproducible_with_seed() -> None:
 def test_fit_then_predict_recovers_linear_signal() -> None:
     X, y = _frames(noise=0.01)
     extension = CupacExtension(random_state=0)
-    model = extension._calc_pandas(data=_ds(X, FeatureRole), mode="fit", model="linear", Y=_ds(y, TargetRole))
+    model = extension._calc_pandas(
+        data=_ds(X, FeatureRole), mode="fit", model="linear", Y=_ds(y, TargetRole)
+    )
     pred = extension._calc_pandas(data=_ds(X, FeatureRole), mode="predict", model=model)
     assert list(pred.columns) == ["predict"]
     np.testing.assert_allclose(
@@ -164,7 +179,10 @@ def test_unknown_model_name_raises_key_error() -> None:
     X, y = _frames()
     with pytest.raises(KeyError):
         CupacExtension()._calc_pandas(
-            data=_ds(X, FeatureRole), mode="kfold_fit", model="nope", Y=_ds(y, TargetRole)
+            data=_ds(X, FeatureRole),
+            mode="kfold_fit",
+            model="nope",
+            Y=_ds(y, TargetRole),
         )
 
 
@@ -173,7 +191,10 @@ def test_catboost_kfold_importances() -> None:
     pytest.importorskip("catboost")
     X, y = _frames(n=200, noise=0.1)
     var_red, importances = CupacExtension(n_folds=3, random_state=0)._calc_pandas(
-        data=_ds(X, FeatureRole), mode="kfold_fit", model="catboost", Y=_ds(y, TargetRole)
+        data=_ds(X, FeatureRole),
+        mode="kfold_fit",
+        model="catboost",
+        Y=_ds(y, TargetRole),
     )
     assert var_red > 50.0
     assert sum(importances.values()) == pytest.approx(100.0, abs=1.0)
@@ -249,7 +270,9 @@ def test_prepare_data_builds_train_and_predict_structures() -> None:
 def test_prepare_data_requires_lagged_history() -> None:
     df = pd.DataFrame({"y": [1.0, 2.0, 3.0]})
     ed = ExperimentData(
-        Dataset(roles={"y": TargetRole(cofounders=[])}, data=df, backend=BackendsEnum.pandas)
+        Dataset(
+            roles={"y": TargetRole(cofounders=[])}, data=df, backend=BackendsEnum.pandas
+        )
     )
     with pytest.raises(ValueError, match="no lag periods"):
         CUPACExecutor._prepare_data(ed)

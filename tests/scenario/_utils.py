@@ -1,4 +1,5 @@
 """Shared helpers for scenario tests (synthetic data with a known truth)."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -8,7 +9,6 @@ from hypex.dataset import (
     Dataset,
     FeatureRole,
     InfoRole,
-    PreTargetRole,
     TargetRole,
     TreatmentRole,
 )

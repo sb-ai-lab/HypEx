@@ -1,4 +1,5 @@
 """Tests for Dataset binary/unary operators and copy semantics."""
+
 from __future__ import annotations
 
 import operator
@@ -56,8 +57,12 @@ def test_arithmetic_with_dataset(make_dataset, name, op) -> None:
 
 @pytest.mark.parametrize(
     "name,op",
-    [("__radd__", lambda d: 10 + d), ("__rsub__", lambda d: 10 - d),
-     ("__rmul__", lambda d: 10 * d), ("__rtruediv__", lambda d: 10 / d)],
+    [
+        ("__radd__", lambda d: 10 + d),
+        ("__rsub__", lambda d: 10 - d),
+        ("__rmul__", lambda d: 10 * d),
+        ("__rtruediv__", lambda d: 10 / d),
+    ],
     ids=["radd", "rsub", "rmul", "rtruediv"],
 )
 def test_reflected_operators(make_dataset, name, op) -> None:
@@ -129,7 +134,9 @@ def test_operator_across_backends_raises(make_dataset, spark_session) -> None:
     df = pd.DataFrame({"x": [1, 2, 3]})
     roles = {"x": FeatureRole()}
     pandas_ds = Dataset(roles=roles, data=df)
-    spark_ds = Dataset(roles=roles, data=df, backend=BackendsEnum.spark, session=spark_session)
+    spark_ds = Dataset(
+        roles=roles, data=df, backend=BackendsEnum.spark, session=spark_session
+    )
     with pytest.raises(BackendTypeError):
         _ = pandas_ds + spark_ds
 

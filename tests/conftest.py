@@ -3,6 +3,7 @@
 Provides session-scoped Spark session, numpy seed isolation,
 backend parametrization, and dataset factory fixtures.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -40,8 +41,7 @@ def spark_session():
         pytest.skip("PySpark is not installed")
 
     session = (
-        SparkSession.builder
-        .master("local[*]")
+        SparkSession.builder.master("local[*]")
         .appName("HypEx-Tests")
         .config("spark.ui.enabled", "false")
         .config("spark.sql.shuffle.partitions", "2")
@@ -130,6 +130,7 @@ def make_dataset(backend, spark_session):
                 ds = make_dataset(df, {"x": FeatureRole(), "y": TargetRole()})
                 assert len(ds) == 3
     """
+
     def _factory(
         data: pd.DataFrame,
         roles: dict[str, ABCRole],
@@ -177,9 +178,7 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "spark_session" in getattr(item, "fixturenames", []):
             # Only add if not already marked (backend fixture handles its own)
-            if not any(
-                marker.name == "spark" for marker in item.iter_markers()
-            ):
+            if not any(marker.name == "spark" for marker in item.iter_markers()):
                 item.add_marker(pytest.mark.spark)
 
 

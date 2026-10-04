@@ -3,6 +3,7 @@
 Where the library currently misbehaves the test is an ``xfail(strict=True)`` that
 states the desired behaviour (a descriptive error or a correct result).
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -163,7 +164,9 @@ def test_missing_treatment_role_raises() -> None:
 def test_missing_target_role_raises() -> None:
     df = _frame()[["treat", "x"]]
     with pytest.raises(NoColumnsError):
-        ABTest().execute(make_dataset(df, {"treat": TreatmentRole(), "x": FeatureRole()}))
+        ABTest().execute(
+            make_dataset(df, {"treat": TreatmentRole(), "x": FeatureRole()})
+        )
 
 
 @pytest.mark.xfail(
@@ -194,7 +197,9 @@ def test_duplicate_index_ab_matches_manual_difference() -> None:
     dup = df.copy()
     dup.index = [0] * len(dup)
     out = ABTest().execute(make_dataset(dup, ROLES))
-    assert float(to_pandas(out.resume).iloc[0]["difference"]) == pytest.approx(expected, abs=1e-9)
+    assert float(to_pandas(out.resume).iloc[0]["difference"]) == pytest.approx(
+        expected, abs=1e-9
+    )
 
 
 @pytest.mark.xfail(

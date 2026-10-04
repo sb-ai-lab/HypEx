@@ -1,11 +1,12 @@
 """Backend contracts of extensions: abstract methods and aggregation parity."""
+
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from hypex.dataset import Dataset, FeatureRole, TargetRole
+from hypex.dataset import Dataset, FeatureRole
 from hypex.extensions import (
     BiasExtension,
     DummyEncoderExtension,
@@ -24,7 +25,9 @@ ALL_STATS = ["mean", "std", "var", "count", "sum", "min", "max"]
 def _ds(df, backend, session=None, roles=None) -> Dataset:
     roles = roles or {c: FeatureRole() for c in df.columns}
     return Dataset(
-        roles=roles, data=df.copy(), backend=backend,
+        roles=roles,
+        data=df.copy(),
+        backend=backend,
         session=session if backend == BackendsEnum.spark else None,
     )
 
@@ -173,7 +176,10 @@ def test_spark_aggregation_skips_nan_like_pandas(frame, spark_session) -> None:
         _ds(frame, BackendsEnum.pandas), ["g"], ["x"], ["mean", "count", "var"]
     )
     spark_result = StatsAggregationExtension().calc(
-        _ds(frame, BackendsEnum.spark, spark_session), ["g"], ["x"], ["mean", "count", "var"]
+        _ds(frame, BackendsEnum.spark, spark_session),
+        ["g"],
+        ["x"],
+        ["mean", "count", "var"],
     )
     for group in pandas_result:
         for stat in ("mean", "count", "var"):

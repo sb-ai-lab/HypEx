@@ -1,4 +1,5 @@
 """Shared helpers for comparator tests."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -13,7 +14,9 @@ from hypex.dataset import (
 from hypex.utils import BackendsEnum
 
 
-def build_dataset(df: pd.DataFrame, roles: dict, backend=BackendsEnum.pandas, session=None) -> Dataset:
+def build_dataset(
+    df: pd.DataFrame, roles: dict, backend=BackendsEnum.pandas, session=None
+) -> Dataset:
     """Create a Dataset on the requested backend."""
     return Dataset(
         roles=roles,

@@ -1,4 +1,5 @@
 """Tests for all exception classes in hypex.utils.errors."""
+
 from __future__ import annotations
 
 import inspect
@@ -43,7 +44,9 @@ CASES = [
 ]
 
 
-@pytest.mark.parametrize("exc_cls,args,fragments", CASES, ids=[c[0].__name__ for c in CASES])
+@pytest.mark.parametrize(
+    "exc_cls,args,fragments", CASES, ids=[c[0].__name__ for c in CASES]
+)
 def test_error_message_contains_context(exc_cls, args, fragments) -> None:
     error = exc_cls(*args)
     for fragment in fragments:
@@ -74,7 +77,9 @@ def test_every_error_class_in_module_is_covered() -> None:
     defined = {
         name
         for name, obj in vars(errors).items()
-        if inspect.isclass(obj) and issubclass(obj, Exception) and obj.__module__ == errors.__name__
+        if inspect.isclass(obj)
+        and issubclass(obj, Exception)
+        and obj.__module__ == errors.__name__
     }
     assert defined == {c[0].__name__ for c in CASES}
 

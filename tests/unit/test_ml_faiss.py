@@ -1,4 +1,5 @@
 """Tests for FaissNearestNeighbors and the Pandas/Spark FAISS extensions."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -18,7 +19,9 @@ from hypex.utils import BackendsEnum
 from hypex.utils.errors import AbstractMethodError, PairsNotFoundError
 
 
-def _points(n: int = 30, seed: int = 0, offset: float = 0.0, start: int = 0) -> pd.DataFrame:
+def _points(
+    n: int = 30, seed: int = 0, offset: float = 0.0, start: int = 0
+) -> pd.DataFrame:
     rng = np.random.RandomState(seed)
     return pd.DataFrame(
         rng.normal(offset, 1, (n, 2)),
@@ -93,7 +96,9 @@ def test_pandas_extension_returns_global_control_index_labels() -> None:
     "by -1, so non-default (e.g. shuffled or offset) index labels are lost",
 )
 def test_pandas_extension_exact_duplicate_is_nearest() -> None:
-    control = pd.DataFrame({"f1": [0.0, 10.0, 20.0], "f2": [0.0, 10.0, 20.0]}, index=[7, 8, 9])
+    control = pd.DataFrame(
+        {"f1": [0.0, 10.0, 20.0], "f2": [0.0, 10.0, 20.0]}, index=[7, 8, 9]
+    )
     test = pd.DataFrame({"f1": [10.0], "f2": [10.0]}, index=[0])
     found = _pdf(PandasFaissExtension().calc(_ds(control), _ds(test)))
     assert found.iloc[0, 0] == 8
@@ -101,7 +106,9 @@ def test_pandas_extension_exact_duplicate_is_nearest() -> None:
 
 @pytest.mark.parametrize("mode", ["base", "auto", "fast"])
 def test_faiss_modes_give_same_result_on_small_data(control, test_df, mode) -> None:
-    base = _pdf(PandasFaissExtension(faiss_mode="base").calc(_ds(control), _ds(test_df)))
+    base = _pdf(
+        PandasFaissExtension(faiss_mode="base").calc(_ds(control), _ds(test_df))
+    )
     other = _pdf(PandasFaissExtension(faiss_mode=mode).calc(_ds(control), _ds(test_df)))
     assert base.equals(other)
 
@@ -121,7 +128,9 @@ def test_mahalanobis_transform_noop_without_matrix(control) -> None:
 def test_mahalanobis_transform_applies_matrix(control) -> None:
     matrix = Dataset(
         roles={"a": FeatureRole(), "b": FeatureRole()},
-        data=pd.DataFrame([[2.0, 0.0], [0.0, 3.0]], index=["f1", "f2"], columns=["a", "b"]),
+        data=pd.DataFrame(
+            [[2.0, 0.0], [0.0, 3.0]], index=["f1", "f2"], columns=["a", "b"]
+        ),
         backend=BackendsEnum.pandas,
     )
     transformed = FaissExtension._mahalanobis_transform(_ds(control), matrix)
@@ -180,7 +189,9 @@ def test_spark_extension_matches_brute_force(control, test_df, spark_session) ->
     ctrl = _ds(control.reset_index(drop=True), BackendsEnum.spark, spark_session)
     test = _ds(test_df.reset_index(drop=True), BackendsEnum.spark, spark_session)
     result = _pdf(SparkFaissExtension(n_neighbors=1).calc(ctrl, test))
-    expected = _brute_force(control.reset_index(drop=True), test_df.reset_index(drop=True), 1)[:, 0]
+    expected = _brute_force(
+        control.reset_index(drop=True), test_df.reset_index(drop=True), 1
+    )[:, 0]
     # Spark returns partitions in arbitrary row order; the index carries the query row id.
     assert result.sort_index().iloc[:, 0].tolist() == expected.tolist()
 
@@ -205,21 +216,36 @@ def _experiment(n_each: int = 20, seed: int = 0) -> tuple[pd.DataFrame, Experime
     rng = np.random.RandomState(seed)
     X = rng.normal(0, 1, (2 * n_each, 2))
     df = pd.DataFrame(
-        {"f1": X[:, 0], "f2": X[:, 1], "t": np.r_[np.zeros(n_each, int), np.ones(n_each, int)]}
+        {
+            "f1": X[:, 0],
+            "f2": X[:, 1],
+            "t": np.r_[np.zeros(n_each, int), np.ones(n_each, int)],
+        }
     )
     roles = {"f1": FeatureRole(), "f2": FeatureRole(), "t": TreatmentRole()}
-    return df, ExperimentData(Dataset(roles=roles, data=df.copy(), backend=BackendsEnum.pandas))
+    return df, ExperimentData(
+        Dataset(roles=roles, data=df.copy(), backend=BackendsEnum.pandas)
+    )
 
 
 def test_executor_defaults() -> None:
     executor = FaissNearestNeighbors()
-    assert (executor.n_neighbors, executor.two_sides, executor.test_pairs) == (1, False, False)
+    assert (executor.n_neighbors, executor.two_sides, executor.test_pairs) == (
+        1,
+        False,
+        False,
+    )
     assert executor.faiss_mode == "auto"
 
 
 def test_inner_function_matches_brute_force(control, test_df) -> None:
-    result = FaissNearestNeighbors._inner_function(_ds(control), _ds(test_df), n_neighbors=1)
-    assert _pdf(result).iloc[:, 0].tolist() == _brute_force(control, test_df, 1)[:, 0].tolist()
+    result = FaissNearestNeighbors._inner_function(
+        _ds(control), _ds(test_df), n_neighbors=1
+    )
+    assert (
+        _pdf(result).iloc[:, 0].tolist()
+        == _brute_force(control, test_df, 1)[:, 0].tolist()
+    )
 
 
 def test_execute_inner_function_returns_test_only_by_default(control, test_df) -> None:
@@ -256,7 +282,7 @@ def test_execute_inner_function_test_pairs_returns_control(control, test_df) -> 
     "one-sided result is shorter than the dataset, so default matching cannot run",
 )
 def test_execute_default_one_sided_matching() -> None:
-    df, data = _experiment()
+    _df, data = _experiment()
     out = FaissNearestNeighbors(grouping_role=TreatmentRole()).execute(data)
     matched = [
         c for c in out.ds.columns if isinstance(out.ds.roles[c], AdditionalMatchingRole)
@@ -273,7 +299,9 @@ def test_execute_two_sides_stores_matched_indexes() -> None:
     df, data = _experiment()
     executor = FaissNearestNeighbors(two_sides=True, grouping_role=TreatmentRole())
     out = executor.execute(data)
-    matched = [c for c in out.ds.columns if isinstance(out.ds.roles[c], AdditionalMatchingRole)]
+    matched = [
+        c for c in out.ds.columns if isinstance(out.ds.roles[c], AdditionalMatchingRole)
+    ]
     assert len(matched) == 1
     found = out.ds.backend_data.data[matched[0]]
     ctrl = df[df.t == 0][["f1", "f2"]]
@@ -293,8 +321,12 @@ def test_execute_two_sides_stores_matched_indexes() -> None:
 )
 def test_execute_two_sides_neighbours_come_from_opposite_group() -> None:
     df, data = _experiment()
-    out = FaissNearestNeighbors(two_sides=True, grouping_role=TreatmentRole()).execute(data)
-    col = [c for c in out.ds.columns if isinstance(out.ds.roles[c], AdditionalMatchingRole)][0]
+    out = FaissNearestNeighbors(two_sides=True, grouping_role=TreatmentRole()).execute(
+        data
+    )
+    col = next(
+        c for c in out.ds.columns if isinstance(out.ds.roles[c], AdditionalMatchingRole)
+    )
     found = out.ds.backend_data.data[col]
     for idx, match in found.items():
         assert df.t.loc[match] != df.t.loc[idx]
@@ -337,7 +369,9 @@ def _with_groups(n_each: int = 20, seed: int = 0):
 
 
 def _matched(out) -> pd.DataFrame:
-    cols = [c for c in out.ds.columns if isinstance(out.ds.roles[c], AdditionalMatchingRole)]
+    cols = [
+        c for c in out.ds.columns if isinstance(out.ds.roles[c], AdditionalMatchingRole)
+    ]
     return out.ds.backend_data.data[cols]
 
 
@@ -359,10 +393,10 @@ def test_execute_with_groups_one_sided_fills_control_with_dummy() -> None:
 
 
 def test_execute_with_groups_two_sided() -> None:
-    df, ctrl, test, data = _with_groups()
-    out = FaissNearestNeighbors(
-        two_sides=True, grouping_role=TreatmentRole()
-    ).execute(data)
+    _df, ctrl, test, data = _with_groups()
+    out = FaissNearestNeighbors(two_sides=True, grouping_role=TreatmentRole()).execute(
+        data
+    )
     found = _matched(out).iloc[:, 0]
     np.testing.assert_array_equal(
         found.loc[test.index].to_numpy(), _brute_force(ctrl, test, 1)[:, 0]
@@ -379,10 +413,10 @@ def test_execute_with_groups_two_sided() -> None:
     "the one-sided result is shorter than the dataset",
 )
 def test_execute_with_groups_test_pairs_matches_control_rows() -> None:
-    df, ctrl, test, data = _with_groups()
-    out = FaissNearestNeighbors(
-        test_pairs=True, grouping_role=TreatmentRole()
-    ).execute(data)
+    _df, ctrl, test, data = _with_groups()
+    out = FaissNearestNeighbors(test_pairs=True, grouping_role=TreatmentRole()).execute(
+        data
+    )
     found = _matched(out).iloc[:, 0]
     np.testing.assert_array_equal(
         found.loc[ctrl.index].to_numpy(), _brute_force(test, ctrl, 1)[:, 0]
@@ -416,7 +450,7 @@ def test_execute_inner_function_test_pairs_two_sides_test_entry_has_test_rows() 
 
 
 def test_execute_with_groups_n_neighbors_two_gives_two_columns() -> None:
-    df, ctrl, test, data = _with_groups()
+    df, _ctrl, _test, data = _with_groups()
     out = FaissNearestNeighbors(
         n_neighbors=2, two_sides=True, grouping_role=TreatmentRole()
     ).execute(data)
@@ -431,7 +465,9 @@ def test_set_global_match_indexes_maps_positions_to_labels() -> None:
         data=pd.DataFrame({"m": [0, 2]}),
         backend=BackendsEnum.pandas,
     )
-    group = _ds(pd.DataFrame({"f1": [1.0, 2.0, 3.0], "f2": [0.0, 0.0, 0.0]}, index=[10, 20, 30]))
+    group = _ds(
+        pd.DataFrame({"f1": [1.0, 2.0, 3.0], "f2": [0.0, 0.0, 0.0]}, index=[10, 20, 30])
+    )
     result = FaissNearestNeighbors._set_global_match_indexes(local, ("0", group))
     assert list(_pdf(result)["m"]) == [10, 30]
 

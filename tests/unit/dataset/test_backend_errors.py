@@ -1,4 +1,5 @@
 """Error handling shared by (or specific to) the Pandas and Spark backends."""
+
 from __future__ import annotations
 
 import warnings
@@ -40,7 +41,9 @@ def spark_ds(spark_session) -> Dataset:
 # ---------------------------------------------------------------------------
 # Merge errors (both backends via the ``make_dataset`` fixture)
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize("kwargs", [{"on": "missing"}, {"left_on": "missing", "right_on": "k"}])
+@pytest.mark.parametrize(
+    "kwargs", [{"on": "missing"}, {"left_on": "missing", "right_on": "k"}]
+)
 def test_merge_on_missing_column_raises(make_dataset, kwargs) -> None:
     ds = make_dataset(DF, {c: FeatureRole() for c in DF.columns})
     with pytest.raises(MergeOnError):
@@ -81,7 +84,9 @@ def test_conversion_limit_blocks_to_pandas(spark_ds, monkeypatch) -> None:
 
 @pytest.mark.spark
 @pytest.mark.parametrize("method", ["to_dict", "get_values"])
-def test_conversion_limit_blocks_materialising_methods(spark_ds, monkeypatch, method) -> None:
+def test_conversion_limit_blocks_materialising_methods(
+    spark_ds, monkeypatch, method
+) -> None:
     monkeypatch.setattr(DatasetConfig, "SPARK_PANDAS_CONVERSION_LIMIT", 2)
     with pytest.raises(ValueError, match="exceed limit"):
         getattr(spark_ds, method)()
@@ -102,7 +107,9 @@ def test_to_backend_unsupported_target_raises(spark_ds) -> None:
 
 
 def test_pandas_to_backend_pandas_is_identity(pandas_ds) -> None:
-    assert pandas_ds.backend_data.to_backend(BackendsEnum.pandas) is pandas_ds.backend_data
+    assert (
+        pandas_ds.backend_data.to_backend(BackendsEnum.pandas) is pandas_ds.backend_data
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -116,7 +123,9 @@ def test_pandas_checkpoint_is_silent_noop(pandas_ds) -> None:
 
 
 @pytest.mark.spark
-def test_spark_checkpoint_without_dir_warns_and_keeps_data(spark_ds, spark_session) -> None:
+def test_spark_checkpoint_without_dir_warns_and_keeps_data(
+    spark_ds, spark_session
+) -> None:
     if spark_session.sparkContext.getCheckpointDir() is not None:
         pytest.skip("checkpoint dir already configured for this session")
     with pytest.warns(UserWarning, match="checkpoint directory is not set"):

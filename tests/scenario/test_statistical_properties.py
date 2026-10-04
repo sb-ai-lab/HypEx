@@ -1,4 +1,5 @@
 """Monte-Carlo checks of the statistical guarantees (I0). All tests are slow."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -11,18 +12,19 @@ from hypex.dataset import (
     Dataset,
     ExperimentData,
     FeatureRole,
-    GroupingRole,
     PreTargetRole,
     TargetRole,
     TreatmentRole,
 )
-from hypex.executor.executor import Executor
 from hypex.experiments import Experiment
-from hypex.operators import MatchingMetrics
 from hypex.ml import FaissNearestNeighbors
+from hypex.operators import MatchingMetrics
 from hypex.transformers import CUPEDTransformer
 from hypex.utils import BackendsEnum
-from hypex.utils.tutorial_data_creation import gen_control_variates_df, gen_special_medicine_df
+from hypex.utils.tutorial_data_creation import (
+    gen_control_variates_df,
+    gen_special_medicine_df,
+)
 
 from ._utils import make_dataset, to_pandas
 
@@ -71,7 +73,9 @@ def test_power_is_monotone_in_effect_size() -> None:
     effects = [0.0, 0.2, 0.4, 0.8]
     power = []
     for effect in effects:
-        pvals = [_ttest_pvalue(_null_frame(1000 + s, effect=effect)) for s in range(N_RUNS)]
+        pvals = [
+            _ttest_pvalue(_null_frame(1000 + s, effect=effect)) for s in range(N_RUNS)
+        ]
         power.append(float(np.mean(np.array(pvals) < 0.05)))
     assert power == sorted(power), power
     assert power[0] < 0.12 and power[-1] > 0.95
@@ -99,7 +103,9 @@ def test_matching_beats_naive_on_confounded_data() -> None:
     naive_errors, matched_errors = [], []
     for seed in range(6):
         raw = gen_special_medicine_df(3000, dependent_division=True, random_state=seed)
-        raw = raw.rename(columns={"experimental_treatment": "treat", "residual_lifetime": "y"})
+        raw = raw.rename(
+            columns={"experimental_treatment": "treat", "residual_lifetime": "y"}
+        )
         naive = raw.y[raw.treat == 1].mean() - raw.y[raw.treat == 0].mean()
         roles = {
             "treat": TreatmentRole(),
@@ -107,7 +113,9 @@ def test_matching_beats_naive_on_confounded_data() -> None:
             "age": FeatureRole(),
             "disease_degree": FeatureRole(),
         }
-        data = ExperimentData(Dataset(roles=roles, data=raw.copy(), backend=BackendsEnum.pandas))
+        data = ExperimentData(
+            Dataset(roles=roles, data=raw.copy(), backend=BackendsEnum.pandas)
+        )
         pipeline = Experiment(
             [
                 FaissNearestNeighbors(two_sides=True, grouping_role=TreatmentRole()),
@@ -115,7 +123,12 @@ def test_matching_beats_naive_on_confounded_data() -> None:
             ]
         )
         out = pipeline.execute(data)
-        key = out.get_one_id(MatchingMetrics, __import__("hypex.utils", fromlist=["ExperimentDataEnum"]).ExperimentDataEnum.variables)
+        key = out.get_one_id(
+            MatchingMetrics,
+            __import__(
+                "hypex.utils", fromlist=["ExperimentDataEnum"]
+            ).ExperimentDataEnum.variables,
+        )
         att = out.variables[key]["ATT"][0]
         naive_errors.append(abs(naive - true_effect))
         matched_errors.append(abs(att - true_effect))
@@ -134,7 +147,9 @@ def test_cuped_reduces_variance_by_expected_amount() -> None:
         "X_lag_1": FeatureRole(),
     }
     ds = Dataset(roles=roles, data=raw.copy(), backend=BackendsEnum.pandas)
-    adjusted = to_pandas(CUPEDTransformer.calc(ds, {"Target": "Target_lag_1"}))["Target_cuped"]
+    adjusted = to_pandas(CUPEDTransformer.calc(ds, {"Target": "Target_lag_1"}))[
+        "Target_cuped"
+    ]
     rho2 = np.corrcoef(raw.Target, raw.Target_lag_1)[0, 1] ** 2
     reduction = 1 - adjusted.var() / raw.Target.var()
     assert reduction == pytest.approx(rho2, abs=0.01)

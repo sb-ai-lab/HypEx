@@ -5,6 +5,7 @@ results of one ``Dataset`` method. Known, intentional divergences live in
 ``test_backend_divergences.py`` and are not exercised here (inputs avoid NaN
 in aggregations for that reason).
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -15,6 +16,7 @@ from hypex.dataset import Dataset, FeatureRole
 from hypex.utils import BackendsEnum
 
 pytestmark = pytest.mark.spark
+
 
 def _to_pandas(ds: Dataset) -> pd.DataFrame:
     """Return the backend data of ``ds`` as a pandas frame (Spark -> pandas)."""

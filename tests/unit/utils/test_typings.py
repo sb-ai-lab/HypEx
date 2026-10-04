@@ -1,7 +1,7 @@
 """Tests for GenericManager.check_type and SparkTypeMapper."""
+
 from __future__ import annotations
 
-import datetime
 from decimal import Decimal
 from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple, Union
 

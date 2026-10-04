@@ -1,4 +1,5 @@
 """Tests for Output, ExperimentShell and the AA/AB/Homogeneity/Matching outputs."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -16,8 +17,8 @@ from hypex.dataset import (
     TargetRole,
     TreatmentRole,
 )
-from hypex.experiments import Experiment
 from hypex.executor import Executor
+from hypex.experiments import Experiment
 from hypex.reporters import Reporter
 from hypex.ui.aa import AAOutput
 from hypex.ui.ab import ABOutput, CupacOutput
@@ -117,7 +118,9 @@ def test_output_keeps_experiment_data_reference() -> None:
 def _split_dataset() -> SmallDataset:
     return SmallDataset(
         roles={f"a{S}b": InfoRole(), "plain": InfoRole()},
-        data=pd.DataFrame({f"a{S}b": [1, 2], "plain": [3, 4]}, index=[f"i{S}1", f"i{S}2"]),
+        data=pd.DataFrame(
+            {f"a{S}b": [1, 2], "plain": [3, 4]}, index=[f"i{S}1", f"i{S}2"]
+        ),
     )
 
 
@@ -173,13 +176,17 @@ def test_shell_accepts_experiment_data() -> None:
 
 def test_shell_applies_experiment_params() -> None:
     executor = _NoOp()
-    ExperimentShell(Experiment([executor]), Output(_ValueReporter(0)), {_NoOp: {"marker": "y"}})
+    ExperimentShell(
+        Experiment([executor]), Output(_ValueReporter(0)), {_NoOp: {"marker": "y"}}
+    )
     assert executor.marker == "y"
 
 
 def test_shell_exposes_experiment() -> None:
     experiment = Experiment([])
-    assert ExperimentShell(experiment, Output(_ValueReporter(0))).experiment is experiment
+    assert (
+        ExperimentShell(experiment, Output(_ValueReporter(0))).experiment is experiment
+    )
 
 
 def test_shell_is_reusable() -> None:
@@ -191,7 +198,9 @@ def test_shell_is_reusable() -> None:
 
 
 @pytest.mark.spark
-def test_shell_auto_persist_spark_unpersists_only_what_it_persisted(spark_session) -> None:
+def test_shell_auto_persist_spark_unpersists_only_what_it_persisted(
+    spark_session,
+) -> None:
     dataset = _dataset(backend=BackendsEnum.spark, session=spark_session)
     ExperimentShell(Experiment([_NoOp()]), Output(_ValueReporter(0))).execute(dataset)
     assert not dataset.is_persisted
@@ -207,7 +216,9 @@ def test_shell_auto_persist_can_be_disabled(spark_session) -> None:
             seen.append(data.ds.is_persisted)
             return data
 
-    ExperimentShell(Experiment([_Check()]), Output(_ValueReporter(0)), auto_persist=False).execute(dataset)
+    ExperimentShell(
+        Experiment([_Check()]), Output(_ValueReporter(0)), auto_persist=False
+    ).execute(dataset)
     assert seen == [False]
 
 
@@ -233,7 +244,13 @@ def test_ab_output_two_groups() -> None:
     assert isinstance(output, ABOutput)
     resume = _frame(output.resume)
     assert resume.loc[0, "feature"] == "y"
-    assert {"control mean", "test mean", "difference", "TTest pass", "TTest p-value"} <= set(resume.columns)
+    assert {
+        "control mean",
+        "test mean",
+        "difference",
+        "TTest pass",
+        "TTest p-value",
+    } <= set(resume.columns)
     assert resume["TTest pass"].iloc[0] in ("OK", "NOT OK")
     assert isinstance(output.multitest, str)
     sizes = _frame(output.sizes)
@@ -250,7 +267,9 @@ def test_ab_output_three_groups_has_multitest_table() -> None:
     table = _frame(output.multitest)
     assert len(table) == 2
     assert sorted(table["group"]) == ["1", "2"]
-    assert (table["new p-value"].astype(float) >= table["old p-value"].astype(float) - 1e-12).all()
+    assert (
+        table["new p-value"].astype(float) >= table["old p-value"].astype(float) - 1e-12
+    ).all()
 
 
 def test_ab_output_values_match_manual_computation() -> None:
@@ -260,7 +279,9 @@ def test_ab_output_values_match_manual_computation() -> None:
     control, test = df.y[df.treat == 0], df.y[df.treat == 1]
     assert float(resume["control mean"]) == pytest.approx(control.mean(), abs=1e-6)
     assert float(resume["test mean"]) == pytest.approx(test.mean(), abs=1e-6)
-    assert float(resume["difference"]) == pytest.approx(test.mean() - control.mean(), abs=1e-6)
+    assert float(resume["difference"]) == pytest.approx(
+        test.mean() - control.mean(), abs=1e-6
+    )
 
 
 @pytest.mark.xfail(
@@ -299,7 +320,13 @@ def test_homo_output_resume() -> None:
 def test_aa_output_structure() -> None:
     output = AATest(n_iterations=4, random_states=range(4)).execute(_dataset())
     assert isinstance(output, AAOutput)
-    for attribute in ("resume", "best_split", "experiments", "aa_score", "best_split_statistics"):
+    for attribute in (
+        "resume",
+        "best_split",
+        "experiments",
+        "aa_score",
+        "best_split_statistics",
+    ):
         assert hasattr(output, attribute), attribute
     assert len(_frame(output.experiments)) == 4
     assert not any(S in c for c in output.experiments.columns)
@@ -318,7 +345,9 @@ def test_aa_output_reproducible_with_fixed_states() -> None:
 )
 @pytest.mark.spark
 def test_matching_output_structure_on_spark(spark_session) -> None:
-    output = Matching().execute(_dataset(backend=BackendsEnum.spark, session=spark_session))
+    output = Matching().execute(
+        _dataset(backend=BackendsEnum.spark, session=spark_session)
+    )
     assert isinstance(output, MatchingOutput)
     for attribute in ("resume", "full_data", "indexes", "quality_results"):
         assert hasattr(output, attribute), attribute

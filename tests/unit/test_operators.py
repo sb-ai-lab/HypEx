@@ -1,4 +1,5 @@
 """Tests for SMD, MatchingMetrics and Bias operators."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -53,7 +54,9 @@ def test_smd_requires_test_data() -> None:
 # MatchingMetrics: pure statistics
 # ---------------------------------------------------------------------------
 def _ext(metric="auto", n_neighbors=1) -> PandasMatchingMetricsExtension:
-    return PandasMatchingMetricsExtension(TreatmentRole(), [TargetRole()], metric, n_neighbors)
+    return PandasMatchingMetricsExtension(
+        TreatmentRole(), [TargetRole()], metric, n_neighbors
+    )
 
 
 STATS_C = {"count": 40, "mean": 1.0, "var": 4.0, "sum": 40.0, "sq_sum": 60.0}
@@ -86,7 +89,9 @@ def test_calc_metrics_atc_formulas() -> None:
     expected_se = np.sqrt(1.0 * 4.0 / m + n * 80.0 / m**2 * 9.0 / n)
     assert estimate == 1.0
     assert se == pytest.approx(expected_se, abs=TOL)
-    assert (lo, hi) == pytest.approx((1.0 - 1.96 * expected_se, 1.0 + 1.96 * expected_se), abs=TOL)
+    assert (lo, hi) == pytest.approx(
+        (1.0 - 1.96 * expected_se, 1.0 + 1.96 * expected_se), abs=TOL
+    )
 
 
 def test_calc_metrics_auto_returns_all_three_and_ate_is_weighted_mean() -> None:
@@ -186,7 +191,9 @@ def test_matching_metrics_recovers_true_effect(matched) -> None:
     assert abs(estimate - 5.0) < 1.5
 
 
-@pytest.mark.parametrize("metric,keys", [("att", {"ATT"}), ("atc", {"ATC"}), ("auto", {"ATT", "ATC", "ATE"})])
+@pytest.mark.parametrize(
+    "metric,keys", [("att", {"ATT"}), ("atc", {"ATC"}), ("auto", {"ATT", "ATC", "ATE"})]
+)
 def test_matching_metrics_metric_selects_outputs(matched, metric, keys) -> None:
     df, roles = matched
     operator = MatchingMetrics(grouping_role=TreatmentRole(), metric=metric)
@@ -221,7 +228,9 @@ def test_matching_metrics_pandas_spark_parity(matched, spark_session) -> None:
         results[backend] = operator.execute(ExperimentData(ds)).variables[operator.id]
     for key in ("ATT", "ATC", "ATE"):
         np.testing.assert_allclose(
-            results[BackendsEnum.pandas][key], results[BackendsEnum.spark][key], rtol=1e-5
+            results[BackendsEnum.pandas][key],
+            results[BackendsEnum.spark][key],
+            rtol=1e-5,
         )
 
 
@@ -230,7 +239,7 @@ def test_bias_execute_matches_numpy_ols(matched) -> None:
     operator = Bias(grouping_role=TreatmentRole(), target_roles=[TargetRole()])
     out = operator.execute(ExperimentData(_ds(df, **roles)))
     table = out.additional_fields.backend_data.data
-    bias_col = [c for c in table.columns if "bias" in str(c)][0]
+    bias_col = next(c for c in table.columns if "bias" in str(c))
     bias = table[bias_col].reindex(df.index).to_numpy(dtype=float)
 
     nn = df.nn.to_numpy()
@@ -248,10 +257,14 @@ def test_bias_correction_reduces_matching_discrepancy(matched) -> None:
     """With the bias term, ATT moves towards the true effect (5)."""
     df, roles = matched
     plain = MatchingMetrics(grouping_role=TreatmentRole(), metric="att")
-    est_plain = plain.execute(ExperimentData(_ds(df, **roles))).variables[plain.id]["ATT"][0]
+    est_plain = plain.execute(ExperimentData(_ds(df, **roles))).variables[plain.id][
+        "ATT"
+    ][0]
 
     data = ExperimentData(_ds(df, **roles))
-    data = Bias(grouping_role=TreatmentRole(), target_roles=[TargetRole()]).execute(data)
+    data = Bias(grouping_role=TreatmentRole(), target_roles=[TargetRole()]).execute(
+        data
+    )
     corrected = MatchingMetrics(grouping_role=TreatmentRole(), metric="att")
     est_corrected = corrected.execute(data).variables[corrected.id]["ATT"][0]
     assert abs(est_corrected - 5.0) <= abs(est_plain - 5.0) + 1e-9

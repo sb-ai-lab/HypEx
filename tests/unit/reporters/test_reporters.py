@@ -1,4 +1,5 @@
 """Tests for reporter helpers, DictReporter, DatasetReporter and deprecated wrappers."""
+
 from __future__ import annotations
 
 import warnings
@@ -11,7 +12,6 @@ from hypex.comparators import GroupDifference, GroupSizes, GroupTTest
 from hypex.dataset import (
     Dataset,
     ExperimentData,
-    GroupingRole,
     SmallDataset,
     TargetRole,
     TreatmentRole,
@@ -50,12 +50,17 @@ from hypex.utils import ID_SPLIT_SYMBOL as S
 from hypex.utils import BackendsEnum
 from hypex.utils.errors import AbstractMethodError
 
+
 # ---------------------------------------------------------------------------
 # ResultKey
 # ---------------------------------------------------------------------------
 def test_result_key_parses_three_parts() -> None:
     key = ResultKey.from_id(f"GroupTTest{S}hash{S}revenue")
-    assert (key.executor, key.params_hash, key.field) == ("GroupTTest", "hash", "revenue")
+    assert (key.executor, key.params_hash, key.field) == (
+        "GroupTTest",
+        "hash",
+        "revenue",
+    )
 
 
 @pytest.mark.parametrize("raw", ["plain", f"a{S}b", f"a{S}b{S}c{S}d", ""])
@@ -120,7 +125,14 @@ def test_normalize_value_empty_list_is_unchanged() -> None:
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize(
     "raw,expected",
-    [("(1,)", "1"), ("(2,)", "2"), ("('a',)", "'a'"), ("1", "1"), ("(1, 2)", "(1, 2)"), (" (3,) ", "3")],
+    [
+        ("(1,)", "1"),
+        ("(2,)", "2"),
+        ("('a',)", "'a'"),
+        ("1", "1"),
+        ("(1, 2)", "(1, 2)"),
+        (" (3,) ", "3"),
+    ],
 )
 def test_normalize_group_name(raw, expected) -> None:
     assert _normalize_group_name(raw) == expected
@@ -192,7 +204,14 @@ def test_extract_tests_for_missing_class_is_empty(executed) -> None:
 
 def test_extract_group_difference_contains_result_metrics(executed) -> None:
     result = extract_group_difference(executed, front=True)
-    for metric in ("difference", "difference %", "control mean", "test mean", "ci lower", "ci upper"):
+    for metric in (
+        "difference",
+        "difference %",
+        "control mean",
+        "test mean",
+        "ci lower",
+        "ci upper",
+    ):
         assert f"y1 GroupDifference {metric} b" in result
         assert f"y2 GroupDifference {metric} b" in result
 
@@ -329,21 +348,35 @@ def test_struct_dict_nests_by_feature_group_executor_metric() -> None:
         f"y{S}GroupTTest{S}p-value{S}b": 0.1,
         f"y{S}GroupTTest{S}pass{S}b": False,
         f"y{S}GroupTTest{S}unknown metric{S}b": 5,  # not reportable -> dropped
-        "no separator": 1,                           # skipped
-        f"y{S}short{S}key": 3,                       # fewer than 4 parts -> skipped
+        "no separator": 1,  # skipped
+        f"y{S}short{S}key": 3,  # fewer than 4 parts -> skipped
     }
     tree = TestDictReporter._get_struct_dict(flat)
     assert tree == {"y": {"b": {"GroupTTest": {"p-value": 0.1, "pass": False}}}}
 
 
 def test_reportable_metrics_contains_expected_names() -> None:
-    assert {"pass", "p-value", "difference", "ci lower", "ci upper"} <= REPORTABLE_METRICS
+    assert {
+        "pass",
+        "p-value",
+        "difference",
+        "ci lower",
+        "ci upper",
+    } <= REPORTABLE_METRICS
 
 
 @pytest.mark.parametrize(
     "value,label",
-    [(True, "NOT OK"), (False, "OK"), ("True", "NOT OK"), ("False", "OK"), ("true", "NOT OK"),
-     (None, "OK"), (1.0, "NOT OK"), (0.0, "OK")],
+    [
+        (True, "NOT OK"),
+        (False, "OK"),
+        ("True", "NOT OK"),
+        ("False", "OK"),
+        ("true", "NOT OK"),
+        (None, "OK"),
+        (1.0, "NOT OK"),
+        (0.0, "OK"),
+    ],
 )
 def test_pass_flag_is_converted_to_ok_labels(value, label) -> None:
     struct = {"y": {"b": {"GroupTTest": {"pass": value, "p-value": 0.5}}}}
@@ -368,7 +401,9 @@ def test_convert_struct_normalizes_test_names_and_orders_group_difference() -> N
         }
     }
     frame = TestDictReporter._convert_struct_dict_to_dataset(struct).backend_data.data
-    assert {"TTest pass", "TTest p-value", "KSTest pass", "KSTest p-value"} <= set(frame.columns)
+    assert {"TTest pass", "TTest p-value", "KSTest pass", "KSTest p-value"} <= set(
+        frame.columns
+    )
     assert frame["difference %"].iloc[0] == 10.0
 
 
@@ -409,8 +444,16 @@ def test_cuped_reporter_is_empty_when_no_cuped_data(executed) -> None:
         lambda: MatchingQualityDatasetReporter(),
     ],
     ids=[
-        "ABDict", "ABDataset", "HomoDict", "HomoDataset", "OneAADict", "AADataset",
-        "MatchingDict", "MatchingDataset", "MatchingQualityDict", "MatchingQualityDataset",
+        "ABDict",
+        "ABDataset",
+        "HomoDict",
+        "HomoDataset",
+        "OneAADict",
+        "AADataset",
+        "MatchingDict",
+        "MatchingDataset",
+        "MatchingQualityDict",
+        "MatchingQualityDataset",
     ],
 )
 def test_deprecated_wrappers_warn(factory) -> None:

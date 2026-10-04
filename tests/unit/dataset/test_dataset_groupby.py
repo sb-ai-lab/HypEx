@@ -1,4 +1,5 @@
 """Tests for Dataset.groupby and GroupedDataset aggregations."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -41,7 +42,10 @@ def test_grouped_mean(make_dataset) -> None:
     assert len(result) == 2
     assert "v" in result.columns
 
-@pytest.mark.parametrize("reducer", ["count", "sum", "min", "max", "first", "last", "median"])
+
+@pytest.mark.parametrize(
+    "reducer", ["count", "sum", "min", "max", "first", "last", "median"]
+)
 def test_grouped_reducers(make_dataset, reducer) -> None:
     """All basic reducers run without error and return one row per group."""
     grouped = _grouped(make_dataset).groupby("g")

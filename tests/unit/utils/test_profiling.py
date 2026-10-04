@@ -1,4 +1,5 @@
 """Tests for the timeit decorator and profiling switches."""
+
 from __future__ import annotations
 
 import logging
@@ -99,7 +100,9 @@ def test_failure_is_reported_and_reraised(capsys) -> None:
     assert "ValueError: bad" in out
 
 
-@pytest.mark.parametrize("elapsed,marker", [(0.0, "[OK]"), (150.0, "[WARN]"), (400.0, "[SLOW]")])
+@pytest.mark.parametrize(
+    "elapsed,marker", [(0.0, "[OK]"), (150.0, "[WARN]"), (400.0, "[SLOW]")]
+)
 def test_markers_follow_thresholds(monkeypatch, capsys, elapsed, marker) -> None:
     ticks = iter([0.0, elapsed])
     monkeypatch.setattr(profiling.time, "perf_counter", lambda: next(ticks))
@@ -152,7 +155,9 @@ def test_failure_goes_to_logger_as_error(caplog) -> None:
     with caplog.at_level(logging.DEBUG, logger=profiling.logger.name):
         with pytest.raises(RuntimeError):
             boom()
-    assert any(r.levelno == logging.ERROR and "FAILED" in r.message for r in caplog.records)
+    assert any(
+        r.levelno == logging.ERROR and "FAILED" in r.message for r in caplog.records
+    )
 
 
 def test_profiling_context_enables_and_restores() -> None:

@@ -1,4 +1,5 @@
 """Tests for Dataset aggregation and statistical methods."""
+
 from __future__ import annotations
 
 import math
@@ -35,7 +36,6 @@ def test_basic_stats_match_expected(make_dataset, xfail_backend) -> None:
     assert _scalar(ds.sum().get_values(row="sum", column="x")) == pytest.approx(6.0)
 
 
-
 @pytest.mark.parametrize("ddof,expected", [(0, math.sqrt(2 / 3)), (1, 1.0)])
 def test_std_ddof(make_dataset, xfail_backend, ddof, expected) -> None:
     xfail_backend(
@@ -47,6 +47,7 @@ def test_std_ddof(make_dataset, xfail_backend, ddof, expected) -> None:
     result = ds.std(ddof=ddof)
     assert _scalar(result.get_values(row="std", column="x")) == pytest.approx(expected)
 
+
 def test_var_bessel_correction(make_dataset, xfail_backend) -> None:
     xfail_backend(
         BackendsEnum.spark,
@@ -56,6 +57,7 @@ def test_var_bessel_correction(make_dataset, xfail_backend) -> None:
     ds = _ds(make_dataset)
     result = ds.var()
     assert _scalar(result.get_values(row="var", column="x")) == pytest.approx(1.0)
+
 
 @pytest.mark.parametrize("q", [0.0, 0.5, 1.0])
 def test_quantile(make_dataset, xfail_backend, q) -> None:
@@ -68,6 +70,7 @@ def test_quantile(make_dataset, xfail_backend, q) -> None:
     result = ds.quantile(q)
     expected = 1.0 + q * 2.0
     assert float(result.data["x"].iloc[0]) == pytest.approx(expected)
+
 
 def test_coefficient_of_variation(make_dataset) -> None:
     ds = _ds(make_dataset)
@@ -134,7 +137,8 @@ def test_isin(make_dataset) -> None:
 
 def test_dot_with_numpy(make_dataset, xfail_backend) -> None:
     xfail_backend(
-        BackendsEnum.pandas, BackendsEnum.spark,
+        BackendsEnum.pandas,
+        BackendsEnum.spark,
         reason="Issue: Dataset.dot with a 1-D numpy vector: pandas backend reads other.shape[1] (IndexError), Spark backend calls .assign on a Series",
         raises=Exception,
     )

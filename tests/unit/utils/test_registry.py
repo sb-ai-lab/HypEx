@@ -1,4 +1,5 @@
 """Tests for BackendFactory register/resolve."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -26,7 +27,9 @@ def factory() -> BackendFactory:
 @pytest.fixture
 def pandas_ds() -> Dataset:
     return Dataset(
-        roles={"x": FeatureRole()}, data=pd.DataFrame({"x": [1.0]}), backend=BackendsEnum.pandas
+        roles={"x": FeatureRole()},
+        data=pd.DataFrame({"x": [1.0]}),
+        backend=BackendsEnum.pandas,
     )
 
 
@@ -51,7 +54,9 @@ def test_resolve_unregistered_base_returns_none(factory, pandas_ds) -> None:
     assert factory.resolve_backend(Master, pandas_ds) is None
 
 
-def test_resolve_missing_backend_for_registered_base_returns_none(factory, pandas_ds) -> None:
+def test_resolve_missing_backend_for_registered_base_returns_none(
+    factory, pandas_ds
+) -> None:
     @factory.register(Master, SparkDataset)
     class SparkImpl(Master):
         pass
@@ -65,7 +70,10 @@ def test_register_multiple_backends(factory, pandas_ds, container) -> None:
     class Universal(Master):
         pass
 
-    assert factory.registry[Master] == {PandasDataset: Universal, SparkDataset: Universal}
+    assert factory.registry[Master] == {
+        PandasDataset: Universal,
+        SparkDataset: Universal,
+    }
     assert factory.resolve_backend(Master, pandas_ds) is Universal
 
 
@@ -149,7 +157,10 @@ def test_repr_counts_registrations(factory) -> None:
 def test_global_factory_resolves_library_extensions(pandas_ds) -> None:
     from hypex.extensions import FaissExtension, PandasFaissExtension
 
-    assert backend_factory.resolve_backend(FaissExtension, pandas_ds) is PandasFaissExtension
+    assert (
+        backend_factory.resolve_backend(FaissExtension, pandas_ds)
+        is PandasFaissExtension
+    )
 
 
 @pytest.mark.spark

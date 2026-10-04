@@ -1,14 +1,15 @@
 """Tests for CUPEDTransformer math and edge cases."""
+
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from hypex.dataset import FeatureRole, PreTargetRole, StatisticRole, TargetRole
+from hypex.dataset import PreTargetRole, TargetRole
 from hypex.transformers import CUPEDTransformer
 
-from ._utils import make_ed, make_ds, to_pandas
+from ._utils import make_ds, make_ed, to_pandas
 
 TOL = 1e-6
 ROLES = {"y": TargetRole(), "x": PreTargetRole()}
@@ -60,7 +61,9 @@ def test_cuped_adds_column_with_target_role_and_keeps_originals(frame) -> None:
     result = CUPEDTransformer.calc(ds, {"y": "x"})
     assert set(result.columns) == {"y", "x", "y_cuped"}
     assert isinstance(result.roles["y_cuped"], TargetRole)
-    np.testing.assert_allclose(to_pandas(result)["y"].to_numpy(dtype=float), frame.y.to_numpy())
+    np.testing.assert_allclose(
+        to_pandas(result)["y"].to_numpy(dtype=float), frame.y.to_numpy()
+    )
 
 
 def test_cuped_does_not_mutate_input(frame) -> None:
@@ -72,7 +75,9 @@ def test_cuped_does_not_mutate_input(frame) -> None:
 def test_cuped_zero_variance_covariate_is_identity() -> None:
     df = pd.DataFrame({"y": [1.0, 2.0, 3.0, 4.0], "x": [5.0, 5.0, 5.0, 5.0]})
     out = to_pandas(CUPEDTransformer.calc(make_ds(df, ROLES), {"y": "x"}))
-    np.testing.assert_allclose(out["y_cuped"].to_numpy(dtype=float), df.y.to_numpy(), atol=TOL)
+    np.testing.assert_allclose(
+        out["y_cuped"].to_numpy(dtype=float), df.y.to_numpy(), atol=TOL
+    )
 
 
 def test_cuped_independent_covariate_barely_changes_variance() -> None:
@@ -85,9 +90,20 @@ def test_cuped_independent_covariate_barely_changes_variance() -> None:
 def test_cuped_multiple_features() -> None:
     rng = np.random.RandomState(1)
     x1, x2 = rng.normal(0, 1, 300), rng.normal(0, 1, 300)
-    df = pd.DataFrame({"y1": 2 * x1 + rng.normal(0, .1, 300), "x1": x1,
-                       "y2": -x2 + rng.normal(0, .1, 300), "x2": x2})
-    roles = {"y1": TargetRole(), "x1": PreTargetRole(), "y2": TargetRole(), "x2": PreTargetRole()}
+    df = pd.DataFrame(
+        {
+            "y1": 2 * x1 + rng.normal(0, 0.1, 300),
+            "x1": x1,
+            "y2": -x2 + rng.normal(0, 0.1, 300),
+            "x2": x2,
+        }
+    )
+    roles = {
+        "y1": TargetRole(),
+        "x1": PreTargetRole(),
+        "y2": TargetRole(),
+        "x2": PreTargetRole(),
+    }
     out = to_pandas(CUPEDTransformer.calc(make_ds(df, roles), {"y1": "x1", "y2": "x2"}))
     assert {"y1_cuped", "y2_cuped"} <= set(out.columns)
     assert out["y1_cuped"].var() < df.y1.var() * 0.05
@@ -97,7 +113,9 @@ def test_cuped_multiple_features() -> None:
 def _reduction(out, executor, feature: str = "y_cuped") -> float:
     """variance_reduction_pct of ``feature`` from the executor's analysis table."""
     report = to_pandas(out.analysis_tables[executor.id])
-    return float(report.loc[report["feature"] == feature, "variance_reduction_pct"].iloc[0])
+    return float(
+        report.loc[report["feature"] == feature, "variance_reduction_pct"].iloc[0]
+    )
 
 
 def test_cuped_execute_stores_variance_reduction(frame) -> None:

@@ -1,11 +1,12 @@
 """Tests for DatasetAdapter and the low-level Adapter helpers."""
+
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from hypex.dataset import Dataset, FeatureRole, SmallDataset
+from hypex.dataset import Dataset, FeatureRole
 from hypex.dataset.dataset import DatasetAdapter
 from hypex.utils.adapter import Adapter
 from hypex.utils.errors import InvalidArgumentError
@@ -33,9 +34,7 @@ def test_to_dataset_dispatch_dict() -> None:
 )
 def test_to_dataset_dispatch_list() -> None:
     """Lists become single-column datasets."""
-    ds = DatasetAdapter.to_dataset(
-        [1, 2, 3], roles={"a": FeatureRole()}, small=False
-    )
+    ds = DatasetAdapter.to_dataset([1, 2, 3], roles={"a": FeatureRole()}, small=False)
     assert len(ds) == 3
 
 
@@ -62,9 +61,7 @@ def test_to_dataset_dispatch_ndarray() -> None:
 
 def test_to_dataset_dispatch_existing_dataset() -> None:
     """An existing Dataset passes through unchanged when small=False."""
-    source = Dataset(
-        roles={"a": FeatureRole()}, data=pd.DataFrame({"a": [1]})
-    )
+    source = Dataset(roles={"a": FeatureRole()}, data=pd.DataFrame({"a": [1]}))
     result = DatasetAdapter.to_dataset(source, roles={"a": FeatureRole()}, small=False)
     assert isinstance(result, Dataset)
 
@@ -101,6 +98,7 @@ def test_list_to_single_multiple_raises() -> None:
     """list_to_single rejects multi-element lists."""
     with pytest.raises(ValueError):
         Adapter.list_to_single([1, 2])
+
 
 @pytest.mark.parametrize("bad_roles", ["feature", 5, None, ["a"]])
 def test_to_dataset_dict_with_wrong_roles_type_raises(bad_roles) -> None:

@@ -1,4 +1,5 @@
 """A/B test scenarios with a known effect (I2)."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -7,7 +8,12 @@ import pytest
 from scipy import stats
 
 from hypex import ABTest
-from hypex.dataset import FeatureRole, InfoRole, PreTargetRole, TargetRole, TreatmentRole
+from hypex.dataset import (
+    InfoRole,
+    PreTargetRole,
+    TargetRole,
+    TreatmentRole,
+)
 
 from ._utils import ab_frame, make_dataset, resume_row, to_pandas
 
@@ -22,7 +28,9 @@ def test_known_effect_is_recovered_exactly_from_group_means() -> None:
     df = ab_frame(n=2000, effect=3.0, seed=1)
     row = resume_row(_run(df), "y", 1)
     control, test = df.y[df.treat == 0], df.y[df.treat == 1]
-    assert float(row["difference"]) == pytest.approx(test.mean() - control.mean(), abs=1e-9)
+    assert float(row["difference"]) == pytest.approx(
+        test.mean() - control.mean(), abs=1e-9
+    )
     assert float(row["control mean"]) == pytest.approx(control.mean(), abs=1e-9)
     assert float(row["test mean"]) == pytest.approx(test.mean(), abs=1e-9)
 
@@ -45,7 +53,9 @@ def test_percentage_difference_is_relative_to_control_mean() -> None:
 def test_real_effect_is_flagged_and_null_is_not() -> None:
     # AB convention: a significant effect is reported as "OK".
     assert resume_row(_run(ab_frame(n=1000, effect=1.0, seed=4)))["TTest pass"] == "OK"
-    assert resume_row(_run(ab_frame(n=1000, effect=0.0, seed=4)))["TTest pass"] == "NOT OK"
+    assert (
+        resume_row(_run(ab_frame(n=1000, effect=0.0, seed=4)))["TTest pass"] == "NOT OK"
+    )
 
 
 def test_pvalue_matches_welch_ttest() -> None:
@@ -92,12 +102,26 @@ def test_three_groups_each_compared_to_control(three_groups) -> None:
     assert sorted(resume["group"].astype(str)) == ["1", "2"]
     for g in (1, 2):
         row = resume_row(out, "y", g)
-        expected = three_groups.y[three_groups.treat == g].mean() - three_groups.y[three_groups.treat == 0].mean()
+        expected = (
+            three_groups.y[three_groups.treat == g].mean()
+            - three_groups.y[three_groups.treat == 0].mean()
+        )
         assert float(row["difference"]) == pytest.approx(expected, abs=1e-9)
 
 
 @pytest.mark.parametrize(
-    "method", ["bonferroni", "sidak", "holm", "holm-sidak", "simes-hochberg", "hommel", "fdr_bh", "fdr_by", "fdr_tsbh"]
+    "method",
+    [
+        "bonferroni",
+        "sidak",
+        "holm",
+        "holm-sidak",
+        "simes-hochberg",
+        "hommel",
+        "fdr_bh",
+        "fdr_by",
+        "fdr_tsbh",
+    ],
 )
 def test_multitest_methods_never_decrease_pvalues(three_groups, method) -> None:
     out = _run(three_groups, multitest_method=method)
@@ -111,13 +135,18 @@ def test_multitest_methods_never_decrease_pvalues(three_groups, method) -> None:
 def test_bonferroni_is_at_least_as_conservative_as_holm(three_groups) -> None:
     bonf = to_pandas(_run(three_groups, multitest_method="bonferroni").multitest)
     holm = to_pandas(_run(three_groups, multitest_method="holm").multitest)
-    assert (bonf["new p-value"].astype(float).to_numpy() >= holm["new p-value"].astype(float).to_numpy() - 1e-12).all()
+    assert (
+        bonf["new p-value"].astype(float).to_numpy()
+        >= holm["new p-value"].astype(float).to_numpy() - 1e-12
+    ).all()
 
 
 def test_bonferroni_equals_pvalue_times_comparisons(three_groups) -> None:
     table = to_pandas(_run(three_groups, multitest_method="bonferroni").multitest)
     old = table["old p-value"].astype(float).to_numpy()
-    np.testing.assert_allclose(table["new p-value"].astype(float), np.minimum(old * 2, 1.0), atol=1e-12)
+    np.testing.assert_allclose(
+        table["new p-value"].astype(float), np.minimum(old * 2, 1.0), atol=1e-12
+    )
 
 
 @pytest.mark.xfail(
@@ -171,7 +200,12 @@ def _with_pre(n=2000, effect=1.0, seed=11) -> tuple[pd.DataFrame, dict]:
         }
     )
     df["y"] = base + effect * df.treat + rng.normal(0, 0.5, n)
-    roles = {"id": InfoRole(), "treat": TreatmentRole(), "y": TargetRole(), "y_pre": PreTargetRole()}
+    roles = {
+        "id": InfoRole(),
+        "treat": TreatmentRole(),
+        "y": TargetRole(),
+        "y_pre": PreTargetRole(),
+    }
     return df, roles
 
 
@@ -200,7 +234,9 @@ def test_exact_att_reference_dataset() -> None:
 
     try:
         df = create_test_data(num_users=3000, rs=0, exact_ATT=100)
-    except TypeError as exc:  # pandas < 2.2 does not know groupby.apply(include_groups=...)
+    except (
+        TypeError
+    ) as exc:  # pandas < 2.2 does not know groupby.apply(include_groups=...)
         pytest.xfail(f"create_test_data is incompatible with this pandas: {exc}")
     roles = {
         "user_id": InfoRole(),

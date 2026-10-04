@@ -1,4 +1,5 @@
 """Tests for CVFilter, ConstFilter, NanFilter, CorrFilter and OutliersFilter."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -6,7 +7,6 @@ import pandas as pd
 import pytest
 
 from hypex.dataset import FeatureRole, InfoRole, TargetRole
-from hypex.utils import BackendsEnum
 from hypex.transformers import (
     ConstFilter,
     CorrFilter,
@@ -14,6 +14,7 @@ from hypex.transformers import (
     NanFilter,
     OutliersFilter,
 )
+from hypex.utils import BackendsEnum
 
 from ._utils import make_ds, make_ed, to_pandas
 
@@ -40,7 +41,9 @@ def const_frame() -> pd.DataFrame:
     )
 
 
-def test_const_filter_marks_constant_column_as_info(const_frame, backend, spark_session, request) -> None:
+def test_const_filter_marks_constant_column_as_info(
+    const_frame, backend, spark_session, request
+) -> None:
     if backend == BackendsEnum.spark:
         request.applymarker(
             pytest.mark.xfail(
@@ -75,7 +78,9 @@ def test_const_filter_execute_uses_role_search(const_frame) -> None:
 def test_const_filter_keeps_data_unchanged(const_frame) -> None:
     ds = make_ds(const_frame, {c: FeatureRole() for c in const_frame})
     out = ConstFilter._inner_function(ds, target_cols=list(const_frame))
-    pd.testing.assert_frame_equal(to_pandas(out).reset_index(drop=True), const_frame, check_dtype=False)
+    pd.testing.assert_frame_equal(
+        to_pandas(out).reset_index(drop=True), const_frame, check_dtype=False
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +97,9 @@ def nan_frame() -> pd.DataFrame:
     )
 
 
-def test_nan_filter_marks_columns_above_threshold(nan_frame, backend, spark_session, request) -> None:
+def test_nan_filter_marks_columns_above_threshold(
+    nan_frame, backend, spark_session, request
+) -> None:
     if backend == BackendsEnum.spark:
         request.applymarker(
             pytest.mark.xfail(
@@ -100,14 +107,18 @@ def test_nan_filter_marks_columns_above_threshold(nan_frame, backend, spark_sess
                 reason="Issue: Spark isna().sum() yields None, so NaN share cannot be computed",
             )
         )
-    ds = make_ds(nan_frame, {c: FeatureRole() for c in nan_frame}, backend, spark_session)
+    ds = make_ds(
+        nan_frame, {c: FeatureRole() for c in nan_frame}, backend, spark_session
+    )
     out = NanFilter._inner_function(ds, target_cols=list(nan_frame), threshold=0.8)
     assert _is_info(out, "mostly_nan")
     assert not _is_info(out, "some_nan")
     assert not _is_info(out, "clean")
 
 
-@pytest.mark.parametrize("threshold,expected", [(0.1, True), (0.2, False), (0.19, True)])
+@pytest.mark.parametrize(
+    "threshold,expected", [(0.1, True), (0.2, False), (0.19, True)]
+)
 def test_nan_filter_threshold_boundary(nan_frame, threshold, expected) -> None:
     ds = make_ds(nan_frame, {c: FeatureRole() for c in nan_frame})
     out = NanFilter._inner_function(ds, target_cols=["some_nan"], threshold=threshold)
@@ -115,7 +126,9 @@ def test_nan_filter_threshold_boundary(nan_frame, threshold, expected) -> None:
 
 
 def test_nan_filter_execute(nan_frame) -> None:
-    out = NanFilter(threshold=0.5).execute(make_ed(nan_frame, {c: FeatureRole() for c in nan_frame}))
+    out = NanFilter(threshold=0.5).execute(
+        make_ed(nan_frame, {c: FeatureRole() for c in nan_frame})
+    )
     assert _is_info(out.ds, "mostly_nan")
     assert not _is_info(out.ds, "some_nan")
 
@@ -192,7 +205,12 @@ def corr_frame() -> pd.DataFrame:
 
 
 def _corr_roles():
-    return {"a": FeatureRole(), "a_copy": FeatureRole(), "indep": FeatureRole(), "y": TargetRole()}
+    return {
+        "a": FeatureRole(),
+        "a_copy": FeatureRole(),
+        "indep": FeatureRole(),
+        "y": TargetRole(),
+    }
 
 
 @pytest.mark.xfail(
@@ -254,7 +272,10 @@ def test_corr_filter_cv_policy_drops_lower_cv_column() -> None:
     df = pd.DataFrame({"hi_cv": base + 0.1, "lo_cv": base * 0.01 + 100.0})
     ds = make_ds(df, {"hi_cv": FeatureRole(), "lo_cv": FeatureRole()})
     out = CorrFilter._inner_function(
-        ds, target_cols=["hi_cv", "lo_cv"], corr_space_cols=["hi_cv", "lo_cv"], threshold=0.9
+        ds,
+        target_cols=["hi_cv", "lo_cv"],
+        corr_space_cols=["hi_cv", "lo_cv"],
+        threshold=0.9,
     )
     assert _is_info(out, "lo_cv")
     assert not _is_info(out, "hi_cv")
@@ -265,7 +286,9 @@ def test_corr_filter_cv_policy_drops_lower_cv_column() -> None:
 # ---------------------------------------------------------------------------
 @pytest.fixture
 def outlier_frame() -> pd.DataFrame:
-    return pd.DataFrame({"x": list(range(1, 101)), "y": list(range(100, 0, -1))}).astype(float)
+    return pd.DataFrame(
+        {"x": list(range(1, 101)), "y": list(range(100, 0, -1))}
+    ).astype(float)
 
 
 def test_outliers_filter_default_percentiles_drop_nothing(outlier_frame) -> None:
@@ -294,7 +317,9 @@ def test_outliers_filter_two_sided(outlier_frame) -> None:
 
 def test_outliers_filter_multiple_columns_drops_union(outlier_frame) -> None:
     ds = make_ds(outlier_frame, {c: FeatureRole() for c in outlier_frame})
-    out = OutliersFilter._inner_function(ds, target_cols=["x", "y"], upper_percentile=0.9)
+    out = OutliersFilter._inner_function(
+        ds, target_cols=["x", "y"], upper_percentile=0.9
+    )
     # x>q90 are rows 91..100; y>q90 are the first 10 rows -> 20 distinct rows dropped
     assert len(out) == 80
 

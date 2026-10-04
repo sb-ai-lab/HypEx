@@ -1,4 +1,5 @@
 """Stats-based hypothesis tests (pre-aggregated inputs) vs ``scipy.stats``."""
+
 from __future__ import annotations
 
 import math
@@ -96,7 +97,9 @@ def test_ttest_zero_variance_different_means() -> None:
     res = StatsTTest._inner_function(
         {"mean": 3.0, "std": 0.0, "count": 10}, {"mean": 4.0, "std": 0.0, "count": 12}
     )
-    assert res["p-value"] == 0.0 and res["statistic"] == math.inf and res["pass"] is True
+    assert (
+        res["p-value"] == 0.0 and res["statistic"] == math.inf and res["pass"] is True
+    )
 
 
 def test_ttest_one_zero_variance_falls_back_to_welch() -> None:
@@ -106,7 +109,9 @@ def test_ttest_one_zero_variance_falls_back_to_welch() -> None:
     se = math.sqrt(0.0 / 10 + 4.0 / 12)
     assert res["statistic"] == pytest.approx((3.0 - 4.0) / se, abs=TOL)
     df = (4.0 / 12) ** 2 / ((4.0 / 12) ** 2 / 11)
-    assert res["p-value"] == pytest.approx(2 * stats.t.sf(abs(res["statistic"]), df), abs=TOL)
+    assert res["p-value"] == pytest.approx(
+        2 * stats.t.sf(abs(res["statistic"]), df), abs=TOL
+    )
 
 
 def test_ttest_statistic_sign_is_baseline_minus_compared() -> None:
@@ -125,7 +130,9 @@ def test_ttest_degrees_of_freedom_formulas() -> None:
 
 def test_ttest_execute_end_to_end(backend, spark_session) -> None:
     df = three_groups_df()
-    ds = build_dataset(df, {"g": TreatmentRole(), "y": TargetRole()}, backend, spark_session)
+    ds = build_dataset(
+        df, {"g": TreatmentRole(), "y": TargetRole()}, backend, spark_session
+    )
     ex = StatsTTest(grouping_role=TreatmentRole())
     table = result_frame(ex.execute(ExperimentData(ds)), ex)
     base = df.y[df.g == "a"]
@@ -141,7 +148,9 @@ def test_ttest_execute_end_to_end(backend, spark_session) -> None:
 # StatsZTest (two proportions)
 # ---------------------------------------------------------------------------
 def test_ztest_statistic_matches_pooled_proportion_formula() -> None:
-    res = StatsZTest._inner_function({"count": 200, "sum": 60}, {"count": 300, "sum": 120})
+    res = StatsZTest._inner_function(
+        {"count": 200, "sum": 60}, {"count": 300, "sum": 120}
+    )
     p1, p2, pool = 60 / 200, 120 / 300, 180 / 500
     z = (p1 - p2) / math.sqrt(pool * (1 - pool) * (1 / 200 + 1 / 300))
     assert res["statistic"][0] == pytest.approx(z, abs=TOL)
@@ -168,7 +177,11 @@ def test_ztest_pvalue_uses_normal_distribution() -> None:
     ],
 )
 def test_ztest_degenerate_inputs_return_none(a, b) -> None:
-    assert StatsZTest._inner_function(a, b) == {"p-value": None, "statistic": None, "pass": None}
+    assert StatsZTest._inner_function(a, b) == {
+        "p-value": None,
+        "statistic": None,
+        "pass": None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -232,16 +245,16 @@ def test_chi2_union_of_categories_is_used() -> None:
     assert res["statistic"] == pytest.approx(ref[0], abs=TOL)
 
 
-@pytest.mark.parametrize(
-    "a,b", [({}, {}), ({}, {"u": 3}), ({"u": 3}, {})]
-)
+@pytest.mark.parametrize("a,b", [({}, {}), ({}, {"u": 3}), ({"u": 3}, {})])
 def test_chi2_empty_inputs_return_none(a, b) -> None:
     res = StatsChi2Test._inner_function({"value_counts": a}, {"value_counts": b})
     assert res == {"p-value": None, "statistic": None, "pass": None}
 
 
 def test_chi2_single_category_returns_identical() -> None:
-    res = StatsChi2Test._inner_function({"value_counts": {"u": 5}}, {"value_counts": {"u": 9}})
+    res = StatsChi2Test._inner_function(
+        {"value_counts": {"u": 5}}, {"value_counts": {"u": 9}}
+    )
     assert res["p-value"] == 1.0 and res["statistic"] == 0.0
 
 

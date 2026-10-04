@@ -1,4 +1,5 @@
 """Tests for SparkSessionCalculator and its settings/recommendation dataclasses."""
+
 from __future__ import annotations
 
 import pytest
@@ -48,7 +49,12 @@ def test_numeric_columns_default_to_total_minus_categorical() -> None:
 
 
 def test_explicit_numeric_columns_win() -> None:
-    assert _calc(num_columns=10, num_categorical_columns=3, num_numeric_columns=5).num_numeric_columns == 5
+    assert (
+        _calc(
+            num_columns=10, num_categorical_columns=3, num_numeric_columns=5
+        ).num_numeric_columns
+        == 5
+    )
 
 
 def test_estimate_prefers_explicit_size() -> None:
@@ -70,11 +76,11 @@ def test_estimate_default_is_one_gigabyte() -> None:
 @pytest.mark.parametrize(
     "size,expected",
     [
-        (1, 10),                       # clamped to the 10-partition floor
+        (1, 10),  # clamped to the 10-partition floor
         (150 * MB * 10, 10),
         (150 * MB * 100, 100),
-        (150 * MB * 100 + 1, 100),     # floor division
-        (150 * MB * 10_000, 500),      # clamped to the 500 ceiling
+        (150 * MB * 100 + 1, 100),  # floor division
+        (150 * MB * 10_000, 500),  # clamped to the 500 ceiling
     ],
 )
 def test_optimal_partitions(size, expected) -> None:
@@ -115,7 +121,9 @@ def test_executor_memory_grows_with_data() -> None:
     assert large > small
 
 
-@pytest.mark.parametrize("memory_gb,expected", [(4, "2048m"), (6, "2048m"), (10, "3072m"), (100, "30720m")])
+@pytest.mark.parametrize(
+    "memory_gb,expected", [(4, "2048m"), (6, "2048m"), (10, "3072m"), (100, "30720m")]
+)
 def test_memory_overhead(memory_gb, expected) -> None:
     assert _calc()._calculate_memory_overhead(memory_gb) == expected
 
@@ -138,13 +146,19 @@ def test_driver_memory_formula() -> None:
 def test_driver_memory_without_row_count_uses_size_per_column() -> None:
     calc = _calc(num_columns=8)
     size = 80 * GB
-    expected = max(8, int(4 + MatchingConfig.FAISS_SAMPLE_TARGET * 8 * 4 / GB + (size // 8) / GB) + 2)
+    expected = max(
+        8,
+        int(4 + MatchingConfig.FAISS_SAMPLE_TARGET * 8 * 4 / GB + (size // 8) / GB) + 2,
+    )
     assert calc._calculate_driver_memory(size) == f"{expected}g"
 
 
 def test_driver_max_result_size() -> None:
     assert _calc(num_rows=10)._calculate_driver_max_result_size() == "8g"
-    assert _calc(num_rows=4 * 10**9)._calculate_driver_max_result_size() == f"{int(4e9 * 8 / GB * 2) + 2}g"
+    assert (
+        _calc(num_rows=4 * 10**9)._calculate_driver_max_result_size()
+        == f"{int(4e9 * 8 / GB * 2) + 2}g"
+    )
     assert _calc(data_size_bytes=20 * GB)._calculate_driver_max_result_size() == "42g"
 
 
@@ -156,11 +170,18 @@ def test_calculate_optimal_settings_is_consistent() -> None:
     settings = calc.calculate_optimal_settings()
     partitions = calc._calculate_optimal_partitions(50 * GB)
     assert settings.shuffle_partitions == settings.default_parallelism == partitions
-    assert settings.executor_instances == calc._calculate_optimal_executors(50 * GB, partitions)
+    assert settings.executor_instances == calc._calculate_optimal_executors(
+        50 * GB, partitions
+    )
     assert settings.executor_cores == 4
     assert settings.driver_cores == 4
-    assert settings.executor_memory == calc._calculate_executor_memory(50 * GB, partitions)
-    assert settings.driver_max_result_size == settings.extra_configs["spark.driver.maxResultSize"]
+    assert settings.executor_memory == calc._calculate_executor_memory(
+        50 * GB, partitions
+    )
+    assert (
+        settings.driver_max_result_size
+        == settings.extra_configs["spark.driver.maxResultSize"]
+    )
     assert settings.extra_configs["spark.sql.adaptive.enabled"] == "true"
 
 
@@ -171,7 +192,10 @@ def test_driver_cores_follow_executor_cores_above_four() -> None:
 def test_overhead_matches_chosen_executor_memory() -> None:
     settings = _calc(data_size_bytes=500 * GB).calculate_optimal_settings()
     memory_gb = int(settings.executor_memory.rstrip("g"))
-    assert settings.executor_memory_overhead == f"{max(2048, int(memory_gb * 1024 * 0.3))}m"
+    assert (
+        settings.executor_memory_overhead
+        == f"{max(2048, int(memory_gb * 1024 * 0.3))}m"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -179,15 +203,23 @@ def test_overhead_matches_chosen_executor_memory() -> None:
 # ---------------------------------------------------------------------------
 def _optimal() -> SparkSettings:
     return SparkSettings(
-        executor_instances=20, executor_cores=4, executor_memory="16g", driver_memory="12g",
-        driver_max_result_size="16g", shuffle_partitions=200,
+        executor_instances=20,
+        executor_cores=4,
+        executor_memory="16g",
+        driver_memory="12g",
+        driver_max_result_size="16g",
+        shuffle_partitions=200,
     )
 
 
 def _matching_current() -> dict:
     return {
-        "executor_instances": 20, "executor_cores": 4, "executor_memory": "16g",
-        "driver_memory": "12g", "driver_max_result_size": "16g", "shuffle_partitions": 200,
+        "executor_instances": 20,
+        "executor_cores": 4,
+        "executor_memory": "16g",
+        "driver_memory": "12g",
+        "driver_max_result_size": "16g",
+        "shuffle_partitions": 200,
         "serializer": SparkSettings().serializer,
     }
 
@@ -200,15 +232,23 @@ def test_no_recommendations_when_settings_match() -> None:
 def test_each_deviation_yields_one_prioritised_recommendation() -> None:
     calc = _calc()
     current = {
-        "executor_instances": 2, "executor_cores": 8, "executor_memory": "2g",
-        "driver_memory": "1g", "driver_max_result_size": "1g", "shuffle_partitions": 10,
+        "executor_instances": 2,
+        "executor_cores": 8,
+        "executor_memory": "2g",
+        "driver_memory": "1g",
+        "driver_max_result_size": "1g",
+        "shuffle_partitions": 10,
         "serializer": "java",
     }
     recs = {r.parameter: r for r in calc.generate_recommendations(current, _optimal())}
     assert set(recs) == {
-        "spark.executor.instances", "spark.executor.cores", "spark.executor.memory",
-        "spark.driver.memory", "spark.driver.maxResultSize",
-        "spark.sql.shuffle.partitions", "spark.serializer",
+        "spark.executor.instances",
+        "spark.executor.cores",
+        "spark.executor.memory",
+        "spark.driver.memory",
+        "spark.driver.maxResultSize",
+        "spark.sql.shuffle.partitions",
+        "spark.serializer",
     }
     assert recs["spark.executor.cores"].priority == "critical"
     assert recs["spark.driver.memory"].priority == "critical"
@@ -221,19 +261,29 @@ def test_each_deviation_yields_one_prioritised_recommendation() -> None:
 
 def test_more_executors_than_needed_is_not_flagged() -> None:
     current = dict(_matching_current(), executor_instances=99)
-    assert not [r for r in _calc().generate_recommendations(current, _optimal()) if r.parameter == "spark.executor.instances"]
+    assert not [
+        r
+        for r in _calc().generate_recommendations(current, _optimal())
+        if r.parameter == "spark.executor.instances"
+    ]
 
 
 def test_fewer_cores_than_target_is_not_flagged() -> None:
     current = dict(_matching_current(), executor_cores=2)
-    assert not [r for r in _calc().generate_recommendations(current, _optimal()) if r.parameter == "spark.executor.cores"]
+    assert not [
+        r
+        for r in _calc().generate_recommendations(current, _optimal())
+        if r.parameter == "spark.executor.cores"
+    ]
 
 
 def test_recommendations_are_stored_and_printed(capsys) -> None:
     calc = _calc()
     calc.print_recommendations()
     assert "All settings are optimal" in capsys.readouterr().out
-    calc.generate_recommendations(dict(_matching_current(), driver_memory="1g"), _optimal())
+    calc.generate_recommendations(
+        dict(_matching_current(), driver_memory="1g"), _optimal()
+    )
     calc.print_recommendations()
     out = capsys.readouterr().out
     assert "[CRITICAL] spark.driver.memory" in out
@@ -249,7 +299,12 @@ def test_check_current_settings_reads_session_conf(spark_session) -> None:
     calc = _calc()
     settings = calc.check_current_settings(spark_session)
     assert settings["shuffle_partitions"] == 2
-    assert {"executor_cores", "driver_memory", "serializer", "driver_max_result_size"} <= set(settings)
+    assert {
+        "executor_cores",
+        "driver_memory",
+        "serializer",
+        "driver_max_result_size",
+    } <= set(settings)
     assert calc._current_settings == settings
 
 

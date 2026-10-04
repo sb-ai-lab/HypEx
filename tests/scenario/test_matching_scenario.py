@@ -3,6 +3,7 @@
 Matching is exercised on Spark only: the pandas path of ``MatchingOutput`` is broken
 (see ``test_matching_on_pandas``).
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -18,7 +19,12 @@ from ._utils import ab_frame, make_dataset, to_pandas
 pytestmark = [pytest.mark.slow, pytest.mark.spark]
 
 TRUE_EFFECT = 2.0
-ROLES = {"id": InfoRole(), "treat": TreatmentRole(), "x": FeatureRole(), "y": TargetRole()}
+ROLES = {
+    "id": InfoRole(),
+    "treat": TreatmentRole(),
+    "x": FeatureRole(),
+    "y": TargetRole(),
+}
 
 
 @pytest.fixture(scope="module")
@@ -58,7 +64,10 @@ def test_default_matching_recovers_true_effect(run, confounded) -> None:
     assert set(effects.index) == {"ATT", "ATC", "ATE"}
     for name in ("ATT", "ATC", "ATE"):
         assert effects.loc[name, "Effect Size"] == pytest.approx(TRUE_EFFECT, abs=0.5)
-    assert abs(effects.loc["ATE", "Effect Size"] - TRUE_EFFECT) < abs(_naive(confounded) - TRUE_EFFECT) / 3
+    assert (
+        abs(effects.loc["ATE", "Effect Size"] - TRUE_EFFECT)
+        < abs(_naive(confounded) - TRUE_EFFECT) / 3
+    )
 
 
 @pytest.mark.xfail(
@@ -78,8 +87,12 @@ def test_confidence_interval_covers_true_effect(run) -> None:
 )
 def test_confidence_interval_is_centered_on_estimate(run) -> None:
     for name, row in _effects(run()).iterrows():
-        assert (row["CI Lower"] + row["CI Upper"]) / 2 == pytest.approx(row["Effect Size"], abs=0.02)
-        assert row["CI Upper"] - row["CI Lower"] == pytest.approx(2 * 1.96 * row["Standard Error"], abs=0.03)
+        assert (row["CI Lower"] + row["CI Upper"]) / 2 == pytest.approx(
+            row["Effect Size"], abs=0.02
+        )
+        assert row["CI Upper"] - row["CI Lower"] == pytest.approx(
+            2 * 1.96 * row["Standard Error"], abs=0.03
+        )
 
 
 @pytest.mark.xfail(
@@ -147,7 +160,10 @@ def test_matched_neighbors_come_from_the_opposite_group(run, confounded) -> None
     for column in indexes.columns:
         matched = indexes[column].astype(int)
         valid = matched >= 0
-        assert (treat.loc[matched[valid].to_numpy()].to_numpy() != treat.loc[indexes.index[valid]].to_numpy()).all()
+        assert (
+            treat.loc[matched[valid].to_numpy()].to_numpy()
+            != treat.loc[indexes.index[valid]].to_numpy()
+        ).all()
 
 
 @pytest.mark.xfail(
@@ -159,7 +175,10 @@ def test_matched_neighbors_are_nearest_on_the_covariate(run, confounded) -> None
     indexes = to_pandas(run().indexes).iloc[:, 0].astype(int).reindex(confounded.index)
     x, t = confounded.x.to_numpy(), confounded.treat.to_numpy()
     expected = np.array(
-        [np.where(t != t[i])[0][np.argmin(np.abs(x[t != t[i]] - x[i]))] for i in range(len(x))]
+        [
+            np.where(t != t[i])[0][np.argmin(np.abs(x[t != t[i]] - x[i]))]
+            for i in range(len(x))
+        ]
     )
     assert (indexes.to_numpy() == expected).mean() > 0.95
 
@@ -193,4 +212,6 @@ def test_matching_on_pandas(confounded) -> None:
     "treatment/target/feature roles",
 )
 def test_group_match_runs(spark_session, confounded) -> None:
-    Matching(group_match=True).execute(make_dataset(confounded, ROLES, BackendsEnum.spark, spark_session))
+    Matching(group_match=True).execute(
+        make_dataset(confounded, ROLES, BackendsEnum.spark, spark_session)
+    )

@@ -1,4 +1,5 @@
 """Tests for TypeCaster."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -36,7 +37,10 @@ def test_cast_by_source_type_casts_all_columns_with_that_type(frame, roles) -> N
 def test_cast_restricted_by_roles(frame) -> None:
     roles = {"i": FeatureRole(int), "f": TargetRole(float), "s": FeatureRole(str)}
     out = TypeCaster.calc(
-        make_ds(frame, roles), {float: int, "s": int}, roles=TargetRole(), downcasting=False
+        make_ds(frame, roles),
+        {float: int, "s": int},
+        roles=TargetRole(),
+        downcasting=False,
     )
     result = to_pandas(out)
     assert result["f"].tolist() == [1, 2, 3]
@@ -71,7 +75,9 @@ def test_execute_default_roles_is_feature_role(frame, roles) -> None:
 
 
 def test_cast_matches_across_backends(frame, roles, backend, spark_session) -> None:
-    out = TypeCaster.calc(make_ds(frame, roles, backend, spark_session), {"s": int}, downcasting=False)
+    out = TypeCaster.calc(
+        make_ds(frame, roles, backend, spark_session), {"s": int}, downcasting=False
+    )
     assert sorted(to_pandas(out)["s"].tolist()) == [1, 2, 3]
 
 

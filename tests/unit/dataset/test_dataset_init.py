@@ -1,4 +1,5 @@
 """Tests for Dataset construction, backend selection and validation."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -28,7 +29,10 @@ def test_init_from_pandas_dataframe(make_dataset) -> None:
 
 def test_init_from_dict(make_dataset) -> None:
     """Dataset can be built from a plain dict of columns."""
-    ds = make_dataset(pd.DataFrame({"x": [1, 2], "y": [3, 4]}), {"x": FeatureRole(), "y": TargetRole()})
+    ds = make_dataset(
+        pd.DataFrame({"x": [1, 2], "y": [3, 4]}),
+        {"x": FeatureRole(), "y": TargetRole()},
+    )
     assert len(ds) == 2
 
 
@@ -119,7 +123,8 @@ def test_create_empty(make_dataset) -> None:
 
 def test_spark_dataset_requires_session() -> None:
     """Building a SparkDataset without a session raises TypeError."""
-    spark_module = pytest.importorskip("pyspark")
+    pytest.importorskip("pyspark")
     from hypex.dataset.backends import SparkDataset
+
     with pytest.raises(ValueError):
         SparkDataset(data=pd.DataFrame({"x": [1]}), session=None)

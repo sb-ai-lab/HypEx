@@ -1,4 +1,5 @@
 """Tests for MahalanobisDistance, PSI and MDEBySize."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -35,7 +36,9 @@ def test_mde_exact_formula() -> None:
 def test_mde_uses_significance_and_power(significance, power) -> None:
     rng = np.random.RandomState(1)
     control, test = rng.normal(0, 1, 40), rng.normal(0, 1, 40)
-    mde = MDEBySize._inner_function(_col(control), _col(test), significance=significance, power=power)
+    mde = MDEBySize._inner_function(
+        _col(control), _col(test), significance=significance, power=power
+    )
     m = norm.ppf((1 + significance) / 2) + norm.ppf(power)
     s = np.sqrt(np.var(test, ddof=1) / 40 + np.var(control, ddof=1) / 40)
     assert mde == pytest.approx(m * s, abs=TOL)
@@ -43,8 +46,12 @@ def test_mde_uses_significance_and_power(significance, power) -> None:
 
 def test_mde_decreases_with_more_data() -> None:
     rng = np.random.RandomState(2)
-    small = MDEBySize._inner_function(_col(rng.normal(0, 1, 30)), _col(rng.normal(0, 1, 30)))
-    large = MDEBySize._inner_function(_col(rng.normal(0, 1, 3000)), _col(rng.normal(0, 1, 3000)))
+    small = MDEBySize._inner_function(
+        _col(rng.normal(0, 1, 30)), _col(rng.normal(0, 1, 30))
+    )
+    large = MDEBySize._inner_function(
+        _col(rng.normal(0, 1, 3000)), _col(rng.normal(0, 1, 3000))
+    )
     assert large < small
 
 
@@ -117,7 +124,9 @@ def test_mahalanobis_matches_numpy_cholesky(two_group_features) -> None:
     result = MahalanobisDistance.calc(ds, group_field="g", target_fields=["f1", "f2"])
     pooled = (np.cov(a.T) + np.cov(b.T)) / 2 + 1e-3 * np.eye(2)
     expected = np.linalg.inv(np.linalg.cholesky(pooled)).T
-    np.testing.assert_allclose(to_pandas(result).to_numpy(dtype=float), expected, atol=TOL)
+    np.testing.assert_allclose(
+        to_pandas(result).to_numpy(dtype=float), expected, atol=TOL
+    )
 
 
 @pytest.mark.xfail(
@@ -127,10 +136,15 @@ def test_mahalanobis_matches_numpy_cholesky(two_group_features) -> None:
 )
 def test_mahalanobis_weights_change_transform(two_group_features) -> None:
     ds, _, _ = two_group_features
-    plain = to_pandas(MahalanobisDistance.calc(ds, group_field="g", target_fields=["f1", "f2"]))
+    plain = to_pandas(
+        MahalanobisDistance.calc(ds, group_field="g", target_fields=["f1", "f2"])
+    )
     weighted = to_pandas(
         MahalanobisDistance.calc(
-            ds, group_field="g", target_fields=["f1", "f2"], weights={"f1": 3.0, "f2": 1.0}
+            ds,
+            group_field="g",
+            target_fields=["f1", "f2"],
+            weights={"f1": 3.0, "f2": 1.0},
         )
     )
     assert not np.allclose(plain.to_numpy(dtype=float), weighted.to_numpy(dtype=float))

@@ -1,4 +1,5 @@
 """Tests for FaissIndexStorage and CachingIndex (no Spark job required)."""
+
 from __future__ import annotations
 
 import os
@@ -80,13 +81,19 @@ def test_save_index_roundtrips_through_faiss_serialization() -> None:
     restored = faiss.deserialize_index(storage.save_index(original))
     assert restored.ntotal == original.ntotal and restored.d == original.d
     query = np.ones((1, 3), dtype="float32")
-    assert restored.search(query, 2)[1].tolist() == original.search(query, 2)[1].tolist()
+    assert (
+        restored.search(query, 2)[1].tolist() == original.search(query, 2)[1].tolist()
+    )
 
 
-def test_load_index_reads_file_resolved_through_sparkfiles(monkeypatch, isolated_cwd) -> None:
+def test_load_index_reads_file_resolved_through_sparkfiles(
+    monkeypatch, isolated_cwd
+) -> None:
     path = isolated_cwd / "stored.index"
     faiss.write_index(_flat_index(), str(path))
-    monkeypatch.setattr("hypex.utils.index_utils.SparkFiles.get", lambda name: str(path))
+    monkeypatch.setattr(
+        "hypex.utils.index_utils.SparkFiles.get", lambda name: str(path)
+    )
     loaded = FaissIndexStorage(_FakeSession()).load_index("stored.index")
     assert loaded.ntotal == 5
 
@@ -109,11 +116,16 @@ def test_collect_and_register_writes_files_and_registers_them(isolated_cwd) -> N
             return iter(self.shards)
 
     storage = FaissIndexStorage(_Session())
-    shards = [faiss.serialize_index(_flat_index(n=3)), faiss.serialize_index(_flat_index(n=7))]
+    shards = [
+        faiss.serialize_index(_flat_index(n=3)),
+        faiss.serialize_index(_flat_index(n=7)),
+    ]
     refs = storage.collect_and_register(_FakeRDD(shards))
 
     assert len(refs) == 2 and len(set(refs)) == 2
-    assert all(r.startswith("__partition_index_") and r.endswith(".index") for r in refs)
+    assert all(
+        r.startswith("__partition_index_") and r.endswith(".index") for r in refs
+    )
     assert added == [f"{storage._local_tmp_dir}/{r}" for r in refs]
     sizes = [faiss.read_index(p).ntotal for p in added]
     assert sizes == [3, 7]
@@ -174,10 +186,10 @@ def test_cache_evicts_least_recently_used() -> None:
     cache, storage = CachingIndex(max_index=2), _CountingStorage()
     cache.get("a", storage)
     cache.get("b", storage)
-    cache.get("a", storage)       # refresh "a" -> "b" becomes LRU
-    cache.get("c", storage)       # evicts "b"
+    cache.get("a", storage)  # refresh "a" -> "b" becomes LRU
+    cache.get("c", storage)  # evicts "b"
     assert list(cache._cache) == ["a", "c"]
-    cache.get("b", storage)       # must be reloaded
+    cache.get("b", storage)  # must be reloaded
     assert storage.loads == ["a", "b", "c", "b"]
 
 

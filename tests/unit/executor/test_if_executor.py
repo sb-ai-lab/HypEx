@@ -1,4 +1,5 @@
 """Tests for IfExecutor and IfAAExecutor branching logic."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -18,7 +19,7 @@ class _Marker(Executor):
         super().__init__(key=name)
 
     def execute(self, data):
-        data.calls = getattr(data, "calls", []) + [self.name]
+        data.calls = [*getattr(data, "calls", []), self.name]
         return data
 
 
@@ -125,7 +126,8 @@ def test_all_features_passed_counts_only_pass_columns() -> None:
 
 
 @pytest.mark.parametrize(
-    "values,expected", [({"x pass": 0}, False), ({"x pass": 1}, True), ({"x pass": 3}, True)]
+    "values,expected",
+    [({"x pass": 0}, False), ({"x pass": 1}, True), ({"x pass": 3}, True)],
 )
 def test_sample_size_rule(values, expected) -> None:
     ex = IfAAExecutor(sample_size=0.5)

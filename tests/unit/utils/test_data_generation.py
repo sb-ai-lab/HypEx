@@ -1,4 +1,5 @@
 """Tests for tutorial data generators in hypex.utils.tutorial_data_creation."""
+
 from __future__ import annotations
 
 import contextlib
@@ -37,8 +38,14 @@ def test_create_test_data_shape(num_users: int) -> None:
 
     assert len(df) == num_users
     expected = {
-        "user_id", "signup_month", "treat", "pre_spends", "post_spends",
-        "age", "gender", "industry",
+        "user_id",
+        "signup_month",
+        "treat",
+        "pre_spends",
+        "post_spends",
+        "age",
+        "gender",
+        "industry",
     }
     assert expected.issubset(df.columns)
 
@@ -90,7 +97,12 @@ def test_gen_oracle_df_structure() -> None:
 
     assert len(df) == 50
     assert set(df.columns) == {
-        "X", "Target_untreated", "Target_treated", "Treatment", "Target", "TE",
+        "X",
+        "Target_untreated",
+        "Target_treated",
+        "Treatment",
+        "Target",
+        "TE",
     }
     assert np.allclose(df["TE"], df["Target_treated"] - df["Target_untreated"])
 
@@ -114,7 +126,10 @@ def test_gen_special_medicine_df_columns() -> None:
     df = gen_special_medicine_df(data_size=100, random_state=9)
 
     assert set(df.columns) == {
-        "age", "disease_degree", "experimental_treatment", "residual_lifetime",
+        "age",
+        "disease_degree",
+        "experimental_treatment",
+        "residual_lifetime",
     }
     assert df["disease_degree"].between(1, 5).all()
     assert (df["residual_lifetime"] >= 0).all()
@@ -124,7 +139,11 @@ def test_gen_control_variates_df_columns() -> None:
     """gen_control_variates_df returns the CUPED-friendly layout."""
     df = gen_control_variates_df(data_size=100, random_state=4)
     assert set(df.columns) == {
-        "X_lag_1", "Target_lag_1", "X", "Treatment", "Target",
+        "X_lag_1",
+        "Target_lag_1",
+        "X",
+        "Treatment",
+        "Target",
     }
     assert len(df) == 100
 
@@ -136,8 +155,19 @@ def test_data_generator_generate_shape() -> None:
     df = gen.generate()
 
     assert len(df) == 100
-    for col in ("z", "U", "D", "d", "X1_lag1", "X2_lag1", "X1_lag2", "X2_lag2",
-                "y0", "y1", "y"):
+    for col in (
+        "z",
+        "U",
+        "D",
+        "d",
+        "X1_lag1",
+        "X2_lag1",
+        "X1_lag2",
+        "X2_lag2",
+        "y0",
+        "y1",
+        "y",
+    ):
         assert col in df.columns
 
 
@@ -150,7 +180,8 @@ def test_data_generator_reproducible() -> None:
 
 # ── sigmoid helpers ───────────────────────────────────────────────────────
 @pytest.mark.parametrize(
-    "x,expected", [(0.0, 0.5), (100.0, pytest.approx(1.0)), (-100.0, pytest.approx(0.0))]
+    "x,expected",
+    [(0.0, 0.5), (100.0, pytest.approx(1.0)), (-100.0, pytest.approx(0.0))],
 )
 def test_sigmoid_values(x: float, expected) -> None:
     """sigmoid is monotone and bounded in (0, 1)."""

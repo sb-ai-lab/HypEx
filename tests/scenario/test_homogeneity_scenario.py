@@ -1,4 +1,5 @@
 """Homogeneity test scenarios: balanced vs imbalanced groups (I3)."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -6,13 +7,18 @@ import pandas as pd
 import pytest
 
 from hypex import HomogeneityTest
-from hypex.dataset import FeatureRole, InfoRole, TargetRole, TreatmentRole
+from hypex.dataset import InfoRole, TargetRole, TreatmentRole
 
 from ._utils import make_dataset, resume_row, to_pandas
 
 pytestmark = pytest.mark.slow
 
-ROLES = {"id": InfoRole(), "treat": TreatmentRole(), "age": TargetRole(), "spend": TargetRole()}
+ROLES = {
+    "id": InfoRole(),
+    "treat": TreatmentRole(),
+    "age": TargetRole(),
+    "spend": TargetRole(),
+}
 
 
 def _frame(n=1000, seed=0, imbalance=0.0) -> pd.DataFrame:
@@ -20,7 +26,9 @@ def _frame(n=1000, seed=0, imbalance=0.0) -> pd.DataFrame:
     treat = rng.randint(0, 2, n)
     age = rng.normal(40, 10, n) + imbalance * treat
     spend = rng.normal(100, 20, n)
-    return pd.DataFrame({"id": np.arange(n), "treat": treat, "age": age, "spend": spend})
+    return pd.DataFrame(
+        {"id": np.arange(n), "treat": treat, "age": age, "spend": spend}
+    )
 
 
 def _run(df):
@@ -62,7 +70,9 @@ def test_imbalance_is_reflected_in_group_means() -> None:
     control, test = df.age[df.treat == 0], df.age[df.treat == 1]
     assert float(row["control mean"]) == pytest.approx(control.mean(), abs=1e-9)
     assert float(row["test mean"]) == pytest.approx(test.mean(), abs=1e-9)
-    assert float(row["difference"]) == pytest.approx(test.mean() - control.mean(), abs=1e-9)
+    assert float(row["difference"]) == pytest.approx(
+        test.mean() - control.mean(), abs=1e-9
+    )
 
 
 @pytest.mark.xfail(
@@ -71,7 +81,10 @@ def test_imbalance_is_reflected_in_group_means() -> None:
     reason="Issue: HomogeneityTest() construction emits the DeprecationWarning of the deprecated HomoDatasetReporter (hypex/ui/homo.py)",
 )
 def test_pvalue_decreases_as_imbalance_grows() -> None:
-    p = [float(resume_row(_run(_frame(seed=4, imbalance=d)), "age")["TTest p-value"]) for d in (0.0, 1.0, 3.0, 6.0)]
+    p = [
+        float(resume_row(_run(_frame(seed=4, imbalance=d)), "age")["TTest p-value"])
+        for d in (0.0, 1.0, 3.0, 6.0)
+    ]
     assert p[0] > p[1] > p[2] > p[3]
     assert p[-1] < 1e-10
 
@@ -83,8 +96,18 @@ def test_pvalue_decreases_as_imbalance_grows() -> None:
 )
 def test_resume_has_expected_columns() -> None:
     resume = to_pandas(_run(_frame()).resume)
-    assert {"feature", "group", "control mean", "test mean", "difference", "difference %",
-            "TTest pass", "TTest p-value", "KSTest pass", "KSTest p-value"} <= set(resume.columns)
+    assert {
+        "feature",
+        "group",
+        "control mean",
+        "test mean",
+        "difference",
+        "difference %",
+        "TTest pass",
+        "TTest p-value",
+        "KSTest pass",
+        "KSTest p-value",
+    } <= set(resume.columns)
 
 
 @pytest.mark.xfail(

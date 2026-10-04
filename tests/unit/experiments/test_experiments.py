@@ -1,4 +1,5 @@
 """Tests for Experiment, OnRoleExperiment, CycledExperiment, GroupExperiment, ParamsExperiment."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -10,7 +11,6 @@ from hypex.dataset import (
     FeatureRole,
     GroupingRole,
     TargetRole,
-    TreatmentRole,
 )
 from hypex.executor import Executor, IfExecutor
 from hypex.experiments import (
@@ -21,7 +21,7 @@ from hypex.experiments import (
     OnRoleExperiment,
     ParamsExperiment,
 )
-from hypex.reporters import DictReporter, Reporter
+from hypex.reporters import Reporter
 from hypex.utils import BackendsEnum
 
 
@@ -101,7 +101,9 @@ def data(frame) -> ExperimentData:
 # ---------------------------------------------------------------------------
 def test_executors_run_in_order(data) -> None:
     log: list = []
-    Experiment([_Recorder("a", log), _Recorder("b", log), _Recorder("c", log)]).execute(data)
+    Experiment([_Recorder("a", log), _Recorder("b", log), _Recorder("c", log)]).execute(
+        data
+    )
     assert [entry[0] for entry in log] == ["a", "b", "c"]
 
 
@@ -187,8 +189,15 @@ def test_on_role_runs_iterative_executor_once_per_target(data) -> None:
 
 def test_on_role_runs_all_executors_for_each_target_in_order(data) -> None:
     log: list = []
-    OnRoleExperiment([_Recorder("a", log), _Recorder("b", log)], role=TargetRole()).execute(data)
-    assert [(e[0], e[2][0]) for e in log] == [("a", "y1"), ("b", "y1"), ("a", "y2"), ("b", "y2")]
+    OnRoleExperiment(
+        [_Recorder("a", log), _Recorder("b", log)], role=TargetRole()
+    ).execute(data)
+    assert [(e[0], e[2][0]) for e in log] == [
+        ("a", "y1"),
+        ("b", "y1"),
+        ("a", "y2"),
+        ("b", "y2"),
+    ]
 
 
 def test_on_role_without_matching_columns_returns_data_unchanged(data) -> None:
@@ -224,7 +233,9 @@ def test_on_role_vector_executor_runs_once_with_all_targets(data) -> None:
             log.append(sorted(d.ds.tmp_roles))
             return d
 
-    OnRoleExperiment([_Vector(grouping_role=GroupingRole())], role=TargetRole()).execute(data)
+    OnRoleExperiment(
+        [_Vector(grouping_role=GroupingRole())], role=TargetRole()
+    ).execute(data)
     assert log == [["y1", "y2"]]
 
 
@@ -234,10 +245,11 @@ def test_on_role_vector_executor_runs_once_with_all_targets(data) -> None:
 def test_cycled_runs_n_iterations_and_collects_results(data) -> None:
     log: list = []
     reporter = _DatasetReporter()
-    out = CycledExperiment([_Recorder("a", log)], reporter, n_iterations=3).execute(data)
+    out = CycledExperiment([_Recorder("a", log)], reporter, n_iterations=3).execute(
+        data
+    )
     assert len(log) == 3
     assert reporter.calls == 3
-    result = out.analysis_tables[CycledExperiment([], reporter, 3).id] if False else None
     table = next(iter(out.analysis_tables.values()))
     frame = table.backend_data.data
     assert len(frame) == 3
@@ -246,7 +258,9 @@ def test_cycled_runs_n_iterations_and_collects_results(data) -> None:
 
 def test_cycled_iteration_keys_are_indices(data) -> None:
     log: list = []
-    CycledExperiment([_Recorder("a", log)], _DatasetReporter(), n_iterations=3).execute(data)
+    CycledExperiment([_Recorder("a", log)], _DatasetReporter(), n_iterations=3).execute(
+        data
+    )
     assert [entry[1] for entry in log] == ["0", "1", "2"]
 
 
@@ -263,7 +277,9 @@ def test_cycled_id_depends_on_iterations() -> None:
 
 def test_cycled_params_hash_method_content() -> None:
     reporter = _CountReporter()
-    assert CycledExperiment([], reporter, 4).generate_params_hash() == "_CountReporter x 4"
+    assert (
+        CycledExperiment([], reporter, 4).generate_params_hash() == "_CountReporter x 4"
+    )
 
 
 def test_cycled_zero_iterations_raises(data) -> None:
@@ -282,7 +298,9 @@ def test_cycled_zero_iterations_raises(data) -> None:
 def test_group_experiment_runs_once_per_group(data) -> None:
     log: list = []
     reporter = _DatasetReporter()
-    out = GroupExperiment([_Recorder("a", log)], reporter, searching_role=GroupingRole()).execute(data)
+    out = GroupExperiment(
+        [_Recorder("a", log)], reporter, searching_role=GroupingRole()
+    ).execute(data)
     assert [entry[1] for entry in log] == ["a", "b"]
     table = next(iter(out.analysis_tables.values())).backend_data.data
     assert table["a rows"].iloc[0] == 2
@@ -295,7 +313,9 @@ def test_group_experiment_runs_once_per_group(data) -> None:
     reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
 )
 def test_group_experiment_prefixes_columns_with_group_key(data) -> None:
-    out = GroupExperiment([], _DatasetReporter(), searching_role=GroupingRole()).execute(data)
+    out = GroupExperiment(
+        [], _DatasetReporter(), searching_role=GroupingRole()
+    ).execute(data)
     cols = next(iter(out.analysis_tables.values())).columns
     assert {"a rows", "a alpha", "b rows", "b alpha"} <= set(cols)
 
@@ -339,7 +359,9 @@ def test_flat_params_for_multiple_classes() -> None:
         pass
 
     experiment = ParamsExperiment(
-        [], _CountReporter(), params={_Recorder: {"alpha": [1, 2]}, _Other: {"beta": [5, 6, 7]}}
+        [],
+        _CountReporter(),
+        params={_Recorder: {"alpha": [1, 2]}, _Other: {"beta": [5, 6, 7]}},
     )
     experiment.params = experiment.params
     assert len(experiment.flat_params) == 6
@@ -348,7 +370,7 @@ def test_flat_params_for_multiple_classes() -> None:
 
 def test_params_experiment_runs_every_combination(data) -> None:
     log: list = []
-    recorder, experiment = _params_experiment(log)
+    _recorder, experiment = _params_experiment(log)
     out = experiment.execute(data)
     assert len(log) == 6
     table = next(iter(out.analysis_tables.values())).backend_data.data
@@ -374,7 +396,7 @@ class _StopAfter(IfExecutor):
 
 def test_params_experiment_stops_when_criterion_met(data) -> None:
     log: list = []
-    recorder, experiment = _params_experiment(log, stopping_criterion=_StopAfter(2))
+    _recorder, experiment = _params_experiment(log, stopping_criterion=_StopAfter(2))
     out = experiment.execute(data)
     assert len(log) == 2
     assert len(next(iter(out.analysis_tables.values())).backend_data.data) == 2
@@ -412,7 +434,9 @@ def test_if_params_experiment_returns_data_when_never_satisfied(data) -> None:
 # ---------------------------------------------------------------------------
 # Dispatch to Experiment.execute (not the ExperimentWithReporter MRO hop)
 # ---------------------------------------------------------------------------
-def test_cycled_dispatches_each_iteration_to_experiment_execute(data, monkeypatch) -> None:
+def test_cycled_dispatches_each_iteration_to_experiment_execute(
+    data, monkeypatch
+) -> None:
     """Behaviour is identical to ``super(ExperimentWithReporter, self).execute``
     (the class adds no ``execute``); this pins the explicit dispatch."""
     calls: list = []
@@ -429,7 +453,9 @@ def test_cycled_dispatches_each_iteration_to_experiment_execute(data, monkeypatc
 
 
 @pytest.mark.filterwarnings("ignore::FutureWarning")
-def test_group_experiment_dispatches_each_group_to_experiment_execute(data, monkeypatch) -> None:
+def test_group_experiment_dispatches_each_group_to_experiment_execute(
+    data, monkeypatch
+) -> None:
     calls: list = []
     original = Experiment.execute
 

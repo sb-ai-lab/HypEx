@@ -1,4 +1,5 @@
 """Group hypothesis tests compared against ``scipy.stats`` reference values."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -43,7 +44,9 @@ def test_ttest_matches_scipy_welch(samples) -> None:
 def test_ttest_reliability_controls_pass(samples) -> None:
     a, b = samples
     p = stats.ttest_ind(a, b, equal_var=False).pvalue
-    loose = _row(GroupTTest._inner_function(_col(a), _col(b), reliability=min(1.0, p * 2)))
+    loose = _row(
+        GroupTTest._inner_function(_col(a), _col(b), reliability=min(1.0, p * 2))
+    )
     strict = _row(GroupTTest._inner_function(_col(a), _col(b), reliability=p / 2))
     assert bool(loose["pass"]) is True
     assert bool(strict["pass"]) is False
@@ -102,7 +105,11 @@ def test_kstest_matches_scipy(samples) -> None:
 
 def test_kstest_detects_shifted_distribution() -> None:
     rng = np.random.RandomState(1)
-    row = _row(GroupKSTest._inner_function(_col(rng.normal(0, 1, 300)), _col(rng.normal(3, 1, 300))))
+    row = _row(
+        GroupKSTest._inner_function(
+            _col(rng.normal(0, 1, 300)), _col(rng.normal(3, 1, 300))
+        )
+    )
     assert bool(row["pass"]) is True
     assert row["statistic"] > 0.8
 
@@ -167,7 +174,9 @@ def test_execute_compares_each_group_with_baseline(cls, scipy_fn) -> None:
 def test_execute_reliability_is_configurable() -> None:
     df = three_groups_df()
     ds = build_dataset(df, {"g": TreatmentRole(), "y": TargetRole()})
-    ex = GroupTTest(compare_by="groups", grouping_role=TreatmentRole(), reliability=1e-12)
+    ex = GroupTTest(
+        compare_by="groups", grouping_role=TreatmentRole(), reliability=1e-12
+    )
     table = result_frame(ex.execute(ExperimentData(ds)), ex)
     assert not table["pass"].astype(bool).any()
 

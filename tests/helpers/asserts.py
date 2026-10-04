@@ -4,6 +4,7 @@ Provides functions that compare Dataset instances structurally
 and semantically, abstracting away backend differences (pandas
 vs Spark) and role metadata.
 """
+
 from __future__ import annotations
 
 import numpy as np

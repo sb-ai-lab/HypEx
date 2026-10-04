@@ -1,4 +1,5 @@
 """Tests for HypExLogger, ProcessContext and the log_methods class decorator."""
+
 from __future__ import annotations
 
 import logging
@@ -13,7 +14,9 @@ def make_logger(request):
     created = []
 
     def _factory(level="DEBUG", **kwargs):
-        lg = HypExLogger(name=f"hypex.test.{request.node.name}.{len(created)}", level=level, **kwargs)
+        lg = HypExLogger(
+            name=f"hypex.test.{request.node.name}.{len(created)}", level=level, **kwargs
+        )
         created.append(lg)
         return lg
 
@@ -92,10 +95,16 @@ def test_log_file_from_environment(monkeypatch, tmp_path) -> None:
     lg.logger.handlers.clear()
 
 
-@pytest.mark.parametrize("method,level", [
-    ("debug", logging.DEBUG), ("info", logging.INFO), ("warning", logging.WARNING),
-    ("error", logging.ERROR), ("critical", logging.CRITICAL),
-])
+@pytest.mark.parametrize(
+    "method,level",
+    [
+        ("debug", logging.DEBUG),
+        ("info", logging.INFO),
+        ("warning", logging.WARNING),
+        ("error", logging.ERROR),
+        ("critical", logging.CRITICAL),
+    ],
+)
 def test_level_methods(make_logger, method, level) -> None:
     lg = make_logger()
     handler = _capture(lg)
@@ -137,7 +146,9 @@ def test_decorator_without_arguments_preserves_behavior(make_logger) -> None:
     assert add(1, 2) == 3
     assert add.__name__ == "add" and add.__doc__ == "Adds."
     messages = [r.getMessage() for r in handler.records]
-    assert any("▶ add" in m for m in messages) and any("✓ add completed" in m for m in messages)
+    assert any("▶ add" in m for m in messages) and any(
+        "✓ add completed" in m for m in messages
+    )
 
 
 def test_decorator_with_arguments_logs_args_and_result(make_logger) -> None:
@@ -171,7 +182,9 @@ def test_decorator_logs_failure_at_error_level_and_reraises(make_logger) -> None
 # ---------------------------------------------------------------------------
 # log_methods
 # ---------------------------------------------------------------------------
-def test_log_methods_wraps_public_methods_and_skips_private_by_default(make_logger) -> None:
+def test_log_methods_wraps_public_methods_and_skips_private_by_default(
+    make_logger,
+) -> None:
     lg = make_logger()
     handler = _capture(lg)
 
@@ -281,7 +294,11 @@ def test_process_context_logs_failure_and_does_not_swallow(make_logger) -> None:
         with lg.process("Step"):
             raise ValueError("bad")
     errors = [r.getMessage() for r in handler.records if r.levelno == logging.ERROR]
-    assert errors and "Process failed: Step" in errors[0] and "ValueError: bad" in errors[0]
+    assert (
+        errors
+        and "Process failed: Step" in errors[0]
+        and "ValueError: bad" in errors[0]
+    )
 
 
 def test_decorated_calls_inside_process_get_a_prefix(make_logger) -> None:

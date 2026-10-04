@@ -1,4 +1,5 @@
 """Tests for AdaptiveHypothesisTest backend dispatch."""
+
 from __future__ import annotations
 
 import pytest
@@ -12,14 +13,14 @@ from ._utils import build_dataset, result_frame, three_groups_df, to_pandas
 
 
 class _AdaptiveT(AdaptiveHypothesisTest):
-    BACKEND_MAP = {
+    BACKEND_MAP = {  # noqa: RUF012
         BackendsEnum.pandas: GroupTTest,
         BackendsEnum.spark: StatsTTest,
     }
 
 
 class _PandasOnly(AdaptiveHypothesisTest):
-    BACKEND_MAP = {BackendsEnum.pandas: GroupTTest}
+    BACKEND_MAP = {BackendsEnum.pandas: GroupTTest}  # noqa: RUF012
 
 
 ROLES = {"g": TreatmentRole(), "y": TargetRole()}
@@ -101,4 +102,6 @@ def test_results_match_direct_delegate() -> None:
     direct = GroupTTest(compare_by="groups", grouping_role=TreatmentRole())
     via_adaptive = _only_table(adaptive.execute(ExperimentData(ds)))
     via_direct = result_frame(direct.execute(ExperimentData(ds)), direct)
-    assert via_adaptive["p-value"].tolist() == pytest.approx(via_direct["p-value"].tolist())
+    assert via_adaptive["p-value"].tolist() == pytest.approx(
+        via_direct["p-value"].tolist()
+    )

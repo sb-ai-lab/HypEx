@@ -1,4 +1,5 @@
 """Tests for the ExperimentData blackboard container."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -88,12 +89,19 @@ def test_check_hash(check: str, result: bool) -> None:
 def test_get_ids_filters_by_class_and_key() -> None:
     """get_ids resolves class names and optional key suffixes."""
     ed = _ed()
-    ed.set_value(ExperimentDataEnum.variables, f"MyCalc{ID_SPLIT_SYMBOL}h{ID_SPLIT_SYMBOL}k", 1, key="k")
+    ed.set_value(
+        ExperimentDataEnum.variables,
+        f"MyCalc{ID_SPLIT_SYMBOL}h{ID_SPLIT_SYMBOL}k",
+        1,
+        key="k",
+    )
 
     found = ed.get_ids("MyCalc", searched_space=ExperimentDataEnum.variables)
     assert len(found["MyCalc"]["variables"]) == 1
 
-    found_keyed = ed.get_ids("MyCalc", searched_space=ExperimentDataEnum.variables, key="k")
+    found_keyed = ed.get_ids(
+        "MyCalc", searched_space=ExperimentDataEnum.variables, key="k"
+    )
     assert len(found_keyed["MyCalc"]["variables"]) == 1
 
 

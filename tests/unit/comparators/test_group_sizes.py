@@ -1,4 +1,5 @@
 """Tests for GroupSizes math."""
+
 from __future__ import annotations
 
 import pytest
@@ -11,7 +12,12 @@ from ._utils import TREAT_TARGET_ROLES, build_dataset, result_frame, three_group
 
 @pytest.mark.parametrize(
     "a,b,pa,pb",
-    [(10, 30, 25.0, 75.0), (50, 50, 50.0, 50.0), (0, 10, 0.0, 100.0), (7, 0, 100.0, 0.0)],
+    [
+        (10, 30, 25.0, 75.0),
+        (50, 50, 50.0, 50.0),
+        (0, 10, 0.0, 100.0),
+        (7, 0, 100.0, 0.0),
+    ],
 )
 def test_inner_function_shares(a, b, pa, pb) -> None:
     res = GroupSizes._inner_function({"count": a}, {"count": b})
@@ -54,7 +60,9 @@ def test_execute_unequal_groups(backend, spark_session) -> None:
 
 
 def test_execute_three_groups_compares_each_to_baseline(backend, spark_session) -> None:
-    ds = build_dataset(three_groups_df(n=20), TREAT_TARGET_ROLES, backend, spark_session)
+    ds = build_dataset(
+        three_groups_df(n=20), TREAT_TARGET_ROLES, backend, spark_session
+    )
     ex = GroupSizes(grouping_role=TreatmentRole())
     table = result_frame(ExperimentData_exec(ex, ds), ex)
     assert len(table) == 2
@@ -68,5 +76,7 @@ def ExperimentData_exec(ex, ds):
 
 def test_uses_grouping_role_as_target() -> None:
     ex = GroupSizes(grouping_role=TreatmentRole())
-    assert ex.target_roles is ex.grouping_role or type(ex.target_roles) is type(ex.grouping_role)
+    assert ex.target_roles is ex.grouping_role or type(ex.target_roles) is type(
+        ex.grouping_role
+    )
     assert GroupSizes.REQUIRED_STATS == ["count"]

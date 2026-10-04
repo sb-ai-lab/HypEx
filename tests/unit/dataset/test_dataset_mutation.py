@@ -1,4 +1,5 @@
 """Tests for Dataset mutation operations."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -13,7 +14,7 @@ from hypex.dataset import (
     TreatmentRole,
 )
 from hypex.utils import BackendsEnum
-from hypex.utils.errors import ConcatBackendError, ConcatDataError, DataTypeError
+from hypex.utils.errors import ConcatBackendError, ConcatDataError
 
 
 def _ds(make_dataset):
@@ -93,7 +94,9 @@ def test_append_cross_backend_raises(make_dataset, spark_session) -> None:
     roles = {"x": FeatureRole()}
 
     pandas_ds = Dataset(roles=roles, data=df)
-    spark_ds = Dataset(roles=roles, data=df, backend=BackendsEnum.spark, session=spark_session)
+    spark_ds = Dataset(
+        roles=roles, data=df, backend=BackendsEnum.spark, session=spark_session
+    )
 
     with pytest.raises(ConcatBackendError):
         pandas_ds.append(spark_ds)

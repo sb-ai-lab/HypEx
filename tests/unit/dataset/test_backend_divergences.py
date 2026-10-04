@@ -5,6 +5,7 @@ Each test states the *desired* contract (identical behaviour) and is marked
 fix flips the test to XPASS(strict) and forces the marker to be removed.
 Tests without ``xfail`` pin down divergences that are intentional.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -50,11 +51,16 @@ PANDAS = pytest.param(BackendsEnum.pandas, id="pandas")
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize(
     "backend_kind",
-    [PANDAS, _spark_xfail("Issue: SparkDataset.labels_dict raises NotImplementedError")],
+    [
+        PANDAS,
+        _spark_xfail("Issue: SparkDataset.labels_dict raises NotImplementedError"),
+    ],
 )
 def test_labels_dict_diverges(backend_kind, spark_session) -> None:
     """``labels_dict`` should be readable on every backend."""
-    ds = _build(pd.DataFrame({"x": [1, 2], "s": ["a", "b"]}), backend_kind, spark_session)
+    ds = _build(
+        pd.DataFrame({"x": [1, 2], "s": ["a", "b"]}), backend_kind, spark_session
+    )
     assert isinstance(ds.labels_dict, dict)
 
 
@@ -69,15 +75,21 @@ def test_hash_split_diverges_across_backends(spark_session) -> None:
     """Same index + seed must yield the same labels (docstring promises it)."""
     df = pd.DataFrame({"x": np.arange(50, dtype=float)})
     kwargs = dict(edges=[MOD // 2, MOD], labels=["A", "B"], random_state=42)
-    left = _pdf(_build(df, BackendsEnum.pandas, spark_session).random_split_labels(**kwargs))
-    right = _pdf(_build(df, BackendsEnum.spark, spark_session).random_split_labels(**kwargs))
+    left = _pdf(
+        _build(df, BackendsEnum.pandas, spark_session).random_split_labels(**kwargs)
+    )
+    right = _pdf(
+        _build(df, BackendsEnum.spark, spark_session).random_split_labels(**kwargs)
+    )
     assert left["split"].sort_index().tolist() == right["split"].sort_index().tolist()
 
 
 # ---------------------------------------------------------------------------
 # NaN vs null
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize("backend_kind", [PANDAS, pytest.param(BackendsEnum.spark, id="spark")])
+@pytest.mark.parametrize(
+    "backend_kind", [PANDAS, pytest.param(BackendsEnum.spark, id="spark")]
+)
 def test_nan_vs_null_in_dropna(backend_kind, spark_session) -> None:
     """dropna removes both float NaN and string null on both backends."""
     df = pd.DataFrame(
@@ -93,7 +105,9 @@ def test_nan_vs_null_in_dropna(backend_kind, spark_session) -> None:
     "backend_kind",
     [
         PANDAS,
-        _spark_xfail("Issue: pyspark.pandas propagates NaN in mean/sum instead of skipping"),
+        _spark_xfail(
+            "Issue: pyspark.pandas propagates NaN in mean/sum instead of skipping"
+        ),
     ],
 )
 def test_nan_vs_null_in_stats(backend_kind, spark_session) -> None:
@@ -126,10 +140,19 @@ def test_count_ignores_nan_on_spark(spark_session) -> None:
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize(
     "backend_kind",
-    [PANDAS, _spark_xfail("Issue: Spark aggregation result is transposed, get_values(row=, column=) -> KeyError")],
+    [
+        PANDAS,
+        _spark_xfail(
+            "Issue: Spark aggregation result is transposed, get_values(row=, column=) -> KeyError"
+        ),
+    ],
 )
 def test_aggregation_layout_diverges(backend_kind, spark_session) -> None:
-    ds = _build(pd.DataFrame({"x": [1.0, 2.0, 3.0], "y": [1.0, 2.0, 3.0]}), backend_kind, spark_session)
+    ds = _build(
+        pd.DataFrame({"x": [1.0, 2.0, 3.0], "y": [1.0, 2.0, 3.0]}),
+        backend_kind,
+        spark_session,
+    )
     assert float(ds.mean().get_values(row="mean", column="x")) == pytest.approx(2.0)
 
 
@@ -138,7 +161,11 @@ def test_aggregation_layout_diverges(backend_kind, spark_session) -> None:
     [PANDAS, _spark_xfail("Issue: SparkDataset.std ignores ddof (always ddof=1)")],
 )
 def test_std_ddof_zero_diverges(backend_kind, spark_session) -> None:
-    ds = _build(pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "y": [1.0, 2.0, 3.0, 4.0]}), backend_kind, spark_session)
+    ds = _build(
+        pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "y": [1.0, 2.0, 3.0, 4.0]}),
+        backend_kind,
+        spark_session,
+    )
     frame = _pdf(ds.std(ddof=0))
     series = frame.iloc[0] if len(frame) == 1 else frame.iloc[:, 0]
     assert float(series["x"]) == pytest.approx(np.std([1, 2, 3, 4]))
@@ -146,16 +173,32 @@ def test_std_ddof_zero_diverges(backend_kind, spark_session) -> None:
 
 @pytest.mark.parametrize(
     "backend_kind",
-    [PANDAS, _spark_xfail("Issue: pyspark.pandas quantile is approximate (lower value, transposed layout)")],
+    [
+        PANDAS,
+        _spark_xfail(
+            "Issue: pyspark.pandas quantile is approximate (lower value, transposed layout)"
+        ),
+    ],
 )
 def test_quantile_median_diverges(backend_kind, spark_session) -> None:
-    ds = _build(pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "y": [1.0, 2.0, 3.0, 4.0]}), backend_kind, spark_session)
-    assert float(_pdf(ds.quantile(0.5)).to_numpy(dtype=float).ravel()[0]) == pytest.approx(2.5)
+    ds = _build(
+        pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "y": [1.0, 2.0, 3.0, 4.0]}),
+        backend_kind,
+        spark_session,
+    )
+    assert float(
+        _pdf(ds.quantile(0.5)).to_numpy(dtype=float).ravel()[0]
+    ) == pytest.approx(2.5)
 
 
 @pytest.mark.parametrize(
     "backend_kind",
-    [PANDAS, _spark_xfail("Issue: NaN poisons groupby mean on Spark instead of being skipped")],
+    [
+        PANDAS,
+        _spark_xfail(
+            "Issue: NaN poisons groupby mean on Spark instead of being skipped"
+        ),
+    ],
 )
 def test_groupby_mean_nan_diverges(backend_kind, spark_session) -> None:
     df = pd.DataFrame({"g": ["a", "a", "b"], "x": [1.0, np.nan, 5.0]})
@@ -182,7 +225,9 @@ def test_file_error_types_diverge(tmp_path, spark_session) -> None:
     """Missing file -> FileNotFoundError on both; directory message differs."""
     missing = str(tmp_path / "missing.csv")
     for backend in (BackendsEnum.pandas, BackendsEnum.spark):
-        assert isinstance(_file_error(backend, missing, spark_session), FileNotFoundError)
+        assert isinstance(
+            _file_error(backend, missing, spark_session), FileNotFoundError
+        )
 
     pandas_err = _file_error(BackendsEnum.pandas, str(tmp_path), spark_session)
     spark_err = _file_error(BackendsEnum.spark, str(tmp_path), spark_session)

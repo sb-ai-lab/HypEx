@@ -1,4 +1,5 @@
 """Tests for hypex.utils.naming."""
+
 from __future__ import annotations
 
 import pytest
@@ -26,9 +27,21 @@ def test_normalization_is_idempotent() -> None:
 
 
 def test_stats_and_group_variants_normalize_identically() -> None:
-    assert normalize_test_name("StatsTTest") == normalize_test_name("GroupTTest") == "TTest"
-    assert normalize_test_name("StatsKSTest") == normalize_test_name("GroupKSTest") == "KSTest"
-    assert normalize_test_name("StatsChi2Test") == normalize_test_name("GroupChi2Test") == "Chi2Test"
+    assert (
+        normalize_test_name("StatsTTest")
+        == normalize_test_name("GroupTTest")
+        == "TTest"
+    )
+    assert (
+        normalize_test_name("StatsKSTest")
+        == normalize_test_name("GroupKSTest")
+        == "KSTest"
+    )
+    assert (
+        normalize_test_name("StatsChi2Test")
+        == normalize_test_name("GroupChi2Test")
+        == "Chi2Test"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -39,10 +52,16 @@ def test_stats_and_group_variants_normalize_identically() -> None:
     [
         ("y GroupTTest p-value b", ("y", "GroupTTest", "p-value", "b")),
         ("y GroupTTest pass b", ("y", "GroupTTest", "pass", "b")),
-        ("y GroupDifference control mean b", ("y", "GroupDifference", "control mean", "b")),
+        (
+            "y GroupDifference control mean b",
+            ("y", "GroupDifference", "control mean", "b"),
+        ),
         ("y GroupDifference test mean b", ("y", "GroupDifference", "test mean", "b")),
         ("y GroupDifference difference b", ("y", "GroupDifference", "difference", "b")),
-        ("y GroupDifference difference % b", ("y", "GroupDifference", "difference %", "b")),
+        (
+            "y GroupDifference difference % b",
+            ("y", "GroupDifference", "difference %", "b"),
+        ),
         ("y StatsTTest p-value", ("y", "StatsTTest", "p-value", "")),
         ("TTest p-value b", ("", "TTest", "p-value", "b")),
     ],

@@ -1,4 +1,5 @@
 """Tests for MultiTest, MultitestQuantile, CholeskyExtension and LstsqExtension."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -67,7 +68,9 @@ def _as_bool(value) -> bool:
 def test_multitest_matches_statsmodels(method, sm_name) -> None:
     result = _frame(MultiTest(method, 0.05).calc(_pvalue_dataset(RAW_P)))
     expected = multipletests(RAW_P, alpha=0.05, method=sm_name)
-    np.testing.assert_allclose(result["new p-value"].astype(float), expected[1], atol=TOL)
+    np.testing.assert_allclose(
+        result["new p-value"].astype(float), expected[1], atol=TOL
+    )
     assert [_as_bool(v) for v in result["rejected"]] == expected[0].tolist()
     np.testing.assert_allclose(result["old p-value"].astype(float), RAW_P, atol=TOL)
 
@@ -78,15 +81,21 @@ def test_multitest_matches_statsmodels(method, sm_name) -> None:
     "back as str), so bool(rejected) is True for every row",
 )
 def test_multitest_result_columns_are_typed() -> None:
-    result = _frame(MultiTest(ABNTestMethodsEnum.bonferroni).calc(_pvalue_dataset(RAW_P)))
+    result = _frame(
+        MultiTest(ABNTestMethodsEnum.bonferroni).calc(_pvalue_dataset(RAW_P))
+    )
     assert result["rejected"].dtype == bool
     assert result["new p-value"].dtype.kind == "f"
 
 
 def test_bonferroni_closed_form() -> None:
-    result = _frame(MultiTest(ABNTestMethodsEnum.bonferroni).calc(_pvalue_dataset(RAW_P)))
+    result = _frame(
+        MultiTest(ABNTestMethodsEnum.bonferroni).calc(_pvalue_dataset(RAW_P))
+    )
     np.testing.assert_allclose(
-        result["new p-value"].astype(float), np.minimum(np.array(RAW_P) * len(RAW_P), 1.0), atol=TOL
+        result["new p-value"].astype(float),
+        np.minimum(np.array(RAW_P) * len(RAW_P), 1.0),
+        atol=TOL,
     )
 
 
@@ -101,7 +110,9 @@ def test_holm_closed_form_is_step_down_and_monotone() -> None:
     m = len(RAW_P)
     sorted_p = np.sort(RAW_P)
     manual = np.maximum.accumulate((m - np.arange(m)) * sorted_p).clip(max=1.0)
-    np.testing.assert_allclose(np.sort(result["new p-value"].astype(float)), manual, atol=TOL)
+    np.testing.assert_allclose(
+        np.sort(result["new p-value"].astype(float)), manual, atol=TOL
+    )
 
 
 def test_fdr_bh_closed_form() -> None:
@@ -113,22 +124,38 @@ def test_fdr_bh_closed_form() -> None:
 
 
 def test_corrected_pvalues_are_never_smaller_than_raw() -> None:
-    for method in (ABNTestMethodsEnum.bonferroni, ABNTestMethodsEnum.holm, ABNTestMethodsEnum.fdr_bh):
+    for method in (
+        ABNTestMethodsEnum.bonferroni,
+        ABNTestMethodsEnum.holm,
+        ABNTestMethodsEnum.fdr_bh,
+    ):
         result = _frame(MultiTest(method).calc(_pvalue_dataset(RAW_P)))
-        assert (result["new p-value"].astype(float).to_numpy() >= np.array(RAW_P) - TOL).all()
+        assert (
+            result["new p-value"].astype(float).to_numpy() >= np.array(RAW_P) - TOL
+        ).all()
 
 
 def test_alpha_controls_rejection() -> None:
-    strict = _frame(MultiTest(ABNTestMethodsEnum.bonferroni, alpha=0.001).calc(_pvalue_dataset(RAW_P)))
-    loose = _frame(MultiTest(ABNTestMethodsEnum.bonferroni, alpha=0.5).calc(_pvalue_dataset(RAW_P)))
-    assert sum(_as_bool(v) for v in strict["rejected"]) < sum(_as_bool(v) for v in loose["rejected"])
+    strict = _frame(
+        MultiTest(ABNTestMethodsEnum.bonferroni, alpha=0.001).calc(
+            _pvalue_dataset(RAW_P)
+        )
+    )
+    loose = _frame(
+        MultiTest(ABNTestMethodsEnum.bonferroni, alpha=0.5).calc(_pvalue_dataset(RAW_P))
+    )
+    assert sum(_as_bool(v) for v in strict["rejected"]) < sum(
+        _as_bool(v) for v in loose["rejected"]
+    )
 
 
 def test_correction_is_applied_per_test_family() -> None:
     p_values = [0.01, 0.02, 0.03, 0.04]
     index = [
-        f"GroupTTest{S}h{S}y{S}b", f"GroupTTest{S}h{S}y2{S}b",
-        f"GroupKSTest{S}h{S}y{S}b", f"GroupKSTest{S}h{S}y2{S}b",
+        f"GroupTTest{S}h{S}y{S}b",
+        f"GroupTTest{S}h{S}y2{S}b",
+        f"GroupKSTest{S}h{S}y{S}b",
+        f"GroupKSTest{S}h{S}y2{S}b",
     ]
     ds = Dataset(
         roles={"p-value": StatisticRole()},
@@ -137,19 +164,25 @@ def test_correction_is_applied_per_test_family() -> None:
     )
     result = _frame(MultiTest(ABNTestMethodsEnum.bonferroni).calc(ds))
     # two p-values per family -> multiplied by 2, not by 4
-    np.testing.assert_allclose(result["new p-value"].astype(float), np.array(p_values) * 2, atol=TOL)
+    np.testing.assert_allclose(
+        result["new p-value"].astype(float), np.array(p_values) * 2, atol=TOL
+    )
     assert list(result["test"]) == ["TTest", "TTest", "KSTest", "KSTest"]
 
 
 def test_index_parts_split_test_field_group() -> None:
-    tests, fields, groups = MultiTest._index_parts([f"GroupTTest{S}h{S}rev{S}b", f"X{S}h{S}f"])
+    tests, fields, groups = MultiTest._index_parts(
+        [f"GroupTTest{S}h{S}rev{S}b", f"X{S}h{S}f"]
+    )
     assert tests == ["GroupTTest", "X"]
     assert fields == ["rev", "f"]
     assert groups == ["b", ""]
 
 
 def test_correction_ratio_and_zero_pvalue_guard() -> None:
-    result = _frame(MultiTest(ABNTestMethodsEnum.bonferroni).calc(_pvalue_dataset([0.0, 0.2])))
+    result = _frame(
+        MultiTest(ABNTestMethodsEnum.bonferroni).calc(_pvalue_dataset([0.0, 0.2]))
+    )
     assert float(result["correction"].iloc[0]) == 0.0
     assert float(result["correction"].iloc[1]) == pytest.approx(0.2 / 0.4)
 
@@ -159,7 +192,9 @@ def test_correction_ratio_and_zero_pvalue_guard() -> None:
 # ---------------------------------------------------------------------------
 def test_quantile_equal_variance_matches_analytic_value() -> None:
     """For 2 groups the statistic (Z_j - Z_i)/sqrt(2) is standard normal."""
-    mtq = MultitestQuantile(alpha=0.05, iteration_size=20000, equal_variance=True, random_state=0)
+    mtq = MultitestQuantile(
+        alpha=0.05, iteration_size=20000, equal_variance=True, random_state=0
+    )
     q = mtq.quantile_of_marginal_distribution(num_samples=2, quantile_level=0.975)
     assert q == [q[0]] * 2
     assert q[0] == pytest.approx(norm.ppf(0.975), abs=0.06)
@@ -167,8 +202,12 @@ def test_quantile_equal_variance_matches_analytic_value() -> None:
 
 def test_quantile_is_reproducible_with_seed() -> None:
     kwargs = dict(num_samples=3, quantile_level=0.9)
-    a = MultitestQuantile(iteration_size=500, random_state=1).quantile_of_marginal_distribution(**kwargs)
-    b = MultitestQuantile(iteration_size=500, random_state=1).quantile_of_marginal_distribution(**kwargs)
+    a = MultitestQuantile(
+        iteration_size=500, random_state=1
+    ).quantile_of_marginal_distribution(**kwargs)
+    b = MultitestQuantile(
+        iteration_size=500, random_state=1
+    ).quantile_of_marginal_distribution(**kwargs)
     assert a == b
 
 
@@ -208,7 +247,9 @@ def test_quantile_calc_accepts_best_hypothesis() -> None:
         }
     )
     ds = Dataset(
-        roles={"g": FeatureRole(), "y": TargetRole()}, data=df, backend=BackendsEnum.pandas
+        roles={"g": FeatureRole(), "y": TargetRole()},
+        data=df,
+        backend=BackendsEnum.pandas,
     )
     mtq = MultitestQuantile(alpha=0.05, iteration_size=1000, random_state=0)
     result = mtq._calc_pandas(ds, group_field="g", target_field="y")
@@ -224,11 +265,11 @@ def test_quantile_calc_accepts_best_hypothesis() -> None:
 def test_quantile_calc_rejects_when_groups_equal() -> None:
     rng = np.random.RandomState(1)
     n = 200
-    df = pd.DataFrame(
-        {"g": ["a"] * n + ["b"] * n, "y": rng.normal(0, 1, 2 * n)}
-    )
+    df = pd.DataFrame({"g": ["a"] * n + ["b"] * n, "y": rng.normal(0, 1, 2 * n)})
     ds = Dataset(
-        roles={"g": FeatureRole(), "y": TargetRole()}, data=df, backend=BackendsEnum.pandas
+        roles={"g": FeatureRole(), "y": TargetRole()},
+        data=df,
+        backend=BackendsEnum.pandas,
     )
     mtq = MultitestQuantile(alpha=0.05, iteration_size=1000, random_state=0)
     result = mtq._calc_pandas(ds, group_field="g", target_field="y", quantiles=5.0)
@@ -255,14 +296,18 @@ def _matrix_ds(matrix: np.ndarray) -> Dataset:
 
 def test_cholesky_reconstructs_matrix_with_epsilon() -> None:
     cov = _spd()
-    lower = _frame(CholeskyExtension().calc(_matrix_ds(cov), epsilon=1e-3)).to_numpy(dtype=float)
+    lower = _frame(CholeskyExtension().calc(_matrix_ds(cov), epsilon=1e-3)).to_numpy(
+        dtype=float
+    )
     np.testing.assert_allclose(lower @ lower.T, cov + 1e-3 * np.eye(3), atol=1e-9)
     assert np.allclose(lower, np.tril(lower))
 
 
 def test_cholesky_zero_epsilon_is_exact() -> None:
     cov = _spd()
-    lower = _frame(CholeskyExtension().calc(_matrix_ds(cov), epsilon=0.0)).to_numpy(dtype=float)
+    lower = _frame(CholeskyExtension().calc(_matrix_ds(cov), epsilon=0.0)).to_numpy(
+        dtype=float
+    )
     np.testing.assert_allclose(lower, np.linalg.cholesky(cov), atol=1e-10)
 
 
@@ -288,7 +333,9 @@ def test_unite_cov_averages_group_covariances() -> None:
     ds_a = Dataset(roles=dict(roles), data=a, backend=BackendsEnum.pandas)
     ds_b = Dataset(roles=dict(roles), data=b, backend=BackendsEnum.pandas)
     united = _frame(UniteCovExtension().calc(ds_a, ds_b)).to_numpy(dtype=float)
-    np.testing.assert_allclose(united, (a.cov().to_numpy() + b.cov().to_numpy()) / 2, atol=1e-9)
+    np.testing.assert_allclose(
+        united, (a.cov().to_numpy() + b.cov().to_numpy()) / 2, atol=1e-9
+    )
     single = _frame(UniteCovExtension().calc(ds_a)).to_numpy(dtype=float)
     np.testing.assert_allclose(single, a.cov().to_numpy(), atol=1e-9)
 

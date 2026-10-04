@@ -1,4 +1,5 @@
 """Tests for Shuffle."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -7,7 +8,7 @@ import pytest
 from hypex.dataset import FeatureRole
 from hypex.transformers import Shuffle
 
-from ._utils import make_ds, make_ed, to_pandas
+from ._utils import make_ds, to_pandas
 
 
 @pytest.fixture

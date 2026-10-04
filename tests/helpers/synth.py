@@ -8,6 +8,7 @@ All functions return plain ``pd.DataFrame`` objects. Use the
 ``make_dataset`` fixture from ``conftest.py`` to wrap them into
 ``Dataset`` instances on the desired backend.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -149,11 +150,13 @@ def make_constant_target_dataset(
             [0, 1]
     """
     treatment = [i % n_groups for i in range(n_rows)]
-    return pd.DataFrame({
-        "treatment": treatment,
-        "target": [target_value] * n_rows,
-        "feature_0": [float(i) for i in range(n_rows)],
-    })
+    return pd.DataFrame(
+        {
+            "treatment": treatment,
+            "target": [target_value] * n_rows,
+            "feature_0": [float(i) for i in range(n_rows)],
+        }
+    )
 
 
 def make_two_group_dataset(
@@ -192,17 +195,21 @@ def make_two_group_dataset(
     n_total = 2 * n_per_group
 
     treatment = [0] * n_per_group + [1] * n_per_group
-    target = np.concatenate([
-        rng.normal(control_mean, std, n_per_group),
-        rng.normal(treatment_mean, std, n_per_group),
-    ])
+    target = np.concatenate(
+        [
+            rng.normal(control_mean, std, n_per_group),
+            rng.normal(treatment_mean, std, n_per_group),
+        ]
+    )
     feature = rng.normal(0, 1, n_total)
 
-    return pd.DataFrame({
-        "treatment": treatment,
-        "target": target,
-        "feature_0": feature,
-    })
+    return pd.DataFrame(
+        {
+            "treatment": treatment,
+            "target": target,
+            "feature_0": feature,
+        }
+    )
 
 
 def make_categorical_dataset(
@@ -233,8 +240,10 @@ def make_categorical_dataset(
     categories = [f"cat_{rng.integers(0, n_categories)}" for _ in range(n_rows)]
     feature = rng.normal(0, 1, n_rows)
 
-    return pd.DataFrame({
-        "treatment": treatment,
-        "category": categories,
-        "feature_0": feature,
-    })
+    return pd.DataFrame(
+        {
+            "treatment": treatment,
+            "category": categories,
+            "feature_0": feature,
+        }
+    )

@@ -1,4 +1,5 @@
 """Pandas vs Spark parity for the public A/B, A/A and Homogeneity tests (I5)."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -26,7 +27,9 @@ def _both(df, roles, session):
 
 def _compare_rows(left: pd.Series, right: pd.Series, columns=NUMERIC) -> None:
     for column in columns:
-        assert float(left[column]) == pytest.approx(float(right[column]), rel=1e-5, abs=1e-9), column
+        assert float(left[column]) == pytest.approx(
+            float(right[column]), rel=1e-5, abs=1e-9
+        ), column
     for column in left.index:
         if column.endswith("pass"):
             assert left[column] == right[column], column
@@ -46,7 +49,9 @@ def test_ab_three_groups_and_multitest_parity(spark_session) -> None:
     left_out = ABTest(multitest_method="holm").execute(pandas_ds)
     right_out = ABTest(multitest_method="holm").execute(spark_ds)
     for group in (1, 2):
-        _compare_rows(resume_row(left_out, "y", group), resume_row(right_out, "y", group))
+        _compare_rows(
+            resume_row(left_out, "y", group), resume_row(right_out, "y", group)
+        )
     left = to_pandas(left_out.multitest).sort_values("group")
     right = to_pandas(right_out.multitest).sort_values("group")
     np.testing.assert_allclose(
@@ -64,7 +69,12 @@ def test_ab_group_sizes_parity(spark_session) -> None:
         assert int(left[column].iloc[0]) == int(right[column].iloc[0])
 
 
-ROLES_HOMO = {"id": InfoRole(), "treat": TreatmentRole(), "age": TargetRole(), "spend": TargetRole()}
+ROLES_HOMO = {
+    "id": InfoRole(),
+    "treat": TreatmentRole(),
+    "age": TargetRole(),
+    "spend": TargetRole(),
+}
 
 
 def _homo_frame(imbalance: float, seed: int = 4, n: int = 800) -> pd.DataFrame:
@@ -119,7 +129,9 @@ AA_ROLES = {"id": InfoRole(), "x": FeatureRole(), "y": TargetRole()}
 
 def _aa_frame(n=600, seed=0) -> pd.DataFrame:
     rng = np.random.RandomState(seed)
-    return pd.DataFrame({"id": np.arange(n), "x": rng.normal(0, 1, n), "y": rng.normal(10, 2, n)})
+    return pd.DataFrame(
+        {"id": np.arange(n), "x": rng.normal(0, 1, n), "y": rng.normal(10, 2, n)}
+    )
 
 
 def test_aa_runs_on_both_backends_with_the_same_structure(spark_session) -> None:
@@ -127,9 +139,14 @@ def test_aa_runs_on_both_backends_with_the_same_structure(spark_session) -> None
     pandas_ds, spark_ds = _both(df, AA_ROLES, spark_session)
     left = AATest(n_iterations=3, random_states=[1, 2, 3]).execute(pandas_ds)
     right = AATest(n_iterations=3, random_states=[1, 2, 3]).execute(spark_ds)
-    assert list(to_pandas(left.experiments).columns) == list(to_pandas(right.experiments).columns)
+    assert list(to_pandas(left.experiments).columns) == list(
+        to_pandas(right.experiments).columns
+    )
     assert len(to_pandas(left.experiments)) == len(to_pandas(right.experiments)) == 3
-    assert to_pandas(left.resume).iloc[0]["result"] == to_pandas(right.resume).iloc[0]["result"]
+    assert (
+        to_pandas(left.resume).iloc[0]["result"]
+        == to_pandas(right.resume).iloc[0]["result"]
+    )
 
 
 @pytest.mark.xfail(
@@ -151,6 +168,12 @@ def test_aa_iterations_are_identical_across_backends(spark_session) -> None:
 def test_spark_ab_reports_the_group_totals_as_a_set(spark_session) -> None:
     """Even when control/test are swapped, the two group sizes are the true group counts."""
     df = ab_frame(n=700, effect=0.2, seed=3)
-    sizes = to_pandas(ABTest().execute(make_dataset(df, None, BackendsEnum.spark, spark_session)).sizes)
-    reported = sorted([int(sizes["control size"].iloc[0]), int(sizes["test size"].iloc[0])])
+    sizes = to_pandas(
+        ABTest()
+        .execute(make_dataset(df, None, BackendsEnum.spark, spark_session))
+        .sizes
+    )
+    reported = sorted(
+        [int(sizes["control size"].iloc[0]), int(sizes["test size"].iloc[0])]
+    )
     assert reported == sorted(df.groupby("treat").size().tolist())

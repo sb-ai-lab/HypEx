@@ -1,4 +1,5 @@
 """Tests for NaFiller and NaDropper."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -94,7 +95,9 @@ def test_filler_scalar_value(frame) -> None:
 )
 def test_filler_dict_values_per_column(frame) -> None:
     ds = make_ds(frame, {c: FeatureRole() for c in frame})
-    out = NaFiller._inner_function(ds, target_cols=["a", "b"], values={"a": -1.0, "b": -2.0})
+    out = NaFiller._inner_function(
+        ds, target_cols=["a", "b"], values={"a": -1.0, "b": -2.0}
+    )
     result = to_pandas(out)
     assert result["a"].tolist() == [1.0, -1.0, 3.0, -1.0, 5.0]
     assert result["b"].tolist() == [-2.0, 2.0, 3.0, -2.0, 5.0]

@@ -1,4 +1,5 @@
 """Tests for hypex.dataset.roles — role classes and the role registry."""
+
 from __future__ import annotations
 
 import pytest
@@ -105,9 +106,7 @@ def test_asadditional_maps_to_additional_variant(
     assert isinstance(result, AdditionalRole)
 
 
-@pytest.mark.parametrize(
-    "role_cls", [DisabledRole, ResumeRole, TempRole, ReportRole]
-)
+@pytest.mark.parametrize("role_cls", [DisabledRole, ResumeRole, TempRole, ReportRole])
 def test_asadditional_returns_same_class_for_unregistered(
     role_cls: type[ABCRole],
 ) -> None:

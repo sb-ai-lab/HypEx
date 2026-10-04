@@ -1,4 +1,5 @@
 """Tests for hypex.utils.enums."""
+
 from __future__ import annotations
 
 import enum
@@ -20,7 +21,10 @@ from hypex.utils.enums import (
 @pytest.mark.parametrize(
     "enum_cls,members",
     [
-        (ExperimentDataEnum, {"variables", "additional_fields", "analysis_tables", "groups", "ml"}),
+        (
+            ExperimentDataEnum,
+            {"variables", "additional_fields", "analysis_tables", "groups", "ml"},
+        ),
         (BackendsEnum, {"pandas", "spark"}),
         (SpaceEnum, {"auto", "additional", "data"}),
         (ABTestTypesEnum, {"t_test", "ks_test", "u_test", "chi2_test"}),
@@ -28,8 +32,17 @@ from hypex.utils.enums import (
         (
             ABNTestMethodsEnum,
             {
-                "bonferroni", "sidak", "holm_sidak", "holm", "simes_hochberg", "hommel",
-                "fdr_bh", "fdr_by", "fdr_tsbh", "fdr_tsbky", "quantile",
+                "bonferroni",
+                "sidak",
+                "holm_sidak",
+                "holm",
+                "simes_hochberg",
+                "hommel",
+                "fdr_bh",
+                "fdr_by",
+                "fdr_tsbh",
+                "fdr_tsbky",
+                "quantile",
             },
         ),
     ],
@@ -38,7 +51,17 @@ def test_enum_members(enum_cls, members) -> None:
     assert {m.name for m in enum_cls} == members
 
 
-@pytest.mark.parametrize("enum_cls", [ExperimentDataEnum, BackendsEnum, SpaceEnum, ABTestTypesEnum, RenameEnum, ABNTestMethodsEnum])
+@pytest.mark.parametrize(
+    "enum_cls",
+    [
+        ExperimentDataEnum,
+        BackendsEnum,
+        SpaceEnum,
+        ABTestTypesEnum,
+        RenameEnum,
+        ABNTestMethodsEnum,
+    ],
+)
 def test_enum_values_are_unique_strings_and_roundtrip(enum_cls) -> None:
     values = [m.value for m in enum_cls]
     assert len(values) == len(set(values))
@@ -49,7 +72,11 @@ def test_enum_values_are_unique_strings_and_roundtrip(enum_cls) -> None:
 
 def test_all_enums_are_declared_unique() -> None:
     for obj in vars(enums).values():
-        if isinstance(obj, type) and issubclass(obj, enum.Enum) and obj is not enum.Enum:
+        if (
+            isinstance(obj, type)
+            and issubclass(obj, enum.Enum)
+            and obj is not enum.Enum
+        ):
             # enum.unique raises on duplicates at class creation, so aliases cannot exist
             assert len(obj.__members__) == len(list(obj))
 
@@ -90,7 +117,9 @@ def test_abtest_literal_matches_enum() -> None:
     from hypex import ABTest
 
     hints = typing.get_type_hints(ABTest.__init__)
-    literal = [a for a in typing.get_args(hints["multitest_method"]) if a is not type(None)]
+    literal = [
+        a for a in typing.get_args(hints["multitest_method"]) if a is not type(None)
+    ]
     advertised = set(typing.get_args(literal[0]))
     unknown = advertised - {m.value for m in ABNTestMethodsEnum}
     assert unknown == {"fdr_tsbhy"}

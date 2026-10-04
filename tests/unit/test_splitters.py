@@ -1,4 +1,5 @@
 """Tests for AASplitter and AASplitterWithStratification."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -56,7 +57,9 @@ def test_default_split_is_roughly_half_and_covers_all_rows(ds) -> None:
 
 @pytest.mark.parametrize("control_size", [0.2, 0.3, 0.7])
 def test_control_size_is_respected_within_hash_noise(ds, control_size) -> None:
-    split = _split_series(AASplitter._inner_function(ds, random_state=1, control_size=control_size))
+    split = _split_series(
+        AASplitter._inner_function(ds, random_state=1, control_size=control_size)
+    )
     assert (split == "control").mean() == pytest.approx(control_size, abs=0.04)
 
 
@@ -90,7 +93,9 @@ def test_groups_sizes_create_named_groups(ds) -> None:
 
 
 def test_sample_size_labels_only_a_fraction(ds) -> None:
-    split = _split_series(AASplitter._inner_function(ds, random_state=1, sample_size=0.5))
+    split = _split_series(
+        AASplitter._inner_function(ds, random_state=1, sample_size=0.5)
+    )
     assert len(split) == pytest.approx(N * 0.5, abs=0.05 * N)
 
 
@@ -204,7 +209,9 @@ def test_stratified_split_balances_each_stratum(ds) -> None:
 def test_stratified_without_fields_falls_back_to_plain_split(ds) -> None:
     plain = _split_series(AASplitter._inner_function(ds, random_state=1))
     strat = _split_series(
-        AASplitterWithStratification._inner_function(ds, random_state=1, grouping_fields=None)
+        AASplitterWithStratification._inner_function(
+            ds, random_state=1, grouping_fields=None
+        )
     )
     assert plain.equals(strat)
 
@@ -219,7 +226,9 @@ def test_stratified_execute_uses_stratification_role(ds) -> None:
 # ---------------------------------------------------------------------------
 # Missing group keys in _set_value / const-group column
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize("missing", [None, float("nan"), pd.NA], ids=["None", "nan", "NA"])
+@pytest.mark.parametrize(
+    "missing", [None, float("nan"), pd.NA], ids=["None", "nan", "NA"]
+)
 def test_set_value_skips_missing_group_keys(ds, missing, monkeypatch) -> None:
     """Group keys that are None / NaN / pd.NA are skipped (``bool(pd.NA)`` raises)."""
     splitter = AASplitter(random_state=1)
@@ -265,7 +274,9 @@ def test_const_group_plan_treats_missing_label_as_free(missing) -> None:
     """None / float NaN labels go through the ``math.isnan`` guard as free rows."""
     data = Dataset(
         roles={"c": InfoRole()},
-        data=pd.DataFrame({"c": pd.Series(["control", "test", missing, missing], dtype=object)}),
+        data=pd.DataFrame(
+            {"c": pd.Series(["control", "test", missing, missing], dtype=object)}
+        ),
         backend=BackendsEnum.pandas,
     )
     translation, free_size, _ = AASplitter._const_group_plan(

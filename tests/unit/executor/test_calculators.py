@@ -1,4 +1,5 @@
 """Tests for MinSampleSize (closed-form equal-variance math and validation)."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -36,21 +37,36 @@ def two_groups() -> Dataset:
 )
 def test_equal_variance_closed_form(var, q1, q2, mde) -> None:
     n = MinSampleSize._inner_function(
-        num_samples=2, mde=mde, variances=var, quantile_1=q1, quantile_2=q2, equal_variance=True
+        num_samples=2,
+        mde=mde,
+        variances=var,
+        quantile_1=q1,
+        quantile_2=q2,
+        equal_variance=True,
     )
     assert n == _closed_form(var, q1, q2, mde)
 
 
 def test_list_variances_use_first_entry_in_equal_variance_mode() -> None:
     n = MinSampleSize._inner_function(
-        num_samples=2, mde=1.0, variances=[4.0, 100.0], quantile_1=2.0, quantile_2=-1.0,
+        num_samples=2,
+        mde=1.0,
+        variances=[4.0, 100.0],
+        quantile_1=2.0,
+        quantile_2=-1.0,
         equal_variance=True,
     )
     assert n == _closed_form(4.0, 2.0, -1.0, 1.0)
 
 
 def test_sample_size_scales_inverse_square_with_mde() -> None:
-    kwargs = dict(num_samples=2, variances=4.0, quantile_1=2.0, quantile_2=-1.0, equal_variance=True)
+    kwargs = dict(
+        num_samples=2,
+        variances=4.0,
+        quantile_1=2.0,
+        quantile_2=-1.0,
+        equal_variance=True,
+    )
     n1 = MinSampleSize._inner_function(mde=1.0, **kwargs)
     n2 = MinSampleSize._inner_function(mde=0.5, **kwargs)
     assert n1 == _closed_form(4.0, 2.0, -1.0, 1.0)
@@ -59,7 +75,9 @@ def test_sample_size_scales_inverse_square_with_mde() -> None:
 
 
 def test_sample_size_scales_linearly_with_variance() -> None:
-    kwargs = dict(num_samples=2, mde=1.0, quantile_1=2.0, quantile_2=-1.0, equal_variance=True)
+    kwargs = dict(
+        num_samples=2, mde=1.0, quantile_1=2.0, quantile_2=-1.0, equal_variance=True
+    )
     n1 = MinSampleSize._inner_function(variances=1.0, **kwargs)
     n2 = MinSampleSize._inner_function(variances=3.0, **kwargs)
     assert n2 == pytest.approx(3 * n1, rel=0.05)
@@ -68,22 +86,40 @@ def test_sample_size_scales_linearly_with_variance() -> None:
 def test_unequal_variance_requires_list() -> None:
     with pytest.raises(TypeError, match="variances must be a list"):
         MinSampleSize._inner_function(
-            num_samples=2, mde=1.0, variances=4.0, quantile_1=2.0, quantile_2=-1.0,
+            num_samples=2,
+            mde=1.0,
+            variances=4.0,
+            quantile_1=2.0,
+            quantile_2=-1.0,
             equal_variance=False,
         )
 
 
 def test_estimated_quantiles_are_reproducible() -> None:
     kwargs = dict(
-        num_samples=2, mde=1.0, variances=4.0, equal_variance=True,
-        iteration_size=500, random_state=1,
+        num_samples=2,
+        mde=1.0,
+        variances=4.0,
+        equal_variance=True,
+        iteration_size=500,
+        random_state=1,
     )
-    assert MinSampleSize._inner_function(**kwargs) == MinSampleSize._inner_function(**kwargs)
+    assert MinSampleSize._inner_function(**kwargs) == MinSampleSize._inner_function(
+        **kwargs
+    )
 
 
 def test_estimated_quantiles_give_larger_n_for_smaller_mde() -> None:
-    kwargs = dict(num_samples=2, variances=4.0, equal_variance=True, iteration_size=500, random_state=1)
-    assert MinSampleSize._inner_function(mde=0.5, **kwargs) > MinSampleSize._inner_function(mde=2.0, **kwargs)
+    kwargs = dict(
+        num_samples=2,
+        variances=4.0,
+        equal_variance=True,
+        iteration_size=500,
+        random_state=1,
+    )
+    assert MinSampleSize._inner_function(
+        mde=0.5, **kwargs
+    ) > MinSampleSize._inner_function(mde=2.0, **kwargs)
 
 
 @pytest.mark.xfail(
@@ -110,7 +146,9 @@ def test_calc_explicit_variances_override_data(two_groups) -> None:
     calc = MinSampleSize(
         mde=1.0, equal_variance=True, variances=9.0, quantile_1=2.0, quantile_2=-1.0
     )
-    assert calc.calc(two_groups)["y"]["min sample size"] == _closed_form(9.0, 2.0, -1.0, 1.0)
+    assert calc.calc(two_groups)["y"]["min sample size"] == _closed_form(
+        9.0, 2.0, -1.0, 1.0
+    )
 
 
 @pytest.mark.xfail(
@@ -158,10 +196,14 @@ def test_calc_overall_is_max_over_targets() -> None:
 def test_calc_single_group_raises() -> None:
     df = pd.DataFrame({"g": ["a"] * 10, "y": np.arange(10.0)})
     ds = Dataset(
-        roles={"g": TreatmentRole(), "y": TargetRole()}, data=df, backend=BackendsEnum.pandas
+        roles={"g": TreatmentRole(), "y": TargetRole()},
+        data=df,
+        backend=BackendsEnum.pandas,
     )
     with pytest.raises(NotSuitableFieldError):
-        MinSampleSize(mde=1.0, equal_variance=True, quantile_1=2.0, quantile_2=-1.0).calc(ds)
+        MinSampleSize(
+            mde=1.0, equal_variance=True, quantile_1=2.0, quantile_2=-1.0
+        ).calc(ds)
 
 
 def test_mde_is_keyword_only_and_required() -> None:
@@ -172,7 +214,13 @@ def test_mde_is_keyword_only_and_required() -> None:
 @pytest.mark.slow
 def test_unequal_variance_search_returns_multiple_of_step(two_groups) -> None:
     n = MinSampleSize._inner_function(
-        num_samples=2, mde=2.0, variances=[4.0, 16.0], quantile_1=1.5, quantile_2=-0.8,
-        equal_variance=False, power_iteration_size=200, random_state=0,
+        num_samples=2,
+        mde=2.0,
+        variances=[4.0, 16.0],
+        quantile_1=1.5,
+        quantile_2=-0.8,
+        equal_variance=False,
+        power_iteration_size=200,
+        random_state=0,
     )
     assert n % 100 == 0 and n >= 100

@@ -1,4 +1,5 @@
 """Tests for GroupDifference math (difference, percentage, 95% CI)."""
+
 from __future__ import annotations
 
 import math
@@ -88,7 +89,9 @@ def test_execute_matches_numpy(backend, spark_session) -> None:
         assert row["control mean"] == pytest.approx(ctrl.mean(), abs=TOL)
         assert row["test mean"] == pytest.approx(test.mean(), abs=TOL)
         assert row["difference"] == pytest.approx(diff, abs=TOL)
-        assert row["difference %"] == pytest.approx((test.mean() / ctrl.mean() - 1) * 100, abs=1e-4)
+        assert row["difference %"] == pytest.approx(
+            (test.mean() / ctrl.mean() - 1) * 100, abs=1e-4
+        )
         assert row["ci lower"] == pytest.approx(diff - 1.96 * se, abs=TOL)
         assert row["ci upper"] == pytest.approx(diff + 1.96 * se, abs=TOL)
 
@@ -97,7 +100,9 @@ def test_execute_stores_stats_table(backend, spark_session) -> None:
     ds = build_dataset(three_groups_df(), TREAT_TARGET_ROLES, backend, spark_session)
     ex = GroupDifference(grouping_role=TreatmentRole())
     out = ex.execute(ExperimentData(ds))
-    stats_ids = [k for k in out.analysis_tables if k.startswith(ex.id) and k.endswith("stats")]
+    stats_ids = [
+        k for k in out.analysis_tables if k.startswith(ex.id) and k.endswith("stats")
+    ]
     assert len(stats_ids) == 1
 
 

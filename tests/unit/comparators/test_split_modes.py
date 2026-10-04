@@ -1,4 +1,5 @@
 """Tests for GroupsComparator split strategies (groups, columns, cross, matched_pairs)."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -6,7 +7,7 @@ import pandas as pd
 import pytest
 
 from hypex.comparators.abstract import GroupsComparator
-from hypex.dataset import FeatureRole, GroupingRole, PreTargetRole, TargetRole
+from hypex.dataset import GroupingRole, PreTargetRole, TargetRole
 from hypex.utils import NoRequiredArgumentError
 
 from ._utils import build_dataset, to_pandas
@@ -139,7 +140,9 @@ def test_columns_in_groups_mode_pairs_baseline_and_target_per_group(ds) -> None:
     reason="Issue: grouping column leaks into compared data in cross mode",
 )
 def test_cross_mode_uses_first_group_baseline_against_other_groups(ds) -> None:
-    base, comp = GroupsComparator._split_for_cross_mode(ds[["g"]], ds[["pre"]], ds[["y"]])
+    base, comp = GroupsComparator._split_for_cross_mode(
+        ds[["g"]], ds[["pre"]], ds[["y"]]
+    )
     assert len(base) == 1 and len(base[0][1]) == 3
     assert [len(d) for _, d in comp] == [2, 4]
 
@@ -157,8 +160,8 @@ def test_matched_pairs_mode_aligns_baseline_with_matches() -> None:
     base, comp = GroupsComparator._split_for_matched_pairs_mode(
         ds[["g"]], ds[["match"]], ds[["y"]]
     )
-    treated = [d for name, d in comp if name == 1][0]
-    matched = [d for name, d in base if name == 1][0]
+    treated = next(d for name, d in comp if name == 1)
+    matched = next(d for name, d in base if name == 1)
     assert to_pandas(treated)["y"].tolist() == [11.0, 22.0]
     assert to_pandas(matched)["y"].tolist() == [3.0, 1.0]
 
@@ -198,7 +201,14 @@ def test_calc_with_empty_group_yields_nan_row() -> None:
     from hypex.dataset import Dataset  # noqa: F401
 
     base = [("a", build_dataset(pd.DataFrame({"y": [1.0, 2.0]}), {"y": TargetRole()}))]
-    cmp = [("b", build_dataset(pd.DataFrame({"y": pd.Series([], dtype=float)}), {"y": TargetRole()}))]
+    cmp = [
+        (
+            "b",
+            build_dataset(
+                pd.DataFrame({"y": pd.Series([], dtype=float)}), {"y": TargetRole()}
+            ),
+        )
+    ]
     result = _Collect.calc(compare_by="groups", grouping_data=(base, cmp))
     row = to_pandas(result["b"]).iloc[0]
     assert np.isnan(row["p-value"]) and np.isnan(row["statistic"])
