@@ -349,6 +349,11 @@ class SparkKSTestExtension(GroupKSTestExtension):
                     StatisticRole(),
                 )
 
+        elif nan_policy == "omit":
+            # same as scipy's nan_policy="omit": drop NaN / null before everything else
+            df1 = df1.filter(F.col(col).isNotNull() & ~F.isnan(F.col(col)))
+            df2 = df2.filter(F.col(col).isNotNull() & ~F.isnan(F.col(col)))
+
         # Get sample sizes
         n1 = df1.count()
         n2 = df2.count()

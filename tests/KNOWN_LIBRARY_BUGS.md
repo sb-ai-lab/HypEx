@@ -26,9 +26,10 @@
 - ИСПРАВЛЕНО: `add_column` присваивает DataFrame колонке.
 - ИСПРАВЛЕНО: `__and__`, `__or__`, `__pos__` работают на pyspark.pandas DataFrame и не работают.
 - ИСПРАВЛЕНО: `SparkBisaExtesion.prepare_data` вызывает `result_to_dataset` без обязательного `roles` (`TypeError`).
-- `SparkKSTestExtension` с `nan_policy="omit"` не отбрасывает NaN (результат 1.0 / 0.0, в pandas иначе).
+- ИСПРАВЛЕНО (числа изменились при наличии NaN, см. «Изменения численных результатов»): `SparkKSTestExtension` с `nan_policy="omit"` не отбрасывал NaN (результат 1.0 / 0.0, в pandas иначе).
 - ИСПРАВЛЕНО: `SparkFaissExtension` определяет `__enter__`, но не `__exit__`.
-- `MultiTest._calc_spark` теряет составной строковый индекс при `to_backend` — поправка ничего не делает.
+- ИСПРАВЛЕНО (диагноз уточнён): `MultiTest._calc_spark` теперь собирает pandas-датасет из `raw_data.to_pandas()` с составным индексом. Фактическая причина падения теста была в другом: `Dataset(data=pd.DataFrame, backend=spark)` создаёт Spark-фрейм через `createDataFrame` и теряет pandas-индекс (составные id p-value пропадают ещё до `MultiTest`). Это поведение конструктора Spark-бэкенда НЕ менялось; тест теперь строит Spark-датасет через `ps.from_pandas` (индекс сохраняется). В пайплайне `ABAnalyzer` p-value всегда собираются в `SmallDataset` (pandas), так что реальные A/B-результаты на Spark это не затрагивало.
+- ОТКРЫТО (вне плана): `SparkNavigation.__init__` для `pd.DataFrame` использует `createDataFrame(data)` и теряет индекс pandas.
 - ИСПРАВЛЕНО: `StatsUTest._execute_spark` → `ImportError`: `StatsUTestExtension` не существует (строки ~922–962 не покрыты).
 
 ## 4. Статистика / comparators / extensions
@@ -70,3 +71,4 @@
 Эти исправления меняют выдаваемые числа; прежние результаты были неверными.
 
 - **Chi2 (`GroupChi2TestExtension.calc`, pandas и Spark).** Раньше в `p-value` попадала статистика хи-квадрат, а в `statistic` — p-value (и флаг `pass` считался по статистике). Теперь значения совпадают с `scipy.stats.chi2_contingency`. Это затрагивает все места, где используется `GroupChi2Test` / `Chi2Test`: A/A-тест (`mean p-value`, `pass` и выбор лучшего разбиения через композитный балл с весом 2 для Chi2), гомогенность, A/B(n)-тест с `additional_tests=["chi2-test"]` и проверки качества Matching. Сохранённые ранее результаты с chi2 пересчитать.
+- **Spark KS (`SparkKSTestExtension.calc`, `nan_policy="omit"` по умолчанию).** Раньше NaN/null отравляли min/max и бакеты, и результат при наличии пропусков был `p-value=1.0, statistic=0.0`-подобным. Теперь строки с NaN/null отбрасываются в обеих выборках, как в pandas `ks_2samp(nan_policy="omit")`. Без пропусков числа не изменились.

@@ -143,13 +143,19 @@ class MultiTest(Extension):
         )
 
     def _calc_spark(self, data: Dataset, **kwargs):
-        """Delegate to the Pandas implementation via to_backend().
+        """Delegate to the Pandas implementation on the driver.
 
         Multiple-testing correction operates on a small, already-collected
         array of p-values (one per test × group), so converting to Pandas
-        on the driver is safe.
+        on the driver is safe. The composite string index (``test<sep>params
+        <sep>field[<sep>group]``) is kept: it defines the test families and
+        field labels used by ``_calc_pandas``.
         """
-        pandas_ds = data.to_backend(BackendsEnum.pandas)
+        pandas_ds = Dataset(
+            roles=data.roles,
+            data=data.raw_data.to_pandas(),
+            backend=BackendsEnum.pandas,
+        )
         return self._calc_pandas(pandas_ds, **kwargs)
 
 

@@ -16,9 +16,15 @@ RAW_P = [0.001, 0.008, 0.02, 0.04, 0.3, 0.7]
 
 def _pvalues(p_values, backend=BackendsEnum.pandas, session=None) -> Dataset:
     index = [f"GroupTTest{S}hash{S}y{i}{S}b" for i in range(len(p_values))]
+    frame = pd.DataFrame({"p-value": p_values}, index=index)
+    if backend == BackendsEnum.spark:
+        # createDataFrame(pandas) drops the pandas index; from_pandas keeps it
+        import pyspark.pandas as ps
+
+        frame = ps.from_pandas(frame)
     return Dataset(
         roles={"p-value": StatisticRole()},
-        data=pd.DataFrame({"p-value": p_values}, index=index),
+        data=frame,
         backend=backend,
         session=session,
     )
@@ -30,12 +36,6 @@ def _frame(ds) -> pd.DataFrame:
 
 
 @pytest.mark.spark
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: MultiTest._calc_spark converts the Spark Dataset to pandas without "
-    "its composite string index, so test/field/group labels are lost (field becomes "
-    "0..n-1, every p-value is its own family and the correction is a no-op)",
-)
 def test_multitest_spark_matches_statsmodels(spark_session) -> None:
     ds = _pvalues(RAW_P, BackendsEnum.spark, spark_session)
     result = _frame(MultiTest(ABNTestMethodsEnum.holm, 0.05).calc(ds))

@@ -221,17 +221,25 @@ def test_spark_kstest_nan_policy_propagate(spark_ds) -> None:
 
 
 @pytest.mark.spark
-@pytest.mark.xfail(
-    strict=True,
-    reason="SparkKSTestExtension default nan_policy='omit' does not drop NaN rows "
-    "(NaN poisons min/max/bucket), unlike the pandas ks_2samp(nan_policy='omit')",
-)
 def test_spark_kstest_nan_policy_omit_matches_clean_data(spark_ds) -> None:
     ext = backend_factory.resolve_backend(GroupKSTestExtension, spark_ds([1.0]))(0.05)
     b = [0.5, 1.5, 2.5, 3.5, 4.5]
     with_nan = _res(ext.calc(spark_ds([1.0, 2.0, 3.0, np.nan]), spark_ds(b)))
     clean = _res(ext.calc(spark_ds([1.0, 2.0, 3.0]), spark_ds(b)))
     assert with_nan == pytest.approx(clean)
+
+
+@pytest.mark.spark
+def test_spark_kstest_nan_policy_omit_matches_pandas(spark_ds) -> None:
+    a = [1.0, 2.0, 3.0, 4.0, 6.5, np.nan, np.nan]
+    b = [0.5, 1.5, 2.5, 3.5, 4.5, np.nan]
+    spark_ext = backend_factory.resolve_backend(GroupKSTestExtension, spark_ds([1.0]))(
+        0.05
+    )
+    got = _res(spark_ext.calc(spark_ds(a), spark_ds(b)))
+    expected = _res(PandasKSTestExtension(0.05).calc(_ds(a), _ds(b)))
+    assert got["statistic"] == pytest.approx(expected["statistic"], abs=0.02)
+    assert got["p-value"] == pytest.approx(expected["p-value"], abs=0.05)
 
 
 @pytest.mark.spark
