@@ -26,11 +26,11 @@
 - ИСПРАВЛЕНО: `add_column` присваивает DataFrame колонке.
 - ИСПРАВЛЕНО: `__and__`, `__or__`, `__pos__` работают на pyspark.pandas DataFrame и не работают.
 - ИСПРАВЛЕНО: `SparkBisaExtesion.prepare_data` вызывает `result_to_dataset` без обязательного `roles` (`TypeError`).
-- ИСПРАВЛЕНО (числа изменились при наличии NaN, см. «Изменения численных результатов»): `SparkKSTestExtension` с `nan_policy="omit"` не отбрасывал NaN (результат 1.0 / 0.0, в pandas иначе).
+- ИСПРАВЛЕНО (числа изменились при наличии NaN, см. «Изменения численных результатов»): `SparkKSTestExtension` (путь `GroupKSTest` на Spark) с `nan_policy="omit"` не отбрасывал NaN (результат 1.0 / 0.0, в pandas иначе). Пользовательский путь `StatsKSTest`/`StatsUTest` на Spark (гистограммы в `StatsKSTestExtension`) тоже игнорировал NaN неверно (NaN в max давал p=1.0) — исправлено отдельно: NaN трактуется как null в bounds и unpivot, без новых Spark-задач.
 - ИСПРАВЛЕНО: `SparkFaissExtension` определяет `__enter__`, но не `__exit__`.
 - ИСПРАВЛЕНО (диагноз уточнён): `MultiTest._calc_spark` теперь собирает pandas-датасет из `raw_data.to_pandas()` с составным индексом. Фактическая причина падения теста была в другом: `Dataset(data=pd.DataFrame, backend=spark)` создаёт Spark-фрейм через `createDataFrame` и теряет pandas-индекс (составные id p-value пропадают ещё до `MultiTest`). Это поведение конструктора Spark-бэкенда НЕ менялось; тест теперь строит Spark-датасет через `ps.from_pandas` (индекс сохраняется). В пайплайне `ABAnalyzer` p-value всегда собираются в `SmallDataset` (pandas), так что реальные A/B-результаты на Spark это не затрагивало.
 - ОТКРЫТО (вне плана): `SparkNavigation.__init__` для `pd.DataFrame` использует `createDataFrame(data)` и теряет индекс pandas.
-- ИСПРАВЛЕНО: `StatsUTest._execute_spark` → `ImportError`: `StatsUTestExtension` не существует (строки ~922–962 не покрыты).
+- ИСПРАВЛЕНО: `StatsUTest._execute_spark` → `ImportError`: `StatsUTestExtension` не существует (переиспользован `StatsKSTestExtension`). `statistic` — U1 базовой группы, как в scipy/pandas (раньше в логике было `min(U1, U2)`). ВАЖНО: KS/U на Spark — приближение по гистограмме (`n_bins` равных бинов на [min, max], нормальное приближение с поправкой на ties): на нормальных данных близко к scipy (~1%), но один экстремальный выброс растягивает бины и p-value может быть сильно неверным.
 
 ## 4. Статистика / comparators / extensions
 
@@ -72,3 +72,5 @@
 
 - **Chi2 (`GroupChi2TestExtension.calc`, pandas и Spark).** Раньше в `p-value` попадала статистика хи-квадрат, а в `statistic` — p-value (и флаг `pass` считался по статистике). Теперь значения совпадают с `scipy.stats.chi2_contingency`. Это затрагивает все места, где используется `GroupChi2Test` / `Chi2Test`: A/A-тест (`mean p-value`, `pass` и выбор лучшего разбиения через композитный балл с весом 2 для Chi2), гомогенность, A/B(n)-тест с `additional_tests=["chi2-test"]` и проверки качества Matching. Сохранённые ранее результаты с chi2 пересчитать.
 - **Spark KS (`SparkKSTestExtension.calc`, `nan_policy="omit"` по умолчанию).** Раньше NaN/null отравляли min/max и бакеты, и результат при наличии пропусков был `p-value=1.0, statistic=0.0`-подобным. Теперь строки с NaN/null отбрасываются в обеих выборках, как в pandas `ks_2samp(nan_policy="omit")`. Без пропусков числа не изменились.
+- **Spark U (`StatsUTest`).** Поле `statistic` теперь U1 базовой группы (совпадает с scipy и pandas `GroupUTest`); раньше Spark выдавал `min(U1, U2)`. p-value не менялось.
+- **Spark `StatsKSTest`/`StatsUTest` с NaN.** Раньше один NaN в колонке давал `p-value=1.0, statistic=0.0`; теперь NaN игнорируются.

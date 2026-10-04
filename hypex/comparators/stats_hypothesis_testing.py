@@ -491,6 +491,12 @@ class StatsKSTest(StatsHypothesisTesting):
     parse them.
 
     For Pandas: delegates to ``GroupKSTest`` (``scipy.stats.ks_2samp``).
+
+    Note:
+        On Spark the statistic and p-value are approximations computed from
+        ``n_bins`` equal-width bins over the global [min, max]. They are close
+        to scipy for well-behaved data, but a single extreme outlier stretches
+        the bins and can make the result misleading. NaN values are ignored.
     """
 
     REQUIRED_STATS: ClassVar[list[str]] = ["histogram", "count"]
@@ -763,6 +769,14 @@ class StatsUTest(StatsHypothesisTesting):
 
     For Pandas backend, delegates to ``GroupUTest`` (scipy
     ``mannwhitneyu``) which is exact and faster for small data.
+
+    Note:
+        On Spark the result is a binned approximation (``n_bins`` equal-width
+        bins over the global [min, max], normal approximation with tie
+        correction): values inside one bin are treated as ties, and an extreme
+        outlier widens the bins and can make the p-value misleading. The
+        reported statistic is U1 of the baseline sample (as in scipy). NaN
+        values are ignored.
 
     Algorithm (histogram approximation)
     ------------------------------------
@@ -1096,6 +1110,6 @@ class StatsUTest(StatsHypothesisTesting):
 
         return {
             "p-value": p_value,
-            "statistic": float(u_stat),
+            "statistic": float(u1),
             "pass": p_value < reliability,
         }

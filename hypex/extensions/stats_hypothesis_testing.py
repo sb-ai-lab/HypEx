@@ -269,6 +269,10 @@ class StatsKSTestExtension(Extension):
     ) -> dict[str, dict[str, dict[str, Any]]]:
         """Compute per-group histograms using the Spark backend.
 
+        NaN values are treated as nulls and ignored (``nan_policy="omit"``).
+        Histograms use ``n_bins`` equal-width bins over the global [min, max],
+        so downstream KS/U results are approximations.
+
         Executes 3 Spark jobs regardless of the number of target columns:
         1. Global bounds: min/max for all targets in one agg().
         2. Counts per (group, column) via unpivot.
@@ -291,10 +295,15 @@ class StatsKSTestExtension(Extension):
         def safe_col(name: str):
             return F.col(f"`{name}`")
 
+        def clean_col(name: str):
+            # NaN is treated as null, so it is ignored by min/max, the counts
+            # and the bucket filters (nan_policy="omit") at no extra Spark cost.
+            return F.when(~F.isnan(safe_col(name)), safe_col(name))
+
         # ── Job 1: global bounds (min/max for all targets) ──────────
         agg_exprs = []
         for col in target_cols:
-            col_ref = safe_col(col)
+            col_ref = clean_col(col)
             agg_exprs.extend(
                 [
                     F.min(col_ref).alias(f"{col}┆min"),
@@ -311,7 +320,7 @@ class StatsKSTestExtension(Extension):
                     [
                         F.struct(
                             F.lit(col).alias("column_name"),
-                            safe_col(col).alias("value"),
+                            clean_col(col).alias("value"),
                         )
                         for col in target_cols
                     ]

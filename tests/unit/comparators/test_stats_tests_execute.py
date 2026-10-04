@@ -41,12 +41,9 @@ def test_utest_matches_scipy_for_fine_buckets() -> None:
         {"histogram": _hist(b, edges), "count": len(b)},
     )
     ref = stats.mannwhitneyu(a, b)
-    # the statistic is min(U1, U2); scipy returns U1 of the first sample
-    n_prod = len(a) * len(b)
-    assert res["statistic"] == pytest.approx(
-        min(ref.statistic, n_prod - ref.statistic), abs=1.0
-    )
-    assert res["p-value"] == pytest.approx(ref.pvalue, abs=5e-3)
+    # same convention as scipy / GroupUTest: U1 of the baseline sample
+    assert res["statistic"] == pytest.approx(ref.statistic, abs=1.0)
+    assert res["p-value"] == pytest.approx(ref.pvalue, rel=0.02, abs=1e-6)
     assert res["pass"] == (res["p-value"] < 0.05)
 
 
@@ -90,12 +87,12 @@ def test_utest_pass_flag_follows_reliability() -> None:
     assert loose["p-value"] == strict["p-value"]
 
 
-def test_utest_swapping_groups_keeps_statistic_and_p_value() -> None:
+def test_utest_swapping_groups_gives_complementary_statistic_same_p_value() -> None:
     base = {"histogram": {0: 10, 2: 10}, "count": 20}
     comp = {"histogram": {1: 12, 2: 8}, "count": 20}
     a = StatsUTest._inner_function(base, comp)
     b = StatsUTest._inner_function(comp, base)
-    assert a["statistic"] == pytest.approx(b["statistic"])
+    assert a["statistic"] + b["statistic"] == pytest.approx(20 * 20)
     assert a["p-value"] == pytest.approx(b["p-value"])
 
 
@@ -283,13 +280,53 @@ def test_spark_kstest_single_group_gives_empty_result(spark_session) -> None:
 @pytest.mark.spark
 def test_spark_utest_execute(spark_session) -> None:
     df = _frame()
-    ex = StatsUTest(grouping_role=TreatmentRole())
+    ex = StatsUTest(grouping_role=TreatmentRole(), n_bins=2000)
     out = ex.execute(_data(df, "y", BackendsEnum.spark, spark_session))
     table = _table(out, ex.id)
     assert list(table.index) == ["b", "c"]
     for grp in ("b", "c"):
         ref = stats.mannwhitneyu(df.y[df.g == "a"], df.y[df.g == grp])
-        assert table.loc[grp, "p-value"] == pytest.approx(ref.pvalue, abs=0.05)
+        assert table.loc[grp, "statistic"] == pytest.approx(ref.statistic, rel=0.01)
+        assert table.loc[grp, "p-value"] == pytest.approx(ref.pvalue, rel=0.1)
+
+
+def _big_baseline_frame() -> pd.DataFrame:
+    rng = np.random.RandomState(3)
+    n = 300
+    return pd.DataFrame(
+        {
+            "g": ["a"] * n + ["b"] * n,
+            "y": np.r_[rng.normal(1.0, 1, n), rng.normal(0.0, 1, n)],
+        }
+    )
+
+
+@pytest.mark.spark
+def test_spark_utest_statistic_matches_scipy_when_baseline_is_larger(
+    spark_session,
+) -> None:
+    df = _big_baseline_frame()
+    ex = StatsUTest(grouping_role=TreatmentRole(), n_bins=2000)
+    out = ex.execute(_data(df, "y", BackendsEnum.spark, spark_session))
+    row = _table(out, ex.id).loc["b"]
+    ref = stats.mannwhitneyu(df.y[df.g == "a"], df.y[df.g == "b"])
+    assert row["statistic"] == pytest.approx(ref.statistic, rel=1e-3)
+    assert row["p-value"] == pytest.approx(ref.pvalue, rel=0.1)
+
+
+@pytest.mark.spark
+@pytest.mark.parametrize("cls", [StatsKSTest, StatsUTest], ids=["ks", "u"])
+def test_spark_stats_tests_ignore_nan(cls, spark_session) -> None:
+    df = _big_baseline_frame()
+    df.loc[5, "y"] = np.nan
+    ex = cls(grouping_role=TreatmentRole(), n_bins=2000)
+    out = ex.execute(_data(df, "y", BackendsEnum.spark, spark_session))
+    row = _table(out, ex.id).loc["b"]
+    a, b = df.y[df.g == "a"].dropna(), df.y[df.g == "b"]
+    ref = stats.ks_2samp(a, b) if cls is StatsKSTest else stats.mannwhitneyu(a, b)
+    assert row["statistic"] == pytest.approx(ref.statistic, rel=0.02)
+    assert row["p-value"] == pytest.approx(ref.pvalue, rel=0.5, abs=1e-12)
+    assert row["p-value"] < 1e-6  # not the NaN-poisoned 1.0
 
 
 def test_chi2_execute_matches_scipy(backend, spark_session) -> None:
