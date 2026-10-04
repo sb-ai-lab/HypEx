@@ -21,13 +21,13 @@
 ## 3. Spark-бэкенд
 
 - Результаты `agg` не адресуются как в pandas (`KeyError`); `quantile` возвращает транспонированный фрейм.
-- `std(ddof=1)` на одной строке: `float(None)`.
-- Сеттер индекса передаёт список в `set_index` как имена колонок (`KeyError`) — `reset_index(drop=True)`.
-- `add_column` присваивает DataFrame колонке.
-- `__and__`, `__or__`, `__pos__` работают на pyspark.pandas DataFrame и не работают.
-- `SparkBisaExtesion.prepare_data` вызывает `result_to_dataset` без обязательного `roles` (`TypeError`).
+- ИСПРАВЛЕНО: `std(ddof=1)` на одной строке: `float(None)`.
+- ИСПРАВЛЕНО: Сеттер индекса передаёт список в `set_index` как имена колонок (`KeyError`) — `reset_index(drop=True)`.
+- ИСПРАВЛЕНО: `add_column` присваивает DataFrame колонке.
+- ИСПРАВЛЕНО: `__and__`, `__or__`, `__pos__` работают на pyspark.pandas DataFrame и не работают.
+- ИСПРАВЛЕНО: `SparkBisaExtesion.prepare_data` вызывает `result_to_dataset` без обязательного `roles` (`TypeError`).
 - `SparkKSTestExtension` с `nan_policy="omit"` не отбрасывает NaN (результат 1.0 / 0.0, в pandas иначе).
-- `SparkFaissExtension` определяет `__enter__`, но не `__exit__`.
+- ИСПРАВЛЕНО: `SparkFaissExtension` определяет `__enter__`, но не `__exit__`.
 - `MultiTest._calc_spark` теряет составной строковый индекс при `to_backend` — поправка ничего не делает.
 - `StatsUTest._execute_spark` → `ImportError`: `StatsUTestExtension` не существует (строки ~922–962 не покрыты).
 

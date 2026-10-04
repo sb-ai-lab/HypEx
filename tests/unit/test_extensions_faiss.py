@@ -229,11 +229,6 @@ def test_spark_string_feature_is_rejected(spark_session) -> None:
 
 
 @pytest.mark.spark
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="SparkFaissExtension defines __enter__ but not __exit__",
-)
 def test_spark_context_manager_returns_self() -> None:
     ext = SparkFaissExtension()
     with ext as entered:

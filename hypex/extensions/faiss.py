@@ -1678,6 +1678,11 @@ class SparkFaissExtension(FaissExtension):
         """
         return self
 
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        """Context manager exit: release Spark resources, never swallow errors."""
+        self.unpersist()
+        return False
+
     def __del__(self, *_) -> None:
         """Destructor that ensures resources are cleaned up."""
         self.unpersist()

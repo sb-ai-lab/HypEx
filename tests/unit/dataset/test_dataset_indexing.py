@@ -6,7 +6,6 @@ import pandas as pd
 import pytest
 
 from hypex.dataset import FeatureRole, TargetRole
-from hypex.utils import BackendsEnum
 
 
 def _ds(make_dataset):
@@ -134,17 +133,12 @@ def test_index_property_and_setter(make_dataset) -> None:
     pytest.skip("Setting list index in pyspark.pandas is unstable")
 
 
-def test_reset_index_drop(make_dataset, xfail_backend) -> None:
-    xfail_backend(
-        BackendsEnum.spark,
-        reason="Issue: SparkDataset.index setter passes the list to set_index() as column names (KeyError)",
-        raises=KeyError,
-    )
+def test_reset_index_drop(make_dataset) -> None:
     """reset_index(drop=True) returns a fresh RangeIndex dataset."""
     ds = _ds(make_dataset)
     ds.index = [10, 11, 12, 13]
     reset = ds.reset_index(drop=True)
-    assert list(reset.index) == [0, 1, 2, 3]
+    assert list(reset.index.to_numpy()) == [0, 1, 2, 3]
 
 
 def test_set_index(make_dataset) -> None:

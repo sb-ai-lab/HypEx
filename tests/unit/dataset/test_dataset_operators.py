@@ -81,12 +81,7 @@ def test_comparison_operators(make_dataset, name, op) -> None:
 
 
 @pytest.mark.pandas
-def test_bitwise_operators(make_dataset, xfail_backend) -> None:
-    xfail_backend(
-        BackendsEnum.spark,
-        reason="Issue: SparkDataset.__and__/__or__ apply & to pyspark.pandas DataFrames, which is unsupported (TypeError)",
-        raises=TypeError,
-    )
+def test_bitwise_operators(make_dataset) -> None:
     """& and | work on boolean datasets."""
     df = pd.DataFrame({"x": [True, True, False]})
     ds = make_dataset(df, {"x": FeatureRole()})
@@ -97,12 +92,7 @@ def test_bitwise_operators(make_dataset, xfail_backend) -> None:
 
 
 @pytest.mark.pandas
-def test_unary_operators(make_dataset, xfail_backend) -> None:
-    xfail_backend(
-        BackendsEnum.spark,
-        reason="Issue: SparkDataset.__pos__ applies unary + to a pyspark.pandas DataFrame, which is unsupported (TypeError)",
-        raises=TypeError,
-    )
+def test_unary_operators(make_dataset) -> None:
     """Unary +, -, abs and round return datasets of the same shape."""
     ds = _ds(make_dataset, [-1, 2, -3])
     assert len(+ds) == 3

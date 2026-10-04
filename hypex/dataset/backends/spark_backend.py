@@ -604,6 +604,15 @@ class SparkNavigation(DatasetBackendNavigation):
         else:
             return other
 
+    def _columnwise(self, other: Any, op: Callable[[Any, Any], Any]) -> ps.DataFrame:
+        """Apply a binary operator per column (ps.DataFrame lacks & and |)."""
+        other = self.__magic_determine_other(other)
+        result = self.data.copy()
+        for col in self.data.columns:
+            right = other[col] if isinstance(other, ps.DataFrame) else other
+            result[col] = op(self.data[col], right)
+        return result
+
     # comparison operators:
     def __eq__(self, other: Any) -> Self:
         """Element-wise equality comparison."""
@@ -632,7 +641,7 @@ class SparkNavigation(DatasetBackendNavigation):
     # unary operations:
     def __pos__(self) -> Self:
         """Unary positive operation (no-op for numeric data)."""
-        return self._wrap_result(+self.data)
+        return self._wrap_result(self.data.copy())
 
     def __neg__(self) -> Self:
         """Unary negation operation."""
@@ -698,12 +707,12 @@ class SparkNavigation(DatasetBackendNavigation):
     def __and__(self, other: Any) -> Self:
         """Element-wise logical AND for boolean data."""
         with self._ops_on_diff_frames():
-            return self._wrap_result(self.data & self.__magic_determine_other(other))
+            return self._wrap_result(self._columnwise(other, lambda a, b: a & b))
 
     def __or__(self, other: Any) -> Self:
         """Element-wise logical OR for boolean data."""
         with self._ops_on_diff_frames():
-            return self._wrap_result(self.data | self.__magic_determine_other(other))
+            return self._wrap_result(self._columnwise(other, lambda a, b: a | b))
 
     # Right arithmetic operators:
     def __radd__(self, other: Any) -> Self:
@@ -904,7 +913,15 @@ class SparkNavigation(DatasetBackendNavigation):
     @index.setter
     def index(self, value):
         """Set the index of the underlying DataFrame."""
-        self.data = self.data.set_index(value)
+        if isinstance(value, (list, tuple, np.ndarray, pd.Index, pd.Series)):
+            tmp_name = "__hypex_new_index__"
+            data = self.data.copy()
+            data[tmp_name] = list(value)
+            data = data.set_index(tmp_name)
+            data.index.name = None
+            self.data = data
+        else:
+            self.data = self.data.set_index(value)
 
     def reset_index(
         self, drop: bool = False, inplace: bool = False, **kwargs
@@ -1100,6 +1117,14 @@ class SparkNavigation(DatasetBackendNavigation):
             self.data = self.data.join(data)
             return
 
+        if isinstance(data, SparkDF):
+            data = data.pandas_api()
+            self.add_column(data, name, index)
+            return
+        if isinstance(data, pd.DataFrame):
+            self.add_column(ps.from_pandas(data), name, index)
+            return
+
         self.data[name] = data
 
     def append(
@@ -1236,7 +1261,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         if isinstance(result, ps.Series):
             result = result.to_frame()
         if result.shape == (1, 1):
-            return float(result.to_spark().collect()[0][0])
+            value = result.to_spark().collect()[0][0]
+            return float("nan") if value is None else float(value)
         return result if isinstance(result, ps.DataFrame) else ps.DataFrame(result)
 
     def __init__(
@@ -1448,7 +1474,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             ]
 
             data_to_agg = self.data[numeric_cols]
-            if data_to_agg is None or len(data_to_agg.columns) == 0: return None
+            if data_to_agg is None or len(data_to_agg.columns) == 0:
+                return None
 
         if data_to_agg is None or len(data_to_agg.columns) == 0:
             return None
