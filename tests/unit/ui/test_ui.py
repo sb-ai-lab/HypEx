@@ -284,11 +284,6 @@ def test_ab_output_values_match_manual_computation() -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: ABOutput.variance_reduction_report calls ABTestReporter.report_variance_reductions, which no longer exists",
-)
 def test_ab_output_variance_reduction_report_without_cuped() -> None:
     output = ABTest().execute(_dataset())
     assert "No variance reduction data" in output.variance_reduction_report
@@ -298,6 +293,13 @@ def test_ab_output_with_cuped_adds_cuped_feature() -> None:
     output = ABTest(cuped_features={"y": "y_pre"}).execute(_dataset())
     features = list(_frame(output.resume)["feature"])
     assert "y" in features and "y_cuped" in features
+
+
+def test_ab_output_variance_reduction_report_with_cuped() -> None:
+    output = ABTest(cuped_features={"y": "y_pre"}).execute(_dataset())
+    report = _frame(output.variance_reduction_report)
+    assert list(report.columns) == ["feature", "variance_reduction_pct"]
+    assert len(report) >= 1
 
 
 def test_cupac_output_repr_describes_content() -> None:

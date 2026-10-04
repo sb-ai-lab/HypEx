@@ -51,7 +51,7 @@
 
 ## 6. UI / reporters
 
-- `ABOutput.variance_reduction_report` вызывает `ABTestReporter.report_variance_reductions`, которого больше нет.
+- ИСПРАВЛЕНО: `ABOutput.variance_reduction_report` вызывает `ABTestReporter.report_variance_reductions`, которого больше нет.
 - `Matching().execute(...)` на Spark и при `compute_indexes=False` по умолчанию возвращает пустой `indexes` (`len == 0`), тесты ожидают строки на каждую запись (`test_matching_output_structure_on_spark`, `test_indexes_cover_every_row`).
 - `Matching(group_match=True)`: `ValueError: No group keys passed!` на обычных ролях.
 - ИСПРАВЛЕНО попутно: `OnRoleExperiment.execute` не восстанавливал `self.executors` при исключении (общий `HOMOGENEITY_TEST` портился после неудачного запуска) — теперь `try/finally`.
