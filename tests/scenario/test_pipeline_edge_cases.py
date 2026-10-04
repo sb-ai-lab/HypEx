@@ -60,9 +60,8 @@ def test_empty_dataset_raises(name) -> None:
             "homo",
             marks=pytest.mark.xfail(
                 strict=True,
-                reason="Issue: HomogeneityTest() construction emits the DeprecationWarning of "
-                "HomoDatasetReporter before any data validation (and an empty dataset gives a "
-                "bare IndexError)",
+                reason="Issue: an empty dataset fails with a bare IndexError('pop from empty list') "
+                "instead of a descriptive error",
             ),
         ),
         "aa",
@@ -80,15 +79,7 @@ def test_empty_dataset_error_is_descriptive(name) -> None:
     "name",
     [
         "ab",
-        pytest.param(
-            "homo",
-            marks=pytest.mark.xfail(
-                strict=True,
-                raises=DeprecationWarning,
-                reason="Issue: HomogeneityTest() construction emits the DeprecationWarning of "
-                "HomoDatasetReporter",
-            ),
-        ),
+        "homo",
         "aa",
     ],
 )
@@ -101,15 +92,7 @@ def test_single_row_raises_not_suitable_field(name) -> None:
     "name",
     [
         "ab",
-        pytest.param(
-            "homo",
-            marks=pytest.mark.xfail(
-                strict=True,
-                raises=DeprecationWarning,
-                reason="Issue: HomogeneityTest() construction emits the DeprecationWarning of "
-                "HomoDatasetReporter",
-            ),
-        ),
+        "homo",
     ],
 )
 def test_single_group_raises_not_suitable_field(name) -> None:

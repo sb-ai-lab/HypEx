@@ -319,36 +319,45 @@ class OnRoleExperiment(Experiment):
                 iterative_executors.append(ex)
 
         original_executors = self.executors
+        try:
+            # Vector executors execution (only true StatsComparators)
+            if vector_executors:
+                tmp_roles_dict = {}
+                for field in target_fields:
+                    if field in data.ds.columns:
+                        tmp_roles_dict[field] = TempTargetRole()
+                    elif (
+                        data.additional_fields
+                        and field in data.additional_fields.columns
+                    ):
+                        tmp_roles_dict[field] = AdditionalTargetRole()
 
-        # Vector executors execution (only true StatsComparators)
-        if vector_executors:
-            tmp_roles_dict = {}
-            for field in target_fields:
-                if field in data.ds.columns:
-                    tmp_roles_dict[field] = TempTargetRole()
-                elif data.additional_fields and field in data.additional_fields.columns:
-                    tmp_roles_dict[field] = AdditionalTargetRole()
+                if tmp_roles_dict:
+                    data.ds.tmp_roles = tmp_roles_dict
+                    self.executors = vector_executors
+                    data = super().execute(data)
+                    data.ds.tmp_roles = {}
 
-            if tmp_roles_dict:
-                data.ds.tmp_roles = tmp_roles_dict
-                self.executors = vector_executors
-                data = super().execute(data)
-                data.ds.tmp_roles = {}
+            # Iterative executors execution (one by one)
+            if iterative_executors:
+                self.executors = iterative_executors
+                for field in target_fields:
+                    if field in data.ds.columns:
+                        data.ds.tmp_roles = {field: TempTargetRole()}
+                    elif (
+                        data.additional_fields
+                        and field in data.additional_fields.columns
+                    ):
+                        data.additional_fields.tmp_roles = {
+                            field: AdditionalTargetRole()
+                        }
 
-        # Iterative executors execution (one by one)
-        if iterative_executors:
-            self.executors = iterative_executors
-            for field in target_fields:
-                if field in data.ds.columns:
-                    data.ds.tmp_roles = {field: TempTargetRole()}
-                elif data.additional_fields and field in data.additional_fields.columns:
-                    data.additional_fields.tmp_roles = {field: AdditionalTargetRole()}
+                    data = super().execute(data)
 
-                data = super().execute(data)
+                    data.ds.tmp_roles = {}
+                    if data.additional_fields:
+                        data.additional_fields.tmp_roles = {}
 
-                data.ds.tmp_roles = {}
-                if data.additional_fields:
-                    data.additional_fields.tmp_roles = {}
-
-        self.executors = original_executors
+        finally:
+            self.executors = original_executors
         return data

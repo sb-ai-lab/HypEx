@@ -305,11 +305,6 @@ def test_cupac_output_repr_describes_content() -> None:
     assert repr(cupac) == "CupacOutput(no CUPAC data available)"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=DeprecationWarning,
-    reason="Issue: HomogeneityTest builds HomoOutput with the deprecated HomoDatasetReporter, so construction emits a DeprecationWarning",
-)
 def test_homo_output_resume() -> None:
     output = HomogeneityTest().execute(_dataset())
     assert isinstance(output, HomoOutput)
@@ -340,8 +335,8 @@ def test_aa_output_reproducible_with_fixed_states() -> None:
 
 @pytest.mark.xfail(
     strict=True,
-    raises=DeprecationWarning,
-    reason="Issue: Matching builds MatchingOutput with the deprecated MatchingDictReporter, so construction emits a DeprecationWarning",
+    raises=AssertionError,
+    reason="Issue: Matching().execute runs on Spark, but output.indexes is empty (0 rows, expected 300) with default and with compute_indexes=True",
 )
 @pytest.mark.spark
 def test_matching_output_structure_on_spark(spark_session) -> None:
@@ -354,13 +349,6 @@ def test_matching_output_structure_on_spark(spark_session) -> None:
     assert len(output.indexes) == 300
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(DeprecationWarning, AttributeError),
-    reason="Issue: Matching builds MatchingOutput with the deprecated MatchingDictReporter "
-    "(DeprecationWarning) and, past that, MatchingOutput._extract_full_data calls the missing "
-    "self._match_pandas, so Matching cannot run on the pandas backend",
-)
 def test_matching_output_on_pandas() -> None:
     Matching().execute(_dataset())
 

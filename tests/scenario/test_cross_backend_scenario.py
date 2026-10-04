@@ -90,11 +90,6 @@ def _homo_frame(imbalance: float, seed: int = 4, n: int = 800) -> pd.DataFrame:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=DeprecationWarning,
-    reason="Issue: HomogeneityTest() construction emits the DeprecationWarning of the deprecated HomoDatasetReporter (hypex/ui/homo.py)",
-)
 @pytest.mark.parametrize("imbalance", [0.0, 4.0])
 def test_homogeneity_parity(spark_session, imbalance) -> None:
     df = _homo_frame(imbalance)
@@ -108,11 +103,6 @@ def test_homogeneity_parity(spark_session, imbalance) -> None:
         assert left.loc[feature, "KSTest pass"] == right.loc[feature, "KSTest pass"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=DeprecationWarning,
-    reason="Issue: HomogeneityTest() construction emits the DeprecationWarning of the deprecated HomoDatasetReporter (hypex/ui/homo.py)",
-)
 def test_homogeneity_ks_pvalue_is_close(spark_session) -> None:
     df = _homo_frame(0.0)
     pandas_ds, spark_ds = _both(df, ROLES_HOMO, spark_session)

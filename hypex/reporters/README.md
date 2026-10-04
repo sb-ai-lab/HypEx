@@ -28,8 +28,8 @@ Two consumers use them:
 | `abstract.py` | `Reporter`, `DictReporter`, `OnDictReporter`, `DatasetReporter`, `TestDictReporter`, `ResultKey`. |
 | `aa.py` | `OneAADictReporter`, `AADatasetReporter`, `AAPassedReporter`, `AABestSplitReporter`, `AATestReporter`. |
 | `ab.py` | `ABDictReporter`, `ABDatasetReporter`, `ABTestReporter`. |
-| `homo.py` | `HomoDictReporter`, `HomoDatasetReporter`, `HomogeneityReporter`. |
-| `matching.py` | `MatchingDictReporter`, `MatchingDatasetReporter`, `MatchingQualityDictReporter`, `MatchingQualityDatasetReporter`, `MatchingReporter`. |
+| `homo.py` | `HomoDictReporter`, `HomogeneityReporter`. |
+| `matching.py` | `MatchingReporter`, `MatchingAnalysisTableReporter`, `MatchingQualityReporter`, `MatchingQualityDictReporter`. |
 | `cupac.py` | `CupacReporter` — **NEW**. |
 | `cuped.py` | `CupedReporter` — **NEW**. |
 | `__init__.py` | Exports the abstract trio plus all concrete reporters. |
@@ -94,21 +94,21 @@ specifics (multitest results, per-group differences).
 
 ### Homogeneity reporters (`homo.py`)
 
-`HomoDictReporter(OneAADictReporter)` and `HomoDatasetReporter(DatasetReporter)` —
-the A/A machinery applied to a single homogeneity check.
+`HomoDictReporter(OneAADictReporter)` — the A/A machinery applied to a single
+homogeneity check.
 
-`HomogeneityReporter` — complete homogeneity test reporting.
+`HomogeneityReporter` — complete homogeneity test reporting (use
+`HomogeneityReporter(DictReporter(), output_format="dataset")` for a `Dataset`).
 
 ### Matching reporters (`matching.py`)
 
-* `MatchingDictReporter(searching_class=MatchingAnalyzer)` — flattens the
+* `MatchingReporter(searching_class=MatchingAnalyzer, output_format="dict")` — flattens the
   analyzer's effect table, and additionally reconstructs the matched index pairs
   from the `FaissNearestNeighbors` columns in `additional_fields`, joining them
   with `MATCHING_INDEXES_SPLITTER_SYMBOL` (`╯`).
-* `MatchingDatasetReporter` — the `Dataset` wrapper.
-* `MatchingQualityDictReporter` / `MatchingQualityDatasetReporter` — the
-  post-matching balance tests (t / KS / chi²).
-* `MatchingReporter` — base matching reporter.
+* `MatchingAnalysisTableReporter` — returns the analyzer table directly as a
+  `Dataset` (used by `GroupExperiment` when `group_match=True`).
+* `MatchingQualityReporter` — the post-matching balance tests (t / KS / chi²).
 * **Enhanced**: Better support for complex matching scenarios and improved error handling.
 
 ### CUPAC reporters (`cupac.py`) — **NEW**

@@ -7,8 +7,8 @@
 | Ошибка | Где | Эффект |
 |---|---|---|
 | ИСПРАВЛЕНО: `PandasDataset.count_groups` делает `int(df[cols].nunique())` | `hypex/dataset/backends/pandas_backend.py` | FutureWarning (в pandas), `TypeError` при нескольких колонках групп и на Spark; ломает любой `list(groupby)`: `GroupedDataset`, `GroupOperator.calc`, `GroupExperiment`, `MahalanobisDistance`, split-modes, calculators, `MLExecutor`, `MinSampleSize` |
-| `HomogeneityTest()` создаёт deprecated `HomoDatasetReporter` | `hypex/ui/homo.py` | DeprecationWarning → ошибка из-за `filterwarnings` в `pyproject.toml`; фасад нельзя вызвать в тестах |
-| `Matching()` / `MatchingOutput()` создают deprecated `MatchingDictReporter` / `MatchingDatasetReporter` / `MatchingQualityDatasetReporter` | `hypex/matching.py`, `hypex/ui/matching.py` | то же; старые xfail-причины Matching (соседи из противоположной группы, ближайший по ковариате, `_match_pandas`, `group_match`) нельзя перепроверить, пока репортёры deprecated |
+| ИСПРАВЛЕНО: `HomogeneityTest()` создаёт deprecated `HomoDatasetReporter` | `hypex/ui/homo.py` | DeprecationWarning → ошибка из-за `filterwarnings` в `pyproject.toml`; фасад нельзя вызвать в тестах |
+| ИСПРАВЛЕНО (deprecated-репортёры удалены, фасады используют `MatchingReporter`/`MatchingQualityReporter`/`HomogeneityReporter`): `Matching()` / `MatchingOutput()` создают deprecated `MatchingDictReporter` / `MatchingDatasetReporter` / `MatchingQualityDatasetReporter` | `hypex/matching.py`, `hypex/ui/matching.py` | то же; старые xfail-причины Matching (соседи из противоположной группы, ближайший по ковариате, `_match_pandas`, `group_match`) нельзя перепроверить, пока репортёры deprecated |
 
 ## 2. Dataset / adapter
 
@@ -52,6 +52,9 @@
 ## 6. UI / reporters
 
 - `ABOutput.variance_reduction_report` вызывает `ABTestReporter.report_variance_reductions`, которого больше нет.
+- `Matching().execute(...)` на Spark и при `compute_indexes=False` по умолчанию возвращает пустой `indexes` (`len == 0`), тесты ожидают строки на каждую запись (`test_matching_output_structure_on_spark`, `test_indexes_cover_every_row`).
+- `Matching(group_match=True)`: `ValueError: No group keys passed!` на обычных ролях.
+- ИСПРАВЛЕНО попутно: `OnRoleExperiment.execute` не восстанавливал `self.executors` при исключении (общий `HOMOGENEITY_TEST` портился после неудачного запуска) — теперь `try/finally`.
 
 ## 7. Прочее наблюдаемое
 

@@ -231,12 +231,5 @@ def test_collect_grouped_indexes_aligns_to_group_rows() -> None:
     assert result.raw_data.index.tolist() == [0, 1, 2, 3]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=DeprecationWarning,
-    reason="Issue: MatchingOutput builds its summary/quality reporters from the deprecated "
-    "MatchingDictReporter / MatchingQualityDatasetReporter, so constructing it emits a "
-    "DeprecationWarning (an error under the project's pytest filterwarnings)",
-)
 def test_matching_output_construction_does_not_use_deprecated_reporters() -> None:
     MatchingOutput()
