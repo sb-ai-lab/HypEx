@@ -180,7 +180,7 @@ class GroupChi2TestExtension(GroupStatTest):
         if isinstance(contingency_table, Dataset):
             contingency_table = contingency_table.raw_data.values
         statistic, p_value, *_ = chi2_contingency(contingency_table, **kwargs)
-        return self._form_results(statistic, p_value, self.reliability)
+        return self._form_results(p_value, statistic, self.reliability)
 
 
 @backend_factory.register(GroupKSTestExtension, PandasDataset)

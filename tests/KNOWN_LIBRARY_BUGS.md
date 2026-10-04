@@ -33,7 +33,7 @@
 
 ## 4. Статистика / comparators / extensions
 
-- `GroupChi2TestExtension.calc` передаёт `_form_results(p_value, statistic, ...)` в перепутанном порядке (pandas и Spark).
+- ИСПРАВЛЕНО (числа изменились, см. «Изменения численных результатов»): `GroupChi2TestExtension.calc` передаёт `_form_results(p_value, statistic, ...)` в перепутанном порядке (pandas и Spark).
 - `StatsKSTest` / `StatsUTest` на pandas: код ставит `delegate._id`, а результаты лежат под `GroupKSTest┴┴y` / `GroupUTest┴┴y` — поиск по id Stats-исполнителя не находит.
 - ИСПРАВЛЕНО: `PandasLstsqExtension.calc` через `create_empty().fillna()` даёт pandas FutureWarning (3 теста lstsq).
 - ИСПРАВЛЕНО (добавлен и `calc`-диспетчер): `MultitestQuantile._calc_pandas` не тестируется: вызов `groupby(fields_list=...)` падает дальше, т.к. в группах остаётся строковая колонка группы.
@@ -64,3 +64,9 @@
 ## Тесты, где поведение изменилось и тест подогнан под новый контракт
 
 `CachingIndex.get(reference, storage)` (nprobe вынесен из кэша); Welch — t-test по умолчанию; в AB «significant = OK»; AA-резюме — одна строка на признак; shell копирует `ExperimentData`. Подробности: `git log` ветки, коммиты шага «fix failing tests».
+
+## Изменения численных результатов (записано при исправлении)
+
+Эти исправления меняют выдаваемые числа; прежние результаты были неверными.
+
+- **Chi2 (`GroupChi2TestExtension.calc`, pandas и Spark).** Раньше в `p-value` попадала статистика хи-квадрат, а в `statistic` — p-value (и флаг `pass` считался по статистике). Теперь значения совпадают с `scipy.stats.chi2_contingency`. Это затрагивает все места, где используется `GroupChi2Test` / `Chi2Test`: A/A-тест (`mean p-value`, `pass` и выбор лучшего разбиения через композитный балл с весом 2 для Chi2), гомогенность, A/B(n)-тест с `additional_tests=["chi2-test"]` и проверки качества Matching. Сохранённые ранее результаты с chi2 пересчитать.

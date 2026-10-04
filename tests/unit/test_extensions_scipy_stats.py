@@ -149,20 +149,18 @@ def test_chi2_calc_degenerate_warns_and_returns_none() -> None:
     assert small.get_values(column="p-value")[0] is None
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="GroupChi2TestExtension.calc passes (statistic, p_value) to "
-    "_form_results(p_value, statistic, ...), so the two are swapped",
-)
 def test_chi2_calc_p_value_and_statistic_are_not_swapped() -> None:
     data = _ds(["a"] * 40 + ["b"] * 20, "c")
     other = _ds(["a"] * 20 + ["b"] * 40, "c")
     ext = PandasChi2TestExtension()
     table = ext.matrix_preparation(data, other).raw_data.values
     stat, p, *_ = chi2_contingency(table)
-    res = _res(ext.calc(data, other))
+    small = ext.calc(data, other)
+    res = _res(small)
     assert res["p-value"] == pytest.approx(p)
     assert res["statistic"] == pytest.approx(stat)
+    # `pass` is derived from the p-value (not from the statistic)
+    assert bool(small.get_values(column="pass")[0]) == (p < ext.reliability)
 
 
 def test_normcdf_two_sided_p_value() -> None:
@@ -237,10 +235,6 @@ def test_spark_kstest_nan_policy_omit_matches_clean_data(spark_ds) -> None:
 
 
 @pytest.mark.spark
-@pytest.mark.xfail(
-    strict=True,
-    reason="GroupChi2TestExtension.calc swaps p-value and statistic",
-)
 def test_spark_chi2_matches_scipy_on_counts(spark_ds) -> None:
     data = spark_ds(["a"] * 40 + ["b"] * 20, "c")
     other = spark_ds(["a"] * 20 + ["b"] * 40, "c")
