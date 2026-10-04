@@ -157,6 +157,7 @@ omit = ["hypex/factory/*", "hypex/hypotheses/*"]
 
 [tool.coverage.report]
 show_missing = true
+fail_under = 88
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
