@@ -38,7 +38,7 @@
 - ИСПРАВЛЕНО: `PandasLstsqExtension.calc` через `create_empty().fillna()` даёт pandas FutureWarning (3 теста lstsq).
 - ИСПРАВЛЕНО (добавлен и `calc`-диспетчер): `MultitestQuantile._calc_pandas` не тестируется: вызов `groupby(fields_list=...)` падает дальше, т.к. в группах остаётся строковая колонка группы.
 - ИСПРАВЛЕНО: `MahalanobisDistance` — недостижимая ветка `test_data=None` удалена; при одной группе `_execute_inner_function` явно бросает `ValueError("test_data is needed ...")`, а `calc` — `NotSuitableFieldError`.
-- Сопоставление ролей игнорирует `data_type`: `Float32Caster(target_roles=InfoRole(int))` выбирает float-колонку Info.
+- ИСПРАВЛЕНО локально в `Float32Caster` (общий `search_columns` не менялся — у него 46 вызывающих): `Float32Caster(target_roles=InfoRole(int))` больше не выбирает float-колонку Info. `Dataset.search_columns` по-прежнему сопоставляет роли только по классу.
 
 ## 5. ML / matching / faiss
 

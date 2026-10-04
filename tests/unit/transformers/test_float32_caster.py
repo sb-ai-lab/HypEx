@@ -78,6 +78,16 @@ def test_execute_with_custom_roles(frame, roles) -> None:
     assert df["f"].dtype == np.float64
 
 
+def test_execute_respects_data_type_of_requested_role(frame, roles) -> None:
+    ed = make_ed(frame, roles)
+    # the only Info column is float, so a request for int Info columns casts nothing
+    assert Float32Caster(target_roles=InfoRole(int)).execute(ed) is ed
+    out = Float32Caster(target_roles=InfoRole(float)).execute(ed)
+    df = to_pandas(out.ds)
+    assert df["info"].dtype == np.float32
+    assert df["f"].dtype == np.float64
+
+
 def test_execute_returns_input_when_nothing_to_cast(frame, roles) -> None:
     ed = make_ed(frame, roles)
     assert Float32Caster(columns=["nope"]).execute(ed) is ed
