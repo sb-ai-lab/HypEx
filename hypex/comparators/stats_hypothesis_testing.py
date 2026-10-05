@@ -465,21 +465,18 @@ class StatsZTest(StatsHypothesisTesting):
         }
 
 
-def _execute_pandas_delegate(
-    owner: Any, delegate: Any, data: ExperimentData
-) -> ExperimentData:
-    """Run a pandas ``Group*`` delegate and file its result under ``owner.id``.
+def _require_spark(owner: Any, data: ExperimentData, master: str) -> None:
+    """Fail fast when a Spark-only executor receives a non-Spark dataset.
 
-    ``Stats*`` executors fall back to their ``Group*`` counterpart on pandas.
-    The delegate stores its table under its own id (``GroupKSTest┴...``); the
-    table is moved under the id of the ``Stats*`` executor so that pandas and
-    Spark runs address the result the same way.
+    Raises:
+        TypeError: If the dataset backend is not Spark.
     """
-    result = delegate.execute(data)
-    tables = result.analysis_tables
-    if delegate.id != owner.id and delegate.id in tables:
-        tables[owner.id] = tables.pop(delegate.id)
-    return result
+    if data.ds.backend_type != BackendsEnum.spark:
+        raise TypeError(
+            f"{type(owner).__name__} supports only the Spark backend "
+            f"(got {data.ds.backend_type}); use {master} - backend_factory "
+            "resolves it to the pandas implementation."
+        )
 
 
 @backend_factory.register(KSTest, SparkDataset)
@@ -490,7 +487,7 @@ class StatsKSTest(StatsHypothesisTesting):
     result storage (with the correct ``self.key``) so reporters can
     parse them.
 
-    For Pandas: delegates to ``GroupKSTest`` (``scipy.stats.ks_2samp``).
+    Spark only: on pandas use ``KSTest`` (resolves to ``GroupKSTest``).
 
     Note:
         On Spark the statistic and p-value are approximations computed from
@@ -554,11 +551,10 @@ class StatsKSTest(StatsHypothesisTesting):
         )
 
     def execute(self, data) -> ExperimentData:
-        """Main entry point. Routes to Spark-optimized or Pandas-fallback path.
+        """Main entry point. Runs the Spark-optimized path.
 
-        For Spark, delegates to ``_execute_spark``. For Pandas, creates a
-        ``GroupKSTest`` delegate with the same ID so pipeline lookups
-        remain consistent.
+        Delegates to ``_execute_spark``. Spark only: on pandas use ``KSTest``
+        (``backend_factory`` resolves it to ``GroupKSTest``).
 
         Args:
             data: The ``ExperimentData`` container.
@@ -568,9 +564,11 @@ class StatsKSTest(StatsHypothesisTesting):
             ``analysis_tables``.
 
         Raises:
+            TypeError: If the dataset backend is not Spark.
             NoColumnsError: If no target columns are found.
             NotSuitableFieldError: If the grouping field is not suitable.
         """
+        _require_spark(self, data, "KSTest")
         fields = self._get_fields_data(data)
         group_field_data = fields["group_field"]
         target_fields_data = fields["target_fields"]
@@ -589,24 +587,11 @@ class StatsKSTest(StatsHypothesisTesting):
             else list(target_fields_data.columns)
         )
 
-        if data.ds.backend_type == BackendsEnum.spark:
-            return self._execute_spark(
-                data,
-                group_col=group_field_data.columns[0],
-                target_cols=list(target_fields_data.columns),
-            )
-        else:
-            # Pandas fallback: scipy ks_2samp is faster for small data
-            from .hypothesis_testing import GroupKSTest
-
-            delegate = GroupKSTest(
-                compare_by="groups",
-                grouping_role=self.grouping_role,
-                target_role=self.target_roles,
-                reliability=self.reliability,
-                key=self.key,
-            )
-            return _execute_pandas_delegate(self, delegate, data)
+        return self._execute_spark(
+            data,
+            group_col=group_field_data.columns[0],
+            target_cols=list(target_fields_data.columns),
+        )
 
     @timeit(level="SPARK", prefix="KS_SPARK")
     def _execute_spark(self, data, group_col: str, target_cols: list[str]):
@@ -767,8 +752,7 @@ class StatsUTest(StatsHypothesisTesting):
     analytically from the histogram buckets — without transferring raw
     data to the driver.
 
-    For Pandas backend, delegates to ``GroupUTest`` (scipy
-    ``mannwhitneyu``) which is exact and faster for small data.
+    Spark only: on pandas use ``UTest`` (resolves to ``GroupUTest``).
 
     Note:
         On Spark the result is a binned approximation (``n_bins`` equal-width
@@ -860,11 +844,10 @@ class StatsUTest(StatsHypothesisTesting):
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        """Main entry point. Routes to Spark-optimized or Pandas-fallback.
+        """Main entry point. Runs the Spark-optimized path.
 
-        For Spark, delegates to ``_execute_spark``. For Pandas, creates
-        a ``GroupUTest`` delegate with the same ID so pipeline lookups
-        remain consistent.
+        Delegates to ``_execute_spark``. Spark only: on pandas use ``UTest``
+        (``backend_factory`` resolves it to ``GroupUTest``).
 
         Args:
             data: The ``ExperimentData`` container.
@@ -874,9 +857,11 @@ class StatsUTest(StatsHypothesisTesting):
             ``analysis_tables``.
 
         Raises:
+            TypeError: If the dataset backend is not Spark.
             NoColumnsError: If no target columns are found.
             NotSuitableFieldError: If the grouping field is not suitable.
         """
+        _require_spark(self, data, "UTest")
         fields = self._get_fields_data(data)
         group_field_data = fields["group_field"]
         target_fields_data = fields["target_fields"]
@@ -895,24 +880,11 @@ class StatsUTest(StatsHypothesisTesting):
             else list(target_fields_data.columns)
         )
 
-        if data.ds.backend_type == BackendsEnum.spark:
-            return self._execute_spark(
-                data,
-                group_col=group_field_data.columns[0],
-                target_cols=list(target_fields_data.columns),
-            )
-        else:
-            # Pandas fallback: scipy mannwhitneyu is exact and faster
-            from .hypothesis_testing import GroupUTest
-
-            delegate = GroupUTest(
-                compare_by="groups",
-                grouping_role=self.grouping_role,
-                target_role=self.target_roles,
-                reliability=self.reliability,
-                key=self.key,
-            )
-            return _execute_pandas_delegate(self, delegate, data)
+        return self._execute_spark(
+            data,
+            group_col=group_field_data.columns[0],
+            target_cols=list(target_fields_data.columns),
+        )
 
     @timeit(level="SPARK", prefix="U_SPARK")
     def _execute_spark(

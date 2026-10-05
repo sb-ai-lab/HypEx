@@ -35,10 +35,10 @@
 ## 4. Статистика / comparators / extensions
 
 - ИСПРАВЛЕНО (числа изменились, см. «Изменения численных результатов»): `GroupChi2TestExtension.calc` передаёт `_form_results(p_value, statistic, ...)` в перепутанном порядке (pandas и Spark).
-- ИСПРАВЛЕНО (вариант a: таблица кладётся под id самого `Stats*`-исполнителя, как на Spark; нигде в фасадах не используется, имена в отчётах не меняются): `StatsKSTest` / `StatsUTest` на pandas: код ставит `delegate._id`, а результаты лежат под `GroupKSTest┴┴y` / `GroupUTest┴┴y` — поиск по id Stats-исполнителя не находит.
+- ИСПРАВЛЕНО (вариант a: таблица кладётся под id самого `Stats*`-исполнителя, как на Spark; нигде в фасадах не используется, имена в отчётах не меняются): `StatsKSTest` / `StatsUTest` на pandas (теперь Spark-only: `execute` на не-Spark данных бросает `TypeError`, на pandas `KSTest`/`UTest` резолвятся в `Group*`; pandas-fallback удалён): код ставил `delegate._id`, а результаты лежат под `GroupKSTest┴┴y` / `GroupUTest┴┴y` — поиск по id Stats-исполнителя не находит.
 - ИСПРАВЛЕНО: `PandasLstsqExtension.calc` через `create_empty().fillna()` даёт pandas FutureWarning (3 теста lstsq).
 - ИСПРАВЛЕНО на pandas (добавлен `calc`-диспетчер; на Spark `MultitestQuantile` явно бросает `NotImplementedError` — не поддержан; `accepted hypothesis` теперь int): `MultitestQuantile._calc_pandas` не тестируется: вызов `groupby(fields_list=...)` падает дальше, т.к. в группах остаётся строковая колонка группы.
-- ИСПРАВЛЕНО: `MahalanobisDistance` — недостижимая ветка `test_data=None` удалена; при одной группе `_execute_inner_function` явно бросает `ValueError("test_data is needed ...")`, а `calc` — `NotSuitableFieldError`.
+- ИСПРАВЛЕНО: `MahalanobisDistance` — недостижимая ветка `test_data=None` удалена; при одной группе `_execute_inner_function` передаёт `test_data=None`, и единственная проверка `_check_test_data` в `_inner_function` бросает `ValueError("test_data is needed ...")`, а `calc` — `NotSuitableFieldError`.
 - ИСПРАВЛЕНО локально в `Float32Caster` (общий `search_columns` не менялся — у него 46 вызывающих): `Float32Caster(target_roles=InfoRole(int))` больше не выбирает float-колонку Info. `Dataset.search_columns` по-прежнему сопоставляет роли только по классу.
 
 ## 5. ML / matching / faiss

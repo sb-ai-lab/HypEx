@@ -211,44 +211,38 @@ def _table(out: ExperimentData, key: str) -> pd.DataFrame:
     return to_pandas(out.analysis_tables[key])
 
 
-@pytest.mark.parametrize("cls", [StatsKSTest, StatsUTest], ids=["ks", "u"])
-def test_pandas_execute_delegates_to_group_test(cls) -> None:
-    df = _frame()
+@pytest.mark.parametrize(
+    ("cls", "master"), [(StatsKSTest, "KSTest"), (StatsUTest, "UTest")], ids=["ks", "u"]
+)
+def test_pandas_execute_raises_type_error(cls, master) -> None:
     ex = cls(grouping_role=TreatmentRole())
-    out = ex.execute(_data(df, "y", BackendsEnum.pandas, None))
-    name = "GroupKSTest" if cls is StatsKSTest else "GroupUTest"
-    # the delegate's table is filed under the Stats* executor id only
-    assert f"{name}┴┴y" not in out.analysis_tables
-    table = _table(out, ex.id)
-    scipy_fn = stats.ks_2samp if cls is StatsKSTest else stats.mannwhitneyu
-    for grp in ("b", "c"):
-        ref = scipy_fn(df.y[df.g == "a"], df.y[df.g == grp])
-        assert table.loc[grp, "p-value"] == pytest.approx(ref.pvalue, abs=1e-9)
-        assert table.loc[grp, "statistic"] == pytest.approx(ref.statistic, abs=1e-9)
+    with pytest.raises(TypeError, match="Spark") as exc:
+        ex.execute(_data(_frame(), "y", BackendsEnum.pandas, None))
+    assert master in str(exc.value)
 
 
 @pytest.mark.parametrize("cls", [StatsKSTest, StatsUTest], ids=["ks", "u"])
-def test_pandas_execute_stores_result_under_own_id(cls) -> None:
-    ex = cls(grouping_role=TreatmentRole())
-    out = ex.execute(_data(_frame(), "y", BackendsEnum.pandas, None))
-    assert ex.id in out.analysis_tables
-
-
-@pytest.mark.parametrize("cls", [StatsKSTest, StatsUTest], ids=["ks", "u"])
-def test_execute_without_target_columns_raises(cls) -> None:
+def test_execute_without_target_columns_raises(cls, spark_session) -> None:
     df = _frame()[["g", "y"]]
-    ds = build_dataset(df, {"g": TreatmentRole(), "y": TreatmentRole()})
+    ds = build_dataset(
+        df,
+        {"g": TreatmentRole(), "y": TreatmentRole()},
+        BackendsEnum.spark,
+        spark_session,
+    )
     with pytest.raises(NoColumnsError):
         cls(grouping_role=TreatmentRole()).execute(ExperimentData(ds))
 
 
 @pytest.mark.parametrize("cls", [StatsKSTest, StatsUTest], ids=["ks", "u"])
-def test_execute_with_two_grouping_columns_raises(cls) -> None:
+def test_execute_with_two_grouping_columns_raises(cls, spark_session) -> None:
     df = _frame()
     df["g2"] = 1
     ds = build_dataset(
         df[["g", "g2", "y"]],
         {"g": TreatmentRole(), "g2": TreatmentRole(), "y": TargetRole()},
+        BackendsEnum.spark,
+        spark_session,
     )
     with pytest.raises(NotSuitableFieldError):
         cls(grouping_role=TreatmentRole()).execute(ExperimentData(ds))
