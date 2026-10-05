@@ -100,3 +100,19 @@ def test_to_dataset_dict_with_wrong_roles_type_raises(bad_roles) -> None:
 def test_dict_to_dataset_with_wrong_roles_type_raises() -> None:
     with pytest.raises(InvalidArgumentError):
         DatasetAdapter.dict_to_dataset({"a": [1, 2]}, roles="feature")
+
+
+@pytest.mark.parametrize("small", [True, False])
+@pytest.mark.parametrize(
+    ("data", "roles"),
+    [
+        ([1, 2], {"a": FeatureRole()}),
+        (np.array([[1, 2]]), {"c1": FeatureRole(), "c2": FeatureRole()}),
+        (3.0, FeatureRole()),
+    ],
+    ids=["list", "ndarray", "scalar"],
+)
+def test_list_ndarray_scalar_inputs_always_return_dataset(data, roles, small) -> None:
+    """``small`` is ignored for list, ndarray and scalar inputs (see to_dataset)."""
+    result = DatasetAdapter.to_dataset(data, roles, small=small)
+    assert type(result) is Dataset
