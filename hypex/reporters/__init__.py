@@ -16,9 +16,12 @@ from .abstract import (
 )
 from .cupac import CupacReporter
 from .cuped import CupedReporter
-from .homo import HomoDictReporter, HomogeneityReporter
+from .homo import HomoDatasetReporter, HomoDictReporter, HomogeneityReporter
 from .matching import (
     MatchingAnalysisTableReporter,
+    MatchingDatasetReporter,
+    MatchingDictReporter,
+    MatchingQualityDatasetReporter,
     MatchingQualityDictReporter,
     MatchingQualityReporter,
     MatchingReporter,
@@ -37,9 +40,13 @@ __all__ = [
     "CupedReporter",
     "DatasetReporter",
     "DictReporter",
+    "HomoDatasetReporter",
     "HomoDictReporter",
     "HomogeneityReporter",
     "MatchingAnalysisTableReporter",
+    "MatchingDatasetReporter",
+    "MatchingDictReporter",
+    "MatchingQualityDatasetReporter",
     "MatchingQualityDictReporter",
     "MatchingQualityReporter",
     "MatchingReporter",

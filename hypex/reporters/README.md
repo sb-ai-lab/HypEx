@@ -28,11 +28,13 @@ Two consumers use them:
 | `abstract.py` | `Reporter`, `DictReporter`, `OnDictReporter`, `DatasetReporter`, `TestDictReporter`, `ResultKey`. |
 | `aa.py` | `OneAADictReporter`, `AADatasetReporter`, `AAPassedReporter`, `AABestSplitReporter`, `AATestReporter`. |
 | `ab.py` | `ABDictReporter`, `ABDatasetReporter`, `ABTestReporter`. |
-| `homo.py` | `HomoDictReporter`, `HomogeneityReporter`. |
-| `matching.py` | `MatchingReporter`, `MatchingAnalysisTableReporter`, `MatchingQualityReporter`, `MatchingQualityDictReporter`. |
+| `homo.py` | `HomoDictReporter`, `HomogeneityReporter`, `HomoDatasetReporter` (deprecated alias). |
+| `matching.py` | `MatchingReporter`, `MatchingAnalysisTableReporter`, `MatchingQualityReporter`, `MatchingQualityDictReporter`; deprecated aliases `MatchingDictReporter`, `MatchingDatasetReporter`, `MatchingQualityDatasetReporter`. |
 | `cupac.py` | `CupacReporter` — **NEW**. |
 | `cuped.py` | `CupedReporter` — **NEW**. |
 | `__init__.py` | Exports the abstract trio plus all concrete reporters. |
+
+The deprecated aliases are kept for backwards compatibility and emit `DeprecationWarning`; facades use the non-deprecated reporters.
 
 ## Key classes
 

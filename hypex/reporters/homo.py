@@ -34,3 +34,11 @@ class HomoDictReporter(HomogeneityReporter):
         warnings.warn(
             "HomoDictReporter is deprecated.", DeprecationWarning, stacklevel=2
         )
+
+
+class HomoDatasetReporter(HomogeneityReporter):
+    def __init__(self):
+        super().__init__(DictReporter(), output_format="dataset")
+        warnings.warn(
+            "HomoDatasetReporter is deprecated.", DeprecationWarning, stacklevel=2
+        )
