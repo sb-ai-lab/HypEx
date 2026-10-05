@@ -1151,9 +1151,15 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             default: Value to return if key not found.
 
         Returns:
-            Column data or default value.
+            A frame (a single column as a one-column frame) for a present key;
+            ``default`` itself for a missing key.
         """
-        return self.data.get(key, default)
+        result = self.data.get(key, default)
+        if result is default:
+            return result
+        if isinstance(result, pd.Series):
+            return result.to_frame()
+        return result
 
     def take(
         self,

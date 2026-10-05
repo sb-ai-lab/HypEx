@@ -76,6 +76,40 @@ def test_get_with_default(make_dataset) -> None:
     assert ds.backend_data.get("missing", "fallback") == "fallback"
 
 
+def test_get_single_column_returns_one_column_dataset(make_dataset) -> None:
+    ds = _ds(make_dataset)
+    single = ds.get("a")
+
+    assert list(single.columns) == ["a"]
+    assert list(single.roles) == ["a"]
+    assert len(single) == 4
+    assert type(single) is type(ds)
+
+
+def test_get_column_list_keeps_order_and_roles(make_dataset) -> None:
+    ds = _ds(make_dataset)
+    subset = ds.get(["b", "a"])
+
+    assert list(subset.columns) == ["b", "a"]
+    assert isinstance(subset.roles["b"], TargetRole)
+    assert isinstance(subset.roles["a"], FeatureRole)
+
+
+def test_get_missing_key_returns_default_object(make_dataset) -> None:
+    ds = _ds(make_dataset)
+    sentinel = object()
+
+    assert ds.get("missing", sentinel) is sentinel
+    assert ds.get("missing") is None
+
+
+def test_backend_get_returns_frame_for_single_column(make_dataset) -> None:
+    ds = _ds(make_dataset)
+    result = ds.backend_data.get("a")
+
+    assert list(result.columns) == ["a"]
+
+
 def test_select_and_iselect(make_dataset) -> None:
     """select uses names while iselect uses integer positions."""
     ds = _ds(make_dataset)

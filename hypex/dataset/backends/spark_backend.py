@@ -1286,9 +1286,15 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             default (Any): Value to return if column not found.
 
         Returns:
-            Any: Column data or default value.
+            Any: A frame (a single column as a one-column frame, lazy) for a
+                present key; ``default`` itself for a missing key.
         """
-        return self.data.get(key, default)
+        result = self.data.get(key, default)
+        if result is default:
+            return result
+        if isinstance(result, ps.Series):
+            return result.to_frame()
+        return result
 
     def take(
         self,

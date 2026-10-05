@@ -553,16 +553,15 @@ class DatasetBase:
 
     def get(self, key: Any, default: Any = None) -> Any:
         result = self._backend_data.get(key, default)
-        if isinstance(result, (pd.Series, ps.Series)):
-            result = result.to_frame()
-        if not isinstance(
-            result, (pd.DataFrame, spark.DataFrame, ps.DataFrame)
-        ) and not isinstance(result, (PandasDataset, SparkDataset)):
-            return result
-        columns = list(result.columns)
+        if result is default:
+            return default
         return self.__class__(
             data=result,
-            roles={k: deepcopy(v) for k, v in self.roles.items() if k in columns},
+            roles={
+                k: deepcopy(v)
+                for k, v in self.roles.items()
+                if k in set(result.columns)
+            },
         )
 
     def take(
