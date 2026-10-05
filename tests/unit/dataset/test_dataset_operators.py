@@ -109,6 +109,40 @@ def test_bitwise_operators_values(make_dataset) -> None:
     pd.testing.assert_frame_equal(_as_pandas(ds), df)
 
 
+@pytest.mark.parametrize("col", ["s", "c"])
+def test_unary_pos_rejects_non_numeric(make_dataset, col) -> None:
+    """Unary + raises TypeError on str and categorical columns."""
+    df = pd.DataFrame({"s": ["a", "b"], "c": pd.Categorical(["u", "v"])})
+    ds = make_dataset(df, {c: FeatureRole() for c in df.columns})
+    with pytest.raises(TypeError):
+        +ds[[col]]
+
+
+@pytest.mark.spark
+def test_unary_pos_rejects_datetime_on_spark(spark_session) -> None:
+    """Unary + raises TypeError on a datetime column (Spark backend).
+
+    The pandas backend cannot build a Dataset with a datetime column
+    (``get_column_type`` has no mapping for it), so there is no pandas variant.
+    """
+    df = pd.DataFrame({"d": pd.to_datetime(["2020-01-01", "2020-01-02"])})
+    ds = Dataset(
+        roles={"d": FeatureRole()},
+        data=df,
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+    with pytest.raises(TypeError):
+        +ds
+
+
+def test_unary_pos_keeps_numeric_and_bool_values(make_dataset) -> None:
+    """Unary + is the identity on float, bool and int columns."""
+    df = pd.DataFrame({"x": [-1.5, 2.0], "b": [True, False], "i": [1, -2]})
+    ds = make_dataset(df, {c: FeatureRole() for c in df.columns})
+    pd.testing.assert_frame_equal(_as_pandas(+ds), df)
+
+
 @pytest.mark.pandas
 def test_unary_operators(make_dataset) -> None:
     """Unary +, -, abs and round return datasets of the same shape."""

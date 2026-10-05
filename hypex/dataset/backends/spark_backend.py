@@ -21,7 +21,10 @@ from pyspark.pandas.exceptions import (
 )
 from pyspark.sql import DataFrame as SparkDF  # pyright: ignore[reportMissingImports]
 from pyspark.sql import SparkSession  # pyright: ignore[reportMissingImports]
-from pyspark.sql.types import StructType  # pyright: ignore[reportMissingImports]
+from pyspark.sql.types import (  # pyright: ignore[reportMissingImports]
+    DecimalType,
+    StructType,
+)
 from pyspark.storagelevel import StorageLevel  # pyright: ignore[reportMissingImports]
 
 from ...config import DatasetConfig
@@ -648,7 +651,26 @@ class SparkNavigation(DatasetBackendNavigation):
 
     # unary operations:
     def __pos__(self) -> Self:
-        """Unary positive operation (no-op for numeric data)."""
+        """Unary positive operation (identity for numeric data).
+
+        Raises:
+            TypeError: If any column is not numeric (as in pandas). Bool is
+                numeric; Spark ``DecimalType`` is accepted although
+                pyspark.pandas reports it as ``object``.
+        """
+        types = {f.name: f.dataType for f in self.data.spark.schema().fields}
+        bad = [
+            col
+            for col, dtype in self.data.dtypes.items()
+            if not pd.api.types.is_numeric_dtype(dtype)
+            and not isinstance(types.get(str(col)), DecimalType)
+        ]
+        if bad:
+            raise TypeError(
+                f"bad operand type for unary +: non-numeric column(s) {bad}"
+            )
+        # pyspark.pandas has no unary + (TypeError in 3.5); + is the identity on
+        # numeric data, so a metadata-only copy is equivalent.
         return self._wrap_result(self.data.copy())
 
     def __neg__(self) -> Self:
