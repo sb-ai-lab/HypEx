@@ -68,9 +68,39 @@ def test_quantile_unequal_variance_returns_one_value_per_group() -> None:
     )  # different variances -> different quantiles
 
 
-def test_quantile_spark_path_raises_clear_error(spark_session) -> None:
+def test_quantile_resolves_to_spark_refusal(spark_session) -> None:
+    from hypex.extensions import MultitestQuantile
+    from hypex.extensions.statsmodels import SparkMultitestQuantile
+    from hypex.utils.registry import backend_factory
+
+    ds_spark = _pvalues(RAW_P, BackendsEnum.spark, spark_session)
+    cls = backend_factory.resolve_backend(MultitestQuantile, ds_spark)
+    assert cls is SparkMultitestQuantile
+    with pytest.raises(NotImplementedError, match="not supported on the Spark backend"):
+        cls().calc(ds_spark, group_field="g", target_field="p-value")
+
+
+def test_quantile_resolves_to_pandas_implementation() -> None:
+    from hypex.extensions import MultitestQuantile
+    from hypex.extensions.statsmodels import PandasMultitestQuantile
+    from hypex.utils.registry import backend_factory
+
+    cls = backend_factory.resolve_backend(MultitestQuantile, _pvalues(RAW_P))
+    assert cls is PandasMultitestQuantile
+
+
+def test_quantile_master_calc_fails_fast_on_pandas() -> None:
+    from hypex.extensions import MultitestQuantile
+
+    with pytest.raises(NotImplementedError, match="backend_factory"):
+        MultitestQuantile().calc(
+            _pvalues(RAW_P), group_field="g", target_field="p-value"
+        )
+
+
+def test_quantile_master_calc_fails_fast_on_spark(spark_session) -> None:
     from hypex.extensions import MultitestQuantile
 
     ds = _pvalues(RAW_P, BackendsEnum.spark, spark_session)
-    with pytest.raises(NotImplementedError, match="Spark"):
+    with pytest.raises(NotImplementedError, match="backend_factory"):
         MultitestQuantile().calc(ds, group_field="g", target_field="p-value")

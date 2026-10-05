@@ -2,7 +2,9 @@
 
 Thin wrappers over external libraries (scipy, statsmodels, faiss, sklearn,
 pandas). This is the **only** place in HypEx that imports a statistics or ML
-library directly, and the only place that branches on the storage backend.
+library directly. Backend-specific behaviour is selected through
+`backend_factory` (see "Backend selection" below), not by branching on the
+storage backend.
 
 ## Role in the architecture
 
@@ -17,9 +19,9 @@ GroupTTest (comparator)                   FaissNearestNeighbors (MLExecutor)
         │ _inner_function                          │
         ▼                                          ▼
 GroupTTestExtension.calc(data, other)     FaissExtension.calc(data, mode=...)
-        │  BACKEND_MAPPING[type(data.backend_data)]
-        ├── _calc_pandas  → scipy.stats.ttest_ind
-        └── _calc_spark   → collect to driver, then scipy
+        │  caller: backend_factory.resolve_backend(Master, data)
+        ├── Pandas<Master>  → scipy.stats.ttest_ind
+        └── Spark<Master>   → collect to driver, then scipy
 ```
 
 Extensions are **not** `Executor`s: no id, no `ExperimentData`, no pipeline
@@ -31,7 +33,7 @@ position. They take `Dataset`s and return `Dataset`s.
 |---|---|---|---|
 | `abstract.py` | — | `Extension`, `CompareExtension`, `MLExtension` | Core |
 | `scipy_stats.py` | `scipy.stats` | `GroupStatTest`, `GroupTTestExtension`, `GroupKSTestExtension`, `GroupUTestExtension`, `GroupChi2TestExtension`, `NormCDF` | Active |
-| `statsmodels.py` | `statsmodels` | `MultiTest`, `MultitestQuantile` | Active |
+| `statsmodels.py` | `statsmodels` | `MultiTest`, `MultitestQuantile`, `PandasMultitestQuantile`, `SparkMultitestQuantile` | Active |
 | `scipy_linalg.py` | `numpy.linalg` | `CholeskyExtension`, `InverseExtension` | Active |
 | `faiss.py` | `faiss` | `FaissExtension`, `PandasFaissExtension`, `SparkFaissExtension` | Enhanced |
 | `cupac.py` | sklearn-style models | `CupacExtension` | Active |
@@ -45,27 +47,25 @@ position. They take `Dataset`s and return `Dataset`s.
 
 ### `Extension` (ABC)
 
-```python
-class Extension(ABC):
-    def __init__(self):
-        self.BACKEND_MAPPING = {PandasDataset: self._calc_pandas,
-                                SparkDataset:  self._calc_spark}
+An `Extension` has a public `calc(data, **kwargs)` and the static helper
+`result_to_dataset(result, roles) -> Dataset`, which routes any plain return
+value through `DatasetAdapter` so callers always get a `Dataset`.
 
-    @abstractmethod
-    def _calc_pandas(self, data, **kwargs): ...
-    @abstractmethod
-    def _calc_spark(self, data, **kwargs): ...
+### Backend selection
 
-    def calc(self, data, **kwargs):
-        return self.BACKEND_MAPPING[type(data.backend_data)](data=data, **kwargs)
+Backend-specific extensions follow one layout: a **master** class plus backend
+subclasses registered with `@backend_factory.register(Master, PandasDataset)` /
+`@backend_factory.register(Master, SparkDataset)`. The **caller** resolves the
+implementation with `backend_factory.resolve_backend(Master, data)` (see
+`operators.py` for `BiasExtension`, `ml/faiss.py`, `encoders.py` and
+`analyzers/ab.py` for `MultitestQuantile`). The master's own `calc` does not
+implement a backend algorithm: it raises, or is inherited from `Extension`.
+Extensions whose logic is identical on every backend keep one implementation and
+convert with `to_backend` (see `MultiTest`).
 
-    @staticmethod
-    def result_to_dataset(result, roles) -> Dataset: ...
-```
-
-`calc` is the single public entry point; the dispatch table is built per
-instance. `result_to_dataset` routes any plain return value through
-`DatasetAdapter` so callers always get a `Dataset`.
+New extensions must not branch on `backend_type`. Pre-existing exceptions:
+`stats_hypothesis_testing.py` (three `if data.backend_type == BackendsEnum.spark`
+branches).
 
 ### `CompareExtension(Extension, ABC)`
 
@@ -74,8 +74,8 @@ Adds a second dataset: `calc(data, other=None, **kwargs)`. Everything in
 
 ### `MLExtension(Extension)`
 
-Adds a fit/predict lifecycle. Its `_calc_pandas` dispatches on a `mode` kwarg
-(`"auto"`, `"fit"`, `"predict"`) to abstract `fit(X, Y=None)` / `predict(X)`.
+Adds a fit/predict lifecycle. Its `calc` dispatches on a `mode` kwarg
+(`"auto"`, `"fit"`, `"predict"`) to `fit(X, Y=None)` / `predict(X)`.
 
 ### `GroupStatTest` and its subclasses (`scipy_stats.py`)
 
@@ -105,9 +105,12 @@ is why `TestDictReporter.rename_passed` renders `True` as `"NOT OK"`.
 * `MultiTest(method: ABNTestMethodsEnum, alpha=0.05)` — wraps
   `statsmodels.stats.multitest.multipletests` for bonferroni, sidak, holm,
   holm-sidak, simes-hochberg, hommel, fdr_bh, fdr_by, fdr_tsbh, fdr_tsbky.
+  One implementation: Spark input is converted to pandas (small p-value table).
 * `MultitestQuantile(alpha=0.05, iteration_size=20000, equal_variance=True,
   random_state=None)` — a resampling-based quantile correction for the
-  `ABNTestMethodsEnum.quantile` option.
+  `ABNTestMethodsEnum.quantile` option. Backend-specific: the master's `calc`
+  raises, `PandasMultitestQuantile` runs the algorithm and
+  `SparkMultitestQuantile` refuses (the raw data must not be collected).
 
 Both are driven by `ABAnalyzer`.
 
@@ -196,16 +199,13 @@ class MyTestExtension(CompareExtension):
         super().__init__()
         self.reliability = reliability
 
-    def _calc_pandas(self, data, other=None, **kwargs):
+    def calc(self, data, other=None, **kwargs):
         stat, p = my_library.test(data.backend_data.data.values.flatten(),
                                   other.backend_data.data.values.flatten())
         return SmallDataset.from_dict(
             {"p-value": p, "statistic": stat, "pass": p < self.reliability},
             StatisticRole(),
         )
-
-    def _calc_spark(self, data, other=None, **kwargs):
-        raise NotImplementedError
 ```
 
 Then add the comparator that calls it (see
@@ -216,11 +216,8 @@ existing reporters and analyzers to pick the result up automatically.
 
 ## Gotchas
 
-* **`calc` backend dispatch fixed.** Previously broken backend lookup now uses
-  `type(data.backend_data)` instead of `type(data.backend)`.
 * **Enhanced Spark support.** Many extensions now have full Spark implementations
   (`FaissExtension`, `DummyEncoderExtension`, `BiasExtension`, `MatchingMetricsExtension`).
-* **`_calc_spark` implementations available.** Spark versions now exist for most core extensions.
 * **FAISS is an optional dependency.** `faiss.py` imports it at module level; ensure
   it's installed when using matching functionality.
 * The result-schema contract is implicit. Nothing validates that an extension
@@ -230,5 +227,5 @@ existing reporters and analyzers to pick the result up automatically.
 ## Related modules
 
 `../comparators/README.md` and `../ml/README.md` (the callers) ·
-`../dataset/backends/README.md` (what `BACKEND_MAPPING` keys on) ·
+`../dataset/backends/README.md` (the backend classes `backend_factory` keys on) ·
 `../utils/README.md` (`ABNTestMethodsEnum`, `backend_factory`).

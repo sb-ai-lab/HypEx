@@ -167,3 +167,14 @@ def test_spark_ab_reports_the_group_totals_as_a_set(spark_session) -> None:
         [int(sizes["control size"].iloc[0]), int(sizes["test size"].iloc[0])]
     )
     assert reported == sorted(df.groupby("treat").size().tolist())
+
+
+def test_ab_quantile_multitest_on_spark_raises_not_implemented(spark_session) -> None:
+    spark_ds = make_dataset(
+        ab_frame(n=300, effect=0.3, groups=3, seed=3),
+        None,
+        BackendsEnum.spark,
+        spark_session,
+    )
+    with pytest.raises(NotImplementedError, match="not supported on the Spark backend"):
+        ABTest(multitest_method="quantile").execute(spark_ds)

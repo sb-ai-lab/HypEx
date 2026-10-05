@@ -25,6 +25,7 @@ from ..experiments.base import Executor
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
 from ..utils import ABNTestMethodsEnum, Adapter, ExperimentDataEnum, timeit
 from ..utils.constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
+from ..utils.registry import backend_factory
 
 
 class ABAnalyzer(Executor):
@@ -134,10 +135,14 @@ class ABAnalyzer(Executor):
                     p_values, **kwargs
                 )
             else:
+                # p_values is the raw experiment dataset here (data.ds)
+                quantile_cls = backend_factory.resolve_backend(
+                    MultitestQuantile, p_values
+                )
                 multitest_result = SmallDataset.create_empty()
                 for target_field in target_fields:
                     multitest_result = multitest_result.append(
-                        MultitestQuantile(
+                        quantile_cls(
                             self.alpha,
                             self.iteration_size,
                             self.equal_variance,
