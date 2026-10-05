@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -159,6 +159,12 @@ class SmallDataset(DatasetBase):
         return Dataset(
             roles=self.roles,
             data=self._backend_data.sort_values(by=by, ascending=ascending, **kwargs),
+        )
+
+    def reindex(self, labels, fill_value: Any | None = None):
+        """Conform to new index labels; returns a full ``Dataset``."""
+        return Dataset(
+            self.roles, data=self._backend_data.reindex(labels, fill_value=fill_value)
         )
 
     def idxmax(self):

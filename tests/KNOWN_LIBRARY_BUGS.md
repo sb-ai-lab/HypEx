@@ -44,7 +44,7 @@
 ## 5. ML / matching / faiss
 
 - ИСПРАВЛЕНО: `FaissExtension.fit` (публичный) передаёт `target_data=` в `MLExtension.calc`, такого параметра нет (`TypeError`); то же на уровне `FaissNearestNeighbors.fit`.
-- ИСПРАВЛЕНО (`Dataset.reindex` добавлен): `FaissNearestNeighbors.execute` в режимах one-sided и `test_pairs` вызывает `Dataset.reindex` (есть только у `SmallDataset`) — `AttributeError`, `hypex/ml/faiss.py:~332`.
+- ИСПРАВЛЕНО (`DatasetBase.reindex` добавлен без импорта `dataset` в `abstract` — возвращает класс `self`; `SmallDataset.reindex` возвращает `Dataset`): `FaissNearestNeighbors.execute` в режимах one-sided и `test_pairs` вызывает `Dataset.reindex` (есть только у `SmallDataset`) — `AttributeError`, `hypex/ml/faiss.py:~332`.
 - ИСПРАВЛЕНО: `FaissNearestNeighbors._execute_inner_function` при `test_pairs=True, two_sides=True`: запись "test" повторяет запрос control вместо сопоставления test→control.
 - ИСПРАВЛЕНО (текст предупреждения и docstring; поведение прежнее): NaN в результате faiss вызывают `PairsNotFoundError`, а не заменяются заглушками.
 - ИСПРАВЛЕНО: `MLExecutor._execute_inner_function` с `target_field` вызывает `_data.drop(target_field)` без `axis=1` — pandas пытается удалить строку.

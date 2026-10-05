@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from hypex.dataset import FeatureRole, TargetRole
+from hypex.dataset import Dataset, FeatureRole, SmallDataset, TargetRole
 
 
 def _ds(make_dataset):
@@ -166,3 +166,44 @@ def test_get_values_vs_iget_values(make_dataset) -> None:
     by_position = ds.iget_values(column=0)
 
     assert by_label == by_position
+
+
+def test_reindex_keeps_class_and_fills_missing(make_dataset) -> None:
+    """reindex returns the same class/backend and fills missing labels."""
+    ds = _ds(make_dataset)
+    out = ds.reindex([0, 1, 7], fill_value=-1)
+
+    assert type(out) is type(ds)
+    assert out.backend_type == ds.backend_type
+    assert len(out) == 3
+    frame = out.backend_data.data
+    frame = frame.to_pandas() if hasattr(frame, "to_pandas") else frame
+    assert frame.loc[7, "a"] == -1
+    assert set(out.roles) == set(ds.roles)
+
+
+def test_small_dataset_reindex_returns_dataset() -> None:
+    """SmallDataset.reindex returns a full Dataset."""
+    small = SmallDataset.from_dict({"a": [1, 2]}, {"a": FeatureRole()})
+    out = small.reindex([0, 1, 2], fill_value=0)
+
+    assert type(out) is Dataset
+    assert len(out) == 3
+
+
+def test_abstract_module_does_not_import_dataset_module() -> None:
+    """abstract.py must not import ``.dataset`` (cyclic import, CodeQL #148)."""
+    import ast
+
+    import hypex.dataset.abstract as abstract
+
+    with open(abstract.__file__, encoding="utf-8") as handle:
+        tree = ast.parse(handle.read())
+    offenders = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.level == 1
+        and node.module == "dataset"
+    ]
+    assert not offenders
