@@ -605,13 +605,21 @@ class SparkNavigation(DatasetBackendNavigation):
             return other
 
     def _columnwise(self, other: Any, op: Callable[[Any, Any], Any]) -> ps.DataFrame:
-        """Apply a binary operator per column (ps.DataFrame lacks & and |)."""
+        """Apply a binary operator per column (ps.DataFrame lacks & and |).
+
+        Column labels of Spark-backed frames are strings, which ``assign(**...)``
+        requires.
+        """
         other = self.__magic_determine_other(other)
-        result = self.data.copy()
-        for col in self.data.columns:
-            right = other[col] if isinstance(other, ps.DataFrame) else other
-            result[col] = op(self.data[col], right)
-        return result
+        return self.data.assign(
+            **{
+                col: op(
+                    self.data[col],
+                    other[col] if isinstance(other, ps.DataFrame) else other,
+                )
+                for col in self.data.columns
+            }
+        )
 
     # comparison operators:
     def __eq__(self, other: Any) -> Self:

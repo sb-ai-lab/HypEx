@@ -91,6 +91,24 @@ def test_bitwise_operators(make_dataset) -> None:
     assert len(ored) == 3
 
 
+def _as_pandas(ds) -> pd.DataFrame:
+    data = ds.backend_data.data
+    frame = data.to_pandas() if hasattr(data, "to_pandas") else data
+    return frame.sort_index()
+
+
+def test_bitwise_operators_values(make_dataset) -> None:
+    """& and | give exact values and do not mutate the operand."""
+    df = pd.DataFrame({"x": [True, True, False], "y": [True, False, False]})
+    ds = make_dataset(df, {"x": FeatureRole(), "y": FeatureRole()})
+
+    pd.testing.assert_frame_equal(_as_pandas(ds & ds), df)
+    pd.testing.assert_frame_equal(_as_pandas(ds | ds), df)
+    assert not _as_pandas(ds & False).to_numpy().any()
+    assert _as_pandas(ds | True).to_numpy().all()
+    pd.testing.assert_frame_equal(_as_pandas(ds), df)
+
+
 @pytest.mark.pandas
 def test_unary_operators(make_dataset) -> None:
     """Unary +, -, abs and round return datasets of the same shape."""
