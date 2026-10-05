@@ -912,10 +912,27 @@ class SparkNavigation(DatasetBackendNavigation):
 
     @index.setter
     def index(self, value):
-        """Set the index of the underlying DataFrame."""
+        """Set the index of the underlying DataFrame.
+
+        Assignment is positional relative to the frame's current Spark row
+        order. That order is not the order of a preceding ``loc[list]`` (Spark
+        returns frame order and drops duplicate labels), so assign labels by
+        position only to frames whose order you control. Row order after the
+        assignment is not preserved.
+        """
         if isinstance(value, (list, tuple, np.ndarray, pd.Index, pd.Series)):
-            tmp_name = "__hypex_new_index__"
+            tmp_name = DatasetConfig.BACKEND_CONVERSION_INDEX_COL
+            # The copy keeps the in-place ps ``__setitem__`` from mutating a
+            # ps.DataFrame that another Dataset may share; a ps copy is
+            # metadata-only (no Spark job).
             data = self.data.copy()
+            # pyspark.pandas assigns a Python list positionally (distributed-
+            # sequence index + join, see the list branch of
+            # ``pyspark.pandas.DataFrame.__setitem__``): label ``i`` goes to the
+            # ``i``-th row in the frame's current Spark row order, which is not
+            # necessarily the order a preceding operation suggests (e.g.
+            # ``loc[list]`` returns rows in frame order on Spark, not in list
+            # order). Row order after the assignment is not preserved either.
             data[tmp_name] = list(value)
             data = data.set_index(tmp_name)
             data.index.name = None

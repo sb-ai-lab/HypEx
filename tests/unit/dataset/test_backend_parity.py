@@ -306,3 +306,62 @@ def test_random_split_labels_structure_match(pair) -> None:
     assert set(right["split"]) <= {"A", "B"}
     assert len(left) == len(right) == 6
     assert sorted(left.index) == sorted(right.index)
+
+
+def _indexed_spark_ds(df: pd.DataFrame, spark_session, partitions: int = 3) -> Dataset:
+    """Spark Dataset keeping ``df.index`` on a deterministic multi-partition frame."""
+    from pyspark.sql import types as T
+
+    idx_col = "__idx__"
+    rows = [(int(i), *map(float, r)) for i, r in zip(df.index, df.to_numpy())]
+    schema = T.StructType(
+        [T.StructField(idx_col, T.LongType())]
+        + [T.StructField(c, T.DoubleType()) for c in df.columns]
+    )
+    sdf = spark_session.createDataFrame(
+        spark_session.sparkContext.parallelize(rows, partitions), schema
+    )
+    psdf = sdf.pandas_api(index_col=idx_col)
+    psdf.index.name = None
+    ds = Dataset(
+        roles={c: FeatureRole() for c in df.columns},
+        data=psdf,
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+    assert ds.backend_data.data.to_spark().rdd.getNumPartitions() == partitions
+    return ds
+
+
+def test_index_setter_list_maps_rows_positionally(source_df, spark_session) -> None:
+    """A list assigned to ``index`` labels the same rows on both backends."""
+    df = source_df[["x", "y"]].copy()
+    df.index = [50, 10, 30, 20, 60, 40]
+    pandas_ds = Dataset(
+        roles={c: FeatureRole() for c in df.columns},
+        data=df,
+        backend=BackendsEnum.pandas,
+    )
+    spark_ds = _indexed_spark_ds(df, spark_session)
+    new = [100, 101, 102, 103, 104, 105]
+    pandas_ds.index = new
+    spark_ds.index = new
+
+    left = _to_pandas(pandas_ds).sort_values("x")
+    right = _to_pandas(spark_ds).sort_values("x")
+    assert left.index.tolist() == right.index.tolist()
+    np.testing.assert_allclose(left["x"], right["x"])
+    np.testing.assert_allclose(left["y"], right["y"])
+
+
+def test_index_setter_does_not_mutate_shared_frame(source_df, spark_session) -> None:
+    """Assigning an index must not change a ps frame shared with another Dataset."""
+    df = source_df[["x", "y"]].copy()
+    df.index = [50, 10, 30, 20, 60, 40]
+    spark_ds = _indexed_spark_ds(df, spark_session)
+    raw = spark_ds.backend_data.data
+    before = sorted(raw.to_pandas().index.tolist())
+
+    spark_ds.index = [100, 101, 102, 103, 104, 105]
+
+    assert sorted(raw.to_pandas().index.tolist()) == before

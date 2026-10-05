@@ -208,6 +208,28 @@ def test_groupby_mean_nan_diverges(backend_kind, spark_session) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Index assignment after loc[list]
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "backend_kind",
+    [
+        PANDAS,
+        _spark_xfail(
+            "Issue: Spark loc[list] returns rows in frame order, so a following "
+            "positional index assignment attaches labels to different rows than pandas"
+        ),
+    ],
+)
+def test_loc_list_then_index_assignment_diverges(backend_kind, spark_session) -> None:
+    """``loc[list]`` followed by ``index = [...]`` should label rows like pandas."""
+    ds = _build(pd.DataFrame({"x": list(range(100, 140))}), backend_kind, spark_session)
+    sub = ds.loc[[30, 5, 17, 2]]
+    sub.index = [0, 1, 2, 3]
+
+    assert _pdf(sub).sort_index()["x"].tolist() == [130, 105, 117, 102]
+
+
+# ---------------------------------------------------------------------------
 # File errors
 # ---------------------------------------------------------------------------
 def _file_error(backend: BackendsEnum, path: str, session):
