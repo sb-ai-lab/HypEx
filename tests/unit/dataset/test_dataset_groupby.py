@@ -105,3 +105,21 @@ def test_groupby_group_of_one_row(make_dataset) -> None:
     grouped = ds.groupby("g")
     result = grouped.count()
     assert len(result) == 2
+
+
+def test_count_groups_two_keys_with_nan_matches_known_answer(make_dataset) -> None:
+    """Rows with a NaN key are dropped: only (a, 1) and (b, 2) survive."""
+    nan = float("nan")
+    df = pd.DataFrame(
+        {
+            "g1": ["a", "a", "b", None, "b", "a"],
+            "g2": [1.0, nan, 2.0, 1.0, 2.0, 1.0],
+            "v": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
+        }
+    )
+    ds = make_dataset(df, {c: FeatureRole() for c in df.columns})
+
+    assert len(ds.groupby(["g1", "g2"])) == 2
+    assert ds.backend_data.count_groups(["g1", "g2"]) == 2
+    assert ds.backend_data.count_groups(["g1"]) == 2
+    assert ds.backend_data.count_groups([]) == 1

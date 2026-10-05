@@ -1,11 +1,4 @@
-"""Executor repr/params, MLExecutor.calc/execute and MinSampleSize paths.
-
-Some tests use the ``fixed_count_groups`` fixture: ``PandasDataset.count_groups``
-currently emits a FutureWarning (``int(Series)``), which the pytest filters turn
-into an error. The fixture swaps in a correct implementation so the code *downstream*
-of ``len(GroupedDataset)`` can still be verified; the bug itself is recorded by the
-strict xfails in other test files.
-"""
+"""Executor repr/params, MLExecutor.calc/execute and MinSampleSize paths."""
 
 from __future__ import annotations
 
@@ -21,20 +14,10 @@ from hypex.dataset import (
     TargetRole,
     TreatmentRole,
 )
-from hypex.dataset.backends import PandasDataset
 from hypex.executor.calculators import MinSampleSize
 from hypex.executor.executor import Calculator, Executor, MLExecutor
 from hypex.utils import ID_SPLIT_SYMBOL, BackendsEnum, NotSuitableFieldError
 from hypex.utils.constants import NAME_BORDER_SYMBOL
-
-
-@pytest.fixture
-def fixed_count_groups(monkeypatch):
-    monkeypatch.setattr(
-        PandasDataset,
-        "count_groups",
-        lambda self, cols: 1 if not cols else len(self.data[cols].drop_duplicates()),
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -328,7 +311,7 @@ def test_execute_inner_function_without_target() -> None:
     assert result.backend_data.data["pred"].tolist() == [2.0, 2.0]
 
 
-def test_mlexecutor_calc_single_group_raises(fixed_count_groups) -> None:
+def test_mlexecutor_calc_single_group_raises() -> None:
     ds = Dataset(
         roles={"t": TreatmentRole(), "f": FeatureRole()},
         data=pd.DataFrame({"t": [1, 1], "f": [1.0, 2.0]}),
@@ -338,14 +321,14 @@ def test_mlexecutor_calc_single_group_raises(fixed_count_groups) -> None:
         _Mean.calc(ds, group_field="t", features_fields="f")
 
 
-def test_mlexecutor_calc_groups_and_predicts(fixed_count_groups) -> None:
+def test_mlexecutor_calc_groups_and_predicts() -> None:
     data = _ml_data()
     result = _Mean.calc(data.ds, group_field="t", features_fields=["f"])
     # control mean(f) = 2 is predicted for each of the 3 test rows
     assert result.backend_data.data["pred"].tolist() == [2.0, 2.0, 2.0]
 
 
-def test_mlexecutor_execute_stores_additional_fields(fixed_count_groups) -> None:
+def test_mlexecutor_execute_stores_additional_fields() -> None:
     data = _ml_data()
     ex = _Mean(grouping_role=TreatmentRole())
     out = ex.execute(data)
@@ -422,7 +405,7 @@ def test_variance_by_group_matches_pandas_var(two_groups) -> None:
     assert got == pytest.approx(expected)
 
 
-def test_min_sample_size_calc_equal_variance(two_groups, fixed_count_groups) -> None:
+def test_min_sample_size_calc_equal_variance(two_groups) -> None:
     calc = MinSampleSize(mde=1.0, equal_variance=True, quantile_1=2.0, quantile_2=-1.0)
     result = calc.calc(two_groups)
     df = two_groups.backend_data.data
@@ -433,9 +416,7 @@ def test_min_sample_size_calc_equal_variance(two_groups, fixed_count_groups) -> 
     assert calc.key == "y"
 
 
-def test_min_sample_size_execute_delegates_to_calc(
-    two_groups, fixed_count_groups
-) -> None:
+def test_min_sample_size_execute_delegates_to_calc(two_groups) -> None:
     calc = MinSampleSize(
         mde=1.0, equal_variance=True, variances=4.0, quantile_1=2.0, quantile_2=-1.0
     )
@@ -443,9 +424,7 @@ def test_min_sample_size_execute_delegates_to_calc(
     assert result["y"]["min sample size"] == int(2 * 4.0 * 9.0) + 1
 
 
-def test_min_sample_size_without_targets_and_tmp_roles_raises(
-    fixed_count_groups,
-) -> None:
+def test_min_sample_size_without_targets_and_tmp_roles_raises() -> None:
     ds = Dataset(
         roles={"g": TreatmentRole()},
         data=pd.DataFrame({"g": ["a", "b"]}),
@@ -456,9 +435,7 @@ def test_min_sample_size_without_targets_and_tmp_roles_raises(
         MinSampleSize(mde=1.0).calc(ds)
 
 
-def test_min_sample_size_unequal_variance_via_calc(
-    two_groups, fixed_count_groups
-) -> None:
+def test_min_sample_size_unequal_variance_via_calc(two_groups) -> None:
     calc = MinSampleSize(
         mde=8.0,
         equal_variance=False,
