@@ -24,6 +24,14 @@ class CompareExtension(Extension, ABC):
 
 
 class MLExtension(Extension):
+    """Extension with a fit/predict lifecycle.
+
+    Subclasses implement EITHER ``fit``/``predict`` and inherit ``calc``, which
+    dispatches on ``mode``, OR ``calc(mode=...)`` and implement ``fit``/
+    ``predict`` as calls to ``self.calc``. ``fit``/``predict`` must never call
+    ``super().calc`` - ``MLExtension.calc`` routes back to them.
+    """
+
     @abstractmethod
     def fit(self, X, Y=None, **kwargs):
         raise NotImplementedError

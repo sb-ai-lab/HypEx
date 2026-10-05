@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip("faiss")
 
 from hypex.config import MatchingConfig
-from hypex.dataset import Dataset, FeatureRole
+from hypex.dataset import AdditionalMatchingRole, Dataset, FeatureRole
 from hypex.extensions import PandasFaissExtension, SparkFaissExtension
 from hypex.extensions.faiss import FaissExtension, get_executor_cache
 from hypex.utils import BackendsEnum
@@ -118,6 +118,49 @@ def test_public_fit_builds_index() -> None:
     ext = PandasFaissExtension()
     ext.fit(_ds(_points(5, 0)))
     assert ext.index.ntotal == 5
+
+
+def test_public_predict_after_fit_matches_brute_force() -> None:
+    control, test = _points(30, 0), _points(10, 1, 0.3)
+    ext = PandasFaissExtension()
+    ext.fit(_ds(control))
+    result = ext.predict(_ds(test))
+    found = _pdf(result)
+    assert found.iloc[:, 0].to_numpy().tolist() == _brute(control, test).tolist()
+    assert len(found) == 10
+    assert list(found.index) == list(test.index)
+    assert all(isinstance(r, AdditionalMatchingRole) for r in result.roles.values())
+
+
+def test_public_predict_equals_auto() -> None:
+    control, test = _points(30, 0), _points(10, 1, 0.3)
+    ext = PandasFaissExtension()
+    ext.fit(_ds(control))
+    predicted = _pdf(ext.predict(_ds(test)))
+    auto = _pdf(PandasFaissExtension().calc(_ds(control), _ds(test)))
+    pd.testing.assert_frame_equal(predicted, auto)
+
+
+def test_public_fit_fast_mode_large_data_builds_ivf_index() -> None:
+    ext = PandasFaissExtension(faiss_mode="fast")
+    ext.fit(_ds(_points(1500, 0)))
+    assert ext.index.ntotal == 1500
+
+
+@pytest.mark.parametrize("entry", ["fit_predict", "auto"])
+def test_offset_control_labels_return_real_ids(entry) -> None:
+    c = _points(40, 0)
+    c.index = range(500, 540)
+    t = _points(10, 1, 0.3)
+    if entry == "fit_predict":
+        ext = PandasFaissExtension()
+        ext.fit(_ds(c))
+        out = ext.predict(_ds(t))
+    else:
+        out = PandasFaissExtension().calc(_ds(c), _ds(t))
+    values = _pdf(out).iloc[:, 0].tolist()
+    assert values == _brute(c, t).tolist()
+    assert -1 not in values
 
 
 # ---------------------------------------------------------------------------
@@ -240,3 +283,37 @@ def test_spark_compute_cluster_params() -> None:
     ext._compute_cluster_params()
     assert ext.k == 5
     assert ext._nprobe == 10
+
+
+@pytest.mark.spark
+def test_spark_public_predict_after_fit_matches_auto(monkeypatch, spark_pair) -> None:
+    control, test, ctrl_ds, test_ds = spark_pair
+    monkeypatch.setattr(MatchingConfig, "FAISS_FIT_MODE", "full")
+    ext = SparkFaissExtension(n_neighbors=1)
+    ext.fit(ctrl_ds)
+    found = _pdf(ext.predict(test_ds)).sort_index()
+    ext.unpersist()
+    assert found.iloc[:, 0].to_numpy().tolist() == _brute(control, test).tolist()
+
+
+@pytest.mark.spark
+def test_spark_offset_control_labels_return_real_ids(
+    monkeypatch, spark_session
+) -> None:
+    monkeypatch.setattr(MatchingConfig, "FAISS_FIT_MODE", "full")
+    c = _points(40, 0)
+    c.index = range(500, 540)
+    t = _points(10, 1, 0.3)
+    import pyspark.pandas as ps
+
+    # createDataFrame(pandas) drops the pandas index; ps.from_pandas keeps it
+    c_ds = Dataset(
+        roles={col: FeatureRole() for col in c.columns},
+        data=ps.from_pandas(c),
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+    ext = SparkFaissExtension()
+    found = _pdf(ext.calc(c_ds, _ds(t, BackendsEnum.spark, spark_session))).sort_index()
+    ext.unpersist()
+    assert found.iloc[:, 0].to_numpy().tolist() == _brute(c, t).tolist()

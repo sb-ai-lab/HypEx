@@ -48,6 +48,9 @@
 - ИСПРАВЛЕНО: `FaissNearestNeighbors._execute_inner_function` при `test_pairs=True, two_sides=True`: запись "test" повторяет запрос control вместо сопоставления test→control.
 - ИСПРАВЛЕНО (текст предупреждения и docstring; поведение прежнее): NaN в результате faiss вызывают `PairsNotFoundError`, а не заменяются заглушками.
 - ИСПРАВЛЕНО: `MLExecutor._execute_inner_function` с `target_field` вызывает `_data.drop(target_field)` без `axis=1` — pandas пытается удалить строку.
+- ИСПРАВЛЕНО: публичный `FaissExtension.predict` уходил в `RecursionError` (`super().calc` -> `MLExtension.calc` -> `self.predict`); теперь `predict` = `self.calc(data=X, test_data=X, mode="predict")` с `AdditionalMatchingRole`. `PandasFaissExtension(faiss_mode="fast").fit(X)` при >1000 строк падал с `TypeError` (`len(None)`) — исправлено.
+- ИСПРАВЛЕНО (числа изменились, см. «Изменения численных результатов»): pandas FAISS `_predict` заменял на -1 совпадения с метками контрольной группы > `len(control)+len(test)` (граница сравнивала метку строки с числом строк); граница удалена, как и на Spark.
+- `FaissNearestNeighbors.predict` (executor) не хранит индекс (stateless) и теперь бросает `NotImplementedError` с указанием `fit(X).predict(Y)` (раньше `RecursionError`).
 - `MLExecutor.execute` передаёт `target_fields=`, а `calc` принимает `target_field` — таргет не доходит до `_inner_function` (теста нет).
 
 ## 6. UI / reporters
@@ -74,3 +77,4 @@
 - **Spark KS (`SparkKSTestExtension.calc`, `nan_policy="omit"` по умолчанию).** Раньше NaN/null отравляли min/max и бакеты, и результат при наличии пропусков был `p-value=1.0, statistic=0.0`-подобным. Теперь строки с NaN/null отбрасываются в обеих выборках, как в pandas `ks_2samp(nan_policy="omit")`. Без пропусков числа не изменились.
 - **Spark U (`StatsUTest`).** Поле `statistic` теперь U1 базовой группы (совпадает с scipy и pandas `GroupUTest`); раньше Spark выдавал `min(U1, U2)`. p-value не менялось.
 - **Spark `StatsKSTest`/`StatsUTest` с NaN.** Раньше один NaN в колонке давал `p-value=1.0, statistic=0.0`; теперь NaN игнорируются.
+- **Pandas FAISS `_predict` (non-default индексы).** Раньше совпадение, чья метка контрольной строки превышала `len(control)+len(test)`, превращалось в `-1` («не найдено»); теперь возвращается настоящая метка ближайшего соседа. Числа меняются только для датасетов, у которых индекс не `0..N-1`.

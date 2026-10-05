@@ -78,11 +78,6 @@ def test_pandas_extension_matches_brute_force(control, test_df, k) -> None:
             assert set(row_found) == set(row_expected)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: matches whose index label exceeds len(data)+len(test_data) are replaced "
-    "by -1, so non-default (e.g. shuffled or offset) index labels are lost",
-)
 def test_pandas_extension_returns_global_control_index_labels() -> None:
     control = _points(10, seed=0, start=500)
     test = _points(5, seed=1, start=0)
@@ -90,11 +85,6 @@ def test_pandas_extension_returns_global_control_index_labels() -> None:
     assert set(found.iloc[:, 0]) <= set(control.index)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: matches whose index label exceeds len(data)+len(test_data) are replaced "
-    "by -1, so non-default (e.g. shuffled or offset) index labels are lost",
-)
 def test_pandas_extension_exact_duplicate_is_nearest() -> None:
     control = pd.DataFrame(
         {"f1": [0.0, 10.0, 20.0], "f2": [0.0, 10.0, 20.0]}, index=[7, 8, 9]
@@ -450,3 +440,16 @@ def test_set_global_match_indexes_empty_returned_unchanged() -> None:
 def test_executor_fit_builds_index(control) -> None:
     fitted = FaissNearestNeighbors().fit(_ds(control))
     assert fitted.index.ntotal == len(control)
+
+
+def test_executor_predict_names_supported_usage(control) -> None:
+    with pytest.raises(NotImplementedError, match=r"fit\(X\)\.predict\(Y\)"):
+        FaissNearestNeighbors().predict(_ds(control))
+
+
+def test_executor_fit_returns_extension_that_predicts(control, test_df) -> None:
+    result = FaissNearestNeighbors().fit(_ds(control)).predict(_ds(test_df))
+    found = _pdf(result)
+    expected = _brute_force(control, test_df, 1)[:, 0]
+    assert found.iloc[:, 0].to_numpy().tolist() == expected.tolist()
+    assert list(found.index) == list(test_df.index)
