@@ -1470,6 +1470,7 @@ class SparkFaissExtension(FaissExtension):
             Dataset: Aggregated result dataset with neighbor indices.
         """
         if self.n_neighbors == 1:
+            # TODO: adapt output as list of one element
             result_df = (
                 neighbors_pairs.groupBy("index")
                 .agg(F.min(F.struct(F.col("dists"), F.col("nids"))).alias("_1"))
@@ -1489,10 +1490,12 @@ class SparkFaissExtension(FaissExtension):
                 )
                 .select(
                     F.col("index"),
-                    *[
-                        F.col("_candidates")["nids"][i].alias(f"{i + 1}")
-                        for i in range(self.n_neighbors)
-                    ],
+                    # *[
+                    #     F.col("_candidates")["nids"][i].alias(f"{i + 1}")
+                    #     for i in range(self.n_neighbors)
+                    # ],
+                    F.col("_candidates")["nids"].alias("1")
+                    # F.transform(F.col("_candidates"))
                 )
             )
 
@@ -1531,13 +1534,14 @@ class SparkFaissExtension(FaissExtension):
 
         result_df = session.createDataFrame(
             result_rdd, schema=self.PREDICT_SCHEMA
-        ).select(
-            ["index"]
-            + [
-                F.expr(f"index_list[{i}]").alias(f"{i + 1}")
-                for i in range(self.n_neighbors)
-            ]
         )
+        # ).select(
+        #     ["index"]
+        #     + [
+        #         F.expr(f"index_list[{i}]").alias(f"{i + 1}")
+        #         for i in range(self.n_neighbors)
+        #     ]
+        # )
 
         result = self.result_to_dataset(result=result_df, roles={}, small=False)
 

@@ -70,6 +70,7 @@ class FaissNearestNeighbors(MLExecutor):
             key=key,
         )
 
+    #  TODO: del this method as it isn't nessasy
     @classmethod
     def _set_global_match_indexes(
         cls, local_indexes: Dataset, data: tuple[str, Dataset]
@@ -297,30 +298,31 @@ class FaissNearestNeighbors(MLExecutor):
             test_pairs=self.test_pairs,
             mahalanobis=mahalanobis,
         )
-        nans = 0
+        # counting nans isn't actual as we use list of indeces istead of list of columns
+        # nans = 0
 
-        for group, result in compare_result.items():
-            nans += sum(result.count_nulls().values())
-            result = result.fillna(-1).astype({col: int for col in result.columns})
-        if nans > 0:
-            warn(
-                f"Faiss returned {nans} nans, which were replaced with dummy matches. Check if the data is suitable for the test.",
-                UserWarning,
-            )
+        # for group, result in compare_result.items():
+        #     nans += sum(result.count_nulls().values())
+        #     result = result.fillna(-1).astype({col: int for col in result.columns})
+        # if nans > 0:
+        #     warn(
+        #         f"Faiss returned {nans} nans, which were replaced with dummy matches. Check if the data is suitable for the test.",
+        #         UserWarning,
+        #     )
         matched_indexes: Dataset = Dataset.create_empty(
             backend=data.ds.backend_type, session=data.ds.session
         )
-        for res_k, res_v in compare_result.items():
+        for _, res_v in compare_result.items():
             # res_v has index similar to group data
             # `limit` may be removed
             t_index_field: Dataset = res_v
 
             # TODO: Similar comment as abobe: find more elegant solution
-            n_nans = sum(t_index_field.count_nulls().values())
+            # n_nans = sum(t_index_field.count_nulls().values())
             # n_nans = sum(t_index_field.isna().nunique().values()) - len(t_index_field.columns)
 
-            if n_nans:
-                raise PairsNotFoundError
+            # if n_nans:
+            #     raise PairsNotFoundError
             t_index_field = t_index_field.rename(
                 {col: f"indexes_{i}" for i, col in enumerate(t_index_field.columns)}
             )
