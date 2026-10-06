@@ -1490,12 +1490,7 @@ class SparkFaissExtension(FaissExtension):
                 )
                 .select(
                     F.col("index"),
-                    # *[
-                    #     F.col("_candidates")["nids"][i].alias(f"{i + 1}")
-                    #     for i in range(self.n_neighbors)
-                    # ],
                     F.col("_candidates")["nids"].alias("1")
-                    # F.transform(F.col("_candidates"))
                 )
             )
 

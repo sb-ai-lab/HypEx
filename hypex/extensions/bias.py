@@ -448,7 +448,6 @@ class SparkBisaExtesion(BiasExtension):
             indexes.select(
                 F.col("index").alias("initial_index"),
                 F.explode(
-                    # F.array(*working_columns).alias("list_indexes")
                     F.col(*working_columns) # there would be only one column
                 ).alias(
                     "index"

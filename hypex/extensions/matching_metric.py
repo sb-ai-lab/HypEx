@@ -525,7 +525,9 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
         matched_data = (
             indexes.select(
                 F.col("index").alias("initial_index"),
-                F.explode(F.array(*working_columns)).alias("index"),
+                F.explode(
+                    F.col(*working_columns) # there would be only one column
+                ).cast("long").alias("index"),
             )
             .join(other=t_data, on="index")
             .groupBy("initial_index")
@@ -557,7 +559,7 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
         """
         match_idx_cols = Adapter.to_list(match_idx_cols)
         return (
-            data.select(F.explode(F.array(*match_idx_cols)).alias("index"))
+            data.select(F.explode(F.col(*match_idx_cols)).alias("index"))
             .groupBy("index")
             .agg((F.count("index") / n_neighbors).alias("scaled_counts"))
             # .withColumnRenamed('count', 'scaled_counts')
@@ -644,7 +646,6 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
                 )
                 .toPandas()
             )
-
             # ── Safe extraction: empty group → NaN defaults ──────────
             stats_dict_1 = _safe_group_stats(stats, self.group_field, group_1)
             stats_dict_2 = _safe_group_stats(stats, self.group_field, group_2)
