@@ -397,7 +397,13 @@ class GroupsComparator(BaseComparator, ABC):
 
         for group in baseline_indexes:
             name = group[0]
-            indexes = group[1].iget_values(column=0)
+            raw_indexes = group[1].iget_values(column=0)
+            indexes = [
+                (v[0] if len(v) > 0 else -1)
+                if hasattr(v, "__len__") and not isinstance(v, str)
+                else v
+                for v in raw_indexes
+            ]
             dummy_index = target_fields_data.index[-1]
             indexes = list(map(lambda x: dummy_index if x < 0 else x, indexes))
             baseline_data.append((name, target_fields_data.loc[indexes, :]))
@@ -1056,6 +1062,16 @@ class StatsComparator(BaseComparator, ABC):
             )
             tmp_data = tmp_data.merge(
                 right=baseline_fields, right_index=True, left_index=True
+            )
+            first_match = tmp_data[best_match_col].map(
+                lambda x: (x[0] if len(x) > 0 else -1)
+                if hasattr(x, "__getitem__") and hasattr(x, "__len__")
+                else x
+            )
+            tmp_data = tmp_data.drop(columns=[best_match_col])
+            tmp_data = tmp_data.add_column(
+                data=first_match,
+                role={best_match_col: InfoRole()},
             )
             # Self-merge on the match-index column to pull in the matched rows.
             # Original columns keep their names; matched counterparts get
