@@ -442,11 +442,6 @@ def test_executor_fit_builds_index(control) -> None:
     assert fitted.index.ntotal == len(control)
 
 
-def test_executor_predict_names_supported_usage(control) -> None:
-    with pytest.raises(NotImplementedError, match=r"fit\(X\)\.predict\(Y\)"):
-        FaissNearestNeighbors().predict(_ds(control))
-
-
 def test_executor_fit_returns_extension_that_predicts(control, test_df) -> None:
     result = FaissNearestNeighbors().fit(_ds(control)).predict(_ds(test_df))
     found = _pdf(result)

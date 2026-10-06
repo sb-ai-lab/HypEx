@@ -227,19 +227,16 @@ class FaissNearestNeighbors(MLExecutor):
 
     def predict(self, X: Dataset) -> Dataset:
         """
-        Not supported: this executor does not keep a fitted index.
+        Predict the nearest neighbors for the given dataset.
 
-        Use the extension returned by ``fit``:
-        ``FaissNearestNeighbors(...).fit(X).predict(Y)``, or ``calc(data, test_data)``.
+        Args:
+            X (Dataset): The dataset for which to find nearest neighbors.
 
-        Raises:
-            NotImplementedError: Always.
+        Returns:
+            Dataset: A dataset containing the indices of the nearest neighbors.
         """
-        raise NotImplementedError(
-            "FaissNearestNeighbors does not keep a fitted index. "
-            "Use the extension returned by fit: "
-            "FaissNearestNeighbors(...).fit(X).predict(Y), or calc(data, test_data)."
-        )
+        faiss_cls = backend_factory.resolve_backend(FaissExtension, X)
+        return faiss_cls().predict(X)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         """

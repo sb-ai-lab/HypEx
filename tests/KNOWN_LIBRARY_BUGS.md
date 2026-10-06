@@ -50,7 +50,7 @@
 - ИСПРАВЛЕНО: `MLExecutor._execute_inner_function` с `target_field` вызывает `_data.drop(target_field)` без `axis=1` — pandas пытается удалить строку.
 - ИСПРАВЛЕНО: публичный `FaissExtension.predict` уходил в `RecursionError` (`super().calc` -> `MLExtension.calc` -> `self.predict`); теперь `predict` = `self.calc(data=X, test_data=X, mode="predict")` с `AdditionalMatchingRole`. `PandasFaissExtension(faiss_mode="fast").fit(X)` при >1000 строк падал с `TypeError` (`len(None)`) — исправлено.
 - ИСПРАВЛЕНО (числа изменились, см. «Изменения численных результатов»): pandas FAISS `_predict` заменял на -1 совпадения с метками контрольной группы > `len(control)+len(test)` (граница сравнивала метку строки с числом строк); граница удалена, как и на Spark.
-- `FaissNearestNeighbors.predict` (executor) не хранит индекс (stateless) и теперь бросает `NotImplementedError` с указанием `fit(X).predict(Y)` (раньше `RecursionError`).
+- `FaissNearestNeighbors.predict` создаёт ненаученный extension → `ValueError("index is not created yet")`; рабочий путь — `fit(X).predict(Y)`.
 - `MLExecutor.execute` передаёт `target_fields=`, а `calc` принимает `target_field` — таргет не доходит до `_inner_function` (теста нет).
 
 ## 6. UI / reporters
