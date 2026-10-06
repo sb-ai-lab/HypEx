@@ -244,7 +244,7 @@ class Executor(ABC):
             if truncated:
                 body += (
                     f"<tr><td colspan='2' style='{cls._HTML_CELL}; color:#999;'>"
-                    f"… и ещё {len(items) - cls._HTML_MAX_ITEMS}</td></tr>"
+                    f"… and also {len(items) - cls._HTML_MAX_ITEMS}</td></tr>"
                 )
             return f"<table style='{cls._HTML_TABLE}'>{body}</table>"
         if isinstance(value, Mapping):
