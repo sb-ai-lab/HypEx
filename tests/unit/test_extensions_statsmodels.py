@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 from statsmodels.stats.multitest import multipletests
 
-from hypex.dataset import Dataset, StatisticRole
+from hypex.dataset import Dataset, InfoRole, StatisticRole
 from hypex.extensions import MultiTest
 from hypex.utils import ABNTestMethodsEnum, BackendsEnum
 from hypex.utils.constants import ID_SPLIT_SYMBOL as S
@@ -68,39 +68,23 @@ def test_quantile_unequal_variance_returns_one_value_per_group() -> None:
     )  # different variances -> different quantiles
 
 
-def test_quantile_resolves_to_spark_refusal(spark_session) -> None:
-    from hypex.extensions import MultitestQuantile
-    from hypex.extensions.statsmodels import SparkMultitestQuantile
-    from hypex.utils.registry import backend_factory
-
-    ds_spark = _pvalues(RAW_P, BackendsEnum.spark, spark_session)
-    cls = backend_factory.resolve_backend(MultitestQuantile, ds_spark)
-    assert cls is SparkMultitestQuantile
-    with pytest.raises(NotImplementedError, match="not supported on the Spark backend"):
-        cls().calc(ds_spark, group_field="g", target_field="p-value")
-
-
-def test_quantile_resolves_to_pandas_implementation() -> None:
-    from hypex.extensions import MultitestQuantile
-    from hypex.extensions.statsmodels import PandasMultitestQuantile
-    from hypex.utils.registry import backend_factory
-
-    cls = backend_factory.resolve_backend(MultitestQuantile, _pvalues(RAW_P))
-    assert cls is PandasMultitestQuantile
-
-
-def test_quantile_master_calc_fails_fast_on_pandas() -> None:
+def test_quantile_calc_on_pandas() -> None:
     from hypex.extensions import MultitestQuantile
 
-    with pytest.raises(NotImplementedError, match="backend_factory"):
-        MultitestQuantile().calc(
-            _pvalues(RAW_P), group_field="g", target_field="p-value"
-        )
+    frame = pd.DataFrame(
+        {"g": [0, 0, 0, 1, 1, 1], "y": [1.0, 2.0, 3.0, 9.0, 10.0, 11.0]}
+    )
+    ds = Dataset(roles={"g": InfoRole(), "y": StatisticRole()}, data=frame)
+    result = MultitestQuantile(random_state=0).calc(
+        ds, group_field="g", target_field="y", quantiles=0.1
+    )
+    assert result.columns == ["field", "accepted hypothesis"]
 
 
-def test_quantile_master_calc_fails_fast_on_spark(spark_session) -> None:
+@pytest.mark.spark
+def test_quantile_calc_on_spark_not_supported(spark_session) -> None:
     from hypex.extensions import MultitestQuantile
 
     ds = _pvalues(RAW_P, BackendsEnum.spark, spark_session)
-    with pytest.raises(NotImplementedError, match="backend_factory"):
+    with pytest.raises(NotImplementedError, match="not supported on the Spark backend"):
         MultitestQuantile().calc(ds, group_field="g", target_field="p-value")

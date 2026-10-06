@@ -5,10 +5,8 @@ from scipy.stats import norm  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
 
 from ..dataset import Dataset, DatasetAdapter, InfoRole, StatisticRole
-from ..dataset.backends import PandasDataset, SparkDataset
 from ..utils import ID_SPLIT_SYMBOL, ABNTestMethodsEnum, BackendsEnum
 from ..utils.constants import TEST_NAME_NORMALIZATION
-from ..utils.registry import backend_factory
 from .abstract import Extension
 
 
@@ -16,9 +14,8 @@ class MultiTest(Extension):
     """Applies multiple testing correction to a collection of p-values.
 
     Wraps ``statsmodels.stats.multitest.multipletests`` and exposes it
-    through the HypEx ``Extension`` interface. There is a single
-    implementation: Spark input is converted to pandas (p-value tables are
-    small).
+    through the HypEx ``Extension`` interface so that both Pandas and
+    Spark backends are supported transparently.
 
     Attributes:
         method: The correction method (e.g. ``holm``, ``bonferroni``).
@@ -29,16 +26,6 @@ class MultiTest(Extension):
         self.method = method
         self.alpha = alpha
         super().__init__()
-
-    def calc(self, data: Dataset, **kwargs):
-        """Apply the multiple testing correction on any backend.
-
-        The correction operates on a small, already-collected array of p-values
-        (one per test x group), so converting to pandas on the driver is safe
-        (a no-op for pandas data). The composite string index must be present
-        on a Spark dataset (it is lost by ``Dataset(pd.DataFrame, spark)``).
-        """
-        return self._calc_pandas(data.to_backend(BackendsEnum.pandas), **kwargs)
 
     @staticmethod
     def _index_parts(index) -> tuple[list[str], list[str], list[str]]:
@@ -150,16 +137,19 @@ class MultiTest(Extension):
             StatisticRole(),
         )
 
+    def _calc_spark(self, data: Dataset, **kwargs):
+        """Delegate to the Pandas implementation via to_backend().
+
+        Multiple-testing correction operates on a small, already-collected
+        array of p-values (one per test × group), so converting to Pandas
+        on the driver is safe.
+        """
+        pandas_ds = data.to_backend(BackendsEnum.pandas)
+        return self._calc_pandas(pandas_ds, **kwargs)
+
 
 class MultitestQuantile(Extension):
-    """Resampling-based quantile multiple testing correction.
-
-    The algorithm needs per-group mean and variance of the raw target, so it
-    is backend-specific: resolve the implementation with
-    ``backend_factory.resolve_backend(MultitestQuantile, data)``
-    (``PandasMultitestQuantile`` / ``SparkMultitestQuantile``). The master's
-    own ``calc`` fails fast on every backend.
-    """
+    """Resampling-based quantile multiple testing correction (pandas only)."""
 
     def __init__(
         self,
@@ -174,10 +164,11 @@ class MultitestQuantile(Extension):
         self.random_state = random_state
         super().__init__()
 
-    def calc(self, data: Dataset, **kwargs):
+    def _calc_spark(self, data: Dataset, **kwargs):
         raise NotImplementedError(
-            "MultitestQuantile is backend-specific: resolve the implementation "
-            "with backend_factory.resolve_backend(MultitestQuantile, data)."
+            "MultitestQuantile is not supported on the Spark backend. "
+            "Use the pandas backend or another multitest_method "
+            "(e.g. 'holm', 'bonferroni')."
         )
 
     def _calc_pandas(self, data: Dataset, **kwargs):
@@ -256,33 +247,4 @@ class MultitestQuantile(Extension):
             np.full(num_samples, quantiles[0]).tolist()
             if self.equal_variance
             else quantiles
-        )
-
-
-@backend_factory.register(MultitestQuantile, PandasDataset)
-class PandasMultitestQuantile(MultitestQuantile):
-    """Pandas implementation of ``MultitestQuantile``."""
-
-    def calc(self, data: Dataset, **kwargs):
-        return self._calc_pandas(data, **kwargs)
-
-
-@backend_factory.register(MultitestQuantile, SparkDataset)
-class SparkMultitestQuantile(MultitestQuantile):
-    """Spark placeholder of ``MultitestQuantile``: always refuses."""
-
-    def calc(self, data: Dataset, **kwargs):
-        """Not supported on Spark.
-
-        The pandas implementation needs per-group mean and variance of the raw
-        target, which pyspark.pandas groups cannot provide here, and collecting
-        the raw data to the driver is not acceptable.
-
-        Raises:
-            NotImplementedError: Always.
-        """
-        raise NotImplementedError(
-            "MultitestQuantile is not supported on the Spark backend. "
-            "Use the pandas backend or another multitest_method "
-            "(e.g. 'holm', 'bonferroni')."
         )
