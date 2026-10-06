@@ -170,3 +170,11 @@ catboost_info/
 
 # Scratch notebooks in the repository root
 /*.ipynb
+
+# Files the tutorials write next to themselves when executed
+/examples/tutorials/*.csv
+/examples/tutorials/*.xlsx
+
+# Windows download markers and locally downloaded wheels
+*:Zone.Identifier
+/*.whl

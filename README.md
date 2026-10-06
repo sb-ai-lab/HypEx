@@ -55,8 +55,10 @@ and make the results unrepresentative.
 ## Installation
 
 ```bash
-pip install -U hypex
+pip install --pre -U hypex   # 2.0 is in alpha: --pre is required
 ```
+
+Without `--pre` pip installs the latest stable release (1.0.x). To pin the alpha: `pip install hypex==2.0.0a1`.
 
 Optional extras for CUPAC models:
 
