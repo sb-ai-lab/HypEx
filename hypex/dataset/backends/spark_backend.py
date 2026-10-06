@@ -26,9 +26,9 @@ from pyspark.storagelevel import StorageLevel  # pyright: ignore[reportMissingIm
 
 from ...config import DatasetConfig
 from ...utils import (
-    UTILITY_NEW_INDEX_COL_NAME,
     BackendsEnum,
     FromDictTypes,
+    ListLikeTypes,
     MergeOnError,
     ScalarType,
     SparkTypeMapper,
@@ -920,10 +920,10 @@ class SparkNavigation(DatasetBackendNavigation):
 
         Lists/arrays are assigned positionally in the frame's current Spark row order.
         """
-        if isinstance(value, (list, tuple, np.ndarray, pd.Index, pd.Series)):
+        if isinstance(value, ListLikeTypes):
             data = self.data.copy()
-            data[UTILITY_NEW_INDEX_COL_NAME] = list(value)
-            data = data.set_index(UTILITY_NEW_INDEX_COL_NAME)
+            data[DatasetConfig.BACKEND_CONVERSION_INDEX_COL] = list(value)
+            data = data.set_index(DatasetConfig.BACKEND_CONVERSION_INDEX_COL)
             data.index.name = None
             self.data = data
         else:

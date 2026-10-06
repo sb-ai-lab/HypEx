@@ -6,7 +6,6 @@ from .constants import (
     NUMBER_TYPES_LIST,
     UTILITY_COL_SYMBOL,
     UTILITY_INDEX_COL_NAME,
-    UTILITY_NEW_INDEX_COL_NAME,
     UTILITY_PHYSICAL_INDEX_COL_NAME,
 )
 from .enums import (
@@ -52,6 +51,7 @@ from .typings import (
     FromDictTypes,
     GenericManager,
     GroupingDataType,
+    ListLikeTypes,
     MultiFieldKeyTypes,
     RoleNameType,
     ScalarType,
@@ -69,7 +69,6 @@ __all__ = [
     "NUMBER_TYPES_LIST",
     "UTILITY_COL_SYMBOL",
     "UTILITY_INDEX_COL_NAME",
-    "UTILITY_NEW_INDEX_COL_NAME",
     "UTILITY_PHYSICAL_INDEX_COL_NAME",
     "ABNTestMethodsEnum",
     "ABTestTypesEnum",
@@ -93,6 +92,7 @@ __all__ = [
     "GenericManager",
     "GroupingDataType",
     "HypExLogger",
+    "ListLikeTypes",
     "MergeOnError",
     "MultiFieldKeyTypes",
     "NoColumnsError",
