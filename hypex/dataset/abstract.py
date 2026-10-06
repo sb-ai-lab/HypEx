@@ -243,7 +243,13 @@ class DatasetBase:
             if role.data_type is None:
                 role.data_type = columns_dtypes[column]
             elif role.data_type != columns_dtypes[column]:
-                new_types[column] = role.data_type
+                # object is not a scalar type, it cannot be converted using
+                # `astype`.  Synchronizing the role with the real data type,
+                # without trying to perform the conversion.
+                if role.data_type is object or columns_dtypes[column] is object:
+                    role.data_type = columns_dtypes[column]
+                else:
+                    new_types[column] = role.data_type
 
         self._backend_data = self._backend_data.update_column_type(new_types)
 
