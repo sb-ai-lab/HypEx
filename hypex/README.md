@@ -121,7 +121,8 @@ matter when reading this code:
 
 ### ✅ **New Architecture is Active**
 - The library has successfully transitioned to the new modular architecture
-- Full backward compatibility with improved performance and functionality
+- 2.0 is substantially faster than 1.0.x and adds a Spark backend; it is not fully backward compatible
+  (see "Migration from 1.0.7" below)
 
 ### 🚀 **Enhanced Backend Support**
 - **Spark backend**: Significantly expanded coverage for core dataset operations
@@ -203,20 +204,28 @@ matter when reading this code:
 * **Notebooks in the repo root** (`ABTestTutorial.ipynb`, `MatchingTutorial.ipynb`,
   `DatasetTutorial.ipynb`, …) are the executable counterpart to these docs.
 
-## Migration from v0.1.10
+## Migration from 1.0.7
 
-The new architecture is **fully backward compatible** with significant improvements:
+2.0.0a1 keeps the 1.0 architecture (roles, executors, `ExperimentData`), but a few defaults and
+names changed. Full list: `RELEASE_NOTES_2.0.0a1.md` in the repository root.
 
-### Key Migration Benefits:
-- **Better performance**: Optimized Spark backend with reduced DAG duplication
-- **Enhanced functionality**: New features like float32 casting and improved matching
-- **Improved error handling**: Clearer error messages and better validation
-- **Full backend support**: Both Pandas and Spark work seamlessly
+### Breaking Changes:
+- Python 3.13 is not supported (`python >=3.8, <3.13`); PySpark 3.5.1 is now a hard dependency.
+- `Output.resume` / `resume_reporter` are renamed to `summary` / `summary_reporter`; the old names
+  still work and emit `DeprecationWarning`.
+- A/A splits use a different hash (SipHash on pandas): the same data and seed give different groups.
+- `Matching` extracts full data and matched indexes only on request
+  (`extract_full_data=True`, `compute_indexes=True`).
+- The KS-test drops NaN by default (`nan_policy="omit"`).
+- `Dataset.data` returns a `pyspark.sql.DataFrame` on the Spark backend; use `Dataset.raw_data` for
+  the pandas-on-Spark object.
 
-### Breaking Changes (Minimal):
-- Some import paths may have changed for better organization
-- New architecture provides better separation of concerns
-- Enhanced error messages may differ from previous versions
+### What you get:
+- **Speed**: substantially faster experiments, especially on large data and in A/A loops.
+- **Spark backend**: the same API on pandas and Spark.
+- **New blocks**: `StatsUTest`, `NaDropper`, `Float32Caster`, matching bias correction and metrics.
+
+Version 0.1.x is no longer supported (`pip install hypex==0.1.10`).
 
 ## Getting Help
 
