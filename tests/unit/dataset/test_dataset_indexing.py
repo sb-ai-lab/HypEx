@@ -138,26 +138,46 @@ def test_select_dtypes(make_dataset, include, exclude, expected) -> None:
 
 @pytest.mark.spark
 def test_spark_select_dtypes_resolves_generic_aliases(spark_session) -> None:
-    """Generic "int"/"float" and python types select the 64-bit columns on Spark."""
+    """Generic "int"/"float" and python types select like pandas (32- and 64-bit)."""
     from hypex.dataset.backends import SparkDataset
-    from hypex.utils import BackendsEnum
 
-    ds = Dataset(
-        roles={"a": FeatureRole(), "b": TargetRole(), "c": FeatureRole()},
-        data=pd.DataFrame({"a": [1, 2], "b": [1.0, 2.0], "c": ["x", "y"]}),
-        backend=BackendsEnum.spark,
-        session=spark_session,
+    pdf = pd.DataFrame(
+        {
+            "i64": pd.Series([1, 2], dtype="int64"),
+            "i32": pd.Series([1, 2], dtype="int32"),
+            "f64": pd.Series([1.0, 2.0], dtype="float64"),
+            "f32": pd.Series([1.0, 2.0], dtype="float32"),
+            "s": ["x", "y"],
+        }
     )
-    backend = ds.backend_data
-    assert isinstance(backend, SparkDataset)
-    assert list(backend.select_dtypes(include=["int", float]).columns) == ["a", "b"]
-    assert list(backend.select_dtypes(include="int").columns) == ["a"]
-    assert list(backend.select_dtypes(exclude=["float"]).columns) == ["a", "c"]
-    assert SparkDataset._normalize_dtype_aliases(["int", float, "object"]) == [
-        "int64",
-        "float64",
-        "object",
+    # createDataFrame(pandas) widens to bigint/double, so build 32-bit Spark
+    # columns explicitly; pandas-on-Spark then reports int32/float32.
+    sdf = spark_session.createDataFrame(
+        [(1, 1, 1.0, 1.0, "x"), (2, 2, 2.0, 2.0, "y")],
+        "i64 long, i32 int, f64 double, f32 float, s string",
+    )
+    backend = SparkDataset(data=sdf.pandas_api(), session=spark_session)
+    assert dict(backend.data.dtypes.astype(str)) == {
+        "i64": "int64",
+        "i32": "int32",
+        "f64": "float64",
+        "f32": "float32",
+        "s": "object",
+    }
+
+    cases = [
+        {"include": ["int"]},
+        {"include": [int]},
+        {"include": ["float"]},
+        {"include": [float]},
+        {"include": ["int", float]},
+        {"exclude": ["float"]},
+        {"exclude": ["int"]},
     ]
+    for kwargs in cases:
+        assert list(backend.select_dtypes(**kwargs).columns) == list(
+            pdf.select_dtypes(**kwargs).columns
+        ), kwargs
     assert SparkDataset._normalize_dtype_aliases(None) is None
 
 

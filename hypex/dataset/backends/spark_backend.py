@@ -2073,27 +2073,27 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
     @staticmethod
     def _normalize_dtype_aliases(dtypes: Any) -> Any:
-        """Map generic "int"/"float" aliases to 64-bit dtypes, as pandas does.
+        """Expand generic "int"/"float" aliases to both 32- and 64-bit dtypes.
 
-        pyspark.pandas resolves them via ``np.dtype`` (int32 on Windows with
-        numpy<2), which would miss the int64 columns Spark produces.
+        Matches pandas; pyspark.pandas would resolve them via ``np.dtype``
+        (platform-dependent width) and miss Spark's int64 or int32 columns.
         """
-        aliases: dict[Any, str] = {
-            "int": "int64",
-            "float": "float64",
-            int: "int64",
-            float: "float64",
+        aliases: dict[Any, list[str]] = {
+            "int": ["int64", "int32"],
+            "float": ["float64", "float32"],
+            int: ["int64", "int32"],
+            float: ["float64", "float32"],
         }
 
-        def _map(dtype: Any) -> Any:
-            return (
-                aliases[dtype]
-                if isinstance(dtype, (str, type)) and dtype in aliases
-                else dtype
-            )
+        def _map(dtype: Any) -> list[Any]:
+            if isinstance(dtype, (str, type)) and dtype in aliases:
+                return aliases[dtype]
+            return [dtype]
 
+        if dtypes is None:
+            return None
         if isinstance(dtypes, (list, tuple, set)):
-            return [_map(d) for d in dtypes]
+            return [m for d in dtypes for m in _map(d)]
         return _map(dtypes)
 
     def isin(self, values: Iterable) -> SparkDataset:
