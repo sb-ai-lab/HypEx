@@ -32,7 +32,6 @@ from ..utils import (
 )
 from ..utils.adapter import Adapter
 from .backends import PandasDataset, SparkDataset
-from .groupby_dataset import GroupedDataset
 from .roles import (
     ABCRole,
     DefaultRole,
@@ -1029,7 +1028,9 @@ class DatasetBase:
             data=self._backend_data.isin(values),
         )
 
-    def groupby(self, by: str | Iterable[str], **kwargs) -> GroupedDataset:
+    # GroupedDataset is not imported at module level: groupby_dataset imports
+    # this module back for typing, and the cycle is flagged by CodeQL.
+    def groupby(self, by: str | Iterable[str], **kwargs) -> GroupedDataset:  # noqa: F821
         if isinstance(by, str):
             by_list = [by]
         elif hasattr(by, "__iter__"):
@@ -1038,6 +1039,8 @@ class DatasetBase:
             by_list = [by]
 
         by_arg = by_list[0] if len(by_list) == 1 else by_list
+
+        from .groupby_dataset import GroupedDataset
 
         return GroupedDataset(
             backend_groupby=self._backend_data.groupby(by=by_arg, **kwargs),

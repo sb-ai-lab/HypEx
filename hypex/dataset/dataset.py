@@ -111,12 +111,6 @@ class SmallDataset(DatasetBase):
             else BackendsEnum.pandas
         )
         super().__init__(roles, data, backend_arg, default_role, session)
-        self.loc = self.Locker(
-            call_class=self.__class__, backend=self._backend_data, roles=self.roles
-        )
-        self.iloc = self.ILocker(
-            call_class=self.__class__, backend=self._backend_data, roles=self.roles
-        )
 
     @property
     def index(self):
