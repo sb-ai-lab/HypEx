@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from typing import Any, ClassVar, Literal
 
 from ..analyzers.matching import MatchingAnalyzer
@@ -148,52 +147,16 @@ class MatchingQualityReporter(DatasetReporter):
         return extract_tests(data, self.tests, self.front)
 
 
-# ── Backwards-compatible aliases ─────────────────────────────────────────────
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
-class MatchingDictReporter(MatchingReporter):
-    """Legacy reporter wrapper for dictionary output.
+class MatchingAnalysisTableReporter(MatchingReporter):
+    """Reporter that returns the matching analyzer table as a dataset.
 
-    Deprecated: Use ``MatchingReporter(output_format='dict')`` instead.
-    """
-
-    def __init__(self, searching_class=MatchingAnalyzer):
-        super().__init__(searching_class, output_format="dict")
-        warnings.warn(
-            "MatchingDictReporter is deprecated. Use MatchingReporter(output_format='dict')",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-
-@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
-class MatchingQualityDictReporter(MatchingQualityReporter):
-    """Legacy reporter wrapper for dictionary output.
-
-    Deprecated: Use ``MatchingQualityReporter(output_format='dict')`` instead.
-    """
-
-    def __init__(self, front=True):
-        super().__init__(output_format="dict")
-        self.front = front
-        warnings.warn(
-            "MatchingQualityDictReporter is deprecated.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-
-@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
-class MatchingDatasetReporter(MatchingReporter):
-    """Legacy reporter wrapper for dataset output.
-
-    Deprecated: Use ``MatchingReporter()`` instead.
+    Used by ``GroupExperiment`` (``group_match=True``) where each group result
+    is the analyzer table itself.
     """
 
     def __init__(self, searching_class=MatchingAnalyzer):
         super().__init__(searching_class, output_format="dataset")
-        warnings.warn(
-            "MatchingDatasetReporter is deprecated.", DeprecationWarning, stacklevel=2
-        )
 
     def report(self, data: ExperimentData) -> Dataset:
         """Directly return the valid dataset from MatchingAnalyzer.
@@ -211,19 +174,3 @@ class MatchingDatasetReporter(MatchingReporter):
             self.searching_class, ExperimentDataEnum.analysis_tables
         )
         return data.analysis_tables[analyzer_id].to_dataset()
-
-
-@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
-class MatchingQualityDatasetReporter(MatchingQualityReporter):
-    """Legacy reporter wrapper for dataset output.
-
-    Deprecated: Use ``MatchingQualityReporter()`` instead.
-    """
-
-    def __init__(self):
-        super().__init__(output_format="dataset")
-        warnings.warn(
-            "MatchingQualityDatasetReporter is deprecated.",
-            DeprecationWarning,
-            stacklevel=2,
-        )

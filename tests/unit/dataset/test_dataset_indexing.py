@@ -1,0 +1,288 @@
+"""Tests for Dataset indexing, selection and value access."""
+
+from __future__ import annotations
+
+import pandas as pd
+import pytest
+
+from hypex.dataset import Dataset, FeatureRole, SmallDataset, TargetRole
+
+
+def _ds(make_dataset):
+    """Four-column fixture-like dataset used by indexing tests."""
+    df = pd.DataFrame(
+        {
+            "a": [1, 2, 3, 4],
+            "b": [10.0, 20.0, 30.0, 40.0],
+            "c": ["w", "x", "y", "z"],
+        }
+    )
+    roles = {"a": FeatureRole(), "b": TargetRole(), "c": FeatureRole()}
+    return make_dataset(df, roles)
+
+
+def test_getitem_by_column_name(make_dataset) -> None:
+    """Selecting a single column by name returns a one-column Dataset."""
+    ds = _ds(make_dataset)
+    single = ds["a"]
+
+    assert list(single.columns) == ["a"]
+    assert len(single) == 4
+
+
+def test_getitem_by_column_list_preserves_order(make_dataset) -> None:
+    """Selecting multiple columns keeps the requested order."""
+    ds = _ds(make_dataset)
+    subset = ds[["b", "a"]]
+
+    assert list(subset.columns) == ["b", "a"]
+
+
+def test_getitem_by_boolean_mask(make_dataset) -> None:
+    """A boolean mask Dataset filters rows."""
+    ds = _ds(make_dataset)
+    mask = ds["a"] > 2
+    filtered = ds[mask]
+
+    assert len(filtered) == 2
+
+
+def test_getitem_missing_column_raises(make_dataset) -> None:
+    """Requesting an unknown column raises KeyError."""
+    ds = _ds(make_dataset)
+    with pytest.raises(KeyError):
+        _ = ds["nope"]
+
+
+def test_setitem_new_column_warns(make_dataset) -> None:
+    """Assigning a brand-new column via __setitem__ emits SyntaxWarning."""
+    ds = _ds(make_dataset)
+    with pytest.warns(SyntaxWarning, match="add_column"):
+        ds["new_col"] = [1, 2, 3, 4]
+    assert "new_col" in ds.columns
+
+
+def test_setitem_existing_column_replaces(make_dataset) -> None:
+    """Assigning to an existing column replaces its values."""
+    ds = _ds(make_dataset)
+    ds["a"] = [9, 9, 9, 9]
+    assert ds["a"].get_values() == [[9], [9], [9], [9]] or ds["a"].sum() == 36
+
+
+def test_get_with_default(make_dataset) -> None:
+    """get() returns the column or the provided default."""
+    ds = _ds(make_dataset)
+    assert ds.get("a") is not None
+    assert ds.backend_data.get("missing", "fallback") == "fallback"
+
+
+def test_get_single_column_returns_one_column_dataset(make_dataset) -> None:
+    ds = _ds(make_dataset)
+    single = ds.get("a")
+
+    assert list(single.columns) == ["a"]
+    assert list(single.roles) == ["a"]
+    assert len(single) == 4
+    assert type(single) is type(ds)
+
+
+def test_get_column_list_keeps_order_and_roles(make_dataset) -> None:
+    ds = _ds(make_dataset)
+    subset = ds.get(["b", "a"])
+
+    assert list(subset.columns) == ["b", "a"]
+    assert isinstance(subset.roles["b"], TargetRole)
+    assert isinstance(subset.roles["a"], FeatureRole)
+
+
+def test_get_missing_key_returns_default_object(make_dataset) -> None:
+    ds = _ds(make_dataset)
+    sentinel = object()
+
+    assert ds.get("missing", sentinel) is sentinel
+    assert ds.get("missing") is None
+
+
+def test_backend_get_returns_frame_for_single_column(make_dataset) -> None:
+    ds = _ds(make_dataset)
+    result = ds.backend_data.get("a")
+
+    assert list(result.columns) == ["a"]
+
+
+def test_select_and_iselect(make_dataset) -> None:
+    """select uses names while iselect uses integer positions."""
+    ds = _ds(make_dataset)
+
+    by_name = ds.select(["a", "b"])
+    by_pos = ds.iselect([0, 1])
+
+    assert list(by_name.columns) == ["a", "b"]
+    assert list(by_pos.columns) == ["a", "b"]
+
+
+@pytest.mark.parametrize(
+    "include,exclude,expected",
+    [
+        (["int"], None, ["a"]),
+        (["float"], None, ["b"]),
+        (None, ["object"], ["a", "b"]),
+    ],
+)
+def test_select_dtypes(make_dataset, include, exclude, expected) -> None:
+    """select_dtypes filters columns by dtype inclusion/exclusion."""
+    ds = _ds(make_dataset)
+    result = ds.select_dtypes(include=include, exclude=exclude)
+    assert set(result.columns) == set(expected)
+
+
+@pytest.mark.spark
+def test_spark_select_dtypes_resolves_generic_aliases(spark_session) -> None:
+    """Generic "int"/"float" and python types select like pandas (32- and 64-bit)."""
+    from hypex.dataset.backends import SparkDataset
+
+    pdf = pd.DataFrame(
+        {
+            "i64": pd.Series([1, 2], dtype="int64"),
+            "i32": pd.Series([1, 2], dtype="int32"),
+            "f64": pd.Series([1.0, 2.0], dtype="float64"),
+            "f32": pd.Series([1.0, 2.0], dtype="float32"),
+            "s": ["x", "y"],
+        }
+    )
+    # createDataFrame(pandas) widens to bigint/double, so build 32-bit Spark
+    # columns explicitly; pandas-on-Spark then reports int32/float32.
+    sdf = spark_session.createDataFrame(
+        [(1, 1, 1.0, 1.0, "x"), (2, 2, 2.0, 2.0, "y")],
+        "i64 long, i32 int, f64 double, f32 float, s string",
+    )
+    backend = SparkDataset(data=sdf.pandas_api(), session=spark_session)
+    assert dict(backend.data.dtypes.astype(str)) == {
+        "i64": "int64",
+        "i32": "int32",
+        "f64": "float64",
+        "f32": "float32",
+        "s": "object",
+    }
+
+    cases = [
+        {"include": ["int"]},
+        {"include": [int]},
+        {"include": ["float"]},
+        {"include": [float]},
+        {"include": ["int", float]},
+        {"exclude": ["float"]},
+        {"exclude": ["int"]},
+    ]
+    for kwargs in cases:
+        assert list(backend.select_dtypes(**kwargs).columns) == list(
+            pdf.select_dtypes(**kwargs).columns
+        ), kwargs
+    assert SparkDataset._normalize_dtype_aliases(None) is None
+
+
+def test_filter_items(make_dataset) -> None:
+    """filter(items=...) keeps only the listed columns."""
+    ds = _ds(make_dataset)
+    result = ds.filter(items=["a", "c"], axis=1)
+    assert set(result.columns) == {"a", "c"}
+
+
+def test_filter_regex(make_dataset) -> None:
+    """filter(regex=...) keeps columns matching the pattern."""
+    ds = _ds(make_dataset)
+    result = ds.filter(regex="^[ab]$", axis=1)
+    assert set(result.columns) == {"a", "b"}
+
+
+def test_limit_and_take(make_dataset) -> None:
+    """limit truncates rows; take selects by position."""
+    ds = _ds(make_dataset)
+
+    limited = ds.limit(2)
+    assert len(limited) == 2
+
+    taken = ds.take([0, 2])
+    assert len(taken) == 2
+
+
+@pytest.mark.spark
+def test_index_property_and_setter(make_dataset) -> None:
+    """index is readable and writable."""
+    pytest.skip("Setting list index in pyspark.pandas is unstable")
+
+
+def test_reset_index_drop(make_dataset) -> None:
+    """reset_index(drop=True) returns a fresh RangeIndex dataset."""
+    ds = _ds(make_dataset)
+    ds.index = [10, 11, 12, 13]
+    reset = ds.reset_index(drop=True)
+    assert list(reset.index.to_numpy()) == [0, 1, 2, 3]
+
+
+def test_set_index(make_dataset) -> None:
+    """set_index promotes a column to index and removes its role."""
+    ds = _ds(make_dataset)
+    reindexed = ds.set_index("c")
+
+    assert "c" not in reindexed.columns
+    assert "c" not in reindexed.roles
+
+
+def test_shape_columns_len(make_dataset) -> None:
+    """shape, columns and len report consistent dimensions."""
+    ds = _ds(make_dataset)
+    assert ds.shape == (4, 3)
+    assert len(ds.columns) == 3
+    assert len(ds) == 4
+
+
+def test_get_values_vs_iget_values(make_dataset) -> None:
+    """get_values resolves by label while iget_values resolves by position."""
+    ds = _ds(make_dataset)
+
+    by_label = ds.get_values(column="a")
+    by_position = ds.iget_values(column=0)
+
+    assert by_label == by_position
+
+
+def test_reindex_keeps_class_and_fills_missing(make_dataset) -> None:
+    """reindex returns the same class/backend and fills missing labels."""
+    ds = _ds(make_dataset)
+    out = ds.reindex([0, 1, 7], fill_value=-1)
+
+    assert type(out) is type(ds)
+    assert out.backend_type == ds.backend_type
+    assert len(out) == 3
+    frame = out.backend_data.data
+    frame = frame.to_pandas() if hasattr(frame, "to_pandas") else frame
+    assert frame.loc[7, "a"] == -1
+    assert set(out.roles) == set(ds.roles)
+
+
+def test_small_dataset_reindex_returns_dataset() -> None:
+    """SmallDataset.reindex returns a full Dataset."""
+    small = SmallDataset.from_dict({"a": [1, 2]}, {"a": FeatureRole()})
+    out = small.reindex([0, 1, 2], fill_value=0)
+
+    assert type(out) is Dataset
+    assert len(out) == 3
+
+
+def test_abstract_module_does_not_import_dataset_module() -> None:
+    """abstract.py must not import ``.dataset`` (cyclic import, CodeQL #148)."""
+    import ast
+
+    import hypex.dataset.abstract as abstract
+
+    with open(abstract.__file__, encoding="utf-8") as handle:
+        tree = ast.parse(handle.read())
+    offenders = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.level == 1
+        and node.module == "dataset"
+    ]
+    assert not offenders

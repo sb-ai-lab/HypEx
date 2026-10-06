@@ -4,7 +4,7 @@ import numpy as np
 from scipy.stats import norm  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
 
-from ..dataset import Dataset, DatasetAdapter, StatisticRole
+from ..dataset import Dataset, DatasetAdapter, InfoRole, StatisticRole
 from ..utils import ID_SPLIT_SYMBOL, ABNTestMethodsEnum, BackendsEnum
 from ..utils.constants import TEST_NAME_NORMALIZATION
 from .abstract import Extension
@@ -26,11 +26,6 @@ class MultiTest(Extension):
         self.method = method
         self.alpha = alpha
         super().__init__()
-
-    def calc(self, data: Dataset, **kwargs):
-        if data.backend_type == BackendsEnum.spark:
-            return self._calc_spark(data, **kwargs)
-        return self._calc_pandas(data, **kwargs)
 
     @staticmethod
     def _index_parts(index) -> tuple[list[str], list[str], list[str]]:
@@ -154,6 +149,8 @@ class MultiTest(Extension):
 
 
 class MultitestQuantile(Extension):
+    """Resampling-based quantile multiple testing correction (pandas only)."""
+
     def __init__(
         self,
         alpha: float = 0.05,
@@ -167,18 +164,22 @@ class MultitestQuantile(Extension):
         self.random_state = random_state
         super().__init__()
 
+    def _calc_spark(self, data: Dataset, **kwargs):
+        raise NotImplementedError(
+            "MultitestQuantile is not supported on the Spark backend. "
+            "Use the pandas backend or another multitest_method "
+            "(e.g. 'holm', 'bonferroni')."
+        )
+
     def _calc_pandas(self, data: Dataset, **kwargs):
         group_field = kwargs.get("group_field")
         target_field = kwargs.get("target_field")
         quantiles = kwargs.get("quantiles")
         num_samples = len(data.unique()[group_field])
         sample_size = len(data)
-        grouped_data = data.groupby(by=group_field, fields_list=target_field)
-        means = [sample[1].agg("mean") for sample in grouped_data]
-        variances = [
-            sample[1].agg("var") * sample_size / (sample_size - 1)
-            for sample in grouped_data
-        ]
+        grouped_data = list(data[[group_field, target_field]].groupby(group_field))
+        means = [sample[1][target_field].agg("mean") for sample in grouped_data]
+        variances = [sample[1][target_field].agg("var") for sample in grouped_data]
         if num_samples != len(means) or num_samples != len(variances):
             num_samples = min(num_samples, len(means), len(variances))
         if type(quantiles) is float:
@@ -202,25 +203,12 @@ class MultitestQuantile(Extension):
             if min_t_value > quantiles[j]:
                 return DatasetAdapter.to_dataset(
                     {"field": target_field, "accepted hypothesis": j + 1},
-                    StatisticRole(),
+                    {"field": InfoRole(str), "accepted hypothesis": StatisticRole(int)},
                 )
         return DatasetAdapter.to_dataset(
-            {"field": target_field, "accepted hypothesis": 0}, StatisticRole()
+            {"field": target_field, "accepted hypothesis": 0},
+            {"field": InfoRole(str), "accepted hypothesis": StatisticRole(int)},
         )
-
-    def _calc_spark(self, data: Dataset, **kwargs):
-        """Delegates to the Pandas implementation.
-
-        Quantile-based multitest runs Monte Carlo simulation on the driver,
-        so data must already be small. ``raw_data`` is passed on as is; it
-        keeps the index needed by ``_index_parts``.
-        """
-        pdf = data.raw_data
-        pandas_ds = Dataset(
-            roles=data.roles,
-            data=pdf,
-        )
-        return self._calc_pandas(pandas_ds, **kwargs)
 
     def quantile_of_marginal_distribution(
         self,

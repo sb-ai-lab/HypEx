@@ -342,7 +342,6 @@ class DatasetBase:
         return False
 
     def get_storage_level(self) -> str | None:
-
         if self.backend_type == BackendsEnum.spark:
             return self._backend_data.get_storage_level()
         return None
@@ -552,9 +551,17 @@ class DatasetBase:
                 new_roles[roles[role]] = deepcopy(r)
         return new_roles or roles
 
-    def get(self, key: Any, default: Any = None) -> Self:
+    def get(self, key: Any, default: Any = None) -> Any:
+        result = self._backend_data.get(key, default)
+        if result is default:
+            return default
         return self.__class__(
-            data=self._backend_data.get(key, default), roles=deepcopy(self.roles)
+            data=result,
+            roles={
+                k: deepcopy(v)
+                for k, v in self.roles.items()
+                if k in set(result.columns)
+            },
         )
 
     def take(
@@ -1144,6 +1151,17 @@ class DatasetBase:
 
     def isna(self) -> Self | ScalarType | None:
         return self._convert_data_after_agg(self._backend_data.isna())
+
+    def reindex(self, labels, fill_value: Any | None = None) -> Self:
+        """Conform to new index labels.
+
+        Returns the same class as ``self``; ``SmallDataset`` overrides it to
+        return ``Dataset``.
+        """
+        return self.__class__(
+            roles=self.roles,
+            data=self._backend_data.reindex(labels, fill_value=fill_value),
+        )
 
     def dropna(
         self,

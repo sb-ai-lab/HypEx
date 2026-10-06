@@ -7,7 +7,7 @@ from pyspark.ml.regression import LinearRegression
 
 from ..dataset import Dataset
 from ..dataset.backends import PandasDataset, SparkDataset
-from ..dataset.roles import FeatureRole, InfoRole, TargetRole
+from ..dataset.roles import FeatureRole, TargetRole
 from ..utils.registry import backend_factory
 from .abstract import Extension
 
@@ -91,11 +91,8 @@ class PandasLstsqExtension(LstsqExtension):
 
     def calc(self, data: Dataset, other: Dataset | None = None, **kwargs):
         target, *features = self.get_columns(data)
-        X_l = Dataset.create_empty(roles={"temp": InfoRole()}, index=data.index).fillna(
-            1
-        )
-        X = X_l.append(data.select(features), axis=1).raw_data.values
-        # TODO: needs fixes
+        features_data = data.select(features).raw_data.to_numpy()
+        X = np.column_stack([np.ones(len(features_data)), features_data])
         return np.linalg.lstsq(X, data[target].raw_data.values, rcond=-1)[0][1:]
 
 

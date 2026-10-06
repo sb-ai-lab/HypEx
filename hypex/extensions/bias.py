@@ -491,7 +491,7 @@ class SparkBisaExtesion(BiasExtension):
         matched_data = cls._prepare_data(
             data=data, neighbors_cols=neighbors_cols, numeric_cols=numeric_cols
         )
-        matched_data = cls.result_to_dataset(matched_data, small=False)
+        matched_data = cls.result_to_dataset(matched_data, roles={}, small=False)
         matched_data = matched_data.set_index("initial_index")
         matched_data.index.name = None
 

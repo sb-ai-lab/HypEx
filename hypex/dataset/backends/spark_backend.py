@@ -28,6 +28,8 @@ from ...config import DatasetConfig
 from ...utils import (
     BackendsEnum,
     FromDictTypes,
+    GenericManager,
+    ListLikeTypes,
     MergeOnError,
     ScalarType,
     SparkTypeMapper,
@@ -604,6 +606,17 @@ class SparkNavigation(DatasetBackendNavigation):
         else:
             return other
 
+    def _columnwise(self, other: Any, op: Callable[[Any, Any], Any]) -> ps.DataFrame:
+        """Apply a binary operator per column (ps.DataFrame lacks & and |)."""
+        other = self.__magic_determine_other(other)
+        return ps.concat(
+            [
+                op(self.data[c], other[c] if isinstance(other, ps.DataFrame) else other)
+                for c in self.data.columns
+            ],
+            axis=1,
+        )
+
     # comparison operators:
     def __eq__(self, other: Any) -> Self:
         """Element-wise equality comparison."""
@@ -632,7 +645,8 @@ class SparkNavigation(DatasetBackendNavigation):
     # unary operations:
     def __pos__(self) -> Self:
         """Unary positive operation (no-op for numeric data)."""
-        return self._wrap_result(+self.data)
+        # pyspark.pandas has no unary +; + is the identity, so return a metadata-only copy
+        return self._wrap_result(self.data.copy())
 
     def __neg__(self) -> Self:
         """Unary negation operation."""
@@ -698,12 +712,12 @@ class SparkNavigation(DatasetBackendNavigation):
     def __and__(self, other: Any) -> Self:
         """Element-wise logical AND for boolean data."""
         with self._ops_on_diff_frames():
-            return self._wrap_result(self.data & self.__magic_determine_other(other))
+            return self._wrap_result(self._columnwise(other, lambda a, b: a & b))
 
     def __or__(self, other: Any) -> Self:
         """Element-wise logical OR for boolean data."""
         with self._ops_on_diff_frames():
-            return self._wrap_result(self.data | self.__magic_determine_other(other))
+            return self._wrap_result(self._columnwise(other, lambda a, b: a | b))
 
     # Right arithmetic operators:
     def __radd__(self, other: Any) -> Self:
@@ -903,8 +917,18 @@ class SparkNavigation(DatasetBackendNavigation):
 
     @index.setter
     def index(self, value):
-        """Set the index of the underlying DataFrame."""
-        self.data = self.data.set_index(value)
+        """Set the index of the underlying DataFrame.
+
+        Lists/arrays are assigned positionally in the frame's current Spark row order.
+        """
+        if GenericManager.check_type(value, ListLikeTypes):
+            data = self.data.copy()
+            data[DatasetConfig.BACKEND_CONVERSION_INDEX_COL] = list(value)
+            data = data.set_index(DatasetConfig.BACKEND_CONVERSION_INDEX_COL)
+            data.index.name = None
+            self.data = data
+        else:
+            self.data = self.data.set_index(value)
 
     def reset_index(
         self, drop: bool = False, inplace: bool = False, **kwargs
@@ -1100,6 +1124,14 @@ class SparkNavigation(DatasetBackendNavigation):
             self.data = self.data.join(data)
             return
 
+        if isinstance(data, SparkDF):
+            data = data.pandas_api()
+            self.add_column(data, name, index)
+            return
+        if isinstance(data, pd.DataFrame):
+            self.add_column(ps.from_pandas(data), name, index)
+            return
+
         self.data[name] = data
 
     def append(
@@ -1236,7 +1268,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         if isinstance(result, ps.Series):
             result = result.to_frame()
         if result.shape == (1, 1):
-            return float(result.to_spark().collect()[0][0])
+            value = result.to_spark().collect()[0][0]
+            return float("nan") if value is None else float(value)
         return result if isinstance(result, ps.DataFrame) else ps.DataFrame(result)
 
     def __init__(
@@ -1260,9 +1293,15 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             default (Any): Value to return if column not found.
 
         Returns:
-            Any: Column data or default value.
+            Any: A frame (a single column as a one-column frame, lazy) for a
+                present key; ``default`` itself for a missing key.
         """
-        return self.data.get(key, default)
+        result = self.data.get(key, default)
+        if result is default:
+            return result
+        if isinstance(result, ps.Series):
+            return result.to_frame()
+        return result
 
     def take(
         self,
@@ -1386,7 +1425,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         """Count unique combinations of group_cols"""
         if not group_cols:
             return 1
-        return int(self.data[group_cols].nunique())
+        return len(self.data[group_cols].drop_duplicates().dropna())
 
     def grouped_value_counts(
         self, by: list[str], feature_cols: list[str] | None = None
@@ -1448,11 +1487,15 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             ]
 
             data_to_agg = self.data[numeric_cols]
+            if data_to_agg is None or len(data_to_agg.columns) == 0:
+                return None
 
         if data_to_agg is None or len(data_to_agg.columns) == 0:
             return None
 
-        if isinstance(func, list) and len(func) == 1:
+        if isinstance(func, dict):
+            agg_dict = func
+        elif isinstance(func, list) and len(func) == 1:
             agg_dict = {col: func[0] for col in data_to_agg.columns}
         else:
             agg_dict = {col: func for col in data_to_agg.columns}
@@ -1763,7 +1806,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                     raise ValueError(
                         f"Vector length ({len(other)}) must match number of columns ({len(self.data.columns)})"
                     )
-                pd_other = pd.Series(other, index=self.data.columns)
+                pd_other = pd.DataFrame({"0": other}, index=self.data.columns)
                 schema = "`0` double"
             else:
                 pd_other = pd.DataFrame(other)
@@ -2022,8 +2065,36 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             SparkDataset: Dataset with filtered columns.
         """
         return self._wrap_result(
-            self.data.select_dtypes(include=include, exclude=exclude)
+            self.data.select_dtypes(
+                include=self._normalize_dtype_aliases(include),
+                exclude=self._normalize_dtype_aliases(exclude),
+            )
         )
+
+    @staticmethod
+    def _normalize_dtype_aliases(dtypes: Any) -> Any:
+        """Expand generic "int"/"float" aliases to both 32- and 64-bit dtypes.
+
+        Matches pandas; pyspark.pandas would resolve them via ``np.dtype``
+        (platform-dependent width) and miss Spark's int64 or int32 columns.
+        """
+        aliases: dict[Any, list[str]] = {
+            "int": ["int64", "int32"],
+            "float": ["float64", "float32"],
+            int: ["int64", "int32"],
+            float: ["float64", "float32"],
+        }
+
+        def _map(dtype: Any) -> list[Any]:
+            if isinstance(dtype, (str, type)) and dtype in aliases:
+                return aliases[dtype]
+            return [dtype]
+
+        if dtypes is None:
+            return None
+        if isinstance(dtypes, (list, tuple, set)):
+            return [m for d in dtypes for m in _map(d)]
+        return _map(dtypes)
 
     def isin(self, values: Iterable) -> SparkDataset:
         """Test if elements are contained in provided values.
