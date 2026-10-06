@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from decimal import Decimal
 from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple, Union
 
@@ -93,8 +94,12 @@ def test_unions(obj, hint, expected) -> None:
         ({1}, Set[int], True),
         ((1,), Tuple[int, ...], True),
         (frozenset({1}), FrozenSet[int], True),
-        ([1], list[int], True),
-        ({"a": 1}, dict[str, int], True),
+        # builtin generics (list[int]) exist only on Python >= 3.9
+        *(
+            [([1], list[int], True), ({"a": 1}, dict[str, int], True)]
+            if sys.version_info >= (3, 9)
+            else []
+        ),
         ([1], List, True),
     ],
 )
