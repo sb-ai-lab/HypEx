@@ -304,12 +304,12 @@ class OnRoleExperiment(Experiment):
         _backend = data.ds.backend_type
 
         for ex in self.executors:
-            # StatsComparator / StatsHypothesisTesting — истинно векторные
+            # StatsComparator and StatsHypothesisTesting are inherently vectorized
             if isinstance(ex, (StatsComparator, StatsHypothesisTesting)):
                 vector_executors.append(ex)
-            # Мастер-классы (TTest, KSTest, Chi2Test…):
-            #   Spark  → Stats* (векторный)
-            #   Pandas → Group* (итеративный)
+            # Master classes (e.g., TTest, KSTest, Chi2Test):
+            # - Spark backend resolves to vectorized Stats* implementations.
+            # - Pandas backend resolves to iterative Group* implementations.
             elif isinstance(ex, StatTestMasterAbstract):
                 if _backend == BackendsEnum.spark:
                     vector_executors.append(ex)
