@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from typing import Any, ClassVar
 
 from ..analyzers.ab import ABAnalyzer
@@ -17,7 +16,6 @@ from ..comparators import (
 from ..dataset import ExperimentData
 from .abstract import (
     DatasetReporter,
-    DictReporter,
     extract_analyzer_data,
     extract_group_difference,
     extract_group_sizes,
@@ -61,40 +59,3 @@ class ABTestReporter(DatasetReporter):
         result.update(extract_tests(data, self.tests, self.front))
         result.update(extract_analyzer_data(data, ABAnalyzer))
         return result
-
-
-class ABDictReporter(ABTestReporter):
-    """Legacy reporter wrapper for dictionary output.
-
-    Deprecated: Use ``ABTestReporter(output_format='dict')`` instead.
-    """
-
-    def __init__(self, front: bool = True):
-        """Initialize the legacy dictionary reporter.
-
-        Args:
-            front: If ``True``, formats keys for front-end display.
-                Defaults to ``True``.
-        """
-        super().__init__(DictReporter(front=front), output_format="dict")
-        warnings.warn("ABDictReporter is deprecated.", DeprecationWarning, stacklevel=2)
-
-
-class ABDatasetReporter(ABTestReporter):
-    """Legacy reporter wrapper for dataset output.
-    Deprecated: Use ``ABTestReporter()`` instead.
-    """
-
-    def __init__(self):
-        super().__init__(
-            DictReporter(),
-            output_format="dataset",
-            invert_pass=True,
-        )
-        warnings.warn(
-            "ABDatasetReporter is deprecated. "
-            "Use ABTestReporter(dict_reporter=DictReporter(), "
-            "output_format='dataset', invert_pass=True) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )

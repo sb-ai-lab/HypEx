@@ -11,8 +11,8 @@ from ..dataset import (
     StatisticRole,
     TreatmentRole,
 )
-from ..reporters.ab import ABTestReporter, DictReporter
-from ..reporters.abstract import _get_index_values
+from ..reporters.ab import ABTestReporter
+from ..reporters.abstract import DictReporter, _get_index_values
 from ..reporters.cuped import CupedReporter
 from ..utils import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL, ExperimentDataEnum
 from .base import Output

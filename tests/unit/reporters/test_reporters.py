@@ -19,14 +19,10 @@ from hypex.dataset import (
 from hypex.experiments import OnRoleExperiment
 from hypex.reporters import (
     REPORTABLE_METRICS,
-    AADatasetReporter,
-    ABDatasetReporter,
-    ABDictReporter,
     ABTestReporter,
     CupedReporter,
     DatasetReporter,
     DictReporter,
-    OneAADictReporter,
     Reporter,
     ResultKey,
     TestDictReporter,
@@ -420,43 +416,10 @@ def test_cuped_reporter_is_empty_when_no_cuped_data(executed) -> None:
     assert CupedReporter().report(executed).is_empty()
 
 
-# ---------------------------------------------------------------------------
-# Deprecated wrappers
-# ---------------------------------------------------------------------------
-@pytest.mark.parametrize(
-    "factory",
-    [
-        lambda: ABDictReporter(),
-        lambda: ABDatasetReporter(),
-        lambda: OneAADictReporter(),
-        lambda: AADatasetReporter(),
-    ],
-    ids=[
-        "ABDict",
-        "ABDataset",
-        "OneAADict",
-        "AADataset",
-    ],
-)
-def test_deprecated_wrappers_warn(factory) -> None:
-    with pytest.warns(DeprecationWarning):
-        reporter = factory()
-    assert isinstance(reporter, DatasetReporter)
-
-
 def test_non_deprecated_reporter_does_not_warn() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         ABTestReporter(DictReporter())
-
-
-def test_deprecated_dict_wrapper_outputs_dict_format() -> None:
-    with pytest.warns(DeprecationWarning):
-        reporter = ABDictReporter(front=False)
-    assert reporter.output_format == "dict"
-    assert reporter.front is False
-    with pytest.warns(DeprecationWarning):
-        assert ABDatasetReporter().output_format == "dataset"
 
 
 def test_star_import_exposes_public_api() -> None:

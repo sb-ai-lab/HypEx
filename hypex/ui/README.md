@@ -134,15 +134,14 @@ result.quality_results # Quality metrics
 
 ```python
 from hypex.ui.base import ExperimentShell, Output
-from hypex.reporters import DatasetReporter
-from hypex.reporters.aa import OneAADictReporter
+from hypex.reporters import AATestReporter, DictReporter
 
 
 class MyTest(ExperimentShell):
     def __init__(self, reliability: float = 0.05):
         super().__init__(
             experiment=MY_EXPERIMENT,
-            output=Output(resume_reporter=DatasetReporter(OneAADictReporter())),
+            output=Output(resume_reporter=AATestReporter(dict_reporter=DictReporter())),
             experiment_params={GroupTTest: {"reliability": reliability}},
         )
 ```
