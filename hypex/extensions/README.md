@@ -2,9 +2,8 @@
 
 Thin wrappers over external libraries (scipy, statsmodels, faiss, sklearn,
 pandas). This is the **only** place in HypEx that imports a statistics or ML
-library directly. Backend-specific behaviour is selected through
-`backend_factory` (see "Backend selection" below), not by branching on the
-storage backend.
+library directly. Backend dispatch lives in `Extension.calc` (`BACKEND_MAPPING`) or in
+`backend_factory`; nothing above this package branches on the backend.
 
 ## Role in the architecture
 
@@ -19,9 +18,9 @@ GroupTTest (comparator)                   FaissNearestNeighbors (MLExecutor)
         │ _inner_function                          │
         ▼                                          ▼
 GroupTTestExtension.calc(data, other)     FaissExtension.calc(data, mode=...)
-        │  caller: backend_factory.resolve_backend(Master, data)
-        ├── Pandas<Master>  → scipy.stats.ttest_ind
-        └── Spark<Master>   → collect to driver, then scipy
+        │  BACKEND_MAPPING[data.backend_type]
+        ├── _calc_pandas  → scipy.stats.ttest_ind
+        └── _calc_spark   → collect to driver, then scipy
 ```
 
 Extensions are **not** `Executor`s: no id, no `ExperimentData`, no pipeline
@@ -33,7 +32,7 @@ position. They take `Dataset`s and return `Dataset`s.
 |---|---|---|---|
 | `abstract.py` | — | `Extension`, `CompareExtension`, `MLExtension` | Core |
 | `scipy_stats.py` | `scipy.stats` | `GroupStatTest`, `GroupTTestExtension`, `GroupKSTestExtension`, `GroupUTestExtension`, `GroupChi2TestExtension`, `NormCDF` | Active |
-| `statsmodels.py` | `statsmodels` | `MultiTest`, `MultitestQuantile`, `PandasMultitestQuantile`, `SparkMultitestQuantile` | Active |
+| `statsmodels.py` | `statsmodels` | `MultiTest`, `MultitestQuantile` | Active |
 | `scipy_linalg.py` | `numpy.linalg` | `CholeskyExtension`, `InverseExtension` | Active |
 | `faiss.py` | `faiss` | `FaissExtension`, `PandasFaissExtension`, `SparkFaissExtension` | Enhanced |
 | `cupac.py` | sklearn-style models | `CupacExtension` | Active |
@@ -47,25 +46,39 @@ position. They take `Dataset`s and return `Dataset`s.
 
 ### `Extension` (ABC)
 
-An `Extension` has a public `calc(data, **kwargs)` and the static helper
-`result_to_dataset(result, roles) -> Dataset`, which routes any plain return
-value through `DatasetAdapter` so callers always get a `Dataset`.
+```python
+class Extension(ABC):
+    BACKEND_MAPPING: ClassVar[dict[BackendsEnum, str]] = {
+        BackendsEnum.pandas: "_calc_pandas",
+        BackendsEnum.spark: "_calc_spark",
+    }
 
-### Backend selection
+    def calc(self, data, *args, **kwargs):
+        # ValueError for a backend missing from BACKEND_MAPPING, otherwise
+        # getattr(self, BACKEND_MAPPING[data.backend_type])(data, *args, **kwargs)
+        ...
 
-Backend-specific extensions follow one layout: a **master** class plus backend
-subclasses registered with `@backend_factory.register(Master, PandasDataset)` /
-`@backend_factory.register(Master, SparkDataset)`. The **caller** resolves the
-implementation with `backend_factory.resolve_backend(Master, data)` (see
-`operators.py` for `BiasExtension`, `ml/faiss.py`, `encoders.py` and
-`analyzers/ab.py` for `MultitestQuantile`). The master's own `calc` does not
-implement a backend algorithm: it raises, or is inherited from `Extension`.
-Extensions whose logic is identical on every backend keep one implementation and
-convert with `to_backend` (see `MultiTest`).
+    def _calc_pandas(self, data, *args, **kwargs): raise NotImplementedError
+    def _calc_spark(self, data, *args, **kwargs): raise NotImplementedError
 
-New extensions must not branch on `backend_type`. Pre-existing exceptions:
-`stats_hypothesis_testing.py` (three `if data.backend_type == BackendsEnum.spark`
-branches).
+    @staticmethod
+    def result_to_dataset(result, roles) -> Dataset: ...
+```
+
+`calc` is the single public entry point and dispatches by `data.backend_type`.
+`_calc_pandas` / `_calc_spark` raise `NotImplementedError` unless overridden.
+`result_to_dataset` routes any plain return value through `DatasetAdapter` so
+callers always get a `Dataset`.
+
+### Two backend patterns
+
+1. One class with `_calc_pandas` / `_calc_spark`, dispatched by `BACKEND_MAPPING`:
+   `MultiTest`, `MultitestQuantile`, the `Stats*Extension` classes.
+2. Heavy backend-specific implementations: subclasses registered in
+   `backend_factory` and chosen by the executor (faiss, bias, encoders,
+   matching_metric, lstsq, scipy KS/Chi2).
+
+New extensions do not branch on `backend_type`: use `BACKEND_MAPPING` or `backend_factory`.
 
 ### `CompareExtension(Extension, ABC)`
 
@@ -105,12 +118,11 @@ is why `TestDictReporter.rename_passed` renders `True` as `"NOT OK"`.
 * `MultiTest(method: ABNTestMethodsEnum, alpha=0.05)` — wraps
   `statsmodels.stats.multitest.multipletests` for bonferroni, sidak, holm,
   holm-sidak, simes-hochberg, hommel, fdr_bh, fdr_by, fdr_tsbh, fdr_tsbky.
-  One implementation: Spark input is converted to pandas (small p-value table).
+  Spark input is converted to pandas (small p-value table).
 * `MultitestQuantile(alpha=0.05, iteration_size=20000, equal_variance=True,
   random_state=None)` — a resampling-based quantile correction for the
-  `ABNTestMethodsEnum.quantile` option. Backend-specific: the master's `calc`
-  raises, `PandasMultitestQuantile` runs the algorithm and
-  `SparkMultitestQuantile` refuses (the raw data must not be collected).
+  `ABNTestMethodsEnum.quantile` option. Pandas only: `_calc_spark` raises
+  `NotImplementedError`.
 
 Both are driven by `ABAnalyzer`.
 
@@ -190,22 +202,25 @@ result = GroupTTestExtension(reliability=0.05).calc(
 ## How to add an extension
 
 ```python
-from hypex.extensions.abstract import CompareExtension
+from hypex.extensions.abstract import Extension
 from hypex.dataset import SmallDataset, StatisticRole
 
 
-class MyTestExtension(CompareExtension):
+class MyTestExtension(Extension):
     def __init__(self, reliability: float = 0.05):
         super().__init__()
         self.reliability = reliability
 
-    def calc(self, data, other=None, **kwargs):
-        stat, p = my_library.test(data.backend_data.data.values.flatten(),
-                                  other.backend_data.data.values.flatten())
+    def _calc_pandas(self, data, other=None, **kwargs):
+        stat, p = my_library.test(data.raw_data.values.flatten(),
+                                  other.raw_data.values.flatten())
         return SmallDataset.from_dict(
             {"p-value": p, "statistic": stat, "pass": p < self.reliability},
             StatisticRole(),
         )
+
+    def _calc_spark(self, data, other=None, **kwargs):
+        raise NotImplementedError
 ```
 
 Then add the comparator that calls it (see
