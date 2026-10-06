@@ -179,10 +179,7 @@ class MultitestQuantile(Extension):
         sample_size = len(data)
         grouped_data = list(data[[group_field, target_field]].groupby(group_field))
         means = [sample[1][target_field].agg("mean") for sample in grouped_data]
-        variances = [
-            sample[1][target_field].agg("var")
-            for sample in grouped_data
-        ]
+        variances = [sample[1][target_field].agg("var") for sample in grouped_data]
         if num_samples != len(means) or num_samples != len(variances):
             num_samples = min(num_samples, len(means), len(variances))
         if type(quantiles) is float:

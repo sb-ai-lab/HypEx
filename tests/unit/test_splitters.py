@@ -208,12 +208,12 @@ def test_stratified_split_balances_each_stratum(ds) -> None:
 
 def test_stratified_without_fields_falls_back_to_plain_split(ds) -> None:
     plain = _split_series(AASplitter._inner_function(ds, random_state=1))
-    strat = _split_series(
+    stratified = _split_series(
         AASplitterWithStratification._inner_function(
             ds, random_state=1, grouping_fields=None
         )
     )
-    assert plain.equals(strat)
+    assert plain.equals(stratified)
 
 
 def test_stratified_execute_uses_stratification_role(ds) -> None:
