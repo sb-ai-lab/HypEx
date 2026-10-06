@@ -1205,7 +1205,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Mapped values.
         """
-        return self._wrap_result(self.data.map(func, **kwargs))
+        return self._wrap_result(self.data.apply(lambda col: col.map(func, **kwargs)))
 
     def is_empty(self) -> bool:
         """Check if DataFrame is empty (no rows or columns).

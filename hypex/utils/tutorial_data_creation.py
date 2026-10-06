@@ -455,8 +455,8 @@ def _aggregate_spends(panel: pd.DataFrame) -> pd.DataFrame:
         )
 
     return (
-        panel.groupby(["user_id", "signup_month", "treat"])
-        .apply(_agg, include_groups=False)
+        panel.groupby(["user_id", "signup_month", "treat"])[["month", "spend"]]
+        .apply(_agg)
         .reset_index()
     )
 

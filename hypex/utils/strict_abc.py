@@ -149,8 +149,10 @@ class StrictABCMeta(ABCMeta):
                 continue
 
             try:
-                sig_parent = inspect.signature(parent_attr)
-                sig_child = inspect.signature(concrete)
+                sig_parent = inspect.signature(
+                    getattr(parent_attr, "__func__", parent_attr)
+                )
+                sig_child = inspect.signature(getattr(concrete, "__func__", concrete))
             except (ValueError, TypeError):
                 continue
 

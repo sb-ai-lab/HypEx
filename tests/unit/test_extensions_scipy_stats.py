@@ -65,6 +65,14 @@ def test_calc_without_test_function_raises() -> None:
         GroupStatTest().calc(_ds([1.0, 2.0]), _ds([1.0, 2.0]))
 
 
+def test_form_results_converts_masked_values_to_nan() -> None:
+    res = GroupStatTest._form_results(np.ma.masked, np.ma.masked, 0.05)
+    assert res.shape[0] == 1
+    assert np.isnan(float(res.get_values(column="p-value")[0]))
+    assert np.isnan(float(res.get_values(column="statistic")[0]))
+    assert not bool(res.get_values(column="pass")[0])
+
+
 def test_extract_arrays_is_backend_dependent() -> None:
     with pytest.raises(NotImplementedError):
         GroupStatTest()._extract_arrays(None, None)

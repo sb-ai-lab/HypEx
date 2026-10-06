@@ -65,6 +65,8 @@ class GroupStatTest(CompareExtension):
     def _form_results(
         p_value: float | None, statistic: float | None, reliability: float
     ) -> SmallDataset:
+        p_value = np.nan if np.ma.is_masked(p_value) else p_value
+        statistic = np.nan if np.ma.is_masked(statistic) else statistic
         return SmallDataset.from_dict(
             {
                 "p-value": p_value,
