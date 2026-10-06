@@ -26,8 +26,6 @@ from hypex.reporters import (
     CupedReporter,
     DatasetReporter,
     DictReporter,
-    HomoDictReporter,
-    MatchingQualityDictReporter,
     OneAADictReporter,
     Reporter,
     ResultKey,
@@ -430,18 +428,14 @@ def test_cuped_reporter_is_empty_when_no_cuped_data(executed) -> None:
     [
         lambda: ABDictReporter(),
         lambda: ABDatasetReporter(),
-        lambda: HomoDictReporter(),
         lambda: OneAADictReporter(),
         lambda: AADatasetReporter(),
-        lambda: MatchingQualityDictReporter(),
     ],
     ids=[
         "ABDict",
         "ABDataset",
-        "HomoDict",
         "OneAADict",
         "AADataset",
-        "MatchingQualityDict",
     ],
 )
 def test_deprecated_wrappers_warn(factory) -> None:

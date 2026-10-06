@@ -136,7 +136,6 @@ Reporters
    reporters.Reporter
    reporters.DatasetReporter
    reporters.DictReporter
-   reporters.HomoDictReporter
 
 Operators
 ---------

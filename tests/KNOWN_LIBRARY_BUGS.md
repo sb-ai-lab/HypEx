@@ -8,7 +8,7 @@
 |---|---|---|
 | ИСПРАВЛЕНО: `PandasDataset.count_groups` делает `int(df[cols].nunique())` | `hypex/dataset/backends/pandas_backend.py` | FutureWarning (в pandas), `TypeError` при нескольких колонках групп и на Spark; ломает любой `list(groupby)`: `GroupedDataset`, `GroupOperator.calc`, `GroupExperiment`, `MahalanobisDistance`, split-modes, calculators, `MLExecutor`, `MinSampleSize` |
 | ИСПРАВЛЕНО: `HomogeneityTest()` создаёт deprecated `HomoDatasetReporter` | `hypex/ui/homo.py` | DeprecationWarning → ошибка из-за `filterwarnings` в `pyproject.toml`; фасад нельзя вызвать в тестах |
-| ИСПРАВЛЕНО (deprecated-репортёры восстановлены как обратно-совместимые алиасы с `DeprecationWarning`, фасады используют `MatchingReporter`/`MatchingQualityReporter`/`HomogeneityReporter`): `Matching()` / `MatchingOutput()` создают deprecated `MatchingDictReporter` / `MatchingDatasetReporter` / `MatchingQualityDatasetReporter` | `hypex/matching.py`, `hypex/ui/matching.py` | то же; старые xfail-причины Matching (соседи из противоположной группы, ближайший по ковариате, `_match_pandas`, `group_match`) нельзя перепроверить, пока репортёры deprecated |
+| ИСПРАВЛЕНО (deprecated-репортёры удалены, фасады используют `MatchingReporter`/`MatchingQualityReporter`/`HomogeneityReporter`): `Matching()` / `MatchingOutput()` создают deprecated `MatchingDictReporter` / `MatchingDatasetReporter` / `MatchingQualityDatasetReporter` | `hypex/matching.py`, `hypex/ui/matching.py` | то же; старые xfail-причины Matching (соседи из противоположной группы, ближайший по ковариате, `_match_pandas`, `group_match`) нельзя перепроверить, пока репортёры deprecated |
 
 ## 2. Dataset / adapter
 

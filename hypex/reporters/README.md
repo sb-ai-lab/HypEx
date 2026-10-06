@@ -28,13 +28,11 @@ Two consumers use them:
 | `abstract.py` | `Reporter`, `DictReporter`, `OnDictReporter`, `DatasetReporter`, `TestDictReporter`, `ResultKey`. |
 | `aa.py` | `OneAADictReporter`, `AADatasetReporter`, `AAPassedReporter`, `AABestSplitReporter`, `AATestReporter`. |
 | `ab.py` | `ABDictReporter`, `ABDatasetReporter`, `ABTestReporter`. |
-| `homo.py` | `HomoDictReporter`, `HomogeneityReporter`, `HomoDatasetReporter` (deprecated alias). |
-| `matching.py` | `MatchingReporter`, `MatchingAnalysisTableReporter`, `MatchingQualityReporter`, `MatchingQualityDictReporter`; deprecated aliases `MatchingDictReporter`, `MatchingDatasetReporter`, `MatchingQualityDatasetReporter`. |
+| `homo.py` | `HomogeneityReporter`. |
+| `matching.py` | `MatchingReporter`, `MatchingAnalysisTableReporter`, `MatchingQualityReporter`. |
 | `cupac.py` | `CupacReporter` — **NEW**. |
 | `cuped.py` | `CupedReporter` — **NEW**. |
 | `__init__.py` | Exports the abstract trio plus all concrete reporters. |
-
-The deprecated aliases are kept for backwards compatibility and emit `DeprecationWarning`; facades use the non-deprecated reporters.
 
 ## Key classes
 
@@ -95,9 +93,6 @@ Base for reporters that summarise statistical tests. Declare a class attribute
 specifics (multitest results, per-group differences).
 
 ### Homogeneity reporters (`homo.py`)
-
-`HomoDictReporter(OneAADictReporter)` — the A/A machinery applied to a single
-homogeneity check.
 
 `HomogeneityReporter` — complete homogeneity test reporting (use
 `HomogeneityReporter(DictReporter(), output_format="dataset")` for a `Dataset`).

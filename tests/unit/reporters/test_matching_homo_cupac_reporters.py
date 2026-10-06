@@ -316,27 +316,3 @@ def test_cupac_reporter_ignores_other_executors() -> None:
     )
     assert CUPACExecutor.__name__ == "CUPACExecutor"
     assert CupacReporter().report(data)["variance_reductions"] is None
-
-
-@pytest.mark.parametrize(
-    "name",
-    [
-        "MatchingDictReporter",
-        "MatchingDatasetReporter",
-        "MatchingQualityDatasetReporter",
-        "HomoDatasetReporter",
-    ],
-)
-def test_deprecated_reporters_are_exported_and_warn(name) -> None:
-    import hypex.reporters as reporters
-
-    cls = getattr(reporters, name)
-    assert name in reporters.__all__
-    with pytest.warns(DeprecationWarning, match=name):
-        cls()
-
-
-def test_matching_dataset_reporter_is_analysis_table_reporter() -> None:
-    from hypex.reporters import MatchingAnalysisTableReporter, MatchingDatasetReporter
-
-    assert issubclass(MatchingDatasetReporter, MatchingAnalysisTableReporter)
