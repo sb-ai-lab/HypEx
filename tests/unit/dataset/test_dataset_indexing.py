@@ -136,6 +136,31 @@ def test_select_dtypes(make_dataset, include, exclude, expected) -> None:
     assert set(result.columns) == set(expected)
 
 
+@pytest.mark.spark
+def test_spark_select_dtypes_resolves_generic_aliases(spark_session) -> None:
+    """Generic "int"/"float" and python types select the 64-bit columns on Spark."""
+    from hypex.dataset.backends import SparkDataset
+    from hypex.utils import BackendsEnum
+
+    ds = Dataset(
+        roles={"a": FeatureRole(), "b": TargetRole(), "c": FeatureRole()},
+        data=pd.DataFrame({"a": [1, 2], "b": [1.0, 2.0], "c": ["x", "y"]}),
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+    backend = ds.backend_data
+    assert isinstance(backend, SparkDataset)
+    assert list(backend.select_dtypes(include=["int", float]).columns) == ["a", "b"]
+    assert list(backend.select_dtypes(include="int").columns) == ["a"]
+    assert list(backend.select_dtypes(exclude=["float"]).columns) == ["a", "c"]
+    assert SparkDataset._normalize_dtype_aliases(["int", float, "object"]) == [
+        "int64",
+        "float64",
+        "object",
+    ]
+    assert SparkDataset._normalize_dtype_aliases(None) is None
+
+
 def test_filter_items(make_dataset) -> None:
     """filter(items=...) keeps only the listed columns."""
     ds = _ds(make_dataset)

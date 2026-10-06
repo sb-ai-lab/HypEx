@@ -2065,8 +2065,36 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             SparkDataset: Dataset with filtered columns.
         """
         return self._wrap_result(
-            self.data.select_dtypes(include=include, exclude=exclude)
+            self.data.select_dtypes(
+                include=self._normalize_dtype_aliases(include),
+                exclude=self._normalize_dtype_aliases(exclude),
+            )
         )
+
+    @staticmethod
+    def _normalize_dtype_aliases(dtypes: Any) -> Any:
+        """Map generic "int"/"float" aliases to 64-bit dtypes, as pandas does.
+
+        pyspark.pandas resolves them via ``np.dtype`` (int32 on Windows with
+        numpy<2), which would miss the int64 columns Spark produces.
+        """
+        aliases: dict[Any, str] = {
+            "int": "int64",
+            "float": "float64",
+            int: "int64",
+            float: "float64",
+        }
+
+        def _map(dtype: Any) -> Any:
+            return (
+                aliases[dtype]
+                if isinstance(dtype, (str, type)) and dtype in aliases
+                else dtype
+            )
+
+        if isinstance(dtypes, (list, tuple, set)):
+            return [_map(d) for d in dtypes]
+        return _map(dtypes)
 
     def isin(self, values: Iterable) -> SparkDataset:
         """Test if elements are contained in provided values.
