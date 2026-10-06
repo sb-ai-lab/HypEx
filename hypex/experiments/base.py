@@ -197,7 +197,7 @@ class Experiment(Executor):
         Returns:
             The experiment data after all executors have been applied.
         """
-        # Логируем информацию о Spark-сессии
+        # log Spark session information
         self.logger.log_spark_info()
 
         experiment_data = deepcopy(data) if self.transformer else data
@@ -205,7 +205,7 @@ class Experiment(Executor):
             with self.logger.process(
                 name=executor.__class__.__name__,
                 backend=experiment_data.ds.backend_type.value,
-                log_spark=False,  # можно включить для детального логирования Spark-процессов
+                log_spark=False,  # can be enabled for detailed logging of Spark processes
             ):
                 cur_executor = self._get_executor_backend(executor, experiment_data.ds)
                 cur_executor.key = self.key
