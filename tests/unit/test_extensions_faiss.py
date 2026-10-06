@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -14,6 +16,12 @@ from hypex.extensions import PandasFaissExtension, SparkFaissExtension
 from hypex.extensions.faiss import FaissExtension, get_executor_cache
 from hypex.utils import BackendsEnum
 from hypex.utils.registry import backend_factory
+
+# Non-"shuffle" fit modes distribute indexes with SparkContext.addFile (SparkFiles).
+requires_spark_files = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="SparkContext.addFile needs Hadoop winutils on Windows",
+)
 
 
 def _points(n, seed, offset=0.0):
@@ -185,7 +193,15 @@ def spark_pair(spark_session):
 
 
 @pytest.mark.spark
-@pytest.mark.parametrize("fit_mode", ["sample", "cluster", "full", "shuffle"])
+@pytest.mark.parametrize(
+    "fit_mode",
+    [
+        pytest.param("sample", marks=requires_spark_files),
+        pytest.param("cluster", marks=requires_spark_files),
+        pytest.param("full", marks=requires_spark_files),
+        "shuffle",
+    ],
+)
 def test_spark_fit_modes_return_valid_neighbours(
     monkeypatch, spark_pair, fit_mode
 ) -> None:
@@ -206,6 +222,7 @@ def test_spark_fit_modes_return_valid_neighbours(
         assert (values == expected).mean() > 0.6
 
 
+@requires_spark_files
 @pytest.mark.spark
 def test_spark_n_neighbors_three_full_mode(monkeypatch, spark_pair) -> None:
     control, test, ctrl_ds, test_ds = spark_pair
@@ -285,6 +302,7 @@ def test_spark_compute_cluster_params() -> None:
     assert ext._nprobe == 10
 
 
+@requires_spark_files
 @pytest.mark.spark
 def test_spark_public_predict_after_fit_matches_auto(monkeypatch, spark_pair) -> None:
     control, test, ctrl_ds, test_ds = spark_pair
@@ -296,6 +314,7 @@ def test_spark_public_predict_after_fit_matches_auto(monkeypatch, spark_pair) ->
     assert found.iloc[:, 0].to_numpy().tolist() == _brute(control, test).tolist()
 
 
+@requires_spark_files
 @pytest.mark.spark
 def test_spark_offset_control_labels_return_real_ids(
     monkeypatch, spark_session
