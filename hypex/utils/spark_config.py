@@ -312,6 +312,7 @@ class SparkSessionCalculator:
             if file_sys == "file:///":
                 file_sys = None
         except Exception:
+            # best-effort: fall back to the default file system
             pass
         if file_sys is None:
             try:

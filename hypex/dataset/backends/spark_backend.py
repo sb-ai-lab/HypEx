@@ -363,10 +363,12 @@ class SparkNavigation(DatasetBackendNavigation):
                             logger_name
                         ).setLevel(sc._jvm.org.apache.log4j.Level.ERROR)
                     except Exception:
+                        # best-effort: a logger that cannot be silenced is not an error
                         pass
 
                 SparkNavigation._SPARK_WARN_SUPPRESED = True
             except Exception:
+                # best-effort: log-level suppression is optional
                 pass
 
         if isinstance(data, ps.DataFrame):
@@ -1445,15 +1447,15 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]
             ]
 
-            # if len(numeric_cols) == 0:
-            #     return None
-
             data_to_agg = self.data[numeric_cols]
+            if data_to_agg is None or len(data_to_agg.columns) == 0: return None
 
         if data_to_agg is None or len(data_to_agg.columns) == 0:
             return None
 
-        if isinstance(func, list) and len(func) == 1:
+        if isinstance(func, dict):
+            agg_dict = func
+        elif isinstance(func, list) and len(func) == 1:
             agg_dict = {col: func[0] for col in data_to_agg.columns}
         else:
             agg_dict = {col: func for col in data_to_agg.columns}
@@ -2154,14 +2156,16 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             SparkDataset: Dataset with replaced values.
         """
         if isinstance(to_replace, ps.DataFrame) and len(to_replace.columns) == 1:
-            to_replace = to_replace.iloc[:, 0]
+            to_replace = to_replace.iloc[:, 0].to_list()
         elif isinstance(to_replace, ps.Series):
             to_replace = to_replace.to_list()
         elif isinstance(to_replace, dict):
-            result = self.data.replace(to_replace=to_replace, regex=regex)
-        else:
-            result = self.data.replace(to_replace=to_replace, value=value, regex=regex)
-        return self._wrap_result(result)
+            return self._wrap_result(
+                self.data.replace(to_replace=to_replace, regex=regex)
+            )
+        return self._wrap_result(
+            self.data.replace(to_replace=to_replace, value=value, regex=regex)
+        )
 
     def reindex(self, labels: str = "", fill_value: str | None = None) -> SparkDataset:
         """Conform dataset to new index with optional fill value.

@@ -322,6 +322,7 @@ class StrictABCMeta(ABCMeta):
                     try:
                         is_covariant = issubclass(c_ret, p_ret)
                     except TypeError:
+                        # annotation is not a class: treat as non-covariant
                         pass
                 if not is_covariant and c_ret != p_ret:
                     raise TypeError(

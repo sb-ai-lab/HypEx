@@ -961,9 +961,6 @@ class PandasNavigation(DatasetBackendNavigation):
         """
         for column_name, type_name in dtype.items():
             if not self.data[column_name].isna().any():
-                # if isinstance(type_name, str):
-                #     self.data = self.data.replace({column_name : self.labels_dict[column_name]})
-                #     self.labels_dict.pop(column_name)
                 self.data = self.astype({column_name: type_name})
         return self
 
@@ -1578,10 +1575,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         """
         initial_index = self.data.index
         if isinstance(other, np.ndarray):
-            other_df = pd.DataFrame(
-                data=other,
-                index=self.columns if other.shape[0] == self.shape[1] else None,
-            )
+            if other.ndim == 1:
+                other_df = pd.DataFrame(data=other, index=self.columns)
+            else:
+                other_df = pd.DataFrame(
+                    data=other,
+                    index=self.columns if other.shape[0] == self.shape[1] else None,
+                )
             result = self.data.dot(other_df)
             result.columns = (
                 self.columns if other.shape[1] == self.shape[1] else result.columns

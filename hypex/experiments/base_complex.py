@@ -88,7 +88,7 @@ class CycledExperiment(ExperimentWithReporter):
         for i in tqdm(range(self.n_iterations)):
             self.key = str(i)
             t_data = ExperimentData(clean_ds)
-            t_data = super(ExperimentWithReporter, self).execute(t_data)
+            t_data = Experiment.execute(self, t_data)
             report = self.reporter.report(t_data)
             report.index = [str(i)]
             result.append(report)
@@ -120,7 +120,7 @@ class GroupExperiment(ExperimentWithReporter):
             key = str(group[0] if isinstance(group, tuple) else group)
             self.key = key
             t_data = ExperimentData(group_data)
-            t_data = super(ExperimentWithReporter, self).execute(t_data)
+            t_data = Experiment.execute(self, t_data)
             report = self.reporter.report(t_data)
             results.append((key, report))
 
