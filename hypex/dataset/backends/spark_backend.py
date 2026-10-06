@@ -28,6 +28,7 @@ from ...config import DatasetConfig
 from ...utils import (
     BackendsEnum,
     FromDictTypes,
+    GenericManager,
     ListLikeTypes,
     MergeOnError,
     ScalarType,
@@ -920,7 +921,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
         Lists/arrays are assigned positionally in the frame's current Spark row order.
         """
-        if isinstance(value, ListLikeTypes):
+        if GenericManager.check_type(value, ListLikeTypes):
             data = self.data.copy()
             data[DatasetConfig.BACKEND_CONVERSION_INDEX_COL] = list(value)
             data = data.set_index(DatasetConfig.BACKEND_CONVERSION_INDEX_COL)
