@@ -365,13 +365,12 @@ def test_ttest_execute_without_target_raises_or_skips(backend, spark_session) ->
 # ---------------------------------------------------------------------------
 # StatsKSTestExtension
 # ---------------------------------------------------------------------------
-def test_ks_extension_pandas_reports_counts_only() -> None:
+def test_ks_extension_pandas_not_implemented() -> None:
     from hypex.extensions.stats_hypothesis_testing import StatsKSTestExtension
 
     ds = build_dataset(_frame()[["g", "y"]], {"g": TreatmentRole(), "y": TargetRole()})
-    res = StatsKSTestExtension().calc(ds, group_col="g", target_cols=["y"])
-    assert set(res) == {"a", "b", "c"}
-    assert all(res[g]["y"] == {"histogram": {}, "count": 40} for g in res)
+    with pytest.raises(NotImplementedError, match="Spark-only"):
+        StatsKSTestExtension().calc(ds, group_col="g", target_cols=["y"])
 
 
 @pytest.mark.spark

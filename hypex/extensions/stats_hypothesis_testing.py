@@ -42,45 +42,6 @@ class StatsAggregationExtension(Extension):
     ``min``, ``max``.
     """
 
-    def calc(
-        self,
-        data: Dataset,
-        group_cols: list[str],
-        target_cols: list[str],
-        stats: list[str],
-        **kwargs,
-    ) -> dict[str, dict[str, dict[str, Any]]]:
-        """Route to the backend-specific aggregation implementation.
-
-        Args:
-            data: The input dataset to aggregate.
-            group_cols: List of column names to group by.
-            target_cols: List of target column names to compute statistics for.
-            stats: List of statistic names to compute (e.g. ['mean', 'std']).
-            **kwargs: Additional keyword arguments.
-
-        Returns:
-            A nested dictionary mapping group_key -> column -> statistic -> value.
-        """
-        from ..utils import BackendsEnum
-
-        if data.backend_type == BackendsEnum.spark:
-            return self._calc_spark(
-                data=data,
-                group_cols=group_cols,
-                target_cols=target_cols,
-                stats=stats,
-                **kwargs,
-            )
-        else:
-            return self._calc_pandas(
-                data=data,
-                group_cols=group_cols,
-                target_cols=target_cols,
-                stats=stats,
-                **kwargs,
-            )
-
     def _calc_pandas(
         self,
         data: Dataset,
@@ -217,47 +178,11 @@ class StatsKSTestExtension(Extension):
         self.n_bins = n_bins
         self.reliability = reliability
 
-    def calc(
-        self,
-        data: Dataset,
-        group_col: str,
-        target_cols: list[str],
-        **kwargs,
-    ) -> dict[str, dict[str, dict[str, Any]]]:
-        """Route to the backend-specific histogram computation."""
-        from ..utils import BackendsEnum
-
-        if data.backend_type == BackendsEnum.spark:
-            return self._calc_spark(
-                data=data,
-                group_col=group_col,
-                target_cols=target_cols,
-                **kwargs,
-            )
-        else:
-            return self._calc_pandas(
-                data=data,
-                group_col=group_col,
-                target_cols=target_cols,
-                **kwargs,
-            )
-
     def _calc_pandas(self, data, group_col, target_cols, **kwargs):
-        result = {}
-        grouped = data.raw_data.groupby(group_col)
-        for group_key, group_df in grouped:
-            result[group_key] = {}
-            group_ds = Dataset(
-                roles={col: data.roles.get(col) for col in target_cols},
-                data=group_df[target_cols],
-            )
-            for col in target_cols:
-                col_ds = group_ds[[col]]
-                result[group_key][col] = {
-                    "histogram": {},
-                    "count": len(col_ds),
-                }
-        return result
+        raise NotImplementedError(
+            "StatsKSTestExtension (histogram KS/U) is Spark-only; on pandas use "
+            "KSTest/UTest, which resolve to GroupKSTest/GroupUTest"
+        )
 
     @timeit(level="SPARK", prefix="KS_EXT_SPARK")
     def _calc_spark(
@@ -403,31 +328,6 @@ class StatsChi2TestExtension(Extension):
     and computes value counts in a single ``groupBy().count()`` job,
     regardless of the number of target columns.
     """
-
-    def calc(
-        self,
-        data: Dataset,
-        group_col: str,
-        target_cols: list[str],
-        **kwargs,
-    ) -> dict[str, dict[str, dict[str, Any]]]:
-        """Route to the backend-specific value-counts computation."""
-        from ..utils import BackendsEnum
-
-        if data.backend_type == BackendsEnum.spark:
-            return self._calc_spark(
-                data=data,
-                group_col=group_col,
-                target_cols=target_cols,
-                **kwargs,
-            )
-        else:
-            return self._calc_pandas(
-                data=data,
-                group_col=group_col,
-                target_cols=target_cols,
-                **kwargs,
-            )
 
     def __init__(self, reliability: float = 0.05):
         """Initializes the chi-squared test extension.
