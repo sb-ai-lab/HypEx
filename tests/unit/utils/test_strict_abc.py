@@ -100,6 +100,28 @@ def test_staticmethod_and_classmethod_are_validated() -> None:
                 return a
 
 
+def test_classmethod_only_violation_is_rejected() -> None:
+    class S(StrictABC):
+        @staticmethod
+        @abstractmethod
+        def f(a): ...
+
+        @classmethod
+        @abstractmethod
+        def g(cls, a): ...
+
+    with pytest.raises(TypeError, match="expected 1 parameters, found 2"):
+
+        class Bad(S):
+            @staticmethod
+            def f(a):
+                return a
+
+            @classmethod
+            def g(cls, a, b):
+                return a
+
+
 def test_narrowing_variadic_is_rejected() -> None:
     class V(StrictABC):
         @abstractmethod

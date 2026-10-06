@@ -6,6 +6,7 @@ except ImportError:
     from typing_extensions import Self  # pyright: ignore[reportMissingModuleSource]
 
 import copy
+import functools
 import warnings
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized
@@ -1205,7 +1206,11 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Mapped values.
         """
-        return self._wrap_result(self.data.apply(lambda col: col.map(func, **kwargs)))
+        na_action = kwargs.pop("na_action", None)
+        f = functools.partial(func, **kwargs) if kwargs else func
+        return self._wrap_result(
+            self.data.apply(lambda col: col.map(f, na_action=na_action))
+        )
 
     def is_empty(self) -> bool:
         """Check if DataFrame is empty (no rows or columns).

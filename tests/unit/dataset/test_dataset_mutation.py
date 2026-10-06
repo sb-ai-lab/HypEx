@@ -136,6 +136,14 @@ def test_map_transforms_values(make_dataset) -> None:
     assert len(doubled) == 3
 
 
+def test_map_forwards_kwargs_to_func_pandas() -> None:
+    """map passes extra kwargs to func (pandas backend)."""
+    df = pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]})
+    ds = Dataset(roles={"x": FeatureRole(), "y": FeatureRole()}, data=df)
+    result = ds.map(lambda v, k: v * k, k=10)
+    assert result.data["x"].tolist() == [10, 20, 30]
+
+
 # ── rename / replace / drop ───────────────────────────────────────────────
 def test_rename_preserves_roles(make_dataset) -> None:
     """rename remaps both column names and their roles."""
