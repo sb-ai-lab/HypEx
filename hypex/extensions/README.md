@@ -14,13 +14,13 @@ extension plus a ~10-line comparator, and Spark support can be added to the
 extension without touching the pipeline.
 
 ```
-GroupTTest (comparator)                   FaissNearestNeighbors (MLExecutor)
-        │ _inner_function                          │
+ABAnalyzer (analyzer)                     FaissNearestNeighbors (MLExecutor)
+        │                                          │
         ▼                                          ▼
-GroupTTestExtension.calc(data, other)     FaissExtension.calc(data, mode=...)
+MultiTest.calc(p_values)                  FaissExtension.calc(data, mode=...)
         │  BACKEND_MAPPING[data.backend_type]
-        ├── _calc_pandas  → scipy.stats.ttest_ind
-        └── _calc_spark   → collect to driver, then scipy
+        ├── _calc_pandas  → statsmodels multipletests
+        └── _calc_spark   → to_backend(pandas), then _calc_pandas
 ```
 
 Extensions are **not** `Executor`s: no id, no `ExperimentData`, no pipeline
@@ -96,13 +96,10 @@ Adds a fit/predict lifecycle. Its `calc` dispatches on a `mode` kwarg
 
 * Validates that both inputs are one-dimensional (`check_dataset`) and that
   `other` was supplied.
-* `_calc_pandas` flattens both to numpy and calls `test_function`, then packs the
-  result into a one-row `SmallDataset` with `p-value`, `statistic`, and
-  `pass = p-value < reliability`.
-* `_calc_spark` does the same after collecting both sides to the driver via
-  `rdd.flatMap(...).collect()` — correct, but it moves the data; prefer the
-  `StatsComparator` branch on Spark (see
-  [`../comparators/README.md`](../comparators/README.md)).
+* It overrides `calc` (it does not use `BACKEND_MAPPING`): `calc` converts both
+  sides with `_to_numpy()`, calls `test_function`, and packs the result into a
+  one-row `SmallDataset` with `p-value`, `statistic`, and
+  `pass = p-value < reliability`. There are no `_calc_pandas` / `_calc_spark`.
 
 Subclasses just bind a scipy function:
 `GroupTTestExtension` → `ttest_ind`, `GroupKSTestExtension` → `ks_2samp`,
@@ -218,10 +215,9 @@ class MyTestExtension(Extension):
             {"p-value": p, "statistic": stat, "pass": p < self.reliability},
             StatisticRole(),
         )
-
-    def _calc_spark(self, data, other=None, **kwargs):
-        raise NotImplementedError
 ```
+
+Add `_calc_spark` for Spark support; until then the base raises `NotImplementedError`.
 
 Then add the comparator that calls it (see
 [`../comparators/README.md`](../comparators/README.md)) and export both.

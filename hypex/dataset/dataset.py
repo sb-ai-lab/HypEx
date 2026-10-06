@@ -207,7 +207,7 @@ class DatasetAdapter(Adapter):
         roles: ABCRole | dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
-        """`small` selects SmallDataset vs Dataset for dict/frame/dataset inputs;
+        """``small`` selects SmallDataset vs Dataset for dict/frame/dataset inputs;
         list, ndarray and scalar inputs always give a pandas-backed Dataset."""
         # Convert data based on its type
         if isinstance(data, dict):
