@@ -71,7 +71,7 @@ IfParamsExperiment(
     executors=[ONE_AA_TEST],
     params={AASplitter: {"random_state": range(2000), "control_size": [0.5]}},
     stopping_criterion=IfAAExecutor(sample_size=0.2),
-    reporter=DatasetReporter(OneAADictReporter(front=False)),
+    reporter=AATestReporter(dict_reporter=DictReporter(front=False)),
 )
 ```
 

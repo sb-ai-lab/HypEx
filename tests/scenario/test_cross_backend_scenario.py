@@ -90,11 +90,6 @@ def _homo_frame(imbalance: float, seed: int = 4, n: int = 800) -> pd.DataFrame:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=DeprecationWarning,
-    reason="Issue: HomogeneityTest() construction emits the DeprecationWarning of the deprecated HomoDatasetReporter (hypex/ui/homo.py)",
-)
 @pytest.mark.parametrize("imbalance", [0.0, 4.0])
 def test_homogeneity_parity(spark_session, imbalance) -> None:
     df = _homo_frame(imbalance)
@@ -108,11 +103,6 @@ def test_homogeneity_parity(spark_session, imbalance) -> None:
         assert left.loc[feature, "KSTest pass"] == right.loc[feature, "KSTest pass"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=DeprecationWarning,
-    reason="Issue: HomogeneityTest() construction emits the DeprecationWarning of the deprecated HomoDatasetReporter (hypex/ui/homo.py)",
-)
 def test_homogeneity_ks_pvalue_is_close(spark_session) -> None:
     df = _homo_frame(0.0)
     pandas_ds, spark_ds = _both(df, ROLES_HOMO, spark_session)
@@ -177,3 +167,14 @@ def test_spark_ab_reports_the_group_totals_as_a_set(spark_session) -> None:
         [int(sizes["control size"].iloc[0]), int(sizes["test size"].iloc[0])]
     )
     assert reported == sorted(df.groupby("treat").size().tolist())
+
+
+def test_ab_quantile_multitest_on_spark_raises_not_implemented(spark_session) -> None:
+    spark_ds = make_dataset(
+        ab_frame(n=300, effect=0.3, groups=3, seed=3),
+        None,
+        BackendsEnum.spark,
+        spark_session,
+    )
+    with pytest.raises(NotImplementedError, match="not supported on the Spark backend"):
+        ABTest(multitest_method="quantile").execute(spark_ds)

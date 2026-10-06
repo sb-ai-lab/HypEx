@@ -83,31 +83,27 @@ class MahalanobisDistance(Calculator):
 
         Returns:
             Dataset:  The corr matrix Dataset to transform into Mahalanobis metric.
+
+        Note:
+            With a single group ``test_data`` is None and ``_inner_function``
+            raises ValueError.
         """
+        test_data = None
         if len(grouping_data) > 1:
-            return cls._inner_function(
-                data=(
-                    grouping_data[0][1][target_fields]
-                    if target_fields
-                    else grouping_data[0][1]
-                ),
-                test_data=(
-                    grouping_data[1][1][target_fields]
-                    if target_fields
-                    else grouping_data[1][1]
-                ),
-                **kwargs,
+            test_data = (
+                grouping_data[1][1][target_fields]
+                if target_fields
+                else grouping_data[1][1]
             )
-        else:
-            return cls._inner_function(
-                data=(
-                    grouping_data[0][1][target_fields]
-                    if target_fields
-                    else grouping_data[0][1]
-                ),
-                test_data=None,
-                **kwargs,
-            )
+        return cls._inner_function(
+            data=(
+                grouping_data[0][1][target_fields]
+                if target_fields
+                else grouping_data[0][1]
+            ),
+            test_data=test_data,
+            **kwargs,
+        )
 
     def _set_value(
         self, data: ExperimentData, value: Dataset | None = None, key: Any = None

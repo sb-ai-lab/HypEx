@@ -5,9 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from hypex.dataset import FeatureRole, TargetRole
-from hypex.utils import BackendsEnum
-from hypex.utils.errors import RoleColumnError
+from hypex.dataset import Dataset, FeatureRole, SmallDataset, TargetRole
 
 
 def _ds(make_dataset):
@@ -71,16 +69,45 @@ def test_setitem_existing_column_replaces(make_dataset) -> None:
     assert ds["a"].get_values() == [[9], [9], [9], [9]] or ds["a"].sum() == 36
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=RoleColumnError,
-    reason="Issue: Dataset.get(key) rebuilds the Dataset with all original roles, so selecting a single column raises RoleColumnError",
-)
 def test_get_with_default(make_dataset) -> None:
     """get() returns the column or the provided default."""
     ds = _ds(make_dataset)
     assert ds.get("a") is not None
     assert ds.backend_data.get("missing", "fallback") == "fallback"
+
+
+def test_get_single_column_returns_one_column_dataset(make_dataset) -> None:
+    ds = _ds(make_dataset)
+    single = ds.get("a")
+
+    assert list(single.columns) == ["a"]
+    assert list(single.roles) == ["a"]
+    assert len(single) == 4
+    assert type(single) is type(ds)
+
+
+def test_get_column_list_keeps_order_and_roles(make_dataset) -> None:
+    ds = _ds(make_dataset)
+    subset = ds.get(["b", "a"])
+
+    assert list(subset.columns) == ["b", "a"]
+    assert isinstance(subset.roles["b"], TargetRole)
+    assert isinstance(subset.roles["a"], FeatureRole)
+
+
+def test_get_missing_key_returns_default_object(make_dataset) -> None:
+    ds = _ds(make_dataset)
+    sentinel = object()
+
+    assert ds.get("missing", sentinel) is sentinel
+    assert ds.get("missing") is None
+
+
+def test_backend_get_returns_frame_for_single_column(make_dataset) -> None:
+    ds = _ds(make_dataset)
+    result = ds.backend_data.get("a")
+
+    assert list(result.columns) == ["a"]
 
 
 def test_select_and_iselect(make_dataset) -> None:
@@ -107,6 +134,51 @@ def test_select_dtypes(make_dataset, include, exclude, expected) -> None:
     ds = _ds(make_dataset)
     result = ds.select_dtypes(include=include, exclude=exclude)
     assert set(result.columns) == set(expected)
+
+
+@pytest.mark.spark
+def test_spark_select_dtypes_resolves_generic_aliases(spark_session) -> None:
+    """Generic "int"/"float" and python types select like pandas (32- and 64-bit)."""
+    from hypex.dataset.backends import SparkDataset
+
+    pdf = pd.DataFrame(
+        {
+            "i64": pd.Series([1, 2], dtype="int64"),
+            "i32": pd.Series([1, 2], dtype="int32"),
+            "f64": pd.Series([1.0, 2.0], dtype="float64"),
+            "f32": pd.Series([1.0, 2.0], dtype="float32"),
+            "s": ["x", "y"],
+        }
+    )
+    # createDataFrame(pandas) widens to bigint/double, so build 32-bit Spark
+    # columns explicitly; pandas-on-Spark then reports int32/float32.
+    sdf = spark_session.createDataFrame(
+        [(1, 1, 1.0, 1.0, "x"), (2, 2, 2.0, 2.0, "y")],
+        "i64 long, i32 int, f64 double, f32 float, s string",
+    )
+    backend = SparkDataset(data=sdf.pandas_api(), session=spark_session)
+    assert dict(backend.data.dtypes.astype(str)) == {
+        "i64": "int64",
+        "i32": "int32",
+        "f64": "float64",
+        "f32": "float32",
+        "s": "object",
+    }
+
+    cases = [
+        {"include": ["int"]},
+        {"include": [int]},
+        {"include": ["float"]},
+        {"include": [float]},
+        {"include": ["int", float]},
+        {"exclude": ["float"]},
+        {"exclude": ["int"]},
+    ]
+    for kwargs in cases:
+        assert list(backend.select_dtypes(**kwargs).columns) == list(
+            pdf.select_dtypes(**kwargs).columns
+        ), kwargs
+    assert SparkDataset._normalize_dtype_aliases(None) is None
 
 
 def test_filter_items(make_dataset) -> None:
@@ -140,17 +212,12 @@ def test_index_property_and_setter(make_dataset) -> None:
     pytest.skip("Setting list index in pyspark.pandas is unstable")
 
 
-def test_reset_index_drop(make_dataset, xfail_backend) -> None:
-    xfail_backend(
-        BackendsEnum.spark,
-        reason="Issue: SparkDataset.index setter passes the list to set_index() as column names (KeyError)",
-        raises=KeyError,
-    )
+def test_reset_index_drop(make_dataset) -> None:
     """reset_index(drop=True) returns a fresh RangeIndex dataset."""
     ds = _ds(make_dataset)
     ds.index = [10, 11, 12, 13]
     reset = ds.reset_index(drop=True)
-    assert list(reset.index) == [0, 1, 2, 3]
+    assert list(reset.index.to_numpy()) == [0, 1, 2, 3]
 
 
 def test_set_index(make_dataset) -> None:
@@ -178,3 +245,44 @@ def test_get_values_vs_iget_values(make_dataset) -> None:
     by_position = ds.iget_values(column=0)
 
     assert by_label == by_position
+
+
+def test_reindex_keeps_class_and_fills_missing(make_dataset) -> None:
+    """reindex returns the same class/backend and fills missing labels."""
+    ds = _ds(make_dataset)
+    out = ds.reindex([0, 1, 7], fill_value=-1)
+
+    assert type(out) is type(ds)
+    assert out.backend_type == ds.backend_type
+    assert len(out) == 3
+    frame = out.backend_data.data
+    frame = frame.to_pandas() if hasattr(frame, "to_pandas") else frame
+    assert frame.loc[7, "a"] == -1
+    assert set(out.roles) == set(ds.roles)
+
+
+def test_small_dataset_reindex_returns_dataset() -> None:
+    """SmallDataset.reindex returns a full Dataset."""
+    small = SmallDataset.from_dict({"a": [1, 2]}, {"a": FeatureRole()})
+    out = small.reindex([0, 1, 2], fill_value=0)
+
+    assert type(out) is Dataset
+    assert len(out) == 3
+
+
+def test_abstract_module_does_not_import_dataset_module() -> None:
+    """abstract.py must not import ``.dataset`` (cyclic import, CodeQL #148)."""
+    import ast
+
+    import hypex.dataset.abstract as abstract
+
+    with open(abstract.__file__, encoding="utf-8") as handle:
+        tree = ast.parse(handle.read())
+    offenders = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.level == 1
+        and node.module == "dataset"
+    ]
+    assert not offenders

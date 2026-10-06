@@ -78,11 +78,6 @@ def test_pandas_extension_matches_brute_force(control, test_df, k) -> None:
             assert set(row_found) == set(row_expected)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: matches whose index label exceeds len(data)+len(test_data) are replaced "
-    "by -1, so non-default (e.g. shuffled or offset) index labels are lost",
-)
 def test_pandas_extension_returns_global_control_index_labels() -> None:
     control = _points(10, seed=0, start=500)
     test = _points(5, seed=1, start=0)
@@ -90,11 +85,6 @@ def test_pandas_extension_returns_global_control_index_labels() -> None:
     assert set(found.iloc[:, 0]) <= set(control.index)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: matches whose index label exceeds len(data)+len(test_data) are replaced "
-    "by -1, so non-default (e.g. shuffled or offset) index labels are lost",
-)
 def test_pandas_extension_exact_duplicate_is_nearest() -> None:
     control = pd.DataFrame(
         {"f1": [0.0, 10.0, 20.0], "f2": [0.0, 10.0, 20.0]}, index=[7, 8, 9]
@@ -274,13 +264,6 @@ def test_execute_inner_function_test_pairs_returns_control(control, test_df) -> 
     assert set(result) == {"control"}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(FutureWarning, AttributeError),
-    reason="Issue: PandasDataset.count_groups does int(Series) (FutureWarning) and, past "
-    "that, execute() calls Dataset.reindex (defined only on SmallDataset) when the "
-    "one-sided result is shorter than the dataset, so default matching cannot run",
-)
 def test_execute_default_one_sided_matching() -> None:
     _df, data = _experiment()
     out = FaissNearestNeighbors(grouping_role=TreatmentRole()).execute(data)
@@ -290,11 +273,6 @@ def test_execute_default_one_sided_matching() -> None:
     assert matched
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FutureWarning,
-    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
-)
 def test_execute_two_sides_stores_matched_indexes() -> None:
     df, data = _experiment()
     executor = FaissNearestNeighbors(two_sides=True, grouping_role=TreatmentRole())
@@ -314,11 +292,6 @@ def test_execute_two_sides_stores_matched_indexes() -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FutureWarning,
-    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
-)
 def test_execute_two_sides_neighbours_come_from_opposite_group() -> None:
     df, data = _experiment()
     out = FaissNearestNeighbors(two_sides=True, grouping_role=TreatmentRole()).execute(
@@ -375,12 +348,6 @@ def _matched(out) -> pd.DataFrame:
     return out.ds.backend_data.data[cols]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: execute() calls Dataset.reindex (defined only on SmallDataset) when "
-    "the one-sided result is shorter than the dataset",
-)
 def test_execute_with_groups_one_sided_fills_control_with_dummy() -> None:
     df, ctrl, test, data = _with_groups()
     out = FaissNearestNeighbors(grouping_role=TreatmentRole()).execute(data)
@@ -406,12 +373,6 @@ def test_execute_with_groups_two_sided() -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: execute() calls Dataset.reindex (defined only on SmallDataset) when "
-    "the one-sided result is shorter than the dataset",
-)
 def test_execute_with_groups_test_pairs_matches_control_rows() -> None:
     _df, ctrl, test, data = _with_groups()
     out = FaissNearestNeighbors(test_pairs=True, grouping_role=TreatmentRole()).execute(
@@ -434,12 +395,6 @@ def test_execute_inner_function_test_pairs_two_sides() -> None:
     assert len(_pdf(result["control"])) == len(ctrl)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: with test_pairs=True and two_sides=True the 'test' entry repeats the "
-    "control query (grouping_data[1] indexed, grouping_data[0] queried) instead of "
-    "matching test rows to control rows",
-)
 def test_execute_inner_function_test_pairs_two_sides_test_entry_has_test_rows() -> None:
     ctrl, test = _points(20, 0), _points(10, 1, start=100)
     grouping = [("0", _ds(ctrl)), ("1", _ds(test))]
@@ -447,6 +402,7 @@ def test_execute_inner_function_test_pairs_two_sides_test_entry_has_test_rows() 
         grouping, tmp_roles={}, n_neighbors=1, two_sides=True, test_pairs=True
     )
     assert len(_pdf(result["test"])) == len(test)
+    assert len(_pdf(result["control"])) == len(ctrl)
 
 
 def test_execute_with_groups_n_neighbors_two_gives_two_columns() -> None:
@@ -481,12 +437,14 @@ def test_set_global_match_indexes_empty_returned_unchanged() -> None:
     assert FaissNearestNeighbors._set_global_match_indexes(empty, ("0", empty)) is empty
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=TypeError,
-    reason="Issue: FaissExtension.fit forwards target_data= to MLExtension.calc, which "
-    "has no such parameter",
-)
 def test_executor_fit_builds_index(control) -> None:
     fitted = FaissNearestNeighbors().fit(_ds(control))
     assert fitted.index.ntotal == len(control)
+
+
+def test_executor_fit_returns_extension_that_predicts(control, test_df) -> None:
+    result = FaissNearestNeighbors().fit(_ds(control)).predict(_ds(test_df))
+    found = _pdf(result)
+    expected = _brute_force(control, test_df, 1)[:, 0]
+    assert found.iloc[:, 0].to_numpy().tolist() == expected.tolist()
+    assert list(found.index) == list(test_df.index)

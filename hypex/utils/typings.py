@@ -18,6 +18,7 @@ from typing import (
     get_origin,
 )
 
+import numpy as np
 import pandas as pd
 import pyspark.pandas as ps
 import pyspark.sql as spark
@@ -54,6 +55,7 @@ PysparkScalarType = (
     ShortType,
     ByteType,
 )
+ListLikeTypes = Union[list, tuple, np.ndarray, pd.Index, pd.Series]
 GroupingDataType = Tuple[List[Tuple[str, "Dataset"]], List[Tuple[str, "Dataset"]]]
 SourceDataTypes = Union[pd.DataFrame, ps.DataFrame, spark.DataFrame]
 

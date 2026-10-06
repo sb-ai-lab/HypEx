@@ -66,6 +66,19 @@ class Float32Caster(Transformer):
         """Only float64 columns are eligible for downcasting."""
         return [float]
 
+    def _matches_role_data_type(self, column_role: ABCRole) -> bool:
+        """Check a column role against the ``data_type`` of the requested roles.
+
+        ``Dataset.search_columns`` matches by role class only, so a request
+        like ``InfoRole(int)`` would also pick up float Info columns. A
+        requested role without ``data_type`` places no restriction.
+        """
+        return any(
+            isinstance(column_role, type(role))
+            and (role.data_type is None or role.data_type == column_role.data_type)
+            for role in self.target_roles
+        )
+
     @staticmethod
     def _inner_function(data: Dataset, target_cols: list[str]) -> Dataset:
         """Cast float64 columns to float32 via the public Dataset API.
@@ -111,10 +124,14 @@ class Float32Caster(Transformer):
         if self.columns is not None:
             target_cols = [c for c in self.columns if c in data.ds.columns]
         else:
-            target_cols = data.ds.search_columns(
-                roles=self.target_roles,
-                search_types=self.search_types,
-            )
+            target_cols = [
+                col
+                for col in data.ds.search_columns(
+                    roles=self.target_roles,
+                    search_types=self.search_types,
+                )
+                if self._matches_role_data_type(data.ds.roles[col])
+            ]
 
         if not target_cols:
             return data

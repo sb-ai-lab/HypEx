@@ -197,7 +197,7 @@ class Experiment(Executor):
         Returns:
             The experiment data after all executors have been applied.
         """
-        # Логируем информацию о Spark-сессии
+        # log Spark session information
         self.logger.log_spark_info()
 
         experiment_data = deepcopy(data) if self.transformer else data
@@ -205,7 +205,7 @@ class Experiment(Executor):
             with self.logger.process(
                 name=executor.__class__.__name__,
                 backend=experiment_data.ds.backend_type.value,
-                log_spark=False,  # можно включить для детального логирования Spark-процессов
+                log_spark=False,  # can be enabled for detailed logging of Spark processes
             ):
                 cur_executor = self._get_executor_backend(executor, experiment_data.ds)
                 cur_executor.key = self.key
@@ -304,12 +304,12 @@ class OnRoleExperiment(Experiment):
         _backend = data.ds.backend_type
 
         for ex in self.executors:
-            # StatsComparator / StatsHypothesisTesting — истинно векторные
+            # StatsComparator and StatsHypothesisTesting are inherently vectorized
             if isinstance(ex, (StatsComparator, StatsHypothesisTesting)):
                 vector_executors.append(ex)
-            # Мастер-классы (TTest, KSTest, Chi2Test…):
-            #   Spark  → Stats* (векторный)
-            #   Pandas → Group* (итеративный)
+            # Master classes (e.g., TTest, KSTest, Chi2Test):
+            # - Spark backend resolves to vectorized Stats* implementations.
+            # - Pandas backend resolves to iterative Group* implementations.
             elif isinstance(ex, StatTestMasterAbstract):
                 if _backend == BackendsEnum.spark:
                     vector_executors.append(ex)
@@ -319,36 +319,45 @@ class OnRoleExperiment(Experiment):
                 iterative_executors.append(ex)
 
         original_executors = self.executors
+        try:
+            # Vector executors execution (only true StatsComparators)
+            if vector_executors:
+                tmp_roles_dict = {}
+                for field in target_fields:
+                    if field in data.ds.columns:
+                        tmp_roles_dict[field] = TempTargetRole()
+                    elif (
+                        data.additional_fields
+                        and field in data.additional_fields.columns
+                    ):
+                        tmp_roles_dict[field] = AdditionalTargetRole()
 
-        # Vector executors execution (only true StatsComparators)
-        if vector_executors:
-            tmp_roles_dict = {}
-            for field in target_fields:
-                if field in data.ds.columns:
-                    tmp_roles_dict[field] = TempTargetRole()
-                elif data.additional_fields and field in data.additional_fields.columns:
-                    tmp_roles_dict[field] = AdditionalTargetRole()
+                if tmp_roles_dict:
+                    data.ds.tmp_roles = tmp_roles_dict
+                    self.executors = vector_executors
+                    data = super().execute(data)
+                    data.ds.tmp_roles = {}
 
-            if tmp_roles_dict:
-                data.ds.tmp_roles = tmp_roles_dict
-                self.executors = vector_executors
-                data = super().execute(data)
-                data.ds.tmp_roles = {}
+            # Iterative executors execution (one by one)
+            if iterative_executors:
+                self.executors = iterative_executors
+                for field in target_fields:
+                    if field in data.ds.columns:
+                        data.ds.tmp_roles = {field: TempTargetRole()}
+                    elif (
+                        data.additional_fields
+                        and field in data.additional_fields.columns
+                    ):
+                        data.additional_fields.tmp_roles = {
+                            field: AdditionalTargetRole()
+                        }
 
-        # Iterative executors execution (one by one)
-        if iterative_executors:
-            self.executors = iterative_executors
-            for field in target_fields:
-                if field in data.ds.columns:
-                    data.ds.tmp_roles = {field: TempTargetRole()}
-                elif data.additional_fields and field in data.additional_fields.columns:
-                    data.additional_fields.tmp_roles = {field: AdditionalTargetRole()}
+                    data = super().execute(data)
 
-                data = super().execute(data)
+                    data.ds.tmp_roles = {}
+                    if data.additional_fields:
+                        data.additional_fields.tmp_roles = {}
 
-                data.ds.tmp_roles = {}
-                if data.additional_fields:
-                    data.additional_fields.tmp_roles = {}
-
-        self.executors = original_executors
+        finally:
+            self.executors = original_executors
         return data

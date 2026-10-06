@@ -194,12 +194,6 @@ def test_spark_bias_matches_pandas(spark_session) -> None:
 
 
 @pytest.mark.spark
-@pytest.mark.xfail(
-    strict=True,
-    raises=TypeError,
-    reason="SparkBisaExtesion.prepare_data calls result_to_dataset without the "
-    "required `roles` argument",
-)
 def test_spark_prepare_data_returns_indexes_and_matched(spark_session) -> None:
     df = _frame()
     ds = Dataset(

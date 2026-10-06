@@ -40,7 +40,7 @@ def _skewed(n: int = 400, seed: int = 0) -> np.ndarray:
 
 def _experiment_data(table: Dataset, targets=("y",)) -> ExperimentData:
     ds = Dataset(
-        roles={t: TargetRole() for t in targets} | {"x": FeatureRole()},
+        roles={**{t: TargetRole() for t in targets}, "x": FeatureRole()},
         data=pd.DataFrame({**{t: [1.0, 2.0] for t in targets}, "x": [1.0, 2.0]}),
         backend=BackendsEnum.pandas,
     )
@@ -201,13 +201,13 @@ def test_no_dry_score_leaves_pass_flag_untouched() -> None:
 # ---------------------------------------------------------------------------
 # AAScoreAnalyzer best split selection / application
 # ---------------------------------------------------------------------------
-def _split_data(n: int = 200, strat_nan: int = 0) -> ExperimentData:
+def _split_data(n: int = 200, strata_nan: int = 0) -> ExperimentData:
     from hypex.dataset import StratificationRole
 
-    strat = np.array(["a", "b"] * (n // 2), dtype=object)
-    if strat_nan:
-        strat[:strat_nan] = None
-    df = pd.DataFrame({"x": np.arange(n, dtype=float), "s": strat})
+    strata_values = np.array(["a", "b"] * (n // 2), dtype=object)
+    if strata_nan:
+        strata_values[:strata_nan] = None
+    df = pd.DataFrame({"x": np.arange(n, dtype=float), "s": strata_values})
     ds = Dataset(
         roles={"x": FeatureRole(), "s": StratificationRole()},
         data=df,
@@ -244,7 +244,7 @@ def test_set_best_split_is_reproducible_for_same_id() -> None:
 
 def test_set_best_split_drops_rows_with_missing_stratification() -> None:
     splitter_id = f"AASplitterWithStratification{S}rs 3{S}"
-    out = AAScoreAnalyzer()._set_best_split(_split_data(strat_nan=10), splitter_id)
+    out = AAScoreAnalyzer()._set_best_split(_split_data(strata_nan=10), splitter_id)
     assert len(out.ds) == 190
     col = next(c for c in out.additional_fields.columns if c.endswith("best"))
     assert out.additional_fields.backend_data.data[col].notna().sum() == 190

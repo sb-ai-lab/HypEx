@@ -401,12 +401,6 @@ def test_ab_multitest_skipped_for_single_comparison() -> None:
     assert f"{analyzer.id}MultiTest" not in out.analysis_tables
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=NotImplementedError,
-    reason="Issue: MultitestQuantile defines no calc(), so ABAnalyzer with the 'quantile' "
-    "method always raises NotImplementedError",
-)
 def test_ab_quantile_method_runs() -> None:
     _, experiment_data = _grouped_experiment()
     ABAnalyzer(

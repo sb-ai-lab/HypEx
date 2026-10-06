@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import enum
+import sys
 
 import pytest
 from statsmodels.stats.multitest import multipletests
@@ -110,6 +111,10 @@ def test_fdr_tsbky_is_the_registered_name() -> None:
     assert "fdr_tsbhy" not in {m.value for m in ABNTestMethodsEnum}
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 10),
+    reason="PEP 604 annotations need Python 3.10 to evaluate",
+)
 def test_abtest_literal_matches_enum() -> None:
     """Every method advertised in ABTest's type hint should map to an enum value."""
     import typing

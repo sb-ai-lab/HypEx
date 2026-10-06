@@ -81,12 +81,7 @@ def test_comparison_operators(make_dataset, name, op) -> None:
 
 
 @pytest.mark.pandas
-def test_bitwise_operators(make_dataset, xfail_backend) -> None:
-    xfail_backend(
-        BackendsEnum.spark,
-        reason="Issue: SparkDataset.__and__/__or__ apply & to pyspark.pandas DataFrames, which is unsupported (TypeError)",
-        raises=TypeError,
-    )
+def test_bitwise_operators(make_dataset) -> None:
     """& and | work on boolean datasets."""
     df = pd.DataFrame({"x": [True, True, False]})
     ds = make_dataset(df, {"x": FeatureRole()})
@@ -96,13 +91,26 @@ def test_bitwise_operators(make_dataset, xfail_backend) -> None:
     assert len(ored) == 3
 
 
+def _as_pandas(ds) -> pd.DataFrame:
+    data = ds.backend_data.data
+    frame = data.to_pandas() if hasattr(data, "to_pandas") else data
+    return frame.sort_index()
+
+
+def test_bitwise_operators_values(make_dataset) -> None:
+    """& and | give exact values and do not mutate the operand."""
+    df = pd.DataFrame({"x": [True, True, False], "y": [True, False, False]})
+    ds = make_dataset(df, {"x": FeatureRole(), "y": FeatureRole()})
+
+    pd.testing.assert_frame_equal(_as_pandas(ds & ds), df)
+    pd.testing.assert_frame_equal(_as_pandas(ds | ds), df)
+    assert not _as_pandas(ds & False).to_numpy().any()
+    assert _as_pandas(ds | True).to_numpy().all()
+    pd.testing.assert_frame_equal(_as_pandas(ds), df)
+
+
 @pytest.mark.pandas
-def test_unary_operators(make_dataset, xfail_backend) -> None:
-    xfail_backend(
-        BackendsEnum.spark,
-        reason="Issue: SparkDataset.__pos__ applies unary + to a pyspark.pandas DataFrame, which is unsupported (TypeError)",
-        raises=TypeError,
-    )
+def test_unary_operators(make_dataset) -> None:
     """Unary +, -, abs and round return datasets of the same shape."""
     ds = _ds(make_dataset, [-1, 2, -3])
     assert len(+ds) == 3
@@ -155,3 +163,21 @@ def test_division_by_zero_does_not_raise(make_dataset) -> None:
     ds = _ds(make_dataset, [1, 2, 3])
     result = ds / 0
     assert len(result) == 3
+
+
+@pytest.mark.spark
+def test_bitwise_operators_with_integer_column_labels(spark_session) -> None:
+    import pyspark.pandas as ps
+
+    frame = ps.DataFrame({0: [True, True, False], 1: [True, False, False]})
+    ds = Dataset(
+        roles={0: FeatureRole(), 1: FeatureRole()},
+        data=frame,
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+    anded = _as_pandas(ds & ds)
+    ored = _as_pandas(ds | ds)
+    assert anded[0].tolist() == [True, True, False]
+    assert ored[1].tolist() == [True, False, False]
+    assert not _as_pandas(ds & False).to_numpy().any()

@@ -2,7 +2,8 @@
 
 Thin wrappers over external libraries (scipy, statsmodels, faiss, sklearn,
 pandas). This is the **only** place in HypEx that imports a statistics or ML
-library directly, and the only place that branches on the storage backend.
+library directly. Backend dispatch lives in `Extension.calc` (`BACKEND_MAPPING`) or in
+`backend_factory`; nothing above this package branches on the backend.
 
 ## Role in the architecture
 
@@ -13,13 +14,13 @@ extension plus a ~10-line comparator, and Spark support can be added to the
 extension without touching the pipeline.
 
 ```
-GroupTTest (comparator)                   FaissNearestNeighbors (MLExecutor)
-        │ _inner_function                          │
+ABAnalyzer (analyzer)                     FaissNearestNeighbors (MLExecutor)
+        │                                          │
         ▼                                          ▼
-GroupTTestExtension.calc(data, other)     FaissExtension.calc(data, mode=...)
-        │  BACKEND_MAPPING[type(data.backend_data)]
-        ├── _calc_pandas  → scipy.stats.ttest_ind
-        └── _calc_spark   → collect to driver, then scipy
+MultiTest.calc(p_values)                  FaissExtension.calc(data, mode=...)
+        │  BACKEND_MAPPING[data.backend_type]
+        ├── _calc_pandas  → statsmodels multipletests
+        └── _calc_spark   → to_backend(pandas), then _calc_pandas
 ```
 
 Extensions are **not** `Executor`s: no id, no `ExperimentData`, no pipeline
@@ -47,25 +48,37 @@ position. They take `Dataset`s and return `Dataset`s.
 
 ```python
 class Extension(ABC):
-    def __init__(self):
-        self.BACKEND_MAPPING = {PandasDataset: self._calc_pandas,
-                                SparkDataset:  self._calc_spark}
+    BACKEND_MAPPING: ClassVar[dict[BackendsEnum, str]] = {
+        BackendsEnum.pandas: "_calc_pandas",
+        BackendsEnum.spark: "_calc_spark",
+    }
 
-    @abstractmethod
-    def _calc_pandas(self, data, **kwargs): ...
-    @abstractmethod
-    def _calc_spark(self, data, **kwargs): ...
+    def calc(self, data, *args, **kwargs):
+        # ValueError for a backend missing from BACKEND_MAPPING, otherwise
+        # getattr(self, BACKEND_MAPPING[data.backend_type])(data, *args, **kwargs)
+        ...
 
-    def calc(self, data, **kwargs):
-        return self.BACKEND_MAPPING[type(data.backend_data)](data=data, **kwargs)
+    def _calc_pandas(self, data, *args, **kwargs): raise NotImplementedError
+    def _calc_spark(self, data, *args, **kwargs): raise NotImplementedError
 
     @staticmethod
     def result_to_dataset(result, roles) -> Dataset: ...
 ```
 
-`calc` is the single public entry point; the dispatch table is built per
-instance. `result_to_dataset` routes any plain return value through
-`DatasetAdapter` so callers always get a `Dataset`.
+`calc` is the single public entry point and dispatches by `data.backend_type`.
+`_calc_pandas` / `_calc_spark` raise `NotImplementedError` unless overridden.
+`result_to_dataset` routes any plain return value through `DatasetAdapter` so
+callers always get a `Dataset`.
+
+### Two backend patterns
+
+1. One class with `_calc_pandas` / `_calc_spark`, dispatched by `BACKEND_MAPPING`:
+   `MultiTest`, `MultitestQuantile`, the `Stats*Extension` classes.
+2. Heavy backend-specific implementations: subclasses registered in
+   `backend_factory` and chosen by the executor (faiss, bias, encoders,
+   matching_metric, lstsq, scipy KS/Chi2).
+
+New extensions do not branch on `backend_type`: use `BACKEND_MAPPING` or `backend_factory`.
 
 ### `CompareExtension(Extension, ABC)`
 
@@ -74,8 +87,8 @@ Adds a second dataset: `calc(data, other=None, **kwargs)`. Everything in
 
 ### `MLExtension(Extension)`
 
-Adds a fit/predict lifecycle. Its `_calc_pandas` dispatches on a `mode` kwarg
-(`"auto"`, `"fit"`, `"predict"`) to abstract `fit(X, Y=None)` / `predict(X)`.
+Adds a fit/predict lifecycle. Its `calc` dispatches on a `mode` kwarg
+(`"auto"`, `"fit"`, `"predict"`) to `fit(X, Y=None)` / `predict(X)`.
 
 ### `GroupStatTest` and its subclasses (`scipy_stats.py`)
 
@@ -83,13 +96,10 @@ Adds a fit/predict lifecycle. Its `_calc_pandas` dispatches on a `mode` kwarg
 
 * Validates that both inputs are one-dimensional (`check_dataset`) and that
   `other` was supplied.
-* `_calc_pandas` flattens both to numpy and calls `test_function`, then packs the
-  result into a one-row `SmallDataset` with `p-value`, `statistic`, and
-  `pass = p-value < reliability`.
-* `_calc_spark` does the same after collecting both sides to the driver via
-  `rdd.flatMap(...).collect()` — correct, but it moves the data; prefer the
-  `StatsComparator` branch on Spark (see
-  [`../comparators/README.md`](../comparators/README.md)).
+* It overrides `calc` (it does not use `BACKEND_MAPPING`): `calc` converts both
+  sides with `_to_numpy()`, calls `test_function`, and packs the result into a
+  one-row `SmallDataset` with `p-value`, `statistic`, and
+  `pass = p-value < reliability`. There are no `_calc_pandas` / `_calc_spark`.
 
 Subclasses just bind a scipy function:
 `GroupTTestExtension` → `ttest_ind`, `GroupKSTestExtension` → `ks_2samp`,
@@ -105,9 +115,11 @@ is why `TestDictReporter.rename_passed` renders `True` as `"NOT OK"`.
 * `MultiTest(method: ABNTestMethodsEnum, alpha=0.05)` — wraps
   `statsmodels.stats.multitest.multipletests` for bonferroni, sidak, holm,
   holm-sidak, simes-hochberg, hommel, fdr_bh, fdr_by, fdr_tsbh, fdr_tsbky.
+  Spark input is converted to pandas (small p-value table).
 * `MultitestQuantile(alpha=0.05, iteration_size=20000, equal_variance=True,
   random_state=None)` — a resampling-based quantile correction for the
-  `ABNTestMethodsEnum.quantile` option.
+  `ABNTestMethodsEnum.quantile` option. Pandas only: `_calc_spark` raises
+  `NotImplementedError`.
 
 Both are driven by `ABAnalyzer`.
 
@@ -187,26 +199,25 @@ result = GroupTTestExtension(reliability=0.05).calc(
 ## How to add an extension
 
 ```python
-from hypex.extensions.abstract import CompareExtension
+from hypex.extensions.abstract import Extension
 from hypex.dataset import SmallDataset, StatisticRole
 
 
-class MyTestExtension(CompareExtension):
+class MyTestExtension(Extension):
     def __init__(self, reliability: float = 0.05):
         super().__init__()
         self.reliability = reliability
 
     def _calc_pandas(self, data, other=None, **kwargs):
-        stat, p = my_library.test(data.backend_data.data.values.flatten(),
-                                  other.backend_data.data.values.flatten())
+        stat, p = my_library.test(data.raw_data.values.flatten(),
+                                  other.raw_data.values.flatten())
         return SmallDataset.from_dict(
             {"p-value": p, "statistic": stat, "pass": p < self.reliability},
             StatisticRole(),
         )
-
-    def _calc_spark(self, data, other=None, **kwargs):
-        raise NotImplementedError
 ```
+
+Add `_calc_spark` for Spark support; until then the base raises `NotImplementedError`.
 
 Then add the comparator that calls it (see
 [`../comparators/README.md`](../comparators/README.md)) and export both.
@@ -216,11 +227,8 @@ existing reporters and analyzers to pick the result up automatically.
 
 ## Gotchas
 
-* **`calc` backend dispatch fixed.** Previously broken backend lookup now uses
-  `type(data.backend_data)` instead of `type(data.backend)`.
 * **Enhanced Spark support.** Many extensions now have full Spark implementations
   (`FaissExtension`, `DummyEncoderExtension`, `BiasExtension`, `MatchingMetricsExtension`).
-* **`_calc_spark` implementations available.** Spark versions now exist for most core extensions.
 * **FAISS is an optional dependency.** `faiss.py` imports it at module level; ensure
   it's installed when using matching functionality.
 * The result-schema contract is implicit. Nothing validates that an extension
@@ -230,5 +238,5 @@ existing reporters and analyzers to pick the result up automatically.
 ## Related modules
 
 `../comparators/README.md` and `../ml/README.md` (the callers) ·
-`../dataset/backends/README.md` (what `BACKEND_MAPPING` keys on) ·
+`../dataset/backends/README.md` (the backend classes `backend_factory` keys on) ·
 `../utils/README.md` (`ABNTestMethodsEnum`, `backend_factory`).

@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 from statsmodels.stats.multitest import multipletests
 
-from hypex.dataset import Dataset, StatisticRole
+from hypex.dataset import Dataset, InfoRole, StatisticRole
 from hypex.extensions import MultiTest
 from hypex.utils import ABNTestMethodsEnum, BackendsEnum
 from hypex.utils.constants import ID_SPLIT_SYMBOL as S
@@ -16,9 +16,15 @@ RAW_P = [0.001, 0.008, 0.02, 0.04, 0.3, 0.7]
 
 def _pvalues(p_values, backend=BackendsEnum.pandas, session=None) -> Dataset:
     index = [f"GroupTTest{S}hash{S}y{i}{S}b" for i in range(len(p_values))]
+    frame = pd.DataFrame({"p-value": p_values}, index=index)
+    if backend == BackendsEnum.spark:
+        # createDataFrame(pandas) drops the pandas index; from_pandas keeps it
+        import pyspark.pandas as ps
+
+        frame = ps.from_pandas(frame)
     return Dataset(
         roles={"p-value": StatisticRole()},
-        data=pd.DataFrame({"p-value": p_values}, index=index),
+        data=frame,
         backend=backend,
         session=session,
     )
@@ -30,12 +36,6 @@ def _frame(ds) -> pd.DataFrame:
 
 
 @pytest.mark.spark
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: MultiTest._calc_spark converts the Spark Dataset to pandas without "
-    "its composite string index, so test/field/group labels are lost (field becomes "
-    "0..n-1, every p-value is its own family and the correction is a no-op)",
-)
 def test_multitest_spark_matches_statsmodels(spark_session) -> None:
     ds = _pvalues(RAW_P, BackendsEnum.spark, spark_session)
     result = _frame(MultiTest(ABNTestMethodsEnum.holm, 0.05).calc(ds))
@@ -68,17 +68,23 @@ def test_quantile_unequal_variance_returns_one_value_per_group() -> None:
     )  # different variances -> different quantiles
 
 
-def test_quantile_spark_wrapper_delegates_with_raw_data(monkeypatch) -> None:
+def test_quantile_calc_on_pandas() -> None:
     from hypex.extensions import MultitestQuantile
 
-    seen = {}
+    frame = pd.DataFrame(
+        {"g": [0, 0, 0, 1, 1, 1], "y": [1.0, 2.0, 3.0, 9.0, 10.0, 11.0]}
+    )
+    ds = Dataset(roles={"g": InfoRole(), "y": StatisticRole()}, data=frame)
+    result = MultitestQuantile(random_state=0).calc(
+        ds, group_field="g", target_field="y", quantiles=0.1
+    )
+    assert result.columns == ["field", "accepted hypothesis"]
 
-    def fake(self, data, **kwargs):
-        seen["rows"] = len(data)
-        seen["kwargs"] = kwargs
-        return "ok"
 
-    monkeypatch.setattr(MultitestQuantile, "_calc_pandas", fake)
-    ds = _pvalues(RAW_P)
-    assert MultitestQuantile()._calc_spark(ds, group_field="g") == "ok"
-    assert seen == {"rows": len(RAW_P), "kwargs": {"group_field": "g"}}
+@pytest.mark.spark
+def test_quantile_calc_on_spark_not_supported(spark_session) -> None:
+    from hypex.extensions import MultitestQuantile
+
+    ds = _pvalues(RAW_P, BackendsEnum.spark, spark_session)
+    with pytest.raises(NotImplementedError, match="not supported on the Spark backend"):
+        MultitestQuantile().calc(ds, group_field="g", target_field="p-value")

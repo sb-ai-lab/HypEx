@@ -40,12 +40,7 @@ def test_add_column_from_list(make_dataset) -> None:
     assert len(ds) == 3
 
 
-def test_add_column_from_dataset(make_dataset, xfail_backend) -> None:
-    xfail_backend(
-        BackendsEnum.spark,
-        reason="Issue: SparkDataset.add_column assigns a pyspark.pandas DataFrame to a column (TypeError)",
-        raises=TypeError,
-    )
+def test_add_column_from_dataset(make_dataset) -> None:
     """add_column accepts another Dataset when role is None."""
     ds = _ds(make_dataset)
     extra = make_dataset(pd.DataFrame({"new": [1, 2, 3]}), {"new": FeatureRole()})
@@ -139,6 +134,14 @@ def test_map_transforms_values(make_dataset) -> None:
     ds = _ds(make_dataset)
     doubled = ds.map(lambda v: v * 2)
     assert len(doubled) == 3
+
+
+def test_map_forwards_kwargs_to_func_pandas() -> None:
+    """map passes extra kwargs to func (pandas backend)."""
+    df = pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]})
+    ds = Dataset(roles={"x": FeatureRole(), "y": FeatureRole()}, data=df)
+    result = ds.map(lambda v, k: v * k, k=10)
+    assert result.data["x"].tolist() == [10, 20, 30]
 
 
 # ── rename / replace / drop ───────────────────────────────────────────────

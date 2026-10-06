@@ -135,13 +135,7 @@ def test_isin(make_dataset) -> None:
     assert len(mask) == 3
 
 
-def test_dot_with_numpy(make_dataset, xfail_backend) -> None:
-    xfail_backend(
-        BackendsEnum.pandas,
-        BackendsEnum.spark,
-        reason="Issue: Dataset.dot with a 1-D numpy vector: pandas backend reads other.shape[1] (IndexError), Spark backend calls .assign on a Series",
-        raises=Exception,
-    )
+def test_dot_with_numpy(make_dataset) -> None:
     """dot multiplies a dataset by a numpy vector."""
     df = pd.DataFrame({"x": [1.0, 2.0], "y": [3.0, 4.0]})
     ds = make_dataset(df, {"x": FeatureRole(), "y": FeatureRole()})
@@ -156,12 +150,7 @@ def test_stats_on_empty_dataset() -> None:
     assert empty.count() is not None or empty.is_empty()
 
 
-def test_std_single_row_is_nan(make_dataset, xfail_backend) -> None:
-    xfail_backend(
-        BackendsEnum.spark,
-        reason="Issue: Spark std(ddof=1) of a single row returns None and _convert_agg_result does float(None) instead of NaN",
-        raises=TypeError,
-    )
+def test_std_single_row_is_nan(make_dataset) -> None:
     df = pd.DataFrame({"x": [5.0]})
     ds = make_dataset(df, {"x": FeatureRole()})
     result = ds.std(ddof=1)

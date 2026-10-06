@@ -6,6 +6,7 @@ except ImportError:
     from typing_extensions import Self  # pyright: ignore[reportMissingModuleSource]
 
 import copy
+import functools
 import warnings
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Sequence, Sized
@@ -1151,9 +1152,15 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             default: Value to return if key not found.
 
         Returns:
-            Column data or default value.
+            A frame (a single column as a one-column frame) for a present key;
+            ``default`` itself for a missing key.
         """
-        return self.data.get(key, default)
+        result = self.data.get(key, default)
+        if result is default:
+            return result
+        if isinstance(result, pd.Series):
+            return result.to_frame()
+        return result
 
     def take(
         self,
@@ -1199,7 +1206,11 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Mapped values.
         """
-        return self._wrap_result(self.data.map(func, **kwargs))
+        na_action = kwargs.pop("na_action", None)
+        f = functools.partial(func, **kwargs) if kwargs else func
+        return self._wrap_result(
+            self.data.apply(lambda col: col.map(f, na_action=na_action))
+        )
 
     def is_empty(self) -> bool:
         """Check if DataFrame is empty (no rows or columns).
@@ -1246,7 +1257,8 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         """Count unique combinations of group_cols"""
         if not group_cols:
             return 1
-        return int(self.data[group_cols].nunique())
+        by_arg = group_cols[0] if len(group_cols) == 1 else group_cols
+        return int(self.data.groupby(by_arg, observed=False).ngroups)
 
     def iter_groups(self, by: list[str]):
         by_arg = by[0] if len(by) == 1 else by
@@ -1583,9 +1595,10 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
                     index=self.columns if other.shape[0] == self.shape[1] else None,
                 )
             result = self.data.dot(other_df)
-            result.columns = (
-                self.columns if other.shape[1] == self.shape[1] else result.columns
-            )
+            if other.ndim != 1:
+                result.columns = (
+                    self.columns if other.shape[1] == self.shape[1] else result.columns
+                )
         elif isinstance(other, pd.DataFrame):
             result = self.data.dot(other)
         else:

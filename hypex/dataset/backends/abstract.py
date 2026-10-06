@@ -555,7 +555,11 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Return the value for ``key`` (column name) or ``default`` if not found."""
+        """Return a frame of this backend for ``key``, or ``default`` if not found.
+
+        For a present key a single column comes back as a one-column frame;
+        for a missing key ``default`` itself (the same object) is returned.
+        """
         raise AbstractMethodError
 
     @abstractmethod

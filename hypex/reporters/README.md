@@ -26,10 +26,10 @@ Two consumers use them:
 | File | Contents |
 |---|---|
 | `abstract.py` | `Reporter`, `DictReporter`, `OnDictReporter`, `DatasetReporter`, `TestDictReporter`, `ResultKey`. |
-| `aa.py` | `OneAADictReporter`, `AADatasetReporter`, `AAPassedReporter`, `AABestSplitReporter`, `AATestReporter`. |
-| `ab.py` | `ABDictReporter`, `ABDatasetReporter`, `ABTestReporter`. |
-| `homo.py` | `HomoDictReporter`, `HomoDatasetReporter`, `HomogeneityReporter`. |
-| `matching.py` | `MatchingDictReporter`, `MatchingDatasetReporter`, `MatchingQualityDictReporter`, `MatchingQualityDatasetReporter`, `MatchingReporter`. |
+| `aa.py` | `AATestReporter`, `AAPassedReporter`, `AABestSplitReporter`. |
+| `ab.py` | `ABTestReporter`. |
+| `homo.py` | `HomogeneityReporter`. |
+| `matching.py` | `MatchingReporter`, `MatchingAnalysisTableReporter`, `MatchingQualityReporter`. |
 | `cupac.py` | `CupacReporter` — **NEW**. |
 | `cuped.py` | `CupedReporter` — **NEW**. |
 | `__init__.py` | Exports the abstract trio plus all concrete reporters. |
@@ -77,38 +77,33 @@ Base for reporters that summarise statistical tests. Declare a class attribute
 
 ### A/A reporters (`aa.py`)
 
-* `OneAADictReporter` — the workhorse. Reports one iteration: the splitter id
+* `AATestReporter` — the workhorse. Reports one iteration: the splitter id
   (found via `get_splitter_id`, tolerating either splitter class), the
   `GroupDifference` values, all test outcomes, and the `OneAAStatAnalyzer` row.
-  Also exposes `convert_flat_dataset(dict)` as a static helper, reused by
-  `AAScoreAnalyzer`.
-* `AADatasetReporter` — the same, forced to `front=False`, returned as a table.
+  `output_format="dict" | "dataset"` (default `"dataset"`) selects the result
+  type.
 * `AAPassedReporter` — reformats the `aa score` table into a pass/fail view.
 * `AABestSplitReporter` — extracts the winning split.
-* `AATestReporter` — complete A/A test reporting with enhanced formatting.
 
 ### A/B reporters (`ab.py`)
 
-`ABDictReporter` / `ABDatasetReporter` / `ABTestReporter` — extend the A/A reporters with the A/B
-specifics (multitest results, per-group differences).
+`ABTestReporter` — the A/B counterpart of `AATestReporter` (multitest results, per-group
+differences); `output_format="dict" | "dataset"`.
 
 ### Homogeneity reporters (`homo.py`)
 
-`HomoDictReporter(OneAADictReporter)` and `HomoDatasetReporter(DatasetReporter)` —
-the A/A machinery applied to a single homogeneity check.
-
-`HomogeneityReporter` — complete homogeneity test reporting.
+`HomogeneityReporter` — complete homogeneity test reporting (use
+`HomogeneityReporter(DictReporter(), output_format="dataset")` for a `Dataset`).
 
 ### Matching reporters (`matching.py`)
 
-* `MatchingDictReporter(searching_class=MatchingAnalyzer)` — flattens the
+* `MatchingReporter(searching_class=MatchingAnalyzer, output_format="dict")` — flattens the
   analyzer's effect table, and additionally reconstructs the matched index pairs
   from the `FaissNearestNeighbors` columns in `additional_fields`, joining them
   with `MATCHING_INDEXES_SPLITTER_SYMBOL` (`╯`).
-* `MatchingDatasetReporter` — the `Dataset` wrapper.
-* `MatchingQualityDictReporter` / `MatchingQualityDatasetReporter` — the
-  post-matching balance tests (t / KS / chi²).
-* `MatchingReporter` — base matching reporter.
+* `MatchingAnalysisTableReporter` — returns the analyzer table directly as a
+  `Dataset` (used by `GroupExperiment` when `group_match=True`).
+* `MatchingQualityReporter` — the post-matching balance tests (t / KS / chi²).
 * **Enhanced**: Better support for complex matching scenarios and improved error handling.
 
 ### CUPAC reporters (`cupac.py`) — **NEW**
@@ -134,17 +129,16 @@ Used for reporting classic CUPED variance reduction results.
 ## How to work with it
 
 ```python
-from hypex.reporters import DatasetReporter
-from hypex.reporters.aa import OneAADictReporter
+from hypex.reporters import AATestReporter, DictReporter
 
-reporter = DatasetReporter(OneAADictReporter(front=False))
+reporter = AATestReporter(dict_reporter=DictReporter(front=False))
 table = reporter.report(experiment_data)
 ```
 
 Inside an experiment:
 
 ```python
-CycledExperiment(executors=[...], reporter=DatasetReporter(OneAADictReporter(front=False)),
+CycledExperiment(executors=[...], reporter=AATestReporter(dict_reporter=DictReporter(front=False)),
                  n_iterations=100)
 ```
 
@@ -163,7 +157,7 @@ CycledExperiment(executors=[...], reporter=DatasetReporter(OneAADictReporter(fro
   If you change `_generate_params_hash` or `key` in an executor, check the
   reporters that read it.
 * **`front` flips both key formatting and `pass` semantics.** Use `front=False`
-  for anything that will be parsed again (as `AADatasetReporter` does
+  for anything that will be parsed again (as `AATestReporter` does
   explicitly), `front=True` only for the last mile.
 * `TestDictReporter.extract_tests` filters to keys containing `"pass"` or
   `"p-value"`. A test that names its outputs differently will silently vanish.

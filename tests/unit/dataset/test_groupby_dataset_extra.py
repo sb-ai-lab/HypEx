@@ -205,41 +205,13 @@ def test_apply_unsupported_groupby_type_raises() -> None:
         grouped.apply(lambda x: x)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: list-of-groups branch uses dataset_class._backend.concat, but "
-    "Dataset has no _backend attribute",
-)
-def test_list_groupby_agg_concatenates_group_results() -> None:
-    parts = [("a", _df().iloc[:2][["v"]]), ("b", _df().iloc[2:][["v"]])]
+def test_list_groupby_is_not_a_supported_backend_groupby() -> None:
+    parts = [("a", _df()[["v"]])]
     grouped = GroupedDataset(parts, Dataset, {"v": FeatureRole()}, {})
-    result = grouped.agg("sum")
-    assert sorted(_pdf(result).iloc[:, 0].tolist()) == [4.0, 40.0]
-
-
-def test_list_groupby_empty_agg_returns_empty_dataset() -> None:
-    grouped = GroupedDataset([], Dataset, {}, {})
-    result = grouped.agg("sum")
-    assert len(result) == 0
-
-
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: list-of-groups branch uses dataset_class._backend.concat, but "
-    "Dataset has no _backend attribute",
-)
-def test_list_groupby_apply_concatenates_group_results() -> None:
-    parts = [("a", _df().iloc[:2][["v"]]), ("b", _df().iloc[2:][["v"]])]
-    grouped = GroupedDataset(parts, Dataset, {"v": FeatureRole()}, {})
-    result = grouped.apply(lambda col: col * 2)
-    assert sorted(_pdf(result)["v"].tolist()) == [2.0, 6.0, 20.0, 60.0]
-    assert all(isinstance(r, InfoRole) for r in result.roles.values())
-
-
-def test_list_groupby_empty_apply_returns_none() -> None:
-    assert GroupedDataset([], Dataset, {}, {}).apply(lambda x: x) is None
+    with pytest.raises(TypeError, match="Unsupported groupby"):
+        grouped.agg("sum")
+    with pytest.raises(NotImplementedError):
+        grouped.apply(lambda x: x)
 
 
 def test_get_agg_roles_copies_known_and_defaults_unknown() -> None:

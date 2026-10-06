@@ -65,6 +65,14 @@ def test_calc_without_test_function_raises() -> None:
         GroupStatTest().calc(_ds([1.0, 2.0]), _ds([1.0, 2.0]))
 
 
+def test_form_results_converts_masked_values_to_nan() -> None:
+    res = GroupStatTest._form_results(np.ma.masked, np.ma.masked, 0.05)
+    assert res.shape[0] == 1
+    assert np.isnan(float(res.get_values(column="p-value")[0]))
+    assert np.isnan(float(res.get_values(column="statistic")[0]))
+    assert not bool(res.get_values(column="pass")[0])
+
+
 def test_extract_arrays_is_backend_dependent() -> None:
     with pytest.raises(NotImplementedError):
         GroupStatTest()._extract_arrays(None, None)
@@ -149,20 +157,18 @@ def test_chi2_calc_degenerate_warns_and_returns_none() -> None:
     assert small.get_values(column="p-value")[0] is None
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="GroupChi2TestExtension.calc passes (statistic, p_value) to "
-    "_form_results(p_value, statistic, ...), so the two are swapped",
-)
 def test_chi2_calc_p_value_and_statistic_are_not_swapped() -> None:
     data = _ds(["a"] * 40 + ["b"] * 20, "c")
     other = _ds(["a"] * 20 + ["b"] * 40, "c")
     ext = PandasChi2TestExtension()
     table = ext.matrix_preparation(data, other).raw_data.values
     stat, p, *_ = chi2_contingency(table)
-    res = _res(ext.calc(data, other))
+    small = ext.calc(data, other)
+    res = _res(small)
     assert res["p-value"] == pytest.approx(p)
     assert res["statistic"] == pytest.approx(stat)
+    # `pass` is derived from the p-value (not from the statistic)
+    assert bool(small.get_values(column="pass")[0]) == (p < ext.reliability)
 
 
 def test_normcdf_two_sided_p_value() -> None:
@@ -223,11 +229,6 @@ def test_spark_kstest_nan_policy_propagate(spark_ds) -> None:
 
 
 @pytest.mark.spark
-@pytest.mark.xfail(
-    strict=True,
-    reason="SparkKSTestExtension default nan_policy='omit' does not drop NaN rows "
-    "(NaN poisons min/max/bucket), unlike the pandas ks_2samp(nan_policy='omit')",
-)
 def test_spark_kstest_nan_policy_omit_matches_clean_data(spark_ds) -> None:
     ext = backend_factory.resolve_backend(GroupKSTestExtension, spark_ds([1.0]))(0.05)
     b = [0.5, 1.5, 2.5, 3.5, 4.5]
@@ -237,10 +238,20 @@ def test_spark_kstest_nan_policy_omit_matches_clean_data(spark_ds) -> None:
 
 
 @pytest.mark.spark
-@pytest.mark.xfail(
-    strict=True,
-    reason="GroupChi2TestExtension.calc swaps p-value and statistic",
-)
+def test_spark_kstest_nan_policy_omit_matches_pandas(spark_ds) -> None:
+    a = [1.0, 2.0, 3.0, 4.0, 6.5, np.nan, np.nan]
+    b = [0.5, 1.5, 2.5, 3.5, 4.5, np.nan]
+    spark_ext = backend_factory.resolve_backend(GroupKSTestExtension, spark_ds([1.0]))(
+        0.05
+    )
+    got = _res(spark_ext.calc(spark_ds(a), spark_ds(b)))
+    ref = ks_2samp([v for v in a if not np.isnan(v)], [v for v in b if not np.isnan(v)])
+    expected = {"statistic": float(ref.statistic), "p-value": float(ref.pvalue)}
+    assert got["statistic"] == pytest.approx(expected["statistic"], abs=0.02)
+    assert got["p-value"] == pytest.approx(expected["p-value"], abs=0.05)
+
+
+@pytest.mark.spark
 def test_spark_chi2_matches_scipy_on_counts(spark_ds) -> None:
     data = spark_ds(["a"] * 40 + ["b"] * 20, "c")
     other = spark_ds(["a"] * 20 + ["b"] * 40, "c")

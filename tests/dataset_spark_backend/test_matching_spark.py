@@ -37,11 +37,6 @@ def _match_roles():
     }
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=DeprecationWarning,
-    reason="Issue: Matching() construction emits the DeprecationWarning of the deprecated MatchingDictReporter (hypex/ui/matching.py)",
-)
 @pytest.mark.parametrize("n_neighbors", [1, 2])
 def test_matching_spark_matches_pandas(spark_session, n_neighbors):
     df = _match_frame()

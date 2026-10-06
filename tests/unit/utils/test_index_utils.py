@@ -211,7 +211,8 @@ def test_cache_leaves_ivf_nprobe_untouched() -> None:
     # nprobe is no longer configured by CachingIndex (it is set by the faiss
     # extension on the index itself); the cache must return the loaded index as is.
     cache, storage = CachingIndex(), _CountingStorage(_ivf_index)
-    expected = faiss.downcast_index(_ivf_index()).nprobe
+    ivf = _ivf_index()
+    expected = faiss.downcast_index(ivf).nprobe
     index = cache.get("ivf", storage)
     assert faiss.downcast_index(index).nprobe == expected
 

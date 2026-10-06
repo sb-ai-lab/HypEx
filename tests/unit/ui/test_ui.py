@@ -284,11 +284,6 @@ def test_ab_output_values_match_manual_computation() -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: ABOutput.variance_reduction_report calls ABTestReporter.report_variance_reductions, which no longer exists",
-)
 def test_ab_output_variance_reduction_report_without_cuped() -> None:
     output = ABTest().execute(_dataset())
     assert "No variance reduction data" in output.variance_reduction_report
@@ -300,16 +295,18 @@ def test_ab_output_with_cuped_adds_cuped_feature() -> None:
     assert "y" in features and "y_cuped" in features
 
 
+def test_ab_output_variance_reduction_report_with_cuped() -> None:
+    output = ABTest(cuped_features={"y": "y_pre"}).execute(_dataset())
+    report = _frame(output.variance_reduction_report)
+    assert list(report.columns) == ["feature", "variance_reduction_pct"]
+    assert len(report) >= 1
+
+
 def test_cupac_output_repr_describes_content() -> None:
     cupac = CupacOutput()
     assert repr(cupac) == "CupacOutput(no CUPAC data available)"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=DeprecationWarning,
-    reason="Issue: HomogeneityTest builds HomoOutput with the deprecated HomoDatasetReporter, so construction emits a DeprecationWarning",
-)
 def test_homo_output_resume() -> None:
     output = HomogeneityTest().execute(_dataset())
     assert isinstance(output, HomoOutput)
@@ -340,8 +337,8 @@ def test_aa_output_reproducible_with_fixed_states() -> None:
 
 @pytest.mark.xfail(
     strict=True,
-    raises=DeprecationWarning,
-    reason="Issue: Matching builds MatchingOutput with the deprecated MatchingDictReporter, so construction emits a DeprecationWarning",
+    raises=AssertionError,
+    reason="Issue: Matching().execute runs on Spark, but output.indexes is empty (0 rows, expected 300) with default and with compute_indexes=True",
 )
 @pytest.mark.spark
 def test_matching_output_structure_on_spark(spark_session) -> None:
@@ -354,13 +351,6 @@ def test_matching_output_structure_on_spark(spark_session) -> None:
     assert len(output.indexes) == 300
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(DeprecationWarning, AttributeError),
-    reason="Issue: Matching builds MatchingOutput with the deprecated MatchingDictReporter "
-    "(DeprecationWarning) and, past that, MatchingOutput._extract_full_data calls the missing "
-    "self._match_pandas, so Matching cannot run on the pandas backend",
-)
 def test_matching_output_on_pandas() -> None:
     Matching().execute(_dataset())
 

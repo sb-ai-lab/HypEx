@@ -1,11 +1,9 @@
 from .aa import (
     AABestSplitReporter,
-    AADatasetReporter,
     AAPassedReporter,
     AATestReporter,
-    OneAADictReporter,
 )
-from .ab import ABDatasetReporter, ABDictReporter, ABTestReporter
+from .ab import ABTestReporter
 from .abstract import (
     REPORTABLE_METRICS,
     DatasetReporter,
@@ -16,12 +14,9 @@ from .abstract import (
 )
 from .cupac import CupacReporter
 from .cuped import CupedReporter
-from .homo import HomoDatasetReporter, HomoDictReporter, HomogeneityReporter
+from .homo import HomogeneityReporter
 from .matching import (
-    MatchingDatasetReporter,
-    MatchingDictReporter,
-    MatchingQualityDatasetReporter,
-    MatchingQualityDictReporter,
+    MatchingAnalysisTableReporter,
     MatchingQualityReporter,
     MatchingReporter,
 )
@@ -29,27 +24,17 @@ from .matching import (
 __all__ = [
     "REPORTABLE_METRICS",
     "AABestSplitReporter",
-    "AADatasetReporter",
     "AAPassedReporter",
     "AATestReporter",
-    "ABDatasetReporter",
-    "ABDictReporter",
     "ABTestReporter",
     "CupacReporter",
     "CupedReporter",
     "DatasetReporter",
     "DictReporter",
-    "HomoDatasetReporter",
-    "HomoDictReporter",
     "HomogeneityReporter",
-    "MatchingDatasetReporter",
-    "MatchingDictReporter",
-    "MatchingQualityDatasetReporter",
-    "MatchingQualityDictReporter",
+    "MatchingAnalysisTableReporter",
     "MatchingQualityReporter",
     "MatchingReporter",
-    # Backwards compat
-    "OneAADictReporter",
     "Reporter",
     "ResultKey",
     "TestDictReporter",

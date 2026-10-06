@@ -40,7 +40,7 @@ def test_base_extension_calc_not_implemented() -> None:
         pass
 
     with pytest.raises(NotImplementedError):
-        _Ext().calc(None)
+        _Ext().calc(_ds(pd.DataFrame({"x": [1]}), BackendsEnum.pandas))
 
 
 def test_compare_extension_calc_not_implemented() -> None:
@@ -49,6 +49,36 @@ def test_compare_extension_calc_not_implemented() -> None:
 
     with pytest.raises(NotImplementedError):
         _Ext().calc(None)
+
+
+def test_extension_calc_dispatches_to_pandas_with_args() -> None:
+    class _Ext(Extension):
+        def _calc_pandas(self, data, *args, **kwargs):
+            return data, args, kwargs
+
+    ds = _ds(pd.DataFrame({"x": [1]}), BackendsEnum.pandas)
+    assert _Ext().calc(ds, ["g"], stats=1) == (ds, (["g"],), {"stats": 1})
+
+
+@pytest.mark.spark
+def test_extension_without_spark_impl_raises_on_spark(spark_session) -> None:
+    class _Ext(Extension):
+        def _calc_pandas(self, data, *args, **kwargs):
+            return None
+
+    ds = _ds(pd.DataFrame({"x": [1]}), BackendsEnum.spark, spark_session)
+    with pytest.raises(NotImplementedError, match="spark"):
+        _Ext().calc(ds)
+
+
+def test_extension_calc_unknown_backend_raises_value_error(monkeypatch) -> None:
+    class _Ext(Extension):
+        pass
+
+    ds = _ds(pd.DataFrame({"x": [1]}), BackendsEnum.pandas)
+    monkeypatch.setattr(type(ds), "backend_type", property(lambda self: "other"))
+    with pytest.raises(ValueError, match="no implementation"):
+        _Ext().calc(ds)
 
 
 def test_ml_extension_requires_fit_and_predict() -> None:
@@ -106,7 +136,7 @@ def test_group_chi2_matrix_preparation_is_abstract() -> None:
 
 def test_dummy_encoder_master_has_no_calc() -> None:
     with pytest.raises(NotImplementedError):
-        DummyEncoderExtension().calc(None)
+        DummyEncoderExtension().calc(_ds(pd.DataFrame({"x": [1]}), BackendsEnum.pandas))
 
 
 def test_abstract_method_error_is_not_implemented_error() -> None:

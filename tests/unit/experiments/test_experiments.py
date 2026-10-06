@@ -290,11 +290,6 @@ def test_cycled_zero_iterations_raises(data) -> None:
 # ---------------------------------------------------------------------------
 # GroupExperiment
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True,
-    raises=FutureWarning,
-    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
-)
 def test_group_experiment_runs_once_per_group(data) -> None:
     log: list = []
     reporter = _DatasetReporter()
@@ -307,11 +302,6 @@ def test_group_experiment_runs_once_per_group(data) -> None:
     assert table["b rows"].iloc[0] == 3
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FutureWarning,
-    reason="Issue: PandasDataset.count_groups does int(df[cols].nunique()) on a Series, emitting a FutureWarning (TypeError for several group cols)",
-)
 def test_group_experiment_prefixes_columns_with_group_key(data) -> None:
     out = GroupExperiment(
         [], _DatasetReporter(), searching_role=GroupingRole()
@@ -320,12 +310,6 @@ def test_group_experiment_prefixes_columns_with_group_key(data) -> None:
     assert {"a rows", "a alpha", "b rows", "b alpha"} <= set(cols)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=Exception,
-    reason="Issue: SmallDataset.rename builds roles for the new names but keeps the old "
-    "data, raising RoleColumnError, so GroupExperiment cannot use dict reporters",
-)
 def test_group_experiment_with_dict_reporter(data) -> None:
     GroupExperiment([], _CountReporter(), searching_role=GroupingRole()).execute(data)
 
