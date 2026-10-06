@@ -40,7 +40,7 @@ def _skewed(n: int = 400, seed: int = 0) -> np.ndarray:
 
 def _experiment_data(table: Dataset, targets=("y",)) -> ExperimentData:
     ds = Dataset(
-        roles={t: TargetRole() for t in targets} | {"x": FeatureRole()},
+        roles={**{t: TargetRole() for t in targets}, "x": FeatureRole()},
         data=pd.DataFrame({**{t: [1.0, 2.0] for t in targets}, "x": [1.0, 2.0]}),
         backend=BackendsEnum.pandas,
     )

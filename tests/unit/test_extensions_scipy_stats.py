@@ -245,7 +245,8 @@ def test_spark_kstest_nan_policy_omit_matches_pandas(spark_ds) -> None:
         0.05
     )
     got = _res(spark_ext.calc(spark_ds(a), spark_ds(b)))
-    expected = _res(PandasKSTestExtension(0.05).calc(_ds(a), _ds(b)))
+    ref = ks_2samp([v for v in a if not np.isnan(v)], [v for v in b if not np.isnan(v)])
+    expected = {"statistic": float(ref.statistic), "p-value": float(ref.pvalue)}
     assert got["statistic"] == pytest.approx(expected["statistic"], abs=0.02)
     assert got["p-value"] == pytest.approx(expected["p-value"], abs=0.05)
 
