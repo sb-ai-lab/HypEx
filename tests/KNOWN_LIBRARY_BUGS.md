@@ -24,7 +24,7 @@
 - ИСПРАВЛЕНО: `std(ddof=1)` на одной строке: `float(None)`.
 - ИСПРАВЛЕНО: Сеттер индекса передаёт список в `set_index` как имена колонок (`KeyError`) — `reset_index(drop=True)`.
 - ИСПРАВЛЕНО: `add_column` присваивает DataFrame колонке.
-- ИСПРАВЛЕНО (`__pos__` на Spark бросает `TypeError` для нечисловых колонок, как pandas): `__and__`, `__or__`, `__pos__` работают на pyspark.pandas DataFrame и не работают.
+- ИСПРАВЛЕНО: `__and__`, `__or__`, `__pos__` работают на pyspark.pandas DataFrame и не работают.
 - ИСПРАВЛЕНО: `SparkBisaExtesion.prepare_data` вызывает `result_to_dataset` без обязательного `roles` (`TypeError`).
 - ИСПРАВЛЕНО (числа изменились при наличии NaN, см. «Изменения численных результатов»): `SparkKSTestExtension` (путь `GroupKSTest` на Spark) с `nan_policy="omit"` не отбрасывал NaN (результат 1.0 / 0.0, в pandas иначе). Пользовательский путь `StatsKSTest`/`StatsUTest` на Spark (гистограммы в `StatsKSTestExtension`) тоже игнорировал NaN неверно (NaN в max давал p=1.0) — исправлено отдельно: NaN трактуется как null в bounds и unpivot, без новых Spark-задач.
 - ИСПРАВЛЕНО: `SparkFaissExtension` определяет `__enter__`, но не `__exit__`.

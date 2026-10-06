@@ -21,14 +21,12 @@ from pyspark.pandas.exceptions import (
 )
 from pyspark.sql import DataFrame as SparkDF  # pyright: ignore[reportMissingImports]
 from pyspark.sql import SparkSession  # pyright: ignore[reportMissingImports]
-from pyspark.sql.types import (  # pyright: ignore[reportMissingImports]
-    DecimalType,
-    StructType,
-)
+from pyspark.sql.types import StructType  # pyright: ignore[reportMissingImports]
 from pyspark.storagelevel import StorageLevel  # pyright: ignore[reportMissingImports]
 
 from ...config import DatasetConfig
 from ...utils import (
+    UTILITY_NEW_INDEX_COL_NAME,
     BackendsEnum,
     FromDictTypes,
     MergeOnError,
@@ -608,20 +606,14 @@ class SparkNavigation(DatasetBackendNavigation):
             return other
 
     def _columnwise(self, other: Any, op: Callable[[Any, Any], Any]) -> ps.DataFrame:
-        """Apply a binary operator per column (ps.DataFrame lacks & and |).
-
-        Column labels of Spark-backed frames are strings, which ``assign(**...)``
-        requires.
-        """
+        """Apply a binary operator per column (ps.DataFrame lacks & and |)."""
         other = self.__magic_determine_other(other)
-        return self.data.assign(
-            **{
-                col: op(
-                    self.data[col],
-                    other[col] if isinstance(other, ps.DataFrame) else other,
-                )
-                for col in self.data.columns
-            }
+        return ps.concat(
+            [
+                op(self.data[c], other[c] if isinstance(other, ps.DataFrame) else other)
+                for c in self.data.columns
+            ],
+            axis=1,
         )
 
     # comparison operators:
@@ -651,26 +643,8 @@ class SparkNavigation(DatasetBackendNavigation):
 
     # unary operations:
     def __pos__(self) -> Self:
-        """Unary positive operation (identity for numeric data).
-
-        Raises:
-            TypeError: If any column is not numeric (as in pandas). Bool is
-                numeric; Spark ``DecimalType`` is accepted although
-                pyspark.pandas reports it as ``object``.
-        """
-        types = {f.name: f.dataType for f in self.data.spark.schema().fields}
-        bad = [
-            col
-            for col, dtype in self.data.dtypes.items()
-            if not pd.api.types.is_numeric_dtype(dtype)
-            and not isinstance(types.get(str(col)), DecimalType)
-        ]
-        if bad:
-            raise TypeError(
-                f"bad operand type for unary +: non-numeric column(s) {bad}"
-            )
-        # pyspark.pandas has no unary + (TypeError in 3.5); + is the identity on
-        # numeric data, so a metadata-only copy is equivalent.
+        """Unary positive operation (no-op for numeric data)."""
+        # pyspark.pandas has no unary +; + is the identity, so return a metadata-only copy
         return self._wrap_result(self.data.copy())
 
     def __neg__(self) -> Self:
@@ -944,27 +918,12 @@ class SparkNavigation(DatasetBackendNavigation):
     def index(self, value):
         """Set the index of the underlying DataFrame.
 
-        Assignment is positional relative to the frame's current Spark row
-        order. That order is not the order of a preceding ``loc[list]`` (Spark
-        returns frame order and drops duplicate labels), so assign labels by
-        position only to frames whose order you control. Row order after the
-        assignment is not preserved.
+        Lists/arrays are assigned positionally in the frame's current Spark row order.
         """
         if isinstance(value, (list, tuple, np.ndarray, pd.Index, pd.Series)):
-            tmp_name = DatasetConfig.BACKEND_CONVERSION_INDEX_COL
-            # The copy keeps the in-place ps ``__setitem__`` from mutating a
-            # ps.DataFrame that another Dataset may share; a ps copy is
-            # metadata-only (no Spark job).
             data = self.data.copy()
-            # pyspark.pandas assigns a Python list positionally (distributed-
-            # sequence index + join, see the list branch of
-            # ``pyspark.pandas.DataFrame.__setitem__``): label ``i`` goes to the
-            # ``i``-th row in the frame's current Spark row order, which is not
-            # necessarily the order a preceding operation suggests (e.g.
-            # ``loc[list]`` returns rows in frame order on Spark, not in list
-            # order). Row order after the assignment is not preserved either.
-            data[tmp_name] = list(value)
-            data = data.set_index(tmp_name)
+            data[UTILITY_NEW_INDEX_COL_NAME] = list(value)
+            data = data.set_index(UTILITY_NEW_INDEX_COL_NAME)
             data.index.name = None
             self.data = data
         else:

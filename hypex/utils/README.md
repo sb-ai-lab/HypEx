@@ -101,6 +101,7 @@ HypExError
 | `NAME_BORDER_SYMBOL` | `"┆"` | Joins name parts inside one id segment (e.g. `"group┆column"`) |
 | `UTILITY_COL_SYMBOL` | `"⏣"` | Prefix for internal utility columns in Spark |
 | `UTILITY_INDEX_COL_NAME` | `"⏣index"` | Row-index emulation column |
+| `UTILITY_NEW_INDEX_COL_NAME` | `"⏣new_index"` | Temporary column used by the Spark `index` setter |
 | `UTILITY_PHYSICAL_INDEX_COL_NAME` | `"⏣_physical_index"` | Physical index column |
 
 ### Adapters (`adapter.py`)

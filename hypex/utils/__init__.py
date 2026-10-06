@@ -6,6 +6,7 @@ from .constants import (
     NUMBER_TYPES_LIST,
     UTILITY_COL_SYMBOL,
     UTILITY_INDEX_COL_NAME,
+    UTILITY_NEW_INDEX_COL_NAME,
     UTILITY_PHYSICAL_INDEX_COL_NAME,
 )
 from .enums import (
@@ -68,6 +69,7 @@ __all__ = [
     "NUMBER_TYPES_LIST",
     "UTILITY_COL_SYMBOL",
     "UTILITY_INDEX_COL_NAME",
+    "UTILITY_NEW_INDEX_COL_NAME",
     "UTILITY_PHYSICAL_INDEX_COL_NAME",
     "ABNTestMethodsEnum",
     "ABTestTypesEnum",
