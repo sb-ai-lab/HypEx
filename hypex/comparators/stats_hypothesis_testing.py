@@ -11,7 +11,7 @@ from scipy.stats import t as t_dist  # type: ignore
 from ..dataset import ABCRole, Dataset, DatasetAdapter, ExperimentData, SmallDataset
 from ..dataset.backends import SparkDataset
 from ..dataset.roles import StatisticRole, TargetRole
-from ..utils import BackendsEnum, NoColumnsError, timeit
+from ..utils import NoColumnsError, timeit
 from ..utils.constants import CATEGORICAL_TYPES_LIST, NUMBER_TYPES_LIST
 from ..utils.errors import NotSuitableFieldError
 from ..utils.logger import logger
@@ -465,20 +465,6 @@ class StatsZTest(StatsHypothesisTesting):
         }
 
 
-def _require_spark(owner: Any, data: ExperimentData, master: str) -> None:
-    """Fail fast when a Spark-only executor receives a non-Spark dataset.
-
-    Raises:
-        TypeError: If the dataset backend is not Spark.
-    """
-    if data.ds.backend_type != BackendsEnum.spark:
-        raise TypeError(
-            f"{type(owner).__name__} supports only the Spark backend "
-            f"(got {data.ds.backend_type}); use {master} - backend_factory "
-            "resolves it to the pandas implementation."
-        )
-
-
 @backend_factory.register(KSTest, SparkDataset)
 class StatsKSTest(StatsHypothesisTesting):
     """Kolmogorov-Smirnov test on aggregated histograms.
@@ -487,7 +473,8 @@ class StatsKSTest(StatsHypothesisTesting):
     result storage (with the correct ``self.key``) so reporters can
     parse them.
 
-    Spark only: on pandas use ``KSTest`` (resolves to ``GroupKSTest``).
+    Histogram-based approximation (see Note). On pandas use KSTest:
+    ``StatsKSTestExtension`` has no pandas implementation.
 
     Note:
         On Spark the statistic and p-value are approximations computed from
@@ -553,8 +540,8 @@ class StatsKSTest(StatsHypothesisTesting):
     def execute(self, data) -> ExperimentData:
         """Main entry point. Runs the Spark-optimized path.
 
-        Delegates to ``_execute_spark``. Spark only: on pandas use ``KSTest``
-        (``backend_factory`` resolves it to ``GroupKSTest``).
+        Histogram-based approximation (see Note). On pandas use KSTest:
+        ``StatsKSTestExtension`` has no pandas implementation.
 
         Args:
             data: The ``ExperimentData`` container.
@@ -564,11 +551,9 @@ class StatsKSTest(StatsHypothesisTesting):
             ``analysis_tables``.
 
         Raises:
-            TypeError: If the dataset backend is not Spark.
             NoColumnsError: If no target columns are found.
             NotSuitableFieldError: If the grouping field is not suitable.
         """
-        _require_spark(self, data, "KSTest")
         fields = self._get_fields_data(data)
         group_field_data = fields["group_field"]
         target_fields_data = fields["target_fields"]
@@ -587,14 +572,14 @@ class StatsKSTest(StatsHypothesisTesting):
             else list(target_fields_data.columns)
         )
 
-        return self._execute_spark(
+        return self._execute_histograms(
             data,
             group_col=group_field_data.columns[0],
             target_cols=list(target_fields_data.columns),
         )
 
     @timeit(level="SPARK", prefix="KS_SPARK")
-    def _execute_spark(self, data, group_col: str, target_cols: list[str]):
+    def _execute_histograms(self, data, group_col: str, target_cols: list[str]):
         """Executes the Kolmogorov-Smirnov test using the Spark-optimized path.
 
         Delegates histogram aggregation to ``StatsKSTestExtension``, which
@@ -752,7 +737,8 @@ class StatsUTest(StatsHypothesisTesting):
     analytically from the histogram buckets — without transferring raw
     data to the driver.
 
-    Spark only: on pandas use ``UTest`` (resolves to ``GroupUTest``).
+    Histogram-based approximation (see Note). On pandas use UTest:
+    ``StatsKSTestExtension`` has no pandas implementation.
 
     Note:
         On Spark the result is a binned approximation (``n_bins`` equal-width
@@ -846,8 +832,8 @@ class StatsUTest(StatsHypothesisTesting):
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Main entry point. Runs the Spark-optimized path.
 
-        Delegates to ``_execute_spark``. Spark only: on pandas use ``UTest``
-        (``backend_factory`` resolves it to ``GroupUTest``).
+        Histogram-based approximation (see Note). On pandas use UTest:
+        ``StatsKSTestExtension`` has no pandas implementation.
 
         Args:
             data: The ``ExperimentData`` container.
@@ -857,11 +843,9 @@ class StatsUTest(StatsHypothesisTesting):
             ``analysis_tables``.
 
         Raises:
-            TypeError: If the dataset backend is not Spark.
             NoColumnsError: If no target columns are found.
             NotSuitableFieldError: If the grouping field is not suitable.
         """
-        _require_spark(self, data, "UTest")
         fields = self._get_fields_data(data)
         group_field_data = fields["group_field"]
         target_fields_data = fields["target_fields"]
@@ -880,14 +864,14 @@ class StatsUTest(StatsHypothesisTesting):
             else list(target_fields_data.columns)
         )
 
-        return self._execute_spark(
+        return self._execute_histograms(
             data,
             group_col=group_field_data.columns[0],
             target_cols=list(target_fields_data.columns),
         )
 
     @timeit(level="SPARK", prefix="U_SPARK")
-    def _execute_spark(
+    def _execute_histograms(
         self, data: ExperimentData, group_col: str, target_cols: list[str]
     ) -> ExperimentData:
         """Execute the Mann-Whitney U test using the Spark-optimized path.

@@ -211,14 +211,11 @@ def _table(out: ExperimentData, key: str) -> pd.DataFrame:
     return to_pandas(out.analysis_tables[key])
 
 
-@pytest.mark.parametrize(
-    ("cls", "master"), [(StatsKSTest, "KSTest"), (StatsUTest, "UTest")], ids=["ks", "u"]
-)
-def test_pandas_execute_raises_type_error(cls, master) -> None:
+@pytest.mark.parametrize("cls", [StatsKSTest, StatsUTest], ids=["ks", "u"])
+def test_pandas_execute_raises_not_implemented(cls) -> None:
     ex = cls(grouping_role=TreatmentRole())
-    with pytest.raises(TypeError, match="Spark") as exc:
+    with pytest.raises(NotImplementedError, match="Spark-only"):
         ex.execute(_data(_frame(), "y", BackendsEnum.pandas, None))
-    assert master in str(exc.value)
 
 
 @pytest.mark.parametrize("cls", [StatsKSTest, StatsUTest], ids=["ks", "u"])
