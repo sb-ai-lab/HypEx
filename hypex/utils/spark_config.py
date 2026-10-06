@@ -82,7 +82,7 @@ class SparkSessionCalculator:
     # Redundancy and safety margins
     EXECUTOR_REDUNDANCY_FACTOR = 2
     MIN_EXECUTOR_MEMORY_GB = 4
-    MIN_EXECUTOR_OVERHEAD_MB = 2048  # 2 ГБ минимум для native-кода
+    MIN_EXECUTOR_OVERHEAD_MB = 2048  # Minimum 2GB overhead for native code execution
     MIN_DRIVER_MEMORY_GB = 8
     MIN_DRIVER_MAX_RESULT_SIZE_GB = 8
 
