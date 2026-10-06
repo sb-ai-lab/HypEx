@@ -207,16 +207,8 @@ class DatasetAdapter(Adapter):
         roles: ABCRole | dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
-        """Convert ``data`` to a dataset according to its type.
-
-        ``small`` selects ``SmallDataset`` vs ``Dataset`` for dict, frame and
-        existing-dataset inputs. List, ndarray and scalar inputs are always
-        materialised on the driver as a pandas-backed ``Dataset``; ``small`` is
-        accepted for signature uniformity but ignored, because returning
-        ``SmallDataset`` for them (the default ``small=True``) would change the
-        result type of every existing caller and how ``ExperimentData.set_value``
-        stores it (it dispatches on ``isinstance(value, Dataset)``).
-        """
+        """`small` selects SmallDataset vs Dataset for dict/frame/dataset inputs;
+        list, ndarray and scalar inputs always give a pandas-backed Dataset."""
         # Convert data based on its type
         if isinstance(data, dict):
             return DatasetAdapter.dict_to_dataset(data, roles, small)
@@ -253,10 +245,7 @@ class DatasetAdapter(Adapter):
         roles: ABCRole | dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
-        """Wrap a scalar into a 1x1 pandas-backed ``Dataset``.
-
-        ``small`` is ignored, see ``to_dataset``.
-        """
+        """Wrap a scalar into a 1x1 pandas-backed ``Dataset``."""
         if isinstance(roles, ABCRole):
             roles = {"value": roles}
         return Dataset(
@@ -288,10 +277,7 @@ class DatasetAdapter(Adapter):
         roles: dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
-        """Wrap a list into a one-column pandas-backed ``Dataset``.
-
-        ``small`` is ignored, see ``to_dataset``.
-        """
+        """Wrap a list into a one-column pandas-backed ``Dataset``."""
         result = Dataset(
             roles=roles if len(roles) > 0 else {0: DefaultRole()},
             data=pd.DataFrame(
@@ -324,10 +310,7 @@ class DatasetAdapter(Adapter):
         roles: dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
-        """Wrap a 2-D array into a pandas-backed ``Dataset``.
-
-        ``small`` is ignored, see ``to_dataset``.
-        """
+        """Wrap a 2-D array into a pandas-backed ``Dataset``."""
         columns = range(data.shape[1]) if len(roles) == 0 else list(roles.keys())
         data = pd.DataFrame(data=data, columns=columns)
         result = Dataset(
