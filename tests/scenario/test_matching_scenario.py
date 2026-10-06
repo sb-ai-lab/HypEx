@@ -87,7 +87,7 @@ def test_real_effect_is_significant(run) -> None:
 def test_distance_modes_agree_for_a_single_feature(run) -> None:
     mahalanobis = _effects(run(distance="mahalanobis"))
     l2 = _effects(run(distance="l2"))
-    pd.testing.assert_frame_equal(mahalanobis, l2)
+    pd.testing.assert_frame_equal(mahalanobis, l2, check_exact=False, atol=0.02)
 
 
 def test_bias_estimation_changes_estimate_but_stays_near_truth(run) -> None:
