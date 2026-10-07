@@ -91,6 +91,13 @@ jobs:
   # The test matrix. Narrowed from 17 jobs to 10: every supported interpreter
   # on Linux, plus the oldest and newest on macOS and Windows, which is where
   # platform bugs actually show up.
+  #
+  # Spark is ~96% of the suite's wall time: locally the whole suite takes
+  # ~10 min, everything but Spark ~25 s. Windows starts Spark's Python workers
+  # by spawn rather than fork, so the full Spark suite there ran past the
+  # 45-minute limit. `spark: full` legs (Linux) run every test; `spark: smoke`
+  # legs (macOS, Windows) run everything without Spark plus a short Spark
+  # smoke set that still catches platform-specific worker crashes.
   # ---------------------------------------------------------------------------
   tests:
     name: Tests ${{ matrix.python-version }} / ${{ matrix.os }}
@@ -102,22 +109,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, python-version: "3.8" }
-          - { os: ubuntu-latest, python-version: "3.9" }
-          - { os: ubuntu-latest, python-version: "3.10" }
-          - { os: ubuntu-latest, python-version: "3.11" }
-          - { os: ubuntu-latest, python-version: "3.12" }
+          - { os: ubuntu-latest, python-version: "3.8", spark: full }
+          - { os: ubuntu-latest, python-version: "3.9", spark: full }
+          - { os: ubuntu-latest, python-version: "3.10", spark: full }
+          - { os: ubuntu-latest, python-version: "3.11", spark: full }
+          - { os: ubuntu-latest, python-version: "3.12", spark: full }
           # macos-latest is arm64 and setup-python has no arm64 build of 3.8,
           # so the oldest interpreter has to run on the x86_64 runner.
-          - { os: macos-15-intel, python-version: "3.8" }
-          - { os: macos-latest, python-version: "3.12" }
-          - { os: windows-latest, python-version: "3.8" }
+          - { os: macos-15-intel, python-version: "3.8", spark: smoke }
+          - { os: macos-latest, python-version: "3.12", spark: smoke }
+          - { os: windows-latest, python-version: "3.8", spark: smoke }
           # Every Spark-backed test that ships a Python function to an executor
           # crashes the Python worker on this leg ("Python worker exited
           # unexpectedly"); the same tests pass on Linux and macOS 3.12 and on
           # Windows 3.8. pyspark 3.5 does not officially support 3.12. Not
           # reproducible locally. Make it blocking again once pyspark 4 is in.
-          - { os: windows-latest, python-version: "3.12", experimental: true }
+          - { os: windows-latest, python-version: "3.12", spark: smoke, experimental: true }
 
     steps:
       - uses: actions/checkout@v4
@@ -148,8 +155,25 @@ jobs:
       # that nothing subsequently used.
       - run: python -m pip install tox tox-gh-actions
 
+      # Arguments after `--` reach pytest through {posargs} in tox.ini.
+      # --durations keeps the next slowdown visible in the log.
       - name: Run the test suite
-        run: tox
+        if: matrix.spark == 'full'
+        run: tox -- --durations=25
+
+      - name: Run the test suite without Spark
+        if: matrix.spark == 'smoke'
+        run: tox -- -m "not spark" --durations=25
+
+      # Runs even when the previous step failed, so one run shows both. These
+      # files use tests/dataset_spark_backend/conftest.py, which points
+      # PYSPARK_PYTHON at the tox interpreter -- needed on Windows.
+      - name: Run the Spark smoke tests
+        if: matrix.spark == 'smoke' && (success() || failure())
+        run: >-
+          tox -- --durations=25
+          tests/dataset_spark_backend/test_raw_data.py
+          tests/dataset_spark_backend/test_group_order.py
 
   # ---------------------------------------------------------------------------
   # One fully reproducible run off poetry.lock, carrying coverage. The matrix

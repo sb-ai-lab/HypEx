@@ -294,7 +294,7 @@ class Calculator(Executor, ABC):
 
     @staticmethod
     @abstractmethod
-    def _inner_function(data: Dataset, **kwargs) -> Any:
+    def _inner_function(data: Dataset, *args, **kwargs) -> Any:
         raise AbstractMethodError
 
     @property

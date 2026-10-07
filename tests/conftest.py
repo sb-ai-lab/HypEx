@@ -35,10 +35,7 @@ def spark_session():
         ``@pytest.mark.spark`` so they can be deselected in
         fast developer runs (``-m "not spark"``).
     """
-    try:
-        from pyspark.sql import SparkSession
-    except ImportError:
-        pytest.skip("PySpark is not installed")
+    SparkSession = pytest.importorskip("pyspark.sql").SparkSession
 
     session = (
         SparkSession.builder.master("local[*]")
