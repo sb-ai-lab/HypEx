@@ -25,7 +25,7 @@ from pyspark.sql.types import ArrayType, FloatType, LongType, StructField, Struc
 from sklearn.cluster import Birch, MiniBatchKMeans
 
 from ..config import MatchingConfig
-from ..dataset import AdditionalMatchingRole, Dataset
+from ..dataset import AdditionalMatchingRole, Dataset, DefaultRole
 from ..dataset.backends import PandasDataset, SparkDataset
 from ..utils.errors import AbstractMethodError
 from ..utils.index_utils import CachingIndex, FaissIndexStorage
@@ -274,17 +274,21 @@ class PandasFaissExtension(FaissExtension):
         if self.n_neighbors == 1:
             equal_dist = list(map(lambda x: np.where(x == x[0])[0], dist))
             indexes = [
-                (
-                    int(index[dist][0])
-                    if abs(index[dist][0]) <= len(data) + len(test_data)
-                    else -1
-                )
-                for index, dist in zip(indexes, equal_dist)
+                [
+                    (
+                        int(index[dist][0])
+                        if abs(index[dist][0]) <= len(data) + len(test_data)
+                        else -1
+                    )
+                    for index, dist in zip(indexes, equal_dist)
+                ]
             ]
         else:
             indexes = self._prepare_indexes(indexes, dist, self.n_neighbors)
-        result = self.result_to_dataset(result=indexes, roles={}).set_index(
-            test_data.index, drop=False
+            indexes = [list(map(int, row)) for row in indexes]
+        result = (
+            self.result_to_dataset(result=pd.DataFrame({"0": indexes}), roles={}, small=False)
+                .set_index(test_data.index, drop=False)
         )
         result.index.name = None
 
