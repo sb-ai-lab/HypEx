@@ -128,7 +128,7 @@ AATest(stratification=True, control_size=0.5, n_iterations=100).execute(data)
 2. Implement `_generate_params_hash` / `init_from_hash` for any new parameter
    that should survive an id round trip.
 3. Register the class in `AAScoreAnalyzer.AA_SPLITER_CLASS_MAPPING`
-   (`hypex/analyzers/aa.py`) and in `OneAADictReporter.get_splitter_id`
+   (`hypex/analyzers/aa.py`) and in `AATestReporter.get_splitter_id`
    (`hypex/reporters/aa.py`), or the best-split machinery will not recognise it.
 4. Export it from `__init__.py`.
 

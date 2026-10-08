@@ -79,6 +79,7 @@ class MatchingMetrics(GroupOperator):
             key=key,
         )
 
+    @staticmethod
     def _write_log(file: str, result: str, time: str, mode: str = "a"):
         with open(file, mode) as f:
             f.write(result + ": " + time + "\n")

@@ -11,8 +11,8 @@ from ..dataset import (
     StatisticRole,
     TreatmentRole,
 )
-from ..reporters.ab import ABTestReporter, DictReporter
-from ..reporters.abstract import _get_index_values
+from ..reporters.ab import ABTestReporter
+from ..reporters.abstract import DictReporter, _get_index_values
 from ..reporters.cuped import CupedReporter
 from ..utils import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL, ExperimentDataEnum
 from .base import Output
@@ -199,6 +199,7 @@ class ABOutput(Output):
             try:
                 idx_str = str(int(float(idx_str)))
             except (ValueError, TypeError):
+                # non-numeric index: keep the string as is
                 pass
             new_index.append(idx_str)
         table.index = new_index
@@ -213,15 +214,20 @@ class ABOutput(Output):
     def variance_reduction_report(self) -> Dataset | str:
         """Get variance reduction report for CUPED/CUPAC transformations.
 
+        CUPED results are returned when CUPED was applied, otherwise CUPAC
+        results (per-target variance reduction of the selected models).
+        When both are present the CUPAC table stays available as
+        ``cupac.variance_reductions``.
+
         Returns:
-            A ``SmallDataset`` with variance reduction percentages per
-            transformed metric, or a descriptive string if unavailable.
+            A ``Dataset`` with variance reduction percentages per transformed
+            metric, or a descriptive string if unavailable.
         """
-        if hasattr(self, "_experiment_data"):
-            return self.summary_reporter.report_variance_reductions(
-                self._experiment_data,
-            )
-        return "No experiment data available."
+        if self.cuped is not None and self.cuped.variance_reductions is not None:
+            return self.cuped.variance_reductions
+        if self.cupac.variance_reductions is not None:
+            return self.cupac.variance_reductions
+        return "No variance reduction data available."
 
     def extract(self, experiment_data: ExperimentData) -> None:
         """Extract all A/B test outputs including CUPED/CUPAC.

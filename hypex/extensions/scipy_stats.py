@@ -65,6 +65,8 @@ class GroupStatTest(CompareExtension):
     def _form_results(
         p_value: float | None, statistic: float | None, reliability: float
     ) -> SmallDataset:
+        p_value = np.nan if np.ma.is_masked(p_value) else p_value
+        statistic = np.nan if np.ma.is_masked(statistic) else statistic
         return SmallDataset.from_dict(
             {
                 "p-value": p_value,
@@ -120,7 +122,10 @@ class GroupTTestExtension(GroupStatTest):
     ) -> SmallDataset | float:
         # Map the library-level 'equal_variance' to scipy's 'equal_var'
         if "equal_variance" in kwargs:
-            kwargs["equal_var"] = kwargs.pop("equal_variance")
+            kwargs = {
+                **{k: v for k, v in kwargs.items() if k != "equal_variance"},
+                "equal_var": kwargs["equal_variance"],
+            }
         return super().calc(data, other, **kwargs)
 
 
@@ -177,7 +182,7 @@ class GroupChi2TestExtension(GroupStatTest):
         if isinstance(contingency_table, Dataset):
             contingency_table = contingency_table.raw_data.values
         statistic, p_value, *_ = chi2_contingency(contingency_table, **kwargs)
-        return self._form_results(statistic, p_value, self.reliability)
+        return self._form_results(p_value, statistic, self.reliability)
 
 
 @backend_factory.register(GroupKSTestExtension, PandasDataset)
@@ -345,6 +350,11 @@ class SparkKSTestExtension(GroupKSTestExtension):
                     {"p-value": float("nan"), "statistic": float("nan"), "pass": None},
                     StatisticRole(),
                 )
+
+        elif nan_policy == "omit":
+            # same as scipy's nan_policy="omit": drop NaN / null before everything else
+            df1 = df1.filter(F.col(col).isNotNull() & ~F.isnan(F.col(col)))
+            df2 = df2.filter(F.col(col).isNotNull() & ~F.isnan(F.col(col)))
 
         # Get sample sizes
         n1 = df1.count()

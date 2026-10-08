@@ -256,6 +256,7 @@ class CUPACExecutor(MLExecutor):
             return self.fit(model, X, Y)
         elif mode == "predict":
             return self.predict(model, X)
+        return None
 
     def kfold_fit(
         self, model: str, X: Dataset, Y: Dataset

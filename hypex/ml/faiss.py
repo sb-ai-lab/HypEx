@@ -170,8 +170,8 @@ class FaissNearestNeighbors(MLExecutor):
         return {
             "control": data,
             "test": cls._inner_function(
-                data=grouping_data[1][1],
-                test_data=grouping_data[0][1],
+                data=_data,
+                test_data=_test_data,
                 n_neighbors=n_neighbors or 1,
                 faiss_mode=faiss_mode,
                 **kwargs,
@@ -247,7 +247,8 @@ class FaissNearestNeighbors(MLExecutor):
         1. Retrieves grouping and feature fields.
         2. Groups the data or retrieves pre-grouped data.
         3. Calls the `calc` method to perform the FAISS search.
-        4. Handles missing values (NaNs) by replacing them with a dummy match (-1) and warns the user.
+        4. Warns the user when the search returned NaNs; NaNs are then rejected in step 5
+           with ``PairsNotFoundError``.
         5. Formats the matched indices with appropriate roles and appends them to the result.
         6. Stores the final matched indices in the `ExperimentData` object.
 

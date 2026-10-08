@@ -95,6 +95,7 @@ class CupacExtension(MLExtension):
             return self._fit_pandas(model, data, Y)
         elif mode == "predict":
             return self._predict_pandas(model, data)
+        return None
 
     def _kfold_fit_pandas(
         self, model: str, X: Dataset, Y: Dataset

@@ -662,7 +662,7 @@ class StatsComparator(BaseComparator, ABC):
         "mean": lambda d: d.mean(),
         "var": lambda d: d.var(),
         "std": lambda d: d.std(),
-        "count": lambda d: len(d),
+        "count": len,
         "sum": lambda d: d.sum(),
         "min": lambda d: d.min(),
         "max": lambda d: d.max(),

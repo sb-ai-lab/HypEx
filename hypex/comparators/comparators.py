@@ -322,12 +322,16 @@ class Chi2Test(StatTestMasterAbstract):
 class KSTest(StatTestMasterAbstract):
     """
     KS-test master-backend class.
+
+    On Spark the p-value is a binned approximation (see ``StatsKSTest``).
     """
 
 
 class UTest(StatTestMasterAbstract):
     """
-    KS-test master-backend class.
+    U-test (Mann-Whitney) master-backend class.
+
+    On Spark the p-value is a binned approximation (see ``StatsUTest``).
     """
 
 

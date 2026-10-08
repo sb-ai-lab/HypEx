@@ -244,7 +244,7 @@ class Executor(ABC):
             if truncated:
                 body += (
                     f"<tr><td colspan='2' style='{cls._HTML_CELL}; color:#999;'>"
-                    f"… и ещё {len(items) - cls._HTML_MAX_ITEMS}</td></tr>"
+                    f"… and also {len(items) - cls._HTML_MAX_ITEMS}</td></tr>"
                 )
             return f"<table style='{cls._HTML_TABLE}'>{body}</table>"
         if isinstance(value, Mapping):
@@ -294,7 +294,7 @@ class Calculator(Executor, ABC):
 
     @staticmethod
     @abstractmethod
-    def _inner_function(data: Dataset, **kwargs) -> Any:
+    def _inner_function(data: Dataset, *args, **kwargs) -> Any:
         raise AbstractMethodError
 
     @property
@@ -367,9 +367,9 @@ class MLExecutor(Calculator, ABC):
 
         if target_field:
             return cls._inner_function(
-                data=_data.drop(target_field),
+                data=_data.drop(columns=target_field),
                 target_data=_data[target_field],
-                test_data=_test_data.drop(target_field),
+                test_data=_test_data.drop(columns=target_field),
                 **kwargs,
             )
         return cls._inner_function(

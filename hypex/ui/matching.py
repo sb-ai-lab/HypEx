@@ -15,7 +15,7 @@ from ..dataset import (
     StatisticRole,
 )
 from ..ml import FaissNearestNeighbors
-from ..reporters.matching import MatchingDictReporter, MatchingQualityDatasetReporter
+from ..reporters.matching import MatchingQualityReporter, MatchingReporter
 from ..utils import (
     ID_SPLIT_SYMBOL,
     MATCHING_INDEXES_SPLITTER_SYMBOL,
@@ -52,8 +52,8 @@ class MatchingOutput(Output):
                 Set to ``False`` to skip index collection. Defaults to ``False``.
         """
         super().__init__(
-            summary_reporter=MatchingDictReporter(searching_class),
-            additional_reporters={"quality_results": MatchingQualityDatasetReporter()},
+            summary_reporter=MatchingReporter(searching_class, output_format="dict"),
+            additional_reporters={"quality_results": MatchingQualityReporter()},
         )
         self.extract_full_data = extract_full_data
         self.compute_indexes = compute_indexes

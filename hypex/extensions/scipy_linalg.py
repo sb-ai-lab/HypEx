@@ -7,18 +7,9 @@ from pyspark.ml.regression import LinearRegression
 
 from ..dataset import Dataset
 from ..dataset.backends import PandasDataset, SparkDataset
-from ..dataset.roles import FeatureRole, InfoRole, TargetRole
+from ..dataset.roles import FeatureRole, TargetRole
 from ..utils.registry import backend_factory
 from .abstract import Extension
-
-# class CholeskyExtension(Extension):
-#     def _calc_pandas(self, data: Dataset, epsilon: float = 1e-3, **kwargs):
-#         cov = data.data.to_numpy()
-#         cov = cov + np.eye(cov.shape[0]) * epsilon
-#         return self.result_to_dataset(
-#             pd.DataFrame(np.linalg.cholesky(cov), columns=data.columns),
-#             {column: FeatureRole() for column in data.columns},
-#         )
 
 
 class UniteCovExtension(Extension):
@@ -100,11 +91,8 @@ class PandasLstsqExtension(LstsqExtension):
 
     def calc(self, data: Dataset, other: Dataset | None = None, **kwargs):
         target, *features = self.get_columns(data)
-        X_l = Dataset.create_empty(roles={"temp": InfoRole()}, index=data.index).fillna(
-            1
-        )
-        X = X_l.append(data.select(features), axis=1).raw_data.values
-        # TODO: needs fixes
+        features_data = data.select(features).raw_data.to_numpy()
+        X = np.column_stack([np.ones(len(features_data)), features_data])
         return np.linalg.lstsq(X, data[target].raw_data.values, rcond=-1)[0][1:]
 
 

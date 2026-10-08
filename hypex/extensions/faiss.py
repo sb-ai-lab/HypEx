@@ -156,17 +156,21 @@ class FaissExtension(MLExtension):
         Args:
             X (Dataset): The dataset to build the index from (typically the
                 control group).
-            Y (Dataset | None, optional): Optional target dataset. Not typically
-                used for FAISS indexing. Defaults to None.
+            Y (Dataset | None, optional): Ignored: a FAISS index is unsupervised.
+                Accepted for the ``MLExtension.fit`` signature
+                (``FaissNearestNeighbors.fit`` forwards it). Defaults to None.
 
         Returns:
             FaissExtension: The fitted extension instance with a populated index.
         """
-        return super().calc(X, target_data=Y, mode="fit", **kwargs)
+        return self.calc(data=X, mode="fit", **kwargs)
 
     def predict(self, X: Dataset, **kwargs) -> Dataset:
         """
         Search the FAISS index for the nearest neighbors of the given dataset.
+
+        Requires a prior ``fit`` on the same instance (otherwise the backend
+        raises ``ValueError("index is not created yet ...")``).
 
         Args:
             X (Dataset): The query dataset (typically the treatment group).
@@ -177,9 +181,9 @@ class FaissExtension(MLExtension):
                 for each observation in ``X``, wrapped with
                 ``AdditionalMatchingRole``.
         """
-        return self.result_to_dataset(
-            super().calc(X, mode="predict", **kwargs), AdditionalMatchingRole()
-        )
+        result = self.calc(data=X, test_data=X, mode="predict", **kwargs)
+        result.roles = {c: AdditionalMatchingRole() for c in result.columns}
+        return result
 
 
 @backend_factory.register(FaissExtension, PandasDataset)
@@ -262,7 +266,8 @@ class PandasFaissExtension(FaissExtension):
         by resolving ties among equidistant candidates.
 
         Args:
-            data (Dataset): The baseline dataset (used for index resolution).
+            data (Dataset): Baseline dataset (not used by the search; kept for
+                the call signature).
             test_data (Dataset): The query dataset.
             X (np.ndarray): Query vectors of shape (n_queries, n_features).
 
@@ -273,16 +278,7 @@ class PandasFaissExtension(FaissExtension):
         dist, indexes = self.index.search(X, k=self.n_neighbors)
         if self.n_neighbors == 1:
             equal_dist = list(map(lambda x: np.where(x == x[0])[0], dist))
-            indexes = [
-                [
-                    (
-                        int(index[dist][0])
-                        if abs(index[dist][0]) <= len(data) + len(test_data)
-                        else -1
-                    )
-                    for index, dist in zip(indexes, equal_dist)
-                ]
-            ]
+            indexes = [[int(index[dist][0]) for index, dist in zip(indexes, equal_dist)]]
         else:
             indexes = self._prepare_indexes(indexes, dist, self.n_neighbors)
             indexes = [list(map(int, row)) for row in indexes]
@@ -297,7 +293,7 @@ class PandasFaissExtension(FaissExtension):
     def _fit(
         self,
         data: Dataset,
-        test_data: Dataset,
+        test_data: Dataset | None,
     ) -> None:
         """
         Build the FAISS index from the baseline dataset.
@@ -312,7 +308,8 @@ class PandasFaissExtension(FaissExtension):
 
         Args:
             data (Dataset): The baseline dataset to index.
-            test_data (Dataset): The query dataset (used for size heuristics).
+            test_data (Dataset | None): The query dataset (used for size
+                heuristics); optional - without it only the index size decides.
         """
         X = self._mahalanobis_transform(data, self.mahalanobis).raw_data.values
         self.index = faiss.IndexIDMap(faiss.IndexFlatL2(X.shape[1]))
@@ -322,7 +319,7 @@ class PandasFaissExtension(FaissExtension):
                 or self.faiss_mode == "fast"
             )
             and len(X) > 1_000
-            and len(test_data) > 1_000
+            and (test_data is None or len(test_data) > 1_000)
         ):
             m = 4  # heuristic
             n_clusters = int(np.sqrt(len(X) / m))
@@ -1680,6 +1677,11 @@ class SparkFaissExtension(FaissExtension):
             SparkFaissExtension: Self, for use in with statements.
         """
         return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        """Context manager exit: release Spark resources, never swallow errors."""
+        self.unpersist()
+        return False
 
     def __del__(self, *_) -> None:
         """Destructor that ensures resources are cleaned up."""

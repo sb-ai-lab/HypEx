@@ -146,6 +146,7 @@ class FaissIndexStorage:
                 try:
                     shutil.rmtree(directory)
                 except Exception:
+                    # best-effort cleanup: directory may already be removed
                     pass
         FaissIndexStorage.LOCAL_DIRS = []
 

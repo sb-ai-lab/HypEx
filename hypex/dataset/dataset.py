@@ -105,16 +105,12 @@ class SmallDataset(DatasetBase):
             else:
                 data = data.to_frame()
 
-        if isinstance(data, (PandasDataset, SparkDataset)):
-            super().__init__(roles, data, None, default_role, session)
-        else:
-            super().__init__(roles, data, BackendsEnum.pandas, default_role, session)
-        self.loc = self.Locker(
-            call_class=self.__class__, backend=self._backend_data, roles=self.roles
+        backend_arg = (
+            None
+            if isinstance(data, (PandasDataset, SparkDataset))
+            else BackendsEnum.pandas
         )
-        self.iloc = self.ILocker(
-            call_class=self.__class__, backend=self._backend_data, roles=self.roles
-        )
+        super().__init__(roles, data, backend_arg, default_role, session)
 
     @property
     def index(self):
@@ -159,7 +155,8 @@ class SmallDataset(DatasetBase):
             data=self._backend_data.sort_values(by=by, ascending=ascending, **kwargs),
         )
 
-    def reindex(self, labels, fill_value: Any | None = None) -> Dataset:
+    def reindex(self, labels, fill_value: Any | None = None):
+        """Conform to new index labels; returns a full ``Dataset``."""
         return Dataset(
             self.roles, data=self._backend_data.reindex(labels, fill_value=fill_value)
         )
@@ -204,6 +201,8 @@ class DatasetAdapter(Adapter):
         roles: ABCRole | dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
+        """``small`` selects SmallDataset vs Dataset for dict/frame/dataset inputs;
+        list, ndarray and scalar inputs always give a pandas-backed Dataset."""
         # Convert data based on its type
         if isinstance(data, dict):
             return DatasetAdapter.dict_to_dataset(data, roles, small)
@@ -240,6 +239,7 @@ class DatasetAdapter(Adapter):
         roles: ABCRole | dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
+        """Wrap a scalar into a 1x1 pandas-backed ``Dataset``."""
         if isinstance(roles, ABCRole):
             roles = {"value": roles}
         return Dataset(
@@ -259,6 +259,8 @@ class DatasetAdapter(Adapter):
             result = SmallDataset.from_dict(
                 data=data, roles={name: roles for name in roles_names}
             )
+        else:
+            raise InvalidArgumentError("roles", "dict, ABCRole")
         if not small:
             result = result.to_dataset()
         return result
@@ -269,14 +271,13 @@ class DatasetAdapter(Adapter):
         roles: dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
+        """Wrap a list into a one-column pandas-backed ``Dataset``."""
         result = Dataset(
             roles=roles if len(roles) > 0 else {0: DefaultRole()},
             data=pd.DataFrame(
                 data=data, columns=[next(iter(roles.keys()))] if len(roles) > 0 else [0]
             ),
         )
-        if not small:
-            result = result.to_dataset()
         return result
 
     @staticmethod
@@ -303,12 +304,11 @@ class DatasetAdapter(Adapter):
         roles: dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
+        """Wrap a 2-D array into a pandas-backed ``Dataset``."""
         columns = range(data.shape[1]) if len(roles) == 0 else list(roles.keys())
         data = pd.DataFrame(data=data, columns=columns)
         result = Dataset(
             roles=roles,
             data=data,
         )
-        if not small:
-            result = result.to_dataset()
         return result

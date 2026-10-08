@@ -33,6 +33,7 @@ jobs:
         with:
           languages: python
           queries: security-and-quality
+          config-file: ./.github/codeql/codeql-config.yml
 
       - uses: github/codeql-action/analyze@v3
 

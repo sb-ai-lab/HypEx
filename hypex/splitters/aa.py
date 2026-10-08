@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import math
 from typing import Any
+
+import pandas as pd
 
 from ..dataset import (
     AdditionalTreatmentRole,
@@ -124,10 +127,8 @@ class AASplitter(Calculator):
             unique_vals = data.ds[splitter_col].unique()
             group_keys = list(unique_vals[splitter_col].to_dict().values())
             for group_key in group_keys:
-                # NaN != NaN is the standard Python check for float/np.nan.
-                # Also catches pd.NaT and any other "not equal to self" value.
-                # The previous `group_key is None` check did NOT catch NaN.
-                if group_key is None or group_key != group_key:
+                # pd.isna catches None, NaN and pd.NaT.
+                if pd.isna(group_key):
                     continue
                 mask = data.ds[splitter_col] == group_key
                 group_data = data.ds[mask]
@@ -209,7 +210,7 @@ class AASplitter(Calculator):
 
             # Missing value (None, NaN): after astype(str) it becomes
             # "None" / "nan", both covered by MISSING_CONST_LABELS.
-            if label is None or (isinstance(label, float) and label != label):
+            if label is None or (isinstance(label, float) and math.isnan(label)):
                 translation[str(label)] = _FREE_CONST_SENTINEL
                 continue
 
@@ -317,12 +318,6 @@ class AASplitter(Calculator):
                 control_size=effective_control_size,
                 sample_size=sample_size,
             )
-        else:
-            # Avoid triggering a Spark count() action just for a boolean check.
-            # free_size = -1 is a sentinel meaning "unknown, assume non-empty".
-            # The actual emptiness check is deferred to random_split_labels
-            # which handles empty data gracefully.
-            free_size = -1  # sentinel: means "unknown, assume non-empty"
 
         # ── 3. bucket edges (always in MOD scale, frac handled separately)
         MOD = 10_000_000

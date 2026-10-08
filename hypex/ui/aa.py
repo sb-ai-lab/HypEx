@@ -1,3 +1,5 @@
+import math
+
 from ..analyzers.aa import AADryTestAnalyzer, AAScoreAnalyzer
 from ..dataset import Dataset, ExperimentData, InfoRole, SmallDataset, StatisticRole
 from ..reporters.aa import AABestSplitReporter, AAPassedReporter
@@ -145,7 +147,9 @@ class AAOutput(Output):
                 new_col = new_col.replace(" all", "")
 
                 if "pass" in new_col and not new_col.startswith("mean "):
-                    if val is not None and not (isinstance(val, float) and val != val):
+                    if val is not None and not (
+                        isinstance(val, float) and math.isnan(val)
+                    ):
                         if isinstance(val, str):
                             val = val.strip().lower() in ("true", "1", "ok")
                         else:
@@ -220,6 +224,7 @@ class AAOutput(Output):
                     for c, r in self.best_split_statistics._roles.items()
                 }
             except Exception:
+                # best-effort rename: keep the original column names on failure
                 pass
 
     def extract(self, experiment_data: ExperimentData):

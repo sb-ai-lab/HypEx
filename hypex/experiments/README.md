@@ -99,7 +99,7 @@ ParamsExperiment(
         Comparator: {"grouping_role": [AdditionalTreatmentRole()],
                      "space": [SpaceEnum.additional]},
     },
-    reporter=DatasetReporter(OneAADictReporter(front=False)),
+    reporter=AATestReporter(dict_reporter=DictReporter(front=False)),
 )
 ```
 

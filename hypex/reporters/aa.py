@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from typing import Any, ClassVar
 
 from ..comparators import (
@@ -119,55 +118,6 @@ class AATestReporter(DatasetReporter):
             return self.convert_to_dataset(dict_result)
         finally:
             self.dict_reporter.front = prev
-
-
-class OneAADictReporter(AATestReporter):
-    """Legacy reporter wrapper for dictionary output.
-
-    Deprecated: Use ``AATestReporter(output_format='dict')`` instead.
-    """
-
-    def __init__(self, front: bool = True):
-        """Initialize the legacy dictionary reporter.
-
-        Args:
-            front: If ``True``, formats keys for front-end display.
-            Defaults to ``True``.
-        """
-        super().__init__(dict_reporter=DictReporter(front=front), output_format="dict")
-        warnings.warn(
-            "OneAADictReporter is deprecated. Use AATestReporter(output_format='dict')",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    @staticmethod
-    def convert_flat_dataset(data: dict[str, Any]) -> SmallDataset:
-        """Convert a flat dictionary representation into a ``SmallDataset``.
-
-        Args:
-            data: The flat dictionary to convert.
-
-        Returns:
-            A ``SmallDataset`` instance containing the structured data.
-        """
-        return AATestReporter.convert_to_dataset(data)
-
-
-class AADatasetReporter(AATestReporter):
-    """Legacy reporter wrapper for dataset output.
-
-    Deprecated: Use ``AATestReporter()`` instead.
-    """
-
-    def __init__(self):
-        """Initialize the legacy dataset reporter."""
-        super().__init__(dict_reporter=DictReporter(), output_format="dataset")
-        warnings.warn(
-            "AADatasetReporter is deprecated. Use AATestReporter()",
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
 
 class AAPassedReporter(Reporter):

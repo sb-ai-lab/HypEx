@@ -11,7 +11,7 @@ from scipy.stats import t as t_dist  # type: ignore
 from ..dataset import ABCRole, Dataset, DatasetAdapter, ExperimentData, SmallDataset
 from ..dataset.backends import SparkDataset
 from ..dataset.roles import StatisticRole, TargetRole
-from ..utils import BackendsEnum, NoColumnsError, timeit
+from ..utils import NoColumnsError, timeit
 from ..utils.constants import CATEGORICAL_TYPES_LIST, NUMBER_TYPES_LIST
 from ..utils.errors import NotSuitableFieldError
 from ..utils.logger import logger
@@ -473,7 +473,14 @@ class StatsKSTest(StatsHypothesisTesting):
     result storage (with the correct ``self.key``) so reporters can
     parse them.
 
-    For Pandas: delegates to ``GroupKSTest`` (``scipy.stats.ks_2samp``).
+    Histogram-based approximation (see Note). On pandas use KSTest:
+    ``StatsKSTestExtension`` has no pandas implementation.
+
+    Note:
+        On Spark the statistic and p-value are approximations computed from
+        ``n_bins`` equal-width bins over the global [min, max]. They are close
+        to scipy for well-behaved data, but a single extreme outlier stretches
+        the bins and can make the result misleading. NaN values are ignored.
     """
 
     REQUIRED_STATS: ClassVar[list[str]] = ["histogram", "count"]
@@ -531,11 +538,10 @@ class StatsKSTest(StatsHypothesisTesting):
         )
 
     def execute(self, data) -> ExperimentData:
-        """Main entry point. Routes to Spark-optimized or Pandas-fallback path.
+        """Main entry point. Runs the Spark-optimized path.
 
-        For Spark, delegates to ``_execute_spark``. For Pandas, creates a
-        ``GroupKSTest`` delegate with the same ID so pipeline lookups
-        remain consistent.
+        Histogram-based approximation (see Note). On pandas use KSTest:
+        ``StatsKSTestExtension`` has no pandas implementation.
 
         Args:
             data: The ``ExperimentData`` container.
@@ -566,28 +572,14 @@ class StatsKSTest(StatsHypothesisTesting):
             else list(target_fields_data.columns)
         )
 
-        if data.ds.backend_type == BackendsEnum.spark:
-            return self._execute_spark(
-                data,
-                group_col=group_field_data.columns[0],
-                target_cols=list(target_fields_data.columns),
-            )
-        else:
-            # Pandas fallback: scipy ks_2samp is faster for small data
-            from .hypothesis_testing import GroupKSTest
-
-            delegate = GroupKSTest(
-                compare_by="groups",
-                grouping_role=self.grouping_role,
-                target_role=self.target_roles,
-                reliability=self.reliability,
-                key=self.key,
-            )
-            delegate._id = self._id  # Preserve ID for pipeline lookups
-            return delegate.execute(data)
+        return self._execute_histograms(
+            data,
+            group_col=group_field_data.columns[0],
+            target_cols=list(target_fields_data.columns),
+        )
 
     @timeit(level="SPARK", prefix="KS_SPARK")
-    def _execute_spark(self, data, group_col: str, target_cols: list[str]):
+    def _execute_histograms(self, data, group_col: str, target_cols: list[str]):
         """Executes the Kolmogorov-Smirnov test using the Spark-optimized path.
 
         Delegates histogram aggregation to ``StatsKSTestExtension``, which
@@ -740,13 +732,21 @@ class StatsKSTest(StatsHypothesisTesting):
 class StatsUTest(StatsHypothesisTesting):
     """Mann-Whitney U test on aggregated histograms (Spark-optimized).
 
-    Computes per-group histograms via ``StatsUTestExtension`` in a fixed
-    number of Spark jobs, then calculates the U statistic and p-value
+    Computes per-group histograms via ``StatsKSTestExtension`` (same histogram format as the KS test) in a
+    fixed number of Spark jobs, then calculates the U statistic and p-value
     analytically from the histogram buckets — without transferring raw
     data to the driver.
 
-    For Pandas backend, delegates to ``GroupUTest`` (scipy
-    ``mannwhitneyu``) which is exact and faster for small data.
+    Histogram-based approximation (see Note). On pandas use UTest:
+    ``StatsKSTestExtension`` has no pandas implementation.
+
+    Note:
+        On Spark the result is a binned approximation (``n_bins`` equal-width
+        bins over the global [min, max], normal approximation with tie
+        correction): values inside one bin are treated as ties, and an extreme
+        outlier widens the bins and can make the p-value misleading. The
+        reported statistic is U1 of the baseline sample (as in scipy). NaN
+        values are ignored.
 
     Algorithm (histogram approximation)
     ------------------------------------
@@ -819,7 +819,7 @@ class StatsUTest(StatsHypothesisTesting):
         """Raises ``NotImplementedError``.
 
         All aggregation for ``StatsUTest`` happens inside ``execute()``
-        via ``StatsUTestExtension``. Do not call this method directly.
+        via ``StatsKSTestExtension``. Do not call this method directly.
 
         Raises:
             NotImplementedError: Always raised.
@@ -830,11 +830,10 @@ class StatsUTest(StatsHypothesisTesting):
         )
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        """Main entry point. Routes to Spark-optimized or Pandas-fallback.
+        """Main entry point. Runs the Spark-optimized path.
 
-        For Spark, delegates to ``_execute_spark``. For Pandas, creates
-        a ``GroupUTest`` delegate with the same ID so pipeline lookups
-        remain consistent.
+        Histogram-based approximation (see Note). On pandas use UTest:
+        ``StatsKSTestExtension`` has no pandas implementation.
 
         Args:
             data: The ``ExperimentData`` container.
@@ -865,33 +864,20 @@ class StatsUTest(StatsHypothesisTesting):
             else list(target_fields_data.columns)
         )
 
-        if data.ds.backend_type == BackendsEnum.spark:
-            return self._execute_spark(
-                data,
-                group_col=group_field_data.columns[0],
-                target_cols=list(target_fields_data.columns),
-            )
-        else:
-            # Pandas fallback: scipy mannwhitneyu is exact and faster
-            from .hypothesis_testing import GroupUTest
-
-            delegate = GroupUTest(
-                compare_by="groups",
-                grouping_role=self.grouping_role,
-                target_role=self.target_roles,
-                reliability=self.reliability,
-                key=self.key,
-            )
-            delegate._id = self._id  # Preserve ID for pipeline lookups
-            return delegate.execute(data)
+        return self._execute_histograms(
+            data,
+            group_col=group_field_data.columns[0],
+            target_cols=list(target_fields_data.columns),
+        )
 
     @timeit(level="SPARK", prefix="U_SPARK")
-    def _execute_spark(
+    def _execute_histograms(
         self, data: ExperimentData, group_col: str, target_cols: list[str]
     ) -> ExperimentData:
         """Execute the Mann-Whitney U test using the Spark-optimized path.
 
-        Delegates histogram aggregation to ``StatsUTestExtension``, which
+        Delegates histogram aggregation to ``StatsKSTestExtension`` (same histogram
+        format as the KS test), which
         computes per-group histograms for all target columns in a fixed
         number of Spark jobs (global bounds → counts → bucket histograms).
         The U statistic and p-value are then calculated from the
@@ -899,7 +885,7 @@ class StatsUTest(StatsHypothesisTesting):
 
         Steps:
         1. Compute per-group histograms and observation counts for every
-           target column via ``StatsUTestExtension.calc()``.
+           target column via ``StatsKSTestExtension.calc()``.
         2. If fewer than two groups, store empty results and return early.
         3. For each target column, run ``_inner_function`` pairwise
            (baseline vs. each compared group) and append results into
@@ -917,10 +903,10 @@ class StatsUTest(StatsHypothesisTesting):
             The updated ``ExperimentData`` with U test results stored in
             ``analysis_tables`` under per-column keys.
         """
-        from ..extensions.stats_hypothesis_testing import StatsUTestExtension
+        from ..extensions.stats_hypothesis_testing import StatsKSTestExtension
 
         subset = data.ds[[group_col, *target_cols]]
-        ext = StatsUTestExtension(n_bins=self.n_bins, reliability=self.reliability)
+        ext = StatsKSTestExtension(n_bins=self.n_bins, reliability=self.reliability)
         all_group_stats = ext.calc(
             data=subset,
             group_col=group_col,
@@ -1080,6 +1066,6 @@ class StatsUTest(StatsHypothesisTesting):
 
         return {
             "p-value": p_value,
-            "statistic": float(u_stat),
+            "statistic": float(u1),
             "pass": p_value < reliability,
         }

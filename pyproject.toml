@@ -26,7 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
-    "Development Status :: 4 - Beta",
+    "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Natural Language :: English",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
@@ -141,3 +141,26 @@ warn_redundant_casts = true
 # Bare `pytest` used to import everything it could find, including
 # examples/experiments scripts that are not tests and break collection.
 testpaths = ["tests"]
+markers = [
+    "spark: requires local Spark session (slow)",
+    "slow: full pipeline on large data or statistical properties",
+    "catboost: requires catboost to be installed",
+]
+filterwarnings = [
+    "error::DeprecationWarning:hypex.*",
+    "error::FutureWarning:hypex.*",
+]
+
+[tool.coverage.run]
+source = ["hypex"]
+omit = ["hypex/factory/*", "hypex/hypotheses/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 88
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "raise AbstractMethodError",
+]

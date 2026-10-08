@@ -82,7 +82,7 @@ class SparkSessionCalculator:
     # Redundancy and safety margins
     EXECUTOR_REDUNDANCY_FACTOR = 2
     MIN_EXECUTOR_MEMORY_GB = 4
-    MIN_EXECUTOR_OVERHEAD_MB = 2048  # 2 ГБ минимум для native-кода
+    MIN_EXECUTOR_OVERHEAD_MB = 2048  # Minimum 2GB overhead for native code execution
     MIN_DRIVER_MEMORY_GB = 8
     MIN_DRIVER_MAX_RESULT_SIZE_GB = 8
 
@@ -312,6 +312,7 @@ class SparkSessionCalculator:
             if file_sys == "file:///":
                 file_sys = None
         except Exception:
+            # best-effort: fall back to the default file system
             pass
         if file_sys is None:
             try:
@@ -321,9 +322,9 @@ class SparkSessionCalculator:
                 )
             except Exception:
                 file_sys = "file:///"
-        # fsspec не поддерживает viewfs://. Мы заменяем его на hdfs://,
-        # а резолв nameservice в реальные IP возьмет на себя libhdfs
-        # благодаря добавлению hdfs-site.xml в CLASSPATH.
+        # fsspec does not support viewfs://. We replace it with hdfs://,
+        # and libhdfs will resolve the nameservice to real IPs
+        # thanks to adding hdfs-site.xml to CLASSPATH.
         if file_sys and file_sys.startswith("viewfs://"):
             file_sys = file_sys.replace("viewfs://", "hdfs://", 1)
         return file_sys or "file:///"

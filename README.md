@@ -10,16 +10,21 @@ HypEx (Hypotheses and Experiments) is a library for causal inference and AB test
 
 ## What's new in 2.0
 
-HypEx 2.0 is built on a new architecture: experiments are pipelines of small composable blocks working on a
-backend-agnostic `Dataset`.
+HypEx 2.0 adds an Apache Spark backend, is substantially faster than 1.0.x (most of all on large data, in A/A loops and
+in matching), and extends the statistical toolkit. Alpha: the API may still change. See the
+[release notes](RELEASE_NOTES_2.0.0a1.md) for the full list.
 
-- **New interface.** Import paths, class names and result objects differ from 0.1.x. Migrate with the
-  [tutorials](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials).
 - **Spark backend.** `Dataset` runs on pandas or Spark with the same API for AA tests, AB tests, homogeneity tests and
   matching.
+- **Speed.** Vectorised splitting, Spark checkpointing, batched statistical tests, FAISS `shuffle` mode and
+  co-partitioned search for distributed matching.
+- **New statistics and blocks.** `StatsUTest`, matching bias correction and metrics, `NaDropper`, `Float32Caster`,
+  `AATest(dry_test=...)`.
 - **CUPED and CUPAC** variance reduction in `ABTest`, with a variance reduction report.
 - **Multiple-testing corrections** in `ABTest` (Holm by default, plus Bonferroni, Sidak, FDR and others).
-- Version 0.1.x is no longer supported. If you need it: `pip install hypex==0.1.10`.
+- **Breaking changes against 1.0.7:** Python 3.13 is not supported, `Output.resume` is now `Output.summary`, A/A splits
+  use a different hash, `Matching` extracts full data and indexes only on request. Version 0.1.x is no longer
+  supported (`pip install hypex==0.1.10`).
 
 ## Introduction
 
@@ -55,8 +60,10 @@ and make the results unrepresentative.
 ## Installation
 
 ```bash
-pip install -U hypex
+pip install --pre -U hypex   # 2.0 is in alpha: --pre is required
 ```
+
+Without `--pre` pip installs the latest stable release (1.0.x). To pin the alpha: `pip install hypex==2.0.0a1`.
 
 Optional extras for CUPAC models:
 

@@ -454,7 +454,11 @@ def _aggregate_spends(panel: pd.DataFrame) -> pd.DataFrame:
             }
         )
 
-    return panel.groupby(["user_id", "signup_month", "treat"]).apply(_agg).reset_index()
+    return (
+        panel.groupby(["user_id", "signup_month", "treat"])[["month", "spend"]]
+        .apply(_agg)
+        .reset_index()
+    )
 
 
 def _add_demographics(data: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:

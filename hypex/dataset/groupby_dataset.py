@@ -17,7 +17,9 @@ class GroupedDataset:
     This class provides an interface to perform aggregation and transformation
     operations on groups within a dataset. It wraps a backend groupby object
     (e.g., from pandas or another engine) and ensures that column roles are
-    correctly maintained or updated after operations.
+    correctly maintained or updated after operations. ``backend_groupby`` is the
+    native groupby object returned by the backend's ``groupby`` (pandas or
+    pyspark.pandas).
 
     Attributes:
         _groupby (Any): The underlying backend groupby object.
@@ -80,7 +82,8 @@ class GroupedDataset:
         """
         Execute the aggregation function on the backend groupby object.
 
-        Handles different backend types (objects with .agg method or lists of groups).
+        The groupby object is the native object returned by the backend's
+        ``groupby`` (pandas or pyspark.pandas) and must provide ``.agg``.
 
         Args:
             func: The aggregation function(s) to apply. Can be a string,
@@ -94,23 +97,7 @@ class GroupedDataset:
         """
         if hasattr(self._groupby, "agg"):
             return self._groupby.agg(func)
-
-        elif isinstance(self._groupby, list):
-            aggregated_groups = []
-            for key, group_df in self._groupby:
-                if hasattr(group_df, "agg"):
-                    agg_res = group_df.agg(func)
-                else:
-                    agg_res = group_df.agg(func)
-                aggregated_groups.append(agg_res)
-
-            if not aggregated_groups:
-                return None
-            result_data = self._dataset_class._backend.concat(aggregated_groups)
-            return result_data
-
-        else:
-            raise TypeError(f"Unsupported groupby object type: {type(self._groupby)}")
+        raise TypeError(f"Unsupported groupby object type: {type(self._groupby)}")
 
     def agg(self, func: str | dict[str, str] | list[str]) -> DatasetBase:
         """
@@ -138,9 +125,6 @@ class GroupedDataset:
             return std_ds.add_column(vc_ds)
 
         result_data = self._execute_agg(func)
-
-        if result_data is None:
-            return self._dataset_class(roles={}, data=None)
 
         if isinstance(func, list) and hasattr(result_data, "columns"):
             if hasattr(result_data.columns, "levels"):  # MultiIndex from list agg
@@ -186,14 +170,6 @@ class GroupedDataset:
         """
         if hasattr(self._groupby, "apply"):
             result_data = self._groupby.apply(func)
-        elif isinstance(self._groupby, list):
-            results = []
-            for key, group_df in self._groupby:
-                res = group_df.apply(func)
-                results.append(res)
-            if not results:
-                return None
-            result_data = self._dataset_class._backend.concat(results)
         else:
             raise NotImplementedError("Apply not supported for this groupby type")
 
