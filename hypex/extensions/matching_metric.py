@@ -362,8 +362,10 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         indexes = data[neighbors_cols].raw_data
 
         # "expand" the neighbor indexes from a wide format to a long one
-        melted = indexes.stack().reset_index()
-        melted.columns = ["initial_index", "neighbor_col", "match_index"]
+        # `neighbors_cols` is a list with single element
+        melted = indexes.reset_index().explode(column=neighbors_cols[0])
+        melted.columns = ["initial_index", "match_index"]
+        melted = melted.dropna(subset=["match_index"])
 
         # filter out dummy match markers (-1)
         melted = melted[melted["match_index"] != -1]
@@ -412,7 +414,7 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         """
         match_idx_cols = Adapter.to_list(match_idx_cols)
 
-        all_neighbors = pd.Series(data[match_idx_cols].values.flatten())
+        all_neighbors = pd.Series(data[match_idx_cols].explode(column=match_idx_cols[0]).values.ravel())
 
         scaled_counts = all_neighbors.value_counts() / n_neighbors
         scaled_counts.name = "scaled_counts"
@@ -527,7 +529,7 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
                 F.col("index").alias("initial_index"),
                 F.explode(
                     F.col(*working_columns) # there would be only one column
-                ).cast("long").alias("index"),
+                ).alias("index"),
             )
             .join(other=t_data, on="index")
             .groupBy("initial_index")
