@@ -77,6 +77,8 @@ class AAOutput(Output):
                 "test mean": None,
                 "difference": None,
                 "difference %": None,
+                "ci lower": None,
+                "ci upper": None,
             }
 
             for k, v in row.items():
@@ -90,6 +92,10 @@ class AAOutput(Output):
                         rec["difference"] = v
                     elif m == "difference %":
                         rec["difference %"] = v
+                    elif m == "ci lower":
+                        rec["ci lower"] = v
+                    elif m == "ci upper":
+                        rec["ci upper"] = v
 
             for tn in ordered_tests:
                 rec[f"{tn} pass"] = None
