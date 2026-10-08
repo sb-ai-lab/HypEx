@@ -159,8 +159,9 @@ class PandasBisaExtesion(BiasExtension):
         indexes = data[neighbors_cols].raw_data
 
         # Melt the neighbor indexes to long format
-        melted = indexes.stack().reset_index()
-        melted.columns = ["initial_index", "neighbor_col", "match_index"]
+        # `neighbors_cols` is a list with single element
+        melted = indexes.reset_index().explode(column=neighbors_cols[0])
+        melted.columns = ["initial_index", "match_index"]
         melted = melted.dropna(subset=["match_index"])
 
         # filter out dummy match markers (-1) that indicate
