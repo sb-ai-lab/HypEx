@@ -1,0 +1,280 @@
+digraph Architecture{
+    compound=true
+    node[style=filled]
+
+    subgraph modules{
+        node[shape=box3d, fillcolor=violet]
+
+        executor_legend[label="Executor"]
+        // -------
+        experiment_executor_list[label="List[Executor]", shape=folder]
+        experiment_legend[label="Experiment"]
+        experiment_executor_0_in_list[label="Executor 0"]
+        experiment_executor_1_in_list[label="Executor 1"]
+        experiment_executor_dotted_in_list[label="..."]
+        experiment_executor_n_in_list[label="Executor n"]
+        // -------
+        multiexperiment_experiment[label="Experiment"]
+        multiexperiment_analyzer[label="Analyzer"]
+        multiexperiment[label="MultiExperiment"]
+        multiexperiment_execute_experiment[label="Experiment"]
+        multiexperiment_execute_analyzer[label="Analyzer"]
+        // -------
+        spliter_executor[label="Spliter"]
+        // -------
+        stat_executor[label="Stat"]
+        // -------
+        analyzer_executor[label="Analyzer"]
+        // -------
+        transformer_executor[label="Transformer"]
+        // -------
+        operator_executor[label="Operator"]
+        // -------
+        report_experiment[label="Experiment"]
+    }
+
+    subgraph methods{
+        node[shape=box, fillcolor=cornflowerblue]
+        executor_execute_legend[label="execute"]
+        // -------
+        experiment_execute_legend[label="execute"]
+        experiment_execute_0[label="execute 0"]
+        experiment_execute_1[label="execute 1"]
+        experiment_execute_dotted[label="..."]
+        experiment_execute_n[label="execute n"]
+        // -------
+        multiexperiment_execute[label="execute"]
+        multiexperiment_executor_execute[label="execute"]
+        multiexperiment_analyzer_execute[label="execute"]
+        // -------
+        spliter_execute[label="execute"]
+        // -------
+        stat_execute[label="execute"]
+        // -------
+        analyzer_execute[label="execute"]
+        // -------
+        transformer_execute[label="execute"]
+        // -------
+        operator_execute[label="execute"]
+        // -------
+        report_execute[label="execute"]
+    }
+
+    subgraph data{
+        node[shape=note, fillcolor=lightgreen]
+
+        executor_legend_data[label="Dataset"]
+        // -------
+        experiment_legend_data[label="Dataset"]
+        experiment_data_0[label="ExperimentData 0"]
+        experiment_data_1[label="ExperimentData 1"]
+        experiment_data_n[label="ExperimentData n-1"]
+        experiment_data_final[label="ExperimentData n"]
+        // -------
+        multiexperiment_data[label="Dataset"]
+        multiexperiment_executor_experiment_data[label="ExperimentData i"]
+        multiexperiment_executor_result_data[label="ExperimentData"]
+        // -------
+        spliter_data[label="Dataset"]
+        spliter_out_data[shape=record label="Dataset | group column"]
+        // -------
+        stat_data[shape=record label="Dataset | stat target column"]
+        stat_experiment_data[label="ExperimentData"]
+        // -------
+        analyzer_in_data[label="ExperimentData"]
+        analyzer_out_data[label="ExperimentData"]
+        // -------
+        transformer_in_data[label="Dataset"]
+        transformer_out_data[label="Dataset"]
+        // -------
+        operator_in_data[shape=record label="Dataset | x1 | x2"]
+        operator_out_data[label="ExperimentData"]
+        // -------
+        report_in_data[label="ExperimentData"]
+        report_out_data[label="Report artifact"]
+    }
+
+    subgraph attributes{
+        node[shape=record, fillcolor=lightpink]
+        experiment_executor_list_attribute[label="List[Executor]"]
+        report_backend[label="Backend"]
+    }
+
+    subgraph cluster_executors{
+        graph[label="Executors"]
+
+        subgraph cluster_executor{
+            graph[style=dashed, label="Executor"]
+
+            executor_legend_data -> executor_execute_legend
+            executor_legend -> executor_execute_legend [arrowhead=none]
+        }
+
+        subgraph cluster_spliter{
+            graph[style=dashed, label="Spliter"]
+
+            spliter_executor -> spliter_execute [arrowhead=none]
+            spliter_execute -> spliter_out_data
+            spliter_data -> spliter_execute
+        }
+
+        executor_legend -> spliter_executor [
+            style="dotted"
+            arrowhead=curve
+            ltail=cluster_executor
+            lhead=cluster_spliter
+        ]
+
+        subgraph cluster_stats{
+            graph[style=dashed, label="Stats"]
+
+            stat_executor -> stat_execute [arrowhead=none]
+            stat_data -> stat_execute
+            stat_execute -> stat_experiment_data
+        }
+
+        executor_legend -> stat_executor [
+            style="dotted"
+            arrowhead=curve
+            ltail=cluster_executor
+            lhead=cluster_stats
+        ]
+
+        subgraph cluster_analyser{
+            graph[style=dashed, label="Analyser"]
+
+            analyzer_executor -> analyzer_execute [arrowhead=none]
+            analyzer_in_data -> analyzer_execute
+            analyzer_execute -> analyzer_out_data
+        }
+
+        executor_legend -> analyzer_executor [
+            style="dotted"
+            arrowhead=curve
+            ltail=cluster_executor
+            lhead=cluster_analyser
+        ]
+
+        subgraph cluster_transformer{
+            graph[style=dashed, label="Transformer"]
+
+            transformer_executor -> transformer_execute [arrowhead=none]
+            transformer_in_data -> transformer_execute
+            transformer_execute -> transformer_out_data
+        }
+
+        executor_legend -> transformer_executor [
+            style="dotted"
+            arrowhead=curve
+            ltail=cluster_executor
+            lhead=cluster_transformer
+        ]
+
+        subgraph cluster_operator{
+            graph[style=dashed, label="Operator"]
+
+            operator_executor -> operator_execute [arrowhead=none]
+            operator_in_data -> operator_execute
+            operator_execute -> operator_out_data
+        }
+
+        executor_legend -> operator_executor [
+            style="dotted"
+            arrowhead=curve
+            ltail=cluster_executor
+            lhead=cluster_operator
+        ]
+
+    }
+
+    subgraph cluster_experiment{
+        graph[style=dashed, label="Experiment"]
+        experiment_executor_list -> experiment_executor_list_attribute
+        experiment_executor_list_attribute -> experiment_legend [arrowhead=none]
+        experiment_legend -> experiment_execute_legend [arrowhead=none]
+        experiment_legend_data -> experiment_execute_legend
+        experiment_legend_data -> experiment_execute_0 [style=dotted]
+
+        subgraph cluster_experiment_executor{
+            graph[style=dotted, label="execute"]
+            experiment_executor_0_in_list -> experiment_execute_0 [arrowhead=none]
+            experiment_execute_0 -> experiment_data_0 -> experiment_execute_1
+            experiment_executor_1_in_list -> experiment_execute_1 [arrowhead=none]
+            experiment_execute_1 -> experiment_data_1 -> experiment_execute_dotted
+            experiment_executor_dotted_in_list -> experiment_execute_dotted [arrowhead=none]
+            experiment_execute_dotted -> experiment_data_n -> experiment_execute_n
+            experiment_executor_n_in_list -> experiment_execute_n [arrowhead=none]
+            experiment_execute_n -> experiment_data_final
+        }
+
+        experiment_execute_legend -> experiment_execute_0 [
+            arrowhead=none, 
+            lhead=cluster_experiment_executor
+        ]
+    }
+
+    executor_legend -> experiment_legend [
+        style="dotted"
+        arrowhead=curve
+        ltail=cluster_executor
+        lhead=cluster_experiment
+    ]
+
+    subgraph cluster_multiexperiment{
+        graph[style=dashed, label="MultiExperiment"]
+        {multiexperiment_experiment multiexperiment_analyzer} -> multiexperiment [arrowhead=none]
+        multiexperiment -> multiexperiment_execute [arrowhead=none]
+        multiexperiment_data -> multiexperiment_execute
+
+        subgraph cluster_multiexperiment_execute{
+            graph[style=dotted, label="execute"]
+            
+            multiexperiment_execute_experiment -> multiexperiment_executor_execute [arrowhead=none]
+            multiexperiment_execute_analyzer -> multiexperiment_analyzer_execute [arrowhead=none]
+            multiexperiment_executor_execute -> multiexperiment_executor_experiment_data
+            multiexperiment_executor_experiment_data -> multiexperiment_analyzer_execute
+
+            multiexperiment_analyzer_execute -> multiexperiment_executor_result_data
+
+            multiexperiment_executor_result_data -> multiexperiment_executor_execute [
+                style=dashed
+                label="n times"
+            ]
+        }
+
+        multiexperiment_execute -> multiexperiment_executor_execute [
+            arrowhead=none
+            lhead=cluster_multiexperiment_execute
+        ]
+    }
+
+    analyzer_executor -> multiexperiment_analyzer [
+        style="dotted"
+        arrowhead=curve
+        ltail=cluster_analyser
+        lhead=cluster_multiexperiment
+    ]
+
+    experiment_legend -> multiexperiment [
+        style="dotted"
+        arrowhead=curve
+        ltail=cluster_experiment
+        lhead=cluster_multiexperiment
+    ]
+
+    subgraph cluster_report{
+        graph[style=dashed, label="Report"]
+
+        report_backend -> report_experiment [arrowhead=none]
+        report_experiment -> report_execute [arrowhead=none]
+        report_in_data -> report_execute
+        report_execute -> report_out_data
+    }
+
+    experiment_legend -> report_experiment [
+        style="dotted"
+        arrowhead=curve
+        ltail=cluster_experiment
+        lhead=cluster_report
+    ]
+}

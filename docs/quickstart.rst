@@ -34,7 +34,7 @@ A/B Testing
     results = ab_test.execute(data)
 
     # View results
-    print(results.resume)
+    print(results.summary)
 
 A/A Testing
 ~~~~~~~~~~~
@@ -51,7 +51,7 @@ A/A Testing
     results = aa_test.execute(data)
 
     # Check if splits are good
-    print(results.resume)
+    print(results.summary)
 
 Matching
 ~~~~~~~~
@@ -68,4 +68,4 @@ Matching
     results = matching.execute(data)
 
     # View matched pairs and treatment effects
-    print(results.resume)
+    print(results.summary)

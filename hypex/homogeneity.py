@@ -1,8 +1,14 @@
 from .analyzers.aa import OneAAStatAnalyzer
-from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest
+from .comparators import (
+    GroupChi2Test,
+    GroupDifference,
+    GroupKSTest,
+    GroupSizes,
+    GroupTTest,
+)
 from .dataset import TargetRole, TreatmentRole
 from .experiments.base import Experiment, OnRoleExperiment
-from .ui.base import ExperimentShell, ExperimentOutput
+from .ui.base import ExperimentShell
 from .ui.homo import HomoOutput
 
 HOMOGENEITY_TEST = Experiment(
@@ -11,9 +17,9 @@ HOMOGENEITY_TEST = Experiment(
             executors=[
                 GroupSizes(grouping_role=TreatmentRole(), compare_by="groups"),
                 GroupDifference(grouping_role=TreatmentRole(), compare_by="groups"),
-                TTest(grouping_role=TreatmentRole(), compare_by="groups"),
-                KSTest(grouping_role=TreatmentRole(), compare_by="groups"),
-                Chi2Test(grouping_role=TreatmentRole(), compare_by="groups"),
+                GroupTTest(grouping_role=TreatmentRole(), compare_by="groups"),
+                GroupKSTest(grouping_role=TreatmentRole(), compare_by="groups"),
+                GroupChi2Test(grouping_role=TreatmentRole(), compare_by="groups"),
             ],
             role=TargetRole(),
         ),
@@ -48,7 +54,7 @@ class HomogeneityTest(ExperimentShell):
         # Accessing specific test results
         homo_test = HomogeneityTest()
         results = homo_test.execute(data)
-        output = results.resume
+        output = results.summary
 
         # Running test on dataset with roles
         from hypex.dataset import Dataset, TargetRole, TreatmentRole
@@ -67,5 +73,5 @@ class HomogeneityTest(ExperimentShell):
         """Initialize HomogeneityTest with default experiment and output configurations."""
         super().__init__(
             experiment=HOMOGENEITY_TEST,
-            output=ExperimentOutput(main_output=HomoOutput()),
+            output=HomoOutput(),
         )

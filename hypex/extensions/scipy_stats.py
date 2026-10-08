@@ -1,27 +1,41 @@
 from __future__ import annotations
 
 import warnings
-from typing import Callable
+from copy import copy
+from typing import Any, Callable, Sequence
 
+import numpy as np
+import pyspark.sql.functions as F
+from pyspark.sql import DataFrame as SparkDF
 from scipy.stats import (  # type: ignore
     chi2_contingency,
     ks_2samp,
+    kstest,
+    kstwobign,
     mannwhitneyu,
     norm,
     ttest_ind,
 )
 
-from ..dataset import Dataset, DatasetAdapter, StatisticRole
+from ..dataset import Dataset, DatasetAdapter, SmallDataset, StatisticRole
+from ..dataset.backends import PandasDataset, SparkDataset
+from ..dataset.roles import ABCRole
+from ..utils.registry import backend_factory
 from .abstract import CompareExtension
 
 
-class StatTest(CompareExtension):
+class GroupStatTest(CompareExtension):
+    """
+    Master-abstract class for statistic test calculation.
+    """
+
     def __init__(
         self, test_function: Callable | None = None, reliability: float = 0.05
     ):
         super().__init__()
         self.test_function = test_function
         self.reliability = reliability
+        self.default_kwargs: dict[str, Any] = {}
 
     @staticmethod  # TODO: remove
     def check_other(other: Dataset | None) -> Dataset:
@@ -42,86 +56,194 @@ class StatTest(CompareExtension):
 
         return other
 
-    def _calc_pandas(
-        self, data: Dataset, other: Dataset | None = None, **kwargs
-    ) -> Dataset | float:
-        other = self.check_data(data, other)
-        if self.test_function is None:
-            raise ValueError("test_function is needed for execution")
-        one_result = self.test_function(
-            data.backend.data.values.flatten(),
-            other.backend.data.values.flatten(),
-            **kwargs,
+    def _extract_arrays(self, data: Dataset, other: Dataset) -> tuple[Sequence, ...]:
+        raise NotImplementedError(
+            "This method should be realized using backend-dependent mixin."
         )
-        one_result = DatasetAdapter.to_dataset(
+
+    @staticmethod
+    def _form_results(
+        p_value: float | None, statistic: float | None, reliability: float
+    ) -> SmallDataset:
+        p_value = np.nan if np.ma.is_masked(p_value) else p_value
+        statistic = np.nan if np.ma.is_masked(statistic) else statistic
+        return SmallDataset.from_dict(
             {
-                "p-value": one_result.pvalue,
-                "statistic": one_result.statistic,
-                "pass": one_result.pvalue < self.reliability,
+                "p-value": p_value,
+                "statistic": statistic,
+                "pass": p_value < reliability,
             },
             StatisticRole(),
         )
-        return one_result
 
-
-class TTestExtension(StatTest):
-    def __init__(self, reliability: float = 0.05):
-        super().__init__(ttest_ind, reliability=reliability)
-
-    def _calc_pandas(
+    def calc(
         self, data: Dataset, other: Dataset | None = None, **kwargs
-    ) -> Dataset | float:
-        # if (
-        #     next(iter(data.nunique().values()))
-        #     and next(iter(other.nunique().values())) < 2
-        # ):
-        #     return DatasetAdapter.to_dataset(
-        #         {
-        #             "p-value": [None],
-        #             "statistic": [None],
-        #             "pass": [None],
-        #         },
-        #         StatisticRole(),
-        #     )
-        return super()._calc_pandas(data, other, nan_policy="omit", **kwargs)
+    ) -> SmallDataset | float:
+        other = self.check_data(data, other)
+        if self.test_function is None:
+            raise ValueError("test_function is needed for execution")
+        import inspect
+
+        sig = inspect.signature(self.test_function)
+        valid_params = set(sig.parameters.keys())
+        merged_kwargs = {**self.default_kwargs, **kwargs}
+        invalid_keys = set(merged_kwargs.keys()) - valid_params
+        if invalid_keys:
+            import warnings
+
+            warnings.warn(
+                f"The following kwargs are not accepted by "
+                f"{self.test_function.__name__} and will be ignored: "
+                f"{sorted(invalid_keys)}. "
+                f"Valid parameters: {sorted(valid_params)}.",
+                UserWarning,
+                stacklevel=2,
+            )
+            merged_kwargs = {
+                k: v for k, v in merged_kwargs.items() if k in valid_params
+            }
+        res = self.test_function(data._to_numpy(), other._to_numpy(), **merged_kwargs)
+        return self._form_results(res[1], res[0], self.reliability)
 
 
-class KSTestExtension(StatTest):
+class GroupTTestExtension(GroupStatTest):
+    """
+    Master-backend class for statistic test calculation.
+    """
+
+    test_function = staticmethod(ttest_ind)
+
     def __init__(self, reliability: float = 0.05):
-        super().__init__(ks_2samp, reliability=reliability)
+        super().__init__(self.test_function, reliability)
+        self.default_kwargs = {"nan_policy": "omit", "equal_var": False}
 
-    def _calc_pandas(
+    def calc(
         self, data: Dataset, other: Dataset | None = None, **kwargs
-    ) -> Dataset | float:
-        return super()._calc_pandas(data.dropna(), other.dropna() if other is not None else other, **kwargs)
+    ) -> SmallDataset | float:
+        # Map the library-level 'equal_variance' to scipy's 'equal_var'
+        if "equal_variance" in kwargs:
+            kwargs = {
+                **{k: v for k, v in kwargs.items() if k != "equal_variance"},
+                "equal_var": kwargs["equal_variance"],
+            }
+        return super().calc(data, other, **kwargs)
 
 
-class UTestExtension(StatTest):
+class GroupKSTestExtension(GroupStatTest):
+    """
+    Master-backend class for statistic test calculation.
+    """
+
+    test_function = staticmethod(ks_2samp)
+
     def __init__(self, reliability: float = 0.05):
-        super().__init__(mannwhitneyu, reliability=reliability)
-
-    def _calc_pandas(
-        self, data: Dataset, other: Dataset | None = None, **kwargs
-    ) -> Dataset | float:
-        return super()._calc_pandas(data.dropna(), other.dropna() if other is not None else other, **kwargs)
+        super().__init__(self.test_function, reliability)
+        self.default_kwargs = {"nan_policy": "omit"}
 
 
-class Chi2TestExtension(StatTest):
+class GroupUTestExtension(GroupStatTest):
+    """
+    Master-backend class for statistic test calculation.
+    """
+
+    test_function = staticmethod(mannwhitneyu)
+
+    def __init__(self, reliability: float = 0.05):
+        super().__init__(self.test_function, reliability)
+        self.default_kwargs = {"nan_policy": "omit"}
+
+
+class GroupChi2TestExtension(GroupStatTest):
+    """
+    Master-backend class for statistic test calculation.
+    """
+
+    test_function = staticmethod(chi2_contingency)
+
+    def __init__(self, reliability=0.05):
+        super().__init__(self.test_function, reliability)
+
+    def matrix_preparation(self, data: Dataset, other: Dataset) -> Dataset | None:
+        raise NotImplementedError
+
+    def calc(self, data, other=None, **kwargs):
+        other = self.check_data(data, other)
+        contingency_table = self.matrix_preparation(data, other)
+        if contingency_table is None:
+            warnings.warn(f"Matrix Chi2 is empty for {data.columns[0]}. Returning None")
+            return DatasetAdapter.to_dataset(
+                {
+                    "p-value": [None],
+                    "statistic": [None],
+                    "pass": [None],
+                },
+                StatisticRole(),
+            )
+        if isinstance(contingency_table, Dataset):
+            contingency_table = contingency_table.raw_data.values
+        statistic, p_value, *_ = chi2_contingency(contingency_table, **kwargs)
+        return self._form_results(p_value, statistic, self.reliability)
+
+
+@backend_factory.register(GroupKSTestExtension, PandasDataset)
+class PandasKSTestExtension(GroupKSTestExtension):
+    """
+    Slave-backend class for statistical test calculation.
+    """
+
+
+@backend_factory.register(GroupChi2TestExtension, PandasDataset)
+class PandasChi2TestExtension(GroupChi2TestExtension):
+    """Slave-backend class for Chi2 statistical test calculation on Pandas."""
+
     @staticmethod
     def mini_category_replace(counts: Dataset) -> Dataset:
+        """Merge rare categories (count < 7) into a single 'other' bucket.
+
+        Args:
+            counts: Value-counts dataset with a category column and 'count'.
+
+        Returns:
+            Dataset with rare categories aggregated into 'other'.
+        """
         mini_counts = counts["count"][counts["count"] < 7]
         if len(mini_counts) > 0:
+            cat_col = counts.columns[0]
+            # Override the category column's data_type to str because
+            # we are inserting the literal string "other".
+            new_roles: dict[str, ABCRole] = {}
+            for col, role in counts.roles.items():
+                new_role = copy(role)
+                if col == cat_col:
+                    new_role.data_type = str
+                new_roles[col] = new_role
+
             counts = counts.append(
-                Dataset.from_dict(
-                    [{counts.columns[0]: "other", "count": mini_counts["count"].sum()}],
-                    roles=mini_counts.roles,
-                )
+                DatasetAdapter.to_dataset(
+                    {
+                        cat_col: ["other"],
+                        "count": [int(mini_counts["count"].sum())],
+                    },
+                    roles=new_roles,
+                    small=False,
+                ),
+                reset_index=True,  # FIX: prevent duplicate index labels
             )
-            counts = counts[counts["count"] >= 7]
+        counts = counts[counts["count"] >= 7]
         return counts
 
     def matrix_preparation(self, data: Dataset, other: Dataset) -> Dataset | None:
+        """Build a 2×K contingency table from two categorical samples.
+
+        Args:
+            data: Baseline group dataset (single categorical column).
+            other: Compared group dataset (single categorical column).
+
+        Returns:
+            Contingency table as a Dataset, or None if degenerate.
+        """
         proportion = len(data) / (len(data) + len(other))
+
         counted_data = data.value_counts()
         counted_data = self.mini_category_replace(counted_data)
         data_vc = counted_data["count"] * (1 - proportion)
@@ -132,53 +254,209 @@ class Chi2TestExtension(StatTest):
 
         if len(counted_data) < 2:
             return None
-        data_vc = data_vc.add_column(counted_data[counted_data.columns[0]])
-        other_vc = other_vc.add_column(counted_data[counted_data.columns[0]])
-        return data_vc.merge(other_vc, on=counted_data.columns[0])[
-            ["count_x", "count_y"]
-        ].fillna(0)
 
-    def _calc_pandas(
+        col_name = str(counted_data.columns[0])
+        col_role = counted_data.roles.get(col_name, StatisticRole())
+
+        data_vc = data_vc.add_column(
+            counted_data[col_name].raw_data,
+            role={col_name: col_role},
+        )
+
+        other_vc = other_vc.add_column(
+            counted_other[col_name].raw_data,  # FIX: was counted_data (typo)
+            role={col_name: col_role},
+        )
+
+        return data_vc.merge(other_vc, on=col_name)[["count_x", "count_y"]].fillna(0)
+
+
+@backend_factory.register(GroupKSTestExtension, SparkDataset)
+class SparkKSTestExtension(GroupKSTestExtension):
+    """
+    Slave-backend class for statistical test calculation.
+    """
+
+    def __init__(self, reliability=0.05, n_bins: int = 1000):
+        super().__init__(reliability)
+        self.n_bins = n_bins
+
+    def calc(
         self, data: Dataset, other: Dataset | None = None, **kwargs
-    ) -> Dataset | float:
+    ) -> SmallDataset | float:
+        """
+        Compute the two-sample Kolmogorov-Smirnov (KS) test for PySpark-backed datasets.
+
+        This method approximates the continuous KS test by discretizing the data into
+        a fixed number of histogram bins (`self.n_bins`) across the global range of
+        both datasets. It then computes the Empirical Cumulative Distribution Functions
+        (ECDFs) for both groups and finds the maximum absolute difference (D-statistic).
+        Finally, it calculates the p-value using the asymptotic Kolmogorov distribution
+        (`kstwobign`) with Stephens' correction for finite sample sizes.
+
+        Args:
+            data (Dataset): The baseline dataset. Must contain exactly one numeric column.
+            other (Dataset | None): The comparison dataset. Must contain exactly one numeric column.
+            **kwargs: Additional keyword arguments (ignored in this implementation).
+
+        Returns:
+            Dataset | float: A SmallDataset containing the following fields:
+                - 'p-value': The calculated p-value (float or None).
+                - 'statistic': The KS D-statistic (float or None).
+                - 'pass': Boolean flag indicating if p-value < self.reliability.
+        """
+
+        def _add_bucket_column(
+            df: SparkDF, global_min: int, global_max: int
+        ) -> SparkDF:
+            """
+            Helper function to assign each row to a discrete histogram bin.
+            Uses the global min/max to ensure both datasets share the exact same bin edges.
+            """
+            width = (global_max - global_min) / self.n_bins
+            return df.withColumn(
+                "bucket",
+                F.least(
+                    F.floor((F.col(col) - global_min) / width),
+                    F.lit(
+                        self.n_bins - 1
+                    ),  # Cap at the last bin to handle the max value edge case
+                ).cast("int"),
+            )
+
+        # Pandas version uses nan policy "omit"
+        nan_policy = kwargs.get("nan_policy", "omit")
+        # Validate inputs and ensure both datasets are single-column and compatible
         other = self.check_data(data, other)
-        matrix = self.matrix_preparation(data, other)
-        if matrix is None:
-            warnings.warn(f"Matrix Chi2 is empty for {data.columns[0]}. Returning None")
-            return DatasetAdapter.to_dataset(
-                {
-                    "p-value": [None],
-                    "statistic": [None],
-                    "pass": [None],
-                },
+        df1 = data.raw_data.to_spark()
+        df2 = other.raw_data.to_spark()
+        col = data.columns[0]
+
+        # ── NaN processing in accordance with nan_policy in scipy ──────────────────────────────
+        if nan_policy == "raise":
+            null_count_1 = df1.filter(F.col(col).isNull() | F.isnan(F.col(col))).count()
+            null_count_2 = df2.filter(F.col(col).isNull() | F.isnan(F.col(col))).count()
+            if null_count_1 > 0 or null_count_2 > 0:
+                raise ValueError(
+                    f"NaN values found in data (dataset1: {null_count_1}, dataset2: {null_count_2}). "
+                    "Use nan_policy='omit' to remove them or nan_policy='propagate' to return NaN."
+                )
+
+        elif nan_policy == "propagate":
+            null_count_1 = df1.filter(F.col(col).isNull() | F.isnan(F.col(col))).count()
+            null_count_2 = df2.filter(F.col(col).isNull() | F.isnan(F.col(col))).count()
+            if null_count_1 > 0 or null_count_2 > 0:
+                return SmallDataset.from_dict(
+                    {"p-value": float("nan"), "statistic": float("nan"), "pass": None},
+                    StatisticRole(),
+                )
+
+        elif nan_policy == "omit":
+            # same as scipy's nan_policy="omit": drop NaN / null before everything else
+            df1 = df1.filter(F.col(col).isNotNull() & ~F.isnan(F.col(col)))
+            df2 = df2.filter(F.col(col).isNotNull() & ~F.isnan(F.col(col)))
+
+        # Get sample sizes
+        n1 = df1.count()
+        n2 = df2.count()
+
+        # Edge case: one or both datasets are empty
+        if n1 == 0 or n2 == 0:
+            return SmallDataset.from_dict(
+                {"p-value": None, "statistic": None, "pass": None}, StatisticRole()
+            )
+
+        # Compute global minimum and maximum across both datasets to define common bin edges
+        bounds1 = df1.agg(F.min(col).alias("min1"), F.max(col).alias("max1")).collect()[
+            0
+        ]
+        bounds2 = df2.agg(F.min(col).alias("min2"), F.max(col).alias("max2")).collect()[
+            0
+        ]
+
+        global_min = min(bounds1["min1"], bounds2["min2"])
+        global_max = max(bounds1["max1"], bounds2["max2"])
+
+        # Edge case: all values in both datasets are identical (zero variance)
+        if global_min == global_max:
+            return SmallDataset.from_dict(
+                {"p-value": 1.0, "statistic": 0.0, "pass": 1.0 < self.reliability},
                 StatisticRole(),
             )
-        one_result = chi2_contingency(matrix.backend.data)
-        return DatasetAdapter.to_dataset(
+
+        # Compute histograms (frequency counts per bin) for both datasets
+        hist1 = (
+            _add_bucket_column(df=df1, global_min=global_min, global_max=global_max)
+            .groupBy("bucket")
+            .count()
+            .withColumnRenamed("count", "c1")
+        )
+        hist2 = (
+            _add_bucket_column(df=df2, global_min=global_min, global_max=global_max)
+            .groupBy("bucket")
+            .count()
+            .withColumnRenamed("count", "c2")
+        )
+
+        # Outer join histograms to align bins, filling missing bins with 0 counts
+        combined = hist1.join(hist2, on="bucket", how="outer").fillna(
+            0, subset=["c1", "c2"]
+        )
+
+        # Convert to Pandas for efficient cumulative sum (ECDF calculation).
+        # Note: The number of rows here is at most `self.n_bins`, so it safely fits in driver memory.
+        pdf = combined.toPandas().sort_values("bucket").reset_index(drop=True)
+        pdf["cum1"] = pdf["c1"].cumsum()
+        pdf["cum2"] = pdf["c2"].cumsum()
+
+        # Calculate the KS statistic: maximum absolute difference between the two ECDFs
+        d_stat = float((pdf["cum1"] / n1 - pdf["cum2"] / n2).abs().max())
+
+        try:
+            # Calculate effective sample size for the asymptotic distribution
+            en = np.sqrt(n1 * n2 / (n1 + n2))
+
+            # Apply Stephens' correction (1970) for better accuracy with finite samples.
+            # This is the exact formula used internally by scipy.stats.ks_2samp for large samples.
+            p_value = float(kstwobign.sf((en + 0.12 + 0.11 / en) * d_stat))
+        except Exception:
+            # Fallback to 0.0 if the statistical function fails (e.g., due to extreme values)
+            p_value = 0.0
+
+        # Return the results as a standardized SmallDataset
+        return SmallDataset.from_dict(
             {
-                "p-value": (
-                    one_result[1]
-                    if isinstance(one_result, tuple)
-                    else one_result.pvalue
-                ),
-                "statistic": (
-                    one_result[0]
-                    if isinstance(one_result, tuple)
-                    else one_result.statistic
-                ),
-                "pass": (
-                    one_result[1]
-                    if isinstance(one_result, tuple)
-                    else one_result.pvalue
-                )
-                < self.reliability,
+                "p-value": p_value,
+                "statistic": d_stat,
+                "pass": p_value < self.reliability,
             },
             StatisticRole(),
         )
 
 
-class NormCDF(StatTest):
-    def _calc_pandas(
+@backend_factory.register(GroupChi2TestExtension, SparkDataset)
+class SparkChi2TestExtension(GroupChi2TestExtension):
+    """
+    Slave-backend class for statistical test calculation.
+    """
+
+    @staticmethod
+    def matrix_preparation(data: Dataset, other: Dataset) -> Dataset | None:
+        other = np.array(
+            other.raw_data.to_spark().rdd.flatMap(lambda row: row).collect()
+        )
+        data = np.array(data.raw_data.to_spark().rdd.flatMap(lambda row: row).collect())
+        unique_values = set(other) | set(data)
+        contingency_table = np.zeros((2, len(unique_values)))
+        for index, element in enumerate(unique_values):
+            contingency_table[0, index] = len(data[data == element])
+            contingency_table[1, index] = len(other[other == element])
+
+        return contingency_table
+
+
+class NormCDF(GroupStatTest):
+    def calc(
         self, data: Dataset, other: Dataset | None = None, **kwargs
     ) -> Dataset | float:
         result = norm.cdf(abs(data.get_values()[0][0]))
@@ -186,3 +464,11 @@ class NormCDF(StatTest):
             {"p-value": 2 * (1 - result)},
             StatisticRole(),
         )
+
+
+class UniformCheck(GroupStatTest):
+    def calc(self, data: Dataset, other: Dataset | None = None, **kwargs) -> Dataset:
+        data = data.raw_data.to_numpy().flatten()
+        res = kstest(data, "uniform")
+
+        return self._form_results(res[1], res[0], self.reliability)

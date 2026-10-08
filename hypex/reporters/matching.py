@@ -1,86 +1,176 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from ..analyzers.matching import MatchingAnalyzer
-from ..comparators import Chi2Test, KSTest, TTest
+from ..comparators import (
+    BaseComparator,
+    GroupChi2Test,
+    GroupKSTest,
+    GroupTTest,
+    StatsChi2Test,
+    StatsKSTest,
+    StatsTTest,
+    StatsUTest,
+)
 from ..dataset import Dataset, ExperimentData
 from ..ml import FaissNearestNeighbors
-from ..reporters.abstract import DatasetReporter, DictReporter, TestDictReporter
 from ..utils import (
     ID_SPLIT_SYMBOL,
     MATCHING_INDEXES_SPLITTER_SYMBOL,
+    BackendsEnum,
     ExperimentDataEnum,
+)
+from ..utils.logger import logger
+from .abstract import (
+    DatasetReporter,
+    DictReporter,
+    extract_tests,
 )
 
 
-class MatchingDictReporter(DictReporter):
-    def __init__(self, searching_class: type = MatchingAnalyzer):
-        self.searching_class = searching_class
-        super().__init__()
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
+class MatchingReporter(DatasetReporter):
+    """Reporter for matching experiment results.
 
-    @staticmethod
-    def _convert_dataset_to_dict(data: Dataset) -> dict[str, Any]:
-        dict_data = data.to_dict()["data"]
-        indexes = dict_data["index"]
-        df = dict_data["data"]
-        result = {}
-        for key, values in df.items():
-            for index, value in zip(indexes, values):
-                result[f"{key}{ID_SPLIT_SYMBOL}{index}"] = value
+    Extracts treatment effect metrics and matched neighbor indices,
+    formatting them into a structured dataset or dictionary.
+    """
+
+    def __init__(
+        self,
+        searching_class: type = MatchingAnalyzer,
+        output_format: Literal["dict", "dataset"] = "dataset",
+    ):
+        """Initialize the matching reporter.
+
+        Args:
+            searching_class: The analyzer class used to compute matching metrics.
+            output_format: The desired output format ('dict' or 'dataset').
+        """
+        dict_rep = DictReporter()
+        super().__init__(dict_rep, output_format)
+        self.searching_class = searching_class
+
+    def _report(self, data: ExperimentData) -> dict[str, Any]:
+        """Construct the internal dictionary report for matching.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            A dictionary containing analyzer metrics and matched indices.
+        """
+        result = self._extract_from_analyser(data)
+        if self.searching_class == MatchingAnalyzer:
+            result.update(self._extract_indexes(data))
         return result
 
-    def _extract_from_analyser(self, data: ExperimentData):
+    def _extract_from_analyser(self, data: ExperimentData) -> dict[str, Any]:
+        """Extract flattened metrics from the matching analyzer table.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            A flat dictionary mapping composite keys to metric values.
+        """
         analyzer_id = data.get_one_id(
             self.searching_class, ExperimentDataEnum.analysis_tables
         )
-        return self._convert_dataset_to_dict(data.analysis_tables[analyzer_id])
-
-    @staticmethod
-    def _extract_from_additional_fields(data: ExperimentData):
-        indexes_id = data.get_ids(
-            FaissNearestNeighbors, ExperimentDataEnum.additional_fields
-        )[FaissNearestNeighbors.__name__][ExperimentDataEnum.additional_fields.value]
+        table = data.analysis_tables[analyzer_id].raw_data
         return {
-            f"indexes{ID_SPLIT_SYMBOL}{column.split(ID_SPLIT_SYMBOL)[3]}": MATCHING_INDEXES_SPLITTER_SYMBOL.join(
-                str(i)
-                for i in data.additional_fields[column].to_dict()["data"]["data"][
-                    column
-                ]
-            )
-            for column in indexes_id
+            f"{col}{ID_SPLIT_SYMBOL}{idx}": val
+            for col in table.columns
+            for idx, row in table.iterrows()
+            for val in [row[col]]
         }
 
-    def report(self, experiment_data: ExperimentData):
-        result = {}
-        result.update(self._extract_from_analyser(experiment_data))
-        if self.searching_class == MatchingAnalyzer:
-            result.update(self._extract_from_additional_fields(experiment_data))
-        return result
+    def _extract_indexes(self, data: ExperimentData) -> dict[str, str]:
+        """Extract matched neighbor indices from additional fields.
+
+        For the Pandas backend, values are collected to the driver and
+        joined into a splitter-delimited string (legacy summary format).
+
+        For the Spark backend, returns an empty dict: matched indices
+        already exist as lazy ``AdditionalMatchingRole`` columns of
+        ``data.ds`` (merged by ``ExperimentData._set_additional_fields``
+        and aligned to ``ds.index``). They are consumed directly by
+        ``MatchingOutput.extract`` without any driver collection.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            A dictionary mapping composite index keys to joined index
+            strings, or an empty dict for the Spark backend.
+        """
+        if data.ds.backend_type == BackendsEnum.spark:
+            return {}
+
+        ids = data.get_ids(FaissNearestNeighbors, ExperimentDataEnum.additional_fields)[
+            FaissNearestNeighbors.__name__
+        ][ExperimentDataEnum.additional_fields.value]
+
+        return {
+            f"indexes{ID_SPLIT_SYMBOL}{col.split(ID_SPLIT_SYMBOL)[3]}": MATCHING_INDEXES_SPLITTER_SYMBOL.join(
+                str(int(i)) if isinstance(i, float) and i.is_integer() else str(i)
+                for i in data.additional_fields[col]._to_numpy()
+            )
+            for col in ids
+        }
 
 
-class MatchingQualityDictReporter(TestDictReporter):
-    tests: ClassVar[list] = [TTest, KSTest, Chi2Test]
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
+class MatchingQualityReporter(DatasetReporter):
+    """Reporter for matching quality tests (T-Test, KS-Test, Chi2-Test)."""
 
-    def report(self, data: ExperimentData) -> dict[str, Any]:
-        return self.extract_tests(data)
+    tests: ClassVar[list[type[BaseComparator]]] = [
+        GroupTTest,
+        GroupKSTest,
+        GroupChi2Test,
+        StatsTTest,
+        StatsKSTest,
+        StatsChi2Test,
+        StatsUTest,
+    ]
+
+    def _report(self, data: ExperimentData) -> dict:
+        """Extract quality test outcomes.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            A dictionary of test pass flags and p-values.
+        """
+        return extract_tests(data, self.tests, self.front)
 
 
-class MatchingQualityDatasetReporter(MatchingQualityDictReporter):
-    @classmethod
-    def convert_flat_dataset(cls, data: dict) -> Dataset:
-        struct_dict = cls._get_struct_dict(data)
-        return cls._convert_struct_dict_to_dataset(struct_dict)
+@logger.log_methods(log_args=False, log_result=False, private=True, static=True)
+class MatchingAnalysisTableReporter(MatchingReporter):
+    """Reporter that returns the matching analyzer table as a dataset.
 
-    def report(self, data: ExperimentData):
-        front_buffer = self.front
-        self.front = False
-        dict_report = super().report(data)
-        self.front = front_buffer
-        return self.convert_flat_dataset(dict_report)
+    Used by ``GroupExperiment`` (``group_match=True``) where each group result
+    is the analyzer table itself.
+    """
 
+    def __init__(self, searching_class=MatchingAnalyzer):
+        super().__init__(searching_class, output_format="dataset")
 
-class MatchingDatasetReporter(DatasetReporter):
-    def __init__(self, searching_class: type = MatchingAnalyzer) -> None:
-        self.dict_reporter = MatchingDictReporter(searching_class)
-        super().__init__(self.dict_reporter)
+    def report(self, data: ExperimentData) -> Dataset:
+        """Directly return the valid dataset from MatchingAnalyzer.
+
+        Bypasses the broken dict-to-dataset conversion via TestDictReporter
+        that previously returned an empty dataset due to key parsing mismatches.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            The pre-computed matching metrics dataset.
+        """
+        analyzer_id = data.get_one_id(
+            self.searching_class, ExperimentDataEnum.analysis_tables
+        )
+        return data.analysis_tables[analyzer_id].to_dataset()

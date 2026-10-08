@@ -1,29 +1,60 @@
 from __future__ import annotations
 
 from ..dataset import Dataset
+from ..dataset.backends import PandasDataset
 from ..extensions.scipy_stats import (
-    Chi2TestExtension,
-    KSTestExtension,
-    TTestExtension,
-    UTestExtension,
+    GroupChi2TestExtension,
+    GroupKSTestExtension,
+    GroupTTestExtension,
+    GroupUTestExtension,
 )
 from ..utils.constants import NUMBER_TYPES_LIST
-from .abstract import StatHypothesisTesting
+from ..utils.registry import backend_factory
+from .abstract import GroupHypothesisTesting
+from .comparators import Chi2Test, KSTest, TTest, UTest
 
 
-class TTest(StatHypothesisTesting):
-    """Two-sample t-test for numeric targets.
+@backend_factory.register(TTest, PandasDataset)
+class GroupTTest(GroupHypothesisTesting):
+    @property
+    def search_types(self) -> list[type] | None:
+        return NUMBER_TYPES_LIST
 
-    Compares group means using Welch's t-test (unequal variances assumed).
-    Operates on raw data slices via scipy. For Spark workloads prefer the
-    aggregated-stats variant exposed through :class:`hypex.comparators.AggTTest`.
+    @classmethod
+    def _inner_function(
+        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
+    ) -> Dataset:
+        return GroupTTestExtension(kwargs.get("reliability", 0.05)).calc(
+            data, other=test_data, **kwargs
+        )
 
-    Args:
-        compare_by: Comparison mode (``"groups"``, ``"columns"``, etc.).
-        grouping_role: Role that identifies the group column.
-        target_role: Role that identifies the numeric target column(s).
-        reliability: Significance level α (default 0.05).
-        key: Optional label for this test instance.
+
+@backend_factory.register(KSTest, PandasDataset)
+class GroupKSTest(GroupHypothesisTesting):
+    @property
+    def search_types(self) -> list[type] | None:
+        return NUMBER_TYPES_LIST
+
+    @classmethod
+    def _inner_function(
+        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
+    ) -> Dataset:
+        test_cls = backend_factory.resolve_backend(GroupKSTestExtension, data)
+        return test_cls(kwargs.get("reliability", 0.05)).calc(
+            data, other=test_data, **kwargs
+        )
+
+
+@backend_factory.register(UTest, PandasDataset)
+class GroupUTest(GroupHypothesisTesting):
+    """Mann-Whitney U test for Pandas backend.
+
+    Uses ``scipy.stats.mannwhitneyu`` on raw arrays collected to the
+    driver.  For the Spark backend, ``StatsUTest`` (registered via
+    ``@backend_factory.register(UTest, SparkDataset)`` in
+    ``stats_hypothesis_testing.py``) is used instead — it computes
+    the U statistic from pre-aggregated histograms without collecting
+    raw data.
     """
 
     @property
@@ -34,79 +65,13 @@ class TTest(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return TTestExtension(kwargs.get("reliability", 0.05)).calc(
+        return GroupUTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
 
 
-class KSTest(StatHypothesisTesting):
-    """Two-sample Kolmogorov-Smirnov test for numeric targets.
-
-    Tests whether two groups are drawn from the same distribution without
-    assuming normality. Operates on raw data slices via scipy.
-
-    Args:
-        compare_by: Comparison mode (``"groups"``, ``"columns"``, etc.).
-        grouping_role: Role that identifies the group column.
-        target_role: Role that identifies the numeric target column(s).
-        reliability: Significance level α (default 0.05).
-        key: Optional label for this test instance.
-    """
-
-    @property
-    def search_types(self) -> list[type] | None:
-        return NUMBER_TYPES_LIST
-
-    @classmethod
-    def _inner_function(
-        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ) -> Dataset:
-        return KSTestExtension(kwargs.get("reliability", 0.05)).calc(
-            data, other=test_data, **kwargs
-        )
-
-
-class UTest(StatHypothesisTesting):
-    """Mann-Whitney U test (Wilcoxon rank-sum) for numeric targets.
-
-    Non-parametric alternative to the t-test; compares rank distributions
-    rather than means. Operates on raw data slices via scipy.
-
-    Args:
-        compare_by: Comparison mode (``"groups"``, ``"columns"``, etc.).
-        grouping_role: Role that identifies the group column.
-        target_role: Role that identifies the numeric target column(s).
-        reliability: Significance level α (default 0.05).
-        key: Optional label for this test instance.
-    """
-
-    @property
-    def search_types(self) -> list[type] | None:
-        return NUMBER_TYPES_LIST
-
-    @classmethod
-    def _inner_function(
-        cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ) -> Dataset:
-        return UTestExtension(kwargs.get("reliability", 0.05)).calc(
-            data, other=test_data, **kwargs
-        )
-
-
-class Chi2Test(StatHypothesisTesting):
-    """Chi-square test of independence for categorical targets.
-
-    Tests whether the distribution of a categorical column differs
-    significantly between groups. Operates on raw data slices via scipy.
-
-    Args:
-        compare_by: Comparison mode (``"groups"``, ``"columns"``, etc.).
-        grouping_role: Role that identifies the group column.
-        target_role: Role that identifies the categorical target column(s).
-        reliability: Significance level α (default 0.05).
-        key: Optional label for this test instance.
-    """
-
+@backend_factory.register(Chi2Test, PandasDataset)
+class GroupChi2Test(GroupHypothesisTesting):
     @property
     def search_types(self) -> list[type] | None:
         return [str]
@@ -115,6 +80,7 @@ class Chi2Test(StatHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        return Chi2TestExtension(reliability=kwargs.get("reliability", 0.05)).calc(
+        test_cls = backend_factory.resolve_backend(GroupChi2TestExtension, data)
+        return test_cls(reliability=kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )

@@ -1,0 +1,6 @@
+name: HypEx CodeQL config
+
+# The tests define deliberately broken classes and bare expressions to check
+# that validation rejects them; the quality queries flag those on purpose.
+paths-ignore:
+  - tests

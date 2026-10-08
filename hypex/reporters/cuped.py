@@ -1,97 +1,69 @@
-"""CUPED-specific reporter for extracting variance reduction metrics."""
+"""Reporters for CUPED variance reduction results."""
 
 from __future__ import annotations
 
-from ..dataset import Dataset, ExperimentData, InfoRole, StatisticRole
-from . import Reporter
+from typing import Any
+
+from ..dataset import ExperimentData, SmallDataset
+from ..dataset.roles import InfoRole, StatisticRole
+from ..transformers.cuped import CUPEDTransformer
+from ..utils import ExperimentDataEnum
+from .abstract import Reporter
 
 
 class CupedReporter(Reporter):
-    """Reporter for extracting CUPED analysis results from experiment data."""
-    
-    def report(self, data: ExperimentData) -> Dataset | None:
-        """Generate summary resume for CUPED results."""
-        return self.extract_resume(data)
+    """Extracts CUPED variance-reduction metrics from ``analysis_tables``.
 
-    @staticmethod
-    def extract_resume(data: ExperimentData) -> Dataset | str:
-        """Generate summary resume for CUPED results.
-        
+    Produces a ``SmallDataset`` with one row per target feature:
+
+    +------------------+---------------------------+
+    | feature          | variance_reduction_pct    |
+    +==================+===========================+
+    | post_spends      | 42.7                      |
+    +------------------+---------------------------+
+
+    Args:
+        output_format: ``"dataset"`` (default) or ``"dict"``.
+    """
+
+    def report(self, data: ExperimentData) -> SmallDataset | dict[str, Any]:
+        """Generate the CUPED variance-reduction report.
+
         Args:
-            data: Experiment data containing variance reduction metrics
-            
+            data: The experiment data container.
+
         Returns:
-            Dataset with target, covariate, and variance_reduction columns
+            A ``SmallDataset`` or dict with variance-reduction metrics.
         """
-        variance_cols = [
-            col
-            for col in data.additional_fields.columns
-            if col.endswith("_variance_reduction")
-        ]
-        
-        if not variance_cols:
-            return "No CUPED data available"
-
-        # Extract CUPED features mapping from additional_fields column names
-        resume_data = []
-        for col in variance_cols:
-            metric_name = col.replace("_variance_reduction", "")
-            reduction_value = data.additional_fields.data[col].iloc[0]
-            
-            # Try to find covariate name from dataset roles or use simple format
-            covariate = f"{metric_name.replace('_cuped', '')}_lag"
-            
-            resume_data.append({
-                "target": metric_name.replace("_cuped", ""),
-                "covariate": covariate,
-                "variance_reduction": f"{reduction_value:.1f}%"
-            })
-
-        return Dataset.from_dict(
-            data=resume_data,
-            roles={
-                "target": InfoRole(str),
-                "covariate": InfoRole(str),
-                "variance_reduction": InfoRole(str),
-            },
+        ids = data.get_ids(
+            CUPEDTransformer,
+            searched_space=ExperimentDataEnum.analysis_tables,
         )
+        table_ids = ids.get(CUPEDTransformer.__name__, {}).get(
+            ExperimentDataEnum.analysis_tables.value,
+            [],
+        )
+        if not table_ids:
+            return SmallDataset.create_empty()
 
-    @staticmethod
-    def extract_variance_reductions(data: ExperimentData) -> Dataset | str:
-        """Generate variance reduction report for CUPED transformations.
-        
-        Args:
-            data: Experiment data containing variance reduction metrics in additional_fields
-            
-        Returns:
-            Dataset with variance reduction metrics or error message string
-        """
-        variance_cols = [
-            col
-            for col in data.additional_fields.columns
-            if col.endswith("_variance_reduction")
-        ]
-        
-        if not variance_cols:
-            return "No variance reduction data available. Ensure CUPED was applied."
+        table = data.analysis_tables[table_ids[0]]
+        records = table.to_records()
+        if not records:
+            return SmallDataset.create_empty()
 
-        # Create report data
-        report_data = []
-        for col in variance_cols:
-            metric_name = col.replace("_variance_reduction", "")
-            # Get the scalar value from the additional_fields
-            reduction_value = data.additional_fields.data[col].iloc[0]
-            report_data.append(
+        rows: list[dict[str, Any]] = []
+        for record in records:
+            rows.append(
                 {
-                    "Transformed Metric Name": metric_name,
-                    "Variance Reduction (%)": reduction_value,
+                    "feature": record.get("feature"),
+                    "variance_reduction_pct": record.get("variance_reduction_pct"),
                 }
             )
 
-        return Dataset.from_dict(
-            data=report_data,
+        return SmallDataset.from_dict(
+            rows,
             roles={
-                "Transformed Metric Name": InfoRole(str),
-                "Variance Reduction (%)": StatisticRole(),
+                "feature": InfoRole(str),
+                "variance_reduction_pct": StatisticRole(float),
             },
         )

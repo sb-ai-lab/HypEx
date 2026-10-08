@@ -4,19 +4,22 @@ import numpy as np
 from scipy.stats import norm  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
 
-from ..dataset import Dataset, DatasetAdapter, StatisticRole
-from ..utils import ID_SPLIT_SYMBOL, ABNTestMethodsEnum
+from ..dataset import Dataset, DatasetAdapter, InfoRole, StatisticRole
+from ..utils import ID_SPLIT_SYMBOL, ABNTestMethodsEnum, BackendsEnum
+from ..utils.constants import TEST_NAME_NORMALIZATION
 from .abstract import Extension
 
 
 class MultiTest(Extension):
-    """Multiple-testing correction over the p-values of an A/B/n test.
+    """Applies multiple testing correction to a collection of p-values.
 
-    The resulting table holds the p-value of every comparison before and after
-    the correction, and ``H0 rejected``: whether the null hypothesis of that
-    comparison - the groups do not differ - is rejected at ``alpha`` once the
-    correction is applied. ``False`` means there is not enough evidence against
-    it, not that the groups are the same.
+    Wraps ``statsmodels.stats.multitest.multipletests`` and exposes it
+    through the HypEx ``Extension`` interface so that both Pandas and
+    Spark backends are supported transparently.
+
+    Attributes:
+        method: The correction method (e.g. ``holm``, ``bonferroni``).
+        alpha: Family-wise error rate. Defaults to ``0.05``.
     """
 
     def __init__(self, method: ABNTestMethodsEnum, alpha: float = 0.05):
@@ -26,10 +29,10 @@ class MultiTest(Extension):
 
     @staticmethod
     def _index_parts(index) -> tuple[list[str], list[str], list[str]]:
-        """Split the ids of the p-values into test, field and group labels.
+        """Split composite p-value IDs into test, field and group labels.
 
-        An id is ``test<sep>params<sep>field`` and, when the p-value belongs to a
-        particular test group, ``<sep>group`` on top of that.
+        An id is ``test<sep>params<sep>field`` and, when the p-value
+        belongs to a particular test group, ``<sep>group`` on top.
         """
         parts = [str(i).split(ID_SPLIT_SYMBOL) for i in index]
         tests = [part[0] for part in parts]
@@ -38,13 +41,75 @@ class MultiTest(Extension):
         return tests, fields, groups
 
     def _calc_pandas(self, data: Dataset, **kwargs):
-        p_values = data.data.values.flatten()
-        tests, fields, groups = self._index_parts(data.index)
+        """Apply multiple testing correction to a Pandas-backed collection of p-values.
+
+        Parses the composite index of *data* to identify which statistical test
+        family (e.g. TTest, KSTest, Chi2Test) each p-value belongs to, then
+        applies ``statsmodels.stats.multitest.multipletests`` **independently
+        within each family**.  This ensures that corrections such as Holm or
+        Bonferroni control the family-wise error rate per test type rather
+        than across all heterogeneous comparisons simultaneously.
+
+        The workflow is:
+        1. Flatten the p-value matrix into a 1-D array.
+        2. Decompose each index label into ``(test, field, group)`` via
+           :meth:`_index_parts`.
+        3. Normalize raw test class names (e.g. ``StatsTTest`` → ``TTest``)
+           using :data:`~hypex.utils.constants.TEST_NAME_NORMALIZATION`.
+        4. For every unique test family, collect the corresponding p-values
+           and call ``multipletests(..., method=self.method.value,
+           alpha=self.alpha)``.
+        5. Assemble the results into a :class:`Dataset` with one row per
+           original p-value.
+
+        Args:
+            data: A Pandas-backed ``Dataset`` whose values are raw,
+                uncorrected p-values.  The index must follow the composite
+                format ``test<sep>params<sep>field[<sep>group]`` (see
+                :data:`~hypex.utils.constants.ID_SPLIT_SYMBOL`).
+            **kwargs: Additional keyword arguments forwarded directly to
+                ``statsmodels.stats.multitest.multipletests`` (e.g.
+                ``maxiter`` for iterative methods).
+
+        Returns:
+            Dataset: A new ``Dataset`` (via ``DatasetAdapter.to_dataset``)
+            with the following columns, all assigned
+            :class:`~hypex.dataset.StatisticRole`:
+
+            - ``"field"`` – the metric / feature name extracted from the
+              index.
+            - ``"test"`` – the normalized test family name (e.g.
+              ``"TTest"``).
+            - ``"old p-value"`` – the original, uncorrected p-value.
+            - ``"new p-value"`` – the p-value after correction.
+            - ``"correction"`` – the ratio ``old / new`` (``0.0`` when the
+              old p-value is zero).
+            - ``"rejected"`` – boolean flag indicating whether the null
+              hypothesis is rejected at ``self.alpha`` after correction.
+            - ``"group"`` – the compared-group label extracted from the
+              index (empty string when not applicable).
+
+        Raises:
+            ValueError: If ``data`` contains no p-values or the index
+                format is incompatible with :meth:`_index_parts`.
+
+        Example:
+            .. code-block:: python
+
+                multitest = MultiTest(method=ABNTestMethodsEnum.holm, alpha=0.05)
+                corrected_ds = multitest._calc_pandas(p_value_dataset)
+                print(corrected_ds[["test", "old p-value", "new p-value", "rejected"]])
+        """
+        p_values = data.raw_data.values.flatten()
+        tests_raw, fields, groups = self._index_parts(data.index)
+
+        # Normalize BEFORE grouping into families
+        tests = [TEST_NAME_NORMALIZATION.get(t, t) for t in tests_raw]
 
         corrected = np.empty(len(p_values), dtype=float)
         rejected = np.empty(len(p_values), dtype=bool)
-        # every statistical test is a family of its own: the same metric checked
-        # by a t-test and by a u-test must not inflate the correction of the other
+
+        # Correction per statistical test family
         for test in dict.fromkeys(tests):
             positions = [i for i, name in enumerate(tests) if name == test]
             test_rejected, test_corrected = multipletests(
@@ -59,7 +124,6 @@ class MultiTest(Extension):
         return DatasetAdapter.to_dataset(
             {
                 "field": fields,
-                "group": groups,
                 "test": tests,
                 "old p-value": p_values,
                 "new p-value": corrected,
@@ -67,13 +131,26 @@ class MultiTest(Extension):
                     old / new if old != 0 else 0.0
                     for new, old in zip(corrected, p_values)
                 ],
-                "H0 rejected": rejected,
+                "rejected": rejected,
+                "group": groups,
             },
             StatisticRole(),
         )
 
+    def _calc_spark(self, data: Dataset, **kwargs):
+        """Delegate to the Pandas implementation via to_backend().
+
+        Multiple-testing correction operates on a small, already-collected
+        array of p-values (one per test × group), so converting to Pandas
+        on the driver is safe.
+        """
+        pandas_ds = data.to_backend(BackendsEnum.pandas)
+        return self._calc_pandas(pandas_ds, **kwargs)
+
 
 class MultitestQuantile(Extension):
+    """Resampling-based quantile multiple testing correction (pandas only)."""
+
     def __init__(
         self,
         alpha: float = 0.05,
@@ -87,18 +164,22 @@ class MultitestQuantile(Extension):
         self.random_state = random_state
         super().__init__()
 
+    def _calc_spark(self, data: Dataset, **kwargs):
+        raise NotImplementedError(
+            "MultitestQuantile is not supported on the Spark backend. "
+            "Use the pandas backend or another multitest_method "
+            "(e.g. 'holm', 'bonferroni')."
+        )
+
     def _calc_pandas(self, data: Dataset, **kwargs):
         group_field = kwargs.get("group_field")
         target_field = kwargs.get("target_field")
         quantiles = kwargs.get("quantiles")
         num_samples = len(data.unique()[group_field])
         sample_size = len(data)
-        grouped_data = data.groupby(by=group_field, fields_list=target_field)
-        means = [sample[1].agg("mean") for sample in grouped_data]
-        variances = [
-            sample[1].agg("var") * sample_size / (sample_size - 1)
-            for sample in grouped_data
-        ]
+        grouped_data = list(data[[group_field, target_field]].groupby(group_field))
+        means = [sample[1][target_field].agg("mean") for sample in grouped_data]
+        variances = [sample[1][target_field].agg("var") for sample in grouped_data]
         if num_samples != len(means) or num_samples != len(variances):
             num_samples = min(num_samples, len(means), len(variances))
         if type(quantiles) is float:
@@ -122,10 +203,11 @@ class MultitestQuantile(Extension):
             if min_t_value > quantiles[j]:
                 return DatasetAdapter.to_dataset(
                     {"field": target_field, "accepted hypothesis": j + 1},
-                    StatisticRole(),
+                    {"field": InfoRole(str), "accepted hypothesis": StatisticRole(int)},
                 )
         return DatasetAdapter.to_dataset(
-            {"field": target_field, "accepted hypothesis": 0}, StatisticRole()
+            {"field": target_field, "accepted hypothesis": 0},
+            {"field": InfoRole(str), "accepted hypothesis": StatisticRole(int)},
         )
 
     def quantile_of_marginal_distribution(

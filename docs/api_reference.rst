@@ -74,7 +74,7 @@ Extend these to implement custom comparators.
    :template: autosummary/class.rst
 
    comparators.Comparator
-   comparators.StatHypothesisTesting
+   comparators.StatsHypothesisTesting
 
 Splitters
 ---------
@@ -112,7 +112,8 @@ Pre-processing steps applied to :class:`~hypex.dataset.Dataset` objects.
 Experiments
 -----------
 
-Pipeline runners that chain executors over :class:`~hypex.dataset.ExperimentData`.
+Pipeline runners that chain executors over
+:class:`~hypex.dataset.ExperimentData`.
 
 .. autosummary::
    :toctree: _autosummary
@@ -135,8 +136,6 @@ Reporters
    reporters.Reporter
    reporters.DatasetReporter
    reporters.DictReporter
-   reporters.HomoDatasetReporter
-   reporters.HomoDictReporter
 
 Operators
 ---------

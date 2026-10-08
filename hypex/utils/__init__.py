@@ -1,8 +1,12 @@
+from .adapter import Adapter
 from .constants import (
     ID_SPLIT_SYMBOL,
     MATCHING_INDEXES_SPLITTER_SYMBOL,
     NAME_BORDER_SYMBOL,
     NUMBER_TYPES_LIST,
+    UTILITY_COL_SYMBOL,
+    UTILITY_INDEX_COL_NAME,
+    UTILITY_PHYSICAL_INDEX_COL_NAME,
 )
 from .enums import (
     ABNTestMethodsEnum,
@@ -25,6 +29,13 @@ from .errors import (
     RoleColumnError,
     SpaceError,
 )
+from .index_utils import CachingIndex, FaissIndexStorage
+from .logger import HypExLogger, ProcessContext, logger
+from .naming import _parse_metric_col, normalize_test_name
+from .profiling import ProfilingContext, disable_profiling, enable_profiling, timeit
+from .registry import BackendFactory
+from .spark_config import SparkSessionCalculator
+from .strict_abc import StrictABC, StrictABCMeta
 from .tutorial_data_creation import (
     create_test_data,
     gen_control_variates_df,
@@ -38,11 +49,15 @@ from .typings import (
     DocstringInheritDecorator,
     FeatureRoleTypes,
     FromDictTypes,
+    GenericManager,
     GroupingDataType,
+    ListLikeTypes,
     MultiFieldKeyTypes,
     RoleNameType,
     ScalarType,
     SetParamsDictTypes,
+    SourceDataTypes,
+    SparkTypeMapper,
     StratificationRoleTypes,
     TargetRoleTypes,
 )
@@ -52,11 +67,17 @@ __all__ = [
     "MATCHING_INDEXES_SPLITTER_SYMBOL",
     "NAME_BORDER_SYMBOL",
     "NUMBER_TYPES_LIST",
+    "UTILITY_COL_SYMBOL",
+    "UTILITY_INDEX_COL_NAME",
+    "UTILITY_PHYSICAL_INDEX_COL_NAME",
     "ABNTestMethodsEnum",
     "ABTestTypesEnum",
     "AbstractMethodError",
+    "Adapter",
+    "BackendFactory",
     "BackendTypeError",
     "BackendsEnum",
+    "CachingIndex",
     "CategoricalTypes",
     "ConcatBackendError",
     "ConcatDataError",
@@ -65,25 +86,39 @@ __all__ = [
     "DefaultRoleTypes",
     "DocstringInheritDecorator",
     "ExperimentDataEnum",
+    "FaissIndexStorage",
     "FeatureRoleTypes",
     "FromDictTypes",
+    "GenericManager",
     "GroupingDataType",
+    "HypExLogger",
+    "ListLikeTypes",
     "MergeOnError",
     "MultiFieldKeyTypes",
     "NoColumnsError",
     "NoRequiredArgumentError",
     "NotFoundInExperimentDataError",
     "NotSuitableFieldError",
+    "ProcessContext",
+    "ProfilingContext",
     "RoleColumnError",
     "RoleNameType",
     "ScalarType",
     "SetParamsDictTypes",
+    "SourceDataTypes",
     "SpaceEnum",
     "SpaceError",
+    "SparkSessionCalculator",
     "StratificationRoleTypes",
+    "StrictABC",
+    "StrictABCMeta",
     "TargetRoleTypes",
+    "_parse_metric_col",
     "create_test_data",
+    "disable_profiling",
+    "enable_profiling",
     "gen_control_variates_df",
     "gen_oracle_df",
     "gen_special_medicine_df",
+    "logger",
 ]

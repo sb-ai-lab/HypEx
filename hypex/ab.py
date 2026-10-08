@@ -4,15 +4,21 @@ import warnings
 from typing import Literal
 
 from .analyzers.ab import ABAnalyzer
-from .comparators import Chi2Test, GroupDifference, GroupSizes, KSTest, TTest, UTest
+from .comparators import (
+    Chi2Test,
+    GroupDifference,
+    GroupSizes,
+    KSTest,
+    TTest,
+    UTest,
+)
 from .dataset import AdditionalTargetRole, TargetRole, TreatmentRole
 from .executor.executor import Executor
 from .experiments.base import Experiment, OnRoleExperiment
 from .transformers import CUPEDTransformer
+from .transformers.float32_caster import Float32Caster
 from .ui.ab import ABOutput
-from .ui.base import ExperimentShell, ExperimentOutput
-from .ui.cupac import CupacOutput
-from .ui.cuped import CupedOutput
+from .ui.base import ExperimentShell
 from .utils import ABNTestMethodsEnum, ABTestTypesEnum
 
 
@@ -58,6 +64,7 @@ class ABTest(ExperimentShell):
         cuped_features: dict[str, str] | None,
         cupac_models: str | list[str] | None,
         enable_cupac: bool,
+        float32: bool = False,
     ) -> Experiment:
         test_mapping: dict[str, Executor] = {
             "t-test": TTest(compare_by="groups", grouping_role=TreatmentRole()),
@@ -71,14 +78,13 @@ class ABTest(ExperimentShell):
         additional_tests = (
             [ABTestTypesEnum.t_test] if additional_tests is None else additional_tests
         )
-        multitest_method = (
-            ABNTestMethodsEnum(multitest_method)
-            if (
-                multitest_method is not None
-                and multitest_method in ABNTestMethodsEnum.__members__.values()
-            )
-            else ABNTestMethodsEnum.holm
-        )
+        if (
+            multitest_method is not None
+            and multitest_method in ABNTestMethodsEnum._value2member_map_
+        ):
+            multitest_method = ABNTestMethodsEnum(multitest_method)
+        else:
+            multitest_method = ABNTestMethodsEnum.holm
         if additional_tests:
             if isinstance(additional_tests, list):
                 additional_tests = [
@@ -116,13 +122,19 @@ class ABTest(ExperimentShell):
                 )
             ),
         ]
+        insert_pos = 0
         if cuped_features:
-            executors.insert(0, CUPEDTransformer(cuped_features=cuped_features))
-
+            executors.insert(
+                insert_pos, CUPEDTransformer(cuped_features=cuped_features)
+            )
+            insert_pos += 1
         if enable_cupac:
             from .ml import CUPACExecutor
 
-            executors.insert(0, CUPACExecutor(cupac_models=cupac_models))
+            executors.insert(insert_pos, CUPACExecutor(cupac_models=cupac_models))
+            insert_pos += 1
+        if float32:
+            executors.insert(insert_pos, Float32Caster())
 
         return Experiment(executors=executors)
 
@@ -151,32 +163,28 @@ class ABTest(ExperimentShell):
         cuped_features: dict[str, str] | None = None,
         cupac_models: str | list[str] | None = None,
         enable_cupac: bool = False,
-        **kwargs,
+        float32: bool = False,
+        t_test_equal_var: bool | None = None,
     ):
         """
         Args:
             additional_tests: Statistical test(s) to run in addition to the default group difference calculation. Valid options are 't-test', 'u-test', 'chi2-test' or ABTestTypesEnum.t_test, ABTestTypesEnum.u_test, and ABTestTypesEnum.chi2_test. Can be a single test name/enum or list of test names/enums. Defaults to [ABTestTypesEnum.t_test].
             multitest_method: Method to use for multiple testing correction. Valid options are ABNTestMethodsEnum.bonferroni, ABNTestMethodsEnum.sidak, etc. Defaults to ABNTestMethodsEnum.holm.
-            equal_variance: Whether to use equal variance in t-test (optional).
+            t_test_equal_var: Whether to use equal variance in t-test (optional).
             cuped_features: dict[str, str] — Dictionary {target_feature: pre_target_feature} for CUPED. Only dict is allowed.
             cupac_models: str | list[str] — model name (e.g. 'linear', 'ridge', 'lasso', 'catboost') or list of model names to try. If None, all available models will be tried and the best will be selected by variance reduction.
             enable_cupac: bool — Enable CUPAC variance reduction. CUPAC configuration is extracted from dataset.features_mapping.
         """
-        additional_outputs = {}
-        if enable_cupac:
-            additional_outputs['cupac'] = CupacOutput()
-        if cuped_features:
-            additional_outputs['cuped'] = CupedOutput()
-
-        if "t_test_equal_var" in kwargs:
+        if t_test_equal_var is not None:
             warnings.warn(
-                "t_test_equal_var is deprecated and will be removed in a future version. "
-                "Use equal_variance instead.",
+                "t_test_equal_var is deprecated and will be removed in a "
+                "future version. Use equal_variance instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            if equal_variance is None:
-                equal_variance = kwargs.pop("t_test_equal_var")
+        if equal_variance is None:
+            equal_variance = t_test_equal_var
+
         super().__init__(
             experiment=self._make_experiment(
                 additional_tests,
@@ -184,17 +192,15 @@ class ABTest(ExperimentShell):
                 cuped_features,
                 cupac_models,
                 enable_cupac,
+                float32=float32,
             ),
-            output=ExperimentOutput(
-                main_output=ABOutput(),
-                additional_outputs=additional_outputs
-        ),
+            output=ABOutput(
+                enable_cuped=cuped_features is not None,
+                enable_cupac=enable_cupac,
+            ),
         )
+
         if equal_variance is not None:
             self.experiment.set_params(
-                {TTest: {"calc_kwargs": {"equal_var": equal_variance}}}
-            )
-        else:
-            self.experiment.set_params(
-                {TTest: {"calc_kwargs": {"equal_var": False}}}
+                {TTest: {"calc_kwargs": {"equal_variance": equal_variance}}}
             )

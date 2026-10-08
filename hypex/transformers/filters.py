@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
-from ..dataset.dataset import Dataset, ExperimentData
+from ..dataset.dataset import Dataset
+from ..dataset.experiment_data import ExperimentData
 from ..dataset.roles import FeatureRole, InfoRole, PreTargetRole, TargetRole
 from ..utils.adapter import Adapter
 from .abstract import Transformer
@@ -272,8 +274,9 @@ class OutliersFilter(Transformer):
         upper_percentile: float = 1,
     ) -> Dataset:
         mask = data[target_cols].apply(
-            func=lambda x: (x < x.quantile(lower_percentile))
-            | (x > x.quantile(upper_percentile)),
+            func=lambda x: (
+                (x < x.quantile(lower_percentile)) | (x > x.quantile(upper_percentile))
+            ),
             role={column: InfoRole() for column in target_cols},
             axis=0,
         )

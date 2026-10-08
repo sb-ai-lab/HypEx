@@ -1,0 +1,36 @@
+# Local autofix layer. The hook versions here must match the pinned versions in
+# tox.ini's `lint` and `codespell` environments, otherwise a commit can be
+# cleaned up by one Ruff and rejected by another in CI.
+#
+#   poetry install --with dev
+#   poetry run pre-commit install
+#
+# To rewrite the whole tree instead of just the staged files, use
+# `tox -e format` (or `poetry run pre-commit run --all-files`).
+default_language_version:
+  python: python3
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.6
+    hooks:
+      # --fix here, never in CI: this rewrites the working tree, which is what
+      # you want on your own machine and exactly what you don't want in a
+      # throwaway checkout that then reports success.
+      - id: ruff-check
+        args: [--fix]
+      # Must follow ruff-check: a fix can leave code that needs reformatting.
+      - id: ruff-format
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.3
+    hooks:
+      # Report only. Spelling "fixes" applied without a human reading them
+      # rewrite identifiers and statistical notation.
+      - id: codespell
+        additional_dependencies: ["tomli"]
+        # pre-commit hands the hook the staged files, so codespell never walks
+        # the tree and never applies `skip` from pyproject.toml. This mirrors
+        # that list; keep the two in step, or a commit gets rejected over a
+        # file CI does not check.
+        exclude: ^(docs/|imgs/|schemes/|poetry\.lock$)|\.ipynb$

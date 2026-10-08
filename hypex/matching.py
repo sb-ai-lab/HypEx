@@ -12,9 +12,9 @@ from .experiments import GroupExperiment
 from .experiments.base import Experiment, OnRoleExperiment
 from .ml.faiss import FaissNearestNeighbors
 from .operators.operators import Bias, MatchingMetrics
-from .reporters.matching import MatchingDatasetReporter
+from .reporters.matching import MatchingAnalysisTableReporter
 from .transformers import TypeCaster
-from .ui.base import ExperimentShell, ExperimentOutput
+from .ui.base import ExperimentShell
 from .ui.matching import MatchingOutput
 
 
@@ -143,10 +143,6 @@ class Matching(ExperimentShell):
         two_sides = metric == "ate"
         test_pairs = metric == "atc"
         executors: list[Executor] = [
-            TypeCaster(
-                dtype={int: float},
-                roles=[FeatureRole(), TargetRole()],
-            ),
             FaissNearestNeighbors(
                 grouping_role=TreatmentRole(),
                 two_sides=two_sides,
@@ -186,13 +182,20 @@ class Matching(ExperimentShell):
         executors = (
             executors if distance == "l2" else [distance_mapping[distance], *executors]
         )
+        executors = [
+            TypeCaster(
+                dtype={int: float},
+                roles=[FeatureRole(), TargetRole()],
+            ),
+            *executors,
+        ]
         executors = executors if not encode_categories else [DummyEncoder(), *executors]
         return (
             Experiment(executors=executors)
             if not group_match
             else GroupExperiment(
                 executors=executors,
-                reporter=MatchingDatasetReporter(),
+                reporter=MatchingAnalysisTableReporter(),
             )
         )
 
@@ -214,6 +217,8 @@ class Matching(ExperimentShell):
         n_neighbors: int = 1,
         weights: dict[str, float] | None = None,
         encode_categories: bool = True,
+        extract_full_data: bool = False,
+        compute_indexes: bool = False,
     ):
         metric = "ate"
         super().__init__(
@@ -228,7 +233,9 @@ class Matching(ExperimentShell):
                 weights,
                 encode_categories,
             ),
-            output=ExperimentOutput(
-                main_output=MatchingOutput(GroupExperiment if group_match else MatchingAnalyzer)
+            output=MatchingOutput(
+                GroupExperiment if group_match else MatchingAnalyzer,
+                extract_full_data=extract_full_data,
+                compute_indexes=compute_indexes,
             ),
         )

@@ -1,21 +1,25 @@
 from __future__ import annotations
 
-from typing import Any
+from ..comparators import (
+    GroupChi2Test,
+    GroupKSTest,
+    GroupTTest,
+)
+from ..dataset import ExperimentData
+from .abstract import (
+    DatasetReporter,
+    extract_group_difference,
+    extract_group_sizes,
+    extract_tests,
+)
 
-from ..dataset import Dataset, ExperimentData
-from .aa import OneAADictReporter
-from .abstract import DatasetReporter
 
-
-class HomoDictReporter(OneAADictReporter):
-    def report(self, data: ExperimentData) -> dict[str, Any]:
-        return self.extract_data_from_analysis_tables(data)
-
-
-class HomoDatasetReporter(DatasetReporter):
-    def __init__(self):
-        super().__init__(dict_reporter=HomoDictReporter(front=False))
-
-    @staticmethod
-    def convert_to_dataset(data: dict) -> dict[str, Dataset] | Dataset:
-        return HomoDictReporter.convert_flat_dataset(data)
+class HomogeneityReporter(DatasetReporter):
+    def _report(self, data: ExperimentData) -> dict:
+        result = {}
+        result.update(extract_group_sizes(data, self.front))
+        result.update(extract_group_difference(data, self.front))
+        result.update(
+            extract_tests(data, [GroupTTest, GroupKSTest, GroupChi2Test], self.front)
+        )
+        return result

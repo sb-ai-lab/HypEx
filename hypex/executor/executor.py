@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import html
+import inspect
 from abc import ABC, abstractmethod
-from typing import Any, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from ..dataset import (
     ABCRole,
@@ -9,6 +12,7 @@ from ..dataset import (
     Dataset,
     ExperimentData,
     FeatureRole,
+    GroupedDataset,
     GroupingRole,
     TargetRole,
 )
@@ -20,9 +24,24 @@ from ..utils import (
     SetParamsDictTypes,
 )
 from ..utils.adapter import Adapter
+from ..utils.constants import NAME_BORDER_SYMBOL
 
 
 class Executor(ABC):
+    # Maximum number of list / dict elements expanded into separate
+    # sub-cells before the rendered output is truncated.
+    _HTML_MAX_ITEMS: int = 10
+    # Inline CSS applied to every nested HTML table.
+    _HTML_TABLE: str = (
+        "border-collapse:collapse; margin:2px 0 2px 10px; "
+        "font-family:monospace; font-size:12px;"
+    )
+    # Inline CSS applied to every HTML table cell.
+    _HTML_CELL: str = (
+        "border:1px solid #d0d0d0; padding:2px 8px; "
+        "text-align:left; vertical-align:top;"
+    )
+
     def __init__(
         self,
         key: Any = "",
@@ -114,6 +133,159 @@ class Executor(ABC):
     def execute(self, data: ExperimentData) -> ExperimentData:
         raise AbstractMethodError
 
+    def get_params(self, deep: bool = False):
+        """Return the initialization parameters of this executor.
+
+        Mirrors the ``scikit-learn`` ``get_params`` API: the signature of
+        ``__init__`` of the concrete class is inspected and the current
+        value of every named argument is read from the instance attribute
+        with the same name (falling back to the declared default).
+
+        Args:
+            deep: If ``True``, parameters of nested objects that implement
+                ``get_params`` are collected recursively and stored under
+                ``<name>__<nested_name>`` keys. Defaults to ``False``.
+
+        Returns:
+            A mapping ``{parameter_name: current_value}`` for every named
+            ``__init__`` argument. ``*args`` / ``**kwargs`` are skipped.
+        """
+        init_params = inspect.signature(self.__init__).parameters
+        out: dict[str, Any] = {}
+
+        for name, param in init_params.items():
+            if name == "self":
+                continue
+
+            #  **kwargs
+            if param.kind == param.VAR_POSITIONAL:
+                stored = getattr(self, name, None)
+                if isinstance(stored, dict):
+                    out.update(stored)
+                continue
+
+            # *args
+            if param.kind == param.VAR_KEYWORD:
+                continue
+
+            value = getattr(self, name, param.default)
+
+            if deep and hasattr(value, "get_params") and not isinstance(value, type):
+                deep_items = value.get_params().items()
+                out.update(
+                    (name + NAME_BORDER_SYMBOL + k, val) for k, val in deep_items
+                )
+
+            out[name] = value
+
+        return out
+
+    def _repr_params(self) -> dict[str, Any]:
+        """Collect the parameters shown by ``__repr__`` and ``_repr_html_``.
+
+        Equivalent to ``get_params(deep=False)`` with one addition: when
+        ``calc_kwargs`` was passed through ``**kwargs`` (and therefore is
+        absent from the ``__init__`` signature), it is appended to the
+        result so that implicitly passed calculation options stay visible.
+
+        Returns:
+            A mapping ``{parameter_name: value}`` ready to be rendered.
+        """
+        params = self.get_params(deep=False)
+        if (
+            hasattr(self, "calc_kwargs")
+            and self.calc_kwargs
+            and "calc_kwargs" not in params
+        ):
+            params = {**params, "calc_kwargs": self.calc_kwargs}
+        return params
+
+    @classmethod
+    def _html_value(cls, value: Any) -> str:
+        """Render a single parameter value as an HTML snippet.
+
+        Rendering rules (applied recursively):
+
+        * :class:`Executor` -- a collapsible ``<details>`` block whose
+          content is the executor's own parameter table;
+        * ``range`` -- a compact ``repr`` (ranges such as
+          ``random_states`` may contain thousands of elements);
+        * ``list`` / ``tuple`` -- a sub-table with one row per element,
+          truncated after ``_HTML_MAX_ITEMS`` rows;
+        * ``Mapping`` -- a sub-table with one row per key; class objects
+          used as keys are displayed via their ``__name__``;
+        * any other value -- an escaped ``repr`` inside a ``<pre>`` block.
+
+        Args:
+            value: The parameter value to render.
+
+        Returns:
+            An HTML string safe for embedding into a table cell.
+        """
+        if isinstance(value, Executor):
+            return (
+                f"<details><summary style='cursor:pointer; font-family:monospace;'>"
+                f"<b>{type(value).__name__}</b></summary>"
+                f"{value._repr_html_()}</details>"
+            )
+        if isinstance(value, range):
+            return f"<pre style='margin:0;'>{html.escape(repr(value))}</pre>"
+        if isinstance(value, (list, tuple)):
+            items = list(value)
+            truncated = len(items) > cls._HTML_MAX_ITEMS
+            shown = items[: cls._HTML_MAX_ITEMS] if truncated else items
+            body = "".join(
+                f"<tr>"
+                f"<td style='{cls._HTML_CELL}; color:#999;'>[{i}]</td>"
+                f"<td style='{cls._HTML_CELL}'>{cls._html_value(item)}</td>"
+                f"</tr>"
+                for i, item in enumerate(shown)
+            )
+            if truncated:
+                body += (
+                    f"<tr><td colspan='2' style='{cls._HTML_CELL}; color:#999;'>"
+                    f"… and also {len(items) - cls._HTML_MAX_ITEMS}</td></tr>"
+                )
+            return f"<table style='{cls._HTML_TABLE}'>{body}</table>"
+        if isinstance(value, Mapping):
+            body = "".join(
+                f"<tr>"
+                f"<td style='{cls._HTML_CELL}'><code>"
+                f"{html.escape(getattr(k, '__name__', None) or repr(k))}</code></td>"
+                f"<td style='{cls._HTML_CELL}'>{cls._html_value(v)}</td>"
+                f"</tr>"
+                for k, v in value.items()
+            )
+            return f"<table style='{cls._HTML_TABLE}'>{body}</table>"
+        return f"<pre style='margin:0;'>{html.escape(repr(value))}</pre>"
+
+    def __repr__(self) -> str:
+        class_name = self.__class__.__name__
+        params = self._repr_params()
+        if not params:
+            return f"{class_name}()"
+        params_str = ", ".join(f"{k}={v!r}" for k, v in params.items())
+        return f"{class_name}({params_str})"
+
+    def _repr_html_(self) -> str:
+        rows = "".join(
+            f"<tr>"
+            f"<td style='{self._HTML_CELL}'><code>{html.escape(str(name))}</code></td>"
+            f"<td style='{self._HTML_CELL}'>{self._html_value(value)}</td>"
+            f"</tr>"
+            for name, value in self._repr_params().items()
+        )
+        header = (
+            f"<tr><th style='{self._HTML_CELL}'>Parameter</th>"
+            f"<th style='{self._HTML_CELL}'>Value</th></tr>"
+        )
+        return (
+            f"<div style='font-family:monospace; display:inline-block;'>"
+            f"<b>{html.escape(type(self).__name__)}</b>"
+            f"<table style='{self._HTML_TABLE}'>{header}{rows}</table>"
+            f"</div>"
+        )
+
 
 class Calculator(Executor, ABC):
     @classmethod
@@ -122,7 +294,7 @@ class Calculator(Executor, ABC):
 
     @staticmethod
     @abstractmethod
-    def _inner_function(data: Dataset, **kwargs) -> Any:
+    def _inner_function(data: Dataset, *args, **kwargs) -> Any:
         raise AbstractMethodError
 
     @property
@@ -186,19 +358,23 @@ class MLExecutor(Calculator, ABC):
     def _execute_inner_function(
         cls,
         grouping_data,
+        tmp_roles,
         target_field: str | None = None,
         **kwargs,
     ) -> Any:
+        (_, _data), (_, _test_data), *_ = grouping_data
+        _data.tmp_roles = tmp_roles
+
         if target_field:
             return cls._inner_function(
-                data=grouping_data[0][1].drop(target_field),
-                target_data=grouping_data[0][1][target_field],
-                test_data=grouping_data[1][1].drop(target_field),
+                data=_data.drop(columns=target_field),
+                target_data=_data[target_field],
+                test_data=_test_data.drop(columns=target_field),
                 **kwargs,
             )
         return cls._inner_function(
-            data=grouping_data[0][1],
-            test_data=grouping_data[1][1],
+            data=_data,
+            test_data=_test_data,
             **kwargs,
         )
 
@@ -220,7 +396,8 @@ class MLExecutor(Calculator, ABC):
         cls,
         data: Dataset,
         group_field: Sequence[str] | str | None = None,
-        grouping_data: list[tuple[str, Dataset]] | None = None,
+        # grouping_data: list[tuple[str, Dataset]] | None = None,
+        grouping_data: GroupedDataset | None = None,
         target_field: str | list[str] | None = None,
         features_fields: str | list[str] | None = None,
         **kwargs,
@@ -228,13 +405,14 @@ class MLExecutor(Calculator, ABC):
         group_field = Adapter.to_list(group_field)
         features_fields = Adapter.to_list(features_fields)
         if grouping_data is None:
-            grouping_data = data.groupby(group_field, fields_list=features_fields)
+            grouping_data = data[group_field + features_fields].groupby(group_field)
         if len(grouping_data) > 1:
-            grouping_data[0][1].tmp_roles = data.tmp_roles
+            # grouping_data[0][1].tmp_roles = data.tmp_roles
+            tmp_roles = data.tmp_roles
         else:
             raise NotSuitableFieldError(group_field, "Grouping")
         result = cls._execute_inner_function(
-            grouping_data, target_field=target_field, **kwargs
+            grouping_data, tmp_roles, target_field=target_field, **kwargs
         )
         return result
 
