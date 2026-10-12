@@ -1,6 +1,7 @@
 # hypex/ui/matching.py
 from __future__ import annotations
 
+import html
 import warnings
 from typing import Any
 
@@ -567,3 +568,130 @@ class MatchingOutput(Output):
             )
             logger.debug("Skipping full_data extraction (extract_full_data=False).")
         self.summary.raw_data = self.summary.raw_data.round(2)
+        
+    def _effect_rows(self) -> list[dict[str, Any]]:
+        """Extract ATT/ATC/ATE rows from summary."""
+        rows: list[dict[str, Any]] = []
+        if not hasattr(self, "summary") or self.summary is None:
+            return rows
+        try:
+            recs = self.summary.to_records()
+            for r in recs:
+                idx = r.get("index", r.get("data", ""))
+                estimate = r.get("Effect Size")
+                se = r.get("Standard Error")
+                pval = r.get("P-value")
+                ci_lo = r.get("CI Lower")
+                ci_hi = r.get("CI Upper")
+                rows.append({
+                    "metric": str(idx),
+                    "estimate": estimate,
+                    "se": se,
+                    "p_value": pval,
+                    "ci_lower": ci_lo,
+                    "ci_upper": ci_hi,
+                })
+        except Exception:
+            pass
+        return rows
+
+    def _quality_summary(self) -> dict[str, int]:
+        """Count pass/fail from quality_results."""
+        result: dict[str, int] = {"ok": 0, "not_ok": 0, "total": 0}
+        if not hasattr(self, "quality_results") or self.quality_results is None:
+            return result
+        try:
+            recs = self.quality_results.to_records()
+            for r in recs:
+                result["total"] += 1
+                # Any column ending with " pass"
+                any_fail = False
+                for k, v in r.items():
+                    if k.endswith(" pass") and v == "NOT OK":
+                        any_fail = True
+                if any_fail:
+                    result["not_ok"] += 1
+                else:
+                    result["ok"] += 1
+        except Exception:
+            pass
+        return result
+
+    def __repr__(self) -> str:
+        lines = ["MatchingOutput"]
+
+        # Treatment effects
+        effects = self._effect_rows()
+        if effects:
+            lines.append("")
+            for e in effects:
+                pval = e["p_value"]
+                significant = pval is not None and pval < 0.05
+                icon = "✅" if significant else "⚠️"
+                est = f"{e['estimate']:.2f}" if e["estimate"] is not None else "—"
+                se = f"{e['se']:.2f}" if e["se"] is not None else "—"
+                pval_str = f"{pval:.4f}" if pval is not None else "—"
+                lines.append(
+                    f"  {icon} {e['metric']:<6s}  "
+                    f"estimate={est}  SE={se}  p={pval_str}"
+                )
+
+        # Quality
+        q = self._quality_summary()
+        if q["total"] > 0:
+            lines.append(f"  Quality: {q['ok']}/{q['total']} passed")
+
+        lines.append("")
+        lines.append(repr(self._report()))
+        return "\n".join(lines)
+
+    def _repr_html_(self) -> str:
+        parts: list[str] = [
+            "<div style='font-family:monospace; display:inline-block;'>",
+            "<b style='font-size:14px;'>MatchingOutput</b>",
+        ]
+
+        # Treatment effects table
+        effects = self._effect_rows()
+        if effects:
+            parts.append(
+                "<table style='border-collapse:collapse; margin:6px 0; font-size:12px;'>"
+                "<tr>"
+                "<th style='padding:2px 8px; text-align:left;'>Metric</th>"
+                "<th style='padding:2px 8px; text-align:right;'>Estimate</th>"
+                "<th style='padding:2px 8px; text-align:right;'>SE</th>"
+                "<th style='padding:2px 8px; text-align:right;'>p-value</th>"
+                "<th style='padding:2px 8px; text-align:center;'>Sig.</th>"
+                "</tr>"
+            )
+            for e in effects:
+                pval = e["p_value"]
+                significant = pval is not None and pval < 0.05
+                color = "#2e7d32" if significant else "#c62828"
+                icon = "✅" if significant else "⚠️"
+                est = f"{e['estimate']:.2f}" if e["estimate"] is not None else "—"
+                se = f"{e['se']:.2f}" if e["se"] is not None else "—"
+                pval_str = f"{pval:.4f}" if pval is not None else "—"
+                parts.append(
+                    "<tr>"
+                    f"<td style='padding:2px 8px; font-weight:bold;'>{html.escape(str(e['metric']))}</td>"
+                    f"<td style='padding:2px 8px; text-align:right;'>{est}</td>"
+                    f"<td style='padding:2px 8px; text-align:right;'>{se}</td>"
+                    f"<td style='padding:2px 8px; text-align:right; color:{color};'>{pval_str}</td>"
+                    f"<td style='padding:2px 8px; text-align:center;'>{icon}</td>"
+                    "</tr>"
+                )
+            parts.append("</table>")
+
+        # Quality summary
+        q = self._quality_summary()
+        if q["total"] > 0:
+            color = "#2e7d32" if q["not_ok"] == 0 else "#f57f17"
+            parts.append(
+                f"<div style='margin:4px 0; font-size:12px; color:{color};'>"
+                f"Quality tests: {q['ok']}/{q['total']} passed</div>"
+            )
+
+        parts.append(self._report()._repr_html_())
+        parts.append("</div>")
+        return "".join(parts)
