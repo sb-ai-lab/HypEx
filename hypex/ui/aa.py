@@ -12,6 +12,7 @@ from ..utils.constants import (
     TEST_NAME_NORMALIZATION,
 )
 from ..utils.enums import RenameEnum
+from ..utils.logger import logger
 from ..utils.naming import normalize_test_name
 from .base import Output
 
@@ -256,7 +257,8 @@ class AAOutput(Output):
                 stats["passed"] = sum(1 for p in passes if p)
                 stats["total"] = len(passes)
             except Exception:
-                pass
+                # best-effort: splitter_id column may be absent
+                logger.debug("AAOutput._summary_stats: failed to parse best_split_statistics")
 
         # Best split id
         if hasattr(self, "best_split_statistics") and self.best_split_statistics is not None:
