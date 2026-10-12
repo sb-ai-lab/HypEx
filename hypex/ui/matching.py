@@ -568,7 +568,7 @@ class MatchingOutput(Output):
             )
             logger.debug("Skipping full_data extraction (extract_full_data=False).")
         self.summary.raw_data = self.summary.raw_data.round(2)
-        
+
     def _effect_rows(self) -> list[dict[str, Any]]:
         """Extract ATT/ATC/ATE rows from summary."""
         rows: list[dict[str, Any]] = []
