@@ -1,4 +1,6 @@
+import html
 import math
+from typing import Any
 
 from ..analyzers.aa import AADryTestAnalyzer, AAScoreAnalyzer
 from ..dataset import Dataset, ExperimentData, InfoRole, SmallDataset, StatisticRole
@@ -232,3 +234,90 @@ class AAOutput(Output):
         self._extract_experiments(experiment_data)
         self._extract_aa_score(experiment_data)
         self._extract_best_split_statistics(experiment_data)
+    
+    def _summary_stats(self) -> dict[str, Any]:
+        """Collect high-level AA statistics for the summary block."""
+        stats: dict[str, Any] = {}
+
+        # Iterations count
+        if hasattr(self, "experiments") and self.experiments is not None:
+            stats["iterations"] = len(self.experiments)
+
+        # AA score (mean pass-rate weight)
+        if hasattr(self, "aa_score") and self.aa_score is not None:
+            try:
+                scores = [
+                    r.get("score", 0) for r in self.aa_score.to_records()
+                ]
+                passes = [
+                    r.get("pass", False) for r in self.aa_score.to_records()
+                ]
+                stats["mean_score"] = sum(scores) / max(len(scores), 1)
+                stats["passed"] = sum(1 for p in passes if p)
+                stats["total"] = len(passes)
+            except Exception:
+                pass
+
+        # Best split id
+        if hasattr(self, "best_split_statistics") and self.best_split_statistics is not None:
+            try:
+                recs = self.best_split_statistics.to_records()
+                if recs and "splitter_id" in recs[0]:
+                    stats["best_split"] = recs[0]["splitter_id"]
+            except Exception:
+                pass
+
+        return stats
+
+    def __repr__(self) -> str:
+        s = self._summary_stats()
+        lines = ["AAOutput"]
+
+        if "iterations" in s:
+            lines.append(f"  Iterations : {s['iterations']}")
+        if "mean_score" in s:
+            lines.append(f"  AA Score   : {s['mean_score']:.3f}")
+        if "passed" in s and "total" in s:
+            lines.append(f"  Passed     : {s['passed']}/{s['total']}")
+        if "best_split" in s:
+            lines.append(f"  Best Split : {s['best_split']}")
+
+        lines.append("")
+        lines.append(repr(self._report()))
+        return "\n".join(lines)
+
+    def _repr_html_(self) -> str:
+        s = self._summary_stats()
+        parts: list[str] = [
+            "<div style='font-family:monospace; display:inline-block;'>",
+            "<b style='font-size:14px;'>AAOutput</b>",
+            "<table style='border-collapse:collapse; margin:6px 0; font-size:12px;'>",
+        ]
+        if "iterations" in s:
+            parts.append(
+                f"<tr><td style='padding:2px 8px; color:#555;'>Iterations</td>"
+                f"<td style='padding:2px 8px; font-weight:bold;'>{s['iterations']}</td></tr>"
+            )
+        if "mean_score" in s:
+            color = "#2e7d32" if s["mean_score"] >= 0.8 else "#f57f17"
+            parts.append(
+                f"<tr><td style='padding:2px 8px; color:#555;'>AA Score</td>"
+                f"<td style='padding:2px 8px; font-weight:bold; color:{color};'>"
+                f"{s['mean_score']:.3f}</td></tr>"
+            )
+        if "passed" in s and "total" in s:
+            color = "#2e7d32" if s["passed"] == s["total"] else "#c62828"
+            parts.append(
+                f"<tr><td style='padding:2px 8px; color:#555;'>Passed</td>"
+                f"<td style='padding:2px 8px; font-weight:bold; color:{color};'>"
+                f"{s['passed']}/{s['total']}</td></tr>"
+            )
+        if "best_split" in s:
+            parts.append(
+                f"<tr><td style='padding:2px 8px; color:#555;'>Best Split</td>"
+                f"<td style='padding:2px 8px;'><code>{html.escape(str(s['best_split']))}</code></td></tr>"
+            )
+        parts.append("</table>")
+        parts.append(self._report()._repr_html_())
+        parts.append("</div>")
+        return "".join(parts)
