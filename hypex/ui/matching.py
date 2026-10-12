@@ -583,14 +583,16 @@ class MatchingOutput(Output):
                 pval = r.get("P-value")
                 ci_lo = r.get("CI Lower")
                 ci_hi = r.get("CI Upper")
-                rows.append({
-                    "metric": str(idx),
-                    "estimate": estimate,
-                    "se": se,
-                    "p_value": pval,
-                    "ci_lower": ci_lo,
-                    "ci_upper": ci_hi,
-                })
+                rows.append(
+                    {
+                        "metric": str(idx),
+                        "estimate": estimate,
+                        "se": se,
+                        "p_value": pval,
+                        "ci_lower": ci_lo,
+                        "ci_upper": ci_hi,
+                    }
+                )
         except Exception:
             # best-effort: keep repr working even if summary is malformed
             logger.debug("MatchingOutput._effect_rows: failed to parse summary")
@@ -616,7 +618,9 @@ class MatchingOutput(Output):
                     result["ok"] += 1
         except Exception:
             # best-effort: keep repr working even if quality_results is malformed
-            logger.debug("MatchingOutput._quality_summary: failed to parse quality_results")
+            logger.debug(
+                "MatchingOutput._quality_summary: failed to parse quality_results"
+            )
         return result
 
     def __repr__(self) -> str:
@@ -634,8 +638,7 @@ class MatchingOutput(Output):
                 se = f"{e['se']:.2f}" if e["se"] is not None else "—"
                 pval_str = f"{pval:.4f}" if pval is not None else "—"
                 lines.append(
-                    f"  {icon} {e['metric']:<6s}  "
-                    f"estimate={est}  SE={se}  p={pval_str}"
+                    f"  {icon} {e['metric']:<6s}  estimate={est}  SE={se}  p={pval_str}"
                 )
 
         # Quality

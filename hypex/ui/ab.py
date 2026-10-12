@@ -53,7 +53,7 @@ class CupedOutput:
             return "#2e7d32"  # green
         if pct >= 10:
             return "#f57f17"  # amber
-        return "#c62828"      # red
+        return "#c62828"  # red
 
     @staticmethod
     def _progress_bar(pct: float, width: int = 20) -> str:
@@ -67,7 +67,9 @@ class CupedOutput:
             return "CupedOutput(no CUPED data available)"
 
         lines = ["CupedOutput:"]
-        lines.append(f"  variance_reductions ({len(self.variance_reductions)} target(s)):")
+        lines.append(
+            f"  variance_reductions ({len(self.variance_reductions)} target(s)):"
+        )
         lines.append("")
 
         records = self.variance_reductions.to_records()
@@ -77,9 +79,9 @@ class CupedOutput:
             bar = self._progress_bar(pct)
             lines.append(f"    {feat:<20s} {bar} {pct:>6.1f}%")
 
-        mean_pct = sum(
-            r.get("variance_reduction_pct", 0) for r in records
-        ) / max(len(records), 1)
+        mean_pct = sum(r.get("variance_reduction_pct", 0) for r in records) / max(
+            len(records), 1
+        )
         lines.append("")
         lines.append(f"    Average VR: {mean_pct:.1f}%")
         return "\n".join(lines)
@@ -114,9 +116,9 @@ class CupedOutput:
                 "</tr>"
             )
 
-        mean_pct = sum(
-            r.get("variance_reduction_pct", 0) for r in records
-        ) / max(len(records), 1)
+        mean_pct = sum(r.get("variance_reduction_pct", 0) for r in records) / max(
+            len(records), 1
+        )
 
         return (
             "<div style='font-family:monospace; display:inline-block;'>"
@@ -133,6 +135,7 @@ class CupedOutput:
             f"Average VR: <b>{mean_pct:.1f}%</b></div>"
             "</div>"
         )
+
 
 # ── CupacOutput ──────────────────────────────────────────────────────────────
 
@@ -175,7 +178,9 @@ class CupacOutput:
         parts: list[str] = ["CupacOutput:"]
 
         if has_vr:
-            parts.append(f"  variance_reductions ({len(self.variance_reductions)} target(s)):")
+            parts.append(
+                f"  variance_reductions ({len(self.variance_reductions)} target(s)):"
+            )
             records = self.variance_reductions.to_records()
             for rec in records:
                 target = rec.get("target", "?")
@@ -188,7 +193,9 @@ class CupacOutput:
                 )
 
         if has_fi:
-            parts.append(f"  feature_importances ({len(self.feature_importances)} rows):")
+            parts.append(
+                f"  feature_importances ({len(self.feature_importances)} rows):"
+            )
             records = self.feature_importances.to_records()
             # Sort by importance descending
             sorted_recs = sorted(
@@ -196,9 +203,7 @@ class CupacOutput:
                 key=lambda r: r.get("importance", 0),
                 reverse=True,
             )
-            max_imp = max(
-                (r.get("importance", 0) for r in sorted_recs), default=1
-            )
+            max_imp = max((r.get("importance", 0) for r in sorted_recs), default=1)
             for rec in sorted_recs[:10]:  # top-10
                 feat = rec.get("feature", "?")
                 imp = rec.get("importance", 0)
@@ -256,9 +261,7 @@ class CupacOutput:
             sorted_recs = sorted(
                 records, key=lambda r: r.get("importance", 0), reverse=True
             )
-            max_imp = max(
-                (r.get("importance", 0) for r in sorted_recs), default=1
-            )
+            max_imp = max((r.get("importance", 0) for r in sorted_recs), default=1)
             rows = ""
             for rec in sorted_recs[:10]:
                 feat = rec.get("feature", "?")
@@ -296,10 +299,9 @@ class CupacOutput:
 
         return (
             "<div style='font-family:monospace; display:inline-block;'>"
-            "<b>CupacOutput</b>"
-            + "".join(sections)
-            + "</div>"
+            "<b>CupacOutput</b>" + "".join(sections) + "</div>"
         )
+
 
 # ── ABOutput ─────────────────────────────────────────────────────────────────
 
@@ -548,12 +550,14 @@ class ABOutput(Output):
                         pval = v
                     elif k == "difference %":
                         diff_pct = v
-                rows.append({
-                    "feature": feature,
-                    "pass": pass_val,
-                    "p_value": pval,
-                    "diff_pct": diff_pct,
-                })
+                rows.append(
+                    {
+                        "feature": feature,
+                        "pass": pass_val,
+                        "p_value": pval,
+                        "diff_pct": diff_pct,
+                    }
+                )
         except Exception:
             # best-effort: keep repr working even if summary is malformed
             logger.debug("ABOutput._result_rows: failed to parse summary rows")

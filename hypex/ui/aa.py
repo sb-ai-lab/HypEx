@@ -247,21 +247,22 @@ class AAOutput(Output):
         # AA score (mean pass-rate weight)
         if hasattr(self, "aa_score") and self.aa_score is not None:
             try:
-                scores = [
-                    r.get("score", 0) for r in self.aa_score.to_records()
-                ]
-                passes = [
-                    r.get("pass", False) for r in self.aa_score.to_records()
-                ]
+                scores = [r.get("score", 0) for r in self.aa_score.to_records()]
+                passes = [r.get("pass", False) for r in self.aa_score.to_records()]
                 stats["mean_score"] = sum(scores) / max(len(scores), 1)
                 stats["passed"] = sum(1 for p in passes if p)
                 stats["total"] = len(passes)
             except Exception:
                 # best-effort: splitter_id column may be absent
-                logger.debug("AAOutput._summary_stats: failed to parse best_split_statistics")
+                logger.debug(
+                    "AAOutput._summary_stats: failed to parse best_split_statistics"
+                )
 
         # Best split id
-        if hasattr(self, "best_split_statistics") and self.best_split_statistics is not None:
+        if (
+            hasattr(self, "best_split_statistics")
+            and self.best_split_statistics is not None
+        ):
             try:
                 recs = self.best_split_statistics.to_records()
                 if recs and "splitter_id" in recs[0]:
