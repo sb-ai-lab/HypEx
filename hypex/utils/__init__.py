@@ -13,6 +13,7 @@ from .enums import (
     ABTestTypesEnum,
     BackendsEnum,
     ExperimentDataEnum,
+    MLModeEnum,
     SpaceEnum,
 )
 from .errors import (
@@ -93,6 +94,7 @@ __all__ = [
     "GroupingDataType",
     "HypExLogger",
     "ListLikeTypes",
+    "MLModeEnum",
     "MergeOnError",
     "MultiFieldKeyTypes",
     "NoColumnsError",
