@@ -18,6 +18,7 @@ from ..reporters.ab import ABTestReporter
 from ..reporters.abstract import DictReporter, _get_index_values
 from ..reporters.cuped import CupedReporter
 from ..utils import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL, ExperimentDataEnum
+from ..utils.logger import logger
 from .base import Output
 
 # ── CupedOutput ──────────────────────────────────────────────────────────────
@@ -492,7 +493,8 @@ class ABOutput(Output):
                 stats["features"] = len(features)
                 stats["groups"] = len(groups)
             except Exception:
-                pass
+                # best-effort: summary table may be empty or malformed
+                logger.debug("ABOutput._summary_stats: failed to parse summary")
 
         # Sizes
         if hasattr(self, "sizes") and self.sizes is not None:
@@ -502,7 +504,8 @@ class ABOutput(Output):
                     stats["control_size"] = recs[0].get("control size")
                     stats["test_size"] = recs[0].get("test size")
             except Exception:
-                pass
+                # best-effort: sizes table may be empty or malformed
+                logger.debug("ABOutput._summary_stats: failed to parse sizes")
 
         # Multitest method
         if hasattr(self, "multitest") and self.multitest is not None:
@@ -514,7 +517,8 @@ class ABOutput(Output):
                     if recs and "correction" in recs[0]:
                         stats["multitest"] = "applied"
                 except Exception:
-                    pass
+                    # best-effort: multitest table may be empty or malformed
+                    logger.debug("ABOutput._summary_stats: failed to parse multitest")
 
         # CUPED / CUPAC presence
         if self.cuped is not None:
@@ -551,7 +555,8 @@ class ABOutput(Output):
                     "diff_pct": diff_pct,
                 })
         except Exception:
-            pass
+            # best-effort: keep repr working even if summary is malformed
+            logger.debug("ABOutput._result_rows: failed to parse summary rows")
         return rows
 
     def __repr__(self) -> str:
