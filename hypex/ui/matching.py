@@ -592,7 +592,8 @@ class MatchingOutput(Output):
                     "ci_upper": ci_hi,
                 })
         except Exception:
-            pass
+            # best-effort: keep repr working even if summary is malformed
+            logger.debug("MatchingOutput._effect_rows: failed to parse summary")
         return rows
 
     def _quality_summary(self) -> dict[str, int]:
@@ -614,7 +615,8 @@ class MatchingOutput(Output):
                 else:
                     result["ok"] += 1
         except Exception:
-            pass
+            # best-effort: keep repr working even if quality_results is malformed
+            logger.debug("MatchingOutput._quality_summary: failed to parse quality_results")
         return result
 
     def __repr__(self) -> str:
