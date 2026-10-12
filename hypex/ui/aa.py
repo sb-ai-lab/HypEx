@@ -84,18 +84,8 @@ class AAOutput(Output):
             for k, v in row.items():
                 f, t, m, g = _parse_metric_col(k)
                 if f == feature and g == group and t == "GroupDifference":
-                    if m == "control mean":
-                        rec["control mean"] = v
-                    elif m == "test mean":
-                        rec["test mean"] = v
-                    elif m == "difference":
-                        rec["difference"] = v
-                    elif m == "difference %":
-                        rec["difference %"] = v
-                    elif m == "ci lower":
-                        rec["ci lower"] = v
-                    elif m == "ci upper":
-                        rec["ci upper"] = v
+                    if m in rec:
+                        rec[m] = v
 
             for tn in ordered_tests:
                 rec[f"{tn} pass"] = None

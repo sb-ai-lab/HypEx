@@ -7,6 +7,8 @@ METRIC_SUFFIXES: tuple[str, ...] = (
     "test mean",
     "difference %",
     "difference",
+    "ci lower",
+    "ci upper",
     "p-value",
     "pass",
 )
