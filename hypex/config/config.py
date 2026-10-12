@@ -22,6 +22,9 @@ from typing import ClassVar, Literal
 from pyspark import StorageLevel  # pyright: ignore[reportMissingImports]
 
 
+class MLConfig:
+    DEFAULT_ARTIFACT_PATH: str = ".hypex_experiments"
+
 class DatasetConfig:
     """
     Configuration constants for dataset display and Spark operations.
