@@ -196,12 +196,14 @@ class AAPassedReporter(Reporter):
         )
         rec["result"] = "NOT OK" if failed else "OK"
 
-        for m in ("control mean",
-                  "test mean",
-                  "difference",
-                  "difference %",
-                  "ci lower",
-                  "ci upper",):
+        for m in (
+            "control mean",
+            "test mean",
+            "difference",
+            "difference %",
+            "ci lower",
+            "ci upper",
+        ):
             rec[m] = self._metric(row, feature, "GroupDifference", m, group)
 
         return rec
