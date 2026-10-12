@@ -268,7 +268,10 @@ class AAOutput(Output):
                 if recs and "splitter_id" in recs[0]:
                     stats["best_split"] = recs[0]["splitter_id"]
             except Exception:
-                pass
+                # best-effort: splitter_id column may be absent or table malformed
+                logger.debug(
+                    "AAOutput._summary_stats: failed to parse best_split_statistics"
+                )
 
         return stats
 
