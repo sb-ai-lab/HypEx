@@ -57,7 +57,7 @@ class CupedOutput:
     @staticmethod
     def _progress_bar(pct: float, width: int = 20) -> str:
         """Render a text progress bar."""
-        filled = int(round(pct / 100 * width))
+        filled = round(pct / 100 * width)
         filled = max(0, min(width, filled))
         return "█" * filled + "░" * (width - filled)
 
@@ -161,7 +161,7 @@ class CupacOutput:
         """Render a horizontal text bar."""
         if max_val <= 0:
             return ""
-        filled = int(round(value / max_val * width))
+        filled = round(value / max_val * width)
         filled = max(0, min(width, filled))
         return "▓" * filled + "░" * (width - filled)
 
@@ -473,7 +473,7 @@ class ABOutput(Output):
         report = CupacReporter().report(experiment_data)
         self.cupac.variance_reductions = report.get("variance_reductions")
         self.cupac.feature_importances = report.get("feature_importances")
-    
+
     def _summary_stats(self) -> dict[str, Any]:
         """Collect high-level AB statistics for the summary block."""
         stats: dict[str, Any] = {}

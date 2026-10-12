@@ -234,7 +234,7 @@ class AAOutput(Output):
         self._extract_experiments(experiment_data)
         self._extract_aa_score(experiment_data)
         self._extract_best_split_statistics(experiment_data)
-    
+
     def _summary_stats(self) -> dict[str, Any]:
         """Collect high-level AA statistics for the summary block."""
         stats: dict[str, Any] = {}
