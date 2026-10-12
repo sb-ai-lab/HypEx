@@ -43,13 +43,35 @@ class CupedOutput:
             self.variance_reductions = report
 
     def __repr__(self) -> str:
+        """Return a text summary including the variance-reduction table."""
         if self.variance_reductions is None:
             return "CupedOutput(no CUPED data available)"
+        inner = repr(self.variance_reductions)
+        indented = "\n".join("  " + line for line in inner.splitlines())
         return (
-            f"CupedOutput(variance_reductions: "
-            f"{len(self.variance_reductions)} target(s))"
+            f"CupedOutput:\n"
+            f"  variance_reductions ({len(self.variance_reductions)} target(s)):\n"
+            f"{indented}"
         )
 
+    def _repr_html_(self) -> str:
+        """Return an HTML representation for Jupyter / IPython display."""
+        if self.variance_reductions is None:
+            return (
+                "<div style='font-family:monospace;'>"
+                "<b>CupedOutput:</b> no CUPED data available</div>"
+            )
+        return (
+            "<div style='font-family:monospace; display:inline-block;'>"
+            "<b>CupedOutput</b>"
+            f"<div style='margin:4px 0 2px 10px; color:#555;'>"
+            f"variance_reductions ({len(self.variance_reductions)} target(s))"
+            f"</div>"
+            f"<div style='margin-left:10px;'>"
+            f"{self.variance_reductions._repr_html_()}"
+            f"</div>"
+            "</div>"
+        )
 
 # ── CupacOutput ──────────────────────────────────────────────────────────────
 
@@ -67,19 +89,62 @@ class CupacOutput:
         self.feature_importances: Dataset | None = None
 
     def __repr__(self) -> str:
+        """Return a text summary including all available tables."""
         has_vr = self.variance_reductions is not None
         has_fi = self.feature_importances is not None
         if not has_vr and not has_fi:
             return "CupacOutput(no CUPAC data available)"
-        parts: list[str] = []
+
+        parts: list[str] = ["CupacOutput:"]
         if has_vr:
+            inner = repr(self.variance_reductions)
+            indented = "\n".join("    " + line for line in inner.splitlines())
             parts.append(
-                f"variance_reductions: {len(self.variance_reductions)} target(s)"
+                f"  variance_reductions "
+                f"({len(self.variance_reductions)} target(s)):\n{indented}"
             )
         if has_fi:
-            parts.append(f"feature_importances: {len(self.feature_importances)} rows")
-        return f"CupacOutput({', '.join(parts)})"
+            inner = repr(self.feature_importances)
+            indented = "\n".join("    " + line for line in inner.splitlines())
+            parts.append(
+                f"  feature_importances "
+                f"({len(self.feature_importances)} rows):\n{indented}"
+            )
+        return "\n".join(parts)
 
+    def _repr_html_(self) -> str:
+        """Return an HTML representation for Jupyter / IPython display."""
+        has_vr = self.variance_reductions is not None
+        has_fi = self.feature_importances is not None
+        if not has_vr and not has_fi:
+            return (
+                "<div style='font-family:monospace;'>"
+                "<b>CupacOutput:</b> no CUPAC data available</div>"
+            )
+
+        sections: list[str] = []
+        if has_vr:
+            sections.append(
+                f"<div style='margin:4px 0 2px 10px; color:#555;'>"
+                f"variance_reductions "
+                f"({len(self.variance_reductions)} target(s))</div>"
+                f"<div style='margin-left:10px;'>"
+                f"{self.variance_reductions._repr_html_()}</div>"
+            )
+        if has_fi:
+            sections.append(
+                f"<div style='margin:8px 0 2px 10px; color:#555;'>"
+                f"feature_importances "
+                f"({len(self.feature_importances)} rows)</div>"
+                f"<div style='margin-left:10px;'>"
+                f"{self.feature_importances._repr_html_()}</div>"
+            )
+        return (
+            "<div style='font-family:monospace; display:inline-block;'>"
+            "<b>CupacOutput</b>"
+            + "".join(sections)
+            + "</div>"
+        )
 
 # ── ABOutput ─────────────────────────────────────────────────────────────────
 
