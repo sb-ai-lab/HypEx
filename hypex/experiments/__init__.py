@@ -6,7 +6,6 @@ from .base_complex import (
     IfParamsExperiment,
     ParamsExperiment,
 )
-from .ml import MLExperiment
 
 __all__ = [
     "CycledExperiment",
@@ -14,7 +13,6 @@ __all__ = [
     "GroupExperiment",
     "IfExecutor",
     "IfParamsExperiment",
-    "MLExperiment",
     "OnRoleExperiment",
     "ParamsExperiment",
 ]
