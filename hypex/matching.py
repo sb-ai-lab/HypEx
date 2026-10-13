@@ -16,6 +16,7 @@ from .reporters.matching import MatchingAnalysisTableReporter
 from .transformers import TypeCaster
 from .ui.base import ExperimentShell
 from .ui.matching import MatchingOutput
+from .utils.index_utils import FaissIndexStorage
 
 
 class Matching(ExperimentShell):
@@ -239,3 +240,9 @@ class Matching(ExperimentShell):
                 compute_indexes=compute_indexes,
             ),
         )
+
+    def execute(self, data):
+        try:
+            return super().execute(data)
+        finally:
+            FaissIndexStorage.cleanup()
