@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import html
+import inspect
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 import numpy as np
 
@@ -258,7 +261,192 @@ def extract_analyzer_data(
 
 
 class Reporter(ABC):
-    """Abstract base class for all experiment reporters."""
+    """Abstract base class for all experiment reporters.
+
+    Provides parameter introspection via :meth:`get_params` and
+    rich string / HTML representations for Jupyter notebooks.
+    """
+
+    #: Maximum number of list/dict elements rendered before truncation.
+    _HTML_MAX_ITEMS: ClassVar[int] = 10
+
+    #: Inline CSS for nested HTML tables.
+    _HTML_TABLE: ClassVar[str] = (
+        "border-collapse:collapse; margin:2px 0 2px 10px; "
+        "font-family:monospace; font-size:12px;"
+    )
+
+    #: Inline CSS for every HTML table cell.
+    _HTML_CELL: ClassVar[str] = (
+        "border:1px solid #d0d0d0; padding:2px 8px; "
+        "text-align:left; vertical-align:top;"
+    )
+
+    # ── Parameter introspection ──────────────────────────────────────
+
+    def get_params(self, deep: bool = False) -> dict[str, Any]:
+        """Return the initialization parameters of this reporter.
+
+        Mirrors the ``scikit-learn`` / :class:`~hypex.executor.Executor`
+        ``get_params`` API: the ``__init__`` signature of the concrete
+        class is inspected and the current value of every named argument
+        is read from the instance attribute with the same name.
+
+        Args:
+            deep: If ``True``, parameters of nested objects that
+                implement ``get_params`` are collected recursively
+                and stored under ``<name>┆<nested_name>`` keys.
+                Defaults to ``False``.
+
+        Returns:
+            A mapping ``{parameter_name: current_value}`` for every
+            named ``__init__`` argument.  ``*args`` / ``**kwargs``
+            are skipped.
+        """
+        init_params = inspect.signature(self.__init__).parameters
+        out: dict[str, Any] = {}
+        for name, param in init_params.items():
+            if name == "self":
+                continue
+            if param.kind == param.VAR_POSITIONAL:
+                stored = getattr(self, name, None)
+                if isinstance(stored, dict):
+                    out.update(stored)
+                continue
+            if param.kind == param.VAR_KEYWORD:
+                continue
+            value = getattr(self, name, param.default)
+            if deep and hasattr(value, "get_params") and not isinstance(value, type):
+                deep_items = value.get_params().items()
+                out.update(
+                    (name + NAME_BORDER_SYMBOL + k, val) for k, val in deep_items
+                )
+            out[name] = value
+        return out
+
+    def _repr_params(self) -> dict[str, Any]:
+        """Collect the parameters shown by ``__repr__`` and ``_repr_html_``.
+
+        Subclasses may override this to append class-level configuration
+        (e.g. the ``tests`` ClassVar) that is not captured by
+        ``get_params``.
+
+        Returns:
+            A mapping ``{parameter_name: value}`` ready to be rendered.
+        """
+        params = self.get_params(deep=False)
+        # Append the ``tests`` class variable when present — it is the
+        # primary configuration for test-extracting reporters.
+        tests = getattr(self, "tests", None)
+        if tests and "tests" not in params:
+            params = {**params, "tests": tests}
+        return params
+
+    # ── HTML rendering helpers ───────────────────────────────────────
+
+    @classmethod
+    def _html_value(cls, value: Any) -> str:
+        """Render a single parameter value as an HTML snippet.
+
+        Rendering rules (applied recursively):
+
+        * :class:`Reporter` — a collapsible ``<details>`` block whose
+          content is the reporter's own parameter table.
+        * ``type`` — rendered via ``__name__`` inside ``<code>``.
+        * ``range`` — a compact ``repr``.
+        * ``list`` / ``tuple`` — a sub-table with one row per element,
+          truncated after :attr:`_HTML_MAX_ITEMS` rows.
+        * ``Mapping`` — a sub-table with one row per key.
+        * Any other value — an escaped ``repr`` inside ``<pre>``.
+
+        Args:
+            value: The parameter value to render.
+
+        Returns:
+            An HTML string safe for embedding into a table cell.
+        """
+        if isinstance(value, Reporter):
+            return (
+                f"<details><summary style='cursor:pointer; font-family:monospace;'>"
+                f"<b>{html.escape(type(value).__name__)}</b></summary>"
+                f"{value._repr_html_()}</details>"
+            )
+        if isinstance(value, type):
+            return f"<code>{html.escape(value.__name__)}</code>"
+        if isinstance(value, range):
+            return f"<pre style='margin:0;'>{html.escape(repr(value))}</pre>"
+        if isinstance(value, (list, tuple)):
+            items = list(value)
+            truncated = len(items) > cls._HTML_MAX_ITEMS
+            shown = items[: cls._HTML_MAX_ITEMS] if truncated else items
+            body = "".join(
+                f"<tr>"
+                f"<td style='{cls._HTML_CELL}; color:#999;'>[{i}]</td>"
+                f"<td style='{cls._HTML_CELL}'>{cls._html_value(item)}</td>"
+                f"</tr>"
+                for i, item in enumerate(shown)
+            )
+            if truncated:
+                body += (
+                    f"<tr><td colspan='2' style='{cls._HTML_CELL}; color:#999;'>"
+                    f"… and also {len(items) - cls._HTML_MAX_ITEMS}</td></tr>"
+                )
+            return f"<table style='{cls._HTML_TABLE}'>{body}</table>"
+        if isinstance(value, Mapping):
+            body = "".join(
+                f"<tr>"
+                f"<td style='{cls._HTML_CELL}'><code>"
+                f"{html.escape(getattr(k, '__name__', None) or repr(k))}</code></td>"
+                f"<td style='{cls._HTML_CELL}'>{cls._html_value(v)}</td>"
+                f"</tr>"
+                for k, v in value.items()
+            )
+            return f"<table style='{cls._HTML_TABLE}'>{body}</table>"
+        return f"<pre style='margin:0;'>{html.escape(repr(value))}</pre>"
+
+    # ── String / HTML representations ────────────────────────────────
+
+    def __repr__(self) -> str:
+        """Return a concise string representation of the reporter.
+
+        Example::
+
+            AATestReporter(output_format='dict', front=False)
+            DatasetReporter(dict_reporter=DictReporter(front=True),
+                            output_format='dataset', single_row=False)
+        """
+        class_name = self.__class__.__name__
+        params = self._repr_params()
+        if not params:
+            return f"{class_name}()"
+        params_str = ", ".join(f"{k}={v!r}" for k, v in params.items())
+        return f"{class_name}({params_str})"
+
+    def _repr_html_(self) -> str:
+        """Return an HTML representation for Jupyter / IPython display.
+
+        Renders a parameter table identical in style to
+        :meth:`Executor._repr_html_`.
+        """
+        rows = "".join(
+            f"<tr>"
+            f"<td style='{self._HTML_CELL}'><code>{html.escape(str(name))}</code></td>"
+            f"<td style='{self._HTML_CELL}'>{self._html_value(value)}</td>"
+            f"</tr>"
+            for name, value in self._repr_params().items()
+        )
+        header = (
+            f"<tr><th style='{self._HTML_CELL}'>Parameter</th>"
+            f"<th style='{self._HTML_CELL}'>Value</th></tr>"
+        )
+        return (
+            f"<div style='font-family:monospace; display:inline-block;'>"
+            f"<b>{html.escape(type(self).__name__)}</b>"
+            f"<table style='{self._HTML_TABLE}'>{header}{rows}</table>"
+            f"</div>"
+        )
+
+    # ── Abstract interface ───────────────────────────────────────────
 
     @abstractmethod
     def report(self, data: ExperimentData) -> Any:
