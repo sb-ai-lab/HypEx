@@ -5,6 +5,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Literal
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from ..comparators import GroupDifference, GroupSizes
@@ -231,9 +232,12 @@ def extract_group_sizes(data: ExperimentData, front: bool) -> dict[str, Any]:
     cid = data.get_one_id(GroupSizes, ExperimentDataEnum.analysis_tables)
     return _extract_from_comparator(data, cid, front)
 
-
+# TODO: add unitests for additionl params
 def extract_analyzer_data(
-    data: ExperimentData, analyzer_class: type | str
+    data: ExperimentData,
+    analyzer_class: type | str,
+    orient: Literal["records", "dataset"] = "records",
+    key: str | None = None
 ) -> dict[str, Any]:
     """Extract aggregated metrics from a specific analyzer.
 
@@ -244,17 +248,22 @@ def extract_analyzer_data(
     Returns:
         A flat dictionary of the first row of the analyzer's results.
     """
-    cid = data.get_one_id(analyzer_class, ExperimentDataEnum.analysis_tables)
+    cid = data.get_one_id(analyzer_class, ExperimentDataEnum.analysis_tables, key)
     table = data.analysis_tables[cid]
     if table.is_empty():
         return {}
 
-    records = table.to_records()
-    if not records:
-        return {}
+    if orient == "records":
+        records = table.to_records()
+        if not records:
+            return {}
 
-    row_dict = records[0]
-    return {col: _normalize_value(val) for col, val in row_dict.items()}
+        row_dict = records[0]
+        return {col: _normalize_value(val) for col, val in row_dict.items()}
+    elif orient == "dataset":
+        return {"result": table}
+    else:
+        raise ValueError(f"Incorrect orient: {orient}")
 
 
 class Reporter(ABC):
@@ -510,3 +519,46 @@ class DatasetReporter(Reporter):
     def convert_to_dataset(data: dict) -> Dataset | SmallDataset:
         struct_dict = TestDictReporter._get_struct_dict(data)
         return TestDictReporter._convert_struct_dict_to_dataset(struct_dict)
+
+class PlotReporter(Reporter, ABC):
+    def __init__(
+        self,
+        figure_dpi: int,
+        save_fig: bool=False,
+    ):
+        super().__init__()
+        self.figure_dpi = figure_dpi
+        self.save_fig = save_fig
+
+    # @staticmethod
+    # def _extract_figure(data: ExperimentData) -> dict[Any, plt.Figure] | None:
+    #     return None
+
+    def _create_figure(self, data: ExperimentData) -> dict[str, plt.Figure]:
+        """Create figure from scratch using raw data."""
+        return {}
+
+    def _save_figure(self, figures: Any) -> None:
+        """Save figures to disk."""
+        raise NotImplementedError
+
+    @staticmethod
+    def _show_figure(figure: Any) -> None:
+        raise NotImplementedError
+
+    # def _build_figure(self, data: ExperimentData):
+    #     # fig_dict = self._extract_figure(data)
+    #     # if fig_dict is None:
+    #         fig_dict = self._create_figure(data)
+    #     return fig_dict
+
+    def report(self, data):
+        fig_dict = self._create_figure(data)
+        if not fig_dict:
+            return {}
+
+        if self.save_fig:
+            self._save_figure(fig_dict)
+
+        return fig_dict
+
