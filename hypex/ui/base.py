@@ -1,14 +1,28 @@
 from __future__ import annotations
 
+import base64
 import warnings
 from copy import deepcopy
+from io import BytesIO
 from typing import Any
+
+import matplotlib.pyplot as plt
 
 from ..dataset import Dataset, ExperimentData
 from ..experiments.base import Experiment
 from ..reporters import Reporter
 from ..utils import ID_SPLIT_SYMBOL, BackendsEnum
 from ..utils.enums import RenameEnum
+
+
+def _figure_to_html(fig: plt.Figure, dpi: int = 100) -> str:
+    """convert matplotlib-figure into base64 HTML <img>."""
+    buf = BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
+    buf.seek(0)
+    b64 = base64.b64encode(buf.read()).decode("utf-8")
+    buf.close()
+    return f'<img src="data:image/png;base64,{b64}" style="max-width:100%;"/>'
 
 
 def _html_section(title: str) -> str:
@@ -39,6 +53,16 @@ class _Report:
         self.title = title
         self.tables = dict(tables)
 
+    def _is_figure(self, value: Any) -> bool:
+        return isinstance(value, plt.Figure)
+
+    def _is_figure_dict(self, value: Any) -> bool:
+        return (
+            isinstance(value, dict)
+            and len(value) > 0
+            and all(isinstance(v, plt.Figure) for v in value.values())
+        )
+
     def __repr__(self) -> str:
         if not self.tables:
             return f"{self.title}(no tables available)"
@@ -47,16 +71,30 @@ class _Report:
             parts.append(f"\n{'=' * 60}")
             parts.append(f"{name}:")
             parts.append("=" * 60)
-            parts.append("None" if table is None else str(table))
+            if self._is_figure(table) or self._is_figure_dict(table):
+                parts.append("[matplotlib figure — см. HTML-вывод в Jupyter]")
+            elif table is None:
+                parts.append("None")
+            else:
+                parts.append(str(table))
         return "\n".join(parts)
 
     def _repr_html_(self) -> str:
         if not self.tables:
             return f"<div><b>{self.title}:</b> no tables available</div>"
-        return "\n".join(
-            _html_section(name) + _html_content(table)
-            for name, table in self.tables.items()
-        )
+        sections = []
+        for name, table in self.tables.items():
+            header = _html_section(name)
+            if self._is_figure(table):
+                content = _figure_to_html(table)
+            elif self._is_figure_dict(table):
+                content = "".join(
+                    _figure_to_html(fig) for fig in table.values()
+                )
+            else:
+                content = _html_content(table)
+            sections.append(header + content)
+        return "\n".join(sections)
 
 
 def _warn_resume_deprecated(old: str, new: str) -> None:

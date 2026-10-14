@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import math
+
+import matplotlib.pyplot as plt
 
 from ..analyzers.aa import AADryTestAnalyzer, AAScoreAnalyzer
 from ..dataset import Dataset, ExperimentData, InfoRole, SmallDataset, StatisticRole
-from ..reporters.aa import AABestSplitReporter, AAPassedReporter
+from ..reporters.aa import AABestSplitReporter, AADryTestPlotReporter, AAPassedReporter
 from ..utils import ExperimentDataEnum, _parse_metric_col
 from ..utils.constants import (
     ID_SPLIT_SYMBOL,
@@ -19,11 +23,19 @@ class AAOutput(Output):
     experiments: Dataset
     aa_score: Dataset
     best_split_statistics: Dataset
+    dry_test_plots: dict[str, plt.Figure]
 
-    def __init__(self):
+    def __init__(self, show_plots: bool = True, save_plots: bool = False):
+        additional = {"best_split": AABestSplitReporter()}
+        if show_plots or save_plots:
+            additional["dry_test_plots"] = AADryTestPlotReporter(
+                figure_dpi=150,
+                save_fig=save_plots,
+                alpha=0.05
+            )
         super().__init__(
             summary_reporter=AAPassedReporter(),
-            additional_reporters={"best_split": AABestSplitReporter()},
+            additional_reporters=additional,
         )
 
     def _extract_best_split_statistics(self, experiment_data: ExperimentData):
@@ -168,16 +180,17 @@ class AAOutput(Output):
 
     @staticmethod
     def _add_dry_score(experiment_data: ExperimentData, aa_score: Dataset) -> Dataset:
-        dry_score_analyser_ids = experiment_data.get_ids(
-            AADryTestAnalyzer, ExperimentDataEnum.analysis_tables
-        )[AADryTestAnalyzer.__name__][ExperimentDataEnum.analysis_tables.value]
-
-        if len(dry_score_analyser_ids) == 0:
+        dry_ids = experiment_data.get_ids(
+            AADryTestAnalyzer,
+            ExperimentDataEnum.analysis_tables,
+            key="dry score",                       # ← явный ключ
+        )
+        dry_table_ids = dry_ids.get("AADryTestAnalyzer", {}).get("analysis_tables", [])
+        if not dry_table_ids:
             return aa_score
-
-        dry_score_analyser_ids = dry_score_analyser_ids[0]
+        print
         table = aa_score.merge(
-            experiment_data.analysis_tables[dry_score_analyser_ids],
+            experiment_data.analysis_tables[dry_table_ids[0]],
             right_index=True,
             left_index=True,
             how="left",
