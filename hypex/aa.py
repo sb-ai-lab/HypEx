@@ -215,6 +215,8 @@ class AATest(ExperimentShell):
         early_stopping: bool = False,
         t_test_equal_var: bool | None = None,
         dry_test: bool = False,
+        show_dry_test_plots: bool = True,
+        save_dry_test_plots: bool = False,
     ):
         import warnings
 
@@ -265,7 +267,10 @@ class AATest(ExperimentShell):
                 early_stopping=early_stopping,
                 dry_test=dry_test,
             ),
-            output=AAOutput(),
+            output=AAOutput(
+                show_plots=show_dry_test_plots and dry_test,
+                save_plots=save_dry_test_plots,
+            ),
         )
 
         if equal_variance is not None:
