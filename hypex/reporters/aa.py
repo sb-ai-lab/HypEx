@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import os
 from typing import Any, ClassVar
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 from ..comparators import (
     BaseComparator,
@@ -21,6 +25,7 @@ from ..utils.naming import _parse_metric_col, normalize_test_name
 from .abstract import (
     DatasetReporter,
     DictReporter,
+    PlotReporter,
     Reporter,
     extract_analyzer_data,
     extract_group_difference,
@@ -281,3 +286,109 @@ class AABestSplitReporter(Reporter):
         if best_split_id in result.columns:
             result = result.drop(columns=[best_split_id])
         return result
+
+class AADryTestPlotReporter(PlotReporter):
+
+    def __init__(
+            self,
+            figure_dpi,
+            save_fig=False,
+            save_dir: str = ".",
+            alpha: float = 0.05
+        ):
+        super().__init__(figure_dpi, save_fig)
+        self.save_dir = save_dir
+        self._saved_paths: dict[str, str] = {}
+        self.alpha = alpha
+
+    # ── create figure ────────────────────────────────────────────────
+
+    def _create_figure(self, data: ExperimentData) -> dict[Any, plt.Figure]:
+        result = extract_analyzer_data(
+            data,
+            "AADryTestAnalyzer",
+            orient="dataset",
+            key="raw pvals",
+        )
+        if not result:
+            return {}
+
+        table = result["result"]
+        if table.is_empty():
+            return {}
+
+        n_cols = len(table.columns)
+        if n_cols == 0:
+            return {}
+
+        fig, axs = plt.subplots(1, n_cols, figsize=(5 * n_cols, 4))
+        fig.suptitle(
+            "AA-test: diagnostic with zero effect",
+            fontsize=15, fontweight="bold",
+        )
+
+        if n_cols == 1:
+            axs = [axs]
+
+        for idx, col in enumerate(table.columns):
+            ax = axs[idx]
+            p_vals = table[col].raw_data
+
+            ax.hist(
+                p_vals, bins=30, density=True,
+                alpha=0.7, color="steelblue", edgecolor="black",
+            )
+            ax.axhline(y=1.0, color="red", linestyle="--",
+                       linewidth=2, label="Uniform(0,1)")
+            ax.axvline(x=self.alpha, color="green", linestyle=":",
+                       linewidth=2, label=f"α = {self.alpha}")
+            ax.set_title(f"{col}: p-values distribution")
+            ax.set_xlabel("p-value")
+            ax.set_ylabel("Density")
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+
+            fpr = float(np.mean(p_vals < self.alpha))
+            ax.text(
+                0.5, 0.95,
+                f"FPR = {fpr:.1%}\n(expected: {self.alpha:.0%})",
+                transform=ax.transAxes, ha="center", va="top",
+                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+                fontsize=11,
+            )
+
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        return {"aa_dry_test": fig}
+
+    # ── save figure ────────────────────────────────────────────────
+
+    def _save_figure(self, figures: dict[str, plt.Figure]):
+        os.makedirs(self.save_dir, exist_ok=True)
+        paths = {}
+        for name, fig in figures.items():
+            path = os.path.join(self.save_dir, f"{name}.png")
+            fig.savefig(path, dpi=self.figure_dpi, bbox_inches="tight")
+            paths[name] = path
+        self._saved_paths = paths
+        return paths
+
+    @staticmethod
+    def _show_figure(figure: dict[str, plt.Figure]) -> None:
+        plt.show(block=False)
+
+    # ── Interactive display (for scripts outside Jupyter) ───────────────
+
+    @staticmethod
+    def _show_figure(figures: dict[str, plt.Figure]) -> None:
+        plt.show(block=False)
+
+    # ── report ────────────────────────────────────────────────────────
+
+    def report(self, data: ExperimentData) -> dict[str, plt.Figure]:
+        fig_dict = self._create_figure(data)
+        if not fig_dict:
+            return {}
+        if self.save_fig:
+            self._save_figure(fig_dict)
+        return fig_dict
+

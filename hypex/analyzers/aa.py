@@ -478,13 +478,17 @@ class AAScoreAnalyzer(Executor):
 
     @staticmethod
     def _get_dry_score(data: ExperimentData) -> Dataset | None:
-        dry_ids = data.get_ids("AADryTestAnalyzer", ExperimentDataEnum.analysis_tables)
+        dry_ids = data.get_ids(
+            "AADryTestAnalyzer",
+            ExperimentDataEnum.analysis_tables,
+            key="dry score",                       # ← явный ключ
+        )
         dry_table_ids = dry_ids.get("AADryTestAnalyzer", {}).get("analysis_tables", [])
         if not dry_table_ids:
             return None
         return data.analysis_tables[dry_table_ids[0]]
 
-
+# TODO: rewrite unit tests that check `_fig` attribute
 class AADryTestAnalyzer(Executor):
     def __init__(self, alpha: int = 0.05, key=""):
         super().__init__(key)
@@ -515,9 +519,17 @@ class AADryTestAnalyzer(Executor):
         score_table = data.analysis_tables[param_id]
         target_columns = data.field_search(TargetRole())
 
-        p_val_dist = self._uniform_test(score_table, target_columns)
+        p_val_dist, raw_pvals_ds = self._uniform_test(score_table, target_columns)
+        key = self.key
+
+        self.key = "dry score"
         output = self._set_value(data, p_val_dist, ExperimentDataEnum.analysis_tables)
-        return self._set_value(output, self._fig, ExperimentDataEnum.variables)
+
+        self.key = "raw pvals"
+        output =  self._set_value(output, raw_pvals_ds, ExperimentDataEnum.analysis_tables)
+
+        self.key = key
+        return output
 
     # ── Uniform Test ──────────────────────────────────────────────────────
 
@@ -531,6 +543,16 @@ class AADryTestAnalyzer(Executor):
             data=df,
         )
 
+    @staticmethod
+    def _build_pval_dataset(rows: dict[str, Any]) -> SmallDataset:
+        if not rows:
+                    return SmallDataset.from_dict([{}], roles={})
+        raw_pvals_ds = SmallDataset.from_dict(
+            rows,
+            {col: StatisticRole() for col in rows}
+        )
+        return raw_pvals_ds
+
     def _uniform_test(self, score_table: Dataset, target_cols: list[str]) -> Dataset:
         if target_cols is None:
             return SmallDataset.create_empty()
@@ -543,6 +565,7 @@ class AADryTestAnalyzer(Executor):
         ]
         data = score_table[dry_cols]
         rows = {"p-value": [], "pass": [], "_idx": []}
+        raw_pvals_dict = {}
         for col in dry_cols:
             tmp_dict = (
                 UniformCheck(self.alpha).calc(data[col]).to_dict()["data"]["data"]
@@ -555,68 +578,9 @@ class AADryTestAnalyzer(Executor):
                     tmp_dict[key] = [bool(1 - int(tmp_dict[key][0]))]
                 rows[key].extend(tmp_dict[key])
 
-        self._plot_results(data, target_cols, dry_cols)
+            raw_pvals_dict[feature] = data[col].raw_data.values.ravel()
+
+        raw_pvals_ds = self._build_pval_dataset(raw_pvals_dict)
         results = self._build_dry_score_dataset(rows)
 
-        return results
-
-    def _plot_results(
-        self,
-        score_table: Dataset,
-        target_cols: str | list[str],
-        dry_cols: str | list[str],
-    ):
-        target_cols = Adapter.to_list(target_cols)
-        dry_cols = Adapter.to_list(dry_cols)
-        fig, axs = plt.subplots(1, len(target_cols))
-        fig.suptitle(
-            "AA-test: diagnostic with zero effect", fontsize=15, fontweight="bold"
-        )
-
-        for idx, (col, d_col) in enumerate(zip(target_cols, dry_cols)):
-            # --- p-values  gist ---
-            p_vals = score_table[d_col].raw_data
-            if isinstance(axs, np.ndarray):
-                ax = axs[idx]
-            else:
-                ax = axs
-
-            ax.hist(
-                p_vals,
-                bins=30,
-                density=True,
-                alpha=0.7,
-                color="steelblue",
-                edgecolor="black",
-            )
-            ax.axhline(
-                y=1.0, color="red", linestyle="--", linewidth=2, label="Uniform(0,1)"
-            )
-            ax.axvline(
-                x=self.alpha,
-                color="green",
-                linestyle=":",
-                linewidth=2,
-                label=f"α = {self.alpha}",
-            )
-
-            ax.set_title(f"{col}: p-values distribution")
-            ax.set_xlabel("p-value")
-            ax.set_ylabel("Density")
-            ax.legend()
-            ax.grid(True, alpha=0.3)
-
-            fpr = np.mean(p_vals < self.alpha)
-            ax.text(
-                0.5,
-                0.95,
-                f"FPR = {fpr:.1%}\n(expected: {self.alpha:.0%})",
-                transform=ax.transAxes,
-                ha="center",
-                va="top",
-                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
-                fontsize=11,
-            )
-
-        plt.close(fig)
-        self._fig = fig
+        return results, raw_pvals_ds
