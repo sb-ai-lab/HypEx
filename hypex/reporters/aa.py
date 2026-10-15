@@ -288,14 +288,47 @@ class AABestSplitReporter(Reporter):
         return result
 
 class AADryTestPlotReporter(PlotReporter):
+    """Reporter for A/A dry test results with visualization support.
+
+    Extracts dry test p-value distributions and generates diagnostic plots
+    to visualize the uniformity of p-values across A/A test iterations.
+    This helps identify potential issues with the testing framework or data splitting.
+
+    The reporter creates histograms of p-value distributions for each target feature,
+    comparing them against the expected uniform distribution (for a proper A/A test
+    with no real effect, p-values should be uniformly distributed between 0 and 1).
+
+    Attributes:
+        save_dir: Directory to save generated plots.
+        _saved_paths: Tracks paths of saved figure files.
+        alpha: Significance level for hypothesis testing (used for plot annotations).
+
+    Example:
+        >>> reporter = AADryTestPlotReporter(
+        ...     figure_dpi=150,
+        ...     save_fig=True,
+        ...     save_dir="./plots",
+        ...     alpha=0.05
+        ... )
+        >>> result = reporter.report(experiment_data)
+    """
 
     def __init__(
             self,
-            figure_dpi,
-            save_fig=False,
+            figure_dpi: int = 100,
+            save_fig: bool = False,
             save_dir: str = ".",
             alpha: float = 0.05
         ):
+        """Initialize the dry test plot reporter.
+
+        Args:
+            figure_dpi: DPI for generated figures. Defaults to 100.
+            save_fig: If True, automatically save figures to disk. Defaults to False.
+            save_dir: Directory to save figure files. Defaults to current directory.
+            alpha: Significance level for hypothesis testing. Used for plot
+                annotations (e.g., alpha line, FPR calculation). Defaults to 0.05.
+        """
         super().__init__(figure_dpi, save_fig)
         self.save_dir = save_dir
         self._saved_paths: dict[str, str] = {}
@@ -303,7 +336,21 @@ class AADryTestPlotReporter(PlotReporter):
 
     # ── create figure ────────────────────────────────────────────────
 
-    def _create_figure(self, data: ExperimentData) -> dict[Any, plt.Figure]:
+    def _create_figure(self, data: ExperimentData) -> dict[str, plt.Figure]:
+        """Create dry test visualization figures from raw p-values data.
+
+        Generates histograms showing p-value distributions for each target feature,
+        with annotations for:
+        - Expected uniform distribution (red dashed line at y=1.0)
+        - Significance threshold alpha (green dotted vertical line)
+        - False Positive Rate (FPR) - actual vs expected alpha
+
+        Args:
+            data: The experiment data containing raw p-values from AADryTestAnalyzer.
+
+        Returns:
+            Dictionary with "aa_dry_test" key mapping to the generated matplotlib Figure.
+        """
         result = extract_analyzer_data(
             data,
             "AADryTestAnalyzer",
@@ -362,7 +409,15 @@ class AADryTestPlotReporter(PlotReporter):
 
     # ── save figure ────────────────────────────────────────────────
 
-    def _save_figure(self, figures: dict[str, plt.Figure]):
+    def _save_figure(self, figures: dict[str, plt.Figure]) -> dict[str, str]:
+        """Save generated figures to disk as PNG files.
+
+        Args:
+            figures: Dictionary of figure names to matplotlib Figure objects.
+
+        Returns:
+            Dictionary mapping figure names to saved file paths.
+        """
         os.makedirs(self.save_dir, exist_ok=True)
         paths = {}
         for name, fig in figures.items():
@@ -374,6 +429,14 @@ class AADryTestPlotReporter(PlotReporter):
 
     @staticmethod
     def _show_figure(figure: dict[str, plt.Figure]) -> None:
+        """Display the generated figures.
+
+        Uses matplotlib's show function with non-blocking mode to allow
+        the script to continue execution after displaying the plot.
+
+        Args:
+            figure: Dictionary of figure names to matplotlib Figure objects.
+        """
         plt.show(block=False)
 
     # ── Interactive display (for scripts outside Jupyter) ───────────────

@@ -19,6 +19,22 @@ from .base import Output
 
 
 class AAOutput(Output):
+    """Output handler for A/A test experiments with plot support.
+
+    Extracts and formats results from A/A testing experiments, including:
+    - Best split statistics
+    - Experiment metrics per iteration
+    - AA score metrics
+    - Dry test plots (p-value distribution diagnostics)
+
+    Attributes:
+        best_split: Dataset containing best split statistics.
+        experiments: Dataset with per-iteration experiment results.
+        aa_score: Dataset with A/A score metrics.
+        best_split_statistics: Dataset with detailed best split information.
+        dry_test_plots: Dictionary of dry test plot figures (if plots enabled).
+    """
+
     best_split: Dataset
     experiments: Dataset
     aa_score: Dataset
@@ -26,6 +42,12 @@ class AAOutput(Output):
     dry_test_plots: dict[str, plt.Figure]
 
     def __init__(self, show_plots: bool = True, save_plots: bool = False):
+        """Initialize AAOutput with plot display options.
+
+        Args:
+            show_plots: If True, include dry test plots in output. Defaults to True.
+            save_plots: If True, save dry test plots to disk. Defaults to False.
+        """
         additional = {"best_split": AABestSplitReporter()}
         if show_plots or save_plots:
             additional["dry_test_plots"] = AADryTestPlotReporter(
@@ -180,15 +202,28 @@ class AAOutput(Output):
 
     @staticmethod
     def _add_dry_score(experiment_data: ExperimentData, aa_score: Dataset) -> Dataset:
+        """Merge dry test results with AA score table.
+
+        Combines the AA score metrics with dry test (uniformity) results.
+        The dry test pass flag is merged with AA score pass flag using logical AND,
+        meaning both must pass for the final result to be "pass".
+
+        Args:
+            experiment_data: The experiment data containing dry test results.
+            aa_score: The AA score dataset to merge with.
+
+        Returns:
+            Merged dataset with combined pass/fail information.
+        """
         dry_ids = experiment_data.get_ids(
             AADryTestAnalyzer,
             ExperimentDataEnum.analysis_tables,
-            key="dry score",                       # ← явный ключ
+            key="dry score",
         )
         dry_table_ids = dry_ids.get("AADryTestAnalyzer", {}).get("analysis_tables", [])
         if not dry_table_ids:
             return aa_score
-        print
+
         table = aa_score.merge(
             experiment_data.analysis_tables[dry_table_ids[0]],
             right_index=True,

@@ -16,7 +16,15 @@ from ..utils.enums import RenameEnum
 
 
 def _figure_to_html(fig: plt.Figure, dpi: int = 100) -> str:
-    """convert matplotlib-figure into base64 HTML <img>."""
+    """Convert matplotlib figure into base64 encoded HTML <img> element.
+
+    Args:
+        fig: Matplotlib Figure object to convert.
+        dpi: Dots per inch for the saved figure. Defaults to 100.
+
+    Returns:
+        HTML string containing base64-encoded PNG image with max-width styling.
+    """
     buf = BytesIO()
     fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
     buf.seek(0)
@@ -54,9 +62,25 @@ class _Report:
         self.tables = dict(tables)
 
     def _is_figure(self, value: Any) -> bool:
+        """Check if a value is a matplotlib Figure object.
+
+        Args:
+            value: Value to check.
+
+        Returns:
+            True if value is a matplotlib Figure, False otherwise.
+        """
         return isinstance(value, plt.Figure)
 
     def _is_figure_dict(self, value: Any) -> bool:
+        """Check if a value is a dictionary of matplotlib Figure objects.
+
+        Args:
+            value: Value to check.
+
+        Returns:
+            True if value is a non-empty dict with Figure values, False otherwise.
+        """
         return (
             isinstance(value, dict)
             and len(value) > 0

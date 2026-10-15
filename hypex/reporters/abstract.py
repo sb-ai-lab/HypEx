@@ -521,38 +521,83 @@ class DatasetReporter(Reporter):
         return TestDictReporter._convert_struct_dict_to_dataset(struct_dict)
 
 class PlotReporter(Reporter, ABC):
+    """Abstract base class for reporters that generate and handle plots/figures.
+
+    Extends DictReporter to provide common functionality for working with
+    visualizations. Subclasses should implement figure extraction/creation logic
+    and optionally override save/show methods.
+
+    Attributes:
+        figure_dpi: DPI (dots per inch) for generated figures.
+        save_fig: If True, automatically save figures to disk.
+    """
+
     def __init__(
         self,
-        figure_dpi: int,
-        save_fig: bool=False,
+        figure_dpi: int = 100,
+        save_fig: bool = False,
     ):
+        """Initialize the plot reporter.
+
+        Args:
+            figure_dpi: DPI for generated figures. Defaults to 100.
+            save_fig: If True, figures will be automatically saved. Defaults to False.
+        """
         super().__init__()
         self.figure_dpi = figure_dpi
         self.save_fig = save_fig
 
-    # @staticmethod
-    # def _extract_figure(data: ExperimentData) -> dict[Any, plt.Figure] | None:
-    #     return None
+    def _create_figure(self, data: ExperimentData) -> dict[str, Any]:
+        """Create figure from scratch using raw data.
 
-    def _create_figure(self, data: ExperimentData) -> dict[str, plt.Figure]:
-        """Create figure from scratch using raw data."""
+        Subclasses should override this method to create visualization
+        when figure is not available in experiment data.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            Dictionary mapping figure names to matplotlib Figure objects.
+        """
         return {}
 
-    def _save_figure(self, figures: Any) -> None:
-        """Save figures to disk."""
+    def _save_figure(self, figures: dict[str, Any]) -> None:
+        """Save figures to disk.
+
+        Subclasses should override this to implement actual saving logic.
+
+        Args:
+            figures: Dictionary of figure names to Figure objects.
+
+        Raises:
+            NotImplementedError: Must be implemented by subclass.
+        """
         raise NotImplementedError
 
     @staticmethod
     def _show_figure(figure: Any) -> None:
+        """Display a figure.
+
+        Subclasses should override this to implement display logic
+        (e.g., for Jupyter notebooks, GUI, or web interfaces).
+
+        Args:
+            figure: A matplotlib Figure object to display.
+
+        Raises:
+            NotImplementedError: Must be implemented by subclass.
+        """
         raise NotImplementedError
 
-    # def _build_figure(self, data: ExperimentData):
-    #     # fig_dict = self._extract_figure(data)
-    #     # if fig_dict is None:
-    #         fig_dict = self._create_figure(data)
-    #     return fig_dict
+    def report(self, data: ExperimentData) -> dict[str, Any]:
+        """Generate report containing plot figures.
 
-    def report(self, data):
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            Dictionary containing generated figures.
+        """
         fig_dict = self._create_figure(data)
         if not fig_dict:
             return {}
