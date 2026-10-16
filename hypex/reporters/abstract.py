@@ -5,7 +5,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Literal
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from ..comparators import GroupDifference, GroupSizes
