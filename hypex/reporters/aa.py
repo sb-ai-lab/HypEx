@@ -427,6 +427,8 @@ class AADryTestPlotReporter(PlotReporter):
         self._saved_paths = paths
         return paths
 
+    # ── Interactive display (for scripts outside Jupyter) ───────────────
+
     @staticmethod
     def _show_figure(figure: dict[str, plt.Figure]) -> None:
         """Display the generated figures.
@@ -437,12 +439,6 @@ class AADryTestPlotReporter(PlotReporter):
         Args:
             figure: Dictionary of figure names to matplotlib Figure objects.
         """
-        plt.show(block=False)
-
-    # ── Interactive display (for scripts outside Jupyter) ───────────────
-
-    @staticmethod
-    def _show_figure(figures: dict[str, plt.Figure]) -> None:
         plt.show(block=False)
 
     # ── report ────────────────────────────────────────────────────────
