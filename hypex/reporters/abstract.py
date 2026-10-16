@@ -231,9 +231,12 @@ def extract_group_sizes(data: ExperimentData, front: bool) -> dict[str, Any]:
     cid = data.get_one_id(GroupSizes, ExperimentDataEnum.analysis_tables)
     return _extract_from_comparator(data, cid, front)
 
-
+# TODO: add unitests for additionl params
 def extract_analyzer_data(
-    data: ExperimentData, analyzer_class: type | str
+    data: ExperimentData,
+    analyzer_class: type | str,
+    orient: Literal["records", "dataset"] = "records",
+    key: str | None = None
 ) -> dict[str, Any]:
     """Extract aggregated metrics from a specific analyzer.
 
@@ -244,17 +247,22 @@ def extract_analyzer_data(
     Returns:
         A flat dictionary of the first row of the analyzer's results.
     """
-    cid = data.get_one_id(analyzer_class, ExperimentDataEnum.analysis_tables)
+    cid = data.get_one_id(analyzer_class, ExperimentDataEnum.analysis_tables, key)
     table = data.analysis_tables[cid]
     if table.is_empty():
         return {}
 
-    records = table.to_records()
-    if not records:
-        return {}
+    if orient == "records":
+        records = table.to_records()
+        if not records:
+            return {}
 
-    row_dict = records[0]
-    return {col: _normalize_value(val) for col, val in row_dict.items()}
+        row_dict = records[0]
+        return {col: _normalize_value(val) for col, val in row_dict.items()}
+    elif orient == "dataset":
+        return {"result": table}
+    else:
+        raise ValueError(f"Incorrect orient: {orient}")
 
 
 class Reporter(ABC):
@@ -510,3 +518,91 @@ class DatasetReporter(Reporter):
     def convert_to_dataset(data: dict) -> Dataset | SmallDataset:
         struct_dict = TestDictReporter._get_struct_dict(data)
         return TestDictReporter._convert_struct_dict_to_dataset(struct_dict)
+
+class PlotReporter(Reporter, ABC):
+    """Abstract base class for reporters that generate and handle plots/figures.
+
+    Extends DictReporter to provide common functionality for working with
+    visualizations. Subclasses should implement figure extraction/creation logic
+    and optionally override save/show methods.
+
+    Attributes:
+        figure_dpi: DPI (dots per inch) for generated figures.
+        save_fig: If True, automatically save figures to disk.
+    """
+
+    def __init__(
+        self,
+        figure_dpi: int = 100,
+        save_fig: bool = False,
+    ):
+        """Initialize the plot reporter.
+
+        Args:
+            figure_dpi: DPI for generated figures. Defaults to 100.
+            save_fig: If True, figures will be automatically saved. Defaults to False.
+        """
+        super().__init__()
+        self.figure_dpi = figure_dpi
+        self.save_fig = save_fig
+
+    def _create_figure(self, data: ExperimentData) -> dict[str, Any]:
+        """Create figure from scratch using raw data.
+
+        Subclasses should override this method to create visualization
+        when figure is not available in experiment data.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            Dictionary mapping figure names to matplotlib Figure objects.
+        """
+        return {}
+
+    def _save_figure(self, figures: dict[str, Any]) -> None:
+        """Save figures to disk.
+
+        Subclasses should override this to implement actual saving logic.
+
+        Args:
+            figures: Dictionary of figure names to Figure objects.
+
+        Raises:
+            NotImplementedError: Must be implemented by subclass.
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    def _show_figure(figure: Any) -> None:
+        """Display a figure.
+
+        Subclasses should override this to implement display logic
+        (e.g., for Jupyter notebooks, GUI, or web interfaces).
+
+        Args:
+            figure: A matplotlib Figure object to display.
+
+        Raises:
+            NotImplementedError: Must be implemented by subclass.
+        """
+        raise NotImplementedError
+
+    def report(self, data: ExperimentData) -> dict[str, Any]:
+        """Generate report containing plot figures.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            Dictionary containing generated figures.
+        """
+        fig_dict = self._create_figure(data)
+        if not fig_dict:
+            return {}
+
+        if self.save_fig:
+            self._save_figure(fig_dict)
+
+        return fig_dict
+

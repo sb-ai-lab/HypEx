@@ -478,7 +478,21 @@ class AAScoreAnalyzer(Executor):
 
     @staticmethod
     def _get_dry_score(data: ExperimentData) -> Dataset | None:
-        dry_ids = data.get_ids("AADryTestAnalyzer", ExperimentDataEnum.analysis_tables)
+        """Retrieve dry test results from experiment data.
+
+        Looks for dry test analysis table with explicit "dry score" key.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            Dataset with dry test results (p-value, pass), or None if not found.
+        """
+        dry_ids = data.get_ids(
+            "AADryTestAnalyzer",
+            ExperimentDataEnum.analysis_tables,
+            key="dry score",
+        )
         dry_table_ids = dry_ids.get("AADryTestAnalyzer", {}).get("analysis_tables", [])
         if not dry_table_ids:
             return None
@@ -486,10 +500,33 @@ class AAScoreAnalyzer(Executor):
 
 
 class AADryTestAnalyzer(Executor):
-    def __init__(self, alpha: int = 0.05, key=""):
-        super().__init__(key)
+    """Analyzer for A/A dry test (uniformity of p-values).
+
+    Performs uniformity testing on p-value distributions from A/A tests.
+    A proper A/A test with no real effect should produce uniformly distributed
+    p-values between 0 and 1. This analyzer:
+
+    1. Extracts p-values from T-test results for target features
+    2. Tests for uniformity using statistical tests
+    3. Stores dry score results (p-value, pass flag) in analysis_tables
+    4. Stores raw p-values dataset separately for potential visualization
+
+    Note: Plot generation has been moved to AADryTestPlotReporter for better
+    separation of concerns and UI integration.
+
+    Attributes:
+        alpha: Significance level for uniformity testing.
+    """
+
+    def __init__(self, alpha: float = 0.05, key: str = ""):
+        """Initialize the dry test analyzer.
+
+        Args:
+            alpha: Significance level for hypothesis testing. Defaults to 0.05.
+            key: Optional identifier key for storing results.
+        """
+        super().__init__(key=key)
         self.alpha = alpha
-        self._fig: plt.Figure | None = None
 
     # ── Storage ───────────────────────────────────────────────────────────
 
@@ -511,13 +548,33 @@ class AADryTestAnalyzer(Executor):
     # ── Public API ────────────────────────────────────────────────────────
 
     def execute(self, data: ExperimentData) -> ExperimentData:
+        """Execute dry test analysis on experiment data.
+
+        Performs uniformity testing on p-value distributions and stores results:
+        - Dry score results (p-value, pass) under "dry score" key
+        - Raw p-values dataset under "raw pvals" key for visualization
+
+        Args:
+            data: The experiment data containing test results.
+
+        Returns:
+            ExperimentData with dry test analysis results stored.
+        """
         param_id = data.get_one_id(ParamsExperiment, ExperimentDataEnum.analysis_tables)
         score_table = data.analysis_tables[param_id]
         target_columns = data.field_search(TargetRole())
 
-        p_val_dist = self._uniform_test(score_table, target_columns)
+        p_val_dist, raw_pvals_ds = self._uniform_test(score_table, target_columns)
+        key = self.key
+
+        self.key = "dry score"
         output = self._set_value(data, p_val_dist, ExperimentDataEnum.analysis_tables)
-        return self._set_value(output, self._fig, ExperimentDataEnum.variables)
+
+        self.key = "raw pvals"
+        output = self._set_value(output, raw_pvals_ds, ExperimentDataEnum.analysis_tables)
+
+        self.key = key
+        return output
 
     # ── Uniform Test ──────────────────────────────────────────────────────
 
@@ -531,9 +588,47 @@ class AADryTestAnalyzer(Executor):
             data=df,
         )
 
-    def _uniform_test(self, score_table: Dataset, target_cols: list[str]) -> Dataset:
+    @staticmethod
+    def _build_pval_dataset(rows: dict[str, Any]) -> SmallDataset:
+        """Build a dataset from raw p-value data.
+
+        Creates a SmallDataset containing raw p-values for each target feature,
+        which can be used for visualization (e.g., histograms).
+
+        Args:
+            rows: Dictionary where keys are feature names and values are
+                lists of p-values.
+
+        Returns:
+            SmallDataset with raw p-value data, or empty dataset if no data.
+        """
+        if not rows:
+            return SmallDataset.from_dict([{}], roles={})
+        raw_pvals_ds = SmallDataset.from_dict(
+            rows,
+            {col: StatisticRole() for col in rows}
+        )
+        return raw_pvals_ds
+
+    def _uniform_test(
+        self, score_table: Dataset, target_cols: list[str]
+    ) -> tuple[SmallDataset, SmallDataset]:
+        """Perform uniformity test on p-value distributions.
+
+        Tests whether p-values from A/A tests are uniformly distributed
+        (as expected when there is no real effect).
+
+        Args:
+            score_table: Dataset containing p-value columns from statistical tests.
+            target_cols: List of target feature names to test.
+
+        Returns:
+            Tuple of two SmallDatasets:
+            - Dry score results (p-value, pass flag for uniformity test)
+            - Raw p-values dataset for each target feature (for visualization)
+        """
         if target_cols is None:
-            return SmallDataset.create_empty()
+            return SmallDataset.create_empty(), SmallDataset.create_empty()
         dry_cols = [
             col
             for col in score_table.columns
@@ -543,6 +638,7 @@ class AADryTestAnalyzer(Executor):
         ]
         data = score_table[dry_cols]
         rows = {"p-value": [], "pass": [], "_idx": []}
+        raw_pvals_dict = {}
         for col in dry_cols:
             tmp_dict = (
                 UniformCheck(self.alpha).calc(data[col]).to_dict()["data"]["data"]
@@ -555,68 +651,9 @@ class AADryTestAnalyzer(Executor):
                     tmp_dict[key] = [bool(1 - int(tmp_dict[key][0]))]
                 rows[key].extend(tmp_dict[key])
 
-        self._plot_results(data, target_cols, dry_cols)
+            raw_pvals_dict[feature] = data[col].raw_data.values.ravel()
+
+        raw_pvals_ds = self._build_pval_dataset(raw_pvals_dict)
         results = self._build_dry_score_dataset(rows)
 
-        return results
-
-    def _plot_results(
-        self,
-        score_table: Dataset,
-        target_cols: str | list[str],
-        dry_cols: str | list[str],
-    ):
-        target_cols = Adapter.to_list(target_cols)
-        dry_cols = Adapter.to_list(dry_cols)
-        fig, axs = plt.subplots(1, len(target_cols))
-        fig.suptitle(
-            "AA-test: diagnostic with zero effect", fontsize=15, fontweight="bold"
-        )
-
-        for idx, (col, d_col) in enumerate(zip(target_cols, dry_cols)):
-            # --- p-values  gist ---
-            p_vals = score_table[d_col].raw_data
-            if isinstance(axs, np.ndarray):
-                ax = axs[idx]
-            else:
-                ax = axs
-
-            ax.hist(
-                p_vals,
-                bins=30,
-                density=True,
-                alpha=0.7,
-                color="steelblue",
-                edgecolor="black",
-            )
-            ax.axhline(
-                y=1.0, color="red", linestyle="--", linewidth=2, label="Uniform(0,1)"
-            )
-            ax.axvline(
-                x=self.alpha,
-                color="green",
-                linestyle=":",
-                linewidth=2,
-                label=f"α = {self.alpha}",
-            )
-
-            ax.set_title(f"{col}: p-values distribution")
-            ax.set_xlabel("p-value")
-            ax.set_ylabel("Density")
-            ax.legend()
-            ax.grid(True, alpha=0.3)
-
-            fpr = np.mean(p_vals < self.alpha)
-            ax.text(
-                0.5,
-                0.95,
-                f"FPR = {fpr:.1%}\n(expected: {self.alpha:.0%})",
-                transform=ax.transAxes,
-                ha="center",
-                va="top",
-                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
-                fontsize=11,
-            )
-
-        plt.close(fig)
-        self._fig = fig
+        return results, raw_pvals_ds

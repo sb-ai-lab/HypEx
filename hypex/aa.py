@@ -23,6 +23,10 @@ from .utils import SpaceEnum
 class AATest(ExperimentShell):
     """A class for conducting A/A tests with configurable parameters.
 
+    Performs A/A testing to verify that there are no statistically significant
+    differences between randomly split groups (control and test) of the same dataset.
+    This helps identify issues with data, splitting logic, or statistical tests.
+
     Args:
         precision_mode (bool, optional): If True, runs more iterations (2000) in order to tackle type 1 error.
             If False, runs fewer iterations (10) for quicker results. Defaults to False.
@@ -45,6 +49,12 @@ class AATest(ExperimentShell):
         float32 (bool, optional): Cast float columns to float32 for memory savings. Defaults to False.
         early_stopping (bool, optional): Stop when all features pass (no differences
             detected) on any iteration. Defaults to False.
+        dry_test (bool, optional): Whether to perform dry test (uniformity of p-values).
+            Defaults to False.
+        show_dry_test_plots (bool, optional): If True and dry_test=True, display dry test
+            p-value distribution plots. Defaults to True.
+        save_dry_test_plots (bool, optional): If True and dry_test=True, save dry test
+            plots to disk. Defaults to False.
         t_test_equal_var (bool | None, optional): Deprecated alias for ``equal_variance``.
     ...
     """
@@ -215,6 +225,8 @@ class AATest(ExperimentShell):
         early_stopping: bool = False,
         t_test_equal_var: bool | None = None,
         dry_test: bool = False,
+        show_dry_test_plots: bool = True,
+        save_dry_test_plots: bool = False,
     ):
         import warnings
 
@@ -265,7 +277,10 @@ class AATest(ExperimentShell):
                 early_stopping=early_stopping,
                 dry_test=dry_test,
             ),
-            output=AAOutput(),
+            output=AAOutput(
+                show_plots=show_dry_test_plots and dry_test,
+                save_plots=save_dry_test_plots,
+            ),
         )
 
         if equal_variance is not None:
