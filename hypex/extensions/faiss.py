@@ -121,6 +121,38 @@ class FaissExtension(MLExtension):
                 data = data[valid_cols]
             return data.dot(mahalanobis.raw_data)
 
+    # ── Clusterization parameters ─────────────────────────────────────────────────────
+
+    def _compute_cluster_params(self) -> None:
+        """
+        Compute clustering parameters for IVF index.
+
+        Calculates the number of clusters (k) and the number of probes (nprobe)
+        based on the dataset size. Uses heuristic values for the factor and
+        bounds for nprobe.
+
+        Note:
+            This method should be called after ``_data_size`` is set.
+        """
+        # TODO: insert into config `m` and 10 and 50 params
+        # factor = MatchingConfig.FAISS_CLUSTER_FACTOR
+        factor = 4  # heuristic
+        self.k = int(np.sqrt(self._data_size / factor))
+        self._nprobe = max(
+            self.n_neighbors,
+            min(
+                # max(self.k // 10, MatchingConfig.FAISS_MIN_NPROBE),
+                # MatchingConfig.FAISS_MAX_NPROBE,
+                max(self.k // 10, 10),
+                50,
+            ),
+        )
+
+    def _get_nlist(self, n_vectors: int) -> int:
+        # IVF Faiss supports up to 39 * (training points) per cluster
+        min_pts = 39
+        return min(self.k, max(1, n_vectors // min_pts))
+
     @abstractmethod
     def calc(
         self,
@@ -309,22 +341,23 @@ class PandasFaissExtension(FaissExtension):
             test_data (Dataset | None): The query dataset (used for size
                 heuristics); optional - without it only the index size decides.
         """
-        X = self._mahalanobis_transform(data, self.mahalanobis).raw_data.values
+        X: np.ndarray = self._mahalanobis_transform(data, self.mahalanobis).raw_data.values
+        self._data_size = len(X)
+        self._compute_cluster_params()
         self.index = faiss.IndexIDMap(faiss.IndexFlatL2(X.shape[1]))
         if (
             (
-                (len(X) > 1_000_000 and self.faiss_mode == "auto")
+                (self._data_size > 1_000_000 and self.faiss_mode == "auto")
                 or self.faiss_mode == "fast"
             )
-            and len(X) > 1_000
+            and self._data_size > 1_000
             and (test_data is None or len(test_data) > 1_000)
         ):
-            m = 4  # heuristic
-            n_clusters = int(np.sqrt(len(X) / m))
-            nlist = min(n_clusters, max(1, X.shape[0] // 39))
+            nlist = self._get_nlist(X.shape[0])
             quantizer = faiss.IndexFlatL2(X.shape[1])
             _index = faiss.IndexIVFFlat(quantizer, X.shape[1], nlist)
             _index.train(X)
+            _index.nprobe = min(self._nprobe, nlist)
             self.index = faiss.IndexIDMap(_index)
         self.index.add_with_ids(X, np.array(data.index.tolist(), dtype=np.int64))
 
@@ -823,33 +856,6 @@ class SparkFaissExtension(FaissExtension):
         self._fitted = True
         return self
 
-    # Clusterization parameters
-
-    def _compute_cluster_params(self) -> None:
-        """
-        Compute clustering parameters for IVF index.
-
-        Calculates the number of clusters (k) and the number of probes (nprobe)
-        based on the dataset size. Uses heuristic values for the factor and
-        bounds for nprobe.
-
-        Note:
-            This method should be called after ``_data_size`` is set.
-        """
-        # TODO: insert into config `m` and 10 and 50 params
-        # factor = MatchingConfig.FAISS_CLUSTER_FACTOR
-        factor = 4  # heuristic
-        self.k = int(np.sqrt(self._data_size / factor))
-        self._nprobe = max(
-            self.n_neighbors,
-            min(
-                # max(self.k // 10, MatchingConfig.FAISS_MIN_NPROBE),
-                # MatchingConfig.FAISS_MAX_NPROBE,
-                max(self.k // 10, 10),
-                50,
-            ),
-        )
-
     # Formatting clusters for "cluster" mode
 
     def _prefit(self, vectorized_data: spark.DataFrame, model_name: str) -> None:
@@ -930,6 +936,7 @@ class SparkFaissExtension(FaissExtension):
         quantizer.add(centroids)
         self.index = faiss.IndexIVFFlat(quantizer, index_shape, nlist)
         self.index.is_trained = True
+        self.index.nprobe = min(self._nprobe, nlist)
 
         self._centroids = centroids
 
@@ -1053,12 +1060,12 @@ class SparkFaissExtension(FaissExtension):
         """
         d = X.shape[1]
         # IVF Faiss supports up to 39 * (training points) per cluster
-        nlist = min(self.k, max(1, X.shape[0] // 39))
+        nlist = self._get_nlist(X.shape[0])
 
         quantizer = faiss.IndexFlatL2(d)
         self.index = faiss.IndexIVFFlat(quantizer, d, nlist)
         self.index.train(X)
-        self.index.nprobe = self._nprobe
+        self.index.nprobe = min(self._nprobe, nlist)
 
     # Fit in "cluster" mode
 
@@ -1080,7 +1087,7 @@ class SparkFaissExtension(FaissExtension):
                 Defaults to None (uses "k-means").
         """
         self._prefit(vectorized_data=vectorized_data, model_name=model_name)
-        self.index.nprobe = self._nprobe
+        self.index.nprobe = min(self._nprobe, self.index.nlist)
         self._build_and_persist_sharded_rdd(
             vectorized_data,
             partition_func=_spark_partition_fit,
