@@ -903,6 +903,31 @@ class SparkFaissExtension(FaissExtension):
             if batch:
                 yield batch
 
+        def _is_fitted(model):
+            """
+            Checks if a scikit-learn estimator/transformer has already been fit.
+            It uses the following fact from sklearn glossary https://scikit-learn.org/dev/glossary.html#term-fitted:
+            '''
+                There is no conventional procedure for checking if an estimator is fitted. However, an estimator that is not fitted:
+                Should not have any attributes beginning with an alphabetic character and ending with an underscore.
+                (Note that a descriptor for the attribute may still be present on the class, but hasattr should return False)
+            '''
+
+            Parameters
+            ----------
+            model: scikit-learn estimator (e.g. RandomForestClassifier)
+                or transformer (e.g. MinMaxScaler) object
+
+            Returns
+            -------
+            Boolean that indicates if ``model`` has already been fit (True) or not (False).
+            """
+
+            attrs = [v for v in vars(model)
+                    if v.endswith("_") and not v.startswith("__")]
+
+            return len(attrs) != 0
+
         model_dict = self.CLUSTERING_METHODS_MAPPER[model_name]
         model_cls, model_params = model_dict["model"], model_dict["params"]
         model_params["n_clusters"] = self.k
@@ -929,6 +954,8 @@ class SparkFaissExtension(FaissExtension):
                 cache = np.array([])
 
         if len(cache) != 0:
+            if len(cache) < self.k and not _is_fitted(model):
+                raise ValueError(f"The amount of data is too small for {self.k} clusters.")
             model.partial_fit(cache)
         del cache
 
