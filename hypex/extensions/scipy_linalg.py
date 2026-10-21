@@ -20,8 +20,11 @@ class UniteCovExtension(Extension):
         else:
             test_data_size = len(test_data)
             data_size = len(data)
+            if test_data_size == 0 and data_size == 0:
+                raise ValueError("One of datasets must be non-empty")
+
             cov_test = test_data.raw_data.cov().to_numpy()
-            result = ((data_size - 1) * cov_data + (test_data_size - 1) * cov_test) / (data_size + test_data_size + 2)
+            result = ((data_size - 1) * cov_data + (test_data_size - 1) * cov_test) / (data_size + test_data_size - 2)
 
         return self.result_to_dataset(
             pd.DataFrame(result, columns=data.columns),

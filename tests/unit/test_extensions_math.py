@@ -317,12 +317,15 @@ def test_unite_cov_averages_group_covariances() -> None:
     rng = np.random.RandomState(0)
     a = pd.DataFrame(rng.normal(0, 1, (50, 2)), columns=["x", "y"])
     b = pd.DataFrame(rng.normal(0, 3, (70, 2)), columns=["x", "y"])
+    n_a, n_b = len(a), len(b)
     roles = {"x": FeatureRole(), "y": FeatureRole()}
     ds_a = Dataset(roles=dict(roles), data=a, backend=BackendsEnum.pandas)
     ds_b = Dataset(roles=dict(roles), data=b, backend=BackendsEnum.pandas)
     united = _frame(UniteCovExtension().calc(ds_a, ds_b)).to_numpy(dtype=float)
     np.testing.assert_allclose(
-        united, (a.cov().to_numpy() + b.cov().to_numpy()) / 2, atol=1e-9
+        united,
+        ((n_a - 1) * a.cov().to_numpy() + (n_b - 1) * b.cov().to_numpy()) / (n_a + n_b - 2),
+        atol=1e-9
     )
     single = _frame(UniteCovExtension().calc(ds_a)).to_numpy(dtype=float)
     np.testing.assert_allclose(single, a.cov().to_numpy(), atol=1e-9)
