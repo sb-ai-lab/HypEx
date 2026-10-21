@@ -911,13 +911,26 @@ class SparkFaissExtension(FaissExtension):
         batch_size = MatchingConfig.FAISS_DRIVER_INDEX_LIMIT
         np_batch = None
 
+        cache = np.array([])
         for batch in (
             vectorized_data.select("_features")
             .rdd.mapPartitions(lambda it: _partition_load(it, batch_size))
             .toLocalIterator()
         ):
             np_batch = np.array(batch, dtype=np.float32)
-            model.partial_fit(np_batch)
+            if len(np_batch) < self.k:
+                cache = np.append(cache, np_batch)
+                continue
+            if len(cache) == 0:
+                model.partial_fit(np_batch)
+            else:
+                cache = np.append(cache, np_batch)
+                model.partial_fit(cache)
+                cache = np.array([])
+
+        if len(cache) != 0:
+            model.partial_fit(cache)
+        del cache
 
         if np_batch is not None:
             del np_batch
