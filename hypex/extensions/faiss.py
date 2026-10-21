@@ -341,7 +341,9 @@ class PandasFaissExtension(FaissExtension):
             test_data (Dataset | None): The query dataset (used for size
                 heuristics); optional - without it only the index size decides.
         """
-        X: np.ndarray = self._mahalanobis_transform(data, self.mahalanobis).raw_data.values
+        X: np.ndarray = self._mahalanobis_transform(
+            data, self.mahalanobis
+        ).raw_data.values
         self._data_size = len(X)
         self._compute_cluster_params()
         self.index = faiss.IndexIDMap(faiss.IndexFlatL2(X.shape[1]))
@@ -923,8 +925,9 @@ class SparkFaissExtension(FaissExtension):
             Boolean that indicates if ``model`` has already been fit (True) or not (False).
             """
 
-            attrs = [v for v in vars(model)
-                    if v.endswith("_") and not v.startswith("__")]
+            attrs = [
+                v for v in vars(model) if v.endswith("_") and not v.startswith("__")
+            ]
 
             return len(attrs) != 0
 
@@ -955,7 +958,9 @@ class SparkFaissExtension(FaissExtension):
 
         if len(cache) != 0:
             if len(cache) < self.k and not _is_fitted(model):
-                raise ValueError(f"The amount of data is too small for {self.k} clusters.")
+                raise ValueError(
+                    f"The amount of data is too small for {self.k} clusters."
+                )
             model.partial_fit(cache)
         del cache
 
