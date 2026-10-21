@@ -325,7 +325,7 @@ def test_unite_cov_averages_group_covariances() -> None:
     np.testing.assert_allclose(
         united,
         ((n_a - 1) * a.cov().to_numpy() + (n_b - 1) * b.cov().to_numpy())
-        / ( n_a + n_b - 2),
+        / (n_a + n_b - 2),
         atol=1e-9,
     )
     single = _frame(UniteCovExtension().calc(ds_a)).to_numpy(dtype=float)
