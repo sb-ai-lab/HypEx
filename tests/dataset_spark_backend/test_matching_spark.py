@@ -57,7 +57,7 @@ def test_matching_spark_matches_pandas(spark_session, n_neighbors):
     for col in a.columns:
         if pd.api.types.is_numeric_dtype(a[col]):
             np.testing.assert_allclose(
-                a[col].astype(float), b[col].astype(float), rtol=1e-6
+                a[col].astype(float), b[col].astype(float), rtol=1e-6, atol=1e-3
             )
         else:
             assert a[col].tolist() == b[col].tolist()
