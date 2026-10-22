@@ -36,7 +36,7 @@ class Matching(ExperimentShell):
             Defaults to "ate".
         bias_estimation (bool, optional): Whether to estimate bias. Defaults to True.
         quality_tests (Union[str, List[str]], optional): Quality tests to perform.
-            Options are "smd", "psi", "ks-test", "repeats", "t-test", or "auto".
+            Options are "chi2-test", "ks-test", "t-test", or "auto".
             Can be a single test or list of tests. Defaults to "auto".
         faiss_mode (Literal["base", "fast", "auto"], optional): Faiss mode to use for matching.
             Options are "base", "fast", or "auto". Defaults to "auto".
@@ -73,10 +73,10 @@ class Matching(ExperimentShell):
         metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: (
-            Literal["smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"]
+            Literal["ks-test", "t-test", "chi2-test", "auto"]
             | list[
                 Literal[
-                    "smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"
+                    "ks-test", "t-test", "chi2-test", "auto"
                 ]
             ]
         ) = "auto",
@@ -98,7 +98,7 @@ class Matching(ExperimentShell):
             Defaults to "ate".
         bias_estimation (bool, optional): Whether to estimate bias. Defaults to True.
         quality_tests (Union[str, List[str]], optional): Quality tests to perform.
-            Options are "ks-test", "t-test", or "auto".
+            Options are "ks-test", "t-test", "chi2-test" or "auto".
             Can be a single test or list of tests. Defaults to "auto", which performs all tests.
         faiss_mode (Literal["base", "fast", "auto"], optional): Faiss mode to use for matching.
             Options are "base", "fast", or "auto". Defaults to "auto".
@@ -173,7 +173,6 @@ class Matching(ExperimentShell):
                 )
             ]
         else:
-            # warnings.warn("Now quality tests aren't supported yet")
             executors += [
                 OnRoleExperiment(
                     executors=[test_mapping[test] for test in quality_tests],
