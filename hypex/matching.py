@@ -206,10 +206,10 @@ class Matching(ExperimentShell):
         # metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: (
-            Literal["smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"]
+            Literal["ks-test", "t-test", "chi2-test", "auto"]
             | list[
                 Literal[
-                    "smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"
+                    "ks-test", "t-test", "chi2-test", "auto"
                 ]
             ]
         ) = "auto",
