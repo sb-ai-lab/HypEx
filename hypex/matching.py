@@ -74,11 +74,7 @@ class Matching(ExperimentShell):
         bias_estimation: bool = True,
         quality_tests: (
             Literal["ks-test", "t-test", "chi2-test", "auto"]
-            | list[
-                Literal[
-                    "ks-test", "t-test", "chi2-test", "auto"
-                ]
-            ]
+            | list[Literal["ks-test", "t-test", "chi2-test", "auto"]]
         ) = "auto",
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
         n_neighbors: int = 1,
@@ -207,11 +203,7 @@ class Matching(ExperimentShell):
         bias_estimation: bool = True,
         quality_tests: (
             Literal["ks-test", "t-test", "chi2-test", "auto"]
-            | list[
-                Literal[
-                    "ks-test", "t-test", "chi2-test", "auto"
-                ]
-            ]
+            | list[Literal["ks-test", "t-test", "chi2-test", "auto"]]
         ) = "auto",
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
         n_neighbors: int = 1,
