@@ -905,9 +905,12 @@ class SparkFaissExtension(FaissExtension):
             if batch:
                 yield batch
 
-        def _is_fitted(model):
+        def _is_cluster_model_fitted(model: MiniBatchKMeans | Birch) -> bool:
             """
-            Checks if a scikit-learn estimator/transformer has already been fit.
+            Check if clustering model has been fitted (at least one partial_fit call).
+            Internal helper for SparkFaissExtension._prefit() to validate that
+            MiniBatchKMeans or BIRCH models have received sufficient data.
+            Uses sklearn convention: fitted models have attributes ending with '_'.
             It uses the following fact from sklearn glossary https://scikit-learn.org/dev/glossary.html#term-fitted:
             '''
                 There is no conventional procedure for checking if an estimator is fitted. However, an estimator that is not fitted:
@@ -915,10 +918,9 @@ class SparkFaissExtension(FaissExtension):
                 (Note that a descriptor for the attribute may still be present on the class, but hasattr should return False)
             '''
 
-            Parameters
-            ----------
-            model: scikit-learn estimator (e.g. RandomForestClassifier)
-                or transformer (e.g. MinMaxScaler) object
+            Args
+            ----
+                model: Clustering model instance (MiniBatchKMeans or BIRCH)
 
             Returns
             -------
@@ -957,7 +959,7 @@ class SparkFaissExtension(FaissExtension):
                 cache = np.array([])
 
         if len(cache) != 0:
-            if len(cache) < self.k and not _is_fitted(model):
+            if len(cache) < self.k and not _is_cluster_model_fitted(model):
                 raise ValueError(
                     f"The amount of data is too small for {self.k} clusters."
                 )
