@@ -18,8 +18,15 @@ class UniteCovExtension(Extension):
         if test_data is None:
             result = cov_data
         else:
+            test_data_size = len(test_data)
+            data_size = len(data)
+            if test_data_size == 0 and data_size == 0:
+                raise ValueError("One of datasets must be non-empty")
+
             cov_test = test_data.raw_data.cov().to_numpy()
-            result = (cov_data + cov_test) / 2
+            result = ((data_size - 1) * cov_data + (test_data_size - 1) * cov_test) / (
+                data_size + test_data_size - 2
+            )
 
         return self.result_to_dataset(
             pd.DataFrame(result, columns=data.columns),
@@ -28,7 +35,7 @@ class UniteCovExtension(Extension):
 
 
 class CholeskyExtension(Extension):
-    def calc(self, data: Dataset, epsilon: float = 1e-3):
+    def calc(self, data: Dataset, epsilon: float = 1e-8):
         """
         Args
         ----
@@ -36,7 +43,7 @@ class CholeskyExtension(Extension):
                 features covariance matrix;
 
             epsilon: `float`
-                Correction to result matrix.By default is `1e-3`.
+                Correction to result matrix.By default is `1e-8`.
 
         """
         cov = data.raw_data.to_numpy()
