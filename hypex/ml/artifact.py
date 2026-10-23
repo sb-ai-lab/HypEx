@@ -9,302 +9,137 @@ knows *what* to save (the pipeline structure and the list of executors)
 but delegates *how* to serialize each executor to the executors themselves
 via the ``MLArtifactMixin`` protocol.
 
+Key design decisions:
+- All executor states are stored in a **single** ``metadata.json`` file,
+  making it easy to inspect the pipeline visually.
+- Executors are stored as a **flat sequential list** (no hardcoded
+  splitters/transformers/ml_executors stages).
+- Models are saved as separate binary files alongside the metadata.
+- Executors are **reconstructed** from the saved state via
+  ``importlib``, so no pre-built experiment is needed for loading.
+
 Disk Structure
 --------------
 ::
 
     .hypex_experiments/                 # DEFAULT_ARTIFACT_PATH
-    +-- my_experiment/                  # <experiment_id>
-        +-- experiment.json             # manifest
-        +-- ml_executors/               # lightweight states (JSON)
+    +-- my_experiment_20261023_120000/  # <experiment_id>_<created_at>
+        +-- metadata.json               # all executor states in one file
         +-- models/                     # heavy models (binary)
+            +-- 0_CUPACExecutor_abc123.pkl
+            +-- 1_MLFillna_def456.pkl
 """
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any
 
 from ..config import MLConfig
-from ..executor import MLExecutor
+from ..executor import Executor, MLExecutor
 
 
 class MLArtifact:
-    """Orchestrator for persisting and restoring ML experiment pipelines.
+    """Orchestrates saving and loading of ML experiment pipelines.
 
-    ``MLArtifact`` manages the complete lifecycle of an ML experiment:
-    saving the pipeline configuration, executor states, and trained models
-    to disk, and restoring them for subsequent inference runs.
+    This class manages the persistence and restoration of ML experiment state,
+    including pipeline structure, executor configurations, and trained models.
 
-    The class follows the **orchestrator pattern**: it does not know how to
-    serialize specific executor types or model formats.  Instead, it delegates
-    serialization to the executors themselves via the ``MLArtifactMixin``
-    protocol (``get_artifact``, ``set_artifact``, ``save_model``, ``load_model``).
+    The class follows a separation of concerns principle: it knows *what* to save
+    (the pipeline structure and list of executors) but delegates *how* to serialize
+    each executor to the executors themselves via the ``MLArtifactMixin`` protocol.
+
+    Parameters
+    ----------
+    experiment_id : str
+        Unique identifier for the experiment.
+    base_dir : str, optional
+        Base directory for storing artifacts. Defaults to ``MLConfig.DEFAULT_ARTIFACT_PATH``.
+    created_at : str, optional
+        Creation timestamp in ISO format. Defaults to current datetime.
 
     Attributes
     ----------
     experiment_id : str
-        Unique identifier for the experiment.
-    experiment_class : str
-        Name of the ``MLExperiment`` class.
+        The unique identifier for this experiment.
     base_dir : str
-        Full path to the artifact directory on disk.
-    pipeline_config : dict[str, Any]
-        Serialized pipeline structure containing executor metadata.
+        The base directory where artifacts are stored.
     created_at : str
-        ISO-8601 timestamp of artifact creation.
+        The creation timestamp in ISO format.
+    experiment_dir : str
+        Full path to the experiment's artifact directory.
+    metadata_file : str
+        Path to the metadata JSON file.
+    models_dir : str
+        Path to the directory containing saved models.
+    _executors : list[MLExecutor]
+        Internal list of executor instances.
+    pipeline_config : list[dict[str, Any]]
+        Configuration of the pipeline structure.
     """
 
     def __init__(
         self,
         experiment_id: str,
-        experiment_class: str,
-        base_dir: str,
-        pipeline_config: dict[str, Any],
+        base_dir: str | None,
         created_at: str | None = None,
     ) -> None:
-        """Initialize an MLArtifact instance.
-
-        Parameters
-        ----------
-        experiment_id : str
-            Unique identifier for the experiment.
-        experiment_class : str
-            Name of the experiment class.
-        base_dir : str
-            Full path to the artifact directory on disk.
-        pipeline_config : dict[str, Any]
-            Serialized pipeline configuration.
-        created_at : str | None, optional
-            ISO-8601 timestamp of creation.  If ``None``, uses current time.
-        """
         self.experiment_id = experiment_id
-        self.experiment_class = experiment_class
-        self.base_dir = base_dir
-        self.pipeline_config = pipeline_config
+        self.base_dir = base_dir or MLConfig.DEFAULT_ARTIFACT_PATH
         self.created_at = created_at or datetime.now().isoformat()
 
         self._executors: list[MLExecutor] = []
+        self.pipeline_config: list[dict[str, Any]] = []
 
-        self.metadata_file = os.path.join(base_dir, "experiment.json")
-        self.ml_executors_dir = os.path.join(base_dir, "ml_executors")
-        self.models_dir = os.path.join(base_dir, "models")
+        safe_created_at = self.created_at.replace(":", "-").replace(".", "-")
+        normalized_name = f"{experiment_id}_{safe_created_at}"
+        self.experiment_dir = os.path.join(self.base_dir, normalized_name)
+        self.metadata_file = os.path.join(self.experiment_dir, "metadata.json")
+        self.models_dir = os.path.join(self.experiment_dir, "models")
 
-    # -- attachment of executors --
+    # ── attachment of executors ────────────────────────────────────────────
 
-    def attach_executors(self, executors: Iterable[MLExecutor]) -> None:
+    def attach_executors(self, experiment: Any) -> None:
         """Bind live executor instances to this artifact.
 
         Parameters
         ----------
-        executors : Iterable[MLExecutor]
-            Iterable of executor instances to bind.
-        """
-        self._executors = list(executors)
-
-    # -- factory --
-
-    @classmethod
-    def from_experiment(
-        cls,
-        ml_experiment: Any,
-        artifact_path: str | None = None,
-        experiment_id: str | None = None,
-    ) -> MLArtifact:
-        """Create an artifact from a live MLExperiment instance.
-
-        Parameters
-        ----------
-        ml_experiment : MLExperiment
-            The experiment instance to serialize.
-        artifact_path : str | None, optional
-            Root directory for storing artifacts.  If ``None``, uses
-            ``MLConfig.DEFAULT_ARTIFACT_PATH``.
-        experiment_id : str | None, optional
-            Custom experiment identifier.  If ``None``, generated from
-            ``ml_experiment.key`` or current timestamp.
-
-        Returns
-        -------
-        MLArtifact
-            A new artifact instance ready for :meth:`save`.
-        """
-        if experiment_id is None:
-            experiment_id = str(ml_experiment.key) or (
-                f"exp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            )
-
-        if artifact_path is None:
-            artifact_path = MLConfig.DEFAULT_ARTIFACT_PATH
-
-        full_path = os.path.join(artifact_path, experiment_id)
-
-        artifact = cls(
-            experiment_id=experiment_id,
-            experiment_class=type(ml_experiment).__name__,
-            base_dir=full_path,
-            pipeline_config=cls._build_pipeline_config(ml_experiment),
-        )
-
-        artifact.attach_executors(ml_experiment.all_executors)
-
-        return artifact
-
-    @classmethod
-    def load_from_directory(cls, base_dir: str) -> MLArtifact:
-        """Restore an artifact from a directory on disk.
-
-        Reads only the ``experiment.json`` manifest and reconstructs the
-        artifact metadata.  Does **not** load executor states or models.
-
-        Parameters
-        ----------
-        base_dir : str
-            Path to the artifact directory (must contain ``experiment.json``).
-
-        Returns
-        -------
-        MLArtifact
-            A new artifact instance with metadata restored.
+        experiment : MLExperiment
+            The ML experiment instance containing executors to bind.
 
         Raises
         ------
-        FileNotFoundError
-            If ``experiment.json`` does not exist in the directory.
+        ValueError
+            If the provided executor configuration is incompatible with the
+            existing pipeline configuration.
         """
-        metadata_file = os.path.join(base_dir, "experiment.json")
+        self._executors = experiment.executors
+        config = self._build_pipeline_config(self._executors)
 
-        if not os.path.exists(metadata_file):
-            raise FileNotFoundError(f"Experiment metadata not found: {metadata_file}")
-
-        with open(metadata_file) as f:
-            data = json.load(f)
-
-        return cls(
-            experiment_id=data["experiment_id"],
-            experiment_class=data["experiment_class"],
-            base_dir=base_dir,
-            pipeline_config=data["pipeline_config"],
-            created_at=data.get("created_at"),
-        )
-
-    # -- discovery & parsing by experiment_id --
+        if self.pipeline_config is None:
+            self.pipeline_config = config
+        else:
+            valid, massage = self._validate_config(self.pipeline_config, config)
+            if not valid:
+                raise ValueError(massage)
 
     @staticmethod
-    def list_experiments(artifact_path: str | None = None) -> list[str]:
-        """Discover available experiment IDs in an artifact directory.
+    def _build_pipeline_config(executors: list[Executor | MLExecutor]) -> list[dict[str, Any]]:
+        """Serialize the pipeline structure from a list of executors.
 
         Parameters
         ----------
-        artifact_path : str | None, optional
-            Root artifact directory.  If ``None``, uses
-            ``MLConfig.DEFAULT_ARTIFACT_PATH``.
+        executors : list[Executor | MLExecutor]
+            The list of executors to serialize into a pipeline configuration.
 
         Returns
         -------
-        list[str]
-            Sorted list of experiment IDs found in the directory.
-        """
-        if artifact_path is None:
-            artifact_path = MLConfig.DEFAULT_ARTIFACT_PATH
-
-        if not os.path.isdir(artifact_path):
-            return []
-
-        result: list[str] = []
-        for entry in sorted(os.listdir(artifact_path)):
-            candidate = os.path.join(artifact_path, entry)
-            manifest = os.path.join(candidate, "experiment.json")
-            if os.path.isdir(candidate) and os.path.exists(manifest):
-                try:
-                    with open(manifest) as f:
-                        data = json.load(f)
-                    exp_id = data.get("experiment_id")
-                    if exp_id:
-                        result.append(str(exp_id))
-                except (json.JSONDecodeError, OSError):
-                    continue
-        return result
-
-    @classmethod
-    def load_experiment(
-        cls,
-        experiment_id: str,
-        artifact_path: str | None = None,
-    ) -> MLArtifact:
-        """Load an artifact by experiment ID.
-
-        Searches inside ``artifact_path`` for a subdirectory matching
-        ``experiment_id`` and loads the artifact from there.
-
-        Parameters
-        ----------
-        experiment_id : str
-            The experiment identifier to load.
-        artifact_path : str | None, optional
-            Root artifact directory.  If ``None``, uses
-            ``MLConfig.DEFAULT_ARTIFACT_PATH``.
-
-        Returns
-        -------
-        MLArtifact
-            A new artifact instance with metadata restored.
-
-        Raises
-        ------
-        FileNotFoundError
-            If no artifact matching ``experiment_id`` is found.
-        """
-        if artifact_path is None:
-            artifact_path = MLConfig.DEFAULT_ARTIFACT_PATH
-
-        if not os.path.isdir(artifact_path):
-            raise FileNotFoundError(
-                f"Artifact path does not exist: {artifact_path}"
-            )
-
-        # Fast path: direct subdirectory match.
-        candidate_dir = os.path.join(artifact_path, experiment_id)
-        manifest = os.path.join(candidate_dir, "experiment.json")
-        if os.path.isdir(candidate_dir) and os.path.exists(manifest):
-            return cls.load_from_directory(candidate_dir)
-
-        # Slow path: scan all subdirectories for a matching experiment_id
-        available = cls.list_experiments(artifact_path)
-        for exp_id in available:
-            sub_dir = os.path.join(artifact_path, exp_id)
-            sub_manifest = os.path.join(sub_dir, "experiment.json")
-            if not os.path.exists(sub_manifest):
-                continue
-            try:
-                with open(sub_manifest) as f:
-                    data = json.load(f)
-                if data.get("experiment_id") == experiment_id:
-                    return cls.load_from_directory(sub_dir)
-            except (json.JSONDecodeError, OSError):
-                continue
-
-        raise FileNotFoundError(
-            f"No artifact found for experiment_id={experiment_id!r} "
-            f"in {artifact_path!r}. "
-            f"Available experiments: {available or '(none)'}"
-        )
-
-    @staticmethod
-    def _build_pipeline_config(ml_experiment: Any) -> dict[str, Any]:
-        """Serialize the pipeline structure from an experiment.
-
-        Parameters
-        ----------
-        ml_experiment : MLExperiment
-            The experiment instance to serialize.
-
-        Returns
-        -------
-        dict[str, Any]
-            Pipeline configuration dictionary.
+        list[dict[str, Any]]
+            List of dictionaries, each containing serialized executor metadata
+            including class name, module, ID, key, and parameters.
         """
 
         def _ser(ex: MLExecutor) -> dict[str, Any]:
@@ -316,120 +151,256 @@ class MLArtifact:
                 "params": ex.get_params(),
             }
 
-        return {
-            "splitters": [_ser(e) for e in ml_experiment.splitters],
-            "transformers": [_ser(e) for e in ml_experiment.transformers],
-            "ml_executors": [_ser(e) for e in ml_experiment.ml_executors],
-        }
+        return [_ser(e) for e in executors]
 
-    # -- Save --
-
-    def save(self) -> None:
-        """Persist the artifact to disk."""
-        self._create_directory_structure()
-        self._save_metadata()
-
-        for executor in self._executors:
-            self._save_executor(executor)
-
-    def _create_directory_structure(self) -> None:
-        """Create the artifact directory structure on disk."""
-        os.makedirs(self.ml_executors_dir, exist_ok=True)
-        os.makedirs(self.models_dir, exist_ok=True)
-
-    def _save_metadata(self) -> None:
-        """Save the experiment manifest to ``experiment.json``."""
-        metadata = {
-            "experiment_id": self.experiment_id,
-            "experiment_class": self.experiment_class,
-            "created_at": self.created_at,
-            "pipeline_config": self.pipeline_config,
-        }
-
-        with open(self.metadata_file, "w") as f:
-            json.dump(metadata, f, indent=2, default=str)
-
-    def _save_executor(self, executor: MLExecutor) -> None:
-        """Save a single executor's state and model to disk.
+    @staticmethod
+    def _validate_config(
+        saved_config: list[dict[str, Any]],
+        current_config: list[dict[str, Any]]
+    ) -> tuple[bool, str]:
+        """Validate compatibility between saved and current pipeline configurations.
 
         Parameters
         ----------
-        executor : MLExecutor
-            The executor instance to save.
-        """
-        # 1) the lightweight part -> json
-        state_file = os.path.join(
-            self.ml_executors_dir, f"{executor.id_for_name}.json"
-        )
-
-        with open(state_file, "w") as f:
-            json.dump(executor.get_artifact(), f, indent=2, default=str)
-
-        # 2) the heavy part -> binary file (delegate to executor)
-        if executor.has_model:
-            model_dir = os.path.join(self.models_dir, executor.id_for_name)
-            executor.save_model(model_dir)
-
-    # -- Load --
-
-    def load(self) -> None:
-        """Restore executor states and models from disk."""
-        for executor in self._executors:
-            self._load_executor(executor)
-
-    def _load_executor(self, executor: MLExecutor) -> None:
-        """Load a single executor's state and model from disk.
-
-        Parameters
-        ----------
-        executor : MLExecutor
-            The executor instance to restore.
-        """
-        # 1) state
-        state_file = os.path.join(
-            self.ml_executors_dir, f"{executor.id_for_name}.json"
-        )
-
-        if os.path.exists(state_file):
-            with open(state_file) as f:
-                executor.set_artifact(json.load(f))
-
-        # 2) model
-        model_dir = os.path.join(self.models_dir, executor.id_for_name)
-
-        if os.path.exists(model_dir):
-            executor.load_model(model_dir)
-
-    # -- validation --
-
-    def validate_compatibility(self, ml_experiment: Any) -> tuple[bool, str]:
-        """Check if the saved pipeline is compatible with the current experiment.
-
-        Parameters
-        ----------
-        ml_experiment : MLExperiment
-            The current experiment instance to validate against.
+        saved_config : list[dict[str, Any]]
+            The saved pipeline configuration (list of serialized executor dicts).
+        current_config : list[dict[str, Any]]
+            The current pipeline configuration.
 
         Returns
         -------
         tuple[bool, str]
-            A tuple of ``(is_compatible, message)``.
+            A tuple of (is_valid, message) where is_valid is True if configurations
+            are compatible, and message provides details if they are not.
         """
-        saved = self.pipeline_config
-
-        for stage in ("splitters", "transformers", "ml_executors"):
-            saved_items = saved.get(stage, [])
-            current_items = getattr(ml_experiment, stage, [])
-
-            if len(saved_items) != len(current_items):
-                return False, (
-                    f"{stage}: saved {len(saved_items)}, current {len(current_items)}"
-                )
+        if len(saved_config) != len(current_config):
+            return False, (
+                f"Incorrect number of executors: saved {len(saved_config)}, current {len(current_config)}"
+            )
+        for idx in range(len(saved_config)):
+            saved_items = saved_config[idx]
+            current_items = current_config[idx]
 
             for i, (s, c) in enumerate(zip(saved_items, current_items)):
                 if s["class"] != type(c).__name__:
                     return False, (
-                        f"{stage}[{i}]: expected {s['class']}, got {type(c).__name__}"
+                        f"stage №{i}: expected {s['class']}, got {type(c).__name__}"
                     )
 
         return True, "Compatible"
+
+    # ── save experiment ────────────────────────────────────────────
+
+    @staticmethod
+    def _state_to_json(executor: MLExecutor) -> dict[str, Any]:
+        """Convert an executor's state to a JSON-serializable dictionary.
+
+        Parameters
+        ----------
+        executor : MLExecutor
+            The executor whose state should be serialized.
+
+        Returns
+        -------
+        dict[str, Any]
+            JSON-serializable dictionary representation of the executor's state.
+        """
+        executor_state = executor.get_artifact()
+        return executor_state.json
+
+    def save_experiment(self) -> None:
+        """Save the experiment's state to disk.
+
+        Persists all executor states and trained models to the artifact directory.
+        Creates the necessary directory structure if it doesn't exist.
+
+        Raises
+        ------
+        ValueError
+            If the base directory doesn't exist or no executors are attached.
+        """
+        if len(self._executors) == 0:
+            raise ValueError("First attach executors to MLArtifact.")
+
+        os.makedirs(self.experiment_dir, exist_ok=True)
+        os.makedirs(self.models_dir, exist_ok=True)
+
+        output_json: dict[str, Any] = {}
+
+        for idx, executor in enumerate(self._executors):
+            output_json[str(idx)] = self._state_to_json(executor)
+            if isinstance(executor, MLExecutor):
+                executor.save_model(self.models_dir, prefix=str(idx))
+
+        with open(self.metadata_file, "w") as f:
+            json.dump(output_json, f, indent=4)
+
+    # ── load experiment ────────────────────────────────────────────
+
+    @staticmethod
+    def _get_path(experiment_id: str, artifact_path: str | None, full_path: str | None) -> str:
+        """Resolve the artifact directory path for an experiment.
+
+        Parameters
+        ----------
+        experiment_id : str
+            The unique identifier of the experiment.
+        artifact_path : str, optional
+            Base path where artifacts are stored. Defaults to
+            ``MLConfig.DEFAULT_ARTIFACT_PATH``.
+        full_path : str, optional
+            If provided, use this as the exact path instead of searching.
+
+        Returns
+        -------
+        str
+            The resolved path to the experiment's artifact directory.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the artifact path doesn't exist or no matching experiment is found.
+        FileExistsError
+            If no experiment artifacts exist for the given ID.
+        """
+        if artifact_path is None:
+            artifact_path = MLConfig.DEFAULT_ARTIFACT_PATH
+
+        if not os.path.isdir(artifact_path):
+            raise FileNotFoundError(
+                f"Artifact path does not exist: {artifact_path}"
+            )
+
+        if full_path is None:
+            relevant_files_list = sorted(
+                element
+                for element in os.listdir(artifact_path)
+                if element.startswith(experiment_id)
+                and os.path.isdir(os.path.join(artifact_path, element))
+            )
+            # take most recent artifact
+            if len(relevant_files_list) == 0:
+                raise FileNotFoundError(
+                    f"No experiment artifacts found for "
+                    f"experiment_id={experiment_id!r} in {artifact_path!r}"
+                )
+            return os.path.join(artifact_path, relevant_files_list[-1])
+        else:
+            if not os.path.isdir(full_path):
+                raise FileNotFoundError(
+                    f"You wrote `full_path`. Full path does not exist: {full_path}"
+                )
+            return full_path
+
+    @staticmethod
+    def _create_executor(
+        state: dict[str, Any],
+        models_dir: str,
+        prefix: str
+    ) -> MLExecutor:
+        """Reconstruct an executor instance from its saved state.
+
+        Dynamically imports the executor's class and instantiates it
+        with the saved parameters, then restores its ID, key, and
+        fitted status.  If the executor has a model, loads it from disk.
+
+        Parameters
+        ----------
+        state : dict[str, Any]
+            The saved state of the executor.
+        models_dir : str
+            Directory where model files are stored.
+        prefix : str
+            Prefix used for the model filename.
+
+        Returns
+        -------
+        MLExecutor | Executor
+            A reconstructed executor instance with restored state.
+        """
+        module_name = state["module"]
+        qual_name = state["qualname"]
+
+        module = importlib.import_module(module_name)
+        cls = module
+        for part in qual_name.split('.'):
+            cls = getattr(cls, part)
+
+        obj = cls(**state["params"])
+        obj.id = state["id"]
+        obj.key = state["key"]
+        obj.is_fitted = state.get("fitted", False)
+
+        if state.get("has_model", False):
+            if not os.path.exists(models_dir):
+                raise FileNotFoundError(
+                    f"Models directory does not exist: {models_dir}"
+                )
+            obj.load_model(models_dir, prefix)
+
+        return obj
+
+    @classmethod
+    def load_experiment(
+        cls,
+        experiment_id: str,
+        artifact_path: str | None = None,
+        full_path: str | None = None
+    ) -> MLArtifact:
+        """Load an experiment from its saved artifacts.
+
+        Reconstructs the experiment's pipeline by loading executor states
+        from the metadata file and trained models from the models directory.
+
+        Parameters
+        ----------
+        experiment_id : str
+            The unique identifier of the experiment to load.
+        artifact_path : str, optional
+            Base directory where artifacts are stored. Defaults to
+            ``MLConfig.DEFAULT_ARTIFACT_PATH``.
+        full_path : str, optional
+            If provided, use this exact path instead of searching for the
+            experiment in artifact_path.
+
+        Returns
+        -------
+        MLArtifact
+            A new MLArtifact instance with the loaded experiment's state,
+            including reconstructed executors and pipeline configuration.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the artifact path doesn't exist, no matching experiment is found,
+            or the metadata file is missing.
+        FileExistsError
+            If no experiment artifacts exist for the given ID.
+        """
+        path = cls._get_path(experiment_id, artifact_path, full_path)
+        metadata_path = os.path.join(path, "metadata.json")
+        models_dir = os.path.join(path, "models")
+
+        if not os.path.isfile(metadata_path):
+            raise FileNotFoundError(
+                f"No metadata file found at: {metadata_path}"
+            )
+
+        metadata = {}
+        with open(metadata_path) as f:
+            metadata: dict[str, Any] = json.load(f)
+
+        executors = []
+        for idx, state in sorted(metadata.items(), key=lambda x: x[0]):
+            executors.append(
+                cls._create_executor(state, models_dir, str(idx))
+            )
+
+        artifact =  cls(
+            experiment_id=experiment_id,
+            base_dir=artifact_path or MLConfig.DEFAULT_ARTIFACT_PATH
+        )
+        artifact._executors = executors
+        artifact.pipeline_config = cls._build_pipeline_config(executors)
+        return artifact
+
