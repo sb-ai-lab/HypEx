@@ -6,6 +6,7 @@ from .abstract import DatasetBase
 from .dataset import Dataset, DatasetAdapter, SmallDataset
 from .experiment_data import ExperimentData
 from .groupby_dataset import GroupedDataset
+from .ml_experiment_data import MLExperimentData
 from .roles import (
     ABCRole,
     AdditionalFeatureRole,
@@ -58,6 +59,7 @@ __all__ = [
     "GroupingRole",
     "IndexRole",
     "InfoRole",
+    "MLExperimentData",
     "PreTargetRole",
     "SmallDataset",
     "StatisticRole",
