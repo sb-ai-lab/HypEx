@@ -21,7 +21,7 @@ from typing import Sequence
 from ..config import MLConfig
 from ..dataset import ExperimentData, MLExperimentData
 from ..executor import Executor
-from ..ml import MLArtifact
+from ..ml.artifact import MLArtifact
 from ..utils import MLModeEnum
 from .base import Experiment
 
@@ -122,52 +122,6 @@ class MLExperiment(Experiment):
                 "can be located in the artifact directory."
             )
 
-    @property
-    def all_executors(self) -> list[Executor]:
-        """Get all executors in the pipeline.
-
-        Returns
-        -------
-        list[Executor]
-            List of all executors in execution order.
-        """
-        return list(self.executors)
-
-    @property
-    def splitters(self) -> list[Executor]:
-        """Get all splitter executors in the pipeline.
-
-        Returns
-        -------
-        list[Executor]
-            List of splitter executors (currently empty for MLExperiment).
-        """
-        return []
-
-    @property
-    def transformers(self) -> list[Executor]:
-        """Get all transformer executors in the pipeline.
-
-        Returns
-        -------
-        list[Executor]
-            List of transformer executors.
-        """
-        return [ex for ex in self.executors if getattr(ex, "_is_transformer", False)]
-
-    @property
-    def ml_executors(self) -> list[Executor]:
-        """Get all ML executors in the pipeline.
-
-        Returns
-        -------
-        list[Executor]
-            List of ML executors (instances of MLExecutor).
-        """
-        from ..executor import MLExecutor
-
-        return [ex for ex in self.executors if isinstance(ex, MLExecutor)]
-
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Execute the ML experiment pipeline.
 
@@ -193,53 +147,14 @@ class MLExperiment(Experiment):
         FileNotFoundError
             If the artifact directory or experiment does not exist.
         """
-        # Re-validate in case mode was changed after construction.
         self._validate_key(self.mode, self.key)
 
-        # Load artifacts if in PREDICT mode
-        if self.mode == MLModeEnum.PREDICT:
-            self._load_artifacts()
-
-        # Execute the pipeline
         result = super().execute(data)
 
-        # Save artifacts if configured
-        if self.save_models:
-            self._save_artifacts()
+        if self.save_models and self.mode in [MLModeEnum.FIT, MLModeEnum.FIT_PREDICT]:
+            self.save()
 
         return result
-
-    def _save_artifacts(self) -> None:
-        """Save executor states and models to disk."""
-        artifact = MLArtifact.from_experiment(
-            ml_experiment=self,
-            artifact_path=self.artifact_path,
-        )
-        artifact.save()
-
-    def _load_artifacts(self) -> None:
-        """Load executor states and models from disk.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the artifact directory or experiment does not exist.
-        ValueError
-            If the saved pipeline is incompatible with the current experiment.
-        """
-        artifact = MLArtifact.load_experiment(
-            experiment_id=str(self.key),
-            artifact_path=self.artifact_path,
-        )
-
-        # Validate compatibility
-        is_compatible, message = artifact.validate_compatibility(self)
-        if not is_compatible:
-            raise ValueError(f"Incompatible artifact: {message}")
-
-        # Attach executors and load
-        artifact.attach_executors(self.all_executors)
-        artifact.load()
 
     def save(self, path: str | None = None) -> MLArtifact:
         """Manually save the experiment to an artifact.
@@ -256,129 +171,87 @@ class MLExperiment(Experiment):
             The saved artifact instance.
         """
         save_path = path or self.artifact_path
-
-        artifact = MLArtifact.from_experiment(
-            ml_experiment=self,
-            artifact_path=save_path,
+        artifact = MLArtifact(
+            experiment_id=str(self.key),
+            base_dir=save_path,
         )
-        artifact.save()
-
+        artifact.attach_executors(self)
+        artifact.save_experiment()
         return artifact
 
-    @classmethod
-    def load(
-        cls,
-        experiment_id: str,
-        executors: Sequence[Executor] | None = None,
-        mode: MLModeEnum | str = MLModeEnum.PREDICT,
-        artifact_path: str | None = None,
-    ) -> MLExperiment:
-        """Load an experiment from an artifact on disk.
+    def load(self) -> None:
+        """Load executors and models from a saved artifact.
 
-        Parameters
-        ----------
-        experiment_id : str
-            The experiment identifier to load.
-        executors : Sequence[Executor] | None, optional
-            List of executors to use.  If ``None``, the experiment is created
-            with an empty executor list.
-        mode : MLModeEnum | str, optional
-            Execution mode.  Defaults to ``MLModeEnum.PREDICT``.
-        artifact_path : str | None, optional
-            Root artifact directory.  If ``None``, uses
-            ``MLConfig.DEFAULT_ARTIFACT_PATH``.
+        Restores the pipeline by loading executor states and models
+        from the artifact directory identified by ``key`` and
+        ``artifact_path``.  If executors were provided at construction,
+        validates compatibility before replacing them.  If no executors
+        were provided, the loaded executors are used as-is.
 
-        Returns
-        -------
-        MLExperiment
-            A new experiment instance with loaded artifacts.
+        This method is **idempotent**: calling it multiple times will
+        only load once.
 
         Raises
         ------
         FileNotFoundError
-            If no artifact matching ``experiment_id`` is found.
+            If no artifact matching ``key`` is found.
         ValueError
-            If the saved pipeline is incompatible with the provided executors.
+            If the saved pipeline is incompatible with the current
+            executors.
+
+        Examples
+        --------
+        **Load after construction**::
+
+            exp = MLExperiment(
+                executors=[CUPACExecutor(...)],
+                key="my_cupac",
+            )
+            exp.load()
+            result = exp.execute(new_data)
+
+        **Load without pre-built executors**::
+
+            exp = MLExperiment(executors=[], key="my_cupac")
+            exp.load()
+            result = exp.execute(new_data)
         """
-        if artifact_path is None:
-            artifact_path = MLConfig.DEFAULT_ARTIFACT_PATH
 
         artifact = MLArtifact.load_experiment(
-            experiment_id=experiment_id,
-            artifact_path=artifact_path,
+            experiment_id=str(self.key),
+            artifact_path=self.artifact_path,
         )
 
-        if executors is None:
-            executors = []
+        # Validate compatibility only if executors were provided
+        if self.executors:
+            current_config = MLArtifact._build_pipeline_config(
+                list(self.executors)
+            )
+            is_valid, message = MLArtifact._validate_config(
+                artifact.pipeline_config, current_config
+            )
+            if not is_valid:
+                raise ValueError(f"Incompatible artifact: {message}")
 
-        exp = cls(
-            executors=executors,
-            mode=mode,
-            artifact_path=artifact_path,
-            key=experiment_id,
-        )
+        # Replace executors with loaded ones
+        self.executors = artifact._executors
+        self._artifacts_loaded = True
 
-        is_compatible, message = artifact.validate_compatibility(exp)
-        if not is_compatible:
-            raise ValueError(f"Incompatible artifact: {message}")
-
-        artifact.attach_executors(exp.all_executors)
-        artifact.load()
-
-        return exp
-
-    @staticmethod
-    def list_experiments(artifact_path: str | None = None) -> list[str]:
-        """Discover available experiment IDs in an artifact directory.
-
-        Parameters
-        ----------
-        artifact_path : str | None, optional
-            Root artifact directory.  If ``None``, uses
-            ``MLConfig.DEFAULT_ARTIFACT_PATH``.
-
-        Returns
-        -------
-        list[str]
-            Sorted list of experiment IDs found in the directory.
-        """
-        return MLArtifact.list_experiments(artifact_path)
+    # ── data helpers ────────────────────────────────────────────────
 
     def _ensure_ml_data(self, data: ExperimentData) -> MLExperimentData:
-        """Ensure the data is an MLExperimentData instance.
-
-        Parameters
-        ----------
-        data : ExperimentData
-            The input data.
-
-        Returns
-        -------
-        MLExperimentData
-            The data as an MLExperimentData instance.
-        """
+        """Ensure the data is an MLExperimentData instance."""
         if isinstance(data, MLExperimentData):
             return data
-
         ml_data = MLExperimentData(data=data.ds)
         ml_data.variables = data.variables
         ml_data.groups = data.groups
         ml_data.analysis_tables = data.analysis_tables
         ml_data.id_name_mapping = data.id_name_mapping
-
         return ml_data
 
-    def _configure_for_inference(self, ml: MLExperimentData) -> MLExperimentData:
-        """Configure the data for inference mode.
-
-        Parameters
-        ----------
-        ml : MLExperimentData
-            The ML experiment data.
-
-        Returns
-        -------
-        MLExperimentData
-            The configured data for inference.
-        """
+    def _configure_for_inference(
+        self, ml: MLExperimentData
+    ) -> MLExperimentData:
+        """Configure the data for inference mode (no-op for now)."""
         return ml
