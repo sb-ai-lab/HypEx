@@ -119,7 +119,7 @@ class MLArtifact:
         self._executors = experiment.executors
         config = self._build_pipeline_config(self._executors)
 
-        if self.pipeline_config is None:
+        if len(self.pipeline_config) == 0:
             self.pipeline_config = config
         else:
             valid, massage = self._validate_config(self.pipeline_config, config)
@@ -181,11 +181,10 @@ class MLArtifact:
             saved_items = saved_config[idx]
             current_items = current_config[idx]
 
-            for i, (s, c) in enumerate(zip(saved_items, current_items)):
-                if s["class"] != type(c).__name__:
-                    return False, (
-                        f"stage №{i}: expected {s['class']}, got {type(c).__name__}"
-                    )
+            if saved_items["class"] != current_items["class"]:
+                return False, (
+                    f"stage №{idx}: expected {saved_items['class']}, got {current_items['class']}"
+                )
 
         return True, "Compatible"
 
@@ -230,7 +229,7 @@ class MLArtifact:
         for idx, executor in enumerate(self._executors):
             output_json[str(idx)] = self._state_to_json(executor)
             if isinstance(executor, MLExecutor):
-                executor.save_model(self.models_dir, prefix=str(idx))
+                executor.save_model(self.models_dir, postfix=str(idx))
 
         with open(self.metadata_file, "w") as f:
             json.dump(output_json, f, indent=4)
@@ -322,15 +321,17 @@ class MLArtifact:
         qual_name = state["qualname"]
 
         module = importlib.import_module(module_name)
-        cls = module
+        cls = None
         for part in qual_name.split('.'):
-            cls = getattr(cls, part)
+            cls = getattr(module, part)
+
+        if cls is None:
+            cls = module
 
         obj = cls(**state["params"])
-        obj.id = state["id"]
+        obj._id = state["id"]
         obj.key = state["key"]
-        obj.is_fitted = state.get("fitted", False)
-
+        obj.is_fitted = True
         if state.get("has_model", False):
             if not os.path.exists(models_dir):
                 raise FileNotFoundError(
