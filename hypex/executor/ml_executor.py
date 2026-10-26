@@ -15,13 +15,12 @@ from .executor import Executor
 
 
 @dataclass
-class MLExecutorState:
+class MLExecutorSnapshot:
     qualname: str
     module: str
     id: str
     key: str
     params: dict[str, Any]
-    fitted: bool
     has_model: bool
 
     @property
@@ -92,34 +91,34 @@ class MLExecutor(Executor, ABC):
         raise NotImplementedError
 
     def fit_predict(self, data: MLExperimentData) -> MLExperimentData:
-        data = self.execute_fit(data)
-        data = self.execute_predict(data)
+        data = self.fit(data)
+        data = self.predict(data)
         return data
 
     # ── STATUS serialization protocol (the lightweight part) ─────────────
 
-    def get_artifact(self) -> MLExecutorState:
+    def get_artifact(self) -> MLExecutorSnapshot:
         cls = type(self)
-        return MLExecutorState(
+        return MLExecutorSnapshot(
             qualname=cls.__qualname__,
             module=cls.__module__,
             id=self.id,
             key=self.key,
             params=self.get_params(),
-            fitted=self.fitted,
+            # fitted=self.fitted,
             has_model=self.has_model,
         )
 
     # ── MODEL serialization protocol (the heavy part) ───────────────
 
-    def save_model(self, path: str, prefix: str="") -> None:
+    def save_model(self, path: str, postfix: str="") -> None:
         """Сохраняет модель на диск, если она есть."""
         if not self.has_model:
             return
-        self._save_model_backend(self._model, path, prefix)
+        self._save_model_backend(self._model, path, postfix)
 
-    def load_model(self, path: str, prefix: str="") -> None:
-        self._model = self._load_model_backend(path, prefix)
+    def load_model(self, path: str, postfix: str="") -> None:
+        self._model = self._load_model_backend(path, postfix)
 
     def _save_model_backend(self, model: Any, path: str, prefix: str) -> None:
         model_name = self.id + "_" + prefix
