@@ -97,6 +97,8 @@ class MLExperiment(Experiment):
         self.save_models = save_models
         self.artifact_path = artifact_path or MLConfig.DEFAULT_ARTIFACT_PATH
 
+        self._artifacts_loaded = False
+
         super().__init__(executors=executors, key=key)
 
     @staticmethod
@@ -216,6 +218,8 @@ class MLExperiment(Experiment):
             exp.load()
             result = exp.execute(new_data)
         """
+        if self._artifacts_loaded:
+            return
 
         artifact = MLArtifact.load_experiment(
             experiment_id=str(self.key),
@@ -236,6 +240,11 @@ class MLExperiment(Experiment):
         # Replace executors with loaded ones
         self.executors = artifact._executors
         self._artifacts_loaded = True
+
+    def reload(self) -> None:
+        """Force re-reading of the artifact, bypassing the idempotency cache."""
+        self._artifacts_loaded = False
+        self.load()
 
     # ── data helpers ────────────────────────────────────────────────
 
