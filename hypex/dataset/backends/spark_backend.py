@@ -185,7 +185,12 @@ class SparkNavigation(DatasetBackendNavigation):
                 "large jobs.",
                 UserWarning,
             )
+            self._previous_cached.append(self.data)
             self.data = self.data.spark.local_checkpoint(eager=eager)
+
+            if eager:
+                self._release_previous_cache()
+
         return self
 
     def limit(self, num: int | None = None) -> Self:
@@ -393,6 +398,8 @@ class SparkNavigation(DatasetBackendNavigation):
         else:
             raise TypeError(f"Unsupported data type: {type(data)}")
 
+        self._previous_cached: list[ps.DataFrame] = []
+
     def persist(
         self,
         storage_level: Literal[
@@ -458,12 +465,17 @@ class SparkNavigation(DatasetBackendNavigation):
             else original_index_names
         )
 
+        if self._is_persisted_flag:
+            self._previous_cached.append(self.data)
+
         self.data = self.data.spark.persist(storage_levels[storage_level])
 
         if action == "count":
             _ = self.data.count()
+            self._release_previous_cache()
         elif action == "head":
             _ = self.data.spark.frame().limit(1).collect()
+            self._release_previous_cache()
 
         if isinstance(original_index_name, str):
             if original_index_name in self.data.columns:
@@ -501,10 +513,10 @@ class SparkNavigation(DatasetBackendNavigation):
                 else original_index_names
             )
 
-            if blocking:
-                self.data.to_spark().unpersist(blocking=True)
-            else:
-                self.data.to_spark().unpersist()
+            # if blocking:
+            #     self.data.to_spark().unpersist(blocking=True)
+            # else:
+            #     self.data.to_spark().unpersist()
             self.data.to_spark().unpersist(blocking=blocking)
 
             if isinstance(original_index_name, str):
@@ -519,6 +531,7 @@ class SparkNavigation(DatasetBackendNavigation):
             self._is_persisted_flag = False
             self._storage_level_flag = None
 
+        self._release_previous_cache()
         return self
 
     @property
@@ -538,6 +551,14 @@ class SparkNavigation(DatasetBackendNavigation):
                 None if not persisted.
         """
         return getattr(self, "_storage_level_flag", None)
+
+    def _release_previous_cache(self):
+        for frame in self._previous_cached:
+            try:
+                frame.to_spark().unpersist(blocking=False)
+            except Exception:
+                pass  # best-effort: cleaning should not drop the pipeline
+        self._previous_cached.clear()
 
     def __getitem__(
         self, item: slice | int | str | list | ps.DataFrame | ps.Series
@@ -768,6 +789,15 @@ class SparkNavigation(DatasetBackendNavigation):
         for k, v in self.__dict__.items():
             if isinstance(v, (SparkSession, SparkDF, ps.DataFrame)):
                 setattr(result, k, v)
+                memo[id(v)] = v
+            elif k == "_previous_cached":
+                # TODO: discuss what we want when use `deepcopy` in experiment_data:
+                # if we `unpersist` data during inner calculations, that original
+                # experiment_data will be unpersisted too. So we should use something
+                # like links counter in `_previous_cached`
+
+                # creates a shallow copy of the cahced frames list
+                setattr(result, k, list(v))
                 memo[id(v)] = v
             else:
                 setattr(result, k, copy.deepcopy(v, memo))

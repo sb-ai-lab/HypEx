@@ -256,12 +256,6 @@ class ExperimentData:
         """
         normalized_role = self._normalize_role(role)
 
-        storage_level = self._data.get_storage_level() or "MEMORY_AND_DISK"
-        was_persisted = self._data.is_persisted
-
-        if was_persisted:
-            self._data.unpersist()
-
         if not isinstance(value, Dataset):
             # Raw data (list, scalar, etc.) — add as a single column
             new_data = self._data.add_column(
@@ -287,9 +281,11 @@ class ExperimentData:
                     new_data.roles[new_col_name] = normalized_role
                 else:
                     new_data.roles[new_col_name] = value.roles.get(col, DefaultRole())
-        new_data.persist(storage_level=storage_level, action="none")
-        if was_persisted:
-            self._data.unpersist()
+
+        if self._data.is_persisted:
+            storage_level = self._data.get_storage_level() or "MEMORY_AND_DISK"
+            new_data.persist(storage_level=storage_level, action="none")
+
         self._data = new_data
         return self
 
