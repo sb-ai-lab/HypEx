@@ -1093,7 +1093,8 @@ class StatsComparator(BaseComparator, ABC):
             )
 
         # ── 4. Validate that at least two groups exist ───────────────────────
-        group_names = sorted(group_col_stats.keys(), key=str)
+        group_names = sorted(group_col_stats)
+        group_col_stats = {group: group_col_stats[group] for group in group_names}
 
         if len(group_names) < 2:
             # Fewer than two groups → nothing to compare.  Store empty results
