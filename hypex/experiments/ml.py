@@ -19,8 +19,8 @@ from __future__ import annotations
 from typing import Sequence
 
 from ..config import MLConfig
-from ..dataset import ExperimentData, MLExperimentData
-from ..executor import Executor
+from ..dataset import ExperimentData
+from ..executor import Executor, MLExecutor
 from ..ml.artifact import MLArtifact
 from ..utils import MLModeEnum
 from .base import Experiment
@@ -151,9 +151,20 @@ class MLExperiment(Experiment):
         """
         self._validate_key(self.mode, self.key)
 
-        result = super().execute(data)
+        result = data.copy()
 
-        if self.save_models and self.mode in [MLModeEnum.FIT, MLModeEnum.FIT_PREDICT]:
+        for executor in self.executors:
+            cur_executor = self._get_executor_backend(executor, result.ds)
+            cur_executor.key = self.key
+            if isinstance(cur_executor, MLExecutor):
+                result = cur_executor.execute(result, mode=self.mode)
+            else:
+                result = cur_executor.execute(result)
+
+        if self.save_models and self.mode in (
+            MLModeEnum.FIT,
+            MLModeEnum.FIT_PREDICT,
+        ):
             self.save()
 
         return result
@@ -246,21 +257,3 @@ class MLExperiment(Experiment):
         self._artifacts_loaded = False
         self.load()
 
-    # ── data helpers ────────────────────────────────────────────────
-
-    def _ensure_ml_data(self, data: ExperimentData) -> MLExperimentData:
-        """Ensure the data is an MLExperimentData instance."""
-        if isinstance(data, MLExperimentData):
-            return data
-        ml_data = MLExperimentData(data=data.ds)
-        ml_data.variables = data.variables
-        ml_data.groups = data.groups
-        ml_data.analysis_tables = data.analysis_tables
-        ml_data.id_name_mapping = data.id_name_mapping
-        return ml_data
-
-    def _configure_for_inference(
-        self, ml: MLExperimentData
-    ) -> MLExperimentData:
-        """Configure the data for inference mode (no-op for now)."""
-        return ml
