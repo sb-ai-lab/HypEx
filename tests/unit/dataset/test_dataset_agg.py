@@ -102,6 +102,15 @@ def test_agg_with_str_list_dict(make_dataset, func) -> None:
     assert result is not None
 
 
+@pytest.mark.parametrize("method", ["mean", "sum", "min", "max"])
+def test_numeric_aggregations_reject_non_numeric_columns(make_dataset, method) -> None:
+    df = pd.DataFrame({"num": [1.0, 2.0], "txt": ["ab", "cd"]})
+    ds = make_dataset(df, {"num": FeatureRole(), "txt": FeatureRole()})
+
+    with pytest.raises((TypeError, ValueError)):
+        getattr(ds, method)()
+
+
 def test_log(make_dataset) -> None:
     df = pd.DataFrame({"x": [1.0, math.e]})
     ds = make_dataset(df, {"x": FeatureRole()})

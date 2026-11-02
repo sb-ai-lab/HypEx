@@ -1485,6 +1485,15 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 for col, dtype in types.items()
                 if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]
             ]
+            if isinstance(func, list) and any(
+                name in {"mean", "sum", "min", "max"} for name in func
+            ):
+                non_numeric = [col for col in types if col not in numeric_cols]
+                if non_numeric:
+                    raise TypeError(
+                        f"Cannot aggregate non-numeric columns: {non_numeric}. "
+                        "Select numeric columns explicitly."
+                    )
 
             data_to_agg = self.data[numeric_cols]
             if data_to_agg is None or len(data_to_agg.columns) == 0:
