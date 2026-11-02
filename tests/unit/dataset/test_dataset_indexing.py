@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from hypex.dataset import Dataset, FeatureRole, SmallDataset, TargetRole
+from hypex.dataset.backends.pandas_backend import PandasDataset
 
 
 def _ds(make_dataset):
@@ -45,6 +46,16 @@ def test_getitem_by_boolean_mask(make_dataset) -> None:
     filtered = ds[mask]
 
     assert len(filtered) == 2
+
+
+def test_pandas_utility_index_column_round_trip() -> None:
+    backend = PandasDataset(data=pd.DataFrame({"x": [1, 2, 3]}))
+
+    backend.add_index_col()
+    assert "⏣index" in backend.data.columns
+    backend.remove_index_col()
+
+    pd.testing.assert_frame_equal(backend.data, pd.DataFrame({"x": [1, 2, 3]}))
 
 
 def test_getitem_missing_column_raises(make_dataset) -> None:
