@@ -566,4 +566,4 @@ class MatchingOutput(Output):
                 session=experiment_data.ds.session,
             )
             logger.debug("Skipping full_data extraction (extract_full_data=False).")
-        self.summary.raw_data = self.summary.raw_data.round(2)
+        self.summary.raw_data = self.summary.raw_data.round(4)
