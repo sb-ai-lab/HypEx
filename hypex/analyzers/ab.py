@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import Any
 
 from ..comparators import (
+    GroupChi2Test,
     GroupKSTest,
     GroupTTest,
     GroupUTest,
@@ -302,6 +303,7 @@ class ABAnalyzer(Executor):
                 GroupTTest,
                 GroupUTest,
                 GroupKSTest,
+                GroupChi2Test,
                 StatsTTest,
                 StatsChi2Test,
                 StatsKSTest,
