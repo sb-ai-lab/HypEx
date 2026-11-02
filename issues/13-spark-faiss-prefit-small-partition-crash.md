@@ -1,3 +1,11 @@
+> **Status: OPEN — the merged fix introduces a different crash (re-checked 2026-11-02 @ `5d8d4beb`).**
+> Batch buffering was added at `hypex/extensions/faiss.py:944-966`, but `np.append(cache, np_batch)`
+> flattens the feature matrix. Once buffered rows are passed to `partial_fit`, scikit-learn receives
+> a 1-D array. Direct execution of the current cache logic for 20 two-row, two-feature batches and
+> `k=3` raises `ValueError: Expected 2D array, got 1D array instead` with cache shape `(80,)`.
+> Accumulate batches in a list and use `np.concatenate(batches, axis=0)` (or initialize and append
+> with `axis=0`) instead. Spark was not rerun because this environment has no Java runtime.
+
 ## 🐛 Bug Description
 
 <!-- A clear and concise description of what the bug is. -->

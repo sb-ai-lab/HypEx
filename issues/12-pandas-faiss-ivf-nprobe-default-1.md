@@ -1,3 +1,9 @@
+> **Status: RESOLVED on `review/hidden-bugs-audit` @ `5d8d4beb` (re-checked 2026-11-02).**
+> `PandasFaissExtension._fit` now computes the shared cluster parameters and assigns
+> `_index.nprobe = min(self._nprobe, nlist)` at `hypex/extensions/faiss.py:360-363`.
+> A runtime check on the IVF path returned `nprobe=10` with `nlist=16`. The report below is retained
+> as the original reproduction and should not be filed as a new issue.
+
 ## 🐛 Bug Description
 
 <!-- A clear and concise description of what the bug is. -->

@@ -1,3 +1,10 @@
+> **Status: RESOLVED AS REPORTED on `review/hidden-bugs-audit` @ `5d8d4beb` (re-checked 2026-11-02).**
+> The unsupported `"smd"`, `"psi"`, and `"repeats"` options were removed from `Matching`'s public
+> annotations and docstring, which now advertise only implemented tests. Passing an explicitly
+> invalid string still raises a raw `KeyError`; replacing that with descriptive input validation is
+> a separate improvement, not the documented-API bug described below. Do not file this draft as a
+> new issue in its current form.
+
 ## 🐛 Bug Description
 
 <!-- A clear and concise description of what the bug is. -->

@@ -11,6 +11,51 @@ after tracing the real call path — see "Rejected candidates".
 
 ---
 
+## Current status — re-checked on `review/hidden-bugs-audit` (2026-11-02)
+
+The original findings above were audited at `20298227`. The branch has since merged `dev/master`
+through `5d8d4beb`; that merge changed FAISS, Mahalanobis, and Matching code. All 26 issue drafts in
+`issues/` were checked against the merged tree. Pandas findings marked "reproduced" below were run
+again on the merged tree. Spark-only findings were checked against unchanged source but not rerun
+because this environment has no Java runtime. Issue 13's current cache logic was reproduced directly
+with NumPy and scikit-learn.
+
+| Draft | Current status | Evidence on merged branch |
+|---|---|---|
+| 01 | **Open** | Reproduced: group 10 remains the baseline; statistic `+25.26` with compared label `2`. |
+| 02 | **Open** | Reproduced: statistic `-25.26` remains under the incorrect `2┆y` label. |
+| 03 | **Open** | Spark collect-order/dict-order and `target_cols` labeling code are unchanged. |
+| 04 | **Open** | Reproduced end to end: group 10 shows mean `8.00`; group 2 shows `-0.01`. |
+| 05 | **Open** | `sample_size = len(data)` remains at `hypex/extensions/statsmodels.py:179`; Monte Carlo not rerun. |
+| 06 | **Open** | Reproduced: predictions get index `[0, 1]` for feature index `[8, 3]`. |
+| 07 | **Open** | Reproduced: mixed `lag=None` and `lag=1` raises the same `TypeError`. |
+| 08 | **Open** | Reproduced: inner merge returns 2×2 and p=`0.192067`; full-table p=`0.000746586`. |
+| 09 | **Open** | Reproduced: `GroupChi2Test` table exists while `ABAnalyzer` output has zero columns. |
+| 10 | **Open** | Reproduced: mixed targets still raise `UFuncTypeError` in multiple-testing correction. |
+| 11 | **Open** | Reproduced: enum `bonferroni` still resolves to `ABNTestMethodsEnum.holm`. |
+| 12 | **Resolved** | Pandas IVF now sets `nprobe`; runtime check returned `nprobe=10`, `nlist=16`. |
+| 13 | **Open — failure changed** | Buffering was added, but `np.append` flattens 2-D feature batches; direct execution of the current logic raises `ValueError: Expected 2D array, got 1D array`. |
+| 14 | **Open** | Spark `value_counts` implementation is unchanged. |
+| 15 | **Open** | Spark scalar `loc` implementation is unchanged. |
+| 16 | **Open** | Reproduced: `check_hash(..., groups)` still raises `RecursionError`. |
+| 17 | **Open** | Reproduced: replacement dataset is aliased and mutated through the copy. |
+| 18 | **Open** | Reproduced: copied role still loses `parent`, `lag`, and `cofounders`. |
+| 19 | **Resolved as reported** | `"smd"`, `"psi"`, and `"repeats"` were removed from the public annotations and docstring. Explicit invalid strings still produce a raw `KeyError`, a separate validation improvement. |
+| 20 | **Open** | Reproduced: `remove_index_col()` still raises `KeyError`. |
+| 21 | **Open** | Spark additional-fields persist/unpersist code is unchanged. |
+| 22 | **Open** | Reproduced: the parser still returns an empty feature name for `difference`. |
+| 23 | **Partially resolved** | Covariance is now n-weighted (verified numerically). Regularization is still absolute, merely reduced from `1e-3` to `1e-8`, so scale invariance is not restored. |
+| 24 | **Open** | Reproduced: keyless pandas merge still raises `MergeError`. |
+| 25 | **Open** | Spark aggregation numeric-column filtering is unchanged. |
+| 26 | **Open** | Reproduced: equal-length predict-mode queries still return positional self-matches `[0,1,2,3,4]`. |
+
+Net: **2 resolved, 1 partially resolved, 23 open**. Drafts 12, 13, 19, and 23 carry individual status
+notes; the other drafts remain accurate as written. The historical evidence below is retained to
+explain the original audit and should not be read as the current state where it conflicts with this
+table.
+
+---
+
 ## Critical — silently wrong statistical results in core flows
 
 ### C1. Group-order / labeling swaps across comparators and the AB analyzer

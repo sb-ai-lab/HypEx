@@ -1,3 +1,10 @@
+> **Status: PARTIALLY RESOLVED on `review/hidden-bugs-audit` @ `5d8d4beb` (re-checked 2026-11-02).**
+> `UniteCovExtension.calc` now uses the n-weighted pooled covariance at
+> `hypex/extensions/scipy_linalg.py:21-29`; this was verified numerically on unequal-sized groups.
+> The absolute regularization concern remains: `CholeskyExtension` still adds `epsilon * I`, with
+> the default merely reduced from `1e-3` to `1e-8` at lines 38-50. The primary unweighted-covariance
+> bug should not be filed again; only the scale-invariance/design concern remains relevant.
+
 ## 🐛 Bug Description
 
 <!-- A clear and concise description of what the bug is. -->
