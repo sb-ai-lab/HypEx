@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from copy import copy
+from typing import Any
 
 from ..utils import (
     CategoricalTypes,
@@ -10,6 +11,13 @@ from ..utils import (
     RoleNameType,
     TargetRoleTypes,
 )
+
+
+def _resolve_type(type_name: str | None) -> type | None:
+    _TYPE_MAP = {"int": int, "float": float, "str": str, "bool": bool}
+    if type_name is None:
+        return None
+    return _TYPE_MAP.get(type_name)
 
 
 class ABCRole(ABC):
@@ -96,6 +104,32 @@ class ABCRole(ABC):
                 return role_type.__class__(data_type)
         return self.__class__(data_type)
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "class": type(self).__name__,
+            "role_name": self._role_name,
+            "data_type": (
+                self.data_type.__name__ if self.data_type is not None else None
+            ),
+        }
+
+    @classmethod
+    def from_dict(cls, dct: dict[str, Any]) -> ABCRole:
+        role_name_lower = dct["role_name"].lower()
+        template = default_roles.get(role_name_lower)
+
+        if template is None:
+            for role in default_roles.values():
+                if type(role).__name__ == dct.get("class"):
+                    template = role
+                    break
+
+        if template is None:
+            raise ValueError(f"Unknown role: {dct.get('class', dct.get('role_name'))}")
+
+        data_type = _resolve_type(dct.get("data_type"))
+        template.data_type = data_type
+        return template
 
 class LagRole(ABCRole):
     """Base class for roles that support temporal metadata (parent, lag).
