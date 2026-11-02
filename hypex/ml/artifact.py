@@ -39,7 +39,18 @@ from datetime import datetime
 from typing import Any
 
 from ..config import MLConfig
+from ..dataset.roles import ABCRole
 from ..executor import Executor, MLExecutor
+
+
+class HypexJsonEncoder(json.JSONEncoder):
+    def default(self, o):
+        if hasattr(o, "to_dict"):
+            return o.to_dict()
+        if isinstance(o, type):
+            return {"name": o.__name__}
+
+        return super().default(o)
 
 
 class MLArtifact:
@@ -232,7 +243,7 @@ class MLArtifact:
                 executor.save_model(self.models_dir, postfix=str(idx))
 
         with open(self.metadata_file, "w") as f:
-            json.dump(output_json, f, indent=4)
+            json.dump(output_json, f, indent=4, cls=HypexJsonEncoder)
 
     # ── load experiment ────────────────────────────────────────────
 
@@ -292,6 +303,25 @@ class MLArtifact:
             return full_path
 
     @staticmethod
+    def _decode_params(params: dict[str, Any]) -> dict:
+        decoded = {}
+        for key, value in params.items():
+            if isinstance(value, dict):
+                if value["class"].endswith("Role"):
+                    decoded[key] = ABCRole.from_dict(value)
+                else:
+                    decoded[key] = value
+            elif isinstance(value, list):
+                tmp_dict = {}
+                for v in value:
+                    tmp_dict = {**tmp_dict, **MLArtifact._decode_params(v)}
+                decoded = {**decoded, **tmp_dict}
+            else:
+                decoded[key] = value
+
+        return decoded
+
+    @staticmethod
     def _create_executor(
         state: dict[str, Any],
         models_dir: str,
@@ -328,7 +358,7 @@ class MLArtifact:
         if cls is None:
             cls = module
 
-        obj = cls(**state["params"])
+        obj = cls(**MLArtifact._decode_params(state["params"]))
         obj._id = state["id"]
         obj.key = state["key"]
         obj.is_fitted = True
