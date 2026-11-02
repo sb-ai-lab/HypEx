@@ -47,6 +47,16 @@ def test_getitem_by_boolean_mask(make_dataset) -> None:
     assert len(filtered) == 2
 
 
+def test_keyless_merge_uses_index(make_dataset) -> None:
+    left = make_dataset(pd.DataFrame({"v": [1, 2]}), {"v": FeatureRole()})
+    right = make_dataset(pd.DataFrame({"w": [3, 4]}), {"w": FeatureRole()})
+
+    merged = left.merge(right)
+
+    assert merged.columns == ["v", "w"]
+    assert len(merged) == 2
+
+
 def test_getitem_missing_column_raises(make_dataset) -> None:
     """Requesting an unknown column raises KeyError."""
     ds = _ds(make_dataset)
