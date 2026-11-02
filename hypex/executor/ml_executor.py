@@ -7,9 +7,7 @@ from typing import Any
 
 import joblib
 
-from ..dataset import ExperimentData, MLExperimentData
-
-# from ..ml import MLExecutorState
+from ..dataset import ExperimentData
 from ..utils.enums import MLModeEnum
 from .executor import Executor
 
@@ -69,11 +67,6 @@ class MLExecutor(Executor, ABC):
         if not isinstance(mode, MLModeEnum):
             raise ValueError(f"Unknown mode: {mode}")
 
-        if not isinstance(data, MLExperimentData):
-            raise TypeError(
-                "MLExecutor must be executed with MLExperimentData and used from MLExperiment"
-            )
-
         if mode == MLModeEnum.FIT:
             return self.fit(data)
         if mode == MLModeEnum.PREDICT:
@@ -83,14 +76,14 @@ class MLExecutor(Executor, ABC):
         raise ValueError(f"Unknown mode: {mode}")
 
     @abstractmethod
-    def fit(self, data: MLExperimentData) -> MLExperimentData:
+    def fit(self, data: ExperimentData) -> ExperimentData:
         raise NotImplementedError
 
     @abstractmethod
-    def predict(self, data: MLExperimentData) -> MLExperimentData:
+    def predict(self, data: ExperimentData) -> ExperimentData:
         raise NotImplementedError
 
-    def fit_predict(self, data: MLExperimentData) -> MLExperimentData:
+    def fit_predict(self, data: ExperimentData) -> ExperimentData:
         data = self.fit(data)
         data = self.predict(data)
         return data
@@ -105,7 +98,6 @@ class MLExecutor(Executor, ABC):
             id=self.id,
             key=self.key,
             params=self.get_params(),
-            # fitted=self.fitted,
             has_model=self.has_model,
         )
 
@@ -120,11 +112,11 @@ class MLExecutor(Executor, ABC):
     def load_model(self, path: str, postfix: str="") -> None:
         self._model = self._load_model_backend(path, postfix)
 
-    def _save_model_backend(self, model: Any, path: str, prefix: str) -> None:
-        model_name = self.id + "_" + prefix
+    def _save_model_backend(self, model: Any, path: str, postfix: str) -> None:
+        model_name = self.id + "_" + postfix
         joblib.dump(model, os.path.join(path, f"{model_name}.pkl"))
 
-    def _load_model_backend(self, path: str, prefix: str) -> Any:
-        model_name = self.id + "_" + prefix
+    def _load_model_backend(self, path: str, postfix: str) -> Any:
+        model_name = self.id + "_" + postfix
         return joblib.load(os.path.join(path, f"{model_name}.pkl"))
 
