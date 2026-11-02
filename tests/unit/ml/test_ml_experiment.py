@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from hypex.config import MLConfig
-from hypex.dataset import Dataset, ExperimentData, InfoRole, MLExperimentData
+from hypex.dataset import Dataset, ExperimentData, InfoRole
 from hypex.executor import MLExecutor
 from hypex.experiments.ml import MLExperiment
 from hypex.ml.artifact import MLArtifact
@@ -38,7 +38,7 @@ def sample_dataset():
 
 @pytest.fixture
 def ml_data(sample_dataset):
-    return MLExperimentData(sample_dataset)
+    return ExperimentData(sample_dataset)
 
 
 # ── __init__ / mode coercion ────────────────────────────────────────────
@@ -146,17 +146,6 @@ class TestExecute:
         predict_exp.execute(ml_data)
         assert len(predict_exp.executors) == 1
 
-    @pytest.mark.xfail(strict=True, reason="bug F: _ensure_ml_data is dead code")
-    def test_execute_requires_ml_experiment_data(self, sample_dataset):
-        exp = MLExperiment(
-            executors=[_StubMLExecutor()],
-            mode=MLModeEnum.FIT,
-            save_models=False,
-            key="exp1",
-        )
-        plain = ExperimentData(sample_dataset)
-        exp.execute(plain)  # should be wrapped by _ensure_ml_data
-
 
 # ── save ────────────────────────────────────────────────────────────────
 class TestSave:
@@ -219,27 +208,3 @@ class TestLoad:
         first = list(exp.executors)
         exp.load()
         assert exp.executors == first
-
-
-# ── _ensure_ml_data ─────────────────────────────────────────────────────
-class TestEnsureMlData:
-    def test_passthrough_ml_experiment_data(self, ml_data):
-        exp = MLExperiment(executors=[], key="k")
-        assert exp._ensure_ml_data(ml_data) is ml_data
-
-    def test_wraps_plain_experiment_data_preserving_state(self, sample_dataset):
-        exp = MLExperiment(executors=[], key="k")
-        plain = ExperimentData(sample_dataset)
-        plain.variables = {"v": {"x": 1}}
-        plain.groups = {"g": {}}
-        plain.analysis_tables = {"a": None}
-        plain.id_name_mapping = {"id": "name"}
-
-        wrapped = exp._ensure_ml_data(plain)
-
-        assert isinstance(wrapped, MLExperimentData)
-        assert wrapped.variables == {"v": {"x": 1}}
-        assert wrapped.groups == {"g": {}}
-        assert wrapped.analysis_tables == {"a": None}
-        assert wrapped.id_name_mapping == {"id": "name"}
-        assert wrapped.ds is plain.ds
