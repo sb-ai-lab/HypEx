@@ -435,7 +435,9 @@ class StatsChi2TestExtension(Extension):
             col = row["column_name"]
             val = row["value"]
             cnt = row["count"]
-            result.setdefault(grp, {}).setdefault(col, {"value_counts": {}})
+            result.setdefault(
+                grp, {target: {"value_counts": {}} for target in target_cols}
+            )
             result[grp][col]["value_counts"][val] = cnt
 
         return _sort_by_group_key(result)
