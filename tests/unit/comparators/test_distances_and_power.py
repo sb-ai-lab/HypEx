@@ -105,7 +105,7 @@ def test_mahalanobis_whitens_pooled_covariance(two_group_features) -> None:
     result = MahalanobisDistance.calc(ds, group_field="g", target_fields=["f1", "f2"])
     w = to_pandas(result).to_numpy(dtype=float)
     pooled = (np.cov(a.T) + np.cov(b.T)) / 2
-    # CholeskyExtension adds epsilon=1e-3 to the diagonal, hence the loose tolerance.
+    # Scale-relative diagonal regularization requires a loose whitening tolerance.
     np.testing.assert_allclose(w.T @ pooled @ w, np.eye(2), atol=5e-3)
 
 
@@ -113,9 +113,8 @@ def test_mahalanobis_matches_numpy_cholesky(two_group_features) -> None:
     ds, a, b = two_group_features
     result = MahalanobisDistance.calc(ds, group_field="g", target_fields=["f1", "f2"])
     n_a, n_b = len(a), len(b)
-    pooled = ((n_a - 1) * np.cov(a.T) + (n_b - 1) * np.cov(b.T)) / (
-        n_a + n_b - 2
-    ) + 1e-8 * np.eye(2)
+    pooled = ((n_a - 1) * np.cov(a.T) + (n_b - 1) * np.cov(b.T)) / (n_a + n_b - 2)
+    pooled += 1e-8 * np.trace(pooled) / pooled.shape[0] * np.eye(2)
     expected = np.linalg.inv(np.linalg.cholesky(pooled)).T
     np.testing.assert_allclose(
         to_pandas(result).to_numpy(dtype=float), expected, atol=TOL
@@ -172,9 +171,8 @@ def test_mahalanobis_pregrouped_matches_numpy_cholesky(two_group_features) -> No
         target_fields=["f1", "f2"],
     )
     n_a, n_b = len(a), len(b)
-    pooled = ((n_a - 1) * np.cov(a.T) + (n_b - 1) * np.cov(b.T)) / (
-        n_a + n_b - 2
-    ) + 1e-8 * np.eye(2)
+    pooled = ((n_a - 1) * np.cov(a.T) + (n_b - 1) * np.cov(b.T)) / (n_a + n_b - 2)
+    pooled += 1e-8 * np.trace(pooled) / pooled.shape[0] * np.eye(2)
     expected = np.linalg.inv(np.linalg.cholesky(pooled)).T
     np.testing.assert_allclose(
         to_pandas(result).to_numpy(dtype=float), expected, atol=TOL
@@ -245,9 +243,8 @@ def test_mahalanobis_execute_uses_precomputed_groups(two_group_features) -> None
     stored = out.variables[op.id]
     assert op.key == str(["f1", "f2"])
     n_a, n_b = len(a), len(b)
-    pooled = ((n_a - 1) * np.cov(a.T) + (n_b - 1) * np.cov(b.T)) / (
-        n_a + n_b - 2
-    ) + 1e-8 * np.eye(2)
+    pooled = ((n_a - 1) * np.cov(a.T) + (n_b - 1) * np.cov(b.T)) / (n_a + n_b - 2)
+    pooled += 1e-8 * np.trace(pooled) / pooled.shape[0] * np.eye(2)
     expected = np.linalg.inv(np.linalg.cholesky(pooled)).T
     np.testing.assert_allclose(
         to_pandas(next(iter(stored.values()))).to_numpy(dtype=float),

@@ -43,11 +43,13 @@ class CholeskyExtension(Extension):
                 features covariance matrix;
 
             epsilon: `float`
-                Correction to result matrix.By default is `1e-8`.
+                Relative correction to the covariance matrix. By default is `1e-8`.
 
         """
         cov = data.raw_data.to_numpy()
-        cov = cov + np.eye(cov.shape[0]) * epsilon
+        scale = np.trace(cov) / cov.shape[0]
+        regularization = epsilon * scale if scale > 0 else epsilon
+        cov = cov + np.eye(cov.shape[0]) * regularization
         return self.result_to_dataset(
             pd.DataFrame(np.linalg.cholesky(cov), columns=data.columns),
             {column: FeatureRole() for column in data.columns},

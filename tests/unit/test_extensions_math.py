@@ -287,8 +287,20 @@ def test_cholesky_reconstructs_matrix_with_epsilon() -> None:
     lower = _frame(CholeskyExtension().calc(_matrix_ds(cov), epsilon=1e-3)).to_numpy(
         dtype=float
     )
-    np.testing.assert_allclose(lower @ lower.T, cov + 1e-3 * np.eye(3), atol=1e-9)
+    regularization = 1e-3 * np.trace(cov) / cov.shape[0]
+    np.testing.assert_allclose(
+        lower @ lower.T, cov + regularization * np.eye(3), atol=1e-9
+    )
     assert np.allclose(lower, np.tril(lower))
+
+
+def test_cholesky_regularization_scales_with_covariance() -> None:
+    cov = _spd()
+
+    lower = _frame(CholeskyExtension().calc(_matrix_ds(cov), epsilon=1e-3))
+    scaled_lower = _frame(CholeskyExtension().calc(_matrix_ds(cov * 100), epsilon=1e-3))
+
+    np.testing.assert_allclose(scaled_lower, lower * 10, atol=1e-9)
 
 
 def test_cholesky_zero_epsilon_is_exact() -> None:
