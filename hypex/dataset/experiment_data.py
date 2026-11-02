@@ -197,11 +197,14 @@ class ExperimentData:
             return exec_id_str in self.variables
         if space == ExperimentDataEnum.analysis_tables:
             return exec_id_str in self.analysis_tables
+        if space == ExperimentDataEnum.groups:
+            return exec_id_str in self.groups
 
-        # Safe fallback: prevents recursion on unknown enum members
         if space not in _SUPPORTED_SPACES:
             return False
-        return any(self.check_hash(executor_id, s) for s in _SUPPORTED_SPACES)
+        return any(
+            self.check_hash(executor_id, s) for s in _SUPPORTED_SPACES if s != space
+        )
 
     def set_value(
         self,

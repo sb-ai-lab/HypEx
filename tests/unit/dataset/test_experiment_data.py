@@ -86,6 +86,15 @@ def test_check_hash(check: str, result: bool) -> None:
     assert ed.check_hash(check, ExperimentDataEnum.variables) is result
 
 
+def test_check_hash_groups_does_not_recurse() -> None:
+    ed = _ed()
+    ed.set_value(ExperimentDataEnum.groups, "splitter", ed.ds, key="control")
+
+    assert ed.check_hash("splitter", ExperimentDataEnum.groups) is True
+    assert ed.check_hash("ghost", ExperimentDataEnum.groups) is False
+    assert ed.check_hash("splitter", ExperimentDataEnum.ml) is False
+
+
 def test_get_ids_filters_by_class_and_key() -> None:
     """get_ids resolves class names and optional key suffixes."""
     ed = _ed()
