@@ -109,6 +109,23 @@ def test_three_groups_each_compared_to_control(three_groups) -> None:
         assert float(row["difference"]) == pytest.approx(expected, abs=1e-9)
 
 
+def test_multidigit_groups_keep_their_own_summary_statistics() -> None:
+    rng = np.random.default_rng(0)
+    n = 1200
+    df = pd.DataFrame({"treat": rng.choice([1, 2, 10], n), "y": 0.0})
+    df["y"] = np.select(
+        [df.treat == 1, df.treat == 2, df.treat == 10], [0.03, 8.0, -0.01]
+    ) + rng.normal(0, 0.1, n)
+
+    summary = to_pandas(_run(df).summary)
+
+    for group in (2, 10):
+        row = summary[summary["group"].astype(int) == group].iloc[0]
+        assert float(row["test mean"]) == pytest.approx(
+            df.y[df.treat == group].mean(), abs=1e-9
+        )
+
+
 @pytest.mark.parametrize(
     "method",
     [
