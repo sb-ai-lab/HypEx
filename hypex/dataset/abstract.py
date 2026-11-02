@@ -463,6 +463,17 @@ class DatasetBase:
     def __setitem__(self, key: str, value: Any) -> None:
         if isinstance(value, DatasetBase):
             value = value.iselect(0).raw_data
+            if (
+                hasattr(value, "shape")
+                and len(value.shape) > 1
+                and value.shape[1] == 1
+            ):
+                # Extract Series from a single-column DataFrame
+                value = value.iloc[:, 0]
+            # Data from Dataset is already role-typed.
+            # Iterating over values on Spark = collect() to driver. Skip check.
+            self.raw_data[key] = value
+            return
         if key not in self.columns and isinstance(key, str):
             self.add_column(value, {key: InfoRole()})
             warnings.warn(
