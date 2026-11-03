@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from copy import copy
+from pydoc import locate
 from typing import Any
 
 from ..utils import (
@@ -11,13 +12,6 @@ from ..utils import (
     RoleNameType,
     TargetRoleTypes,
 )
-
-
-def _resolve_type(type_name: str | None) -> type | None:
-    _TYPE_MAP = {"int": int, "float": float, "str": str, "bool": bool}
-    if type_name is None:
-        return None
-    return _TYPE_MAP.get(type_name)
 
 
 class ABCRole(ABC):
@@ -157,7 +151,7 @@ class ABCRole(ABC):
         if template is None:
             raise ValueError(f"Unknown role: {dct.get('class', dct.get('role_name'))}")
 
-        data_type = _resolve_type(dct.get("data_type"))
+        data_type = locate(dct.get("data_type"))
         template.data_type = data_type
         return template
 
