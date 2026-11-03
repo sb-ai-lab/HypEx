@@ -151,7 +151,8 @@ class ABCRole(ABC):
         if template is None:
             raise ValueError(f"Unknown role: {dct.get('class', dct.get('role_name'))}")
 
-        data_type = locate(dct.get("data_type"))
+        t = str(dct.get("data_type", "None"))
+        data_type = locate(t)
         template.data_type = data_type
         return template
 
