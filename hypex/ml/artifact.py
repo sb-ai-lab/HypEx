@@ -312,10 +312,12 @@ class MLArtifact:
                 else:
                     decoded[key] = value
             elif isinstance(value, list):
-                tmp_dict = {}
-                for v in value:
-                    tmp_dict = {**tmp_dict, **MLArtifact._decode_params(v)}
-                decoded = {**decoded, **tmp_dict}
+                decoded[key] = [
+                    ABCRole.from_dict(v)
+                    if isinstance(v, dict) and v["class"].endswith("Role")
+                    else v
+                    for v in value
+                ]
             else:
                 decoded[key] = value
 
