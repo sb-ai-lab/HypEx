@@ -304,6 +304,20 @@ class MLArtifact:
 
     @staticmethod
     def _decode_params(params: dict[str, Any]) -> dict:
+        """Decodes parameters from their serialized representation.
+
+        This method recursively processes parameter values to restore complex objects
+        (like :class:`~hypex.dataset.roles.ABCRole` instances) from their dictionary
+        representations. It handles nested dictionaries and lists, converting role
+        objects back to their original form during deserialization.
+
+        Args:
+            params: A dictionary of serialized parameter values.
+
+        Returns:
+            A dictionary with decoded parameters, where role objects are restored
+            to their original instances.
+        """
         decoded = {}
         for key, value in params.items():
             if isinstance(value, dict):

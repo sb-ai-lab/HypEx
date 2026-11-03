@@ -105,6 +105,18 @@ class ABCRole(ABC):
         return self.__class__(data_type)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serializes the role to a dictionary representation.
+
+        This method converts the role instance into a dictionary that can be
+        used for serialization, storage, or transmission. The dictionary contains
+        the role's class name, role name, and optional data type information.
+
+        Returns:
+            A dictionary with keys 'class', 'role_name', and optionally 'data_type'.
+            The 'class' key contains the role's class name as a string,
+            'role_name' contains the canonical role name, and 'data_type' contains
+            the data type name if available.
+        """
         return {
             "class": type(self).__name__,
             "role_name": self._role_name,
@@ -115,6 +127,24 @@ class ABCRole(ABC):
 
     @classmethod
     def from_dict(cls, dct: dict[str, Any]) -> ABCRole:
+        """Reconstructs a role instance from its dictionary representation.
+
+        This class method deserializes a role from a dictionary, creating a new
+        instance of the appropriate role class. It looks up the role name in the
+        global default_roles registry and applies any specified data type.
+
+        Args:
+            dct: A dictionary containing the serialized role data. Expected keys
+                are 'role_name' and optionally 'data_type' or 'class'.
+
+        Returns:
+            A new instance of the role class corresponding to the provided
+            role name, with the specified data type applied if present.
+
+        Raises:
+            ValueError: If the role class cannot be found in the default_roles
+                registry.
+        """
         role_name_lower = dct["role_name"].lower()
         template = default_roles.get(role_name_lower)
 
