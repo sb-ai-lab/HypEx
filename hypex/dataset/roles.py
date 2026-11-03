@@ -349,7 +349,7 @@ class StatisticRole(ABCRole):
 class ResumeRole(ABCRole):
     """Semantic role for columns containing summary or report-level metrics."""
 
-    _role_name = "Resume"
+    _role_name: RoleNameType = "Resume"
 
 
 class FilterRole(ABCRole):
@@ -467,6 +467,10 @@ default_roles: dict[RoleNameType, ABCRole] = {
     "index": IndexRole(),
     "filter": FilterRole(),
     "constgroup": ConstGroupRole(),
+    "disabled": DisabledRole(),
+    "lag": LagRole(),
+    "resume": ResumeRole(),
+    "report": ReportRole(),
     "additionaltreatment": AdditionalTreatmentRole(),
     "additionalgrouping": AdditionalGroupingRole(),
     "additionaltarget": AdditionalTargetRole(),
