@@ -58,6 +58,7 @@ __all__ = [
     "GroupingRole",
     "IndexRole",
     "InfoRole",
+    "MLExperimentData",
     "PreTargetRole",
     "SmallDataset",
     "StatisticRole",

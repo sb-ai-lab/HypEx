@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from abc import ABC
 from copy import copy
+from pydoc import locate
+from typing import Any
 
 from ..utils import (
     CategoricalTypes,
@@ -96,6 +98,63 @@ class ABCRole(ABC):
                 return role_type.__class__(data_type)
         return self.__class__(data_type)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Serializes the role to a dictionary representation.
+
+        This method converts the role instance into a dictionary that can be
+        used for serialization, storage, or transmission. The dictionary contains
+        the role's class name, role name, and optional data type information.
+
+        Returns:
+            A dictionary with keys 'class', 'role_name', and optionally 'data_type'.
+            The 'class' key contains the role's class name as a string,
+            'role_name' contains the canonical role name, and 'data_type' contains
+            the data type name if available.
+        """
+        return {
+            "class": type(self).__name__,
+            "role_name": self._role_name,
+            "data_type": (
+                self.data_type.__name__ if self.data_type is not None else None
+            ),
+        }
+
+    @classmethod
+    def from_dict(cls, dct: dict[str, Any]) -> ABCRole:
+        """Reconstructs a role instance from its dictionary representation.
+
+        This class method deserializes a role from a dictionary, creating a new
+        instance of the appropriate role class. It looks up the role name in the
+        global default_roles registry and applies any specified data type.
+
+        Args:
+            dct: A dictionary containing the serialized role data. Expected keys
+                are 'role_name' and optionally 'data_type' or 'class'.
+
+        Returns:
+            A new instance of the role class corresponding to the provided
+            role name, with the specified data type applied if present.
+
+        Raises:
+            ValueError: If the role class cannot be found in the default_roles
+                registry.
+        """
+        role_name_lower = dct["role_name"].lower()
+        template = default_roles.get(role_name_lower)
+
+        if template is None:
+            for role in default_roles.values():
+                if type(role).__name__ == dct.get("class"):
+                    template = role
+                    break
+
+        if template is None:
+            raise ValueError(f"Unknown role: {dct.get('class', dct.get('role_name'))}")
+
+        t = str(dct.get("data_type", "None"))
+        data_type = locate(t)
+        template.data_type = data_type
+        return template
 
 class LagRole(ABCRole):
     """Base class for roles that support temporal metadata (parent, lag).
@@ -290,7 +349,7 @@ class StatisticRole(ABCRole):
 class ResumeRole(ABCRole):
     """Semantic role for columns containing summary or report-level metrics."""
 
-    _role_name = "Resume"
+    _role_name: RoleNameType = "Resume"
 
 
 class FilterRole(ABCRole):
@@ -408,6 +467,10 @@ default_roles: dict[RoleNameType, ABCRole] = {
     "index": IndexRole(),
     "filter": FilterRole(),
     "constgroup": ConstGroupRole(),
+    "disabled": DisabledRole(),
+    "lag": LagRole(),
+    "resume": ResumeRole(),
+    "report": ReportRole(),
     "additionaltreatment": AdditionalTreatmentRole(),
     "additionalgrouping": AdditionalGroupingRole(),
     "additionaltarget": AdditionalTargetRole(),
