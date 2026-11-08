@@ -1037,7 +1037,7 @@ class PandasNavigation(DatasetBackendNavigation):
         self.data[index_col_name] = np.array(range(len(self.data)))
 
     def remove_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
-        self.data = self.data.drop(index_col_name)
+        self.data = self.data.drop(columns=[index_col_name])
 
     def from_dict(self, data: FromDictTypes, index: Iterable | Sized | None = None):
         """Load data from dict-like structure into DataFrame.
