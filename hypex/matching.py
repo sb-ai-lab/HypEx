@@ -169,9 +169,12 @@ class Matching(ExperimentShell):
                 )
             ]
         else:
+            selected_tests = (
+                [quality_tests] if isinstance(quality_tests, str) else quality_tests
+            )
             executors += [
                 OnRoleExperiment(
-                    executors=[test_mapping[test] for test in quality_tests],
+                    executors=[test_mapping[test] for test in selected_tests],
                     role=FeatureRole(),
                 )
             ]
