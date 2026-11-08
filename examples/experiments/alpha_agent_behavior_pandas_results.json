@@ -1,0 +1,172 @@
+[
+  {
+    "case": "aa_null",
+    "family": "aa",
+    "backend": "pandas",
+    "status": "FAIL",
+    "error": "AssertionError: {'categorical_chi2_mean_p': 0.6254340984741285, 'uniformity_p': 1.9649987979412064e-09}",
+    "traceback": "Traceback (most recent call last):\n  File \"/Users/danilsamsutdinov/HypEx/examples/experiments/alpha_agent_behavior_check.py\", line 577, in main\n    metrics = function(backend, spark, args.aa_iterations)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/examples/experiments/alpha_agent_behavior_check.py\", line 145, in aa_null\n    assert uniformity_p > 0.001, {\n           ^^^^^^^^^^^^^^^^^^^^\nAssertionError: {'categorical_chi2_mean_p': 0.6254340984741285, 'uniformity_p': 1.9649987979412064e-09}\n",
+    "seconds": 10.179
+  },
+  {
+    "case": "aa_parameters",
+    "family": "aa",
+    "backend": "pandas",
+    "status": "PASS",
+    "metrics": {
+      "stratified_iterations": 12,
+      "sample_size": 0.75,
+      "control_size": 0.3
+    },
+    "seconds": 0.735
+  },
+  {
+    "case": "aa_three_groups",
+    "family": "aa",
+    "backend": "pandas",
+    "status": "PASS",
+    "metrics": {
+      "groups": [
+        "test_1",
+        "test_2"
+      ]
+    },
+    "seconds": 0.421
+  },
+  {
+    "case": "aa_reproducibility",
+    "family": "aa",
+    "backend": "pandas",
+    "status": "PASS",
+    "metrics": {
+      "reproducible_iterations": 5
+    },
+    "seconds": 0.393
+  },
+  {
+    "case": "ab_welch_and_effect",
+    "family": "ab",
+    "backend": "pandas",
+    "status": "PASS",
+    "metrics": {
+      "effect": 1.7406236050751946,
+      "p_value": 5.4128276060155905e-58,
+      "null_p": 0.3918440433334295
+    },
+    "seconds": 0.028
+  },
+  {
+    "case": "ab_multigroup_order_and_bonferroni",
+    "family": "ab",
+    "backend": "pandas",
+    "status": "PASS",
+    "metrics": {
+      "groups": [
+        "1",
+        "2",
+        "10"
+      ],
+      "comparisons": 3
+    },
+    "seconds": 0.022
+  },
+  {
+    "case": "ab_categorical_and_quantile",
+    "family": "ab",
+    "backend": "pandas",
+    "status": "FAIL",
+    "error": "AssertionError: \nNot equal to tolerance rtol=0.05, atol=1e-12\n\nMismatched elements: 1 / 1 (100%)\nMax absolute difference: 2.93462597e-11\nMax relative difference: 6.29391121e+10\n x: array(2.934626e-11)\n y: array(4.662643e-22)",
+    "traceback": "Traceback (most recent call last):\n  File \"/Users/danilsamsutdinov/HypEx/examples/experiments/alpha_agent_behavior_check.py\", line 579, in main\n    metrics = function(backend, spark)\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/examples/experiments/alpha_agent_behavior_check.py\", line 308, in ab_categorical_and_quantile\n    np.testing.assert_allclose(\n  File \"/Users/danilsamsutdinov/HypEx/.venv/lib/python3.11/site-packages/numpy/testing/_private/utils.py\", line 1504, in assert_allclose\n    assert_array_compare(compare, actual, desired, err_msg=str(err_msg),\n  File \"/opt/homebrew/Cellar/python@3.11/3.11.14_3/Frameworks/Python.framework/Versions/3.11/lib/python3.11/contextlib.py\", line 81, in inner\n    return func(*args, **kwds)\n           ^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/.venv/lib/python3.11/site-packages/numpy/testing/_private/utils.py\", line 797, in assert_array_compare\n    raise AssertionError(msg)\nAssertionError: \nNot equal to tolerance rtol=0.05, atol=1e-12\n\nMismatched elements: 1 / 1 (100%)\nMax absolute difference: 2.93462597e-11\nMax relative difference: 6.29391121e+10\n x: array(2.934626e-11)\n y: array(4.662643e-22)\n",
+    "seconds": 0.108
+  },
+  {
+    "case": "ab_cuped",
+    "family": "ab",
+    "backend": "pandas",
+    "status": "PASS",
+    "metrics": {
+      "plain_p": 5.537055946769496e-43,
+      "cuped_p": 0.0,
+      "effect": 2.0249933064030055
+    },
+    "seconds": 0.07
+  },
+  {
+    "case": "homogeneity_numeric",
+    "family": "homo",
+    "backend": "pandas",
+    "status": "PASS",
+    "metrics": {
+      "groups": [
+        "1",
+        "2",
+        "10"
+      ],
+      "null_p": 0.1639878830763829
+    },
+    "seconds": 0.036
+  },
+  {
+    "case": "homogeneity_categorical",
+    "family": "homo",
+    "backend": "pandas",
+    "status": "PASS",
+    "metrics": {
+      "p_values": [
+        1.2387708912095987e-07,
+        1.883237243348712e-14
+      ]
+    },
+    "seconds": 0.024
+  },
+  {
+    "case": "matching_mahalanobis",
+    "family": "matching",
+    "backend": "pandas",
+    "status": "PASS",
+    "metrics": {
+      "effects": {
+        "ATT": 2.355,
+        "ATC": 2.4037,
+        "ATE": 2.3798
+      }
+    },
+    "seconds": 0.111
+  },
+  {
+    "case": "matching_l2_fast",
+    "family": "matching",
+    "backend": "pandas",
+    "status": "PASS",
+    "metrics": {
+      "effects": {
+        "ATT": 2.5438,
+        "ATC": 2.4871,
+        "ATE": 2.5147
+      }
+    },
+    "seconds": 0.064
+  },
+  {
+    "case": "matching_repeated_calibration",
+    "family": "matching",
+    "backend": "pandas",
+    "status": "PASS",
+    "metrics": {
+      "runs": 40,
+      "mean_ate": 2.2324224999999998,
+      "ate_sd": 0.18642597792086274,
+      "ci_coverage": 0.85
+    },
+    "seconds": 1.236
+  },
+  {
+    "case": "matching_single_quality_string",
+    "family": "matching",
+    "backend": "pandas",
+    "status": "FAIL",
+    "error": "KeyError: 't'",
+    "traceback": "Traceback (most recent call last):\n  File \"/Users/danilsamsutdinov/HypEx/examples/experiments/alpha_agent_behavior_check.py\", line 579, in main\n    metrics = function(backend, spark)\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/examples/experiments/alpha_agent_behavior_check.py\", line 513, in matching_single_quality_string\n    output = Matching(distance=\"l2\", quality_tests=\"t-test\").execute(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/matching.py\", line 217, in __init__\n    experiment=self._make_experiment(\n               ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/matching.py\", line 174, in _make_experiment\n    executors=[test_mapping[test] for test in quality_tests],\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/matching.py\", line 174, in <listcomp>\n    executors=[test_mapping[test] for test in quality_tests],\n               ~~~~~~~~~~~~^^^^^^\nKeyError: 't'\n",
+    "seconds": 0.001
+  }
+]
