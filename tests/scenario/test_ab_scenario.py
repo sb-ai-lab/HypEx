@@ -133,6 +133,29 @@ def test_mixed_numeric_and_categorical_targets_correct_without_dtype_error() -> 
     assert corrected["old p-value"].astype(float).between(0, 1).all()
 
 
+def test_pandas_chi2_results_reach_ab_analyzer() -> None:
+    rng = np.random.default_rng(0)
+    n = 600
+    df = pd.DataFrame(
+        {
+            "treat": rng.integers(0, 3, n),
+            "purchased": rng.choice(["a", "b", "c"], n),
+        }
+    )
+
+    out = _run(
+        df,
+        roles={"treat": TreatmentRole(), "purchased": TargetRole(str)},
+        additional_tests=["chi2-test"],
+        multitest_method="holm",
+    )
+    analyzer = out._experiment_data.analysis_tables["ABAnalyzer┴┴"].raw_data
+
+    assert "GroupChi2Test p-value 1" in analyzer
+    assert "GroupChi2Test p-value 2" in analyzer
+    assert analyzer.filter(like="GroupChi2Test p-value").notna().all().all()
+
+
 def test_sizes_table_reports_group_counts() -> None:
     df = ab_frame(n=900, effect=1.0, seed=8)
     sizes = to_pandas(_run(df).sizes)
