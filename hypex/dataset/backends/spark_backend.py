@@ -1740,7 +1740,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         ascending: bool = False,
         dropna: bool = True,
     ) -> Self:
-        """Count unique values in first column.
+        """Count unique row combinations across all columns.
 
         Args:
             normalize (bool): Return proportions instead of counts.
@@ -1752,18 +1752,26 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             SparkDataset: DataFrame with value counts, reset to column format.
         """
 
-        col = next(iter(self.data.columns))
-        series = self.data[col]
+        columns = list(self.data.columns)
+        spark_columns = [F.col(f"`{column}`") for column in columns]
+        sdf = self.data.to_spark()
+        if dropna:
+            sdf = sdf.dropna(subset=columns)
+        total = sdf.count() if normalize else 0
 
-        result = series.value_counts(
-            normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
-        )
+        result = sdf.groupBy(*spark_columns).count()
+        if normalize:
+            result = result.withColumn(
+                "proportion",
+                F.col("count") / float(total) if total else F.lit(0.0),
+            ).drop("count")
+        if sort:
+            sort_column = "proportion" if normalize else "count"
+            result = result.orderBy(
+                F.col(sort_column).asc() if ascending else F.col(sort_column).desc()
+            )
 
-        result_df = result.to_frame(name="count").reset_index()
-
-        result_df = result_df.rename(columns={"index": col})
-
-        return self._wrap_result(result_df)
+        return self._wrap_result(result.pandas_api())
 
     def na_counts(self) -> Self | int:
         """Count null values per column.
