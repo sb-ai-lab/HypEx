@@ -287,9 +287,8 @@ class ExperimentData:
                     new_data.roles[new_col_name] = normalized_role
                 else:
                     new_data.roles[new_col_name] = value.roles.get(col, DefaultRole())
-        new_data.persist(storage_level=storage_level, action="none")
         if was_persisted:
-            self._data.unpersist()
+            new_data.persist(storage_level=storage_level, action="none")
         self._data = new_data
         return self
 
