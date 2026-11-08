@@ -201,6 +201,23 @@ def test_fit_then_predict_recovers_linear_signal() -> None:
     )
 
 
+def test_predict_preserves_shuffled_feature_index() -> None:
+    X, y = _frames(noise=0.01)
+    shuffled_index = np.random.default_rng(2).permutation(len(X))
+    X.index = shuffled_index
+    y.index = shuffled_index
+    extension = CupacExtension(random_state=0)
+    model = extension._calc_pandas(
+        data=_ds(X, FeatureRole), mode="fit", model="linear", Y=_ds(y, TargetRole)
+    )
+
+    pred = extension._calc_pandas(data=_ds(X, FeatureRole), mode="predict", model=model)
+
+    assert pred.index.tolist() == X.index.tolist()
+    adjusted = _ds(y, TargetRole) - (pred - pred.mean())
+    assert np.nanvar(adjusted.raw_data["t"]) < np.nanvar(y["t"])
+
+
 def test_unknown_model_name_raises_key_error() -> None:
     X, y = _frames()
     with pytest.raises(KeyError):
