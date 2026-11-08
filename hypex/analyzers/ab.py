@@ -241,9 +241,15 @@ class ABAnalyzer(Executor):
         num_targets = len(t_data) // num_groups if num_groups > 0 else 1
 
         if len(analysis_ids) == num_targets:
-            # Iterative mode: one analysis_id per target, rows are
-            # target-major.  Each analysis_id already has the format
-            # ``TestName┆hash┆single_target`` so we just append the group.
+            # Iterative tables already carry the compared group in each row index.
+            # Use those labels rather than assuming data.groups has the same order.
+            existing_index = self._get_index_values(t_data)
+            if len(existing_index) == len(analysis_ids) * num_groups:
+                return [
+                    f"{aid}{ID_SPLIT_SYMBOL}{existing_index[target_position * num_groups + group_position]}"
+                    for target_position, aid in enumerate(analysis_ids)
+                    for group_position in range(num_groups)
+                ]
             return [
                 f"{aid}{ID_SPLIT_SYMBOL}{group}"
                 for aid in analysis_ids
