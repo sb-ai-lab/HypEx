@@ -84,7 +84,7 @@ class ExperimentData:
         """
         result = deepcopy(self)
         if data is not None:
-            result._data = data
+            result._data = deepcopy(data)
             # Sync _initial_cols with the replacement dataset.
             # Without this, columns dropped from _data (e.g. CUPAC
             # cleanup) remain in _initial_cols, causing KeyError in
