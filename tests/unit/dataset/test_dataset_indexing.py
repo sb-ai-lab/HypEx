@@ -68,6 +68,14 @@ def test_pandas_utility_index_column_round_trip() -> None:
     pd.testing.assert_frame_equal(backend.data, pd.DataFrame({"x": [1, 2, 3]}))
 
 
+def test_scalar_loc_matches_pandas_frame_contract(make_dataset) -> None:
+    ds = _ds(make_dataset)
+
+    selected = ds.loc[0]
+
+    assert selected.raw_data.shape == (3, 1)
+
+
 def test_getitem_missing_column_raises(make_dataset) -> None:
     """Requesting an unknown column raises KeyError."""
     ds = _ds(make_dataset)
