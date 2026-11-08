@@ -9,6 +9,7 @@ from scipy import stats
 
 from hypex.comparators import GroupChi2Test, GroupKSTest, GroupTTest, GroupUTest
 from hypex.dataset import ExperimentData, TargetRole, TreatmentRole
+from hypex.extensions.scipy_stats import PandasChi2TestExtension
 
 from ._utils import build_dataset, result_frame, three_groups_df, to_pandas
 
@@ -126,6 +127,16 @@ def test_chi2_single_category_returns_none_row() -> None:
         ds = GroupChi2Test._inner_function(_cat(["u"] * 20), _cat(["u"] * 25))
     row = _row(ds)
     assert pd.isna(row["p-value"]) and pd.isna(row["statistic"])
+
+
+def test_chi2_contingency_includes_categories_unique_to_one_sample() -> None:
+    control = _cat(["u"] * 30 + ["v"] * 10)
+    test = _cat(["u"] * 20 + ["v"] * 20 + ["rare"] * 10)
+
+    matrix = PandasChi2TestExtension().matrix_preparation(control, test)
+
+    assert matrix.raw_data.shape == (3, 2)
+    assert matrix.raw_data.eq(0).any().any()
 
 
 @pytest.mark.xfail(
