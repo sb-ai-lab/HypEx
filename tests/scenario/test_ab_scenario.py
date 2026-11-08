@@ -82,6 +82,57 @@ def test_additional_tests_are_reported(extra) -> None:
     assert f"{name} p-value" in columns
 
 
+def test_categorical_targets_receive_multitest_correction() -> None:
+    rng = np.random.default_rng(0)
+    n = 600
+    df = pd.DataFrame({"treat": rng.integers(0, 3, n)})
+    df["cat1"] = rng.choice(["a", "b"], n)
+    df["cat2"] = rng.choice(["x", "y", "z"], n)
+
+    out = _run(
+        df,
+        roles={
+            "treat": TreatmentRole(),
+            "cat1": TargetRole(str),
+            "cat2": TargetRole(str),
+        },
+        additional_tests=["chi2-test"],
+        multitest_method="holm",
+    )
+    corrected = to_pandas(out.multitest)
+
+    assert len(corrected) == 4
+    assert corrected["new p-value"].astype(float).between(0, 1).all()
+
+
+def test_mixed_numeric_and_categorical_targets_correct_without_dtype_error() -> None:
+    rng = np.random.default_rng(0)
+    n = 600
+    df = pd.DataFrame(
+        {
+            "treat": rng.integers(0, 3, n),
+            "num_y": rng.normal(size=n),
+            "purchased": rng.choice(["a", "b"], n),
+        }
+    )
+
+    out = _run(
+        df,
+        roles={
+            "treat": TreatmentRole(),
+            "num_y": TargetRole(),
+            "purchased": TargetRole(str),
+        },
+        additional_tests=["t-test", "chi2-test"],
+        multitest_method="holm",
+    )
+    corrected = to_pandas(out.multitest)
+
+    assert len(corrected) == 4
+    assert set(corrected["test"]) == {"TTest", "Chi2Test"}
+    assert corrected["old p-value"].astype(float).between(0, 1).all()
+
+
 def test_sizes_table_reports_group_counts() -> None:
     df = ab_frame(n=900, effect=1.0, seed=8)
     sizes = to_pandas(_run(df).sizes)

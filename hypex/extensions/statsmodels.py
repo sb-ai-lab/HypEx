@@ -100,7 +100,7 @@ class MultiTest(Extension):
                 corrected_ds = multitest._calc_pandas(p_value_dataset)
                 print(corrected_ds[["test", "old p-value", "new p-value", "rejected"]])
         """
-        p_values = data.raw_data.values.flatten()
+        p_values = data.raw_data.astype(float).values.flatten()
         tests_raw, fields, groups = self._index_parts(data.index)
 
         # Normalize BEFORE grouping into families

@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import Any
 
 from ..comparators import (
+    GroupChi2Test,
     GroupKSTest,
     GroupTTest,
     GroupUTest,
@@ -101,10 +102,10 @@ class ABAnalyzer(Executor):
     def execute_multitest(self, data: ExperimentData, p_values: Dataset, **kwargs):
         """Applies multiple testing correction to aggregated p-values.
 
-        Retrieves treatment and target fields from the experiment data and calculates
-        the total number of statistical comparisons being made. The correction is
-        applied if the total number of comparisons (calculated as
-        ``(num_groups - 1) * num_target_fields``) is strictly greater than 1.
+        Standard corrections use the actual number of collected p-values as the
+        family size. Quantile correction retains the numeric-target calculation
+        needed to drive its per-target simulations. Correction is applied only
+        when more than one comparison is present.
 
         For standard correction methods (e.g., Bonferroni, Holm), it uses the
         ``MultiTest`` extension wrapping ``statsmodels``. For the ``quantile`` method,
@@ -125,8 +126,11 @@ class ABAnalyzer(Executor):
         group_field = data.ds.search_columns(TreatmentRole())[0]
         target_fields = data.ds.search_columns(TargetRole(), search_types=[int, float])
 
-        num_groups = len(data.groups[group_field])
-        num_comparisons = (num_groups - 1) * len(target_fields)
+        num_comparisons = (
+            (len(data.groups[group_field]) - 1) * len(target_fields)
+            if self.multitest_method == ABNTestMethodsEnum.quantile
+            else len(p_values)
+        )
 
         if self.multitest_method and num_comparisons > 1:
             if self.multitest_method != ABNTestMethodsEnum.quantile:
@@ -302,6 +306,7 @@ class ABAnalyzer(Executor):
                 GroupTTest,
                 GroupUTest,
                 GroupKSTest,
+                GroupChi2Test,
                 StatsTTest,
                 StatsChi2Test,
                 StatsKSTest,
