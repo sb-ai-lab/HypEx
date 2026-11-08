@@ -13,19 +13,22 @@
         "y_second KSTest pass test_1": 0.025,
         "category Chi2Test pass test_1": 0.04
       },
-      "categorical_chi2_mean_p": 0.49146640294901445,
-      "categorical_chi2_uniformity_p": 0.7033267467430244
+      "categorical_chi2_mean_p": 0.4914664029490144,
+      "categorical_chi2_uniformity_p": 0.7033267467430218
     },
-    "seconds": 211.442
+    "seconds": 283.383
   },
   {
     "case": "aa_parameters",
     "family": "aa",
     "backend": "spark",
-    "status": "FAIL",
-    "error": "TypeError: '<' not supported between instances of 'NoneType' and 'str'",
-    "traceback": "Traceback (most recent call last):\n  File \"/Users/danilsamsutdinov/HypEx/examples/experiments/alpha_agent_behavior_check.py\", line 579, in main\n    metrics = function(backend, spark)\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/examples/experiments/alpha_agent_behavior_check.py\", line 181, in aa_parameters\n    ).execute(make_dataset(df, roles, backend, spark))\n      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/ui/base.py\", line 343, in execute\n    result_experiment_data = self._experiment.execute(data)\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/utils/profiling.py\", line 142, in wrapper\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/experiments/base.py\", line 212, in execute\n    experiment_data = cur_executor.execute(experiment_data)\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/utils/profiling.py\", line 142, in wrapper\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/experiments/base_complex.py\", line 233, in execute\n    t_data = executor.execute(t_data)\n             ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/utils/profiling.py\", line 142, in wrapper\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/experiments/base.py\", line 212, in execute\n    experiment_data = cur_executor.execute(experiment_data)\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/utils/profiling.py\", line 142, in wrapper\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/experiments/base.py\", line 212, in execute\n    experiment_data = cur_executor.execute(experiment_data)\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/utils/profiling.py\", line 142, in wrapper\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/comparators/abstract.py\", line 1096, in execute\n    group_names = sorted(group_col_stats)\n                  ^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: '<' not supported between instances of 'NoneType' and 'str'\n",
-    "seconds": 1.221
+    "status": "PASS",
+    "metrics": {
+      "stratified_iterations": 12,
+      "sample_size": 0.75,
+      "control_size": 0.3
+    },
+    "seconds": 18.872
   },
   {
     "case": "aa_three_groups",
@@ -38,7 +41,7 @@
         "test_2"
       ]
     },
-    "seconds": 10.442
+    "seconds": 10.593
   },
   {
     "case": "aa_reproducibility",
@@ -48,7 +51,7 @@
     "metrics": {
       "reproducible_iterations": 5
     },
-    "seconds": 10.94
+    "seconds": 12.123
   },
   {
     "case": "ab_welch_and_effect",
@@ -60,7 +63,7 @@
       "p_value": 5.4128276060155905e-58,
       "null_p": 0.39184404333341194
     },
-    "seconds": 3.266
+    "seconds": 3.262
   },
   {
     "case": "ab_multigroup_order_and_bonferroni",
@@ -75,7 +78,7 @@
       ],
       "comparisons": 3
     },
-    "seconds": 1.613
+    "seconds": 1.583
   },
   {
     "case": "ab_categorical_and_quantile",
@@ -87,7 +90,7 @@
       "reference_p": 4.662642784093672e-22,
       "quantile_result": "not supported on Spark"
     },
-    "seconds": 1.755
+    "seconds": 1.74
   },
   {
     "case": "ab_cuped",
@@ -99,7 +102,7 @@
       "cuped_p": 0.0,
       "effect": 2.0249933064030077
     },
-    "seconds": 3.453
+    "seconds": 3.496
   },
   {
     "case": "homogeneity_numeric",
@@ -114,7 +117,7 @@
       ],
       "null_p": 0.1639878830763829
     },
-    "seconds": 3.694
+    "seconds": 3.666
   },
   {
     "case": "homogeneity_categorical",
@@ -127,7 +130,7 @@
         2.813604925243952e-28
       ]
     },
-    "seconds": 1.519
+    "seconds": 1.542
   },
   {
     "case": "matching_mahalanobis",
@@ -141,7 +144,7 @@
         "ATE": 2.3811
       }
     },
-    "seconds": 9.653
+    "seconds": 10.023
   },
   {
     "case": "matching_l2_fast",
@@ -155,7 +158,7 @@
         "ATE": 2.5147
       }
     },
-    "seconds": 5.927
+    "seconds": 5.975
   },
   {
     "case": "matching_repeated_calibration",
@@ -168,15 +171,20 @@
       "ate_sd": 0.18647878458419878,
       "ci_coverage": 0.85
     },
-    "seconds": 127.959
+    "seconds": 130.443
   },
   {
     "case": "matching_single_quality_string",
     "family": "matching",
     "backend": "spark",
-    "status": "FAIL",
-    "error": "KeyError: 't'",
-    "traceback": "Traceback (most recent call last):\n  File \"/Users/danilsamsutdinov/HypEx/examples/experiments/alpha_agent_behavior_check.py\", line 579, in main\n    metrics = function(backend, spark)\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/examples/experiments/alpha_agent_behavior_check.py\", line 513, in matching_single_quality_string\n    output = Matching(distance=\"l2\", quality_tests=\"t-test\").execute(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/matching.py\", line 217, in __init__\n    experiment=self._make_experiment(\n               ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/matching.py\", line 174, in _make_experiment\n    executors=[test_mapping[test] for test in quality_tests],\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/danilsamsutdinov/HypEx/hypex/matching.py\", line 174, in <listcomp>\n    executors=[test_mapping[test] for test in quality_tests],\n               ~~~~~~~~~~~~^^^^^^\nKeyError: 't'\n",
-    "seconds": 0.001
+    "status": "PASS",
+    "metrics": {
+      "effects": {
+        "ATT": 2.3152,
+        "ATC": 2.0583,
+        "ATE": 2.1848
+      }
+    },
+    "seconds": 3.515
   }
 ]

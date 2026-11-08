@@ -28,9 +28,9 @@ Spark quantile multitest was excluded because it is explicitly unsupported. Spar
 
 ### Synthetic outcome
 
-- Pandas: **11/14 cases passed**. Three failed cases represent two unique defects (chi-square calibration and scalar Matching quality tests).
-- Spark: **12/14 cases passed**. Two failed cases represent two unique defects (AA subsampling and scalar Matching quality tests).
-- Total: **23/28 cases passed**, with three unique defects confirmed across the matrices.
+- Pandas: **14/14 cases passed** after the follow-up fixes.
+- Spark: **14/14 cases passed** after the follow-up fixes.
+- Total: **28/28 cases passed**. The original failures and their resolutions are documented below.
 
 ## Integration correction made during merging
 
@@ -45,43 +45,41 @@ Verification after these corrections:
 - `pytest -m "not spark" -q`: **1273 passed, 54 xfailed**.
 - Targeted pandas/Spark merge and ordering tests: **12 passed**.
 - Final targeted scalar-`.loc` and merge tests: **6 passed**.
-- Complete `pytest -q`: **1760 passed, 18 skipped, 79 xfailed; 3 failed**. The three remaining failures are exclusively the out-of-scope issue-13 FAISS cases detailed below.
+- Complete `pytest -q` after all follow-up fixes: **1767 passed, 18 skipped, 78 xfailed; 0 failed**.
 - Direct Ruff equivalents of the lint environment: **all checks passed; 207 files formatted**. The `tox` executable was unavailable.
 
-## Confirmed defects
+## Defects confirmed during testing and resolved in follow-up branches
 
-### 1. Pandas chi-square uses scaled counts and is conservative under the null
+### 1. Pandas chi-square used scaled counts and was conservative under the null
 
 **Affected paths:** pandas AA, AB categorical tests, Homogeneity categorical tests, and Matching categorical quality tests.
 
-**Evidence**
+**Original evidence**
 
 - Over 200 null AA splits, categorical chi-square rejected **0/200** on pandas versus **8/200 (4%)** on Spark.
-- The pandas p-values had mean **0.625434** and a KS-uniformity p-value of **1.965e-9**. This is not consistent with a calibrated uniform null distribution. Spark had mean **0.491466** and uniformity p-value **0.703327**.
+- The pandas p-values had mean **0.625434** and a KS-uniformity p-value of **1.965e-9**. Spark had mean **0.491466** and uniformity p-value **0.703327**.
 - On the deterministic categorical AB dataset, pandas returned p=`2.934626e-11`; raw-count SciPy returned p=`4.662643e-22`. Spark matched SciPy.
 - Minimal reproduction with raw counts `[[80, 20], [60, 40]]`:
   - raw-count SciPy: statistic `8.595238`, p=`0.00337043`;
-  - HypEx pandas table `[[40, 30], [10, 20]]`: statistic `3.857143`, p=`0.04953461`.
+  - original HypEx pandas table `[[40, 30], [10, 20]]`: statistic `3.857143`, p=`0.04953461`.
 
 **Confirmed cause**
 
-`PandasChi2TestExtension.matrix_preparation` multiplies the first group's counts by `1 - proportion` and the second group's counts by `proportion` (`hypex/extensions/scipy_stats.py:245-253`). For equal groups this halves the effective sample size. `scipy.stats.chi2_contingency` expects observed counts, not counts rescaled to a smaller common total. The Spark implementation uses raw counts (`hypex/extensions/scipy_stats.py:446-457`).
+`PandasChi2TestExtension.matrix_preparation` multiplied each group's counts by the opposite group's fraction. For equal groups this halved the effective sample size. `scipy.stats.chi2_contingency` expects observed counts, which the Spark implementation already used.
 
-**Impact**
+**Resolution**
 
-P-values are inflated and categorical tests lose power. AA categorical scores and split selection are also distorted. Strong effects can still be detected, which is why simple smoke tests do not expose the problem.
+`fix/issue-27-pandas-chi2-raw-counts` removes the scaling and passes observed counts on pandas. The strict-xfail SciPy reference test is now a normal passing test. Post-fix categorical AA rejection is **11/200 (5.5%)**, and the categorical AB p-value exactly matches SciPy.
 
-### 2. Spark AA fails whenever `sample_size < 1`
+### 2. Spark AA failed whenever `sample_size < 1`
 
-**Affected path:** `AATest(sample_size=...)` on Spark, with or without stratification.
-
-**Reproduction**
+**Original failure**
 
 ```python
 AATest(n_iterations=1, sample_size=0.75, random_states=[0]).execute(spark_ds)
 ```
 
-It fails in `GroupSizes` with:
+failed in `GroupSizes` with:
 
 ```text
 TypeError: '<' not supported between instances of 'NoneType' and 'str'
@@ -89,45 +87,34 @@ TypeError: '<' not supported between instances of 'NoneType' and 'str'
 
 **Evidence and confirmed cause**
 
-- Stratification alone passed with `control_size` 0.5 and 0.3.
-- `sample_size=0.75` failed with and without stratification, at both control sizes, and with `float32` on or off.
-- In a 100-row reproduction, the splitter produced 44 control rows, 39 test rows, and **17 null labels**. The dataset still contains all 100 rows after additional-field alignment.
-- Spark group statistics include the null key; `sorted(group_col_stats)` at `hypex/comparators/abstract.py:1096` then attempts to order `None` with strings.
+- Stratification alone passed with `control_size` 0.5 and 0.3; subsampling failed independently of stratification, control size, and `float32`.
+- In a 100-row reproduction, the splitter produced 44 control rows, 39 test rows, and **17 null labels**. The dataset still contained all 100 rows after additional-field alignment.
+- Spark group statistics included the null key, and sorting mixed `None` with strings failed.
 
-The sampled-out rows need to be excluded from downstream comparisons or the null group must be dropped consistently before sorting/aggregation.
+**Resolution**
 
-### 3. `Matching(quality_tests="t-test")` iterates the string as characters
+`fix/issue-28-spark-aa-sample-size-null-groups` drops unlabeled rows in comparator inputs for ordinary statistics, chi-square counts, and KS/U histograms. Low-level extensions still preserve explicitly requested NaN-group ordering. The fix passed 40 relevant Spark tests, including both pre-existing NaN-ordering contracts and a mixed numeric/categorical subsampled AA regression.
 
-**Affected backends:** both pandas and Spark.
+### 3. `Matching(quality_tests="t-test")` iterated the string as characters
 
-**Reproduction**
+**Original failure:** both backends raised `KeyError: 't'` because the non-`auto` branch iterated the scalar string directly instead of normalizing it to a one-element list.
 
-```python
-Matching(distance="l2", quality_tests="t-test")
-```
+**Resolution**
 
-It fails immediately with `KeyError: 't'`. The documented scalar form is therefore unusable; `quality_tests=["t-test"]` works.
+`fix/issue-29-matching-scalar-quality-tests` normalizes a scalar string before lookup. An end-to-end regression verifies identical scalar/list results on pandas and Spark.
 
-**Confirmed cause**
+## Additional issue-13 failure resolved during follow-up
 
-The non-`auto` branch iterates `quality_tests` directly in `hypex/matching.py:171-175`. A string is iterated as characters instead of being normalized to a one-element list.
+The complete suite originally reproduced three Spark FAISS failures in `test_matching_spark_matches_pandas[1]`, `[2]`, and `test_spark_extension_matches_brute_force`. All reached `MiniBatchKMeans.partial_fit` with a one-dimensional partition array because `np.append` flattened cached feature matrices.
 
-## Remaining failure outside the requested merge set
-
-The complete suite also reproduces three Spark FAISS failures:
-
-- `tests/dataset_spark_backend/test_matching_spark.py::test_matching_spark_matches_pandas[1]`
-- `tests/dataset_spark_backend/test_matching_spark.py::test_matching_spark_matches_pandas[2]`
-- `tests/unit/test_ml_faiss.py::test_spark_extension_matches_brute_force`
-
-All three reach `MiniBatchKMeans.partial_fit` with a one-dimensional partition array. scikit-learn requires a 2D array and raises `ValueError: Expected 2D array, got 1D array instead`. This is the batch-dimension problem addressed by the existing `fix/issue-13-spark-faiss-prefit-batches` branch. Issue 13 was **not** in the requested list, so that branch was not silently merged and its fix was not duplicated here. The successful custom Matching cases use different FAISS paths and do not remove this prefit failure.
+The existing `fix/issue-13-spark-faiss-prefit-batches` branch accumulates arrays in a list and concatenates them along axis 0. It passed all four targeted prefit/FAISS/Matching tests unchanged and was included in the final integration verification.
 
 ## Observations not classified as defects
 
 - Forty independent Matching runs per backend gave mean ATE **2.2324** on pandas and **2.2340** on Spark for an injected effect of 2.0. ATE SD was **0.1864/0.1865**, and 95%-CI coverage was **85% on both backends**. The estimates passed the predeclared calibration bounds. Coverage below 95% is worth a larger simulation, but 40 runs and residual matching bias are insufficient to declare a standard-error bug. Single-run CI misses encountered earlier were deliberately discarded as evidence.
 - Pandas numeric AA rejection rates were 3–5%; Spark numeric AA rates were 2.5–5.5%. No numeric AA calibration defect was indicated.
 - Welch AB p-values and group means agreed with independent references on both backends. Natural group ordering, Bonferroni correction, CUPED, and categorical Spark references passed.
-- The behavior harness exits nonzero while known defect cases remain failing. This is intentional; its JSON differentiates those failures from all passing cases.
+- The behavior harness exits nonzero if any behavior case fails. Its JSON retains per-case metrics and tracebacks; the original failures shown above led to the separate fix branches documented in this report.
 
 ## Reproduction
 
