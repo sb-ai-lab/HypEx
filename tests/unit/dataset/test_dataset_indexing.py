@@ -57,6 +57,22 @@ def test_keyless_merge_uses_index(make_dataset) -> None:
     assert len(merged) == 2
 
 
+def test_column_merge_does_not_implicitly_use_index(make_dataset) -> None:
+    left = make_dataset(
+        pd.DataFrame({"key": [1, 2], "v": [3, 4]}),
+        {"key": FeatureRole(), "v": FeatureRole()},
+    )
+    right = make_dataset(
+        pd.DataFrame({"key": [1, 2], "w": [5, 6]}),
+        {"key": FeatureRole(), "w": FeatureRole()},
+    )
+
+    merged = left.merge(right, on="key")
+
+    assert merged.columns == ["key", "v", "w"]
+    assert len(merged) == 2
+
+
 def test_getitem_missing_column_raises(make_dataset) -> None:
     """Requesting an unknown column raises KeyError."""
     ds = _ds(make_dataset)
