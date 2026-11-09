@@ -16,6 +16,7 @@ from .reporters.matching import MatchingAnalysisTableReporter
 from .transformers import TypeCaster
 from .ui.base import ExperimentShell
 from .ui.matching import MatchingOutput
+from .utils.adapter import Adapter
 from .utils.index_utils import FaissIndexStorage
 
 
@@ -169,9 +170,7 @@ class Matching(ExperimentShell):
                 )
             ]
         else:
-            selected_tests = (
-                [quality_tests] if isinstance(quality_tests, str) else quality_tests
-            )
+            selected_tests = Adapter.to_list(quality_tests)
             executors += [
                 OnRoleExperiment(
                     executors=[test_mapping[test] for test in selected_tests],
