@@ -133,6 +133,18 @@ def test_pretarget_role_carries_lag_and_cofounders() -> None:
     assert role.cofounders == ["age", "gender"]
 
 
+def test_copy_and_conversion_preserve_role_metadata() -> None:
+    from copy import copy
+
+    original = PreTargetRole(parent="y", lag=1, cofounders=["x"])
+
+    for cloned in (copy(original), original.astype(float), original.asadditional(int)):
+        assert cloned is not original
+        assert cloned.parent == "y"
+        assert cloned.lag == 1
+        assert cloned.cofounders == ["x"]
+
+
 def test_lag_role_subclasses() -> None:
     """FeatureRole and PreTargetRole belong to the LagRole family."""
     assert issubclass(FeatureRole, LagRole)
