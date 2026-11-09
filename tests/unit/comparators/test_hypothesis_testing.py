@@ -166,6 +166,24 @@ def test_execute_compares_each_group_with_baseline(cls, scipy_fn) -> None:
         assert table.loc[group, "statistic"] == pytest.approx(ref.statistic, abs=TOL)
 
 
+def test_execute_uses_natural_order_for_numeric_group_keys() -> None:
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame(
+        {
+            "g": [2] * 50 + [10] * 50,
+            "y": np.concatenate([rng.normal(0, 1, 50), rng.normal(5, 1, 50)]),
+        }
+    )
+    ds = build_dataset(df, {"g": TreatmentRole(int), "y": TargetRole()})
+    executor = GroupTTest(compare_by="groups", grouping_role=TreatmentRole())
+
+    table = result_frame(executor.execute(ExperimentData(ds)), executor)
+
+    reference = stats.ttest_ind(df.y[df.g == 2], df.y[df.g == 10], equal_var=False)
+    assert table.index.tolist() == [10]
+    assert table.loc[10, "statistic"] == pytest.approx(reference.statistic, abs=TOL)
+
+
 @pytest.mark.xfail(
     strict=True,
     reason="Issue: GroupHypothesisTesting.reliability is stored but never forwarded "
