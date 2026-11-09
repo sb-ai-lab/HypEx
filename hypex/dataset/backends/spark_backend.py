@@ -1214,6 +1214,8 @@ class SparkNavigation(DatasetBackendNavigation):
                 consider wrapping for consistency).
         """
         data = self.data.loc[items]
+        if isinstance(data, (pd.Series, ps.Series)):
+            data = data.to_frame()
         return data
 
     def iloc(self, items: Iterable[Any]) -> Self:
