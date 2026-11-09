@@ -1254,7 +1254,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     """
 
     @staticmethod
-    def _convert_agg_result(result: ps.Series | ps.DataFrame) -> Self | float:
+    def _convert_agg_result(result: ps.Series | ps.DataFrame) -> Self | ScalarType:
         """Convert aggregation results to appropriate return type.
 
         Handles edge case where single-value aggregations should return scalar
@@ -1264,14 +1264,14 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             result (ps.Series | ps.DataFrame): Result from aggregation operation.
 
         Returns:
-            SparkDataset | float: Wrapped DataFrame for multi-value results,
-                or scalar float for single-value results.
+            SparkDataset | ScalarType: Wrapped DataFrame for multi-value results,
+                or the native scalar value for single-value results.
         """
         if isinstance(result, ps.Series):
             result = result.to_frame()
         if result.shape == (1, 1):
             value = result.to_spark().collect()[0][0]
-            return float("nan") if value is None else float(value)
+            return float("nan") if value is None else value
         return result if isinstance(result, ps.DataFrame) else ps.DataFrame(result)
 
     def __init__(
@@ -1460,73 +1460,112 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             "index": list(rows.keys()),
         }
 
-    def agg(self, func: str | list, **kwargs) -> SparkDataset | float:
+    def agg(
+        self, func: str | list | dict, **kwargs
+    ) -> SparkDataset | ScalarType | None:
         """Aggregate data using specified function(s).
 
-        Automatically selects numeric columns if subset not specified.
+        Numeric-only operations reject non-numeric input instead of silently
+        dropping columns. Operations such as count, min, and max retain all
+        supported column types.
 
         Args:
-            func (str | list): Aggregation function name(s) (e.g., "sum", ["mean", "std"]).
-            subset (str | list, optional): Column(s) to aggregate. Defaults to numeric columns.
+            func (str | list | dict): Aggregation function name(s), or a mapping
+                from column names to aggregation functions.
+            subset (str | list, optional): Column(s) to aggregate. By default,
+                dictionary keys or all columns are used.
             **kwargs: Additional arguments for aggregation.
 
         Returns:
-            SparkDataset | float: Aggregated results, or scalar for single-value results.
+            SparkDataset | ScalarType | None: Aggregated results, a scalar for
+                single-value results, or None for an empty column selection.
         """
         subset = kwargs.pop("subset", None)
         func = func if isinstance(func, (list, dict)) else [func]
 
         if subset is not None:
-            if isinstance(subset, str):
-                subset = [subset]
-            data_to_agg = self.data[subset]
+            selected = [subset] if isinstance(subset, str) else list(subset)
+        elif isinstance(func, dict):
+            selected = list(func)
         else:
-            types = self.get_column_type()
-            numeric_cols = [
-                col
-                for col, dtype in types.items()
-                if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]
-            ]
-            if isinstance(func, list) and any(
-                name in {"mean", "sum", "min", "max"} for name in func
-            ):
-                non_numeric = [col for col in types if col not in numeric_cols]
-                if non_numeric:
-                    raise TypeError(
-                        f"Cannot aggregate non-numeric columns: {non_numeric}. "
-                        "Select numeric columns explicitly."
-                    )
-
-            data_to_agg = self.data[numeric_cols]
-            if data_to_agg is None or len(data_to_agg.columns) == 0:
-                return None
+            selected = list(self.data.columns)
+        data_to_agg = self.data[selected]
 
         if data_to_agg is None or len(data_to_agg.columns) == 0:
             return None
 
         if isinstance(func, dict):
             agg_dict = func
-        elif isinstance(func, list) and len(func) == 1:
+        elif len(func) == 1:
             agg_dict = {col: func[0] for col in data_to_agg.columns}
         else:
             agg_dict = {col: func for col in data_to_agg.columns}
 
-        result = data_to_agg.agg(agg_dict, **kwargs)
+        numeric_aggs = {
+            "mean",
+            "sum",
+            "var",
+            "std",
+            "median",
+            "quantile",
+            "prod",
+            "product",
+            "sem",
+            "skew",
+            "kurt",
+            "kurtosis",
+        }
+        numeric_types = {int, float, np.int64, np.float64, np.int32, np.float32}
+        types = self.get_column_type()
+        non_numeric = []
+        for col, operations in agg_dict.items():
+            operations = operations if isinstance(operations, list) else [operations]
+            if (
+                col in types
+                and types[col] not in numeric_types
+                and any(operation in numeric_aggs for operation in operations)
+            ):
+                non_numeric.append(col)
+        if non_numeric:
+            raise TypeError(
+                f"Cannot apply numeric aggregation to non-numeric columns: "
+                f"{non_numeric}. Select numeric columns explicitly."
+            )
+
+        native_aggs = {"count", "min", "max", "mean", "sum", "std", "var"}
+        has_non_numeric = any(
+            col in types and types[col] not in numeric_types for col in agg_dict
+        )
+        if (
+            has_non_numeric
+            and not kwargs
+            and all(
+                isinstance(operation, str) and operation in native_aggs
+                for operation in agg_dict.values()
+            )
+        ):
+            expressions = [
+                getattr(F, operation)(F.col(f"`{col}`")).alias(col)
+                for col, operation in agg_dict.items()
+            ]
+            result = data_to_agg.to_spark().agg(*expressions).pandas_api()
+        else:
+            result = data_to_agg.agg(agg_dict, **kwargs)
         converted = self._convert_agg_result(result)
 
         if isinstance(converted, ps.DataFrame):
             return self._wrap_result(converted)
         return self._wrap_result(converted)
 
-    def max(self) -> SparkDataset | float:
+    def max(self) -> SparkDataset | ScalarType | None:
         """Compute maximum value(s)."""
         return self._wrap_result(self.agg(["max"]))
 
-    def idxmax(self) -> SparkDataset | float:
+    def idxmax(self) -> SparkDataset | ScalarType | None:
         """Return index of maximum value(s)."""
         return self._wrap_result(self.agg(["idxmax"]))
 
-    def min(self) -> SparkDataset | float:
+    def min(self) -> SparkDataset | ScalarType | None:
         """Compute minimum value(s)."""
         return self._wrap_result(self.agg(["min"]))
 
