@@ -152,18 +152,28 @@ def test_fit_mode_returns_self_with_populated_index(control, test_df) -> None:
     assert extension.index.ntotal == len(control)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=ValueError,
-    reason="Issue: mode='predict' queries the index with `data` (the indexed set) instead of "
-    "`test_data`, so the result has the wrong number of rows",
-)
 def test_fit_then_predict_equals_auto(control, test_df) -> None:
     auto = _pdf(PandasFaissExtension().calc(_ds(control), _ds(test_df)))
     extension = PandasFaissExtension()
     extension.calc(_ds(control), _ds(test_df), mode="fit")
     split = _pdf(extension.calc(_ds(control), _ds(test_df), mode="predict"))
-    assert split.shape == auto.shape
+    pd.testing.assert_frame_equal(split, auto)
+
+
+def test_predict_uses_test_data_for_equal_length_queries() -> None:
+    control = pd.DataFrame(
+        {"f1": [0.0, 1.0, 2.0, 3.0, 4.0], "f2": [0.0, 2.0, 4.0, 6.0, 8.0]}
+    )
+    test_df = control.copy()
+    test_df["f1"] += 40.0
+    test_df["f2"] += 80.0
+    extension = PandasFaissExtension()
+    extension.calc(_ds(control), _ds(test_df), mode="fit")
+
+    found = _pdf(extension.calc(_ds(control), _ds(test_df), mode="predict"))
+
+    expected = _brute_force(control, test_df, 1)[:, 0]
+    assert found.iloc[:, 0].tolist() == expected.tolist()
 
 
 def test_abstract_calc_raises() -> None:
