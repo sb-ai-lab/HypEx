@@ -13,14 +13,19 @@ from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
 import numpy as np
 import pandas as pd  # type: ignore
-import pyspark.pandas as ps  # type: ignore
-import pyspark.sql as spark  # type: ignore
-import pyspark.sql.functions as F  # type: ignore
 
 # pandas.util.hash_array — C-level vectorized hash
 from pandas.util import hash_array
-from pyspark.ml.feature import StringIndexer  # type: ignore
 
+from ..._spark import (
+    PANDAS_ON_SPARK_DATAFRAME_TYPES,
+    SPARK_SQL_DATAFRAME_TYPES,
+    F,
+    StringIndexer,
+    ps,
+    require_pyspark,
+    spark,
+)
 from ...config import DatasetConfig
 from ...utils import BackendsEnum, FromDictTypes, MergeOnError, ScalarType
 from ...utils.adapter import Adapter
@@ -84,6 +89,7 @@ class PandasNavigation(DatasetBackendNavigation):
             return self
 
         if target_backend == BackendsEnum.spark:
+            require_pyspark()
             if session is None:
                 raise ValueError(
                     "Spark session is required for pandas → spark conversion"
@@ -259,11 +265,11 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data = data
         elif isinstance(data, pd.Series):
             self.data = pd.DataFrame(data)
-        elif isinstance(data, spark.DataFrame):
+        elif isinstance(data, SPARK_SQL_DATAFRAME_TYPES):
             self.data = self._data_compression(
                 data, data_compression, non_compresion_cols
             )
-        elif isinstance(data, ps.DataFrame):
+        elif isinstance(data, PANDAS_ON_SPARK_DATAFRAME_TYPES):
             self.data = data.to_pandas()
         elif isinstance(data, dict):
             wrapped = {

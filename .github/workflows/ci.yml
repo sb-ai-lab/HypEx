@@ -87,6 +87,25 @@ jobs:
       # Catches a pyproject.toml edited without re-running `poetry lock`.
       - run: poetry check --lock
 
+  no-spark:
+    name: Tests without PySpark
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: poetry.lock
+
+      - run: python -m pip install tox
+
+      # Installs the wheel without extras and checks imports, pandas workflows,
+      # and the actionable errors exposed by Spark-only entry points.
+      - run: tox -e no-spark
+
   # ---------------------------------------------------------------------------
   # The test matrix. Narrowed from 17 jobs to 10: every supported interpreter
   # on Linux, plus the oldest and newest on macOS and Windows, which is where

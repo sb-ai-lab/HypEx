@@ -69,7 +69,7 @@ faiss-cpu = [
 ]
 seaborn = "<=0.13.2"
 statsmodels = "<=0.14.2"
-pyspark = "3.5.1"
+pyspark = { version = "3.5.1", optional = true }
 pyarrow = ">=11.0.0,<16.0.0"
 
 catboost = { version = "*", optional = true }
@@ -78,7 +78,8 @@ lightgbm = { version = "*", optional = true }
 [tool.poetry.extras]
 cat = ["catboost"]
 lgbm = ["lightgbm"]
-all = ["catboost", "lightgbm"]
+spark = ["pyspark"]
+all = ["catboost", "lightgbm", "pyspark"]
 
 [tool.poetry.group.dev.dependencies]
 docutils = ">=0.17,<0.21"

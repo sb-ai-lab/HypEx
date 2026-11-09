@@ -210,7 +210,8 @@ matter when reading this code:
 names changed. Full list: `RELEASE_NOTES_2.0.0a1.md` in the repository root.
 
 ### Breaking Changes:
-- Python 3.13 is not supported (`python >=3.8, <3.13`); PySpark 3.5.1 is now a hard dependency.
+- Python 3.13 is not supported (`python >=3.8, <3.13`). PySpark 3.5.1 is optional and is installed with
+  `pip install "hypex[spark]"`; the base installation supports pandas.
 - `Output.resume` / `resume_reporter` are renamed to `summary` / `summary_reporter`; the old names
   still work and emit `DeprecationWarning`.
 - A/A splits use a different hash (SipHash on pandas): the same data and seed give different groups.

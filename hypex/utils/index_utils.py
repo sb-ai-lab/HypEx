@@ -21,8 +21,8 @@ from collections import OrderedDict
 from typing import Any, ClassVar
 
 import faiss  # pyright: ignore[reportMissingImports]
-from pyspark import RDD, SparkFiles  # pyright: ignore[reportMissingImports]
-from pyspark.sql import SparkSession  # pyright: ignore[reportMissingImports]
+
+from .._spark import RDD, SparkFiles, SparkSession, require_pyspark
 
 
 class FaissIndexStorage:
@@ -55,6 +55,7 @@ class FaissIndexStorage:
         sp_s: SparkSession,
         base_dir: str | None = None,
     ) -> None:
+        require_pyspark()
         self.sp_s: SparkSession = sp_s
         # Retained for backward compatibility with external code.
         self._distributed: bool = False

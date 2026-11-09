@@ -14,10 +14,14 @@ except ImportError:
 
 
 import pandas as pd  # type: ignore
-import pyspark.pandas as ps  # type: ignore
-import pyspark.sql as spark  # type: ignore
 from numpy import ndarray
 
+from .._spark import (
+    SPARK_DATAFRAME_TYPES,
+    SPARK_SERIES_TYPES,
+    require_pyspark,
+    spark,
+)
 from ..config import DatasetConfig
 from ..utils import (
     BackendsEnum,
@@ -28,7 +32,6 @@ from ..utils import (
     GenericManager,
     RoleColumnError,
     ScalarType,
-    SourceDataTypes,
 )
 from ..utils.adapter import Adapter
 from .backends import PandasDataset, SparkDataset
@@ -160,6 +163,7 @@ class DatasetBase:
 
         # Resolve session for spark targets.
         if backend == BackendsEnum.spark:
+            require_pyspark()
             if session is None:
                 session = self.session
             if session is None:
@@ -188,7 +192,7 @@ class DatasetBase:
             return data
         elif isinstance(data, pd.DataFrame):
             return PandasDataset(data)
-        elif isinstance(data, (spark.DataFrame, ps.DataFrame)):
+        elif isinstance(data, SPARK_DATAFRAME_TYPES):
             return SparkDataset(data, session)
 
         raise TypeError(
@@ -267,10 +271,7 @@ class DatasetBase:
                 self._backend_data = deepcopy(data._backend_data)
             elif isinstance(data, (PandasDataset, SparkDataset)):
                 self._backend_data = data
-            elif any(
-                isinstance(data, source_data_type)
-                for source_data_type in SourceDataTypes.__args__
-            ):
+            elif isinstance(data, (pd.DataFrame, *SPARK_DATAFRAME_TYPES)):
                 self._backend_data = self._select_backend_from_data(data, session)
             else:
                 if session is not None:
@@ -405,7 +406,8 @@ class DatasetBase:
             result = self._backend_data.__getitem__(item)
             return self.__class__(roles=self.roles, data=result)
 
-        if isinstance(item, (pd.DataFrame, ps.DataFrame, pd.Series, ps.Series)):
+        spark_types = SPARK_DATAFRAME_TYPES + SPARK_SERIES_TYPES
+        if isinstance(item, (pd.DataFrame, pd.Series, *spark_types)):
             result_data = self._backend_data.__getitem__(item)
             res_cols = (
                 list(result_data.columns)

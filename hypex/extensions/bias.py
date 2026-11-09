@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pyspark.sql.functions as F
-from pyspark import StorageLevel
-from pyspark.ml.feature import VectorAssembler
-from pyspark.ml.regression import LinearRegression
-from pyspark.sql import DataFrame as SparkDF
 
+from .._spark import (
+    PYSPARK_AVAILABLE,
+    F,
+    LinearRegression,
+    SparkDF,
+    StorageLevel,
+    VectorAssembler,
+)
 from ..dataset import (
     ABCRole,
     AdditionalMatchingRole,
@@ -403,11 +406,15 @@ class SparkBisaExtesion(BiasExtension):
         for caching Datasets.
     """
 
-    STORAGE_DICT = {  # noqa: RUF012
-        "MEMORY_ONLY": StorageLevel.MEMORY_ONLY,
-        "MEMORY_AND_DISK": StorageLevel.MEMORY_AND_DISK,
-        "DISK_ONLY": StorageLevel.DISK_ONLY,
-    }
+    STORAGE_DICT = (
+        {
+            "MEMORY_ONLY": StorageLevel.MEMORY_ONLY,
+            "MEMORY_AND_DISK": StorageLevel.MEMORY_AND_DISK,
+            "DISK_ONLY": StorageLevel.DISK_ONLY,
+        }
+        if PYSPARK_AVAILABLE
+        else {}
+    )
 
     @staticmethod
     def _prepare_data(

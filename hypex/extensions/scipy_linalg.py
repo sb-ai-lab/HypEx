@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd  # type: ignore
-from pyspark.ml.feature import VectorAssembler
-from pyspark.ml.regression import LinearRegression
 
+from .._spark import LinearRegression, VectorAssembler
 from ..dataset import Dataset
 from ..dataset.backends import PandasDataset, SparkDataset
 from ..dataset.roles import FeatureRole, TargetRole

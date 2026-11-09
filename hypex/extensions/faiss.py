@@ -15,15 +15,21 @@ from typing import (
 import faiss
 import numpy as np
 import pandas as pd
-
-# Spark imports
-import pyspark.sql as spark
-import pyspark.sql.functions as F
-from pyspark import RDD, Broadcast
-from pyspark.ml.feature import VectorAssembler
-from pyspark.sql.types import ArrayType, FloatType, LongType, StructField, StructType
 from sklearn.cluster import Birch, MiniBatchKMeans
 
+from .._spark import (
+    PYSPARK_AVAILABLE,
+    RDD,
+    ArrayType,
+    Broadcast,
+    F,
+    FloatType,
+    LongType,
+    StructField,
+    StructType,
+    VectorAssembler,
+    spark,
+)
 from ..config import MatchingConfig
 from ..dataset import AdditionalMatchingRole, Dataset
 from ..dataset.backends import PandasDataset, SparkDataset
@@ -688,11 +694,15 @@ class SparkFaissExtension(FaissExtension):
     """
 
     # Storage level for intermediate RDDs
-    PREDICT_SCHEMA = StructType(
-        [
-            StructField("index", LongType(), False),
-            StructField("index_list", ArrayType(LongType()), False),
-        ]
+    PREDICT_SCHEMA = (
+        StructType(
+            [
+                StructField("index", LongType(), False),
+                StructField("index_list", ArrayType(LongType()), False),
+            ]
+        )
+        if PYSPARK_AVAILABLE
+        else None
     )
 
     CLUSTERING_METHODS_MAPPER: ClassVar[dict] = {
