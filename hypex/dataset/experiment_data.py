@@ -24,7 +24,7 @@ from ..utils import (
 )
 from ..utils.adapter import Adapter
 from ..utils.logger import logger
-from .dataset import Dataset, SmallDataset
+from .dataset import Dataset, DatasetAdapter, SmallDataset
 from .roles import ABCRole, AdditionalRole, DefaultRole, DisabledRole
 
 _SUPPORTED_SPACES = frozenset(
@@ -209,7 +209,8 @@ class ExperimentData:
         executor_id: str | dict[str, str],
         value: Any,
         key: str | None = None,
-        role: ABCRole | None = None,
+        role: ABCRole | dict[str, ABCRole] | None = None,
+        mode: Literal["add_columns", "replace"] = "add_columns",
     ) -> Self:
         """Store a value in the specified experiment data space.
 
@@ -222,13 +223,20 @@ class ExperimentData:
             value: Data to store (Dataset, SmallDataset, scalar, or dict).
             key: Optional sub-key for nested storage (variables, groups).
             role: Optional semantic role for column assignment in additional_fields.
+            mode: ``add_columns`` merges an executor result into the main dataset;
+                ``replace`` makes the executor result the new main dataset.
 
         Returns:
             Self for method chaining.
         """
+        if mode not in ("add_columns", "replace"):
+            raise ValueError(f"Unknown set_value mode: {mode}")
+
         exec_id = self._normalize_executor_id(executor_id)
 
         if space == ExperimentDataEnum.additional_fields:
+            if mode == "replace":
+                return self._replace_data(value, role)
             return self._set_additional_fields(exec_id, value, role)
         if space == ExperimentDataEnum.analysis_tables:
             return self._set_analysis_tables(exec_id, value)
@@ -238,6 +246,33 @@ class ExperimentData:
             return self._set_groups(exec_id, value, key)
 
         raise ValueError(f"Unknown space: {space}")
+
+    def _replace_data(self, value: Any, role: Any) -> Self:
+        """Replace the main dataset with a Dataset or executor DataFrame."""
+        if isinstance(value, SmallDataset):
+            new_data = value.to_dataset()
+        elif isinstance(value, Dataset):
+            new_data = value
+        else:
+            if not hasattr(value, "columns"):
+                raise TypeError("Replacement value must be a Dataset or DataFrame")
+            if isinstance(role, dict):
+                roles = deepcopy(role)
+            else:
+                normalized_role = self._normalize_role(role)
+                roles = {
+                    column: (
+                        normalized_role
+                        if normalized_role is not None
+                        else deepcopy(self._data.roles.get(column, DefaultRole()))
+                    )
+                    for column in value.columns
+                }
+            new_data = DatasetAdapter.to_dataset(value, roles=roles, small=False)
+
+        self._data = new_data
+        self._initial_cols = deepcopy(new_data.columns)
+        return self
 
     def _set_additional_fields(self, exec_id: str, value: Any, role: Any) -> Self:
         """Handle storage in the additional_fields space.

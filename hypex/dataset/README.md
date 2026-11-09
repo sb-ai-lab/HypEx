@@ -88,8 +88,10 @@ The pipeline state. Five namespaces, keyed by `ExperimentDataEnum`:
 
 Main methods:
 
-* `set_value(space, executor_id, value, key=None, role=None)` — the single write
-  entry point; the branching per namespace lives here.
+* `set_value(space, executor_id, value, key=None, role=None, mode="add_columns")` —
+  the single write entry point; the branching per namespace lives here. For
+  `additional_fields`, `mode="add_columns"` merges executor results into `ds`, while
+  `mode="replace"` replaces all of `ds` with the returned Dataset or DataFrame.
 * `get_ids(classes, searched_space=None, key=None)` — find the ids produced by
   given executor classes. This is how reporters and analyzers locate upstream
   results without holding references.

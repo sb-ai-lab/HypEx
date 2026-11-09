@@ -7,6 +7,7 @@ import pytest
 
 from hypex.dataset import (
     Dataset,
+    DefaultRole,
     ExperimentData,
     FeatureRole,
     InfoRole,
@@ -69,6 +70,78 @@ def test_set_value_each_space(space: ExperimentDataEnum) -> None:
         group_ds = ed.ds
         ed.set_value(space, "splitter", group_ds, key="control")
         assert "control" in ed.groups["splitter"]
+
+
+def test_set_value_add_columns_mode(make_dataset) -> None:
+    ed = ExperimentData(
+        make_dataset(
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"x": FeatureRole(), "y": TargetRole()},
+        )
+    )
+
+    result = ed.set_value(
+        ExperimentDataEnum.additional_fields,
+        "calc",
+        [7, 8, 9],
+        role=InfoRole(),
+        mode="add_columns",
+    )
+
+    assert result is ed
+    assert list(ed.ds.columns) == ["x", "y", "calc"]
+    assert isinstance(ed.ds.roles["calc"], InfoRole)
+
+
+def test_set_value_replace_mode(make_dataset) -> None:
+    ed = ExperimentData(
+        make_dataset(pd.DataFrame({"x": [1, 2, 3]}), {"x": FeatureRole()})
+    )
+    replacement = make_dataset(
+        pd.DataFrame({"z": [7, 8], "label": [0, 1]}),
+        {"z": FeatureRole(), "label": TargetRole()},
+    )
+
+    result = ed.set_value(
+        ExperimentDataEnum.additional_fields,
+        "transformer",
+        replacement,
+        mode="replace",
+    )
+
+    assert result is ed
+    assert ed.ds is replacement
+    assert list(ed.ds.columns) == ["z", "label"]
+    assert list(ed.initial_ds.columns) == ["z", "label"]
+    assert isinstance(ed.ds.roles["z"], FeatureRole)
+    assert isinstance(ed.ds.roles["label"], TargetRole)
+
+
+def test_set_value_replace_mode_accepts_dataframe() -> None:
+    ed = _ed()
+    replacement = pd.DataFrame({"x": [7, 8], "new": [9, 10]})
+
+    ed.set_value(
+        ExperimentDataEnum.additional_fields,
+        "transformer",
+        replacement,
+        mode="replace",
+    )
+
+    pd.testing.assert_frame_equal(ed.ds.raw_data, replacement)
+    assert isinstance(ed.ds.roles["x"], FeatureRole)
+    assert isinstance(ed.ds.roles["new"], DefaultRole)
+
+
+def test_set_value_unknown_mode_raises() -> None:
+    ed = _ed()
+    with pytest.raises(ValueError, match="Unknown set_value mode"):
+        ed.set_value(
+            ExperimentDataEnum.additional_fields,
+            "calc",
+            [1, 2, 3],
+            mode="invalid",
+        )
 
 
 def test_set_value_unknown_space_raises() -> None:
