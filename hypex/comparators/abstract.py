@@ -215,7 +215,7 @@ class GroupsComparator(BaseComparator, ABC):
             raise TypeError(
                 f"Grouping data must be dict of strings and datasets, but got {type(grouping_data)}"
             )
-        compared_data = sorted(grouping_data.items(), key=lambda x: str(x[0]))
+        compared_data = sorted(grouping_data.items(), key=lambda x: x[0])
         baseline_data = [compared_data.pop(0)]
 
         baseline_cols = target_fields if compare_by == "groups" else baseline_field
@@ -565,7 +565,7 @@ class GroupsComparator(BaseComparator, ABC):
                         },
                     )
             data.groups[group_field_data.columns[0]] = {
-                f"{group}": ds
+                group: ds
                 for group, ds in combined_data.groupby(group_field_data.columns[0])
             }
             grouping_data = self._grouping_data_split(
@@ -1094,7 +1094,8 @@ class StatsComparator(BaseComparator, ABC):
             )
 
         # ── 4. Validate that at least two groups exist ───────────────────────
-        group_names = sorted(group_col_stats.keys(), key=str)
+        group_names = sorted(group_col_stats)
+        group_col_stats = {group: group_col_stats[group] for group in group_names}
 
         if len(group_names) < 2:
             # Fewer than two groups → nothing to compare.  Store empty results
