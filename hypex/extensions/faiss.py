@@ -404,11 +404,7 @@ class PandasFaissExtension(FaissExtension):
                     "index is not created yet. Call 'fit' before 'predict'."
                 )
 
-            X = (
-                self._mahalanobis_transform(test_data, self.mahalanobis).raw_data.values
-                if mode == "auto"
-                else self._mahalanobis_transform(data, self.mahalanobis).raw_data.values
-            )
+            X = self._mahalanobis_transform(test_data, self.mahalanobis).raw_data.values
             return self._predict(data, test_data, X)
         return self
 
@@ -941,7 +937,7 @@ class SparkFaissExtension(FaissExtension):
         batch_size = MatchingConfig.FAISS_DRIVER_INDEX_LIMIT
         np_batch = None
 
-        cache = np.array([])
+        cache: list[np.ndarray] = []
         for batch in (
             vectorized_data.select("_features")
             .rdd.mapPartitions(lambda it: _partition_load(it, batch_size))
@@ -949,21 +945,22 @@ class SparkFaissExtension(FaissExtension):
         ):
             np_batch = np.array(batch, dtype=np.float32)
             if len(np_batch) < self.k:
-                cache = np.append(cache, np_batch)
+                cache.append(np_batch)
                 continue
-            if len(cache) == 0:
+            if not cache:
                 model.partial_fit(np_batch)
             else:
-                cache = np.append(cache, np_batch)
-                model.partial_fit(cache)
-                cache = np.array([])
+                cache.append(np_batch)
+                model.partial_fit(np.concatenate(cache, axis=0))
+                cache = []
 
-        if len(cache) != 0:
-            if len(cache) < self.k and not _is_cluster_model_fitted(model):
+        if cache:
+            cached_batch = np.concatenate(cache, axis=0)
+            if len(cached_batch) < self.k and not _is_cluster_model_fitted(model):
                 raise ValueError(
                     f"The amount of data is too small for {self.k} clusters."
                 )
-            model.partial_fit(cache)
+            model.partial_fit(cached_batch)
         del cache
 
         if np_batch is not None:
