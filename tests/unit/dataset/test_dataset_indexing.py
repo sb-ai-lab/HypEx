@@ -47,6 +47,14 @@ def test_getitem_by_boolean_mask(make_dataset) -> None:
     assert len(filtered) == 2
 
 
+def test_scalar_loc_matches_pandas_frame_contract(make_dataset) -> None:
+    ds = _ds(make_dataset)
+
+    selected = ds.loc[0]
+
+    assert selected.raw_data.shape == (3, 1)
+
+
 def test_getitem_missing_column_raises(make_dataset) -> None:
     """Requesting an unknown column raises KeyError."""
     ds = _ds(make_dataset)
