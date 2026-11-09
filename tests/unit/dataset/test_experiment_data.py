@@ -13,7 +13,7 @@ from hypex.dataset import (
     SmallDataset,
     TargetRole,
 )
-from hypex.utils import ExperimentDataEnum
+from hypex.utils import BackendsEnum, ExperimentDataEnum
 from hypex.utils.constants import ID_SPLIT_SYMBOL
 from hypex.utils.errors import NotFoundInExperimentDataError
 
@@ -69,6 +69,30 @@ def test_set_value_each_space(space: ExperimentDataEnum) -> None:
         group_ds = ed.ds
         ed.set_value(space, "splitter", group_ds, key="control")
         assert "control" in ed.groups["splitter"]
+
+
+@pytest.mark.spark
+@pytest.mark.parametrize("was_persisted", [False, True])
+def test_additional_fields_preserve_persistence_state(
+    spark_session, was_persisted
+) -> None:
+    ds = Dataset(
+        roles={"x": FeatureRole()},
+        data=pd.DataFrame({"x": [1, 2, 3]}),
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+    if was_persisted:
+        ds.persist(action="none")
+    ed = ExperimentData(ds)
+
+    ed.set_value(
+        ExperimentDataEnum.additional_fields, "extra", [4, 5, 6], role=InfoRole()
+    )
+
+    assert ed.ds.is_persisted is was_persisted
+    if was_persisted:
+        ed.ds.unpersist()
 
 
 def test_set_value_unknown_space_raises() -> None:
