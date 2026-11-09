@@ -9,6 +9,7 @@ from scipy import stats
 
 from hypex.comparators import GroupChi2Test, GroupKSTest, GroupTTest, GroupUTest
 from hypex.dataset import ExperimentData, TargetRole, TreatmentRole
+from hypex.extensions.scipy_stats import PandasChi2TestExtension
 
 from ._utils import build_dataset, result_frame, three_groups_df, to_pandas
 
@@ -128,6 +129,16 @@ def test_chi2_single_category_returns_none_row() -> None:
     assert pd.isna(row["p-value"]) and pd.isna(row["statistic"])
 
 
+def test_chi2_contingency_includes_categories_unique_to_one_sample() -> None:
+    control = _cat(["u"] * 30 + ["v"] * 10)
+    test = _cat(["u"] * 20 + ["v"] * 20 + ["rare"] * 10)
+
+    matrix = PandasChi2TestExtension().matrix_preparation(control, test)
+
+    assert matrix.raw_data.shape == (3, 2)
+    assert matrix.raw_data.eq(0).any().any()
+
+
 def test_chi2_matches_scipy_contingency() -> None:
     a = ["u"] * 30 + ["v"] * 10
     b = ["u"] * 15 + ["v"] * 25
@@ -159,6 +170,24 @@ def test_execute_compares_each_group_with_baseline(cls, scipy_fn) -> None:
         ref = scipy_fn(base, df.y[df.g == group])
         assert table.loc[group, "p-value"] == pytest.approx(ref.pvalue, abs=TOL)
         assert table.loc[group, "statistic"] == pytest.approx(ref.statistic, abs=TOL)
+
+
+def test_execute_uses_natural_order_for_numeric_group_keys() -> None:
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame(
+        {
+            "g": [2] * 50 + [10] * 50,
+            "y": np.concatenate([rng.normal(0, 1, 50), rng.normal(5, 1, 50)]),
+        }
+    )
+    ds = build_dataset(df, {"g": TreatmentRole(int), "y": TargetRole()})
+    executor = GroupTTest(compare_by="groups", grouping_role=TreatmentRole())
+
+    table = result_frame(executor.execute(ExperimentData(ds)), executor)
+
+    reference = stats.ttest_ind(df.y[df.g == 2], df.y[df.g == 10], equal_var=False)
+    assert table.index.tolist() == [10]
+    assert table.loc[10, "statistic"] == pytest.approx(reference.statistic, abs=TOL)
 
 
 @pytest.mark.xfail(

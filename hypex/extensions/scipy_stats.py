@@ -266,7 +266,9 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
             role={col_name: col_role},
         )
 
-        return data_vc.merge(other_vc, on=col_name)[["count_x", "count_y"]].fillna(0)
+        return data_vc.merge(other_vc, on=col_name, how="outer")[
+            ["count_x", "count_y"]
+        ].fillna(0)
 
 
 @backend_factory.register(GroupKSTestExtension, SparkDataset)
