@@ -40,6 +40,32 @@ def _ds(df: pd.DataFrame, role) -> Dataset:
     )
 
 
+def test_prepare_data_accepts_current_and_lagged_features() -> None:
+    rng = np.random.default_rng(0)
+    n = 200
+    df = pd.DataFrame(
+        {
+            "x1": rng.normal(size=n),
+            "x1_lag1": rng.normal(size=n),
+            "y": rng.normal(size=n),
+            "y_lag1": rng.normal(size=n),
+        }
+    )
+    ds = Dataset(
+        data=df,
+        roles={
+            "x1": FeatureRole(),
+            "x1_lag1": FeatureRole(parent="x1", lag=1),
+            "y": TargetRole(cofounders=["x1"]),
+            "y_lag1": PreTargetRole(parent="y", lag=1, cofounders=["x1"]),
+        },
+    )
+
+    prepared = CUPACExecutor._prepare_data(ExperimentData(ds))
+
+    assert prepared["y"]["X_predict"] == [["x1_lag1"], ["y_lag1"]]
+
+
 # ---------------------------------------------------------------------------
 # cuped_theta helper
 # ---------------------------------------------------------------------------
