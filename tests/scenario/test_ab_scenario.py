@@ -14,6 +14,7 @@ from hypex.dataset import (
     TargetRole,
     TreatmentRole,
 )
+from hypex.utils.enums import ABNTestMethodsEnum
 
 from ._utils import ab_frame, make_dataset, resume_row, to_pandas
 
@@ -179,6 +180,18 @@ def test_bonferroni_is_at_least_as_conservative_as_holm(three_groups) -> None:
         bonf["new p-value"].astype(float).to_numpy()
         >= holm["new p-value"].astype(float).to_numpy() - 1e-12
     ).all()
+
+
+def test_enum_multitest_method_is_preserved() -> None:
+    experiment = ABTest._make_experiment(
+        additional_tests=None,
+        multitest_method=ABNTestMethodsEnum.bonferroni,
+        cuped_features=None,
+        cupac_models=None,
+        enable_cupac=False,
+    )
+
+    assert experiment.executors[-1].multitest_method is ABNTestMethodsEnum.bonferroni
 
 
 def test_bonferroni_equals_pvalue_times_comparisons(three_groups) -> None:
