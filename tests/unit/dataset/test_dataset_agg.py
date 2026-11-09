@@ -128,6 +128,19 @@ def test_value_counts(make_dataset) -> None:
     assert len(counts) == 2
 
 
+def test_value_counts_multiple_columns_and_normalize(make_dataset) -> None:
+    df = pd.DataFrame({"x": ["a", "a", "b"], "y": [1, 1, 2]})
+    ds = make_dataset(df, {"x": FeatureRole(), "y": FeatureRole()})
+
+    counts = ds.value_counts()
+    proportions = ds.value_counts(normalize=True)
+
+    assert counts.columns == ["x", "y", "count"]
+    assert proportions.columns == ["x", "y", "proportion"]
+    assert counts.raw_data["count"].sum() == 3
+    assert proportions.raw_data["proportion"].sum() == pytest.approx(1.0)
+
+
 def test_nunique_and_unique(make_dataset) -> None:
     """nunique counts distinct values; unique lists them."""
     df = pd.DataFrame({"x": [1, 1, 2]})
