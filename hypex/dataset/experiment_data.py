@@ -367,11 +367,7 @@ class ExperimentData:
 
         cleaned = self._data.drop(columns=additional_cols)
 
-        # truncate the computational graph (DAG) in Spark,
-        # to avoid exponential slowdown at each iteration.
-        if cleaned.backend_type == BackendsEnum.spark:
-            cleaned.checkpoint(eager=True)
-
+        cleaned.checkpoint(eager=True)
         return cleaned
 
     def _set_analysis_tables(self, exec_id: str, value: Any) -> Self:

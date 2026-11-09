@@ -5,12 +5,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-import numpy as np
-
 from ..dataset.dataset import Dataset
 from ..dataset.experiment_data import ExperimentData
 from ..dataset.roles import ABCRole, FeatureRole, TargetRole
-from ..utils import BackendsEnum
 from ..utils.adapter import Adapter
 from .abstract import Transformer
 
@@ -22,10 +19,8 @@ class Float32Caster(Transformer):
     most A/B-test metrics.  Operates on columns identified by semantic
     roles, not by name.
 
-    For the **Spark** backend the cast is performed via
-    ``pyspark.pandas.DataFrame.astype("float32")`` which maps to
-    Spark ``FloatType``.  For **Pandas** the standard
-    ``DataFrame.astype(np.float32)`` path is used.
+    The portable ``"float32"`` dtype is delegated to the active dataset
+    backend, and semantic role types remain ``float`` after casting.
 
     Args:
         target_roles: Role(s) identifying columns to downcast.
@@ -84,9 +79,8 @@ class Float32Caster(Transformer):
         """Cast float64 columns to float32 via the public Dataset API.
 
         After ``DatasetBase.astype`` overwrites ``role.data_type`` with the
-        cast target (``np.float32`` on Pandas, ``"float32"`` string on
-        Spark), the original ``float`` type is explicitly restored so that
-        downstream ``search_columns(search_types=[float])`` continues to
+        cast target, the original ``float`` type is explicitly restored so
+        that downstream ``search_columns(search_types=[float])`` continues to
         match these columns.
 
         Args:
@@ -98,11 +92,7 @@ class Float32Caster(Transformer):
         """
         if not target_cols:
             return data
-        if data.backend_type == BackendsEnum.spark:
-            dtype_map = {col: "float32" for col in target_cols}
-        else:
-            dtype_map = {col: np.float32 for col in target_cols}
-
+        dtype_map = {col: "float32" for col in target_cols}
         result = data.astype(dtype_map)
 
         # DatasetBase.astype overwrites role.data_type with the cast target.
