@@ -42,16 +42,8 @@ def const_frame() -> pd.DataFrame:
 
 
 def test_const_filter_marks_constant_column_as_info(
-    const_frame, backend, spark_session, request
+    const_frame, backend, spark_session
 ) -> None:
-    if backend == BackendsEnum.spark:
-        request.applymarker(
-            pytest.mark.xfail(
-                strict=True,
-                reason="Issue: Spark value_counts(normalize=True) returns mismatched roles "
-                "(RoleColumnError)",
-            )
-        )
     roles = {c: FeatureRole() for c in const_frame}
     ds = make_ds(const_frame, roles, backend, spark_session)
     out = ConstFilter._inner_function(ds, target_cols=list(const_frame), threshold=0.95)
