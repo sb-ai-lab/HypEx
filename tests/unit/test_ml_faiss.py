@@ -184,6 +184,43 @@ def test_abstract_calc_raises() -> None:
 # ---------------------------------------------------------------------------
 # SparkFaissExtension
 # ---------------------------------------------------------------------------
+def test_spark_prefit_buffers_small_partitions_without_flattening() -> None:
+    class FakeRDD:
+        def __init__(self, partitions):
+            self.partitions = partitions
+
+        def mapPartitions(self, mapper):
+            batches = []
+            for partition in self.partitions:
+                batches.extend(mapper(iter(partition)))
+            return FakeRDD(batches)
+
+        def toLocalIterator(self):
+            return iter(self.partitions)
+
+    class FakeVectorizedData:
+        def __init__(self, partitions):
+            self.rdd = FakeRDD(partitions)
+
+        def select(self, _column):
+            return self
+
+    points = np.random.default_rng(0).normal(size=(40, 2)).astype(np.float32)
+    partitions = [
+        [{"_features": row.tolist()} for row in points[i : i + 2]]
+        for i in range(0, len(points), 2)
+    ]
+    extension = SparkFaissExtension()
+    extension._data_size = len(points)
+    extension._compute_cluster_params()
+    assert extension.k == 3
+
+    extension._prefit(FakeVectorizedData(partitions), model_name="k-means")
+
+    assert extension._centroids.shape == (3, 2)
+    assert extension.index.nlist == 3
+
+
 @pytest.mark.spark
 def test_spark_extension_matches_brute_force(control, test_df, spark_session) -> None:
     ctrl = _ds(control.reset_index(drop=True), BackendsEnum.spark, spark_session)
