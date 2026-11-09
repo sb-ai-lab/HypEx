@@ -14,6 +14,7 @@ from hypex.dataset import (
     TargetRole,
     TreatmentRole,
 )
+from hypex.utils.enums import ABNTestMethodsEnum
 
 from ._utils import ab_frame, make_dataset, resume_row, to_pandas
 
@@ -132,6 +133,29 @@ def test_mixed_numeric_and_categorical_targets_correct_without_dtype_error() -> 
     assert corrected["old p-value"].astype(float).between(0, 1).all()
 
 
+def test_pandas_chi2_results_reach_ab_analyzer() -> None:
+    rng = np.random.default_rng(0)
+    n = 600
+    df = pd.DataFrame(
+        {
+            "treat": rng.integers(0, 3, n),
+            "purchased": rng.choice(["a", "b", "c"], n),
+        }
+    )
+
+    out = _run(
+        df,
+        roles={"treat": TreatmentRole(), "purchased": TargetRole(str)},
+        additional_tests=["chi2-test"],
+        multitest_method="holm",
+    )
+    analyzer = out._experiment_data.analysis_tables["ABAnalyzer┴┴"].raw_data
+
+    assert "GroupChi2Test p-value 1" in analyzer
+    assert "GroupChi2Test p-value 2" in analyzer
+    assert analyzer.filter(like="GroupChi2Test p-value").notna().all().all()
+
+
 def test_sizes_table_reports_group_counts() -> None:
     df = ab_frame(n=900, effect=1.0, seed=8)
     sizes = to_pandas(_run(df).sizes)
@@ -158,6 +182,23 @@ def test_three_groups_each_compared_to_control(three_groups) -> None:
             - three_groups.y[three_groups.treat == 0].mean()
         )
         assert float(row["difference"]) == pytest.approx(expected, abs=1e-9)
+
+
+def test_multidigit_groups_keep_their_own_summary_statistics() -> None:
+    rng = np.random.default_rng(0)
+    n = 1200
+    df = pd.DataFrame({"treat": rng.choice([1, 2, 10], n), "y": 0.0})
+    df["y"] = np.select(
+        [df.treat == 1, df.treat == 2, df.treat == 10], [0.03, 8.0, -0.01]
+    ) + rng.normal(0, 0.1, n)
+
+    summary = to_pandas(_run(df).summary)
+
+    for group in (2, 10):
+        row = summary[summary["group"].astype(int) == group].iloc[0]
+        assert float(row["test mean"]) == pytest.approx(
+            df.y[df.treat == group].mean(), abs=1e-9
+        )
 
 
 @pytest.mark.parametrize(
@@ -190,6 +231,18 @@ def test_bonferroni_is_at_least_as_conservative_as_holm(three_groups) -> None:
         bonf["new p-value"].astype(float).to_numpy()
         >= holm["new p-value"].astype(float).to_numpy() - 1e-12
     ).all()
+
+
+def test_enum_multitest_method_is_preserved() -> None:
+    experiment = ABTest._make_experiment(
+        additional_tests=None,
+        multitest_method=ABNTestMethodsEnum.bonferroni,
+        cuped_features=None,
+        cupac_models=None,
+        enable_cupac=False,
+    )
+
+    assert experiment.executors[-1].multitest_method is ABNTestMethodsEnum.bonferroni
 
 
 def test_bonferroni_equals_pvalue_times_comparisons(three_groups) -> None:
