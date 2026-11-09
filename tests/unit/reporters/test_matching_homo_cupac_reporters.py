@@ -94,6 +94,19 @@ def test_matching_reporter_extract_indexes_joined_string(matched) -> None:
     assert result == {f"indexes{S}0": M.join(str(int(i)) for i in nn)}
 
 
+@pytest.mark.spark
+def test_matching_reporter_spark_omits_summary_indexes(spark_session) -> None:
+    data = ExperimentData(
+        Dataset(
+            roles={"x": FeatureRole()},
+            data=pd.DataFrame({"x": [1.0, 2.0]}),
+            backend=BackendsEnum.spark,
+            session=spark_session,
+        )
+    )
+    assert MatchingReporter(output_format="dict")._extract_indexes(data) == {}
+
+
 def test_matching_reporter_report_includes_indexes_for_analyzer(matched) -> None:
     data, nn = matched
     data.set_value(

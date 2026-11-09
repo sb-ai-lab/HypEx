@@ -10,6 +10,11 @@ from .matching_metric import (
     PandasMatchingMetricsExtension,
     SparkMatchingMetricsExtension,
 )
+from .matching_output import (
+    MatchingOutputExtension,
+    PandasMatchingOutputExtension,
+    SparkMatchingOutputExtension,
+)
 from .scipy_linalg import (
     CholeskyExtension,
     InverseExtension,
@@ -43,6 +48,7 @@ __all__ = [
     "InverseExtension",
     "LstsqExtension",
     "MatchingMetricsExtension",
+    "MatchingOutputExtension",
     "MultiTest",
     "MultitestQuantile",
     "PandasBisaExtesion",
@@ -52,6 +58,7 @@ __all__ = [
     "PandasKSTestExtension",
     "PandasLstsqExtension",
     "PandasMatchingMetricsExtension",
+    "PandasMatchingOutputExtension",
     "SparkBisaExtesion",
     "SparkChi2TestExtension",
     "SparkDummyEncoderExtension",
@@ -59,6 +66,7 @@ __all__ = [
     "SparkKSTestExtension",
     "SparkLstsqExtension",
     "SparkMatchingMetricsExtension",
+    "SparkMatchingOutputExtension",
     "UniformCheck",
     "UniteCovExtension",
 ]
