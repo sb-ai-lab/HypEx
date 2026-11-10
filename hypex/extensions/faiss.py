@@ -941,24 +941,30 @@ class SparkFaissExtension(FaissExtension):
         batch_size = MatchingConfig.FAISS_DRIVER_INDEX_LIMIT
         np_batch = None
 
-        cache = np.array([])
+        cache: np.ndarray | None = None
         for batch in (
             vectorized_data.select("_features")
             .rdd.mapPartitions(lambda it: _partition_load(it, batch_size))
             .toLocalIterator()
         ):
-            np_batch = np.array(batch, dtype=np.float32)
+            np_batch = np.asarray(batch, dtype=np.float32)
+            if np_batch.ndim != 2:
+                raise ValueError(
+                    f"Expected a 2D feature batch, got shape {np_batch.shape}."
+                )
             if len(np_batch) < self.k:
-                cache = np.append(cache, np_batch)
+                cache = (
+                    np_batch
+                    if cache is None
+                    else np.concatenate((cache, np_batch), axis=0)
+                )
                 continue
-            if len(cache) == 0:
-                model.partial_fit(np_batch)
-            else:
-                cache = np.append(cache, np_batch)
-                model.partial_fit(cache)
-                cache = np.array([])
+            if cache is not None:
+                np_batch = np.concatenate((cache, np_batch), axis=0)
+                cache = None
+            model.partial_fit(np_batch)
 
-        if len(cache) != 0:
+        if cache is not None:
             if len(cache) < self.k and not _is_cluster_model_fitted(model):
                 raise ValueError(
                     f"The amount of data is too small for {self.k} clusters."
