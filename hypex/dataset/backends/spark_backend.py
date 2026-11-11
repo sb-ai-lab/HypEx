@@ -398,6 +398,7 @@ class SparkNavigation(DatasetBackendNavigation):
         else:
             raise TypeError(f"Unsupported data type: {type(data)}")
 
+        self._is_persisted_flag = False
         self._previous_cached: list[ps.DataFrame] = []
 
     def persist(

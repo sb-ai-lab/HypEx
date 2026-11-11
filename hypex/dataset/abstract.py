@@ -347,12 +347,12 @@ class DatasetBase:
 
     def get_cache_info(self) -> dict[str, Any]:
         return {
-            "is_persisted": self.is_persisted(),
+            "is_persisted": self.is_persisted,
             "storage_level": self.get_storage_level(),
             "backend_type": self.backend_type,
             "in_memory": True
             if self.backend_type == BackendsEnum.pandas
-            else self.is_persisted(),
+            else self.is_persisted,
         }
 
     def checkpoint(self, eager: bool = True) -> Self:
