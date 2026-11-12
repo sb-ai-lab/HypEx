@@ -504,86 +504,6 @@ class MatchingOutput(Output):
 
         return indexes
 
-    def _restore_pandas_index_role(
-        self, experiment_data: ExperimentData, index_field: str
-    ) -> None:
-        index_mapping = experiment_data.ds[index_field].raw_data.iloc[:, 0].to_dict()
-        index_frame = self.indexes.raw_data.copy()
-        index_frame.index = index_frame.index.map(index_mapping)
-        index_frame.index.name = index_field
-        index_role = experiment_data.ds.roles[index_field]
-        for column in index_frame.columns:
-            mapped_column = index_frame[column].astype(object)
-            mapped_column.iloc[:] = [
-                index_mapping.get(value) for value in mapped_column
-            ]
-            index_frame[column] = (
-                mapped_column.astype("Int64")
-                if index_role.data_type is int
-                else mapped_column
-            )
-
-        self.indexes = Dataset(
-            roles={
-                column: AdditionalMatchingRole(index_role.data_type)
-                for column in index_frame.columns
-            },
-            data=index_frame,
-        )
-
-    def _restore_spark_index_role(
-        self, experiment_data: ExperimentData, index_field: str
-    ) -> None:
-        reserved = set(self.indexes.columns) | set(experiment_data.ds.columns)
-
-        def temporary_name(base: str) -> str:
-            name = base
-            while name in reserved:
-                name = f"_{name}"
-            reserved.add(name)
-            return name
-
-        index_data = experiment_data.ds[index_field]
-        index_data.checkpoint(eager=True)
-        original_columns = set(self.indexes.columns)
-        result = self.indexes.raw_data.reset_index()
-        source_field = next(
-            column for column in result.columns if column not in original_columns
-        )
-
-        source_name = temporary_name("__hypex_index_role_source")
-        source_ids = index_data.rename({index_field: source_name}).raw_data
-        result = result.merge(
-            source_ids, left_on=source_field, right_index=True, how="left"
-        )
-        result = result.set_index(source_name, drop=True).drop(columns=[source_field])
-        result.index.name = index_field
-
-        index_role = experiment_data.ds.roles[index_field]
-        for column in self.indexes.columns:
-            match_name = temporary_name(f"__hypex_index_role_{column}")
-            match_ids = index_data.rename({index_field: match_name}).raw_data
-            result = result.merge(
-                match_ids, left_on=column, right_index=True, how="left"
-            )
-            result = result.drop(columns=[column]).rename(columns={match_name: column})
-            converted = Dataset(
-                roles={column: AdditionalMatchingRole(index_role.data_type)},
-                data=result,
-                session=experiment_data.ds.session,
-            )
-            converted.checkpoint(eager=True)
-            result = converted.raw_data
-
-        self.indexes = Dataset(
-            roles={
-                column: AdditionalMatchingRole(index_role.data_type)
-                for column in result.columns
-            },
-            data=result,
-            session=experiment_data.ds.session,
-        )
-
     def _restore_index_role(self, experiment_data: ExperimentData) -> None:
         index_fields = experiment_data.ds.search_columns(IndexRole())
         if not index_fields:
@@ -591,10 +511,17 @@ class MatchingOutput(Output):
         index_field = index_fields[0]
 
         if not self.indexes.is_empty():
-            if experiment_data.ds.backend_type == BackendsEnum.pandas:
-                self._restore_pandas_index_role(experiment_data, index_field)
-            else:
-                self._restore_spark_index_role(experiment_data, index_field)
+            index_data = experiment_data.ds[index_field]
+            mapped_indexes = self.indexes.map_index_values(index_data)
+            index_role = experiment_data.ds.roles[index_field]
+            self.indexes = Dataset(
+                roles={
+                    column: AdditionalMatchingRole(index_role.data_type)
+                    for column in mapped_indexes.columns
+                },
+                data=mapped_indexes.raw_data,
+                session=experiment_data.ds.session,
+            )
         if not self.full_data.is_empty():
             self.full_data = self.full_data.set_index(index_field, drop=False)
 
