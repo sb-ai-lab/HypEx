@@ -511,10 +511,18 @@ class MatchingOutput(Output):
         index_frame = self.indexes.raw_data.copy()
         index_frame.index = index_frame.index.map(index_mapping)
         index_frame.index.name = index_field
-        for column in index_frame.columns:
-            index_frame[column] = index_frame[column].map(index_mapping)
-
         index_role = experiment_data.ds.roles[index_field]
+        for column in index_frame.columns:
+            mapped_column = index_frame[column].astype(object)
+            mapped_column.iloc[:] = [
+                index_mapping.get(value) for value in mapped_column
+            ]
+            index_frame[column] = (
+                mapped_column.astype("Int64")
+                if index_role.data_type is int
+                else mapped_column
+            )
+
         self.indexes = Dataset(
             roles={
                 column: AdditionalMatchingRole(index_role.data_type)
@@ -647,10 +655,14 @@ class MatchingOutput(Output):
                 backend=experiment_data.ds.backend_type,
                 session=experiment_data.ds.session,
             )
-            self.indexes = Dataset.create_empty(
-                roles={},
-                backend=experiment_data.ds.backend_type,
-                session=experiment_data.ds.session,
+            self.indexes = (
+                indexes
+                if self.compute_indexes
+                else Dataset.create_empty(
+                    roles={},
+                    backend=experiment_data.ds.backend_type,
+                    session=experiment_data.ds.session,
+                )
             )
             logger.debug("Skipping full_data extraction (extract_full_data=False).")
         self._restore_index_role(experiment_data)

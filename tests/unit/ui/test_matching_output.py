@@ -123,6 +123,18 @@ def test_extract_compute_indexes_returns_matched_indexes(matched_data) -> None:
     assert output.indexes["indexes_0"].raw_data.iloc[:, 0].tolist() == nn.tolist()
 
 
+def test_extract_compute_indexes_without_full_data_returns_matched_indexes(
+    matched_data,
+) -> None:
+    data, nn = matched_data
+    output = _make_output(compute_indexes=True, extract_full_data=False)
+
+    output.extract(data)
+
+    assert output.full_data.is_empty()
+    assert output.indexes["indexes_0"].raw_data.iloc[:, 0].tolist() == nn.tolist()
+
+
 def test_extract_full_data_adds_matched_columns(matched_data) -> None:
     data, nn = matched_data
     output = _make_output(compute_indexes=True, extract_full_data=True)
@@ -282,6 +294,25 @@ def test_restore_index_role_maps_source_neighbors_and_unmatched(ids) -> None:
     assert pd.isna(result["indexes_a"].iloc[1])
     assert result["indexes_b"].tolist() == [ids[1], ids[2], ids[3], ids[0]]
     assert all(role.data_type is type(ids[0]) for role in output.indexes.roles.values())
+
+
+def test_restore_index_role_preserves_large_integer_ids_with_unmatched() -> None:
+    ids = [2**53 + 3 + 2 * i for i in range(4)]
+    data = _index_role_data(ids)
+    output = _make_output()
+    output.indexes = Dataset(
+        roles={"indexes_0": AdditionalMatchingRole()},
+        data=pd.DataFrame({"indexes_0": [2, -1, 0, 1]}),
+    )
+    output.full_data = Dataset.create_empty()
+
+    output._restore_index_role(data)
+
+    result = output.indexes.raw_data
+    assert result["indexes_0"].dtype == pd.Int64Dtype()
+    assert result["indexes_0"].iloc[[0, 2, 3]].tolist() == [ids[2], ids[0], ids[1]]
+    assert pd.isna(result["indexes_0"].iloc[1])
+    assert result.index.tolist() == ids
 
 
 def test_restore_index_role_sets_full_data_business_index() -> None:

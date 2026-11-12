@@ -145,6 +145,53 @@ def test_matching_index_role_restores_business_ids_on_both_backends(spark_sessio
     assert ds_sp.index.to_pandas().tolist() == original_sp_index
 
 
+def test_matching_index_role_indexes_without_full_data(spark_session):
+    rng = np.random.default_rng(5)
+    n = 12
+    df = pd.DataFrame(
+        {
+            "uid": [f"user-{i}" for i in range(n)],
+            "treat": [0, 1] * (n // 2),
+            "x1": rng.normal(size=n),
+            "y": rng.normal(size=n),
+        }
+    )
+    roles = {
+        "uid": IndexRole(str),
+        "treat": TreatmentRole(),
+        "x1": FeatureRole(),
+        "y": TargetRole(),
+    }
+    results = []
+    for backend in (BackendsEnum.pandas, BackendsEnum.spark):
+        ds = Dataset(
+            roles=roles,
+            data=df,
+            backend=backend,
+            session=spark_session if backend == BackendsEnum.spark else None,
+        )
+        output = Matching(
+            distance="l2",
+            faiss_mode="base",
+            bias_estimation=False,
+            quality_tests=[],
+            compute_indexes=True,
+            extract_full_data=False,
+        ).execute(ds)
+        assert output.full_data.is_empty()
+        indexes = output.indexes.raw_data
+        results.append(
+            indexes.sort_index()
+            if backend == BackendsEnum.pandas
+            else indexes.to_pandas().sort_index()
+        )
+
+    pd.testing.assert_frame_equal(results[0], results[1], check_dtype=False)
+    assert results[0].index.name == "uid"
+    assert set(results[0].index) == set(df["uid"])
+    assert results[0]["indexes_0"].isin(df["uid"]).all()
+
+
 def test_spark_index_role_unmatched_becomes_null(spark_session):
     ds = Dataset(
         roles={"uid": IndexRole(str)},
