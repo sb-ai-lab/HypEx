@@ -216,3 +216,29 @@ def test_spark_index_role_unmatched_becomes_null(spark_session):
     assert result.index.tolist() == ["a", "b", "c"]
     assert result["indexes_0"].iloc[[0, 2]].tolist() == ["b", "a"]
     assert pd.isna(result["indexes_0"].iloc[1])
+
+
+def _summary(output):
+    data = output.summary.raw_data
+    return data.to_pandas() if hasattr(data, "to_pandas") else data
+
+
+def test_matching_scalar_quality_tests_matches_list(spark_session):
+    for backend in (BackendsEnum.pandas, BackendsEnum.spark):
+        data = _match_frame()
+        if backend == BackendsEnum.spark:
+            data = spark_session.createDataFrame(data).repartition(1).pandas_api()
+        ds = Dataset(
+            roles=_match_roles(),
+            data=data,
+            backend=backend,
+            session=spark_session if backend == BackendsEnum.spark else None,
+        )
+        scalar = Matching(
+            distance="l2", faiss_mode="base", quality_tests="t-test"
+        ).execute(ds)
+        listed = Matching(
+            distance="l2", faiss_mode="base", quality_tests=["t-test"]
+        ).execute(ds)
+
+        pd.testing.assert_frame_equal(_summary(scalar), _summary(listed))

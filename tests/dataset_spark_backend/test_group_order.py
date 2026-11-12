@@ -59,6 +59,36 @@ def test_stats_chi2_spark_group_order(spark_session):
         assert act_vc == exp_vc
 
 
+def test_stats_chi2_spark_target_order_matches_request(spark_session):
+    pdf = pd.DataFrame(
+        {
+            "g": np.arange(60) % 2,
+            "y1": np.where(np.arange(60) % 2 == 0, "a", "b"),
+            "y2": np.tile(["a", "b"], 30),
+            "y3": np.where(np.arange(60) % 3 == 0, "a", "b"),
+        }
+    )
+    roles = {
+        "g": InfoRole(),
+        "y1": TargetRole(str),
+        "y2": TargetRole(str),
+        "y3": TargetRole(str),
+    }
+    pandas_ds = Dataset(roles=roles, data=pdf)
+    spark_ds = Dataset(
+        roles=roles, data=pdf, backend=BackendsEnum.spark, session=spark_session
+    )
+    target_cols = ["y1", "y2", "y3"]
+
+    expected = StatsChi2TestExtension().calc(pandas_ds, "g", target_cols)
+    actual = StatsChi2TestExtension().calc(spark_ds, "g", target_cols)
+
+    for group in expected:
+        assert list(actual[group]) == target_cols
+        for target in target_cols:
+            assert actual[group][target] == expected[group][target]
+
+
 def _layout(name):
     if name == "cyclic":
         return np.arange(60) % 6

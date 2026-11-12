@@ -404,11 +404,7 @@ class PandasFaissExtension(FaissExtension):
                     "index is not created yet. Call 'fit' before 'predict'."
                 )
 
-            X = (
-                self._mahalanobis_transform(test_data, self.mahalanobis).raw_data.values
-                if mode == "auto"
-                else self._mahalanobis_transform(data, self.mahalanobis).raw_data.values
-            )
+            X = self._mahalanobis_transform(test_data, self.mahalanobis).raw_data.values
             return self._predict(data, test_data, X)
         return self
 
@@ -941,7 +937,7 @@ class SparkFaissExtension(FaissExtension):
         batch_size = MatchingConfig.FAISS_DRIVER_INDEX_LIMIT
         np_batch = None
 
-        cache: np.ndarray | None = None
+        cache: list[np.ndarray] = []
         for batch in (
             vectorized_data.select("_features")
             .rdd.mapPartitions(lambda it: _partition_load(it, batch_size))
@@ -953,23 +949,22 @@ class SparkFaissExtension(FaissExtension):
                     f"Expected a 2D feature batch, got shape {np_batch.shape}."
                 )
             if len(np_batch) < self.k:
-                cache = (
-                    np_batch
-                    if cache is None
-                    else np.concatenate((cache, np_batch), axis=0)
-                )
+                cache.append(np_batch)
                 continue
-            if cache is not None:
-                np_batch = np.concatenate((cache, np_batch), axis=0)
-                cache = None
-            model.partial_fit(np_batch)
+            if not cache:
+                model.partial_fit(np_batch)
+            else:
+                cache.append(np_batch)
+                model.partial_fit(np.concatenate(cache, axis=0))
+                cache = []
 
-        if cache is not None:
-            if len(cache) < self.k and not _is_cluster_model_fitted(model):
+        if cache:
+            cached_batch = np.concatenate(cache, axis=0)
+            if len(cached_batch) < self.k and not _is_cluster_model_fitted(model):
                 raise ValueError(
                     f"The amount of data is too small for {self.k} clusters."
                 )
-            model.partial_fit(cache)
+            model.partial_fit(cached_batch)
         del cache
 
         if np_batch is not None:
