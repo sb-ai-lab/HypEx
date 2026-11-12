@@ -1245,8 +1245,8 @@ class DatasetBase:
         on: str | None = None,
         left_on: str | None = None,
         right_on: str | None = None,
-        left_index: bool = False,
-        right_index: bool = False,
+        left_index: bool | None = None,
+        right_index: bool | None = None,
         suffixes: tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "outer", "inner", "cross"] = "inner",
     ) -> Self:
