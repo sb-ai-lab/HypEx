@@ -139,11 +139,6 @@ def test_chi2_contingency_includes_categories_unique_to_one_sample() -> None:
     assert matrix.raw_data.eq(0).any().any()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: matrix_preparation scales counts by group proportion instead of "
-    "building a real contingency table, so results differ from chi2_contingency",
-)
 def test_chi2_matches_scipy_contingency() -> None:
     a = ["u"] * 30 + ["v"] * 10
     b = ["u"] * 15 + ["v"] * 25
