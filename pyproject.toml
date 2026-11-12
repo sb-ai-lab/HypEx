@@ -35,45 +35,57 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-# 3.13 is not supported yet: pyspark 3.5 imports np.NaN, which numpy 2 removed,
-# and numpy has no 3.13 wheels below 2.1. Revisit with pyspark 4.
-python = ">=3.8, <3.13"
-tqdm = "*"
-scikit-learn = "*"
-
-typing_extensions = {version = ">=4.0", python = "<3.11"}
+# Three ABI-lines:
+#   py3.8       — legacy: numpy 1.24 / pandas 2.0 / matplotlib 3.7
+#   py3.9–3.11  — Spark: numpy<2, as pyspark 3.5 uses np.NaN,
+#                 and pyarrow 15 pins numpy<2 bu itself
+#   py3.12–3.13 — without Spark: numpy 2 and fresh numeric-stack
+python = ">=3.8,<3.14"
+tqdm         = ">=4.66,<5"
+scikit-learn = ">=1.3.2,<2"
+typing_extensions = { version = ">=4.12,<5", python = "<3.11" }
 
 pandas = [
-    { version = ">=1.3.5, <=2.0.3", python = "<3.9" },
-    { version = ">=1.3.5, <=2.2.3", python = ">=3.9" }
+  { version = ">=1.3.5,<=2.0.3", python = "<3.9" },
+  { version = ">=2.0.3,<2.3",    python = ">=3.9,<3.12" },
+  { version = ">=2.2.3,<3.0",    python = ">=3.12" },
 ]
 
 numpy = [
-    { version = ">=1.17.0, <=1.24.4", python = "<3.9" },
-    { version = ">=1.17.0, <=1.26.4", python = ">=3.9" }
+  { version = ">=1.17.0,<=1.24.4", python = "<3.9" },
+  { version = ">=1.26.4,<2.0",     python = ">=3.9,<3.12" },
+  { version = ">=2.1,<3",          python = ">=3.12" },
 ]
 
 scipy = [
-    { version = ">=1.5.0, <=1.10.1", python = "<3.9" },
-    { version = ">=1.5.0, <=1.13.1", python = ">=3.9" }
+  { version = ">=1.5.0,<=1.10.1", python = "<3.9" },
+  { version = ">=1.10.1,<2",      python = ">=3.9" },
 ]
 
 matplotlib = [
-    { version = ">=3.0.0, <=3.7.3", python = "<3.9" },
-    { version = ">=3.0.0, <=3.9.0", python = ">=3.9" }
+  { version = ">=3.0.0,<3.8", python = "<3.9" },
+  { version = ">=3.5,<4",     python = ">=3.9" },
 ]
 
 faiss-cpu = [
-    { version = ">=1.6.0, <=1.8.0", python = "<3.9" },
-    { version = ">=1.9.0,<=1.14.0", python = ">=3.9" }
+  { version = ">=1.6.0,<=1.8.0", python = "<3.9" },
+  { version = ">=1.9.0,<2",      python = ">=3.9" },
 ]
-seaborn = "<=0.13.2"
-statsmodels = "<=0.14.2"
-pyspark = { version = "3.5.1", optional = true }
-pyarrow = ">=11.0.0,<16.0.0"
+statsmodels = [
+  { version = ">=0.14.1,<0.15", python = "<3.9" },
+  { version = ">=0.14.2,<0.15", python = ">=3.9" },
+]
 
-catboost = { version = "*", optional = true }
-lightgbm = { version = "*", optional = true }
+pyarrow = [
+  { version = ">=11.0.0,<16", python = "<3.12" },
+  { version = ">=18,<23",     python = ">=3.12" },
+]
+
+seaborn = "<=0.13.2"
+pyspark = {version = ">=3.5.1,<=3.5.7", optional = true }
+
+catboost = {version = ">=1.2.7,<2", optional = true }
+lightgbm = { version = ">=4.5,<5", optional = true }
 
 [tool.poetry.extras]
 cat = ["catboost"]
@@ -82,25 +94,36 @@ spark = ["pyspark"]
 all = ["catboost", "lightgbm", "pyspark"]
 
 [tool.poetry.group.dev.dependencies]
-docutils = ">=0.17,<0.21"
-jupyter = "^1.0.0"
-pytest = "^7.4.3"
-sphinx = { version = "^7.2.6", python = ">=3.9, <3.11" }
-nbsphinx = "*"
-nbsphinx_link = "*"
-sphinx_autodoc-typehints = "*"
-sphinx_rtd_theme = "^1.2.2"
-ruff = "0.16.6"
-alive-progress = "^3.1.0"
-psutil = "^7.0.0"
-jsonschema = "^4.23.0"
-mypy = ">=1.8.0,<1.17"
-pytest-cov = "^5.0.0"
-pre-commit = ">=3.5"
+pytest     = ">=8.3,<10"
+pytest-cov = ">=5,<8"
+mypy       = ">=1.8,<3" 
+ruff       = "0.16.6"  
+pre-commit = ">=3.5,<5"
+psutil     = ">=7.0,<8"
+jsonschema = ">=4.23,<5"
+jupyter    = ">=1.0,<2"
+alive-progress  = ">=3.1,<4"
 causalinference = "*"
 
+
+sphinx = [
+  { version = ">=7.1,<8",  python = "<3.9" },
+  { version = ">=7.3,<10", python = ">=3.9" },
+]
+sphinx_rtd_theme = [
+  { version = ">=1.3,<2", python = "<3.9" },
+  { version = ">=3.0,<4", python = ">=3.9" },
+]
+docutils = [
+  { version = ">=0.17,<0.19", python = "<3.9" },
+  { version = ">=0.20,<0.23", python = ">=3.9" },
+]
+sphinx_autodoc-typehints = ">=2.0,<4"
+nbsphinx      = ">=0.9,<0.10"
+nbsphinx_link = ">=1.3,<2"
+
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0,<3"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
