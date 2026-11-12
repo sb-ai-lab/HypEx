@@ -183,13 +183,14 @@ class DatasetBase:
     def _select_backend_from_data(
         data: Any,
         session: spark.SparkSession = None,
+        persist_key: str | None = None,
     ) -> PandasDataset | SparkDataset:
         if isinstance(data, (PandasDataset, SparkDataset)):
             return data
         elif isinstance(data, pd.DataFrame):
             return PandasDataset(data)
         elif isinstance(data, (spark.DataFrame, ps.DataFrame)):
-            return SparkDataset(data, session)
+            return SparkDataset(data, session, persist_key=persist_key)
 
         raise TypeError(
             "data must be an instance of either"
@@ -217,14 +218,15 @@ class DatasetBase:
         data_compression: Literal["downcasting", "encoding", "auto", "disable"],
         session: spark.SparkSession | None = None,
         non_compresion_cols: list[str] | None = None,
+        persist_key: str | None = None,
     ) -> PandasDataset | SparkDataset:
         if backend == BackendsEnum.pandas:
             return PandasDataset(data, data_compression, non_compresion_cols)
         elif backend == BackendsEnum.spark:
-            return SparkDataset(data, session)
+            return SparkDataset(data, session, persist_key=persist_key)
         elif backend is None:
             if session is not None:
-                return SparkDataset(data, session)
+                return SparkDataset(data, session, persist_key=persist_key)
             return PandasDataset(data, data_compression, non_compresion_cols)
         raise TypeError("Backend must be an instance of BackendsEnum")
 
@@ -256,14 +258,28 @@ class DatasetBase:
         data_compression: Literal[
             "downcasting", "encoding", "auto", "disable"
         ] = "auto",
+        persist_key: str | None = None,
     ):
+        """Initialize the dataset.
+
+        Args:
+            persist_key (str | None): Lineage key of the persisted-plans bucket
+                in the global :class:`~hypex.dataset.backends.persist_manager.PersistManager`.
+                Generated when omitted. Inherited from the parent dataset when
+                the new one is derived from it (``groupby(...).agg(...)``,
+                ``deepcopy``, backend transformations), so the persisted plans
+                of the lineage stay reachable — references are never lost.
+        """
         if backend is not None:
             non_compresion_cols = self._select_non_encoding_columns(roles)
             self._backend_data = self._select_backend_from_str(
-                data, backend, data_compression, session, non_compresion_cols
+                data, backend, data_compression, session, non_compresion_cols,
+                persist_key=persist_key,
             )
         elif data is not None:
             if isinstance(data, DatasetBase):
+                # ``deepcopy`` of the backend preserves ``_persist_key``:
+                # the copy shares the persisted-plans bucket of the lineage.
                 self._backend_data = deepcopy(data._backend_data)
             elif isinstance(data, (PandasDataset, SparkDataset)):
                 self._backend_data = data
@@ -271,15 +287,21 @@ class DatasetBase:
                 isinstance(data, source_data_type)
                 for source_data_type in SourceDataTypes.__args__
             ):
-                self._backend_data = self._select_backend_from_data(data, session)
+                self._backend_data = self._select_backend_from_data(
+                    data, session, persist_key=persist_key
+                )
             else:
                 if session is not None:
-                    self._backend_data = SparkDataset(data, session)
+                    self._backend_data = SparkDataset(
+                        data, session, persist_key=persist_key
+                    )
                 else:
                     self._backend_data = PandasDataset(data)
         else:
             if session is not None:
-                self._backend_data = SparkDataset(data, session)
+                self._backend_data = SparkDataset(
+                    data, session, persist_key=persist_key
+                )
             else:
                 self._backend_data = PandasDataset(data)
 
@@ -323,12 +345,24 @@ class DatasetBase:
         ] = "MEMORY_AND_DISK",
         action: Literal["count", "head", "none"] = "count",
     ):
+        """Persist the dataset in cache with automatic materialization.
+
+        Reference tracking is done by the global ``PersistManager`` per
+        dataset *lineage* (see the Spark backend):
+
+        - ``action="none"`` — only accumulate the reference;
+        - ``action="count"`` / ``action="head"`` — release all previously
+          accumulated references of the lineage, except the new one that
+          triggered the action;
+        - :meth:`unpersist` releases all accumulated references.
+        """
         if self.backend_type == BackendsEnum.spark:
             self._backend_data.persist(storage_level=storage_level, action=action)
 
         return self
 
     def unpersist(self, blocking: bool = False):
+        """Release ALL references accumulated by the dataset lineage."""
         if self.backend_type == BackendsEnum.spark:
             self._backend_data.unpersist(blocking=blocking)
 
