@@ -71,7 +71,11 @@ class ExperimentData:
         self._initial_cols = deepcopy(self._data.columns)
 
     def copy(self, data: Dataset | SmallDataset | None = None) -> Self:
-        """Create a deep copy of this ExperimentData instance.
+        """Create a copy of this ExperimentData instance.
+
+        Internal state is deep-copied. A provided replacement dataset is used
+        without copying, and its ownership is transferred to the returned
+        instance. The caller must not reuse or mutate it afterward.
 
         Args:
             data: Optional replacement dataset for the primary data field.
