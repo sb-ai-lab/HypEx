@@ -71,7 +71,11 @@ class ExperimentData:
         self._initial_cols = deepcopy(self._data.columns)
 
     def copy(self, data: Dataset | SmallDataset | None = None) -> Self:
-        """Create a deep copy of this ExperimentData instance.
+        """Create a copy of this ExperimentData instance.
+
+        Internal state is deep-copied. A provided replacement dataset is used
+        without copying, and its ownership is transferred to the returned
+        instance. The caller must not reuse or mutate it afterward.
 
         Args:
             data: Optional replacement dataset for the primary data field.
@@ -84,7 +88,7 @@ class ExperimentData:
         """
         result = deepcopy(self)
         if data is not None:
-            result._data = deepcopy(data)
+            result._data = data
             # Sync _initial_cols with the replacement dataset.
             # Without this, columns dropped from _data (e.g. CUPAC
             # cleanup) remain in _initial_cols, causing KeyError in
