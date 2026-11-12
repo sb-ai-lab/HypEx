@@ -35,6 +35,7 @@ from .roles import (
     TreatmentRole,
     default_roles,
 )
+from .storage_manager import PersistEntry, StorageManager
 
 __all__ = [
     "ABCRole",
@@ -61,6 +62,7 @@ __all__ = [
     "PreTargetRole",
     "SmallDataset",
     "StatisticRole",
+    "StorageManager",
     "StratificationRole",
     "TargetRole",
     "TempGroupingRole",
