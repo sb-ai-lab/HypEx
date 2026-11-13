@@ -173,10 +173,10 @@ class DatasetBase:
             session=session,
         )
 
-        return self.__class__(
-            roles=deepcopy(self.roles),
+        return self._from_derived_backend(
             data=new_backend_data,
-            session=session,
+            roles=self.roles,
+            session=session
         )
 
     @staticmethod
@@ -338,6 +338,17 @@ class DatasetBase:
             call_class=self.__class__, backend=self._backend_data, roles=self.roles
         )
 
+    def _from_derived_backend(self, data, roles, session=None):
+        persist_key = getattr(data, "persist_key", None)
+        result = self.__class__(roles=deepcopy(roles), data=data, session=session, persist_key=persist_key)
+        result.tmp_roles = {
+            c: deepcopy(role)
+            for c, role in self.tmp_roles.items()
+            if c in data.columns
+        }
+
+        return result
+
     def persist(
         self,
         storage_level: Literal[
@@ -437,7 +448,7 @@ class DatasetBase:
             item = item.raw_data
         elif isinstance(item, slice):
             result = self._backend_data.__getitem__(item)
-            return self.__class__(roles=self.roles, data=result)
+            return self._from_derived_backend(data=result, roles=self.roles)
 
         if isinstance(item, (pd.DataFrame, ps.DataFrame, pd.Series, ps.Series)):
             result_data = self._backend_data.__getitem__(item)
@@ -447,10 +458,7 @@ class DatasetBase:
                 else self.columns
             )
             roles = {col: self.roles.get(col, InfoRole()) for col in res_cols}
-            result = self.__class__(data=result_data, roles=roles)
-            result.tmp_roles = {
-                k: v for k, v in self.tmp_roles.items() if k in result.columns
-            }
+            result = self._from_derived_backend(data=result_data, roles=roles)
             return result
 
         items = (
@@ -464,10 +472,7 @@ class DatasetBase:
             )
             for column in items
         }
-        result = self.__class__(data=self._backend_data.__getitem__(item), roles=roles)
-        result.tmp_roles = {
-            key: value for key, value in self.tmp_roles.items() if key in items
-        }
+        result = self._from_derived_backend(data=self._backend_data.__getitem__(item), roles=roles)
         return result
 
     def reset_index(self, drop: bool = False, **kwargs) -> Self:
@@ -482,7 +487,8 @@ class DatasetBase:
                 if col not in new_roles:
                     new_roles[col] = deepcopy(self.default_role) or InfoRole()
 
-        return self.__class__(roles=new_roles, data=new_data)
+        # return self.__class__(roles=new_roles, data=new_data)
+        return self._from_derived_backend(data=new_data, roles=new_roles)
 
     def set_index(self, keys, drop=True, **kwargs) -> DatasetBase:
         new_data = self._backend_data.set_index(keys=keys, drop=drop, **kwargs)
@@ -492,7 +498,7 @@ class DatasetBase:
             for col in Adapter.to_list(keys):
                 del new_roles[col]
 
-        return self.__class__(roles=new_roles, data=new_data)
+        return self._from_derived_backend(data=new_data, roles=new_roles)
 
     def __setitem__(self, key: str, value: Any) -> None:
         if isinstance(value, DatasetBase):
@@ -588,7 +594,8 @@ class DatasetBase:
         result = self._backend_data.get(key, default)
         if result is default:
             return default
-        return self.__class__(
+
+        return self._from_derived_backend(
             data=result,
             roles={
                 k: deepcopy(v)
@@ -608,7 +615,7 @@ class DatasetBase:
             if axis == 1
             else deepcopy(self.roles)
         )
-        return self.__class__(data=new_data, roles=new_roles)
+        return self._from_derived_backend(data=new_data, roles=new_roles)
 
     def __binary_magic_operator(self, other: Any, func_name: str) -> Any:
         if not any(
@@ -674,7 +681,7 @@ class DatasetBase:
             )
             new_roles[col].data_type = None
 
-        return self.__class__(roles=new_roles, data=result_raw, session=self.session)
+        return self._from_derived_backend(data=result_raw, roles=new_roles, session=self.session)
 
     # comparison operators:
     def __eq__(self, other: Any) -> Self:
@@ -697,27 +704,27 @@ class DatasetBase:
 
     # unary operators:
     def __pos__(self) -> Self:
-        return self.__class__(
+        return self._from_derived_backend(
             roles=self.roles, data=(+self._backend_data), session=self.session
         )
 
     def __neg__(self) -> Self:
-        return self.__class__(
+        return self._from_derived_backend(
             roles=self.roles, data=(-self._backend_data), session=self.session
         )
 
     def __abs__(self) -> Self:
-        return self.__class__(
+        return self._from_derived_backend(
             roles=self.roles, data=abs(self._backend_data), session=self.session
         )
 
     def __invert__(self) -> Self:
-        return self.__class__(
+        return self._from_derived_backend(
             roles=self.roles, data=(~self._backend_data), session=self.session
         )
 
     def __round__(self, ndigits: int = 0) -> Self:
-        return self.__class__(
+        return self._from_derived_backend(
             roles=self.roles,
             data=round(self._backend_data, ndigits),
             session=self.session,
@@ -932,7 +939,7 @@ class DatasetBase:
             return result
 
         role: ABCRole = StatisticRole()
-        return self.__class__(
+        return self._from_derived_backend(
             data=result, roles={column: role for column in result.columns}
         )
 
@@ -995,7 +1002,7 @@ class DatasetBase:
             if col in new_roles:
                 new_roles[col].data_type = target_type
 
-        return self.__class__(roles=new_roles, data=new_data)
+        return self._from_derived_backend(roles=new_roles, data=new_data)
 
     def append(
         self,
@@ -1009,8 +1016,7 @@ class DatasetBase:
         for o in other:
             self._check_other_dataset(o)
             new_roles.update(o.roles)
-
-        return self.__class__(
+        return self._from_derived_backend(
             roles=new_roles,
             data=self.backend_data.append(
                 other=[o._backend_data for o in other],
@@ -1020,7 +1026,7 @@ class DatasetBase:
         )
 
     def limit(self, num: int | None = None) -> Any:
-        return self.__class__(data=self._backend_data.limit(num=num), roles=self.roles)
+        return self._from_derived_backend(data=self._backend_data.limit(num=num), roles=self.roles)
 
     def apply(
         self,
@@ -1034,14 +1040,13 @@ class DatasetBase:
         tmp_data = self._backend_data.apply(
             func=func, axis=axis, column_name=next(iter(role.keys())), **kwargs
         )
-        tmp_roles = deepcopy(role)
-        return self.__class__(
+        return self._from_derived_backend(
             data=tmp_data,
-            roles=tmp_roles,
+            roles=role,
         )
 
     def map(self, func: Callable[..., Any], na_action: Any = None, **kwargs) -> Self:
-        return self.__class__(
+        return self._from_derived_backend(
             roles=self.roles,
             data=self._backend_data.map(func=func, na_action=na_action, **kwargs),
         )
@@ -1057,7 +1062,7 @@ class DatasetBase:
 
     def isin(self, values: Iterable[Any]) -> Self:
         role: ABCRole = FilterRole()
-        return self.__class__(
+        return self._from_derived_backend(
             roles={column: role for column in self.roles.keys()},
             data=self._backend_data.isin(values),
         )
@@ -1093,7 +1098,7 @@ class DatasetBase:
     ) -> Self:
         if values is None and method is None:
             raise ValueError("Value or filling method must be provided")
-        return self.__class__(
+        return self._from_derived_backend(
             roles=self.roles,
             data=self.backend_data.fillna(values=values, method=method, **kwargs),
         )
@@ -1120,7 +1125,7 @@ class DatasetBase:
 
     def mode(self, numeric_only: bool = False, dropna: bool = True) -> Self:
         t_data = self._backend_data.mode(numeric_only=numeric_only, dropna=dropna)
-        return self.__class__(
+        return self._from_derived_backend(
             data=t_data, roles={role: InfoRole() for role in t_data.columns}
         )
 
@@ -1150,7 +1155,8 @@ class DatasetBase:
     def corr(self, numeric_only: bool = False) -> Self:
         t_data = self._backend_data.corr(numeric_only=numeric_only)
         t_roles = {column: self.roles[column] for column in t_data.columns}
-        return self.__class__(roles=t_roles, data=t_data)
+        return self._from_derived_backend(roles=t_roles, data=t_data)
+
 
     def value_counts(
         self,
@@ -1177,7 +1183,7 @@ class DatasetBase:
             t_data = t_data.rename(columns={0: column_name})
 
         t_roles[column_name] = StatisticRole()
-        return self.__class__(roles=t_roles, data=t_data)
+        return self._from_derived_backend(roles=t_roles, data=t_data)
 
     def na_counts(self) -> Self | ScalarType | None:
         """Count NA values"""
@@ -1195,7 +1201,7 @@ class DatasetBase:
         Returns the same class as ``self``; ``SmallDataset`` overrides it to
         return ``Dataset``.
         """
-        return self.__class__(
+        return self._from_derived_backend(
             roles=self.roles,
             data=self._backend_data.reindex(labels, fill_value=fill_value),
         )
@@ -1216,7 +1222,7 @@ class DatasetBase:
             if axis == 0
             else {column: self.roles[column] for column in new_data.columns}
         )
-        return self.__class__(roles=new_roles, data=new_data)
+        return self._from_derived_backend(roles=new_roles, data=new_data)
 
     def drop(
         self,
@@ -1245,7 +1251,7 @@ class DatasetBase:
             if column not in dropped_columns and column in new_data.columns
         }
 
-        result = self.__class__(roles=new_roles, data=new_data)
+        result = self._from_derived_backend(roles=new_roles, data=new_data)
         result._tmp_roles = new_tmp_roles
         return result
 
@@ -1255,8 +1261,7 @@ class DatasetBase:
 
         t_data = self._backend_data.filter(items=items, regex=regex, axis=axis)
         t_roles = {c: self.roles[c] for c in t_data.columns if c in self.roles.keys()}
-        raw_data = t_data.data if hasattr(t_data, "data") else t_data
-        return self.__class__(roles=t_roles, data=raw_data)
+        return self._from_derived_backend(roles=t_roles, data=t_data)
 
     def select(self, columns: str | list[str]):
         columns = Adapter.to_list(columns)
@@ -1271,7 +1276,7 @@ class DatasetBase:
         t_data = self._backend_data.select_dtypes(include=include, exclude=exclude)
 
         t_roles = {k: v for k, v in self.roles.items() if k in t_data.columns}
-        return self.__class__(roles=t_roles, data=t_data)
+        return self._from_derived_backend(roles=t_roles, data=t_data)
 
     def merge(
         self,
@@ -1310,11 +1315,11 @@ class DatasetBase:
                 t_roles[c] = right.roles[c[: -len(suffixes[1])]]
 
         new_roles = {c: t_roles[c] for c in t_data.columns}
-        return self.__class__(roles=new_roles, data=t_data)
+        return self._from_derived_backend(roles=new_roles, data=t_data)
 
     def dot(self, other: DatasetBase | ndarray) -> DatasetBase:
-        return self.__class__(
-            roles=deepcopy(other.roles) if isinstance(other, self.__class__) else {},
+        return self._from_derived_backend(
+            roles=other.roles if isinstance(other, self.__class__) else {},
             data=self.backend_data.dot(
                 other.backend_data if isinstance(other, self.__class__) else other
             ),
@@ -1326,8 +1331,8 @@ class DatasetBase:
         n: int | None = None,
         random_state: int | None = None,
     ) -> Self:
-        return self.__class__(
-            self.roles,
+        return self._from_derived_backend(
+            roles=self.roles,
             data=self.backend_data.sample(frac=frac, n=n, random_state=random_state),
         )
 
@@ -1372,7 +1377,7 @@ class DatasetBase:
         # Roles should be minimal here, usually just InfoRole or StatisticRole for the split column.
         from .roles import InfoRole
 
-        return self.__class__(
+        return self._from_derived_backend(
             roles={name: InfoRole()},
             data=result_df,
             session=self.session if hasattr(self, "session") else None,
@@ -1380,19 +1385,19 @@ class DatasetBase:
 
     def cov(self) -> DatasetBase:
         t_data = self.backend_data.cov()
-        return self.__class__(
-            {column: DefaultRole() for column in t_data.columns}, data=t_data
+        return self._from_derived_backend(
+            roles={column: DefaultRole() for column in t_data.columns}, data=t_data
         )
 
     def rename(self, names: dict[str, str]) -> Self:
         roles = {names.get(column, column): role for column, role in self.roles.items()}
-        return self.__class__(roles, data=self.backend_data.rename(names))
+        return self._from_derived_backend(roles=roles, data=self.backend_data.rename(names))
 
     def replace(
         self, to_replace: Any = None, value: Any = None, regex: bool = False
     ) -> Self:
-        return self.__class__(
-            self.roles,
+        return self._from_derived_backend(
+            roles=self.roles,
             data=self._backend_data.replace(
                 to_replace=to_replace, value=value, regex=regex
             ),
@@ -1405,7 +1410,7 @@ class DatasetBase:
         extended_roles = {
             c: deepcopy(self.roles[column]) for c in extended_data.columns
         }
-        extended_ds = self.__class__(roles=extended_roles, data=extended_data)
+        extended_ds = self._from_derived_backend(roles=extended_roles, data=extended_data)
         return self.append(extended_ds, axis=1).drop(column, axis=1)
 
     def to_dict(self) -> dict[str, Any]:
@@ -1477,4 +1482,4 @@ class DatasetBase:
         new_roles = deepcopy(self.roles)
         new_roles[column] = type(new_roles[column])()
 
-        return self.__class__(new_roles, data=result)
+        return self._from_derived_backend(roles=new_roles, data=result)

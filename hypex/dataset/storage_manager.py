@@ -72,7 +72,7 @@ class StorageManager:
     # ── main api ────────────────────────────────────────────────
 
     def register(
-        self, key: str, frame: Any, storage_level: str | None = None
+        self, key: str, data: Any, storage_level: str | None = None
     ) -> PersistEntry:
         """Register a persisted ``frame`` in the lineage bucket ``key``.
 
@@ -87,10 +87,22 @@ class StorageManager:
         Returns:
             The registry entry for the frame.
         """
+        # Extract the actual frame from the wrapper if needed.
+        # Priority:
+        # 1. _internal_frame_api (SparkNavigation/SparkDataset) -> Spark DataFrame
+        # 2. _internal.spark_frame (pyspark.pandas.DataFrame) -> Spark DataFrame
+        # 3. data itself (for testing with FakeFrame)
+        if hasattr(data, '_internal_frame_api'):
+            frame = data._internal_frame_api
+        elif hasattr(data, '_internal') and hasattr(data._internal, 'spark_frame'):
+            frame = data._internal.spark_frame
+        else:
+            frame = data
         with self._lock:
             bucket = self._storage.setdefault(key, [])
             for entry in bucket:
                 if entry.frame is frame:
+                    entry.storage_level = storage_level
                     return entry
             entry = PersistEntry(frame, storage_level=storage_level)
             bucket.append(entry)
@@ -119,10 +131,21 @@ class StorageManager:
         Returns:
             Number of released references.
         """
+        if keep is None:
+            frame_to_keep = None
+        else:
+            # Extract the actual frame from the wrapper if needed (same logic as register)
+            if hasattr(keep, '_internal_frame_api'):
+                frame_to_keep = keep._internal_frame_api
+            elif hasattr(keep, '_internal') and hasattr(keep._internal, 'spark_frame'):
+                frame_to_keep = keep._internal.spark_frame
+            else:
+                frame_to_keep = keep
+
         with self._lock:
             bucket = self._storage.get(key, [])
-            kept = [entry for entry in bucket if entry.frame is keep]
-            released = [entry for entry in bucket if entry.frame is not keep]
+            kept = [entry for entry in bucket if entry.frame is frame_to_keep]
+            released = [entry for entry in bucket if entry.frame is not frame_to_keep]
 
             if kept:
                 self._storage[key] = kept

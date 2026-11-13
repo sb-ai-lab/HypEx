@@ -195,7 +195,6 @@ class SparkNavigation(DatasetBackendNavigation):
             # all references accumulated for the lineage and reset the
             # persistence flags.
             StorageManager.instance().release_all(self._persist_key)
-            self._is_persisted_flag = False
             self._storage_level_flag = None
 
         return self
@@ -425,7 +424,6 @@ class SparkNavigation(DatasetBackendNavigation):
         # so the persisted plans of the lineage stay reachable — even after
         # `dataset = dataset.groupby(...).agg(...)`, deepcopy or wrapping.
         self._persist_key = persist_key or StorageManager.new_key()
-        self._is_persisted_flag = False
 
     def persist(
         self,
@@ -514,11 +512,9 @@ class SparkNavigation(DatasetBackendNavigation):
         # Persist the current DAG point and register the reference BEFORE
         # running the action: even if the action fails, a later `unpersist()`
         # will still be able to release this frame.
-        frame = self.data._internal.spark_frame
-        frame.persist(storage_levels[storage_level])
-        manager.register(self._persist_key, frame, storage_level=storage_level)
+        self.data.spark.persist(storage_levels[storage_level])
+        manager.register(self._persist_key, self, storage_level=storage_level)
 
-        self._is_persisted_flag = True
 
         # The action runs while the previously cached DAG points of the
         # lineage are still materialized, so the new cache is computed from
@@ -533,7 +529,7 @@ class SparkNavigation(DatasetBackendNavigation):
             # Every previously accumulated reference of the lineage is stale
             # now — release it, keeping only the frame that triggered the
             # action.
-            manager.release(self._persist_key, keep=frame, blocking=True)
+            manager.release(self._persist_key, keep=self.data, blocking=True)
 
         if isinstance(original_index_name, str):
             if original_index_name in self.data.columns:
@@ -567,8 +563,7 @@ class SparkNavigation(DatasetBackendNavigation):
         """
         manager = StorageManager.instance()
         if not (
-            getattr(self, "_is_persisted_flag", False)
-            or manager.count(self._persist_key) > 0
+            manager.count(self._persist_key) > 0
         ):
             return self
 
@@ -593,10 +588,13 @@ class SparkNavigation(DatasetBackendNavigation):
         elif original_index_names == [None] and "index" in self.data.columns:
             self.data = self.data.set_index("index")
 
-        self._is_persisted_flag = False
         self._storage_level_flag = None
 
         return self
+
+    @property
+    def _internal_frame_api(self):
+        return self.data._internal.spark_frame
 
     @property
     def is_persisted(self) -> bool:
@@ -605,7 +603,7 @@ class SparkNavigation(DatasetBackendNavigation):
         Returns:
             bool: True if DataFrame has non-NONE storage level.
         """
-        return getattr(self, "_is_persisted_flag", False)
+        return StorageManager.instance().count(key=self._persist_key) > 0
 
     def get_storage_level(self) -> str | None:
         """Get the current storage level of the Spark DataFrame.
@@ -614,7 +612,8 @@ class SparkNavigation(DatasetBackendNavigation):
             str | None: Storage level name (e.g., "MEMORY_AND_DISK") if persisted,
                 None if not persisted.
         """
-        return getattr(self, "_storage_level_flag", None)
+        entry = StorageManager.instance().entries(key=self._persist_key)
+        return entry[-1].storage_level if entry else None
 
     def __getitem__(
         self, item: slice | int | str | list | ps.DataFrame | ps.Series
@@ -843,7 +842,10 @@ class SparkNavigation(DatasetBackendNavigation):
         result = cls.__new__(cls)
         memo[id(self)] = result
         for k, v in self.__dict__.items():
-            if isinstance(v, (SparkSession, SparkDF, ps.DataFrame)):
+            if k == "_persist_key":
+                new_key = StorageManager.instance().new_key()
+                setattr(result, k, new_key)
+            elif isinstance(v, (SparkSession, SparkDF, ps.DataFrame)):
                 setattr(result, k, v)
                 memo[id(v)] = v
             else:
