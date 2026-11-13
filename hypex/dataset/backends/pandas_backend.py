@@ -1120,20 +1120,21 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
         Handles edge cases:
             - pd.Series -> pd.DataFrame
-            - Single-value (1x1) DataFrame -> float
+            - Single-value (1x1) DataFrame -> native scalar value
             - Otherwise returns pd.DataFrame
 
         Args:
             result: Output from pandas aggregation methods.
 
         Returns:
-            float or pd.DataFrame: Simplified result for single values,
+            Scalar value or pd.DataFrame: Simplified result for single values,
             otherwise DataFrame.
         """
         if isinstance(result, pd.Series):
             result = result.to_frame()
         if result.shape == (1, 1):
-            return float(result.loc[result.index[0], result.columns[0]])
+            value = result.loc[result.index[0], result.columns[0]]
+            return float("nan") if value is None else value
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
     def __init__(
