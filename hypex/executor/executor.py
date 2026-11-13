@@ -436,7 +436,7 @@ class MLExecutor(Calculator, ABC):
             data=data.ds,
             group_field=group_field,
             grouping_data=grouping_data,
-            target_fields=target_field,
+            target_field=target_field,
             features_fields=features_fields,
         )
         # TODO: add roles to compare_result
