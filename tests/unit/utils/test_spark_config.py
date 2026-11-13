@@ -378,12 +378,12 @@ def test_apply_settings_changes_runtime_conf(spark_session, capsys) -> None:
 # ---------------------------------------------------------------------------
 # optimize_config
 # ---------------------------------------------------------------------------
-def test_optimize_config_rejects_unknown_type() -> None:
+def test_optimize_config_rejects_unknown_type(pyspark_types) -> None:
     with pytest.raises(TypeError, match="config must be"):
         _calc().optimize_config("not a config")  # type: ignore[arg-type]
 
 
-def test_optimize_config_from_none_sets_optimal_values(capsys) -> None:
+def test_optimize_config_from_none_sets_optimal_values(capsys, pyspark_types) -> None:
     calc = _calc(data_size_bytes=50 * GB)
     conf = calc.optimize_config(None)
     settings = calc.calculate_optimal_settings()
@@ -392,13 +392,15 @@ def test_optimize_config_from_none_sets_optimal_values(capsys) -> None:
     assert conf.get("spark.sql.shuffle.partitions") == str(settings.shuffle_partitions)
 
 
-def test_optimize_config_keeps_unrelated_keys(capsys) -> None:
+def test_optimize_config_keeps_unrelated_keys(capsys, pyspark_types) -> None:
     conf = _calc().optimize_config({"spark.app.name": "MyApp", "custom.key": "v"})
     assert conf.get("spark.app.name") == "MyApp"
     assert conf.get("custom.key") == "v"
 
 
-def test_optimize_config_accepts_spark_conf_without_mutating_it(capsys) -> None:
+def test_optimize_config_accepts_spark_conf_without_mutating_it(
+    capsys, pyspark_types
+) -> None:
     from pyspark import SparkConf
 
     original = SparkConf().setAppName("keep").set("spark.executor.memory", "1g")
