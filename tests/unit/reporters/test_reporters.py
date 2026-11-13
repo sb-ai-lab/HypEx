@@ -258,6 +258,26 @@ def test_reporter_base_report_raises_abstract_method_error() -> None:
         _R().report(None)
 
 
+def test_reporter_get_params_skips_variadic_arguments() -> None:
+    class _R(Reporter):
+        def __init__(self, roles=None, *args, **kwargs):
+            self.roles = roles
+            self.args = {"id": "InfoRole()", "spend": "TargetRole()"}
+            self.kwargs = kwargs
+
+        def report(self, data):
+            return data
+
+    roles = {"id": "InfoRole()", "spend": "TargetRole()"}
+    assert _R(roles=roles, unused=True).get_params() == {"roles": roles}
+
+
+def test_dataset_reporter_repr_preserves_invert_pass() -> None:
+    reporter = DatasetReporter(invert_pass=True)
+    assert reporter.get_params()["invert_pass"] is True
+    assert "invert_pass=True" in repr(reporter)
+
+
 def test_dict_reporter_default_is_empty(executed) -> None:
     assert DictReporter().report(executed) == {}
 

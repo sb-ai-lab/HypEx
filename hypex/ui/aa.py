@@ -253,9 +253,10 @@ class AAOutput(Output):
                 stats["passed"] = sum(1 for p in passes if p)
                 stats["total"] = len(passes)
             except Exception:
-                # best-effort: splitter_id column may be absent
+                # best-effort: keep repr working if the score table is malformed
                 logger.debug(
-                    "AAOutput._summary_stats: failed to parse best_split_statistics"
+                    "AAOutput._summary_stats: failed to parse aa_score",
+                    exc_info=True,
                 )
 
         # Best split id
@@ -265,12 +266,13 @@ class AAOutput(Output):
         ):
             try:
                 recs = self.best_split_statistics.to_records()
-                if recs and "splitter_id" in recs[0]:
-                    stats["best_split"] = recs[0]["splitter_id"]
+                if recs and "group" in recs[0]:
+                    stats["best_split"] = recs[0]["group"]
             except Exception:
-                # best-effort: splitter_id column may be absent or table malformed
+                # best-effort: group column may be absent or table malformed
                 logger.debug(
-                    "AAOutput._summary_stats: failed to parse best_split_statistics"
+                    "AAOutput._summary_stats: failed to parse best_split_statistics",
+                    exc_info=True,
                 )
 
         return stats

@@ -567,7 +567,7 @@ class MatchingOutput(Output):
                 session=experiment_data.ds.session,
             )
             logger.debug("Skipping full_data extraction (extract_full_data=False).")
-        self.summary.raw_data = self.summary.raw_data.round(2)
+        self.summary.raw_data = self.summary.raw_data.round(4)
 
     def _effect_rows(self) -> list[dict[str, Any]]:
         """Extract ATT/ATC/ATE rows from summary."""
@@ -576,8 +576,7 @@ class MatchingOutput(Output):
             return rows
         try:
             recs = self.summary.to_records()
-            for r in recs:
-                idx = r.get("index", r.get("data", ""))
+            for idx, r in zip(self.summary.index, recs):
                 estimate = r.get("Effect Size")
                 se = r.get("Standard Error")
                 pval = r.get("P-value")
@@ -595,7 +594,10 @@ class MatchingOutput(Output):
                 )
         except Exception:
             # best-effort: keep repr working even if summary is malformed
-            logger.debug("MatchingOutput._effect_rows: failed to parse summary")
+            logger.debug(
+                "MatchingOutput._effect_rows: failed to parse summary",
+                exc_info=True,
+            )
         return rows
 
     def _quality_summary(self) -> dict[str, int]:
@@ -619,7 +621,8 @@ class MatchingOutput(Output):
         except Exception:
             # best-effort: keep repr working even if quality_results is malformed
             logger.debug(
-                "MatchingOutput._quality_summary: failed to parse quality_results"
+                "MatchingOutput._quality_summary: failed to parse quality_results",
+                exc_info=True,
             )
         return result
 

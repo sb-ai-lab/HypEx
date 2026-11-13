@@ -94,7 +94,7 @@ def test_reformat_summary_indexes_flat_and_nested() -> None:
 # --------------------------------------------------------------------------
 def test_extract_summary_matches_analyzer_table_rounded(matched_data) -> None:
     data, _ = matched_data
-    expected = data.analysis_tables[next(iter(data.analysis_tables))].raw_data.round(2)
+    expected = data.analysis_tables[next(iter(data.analysis_tables))].raw_data.round(4)
     output = _make_output()
     output.extract(data)
     pd.testing.assert_frame_equal(output.summary.raw_data, expected, check_dtype=False)
@@ -105,6 +105,16 @@ def test_extract_summary_matches_analyzer_table_rounded(matched_data) -> None:
         "CI Lower",
         "CI Upper",
     ]
+
+
+def test_effect_rows_use_summary_index(matched_data) -> None:
+    data, _ = matched_data
+    output = _make_output()
+    output.extract(data)
+    assert [row["metric"] for row in output._effect_rows()] == list(
+        output.summary.index
+    )
+    assert all(metric in repr(output) for metric in ("ATT", "ATC", "ATE"))
 
 
 def test_extract_skips_indexes_and_full_data_by_default(matched_data) -> None:

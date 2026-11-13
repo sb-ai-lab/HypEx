@@ -308,12 +308,7 @@ class Reporter(ABC):
         for name, param in init_params.items():
             if name == "self":
                 continue
-            if param.kind == param.VAR_POSITIONAL:
-                stored = getattr(self, name, None)
-                if isinstance(stored, dict):
-                    out.update(stored)
-                continue
-            if param.kind == param.VAR_KEYWORD:
+            if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
                 continue
             value = getattr(self, name, param.default)
             if deep and hasattr(value, "get_params") and not isinstance(value, type):
@@ -635,7 +630,7 @@ class DatasetReporter(Reporter):
         self.dict_reporter = dict_reporter or DictReporter()
         self.output_format = output_format
         self.single_row = single_row
-        self._invert_pass = invert_pass
+        self.invert_pass = invert_pass
 
     @property
     def front(self) -> bool:
@@ -670,7 +665,7 @@ class DatasetReporter(Reporter):
         struct_dict = TestDictReporter._get_struct_dict(dict_result)
         return TestDictReporter._convert_struct_dict_to_dataset(
             struct_dict,
-            invert_pass=self._invert_pass,
+            invert_pass=self.invert_pass,
         )
 
     @staticmethod

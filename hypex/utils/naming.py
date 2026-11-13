@@ -54,13 +54,13 @@ def _parse_metric_col(col: str) -> tuple[str, str, str, str]:
 
     # ── Space-separated format ────────────────────────────────────
     parts = col.split()
-    for metric in METRIC_SUFFIXES:
-        metric_parts = metric.split()
-        mlen = len(metric_parts)
-        for i in range(len(parts) - mlen + 1):
-            if parts[i : i + mlen] == metric_parts:
-                before = parts[:i]
-                after = parts[i + mlen :]
+    for end in range(len(parts), 0, -1):
+        for metric in METRIC_SUFFIXES:
+            metric_parts = metric.split()
+            start = end - len(metric_parts)
+            if start >= 0 and parts[start:end] == metric_parts:
+                before = parts[:start]
+                after = parts[end:]
                 if len(before) >= 2:
                     feature = before[0]
                     test = " ".join(before[1:])

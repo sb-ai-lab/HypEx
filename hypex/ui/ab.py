@@ -102,7 +102,7 @@ class CupedOutput:
             bar_width = max(0, min(100, pct))
             rows_html += (
                 "<tr>"
-                f"<td style='padding:2px 8px; font-family:monospace;'>{feat}</td>"
+                f"<td style='padding:2px 8px; font-family:monospace;'>{html.escape(str(feat))}</td>"
                 "<td style='padding:2px 8px;'>"
                 f"<div style='background:#e0e0e0; border-radius:3px; "
                 f"width:120px; height:14px; display:inline-block; "
@@ -236,8 +236,8 @@ class CupacOutput:
                 color = self._vr_color(vr_real)
                 rows += (
                     "<tr>"
-                    f"<td style='padding:2px 8px;'>{target}</td>"
-                    f"<td style='padding:2px 8px;'><code>{model}</code></td>"
+                    f"<td style='padding:2px 8px;'>{html.escape(str(target))}</td>"
+                    f"<td style='padding:2px 8px;'><code>{html.escape(str(model))}</code></td>"
                     f"<td style='padding:2px 8px; text-align:right;'>{vr_cv:.1f}%</td>"
                     f"<td style='padding:2px 8px; text-align:right; "
                     f"color:{color}; font-weight:bold;'>{vr_real:.1f}%</td>"
@@ -266,10 +266,10 @@ class CupacOutput:
             for rec in sorted_recs[:10]:
                 feat = rec.get("feature", "?")
                 imp = rec.get("importance", 0)
-                bar_pct = max(0, min(100, imp / max_imp * 100))
+                bar_pct = 0.0 if max_imp <= 0 else max(0, min(100, imp / max_imp * 100))
                 rows += (
                     "<tr>"
-                    f"<td style='padding:2px 8px;'>{feat}</td>"
+                    f"<td style='padding:2px 8px;'>{html.escape(str(feat))}</td>"
                     "<td style='padding:2px 8px;'>"
                     f"<div style='background:#e3f2fd; border-radius:2px; "
                     f"width:100px; height:12px; display:inline-block;'>"
@@ -496,7 +496,10 @@ class ABOutput(Output):
                 stats["groups"] = len(groups)
             except Exception:
                 # best-effort: summary table may be empty or malformed
-                logger.debug("ABOutput._summary_stats: failed to parse summary")
+                logger.debug(
+                    "ABOutput._summary_stats: failed to parse summary",
+                    exc_info=True,
+                )
 
         # Sizes
         if hasattr(self, "sizes") and self.sizes is not None:
@@ -507,7 +510,10 @@ class ABOutput(Output):
                     stats["test_size"] = recs[0].get("test size")
             except Exception:
                 # best-effort: sizes table may be empty or malformed
-                logger.debug("ABOutput._summary_stats: failed to parse sizes")
+                logger.debug(
+                    "ABOutput._summary_stats: failed to parse sizes",
+                    exc_info=True,
+                )
 
         # Multitest method
         if hasattr(self, "multitest") and self.multitest is not None:
@@ -520,7 +526,10 @@ class ABOutput(Output):
                         stats["multitest"] = "applied"
                 except Exception:
                     # best-effort: multitest table may be empty or malformed
-                    logger.debug("ABOutput._summary_stats: failed to parse multitest")
+                    logger.debug(
+                        "ABOutput._summary_stats: failed to parse multitest",
+                        exc_info=True,
+                    )
 
         # CUPED / CUPAC presence
         if self.cuped is not None:
@@ -531,36 +540,33 @@ class ABOutput(Output):
         return stats
 
     def _result_rows(self) -> list[dict[str, Any]]:
-        """Extract per-feature pass/fail rows from summary."""
+        """Extract one result row per feature, group, and statistical test."""
         rows: list[dict[str, Any]] = []
         if not hasattr(self, "summary") or self.summary is None:
             return rows
         try:
             recs = self.summary.to_records()
             for r in recs:
-                feature = r.get("feature", "?")
-                # Find any column ending with " pass"
-                pass_val = None
-                pval = None
-                diff_pct = None
-                for k, v in r.items():
-                    if k.endswith(" pass"):
-                        pass_val = v
-                    elif k.endswith(" p-value"):
-                        pval = v
-                    elif k == "difference %":
-                        diff_pct = v
-                rows.append(
-                    {
-                        "feature": feature,
-                        "pass": pass_val,
-                        "p_value": pval,
-                        "diff_pct": diff_pct,
-                    }
-                )
+                for column, pval in r.items():
+                    if not column.endswith(" p-value"):
+                        continue
+                    test = column[: -len(" p-value")]
+                    rows.append(
+                        {
+                            "feature": r.get("feature", "?"),
+                            "group": r.get("group", "?"),
+                            "test": test,
+                            "pass": r.get(f"{test} pass"),
+                            "p_value": pval,
+                            "diff_pct": r.get("difference %"),
+                        }
+                    )
         except Exception:
             # best-effort: keep repr working even if summary is malformed
-            logger.debug("ABOutput._result_rows: failed to parse summary rows")
+            logger.debug(
+                "ABOutput._result_rows: failed to parse summary rows",
+                exc_info=True,
+            )
         return rows
 
     def __repr__(self) -> str:
@@ -588,10 +594,11 @@ class ABOutput(Output):
         if rows:
             lines.append("")
             for r in rows:
-                icon = "✅" if r["pass"] == "OK" else "❌"
+                icon = {"OK": "✅", "NOT OK": "❌"}.get(r["pass"], "—")
                 pval_str = f"{r['p_value']:.4f}" if r["p_value"] is not None else "—"
                 diff_str = f"{r['diff_pct']:+.1f}%" if r["diff_pct"] is not None else ""
-                lines.append(f"  {icon} {r['feature']:<20s} p={pval_str}  {diff_str}")
+                label = f"{r['feature']} (group={r['group']}, {r['test']})"
+                lines.append(f"  {icon} {label:<40s} p={pval_str}  {diff_str}")
 
         lines.append("")
         lines.append(repr(self._report()))
@@ -630,20 +637,23 @@ class ABOutput(Output):
                 "<table style='border-collapse:collapse; margin:6px 0; font-size:12px;'>"
                 "<tr>"
                 "<th style='padding:2px 8px; text-align:left;'>Feature</th>"
+                "<th style='padding:2px 8px; text-align:left;'>Group</th>"
+                "<th style='padding:2px 8px; text-align:left;'>Test</th>"
                 "<th style='padding:2px 8px; text-align:center;'>Result</th>"
                 "<th style='padding:2px 8px; text-align:right;'>p-value</th>"
                 "<th style='padding:2px 8px; text-align:right;'>Diff %</th>"
                 "</tr>"
             )
             for r in rows:
-                ok = r["pass"] == "OK"
-                color = "#2e7d32" if ok else "#c62828"
-                icon = "✅" if ok else "❌"
+                color = {"OK": "#2e7d32", "NOT OK": "#c62828"}.get(r["pass"], "#555")
+                icon = {"OK": "✅", "NOT OK": "❌"}.get(r["pass"], "—")
                 pval = f"{r['p_value']:.4f}" if r["p_value"] is not None else "—"
                 diff = f"{r['diff_pct']:+.1f}%" if r["diff_pct"] is not None else "—"
                 parts.append(
                     "<tr>"
                     f"<td style='padding:2px 8px;'>{html.escape(str(r['feature']))}</td>"
+                    f"<td style='padding:2px 8px;'>{html.escape(str(r['group']))}</td>"
+                    f"<td style='padding:2px 8px;'>{html.escape(str(r['test']))}</td>"
                     f"<td style='padding:2px 8px; text-align:center; color:{color};'>{icon}</td>"
                     f"<td style='padding:2px 8px; text-align:right;'>{pval}</td>"
                     f"<td style='padding:2px 8px; text-align:right;'>{diff}</td>"

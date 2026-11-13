@@ -16,6 +16,8 @@ from .reporters.matching import MatchingAnalysisTableReporter
 from .transformers import TypeCaster
 from .ui.base import ExperimentShell
 from .ui.matching import MatchingOutput
+from .utils.adapter import Adapter
+from .utils.index_utils import FaissIndexStorage
 
 
 class Matching(ExperimentShell):
@@ -35,7 +37,7 @@ class Matching(ExperimentShell):
             Defaults to "ate".
         bias_estimation (bool, optional): Whether to estimate bias. Defaults to True.
         quality_tests (Union[str, List[str]], optional): Quality tests to perform.
-            Options are "smd", "psi", "ks-test", "repeats", "t-test", or "auto".
+            Options are "chi2-test", "ks-test", "t-test", or "auto".
             Can be a single test or list of tests. Defaults to "auto".
         faiss_mode (Literal["base", "fast", "auto"], optional): Faiss mode to use for matching.
             Options are "base", "fast", or "auto". Defaults to "auto".
@@ -72,12 +74,8 @@ class Matching(ExperimentShell):
         metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: (
-            Literal["smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"]
-            | list[
-                Literal[
-                    "smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"
-                ]
-            ]
+            Literal["ks-test", "t-test", "chi2-test", "auto"]
+            | list[Literal["ks-test", "t-test", "chi2-test", "auto"]]
         ) = "auto",
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
         n_neighbors: int = 1,
@@ -97,7 +95,7 @@ class Matching(ExperimentShell):
             Defaults to "ate".
         bias_estimation (bool, optional): Whether to estimate bias. Defaults to True.
         quality_tests (Union[str, List[str]], optional): Quality tests to perform.
-            Options are "ks-test", "t-test", or "auto".
+            Options are "ks-test", "t-test", "chi2-test" or "auto".
             Can be a single test or list of tests. Defaults to "auto", which performs all tests.
         faiss_mode (Literal["base", "fast", "auto"], optional): Faiss mode to use for matching.
             Options are "base", "fast", or "auto". Defaults to "auto".
@@ -172,10 +170,10 @@ class Matching(ExperimentShell):
                 )
             ]
         else:
-            # warnings.warn("Now quality tests aren't supported yet")
+            selected_tests = Adapter.to_list(quality_tests)
             executors += [
                 OnRoleExperiment(
-                    executors=[test_mapping[test] for test in quality_tests],
+                    executors=[test_mapping[test] for test in selected_tests],
                     role=FeatureRole(),
                 )
             ]
@@ -206,12 +204,8 @@ class Matching(ExperimentShell):
         # metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: (
-            Literal["smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"]
-            | list[
-                Literal[
-                    "smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"
-                ]
-            ]
+            Literal["ks-test", "t-test", "chi2-test", "auto"]
+            | list[Literal["ks-test", "t-test", "chi2-test", "auto"]]
         ) = "auto",
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
         n_neighbors: int = 1,
@@ -239,3 +233,9 @@ class Matching(ExperimentShell):
                 compute_indexes=compute_indexes,
             ),
         )
+
+    def execute(self, data):
+        try:
+            return super().execute(data)
+        finally:
+            FaissIndexStorage.cleanup()
