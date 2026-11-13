@@ -321,11 +321,15 @@ def test_mlexecutor_calc_single_group_raises() -> None:
         _Mean.calc(ds, group_field="t", features_fields="f")
 
 
-def test_mlexecutor_calc_groups_and_predicts() -> None:
+@pytest.mark.parametrize(
+    "target_field, expected", [(None, 2.0), ("y", 8.0), (["y"], 8.0)]
+)
+def test_mlexecutor_calc_groups_and_predicts(target_field, expected) -> None:
     data = _ml_data()
-    result = _Mean.calc(data.ds, group_field="t", features_fields=["f"])
-    # control mean(f) = 2 is predicted for each of the 3 test rows
-    assert result.backend_data.data["pred"].tolist() == [2.0, 2.0, 2.0]
+    result = _Mean.calc(
+        data.ds, group_field="t", features_fields=["f"], target_field=target_field
+    )
+    assert result.backend_data.data["pred"].tolist() == [expected] * 3
 
 
 def test_mlexecutor_execute_stores_additional_fields() -> None:
@@ -336,7 +340,8 @@ def test_mlexecutor_execute_stores_additional_fields() -> None:
     stored = [c for c in out.additional_fields.columns if ex.id in c]
     assert len(stored) == 1
     col = out.additional_fields.backend_data.data[stored[0]]
-    assert col.dropna().tolist() == [2.0, 2.0, 2.0]
+    # The model receives both mean(f)=2 and mean(y)=6 from the control group.
+    assert col.dropna().tolist() == [8.0, 8.0, 8.0]
 
 
 def test_mlexecutor_execute_uses_prebuilt_groups() -> None:
@@ -356,7 +361,7 @@ def test_mlexecutor_execute_uses_prebuilt_groups() -> None:
     # patched: len(list-of-pairs) == 2 so no count_groups is needed
     out = ex.execute(data)
     col = next(c for c in out.additional_fields.columns if ex.id in c)
-    assert out.additional_fields.backend_data.data[col].dropna().tolist() == [100.0]
+    assert out.additional_fields.backend_data.data[col].dropna().tolist() == [101.0]
 
 
 def test_mlexecutor_execute_without_targets_and_tmp_roles_returns_data() -> None:
