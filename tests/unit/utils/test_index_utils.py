@@ -46,26 +46,28 @@ def _ivf_index(dim: int = 4) -> faiss.Index:
 # ---------------------------------------------------------------------------
 # FaissIndexStorage
 # ---------------------------------------------------------------------------
-def test_storage_creates_local_directory_and_registers_it(isolated_cwd) -> None:
+def test_storage_creates_local_directory_and_registers_it(
+    isolated_cwd, pyspark_types
+) -> None:
     storage = FaissIndexStorage(_FakeSession())
     assert os.path.isdir(storage._local_tmp_dir)
     assert storage._local_tmp_dir.startswith("__partition_indexes_")
     assert storage._local_tmp_dir in FaissIndexStorage.LOCAL_DIRS
 
 
-def test_each_storage_gets_its_own_directory() -> None:
+def test_each_storage_gets_its_own_directory(pyspark_types) -> None:
     a, b = FaissIndexStorage(_FakeSession()), FaissIndexStorage(_FakeSession())
     assert a._local_tmp_dir != b._local_tmp_dir
 
 
-def test_backward_compatible_attributes() -> None:
+def test_backward_compatible_attributes(pyspark_types) -> None:
     storage = FaissIndexStorage(_FakeSession(), base_dir="ignored")
     assert storage._distributed is False
     assert storage._distributed_dir is None
     assert FaissIndexStorage.DISTRIBUTED_DIRS == []
 
 
-def test_pickling_drops_spark_session() -> None:
+def test_pickling_drops_spark_session(pyspark_types) -> None:
     storage = FaissIndexStorage(_FakeSession())
     state = storage.__getstate__()
     assert "sp_s" not in state
@@ -75,7 +77,7 @@ def test_pickling_drops_spark_session() -> None:
     assert restored._local_tmp_dir == storage._local_tmp_dir
 
 
-def test_save_index_roundtrips_through_faiss_serialization() -> None:
+def test_save_index_roundtrips_through_faiss_serialization(pyspark_types) -> None:
     storage = FaissIndexStorage(_FakeSession())
     original = _flat_index()
     restored = faiss.deserialize_index(storage.save_index(original))
@@ -87,7 +89,7 @@ def test_save_index_roundtrips_through_faiss_serialization() -> None:
 
 
 def test_load_index_reads_file_resolved_through_sparkfiles(
-    monkeypatch, isolated_cwd
+    monkeypatch, isolated_cwd, pyspark_types
 ) -> None:
     path = isolated_cwd / "stored.index"
     faiss.write_index(_flat_index(), str(path))
@@ -98,7 +100,9 @@ def test_load_index_reads_file_resolved_through_sparkfiles(
     assert loaded.ntotal == 5
 
 
-def test_collect_and_register_writes_files_and_registers_them(isolated_cwd) -> None:
+def test_collect_and_register_writes_files_and_registers_them(
+    isolated_cwd, pyspark_types
+) -> None:
     added = []
 
     class _Context:
@@ -131,7 +135,7 @@ def test_collect_and_register_writes_files_and_registers_them(isolated_cwd) -> N
     assert sizes == [3, 7]
 
 
-def test_collect_and_register_empty_rdd() -> None:
+def test_collect_and_register_empty_rdd(pyspark_types) -> None:
     class _Empty:
         @staticmethod
         def toLocalIterator():
@@ -140,7 +144,9 @@ def test_collect_and_register_empty_rdd() -> None:
     assert FaissIndexStorage(_FakeSession()).collect_and_register(_Empty()) == []
 
 
-def test_cleanup_removes_directories_and_resets_list(isolated_cwd) -> None:
+def test_cleanup_removes_directories_and_resets_list(
+    isolated_cwd, pyspark_types
+) -> None:
     storages = [FaissIndexStorage(_FakeSession()) for _ in range(2)]
     dirs = [s._local_tmp_dir for s in storages]
     FaissIndexStorage.cleanup()
@@ -148,7 +154,7 @@ def test_cleanup_removes_directories_and_resets_list(isolated_cwd) -> None:
     assert FaissIndexStorage.LOCAL_DIRS == []
 
 
-def test_cleanup_tolerates_missing_directories() -> None:
+def test_cleanup_tolerates_missing_directories(pyspark_types) -> None:
     storage = FaissIndexStorage(_FakeSession())
     os.rmdir(storage._local_tmp_dir)
     FaissIndexStorage.cleanup()
@@ -241,7 +247,7 @@ def test_cache_is_thread_safe_for_concurrent_gets() -> None:
     assert len(cache._cache) <= 3
 
 
-def test_cleanup_swallows_rmtree_errors(monkeypatch) -> None:
+def test_cleanup_swallows_rmtree_errors(monkeypatch, pyspark_types) -> None:
     storage = FaissIndexStorage(_FakeSession())
     directory = storage._local_tmp_dir
 

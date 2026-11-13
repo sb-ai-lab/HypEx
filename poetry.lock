@@ -5003,7 +5003,7 @@ description = "Extremely lightweight compatibility layer between dataframe libra
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "python_version >= \"3.10\" and (extra == \"cat\" or extra == \"all\" or extra == \"lgbm\") or python_version >= \"3.11\""
+markers = "python_version >= \"3.10\" and (extra == \"cat\" or extra == \"all\" or extra == \"lgbm\" or python_version >= \"3.11\")"
 files = [
     {file = "narwhals-2.26.0-py3-none-any.whl", hash = "sha256:29326d74f107c347fd1009bd58e38d9f7c7c5b51e6de97bc93dbc325d9038b54"},
     {file = "narwhals-2.26.0.tar.gz", hash = "sha256:6b9cadca82f375c7e4cf584fdc86ca25da54827307a9c58f94547ee6104b82dd"},
@@ -5712,7 +5712,7 @@ description = "Fundamental package for array computing in Python"
 optional = false
 python-versions = ">=3.12"
 groups = ["main"]
-markers = "python_version >= \"3.12\""
+markers = "python_version == \"3.12\""
 files = [
     {file = "numpy-2.5.4-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:c6342f54c67093cae5c0227eb0eb772fdb79f2a2c37a6eb278b9909ee06aa356"},
     {file = "numpy-2.5.4-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:b11e8fda06a7d69f15ebf542660b74466c2e51094800c1fb794f47ad4faeef17"},
@@ -9022,7 +9022,7 @@ description = "Fundamental algorithms for scientific computing in Python"
 optional = false
 python-versions = ">=3.12"
 groups = ["main"]
-markers = "python_version >= \"3.12\""
+markers = "python_version == \"3.12\""
 files = [
     {file = "scipy-1.18.1-cp312-cp312-macosx_10_15_x86_64.whl", hash = "sha256:457fd7a2a8edeb044ab6ffbc0aa03ff6cd18491356e5e0c834d76ce621b916d1"},
     {file = "scipy-1.18.1-cp312-cp312-macosx_12_0_arm64.whl", hash = "sha256:e708533e8b2ae2497d65346538a7dcc92814410b25b81432eac66de0f2af8265"},
@@ -9161,12 +9161,12 @@ version = "82.0.1"
 description = "Most extensible Python build backend with support for C/C++ extension modules"
 optional = false
 python-versions = ">=3.9"
-groups = ["dev"]
-markers = "python_version == \"3.9\""
+groups = ["main", "dev"]
 files = [
     {file = "setuptools-82.0.1-py3-none-any.whl", hash = "sha256:a59e362652f08dcd477c78bb6e7bd9d80a7995bc73ce773050228a348ce2e5bb"},
     {file = "setuptools-82.0.1.tar.gz", hash = "sha256:7d872682c5d01cfde07da7bccc7b65469d3dca203318515ada1de5eda35efbf9"},
 ]
+markers = {main = "python_version == \"3.12\" and (extra == \"spark\" or extra == \"all\")", dev = "python_version == \"3.9\""}
 
 [package.extras]
 check = ["pytest-checkdocs (>=2.4)", "pytest-ruff (>=0.2.1) ; sys_platform != \"cygwin\"", "ruff (>=0.13.0) ; sys_platform != \"cygwin\""]
@@ -10440,12 +10440,12 @@ test = ["big-O", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more_it
 type = ["pytest-mypy"]
 
 [extras]
-all = ["catboost", "lightgbm", "numpy", "numpy", "pandas", "pandas", "pandas", "pyarrow", "pyspark"]
+all = ["catboost", "lightgbm", "numpy", "numpy", "pandas", "pandas", "pandas", "pyarrow", "pyspark", "setuptools"]
 cat = ["catboost"]
 lgbm = ["lightgbm"]
-spark = ["numpy", "numpy", "pandas", "pandas", "pandas", "pyarrow", "pyspark"]
+spark = ["numpy", "numpy", "pandas", "pandas", "pandas", "pyarrow", "pyspark", "setuptools"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.8,<3.14"
-content-hash = "0b688f789163300571a669775a46a073224b323447f3eb33def916b913191372"
+python-versions = ">=3.8,<3.13"
+content-hash = "64d9c4f1b291fe859489767f95832307e320b47ddf324677c8c9b3eef1219f23"

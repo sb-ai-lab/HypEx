@@ -831,9 +831,6 @@ class PandasNavigation(DatasetBackendNavigation):
         if "append" not in kwargs:
             kwargs["append"] = False
 
-        if "inplace" not in kwargs:
-            kwargs["inplace"] = False
-
         return self._wrap_result(self.data.set_index(keys=keys, drop=drop, **kwargs))
 
     @property
