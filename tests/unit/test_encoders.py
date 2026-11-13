@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
+from pandas.api.types import is_bool_dtype, is_integer_dtype
 
 from hypex.dataset import (
     Dataset,
@@ -94,9 +95,17 @@ def test_roles_are_derived_from_original_roles(frame) -> None:
     assert type(result.roles["color_red"]).__name__ == "AdditionalTargetRole"
 
 
-def test_encoded_roles_have_bool_data_type(frame, roles) -> None:
-    result = DummyEncoder._inner_function(_build(frame, roles), target_cols=["color"])
-    assert all(r.data_type is bool for r in result.roles.values())
+def test_encoded_roles_and_values_are_integer(
+    frame, roles, backend, spark_session
+):
+    source = _build(frame, roles, backend, spark_session)
+    result = DummyEncoder._inner_function(source, target_cols=["color"])
+    encoded = _pdf(result)
+    assert all(role.data_type is int for role in result.roles.values())
+    for name in encoded.columns:
+        assert is_integer_dtype(encoded[name].dtype)
+        assert not is_bool_dtype(encoded[name].dtype)
+        assert encoded[name].isin([0, 1]).all()
 
 
 def test_no_target_cols_returns_empty_dataset(frame, roles) -> None:
