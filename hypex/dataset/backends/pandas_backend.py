@@ -831,9 +831,6 @@ class PandasNavigation(DatasetBackendNavigation):
         if "append" not in kwargs:
             kwargs["append"] = False
 
-        if "inplace" not in kwargs:
-            kwargs["inplace"] = False
-
         return self._wrap_result(self.data.set_index(keys=keys, drop=drop, **kwargs))
 
     @property
@@ -1762,6 +1759,22 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: DataFrame with selected columns.
         """
+        if int(pd.__version__.split(".")[0]) >= 3:
+
+            def normalize(selector):
+                if selector is None:
+                    return None
+                values = (
+                    [selector]
+                    if isinstance(selector, (str, type, np.dtype))
+                    else list(selector)
+                )
+                if any(pd.api.types.is_object_dtype(value) for value in values):
+                    if "str" not in values:
+                        values.append("str")
+                return values
+
+            include, exclude = normalize(include), normalize(exclude)
         return self._wrap_result(
             self.data.select_dtypes(include=include, exclude=exclude)
         )
@@ -1924,7 +1937,23 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         Returns:
             pd.DataFrame: Reindexed DataFrame.
         """
-        return self._wrap_result(self.data.reindex(labels, fill_value=fill_value))
+        data = self.data
+        if (
+            fill_value is not None
+            and not isinstance(fill_value, str)
+            and not pd.isna(fill_value)
+        ):
+            string_columns = {
+                col: object
+                for col in data.columns
+                if isinstance(data[col].dtype, pd.StringDtype)
+            }
+            if string_columns and labels is not None:
+                if iter(labels) is labels:
+                    labels = list(labels)
+                if not pd.Index(labels).isin(data.index).all():
+                    data = data.astype(string_columns)
+        return self._wrap_result(data.reindex(labels, fill_value=fill_value))
 
     def list_to_columns(self, column: str) -> pd.DataFrame:
         """Expand a column containing lists into multiple columns.

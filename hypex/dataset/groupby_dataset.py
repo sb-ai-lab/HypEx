@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 from typing import TYPE_CHECKING, Any, Callable
 
+import pandas as pd
+
 from ..utils import NAME_BORDER_SYMBOL
 from .roles import ABCRole, InfoRole, StatisticRole
 
@@ -157,6 +159,7 @@ class GroupedDataset:
         Apply a custom function to each group and combine the results.
 
         Applies the callable to each group independently and concatenates the results.
+        On pandas, the callable receives the grouping columns as well.
         Resulting columns are assigned InfoRole by default.
 
         Args:
@@ -169,7 +172,10 @@ class GroupedDataset:
             NotImplementedError: If apply is not supported for the current groupby type.
         """
         if hasattr(self._groupby, "apply"):
-            result_data = self._groupby.apply(func)
+            groupby = self._groupby
+            if isinstance(getattr(groupby, "obj", None), pd.DataFrame):
+                groupby = groupby[list(groupby.obj.columns)]
+            result_data = groupby.apply(func)
         else:
             raise NotImplementedError("Apply not supported for this groupby type")
 
