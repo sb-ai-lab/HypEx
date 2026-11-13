@@ -34,64 +34,60 @@ classifiers = [
     "Typing :: Typed",
 ]
 
+[project]
+name = "HypEx"
+version = "2.0.0a1"
+dynamic = ["description", "authors", "readme", "license", "classifiers"]
+requires-python = ">=3.8,<3.14"
+dependencies = [
+    "tqdm>=4.66,<5",
+    "scikit-learn>=1.3.2,<2",
+    "typing_extensions>=4.12,<5; python_version < '3.11'",
+    "pandas>=1.3.5; python_version < '3.9'",
+    "pandas>=2.0.3; python_version >= '3.9' and python_version < '3.12'",
+    "pandas>=2.2.3; python_version >= '3.12'",
+    "numpy>=1.17.0; python_version < '3.9'",
+    "numpy>=1.26.4; python_version >= '3.9'",
+    "scipy>=1.5.0,<=1.10.1; python_version < '3.9'",
+    "scipy>=1.10.1,<2; python_version >= '3.9'",
+    "matplotlib>=3.0.0,<3.8; python_version < '3.9'",
+    "matplotlib>=3.5,<4; python_version >= '3.9'",
+    "faiss-cpu>=1.6.0,<=1.8.0; python_version < '3.9'",
+    "faiss-cpu>=1.9.0,<2; python_version >= '3.9'",
+    "statsmodels>=0.14.1,<0.15; python_version < '3.9'",
+    "statsmodels>=0.14.2,<0.15; python_version >= '3.9'",
+    "pyarrow>=11.0.0",
+    "seaborn<=0.13.2",
+]
+
+# Keep base dependencies mandatory and open above. Explicit extra markers
+# let Poetry lock separate modern and Spark-compatible numeric stacks.
+[project.optional-dependencies]
+cat = ["catboost>=1.2.7,<2"]
+lgbm = ["lightgbm>=4.5,<5"]
+spark = [
+    "pyspark==3.5.7",
+    "numpy>=1.17.0,<2; python_version < '3.9' and extra == 'spark'",
+    "numpy>=1.26.4,<2; python_version >= '3.9' and extra == 'spark'",
+    "pandas>=1.3.5,<2.3; python_version < '3.9' and extra == 'spark'",
+    "pandas>=2.0.3,<2.3; python_version >= '3.9' and python_version < '3.12' and extra == 'spark'",
+    "pandas>=2.2.3,<2.3; python_version >= '3.12' and extra == 'spark'",
+    "pyarrow>=11.0.0,<16; extra == 'spark'",
+]
+all = [
+    "catboost>=1.2.7,<2",
+    "lightgbm>=4.5,<5",
+    "pyspark==3.5.7",
+    "numpy>=1.17.0,<2; python_version < '3.9' and extra == 'all'",
+    "numpy>=1.26.4,<2; python_version >= '3.9' and extra == 'all'",
+    "pandas>=1.3.5,<2.3; python_version < '3.9' and extra == 'all'",
+    "pandas>=2.0.3,<2.3; python_version >= '3.9' and python_version < '3.12' and extra == 'all'",
+    "pandas>=2.2.3,<2.3; python_version >= '3.12' and extra == 'all'",
+    "pyarrow>=11.0.0,<16; extra == 'all'",
+]
+
 [tool.poetry.dependencies]
-# Three ABI-lines:
-#   py3.8       — legacy: numpy 1.24 / pandas 2.0 / matplotlib 3.7
-#   py3.9–3.11  — Spark: numpy<2, as pyspark 3.5 uses np.NaN,
-#                 and pyarrow 15 pins numpy<2 bu itself
-#   py3.12–3.13 — without Spark: numpy 2 and fresh numeric-stack
 python = ">=3.8,<3.14"
-tqdm         = ">=4.66,<5"
-scikit-learn = ">=1.3.2,<2"
-typing_extensions = { version = ">=4.12,<5", python = "<3.11" }
-
-pandas = [
-  { version = ">=1.3.5,<=2.0.3", python = "<3.9" },
-  { version = ">=2.0.3,<2.3",    python = ">=3.9,<3.12" },
-  { version = ">=2.2.3,<3.0",    python = ">=3.12" },
-]
-
-numpy = [
-  { version = ">=1.17.0,<=1.24.4", python = "<3.9" },
-  { version = ">=1.26.4,<2.0",     python = ">=3.9,<3.12" },
-  { version = ">=2.1,<3",          python = ">=3.12" },
-]
-
-scipy = [
-  { version = ">=1.5.0,<=1.10.1", python = "<3.9" },
-  { version = ">=1.10.1,<2",      python = ">=3.9" },
-]
-
-matplotlib = [
-  { version = ">=3.0.0,<3.8", python = "<3.9" },
-  { version = ">=3.5,<4",     python = ">=3.9" },
-]
-
-faiss-cpu = [
-  { version = ">=1.6.0,<=1.8.0", python = "<3.9" },
-  { version = ">=1.9.0,<2",      python = ">=3.9" },
-]
-statsmodels = [
-  { version = ">=0.14.1,<0.15", python = "<3.9" },
-  { version = ">=0.14.2,<0.15", python = ">=3.9" },
-]
-
-pyarrow = [
-  { version = ">=11.0.0,<16", python = "<3.12" },
-  { version = ">=18,<23",     python = ">=3.12" },
-]
-
-seaborn = "<=0.13.2"
-pyspark = {version = ">=3.5.1,<=3.5.7", optional = true }
-
-catboost = {version = ">=1.2.7,<2", optional = true }
-lightgbm = { version = ">=4.5,<5", optional = true }
-
-[tool.poetry.extras]
-cat = ["catboost"]
-lgbm = ["lightgbm"]
-spark = ["pyspark"]
-all = ["catboost", "lightgbm", "pyspark"]
 
 [tool.poetry.group.dev.dependencies]
 pytest     = ">=8.3,<10"
