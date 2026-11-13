@@ -345,6 +345,7 @@ class DatasetBase:
             c: deepcopy(role)
             for c, role in self.tmp_roles.items()
             if c in data.columns
+            and role.data_type == result.roles[c].data_type
         }
 
         return result
