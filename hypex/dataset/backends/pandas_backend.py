@@ -1229,6 +1229,23 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             )
         return self._wrap_result(result)
 
+    def lookup_by_index(
+        self, keys: Any, column: str, source_index_column: str | None
+    ) -> Any:
+        source_labels = (
+            self.data.index
+            if source_index_column is None
+            else pd.Index(self.data[source_index_column])
+        )
+        lookup_labels = pd.Index(keys.data[column])
+        positions = source_labels.get_indexer(lookup_labels)
+        valid = positions >= 0
+        result = self.data.iloc[positions[valid]].copy()
+        result.index = keys.data.index[valid]
+        if source_index_column is not None:
+            result = result.drop(columns=[source_index_column])
+        return self._wrap_result(result)
+
     def is_empty(self) -> bool:
         """Check if DataFrame is empty (no rows or columns).
 

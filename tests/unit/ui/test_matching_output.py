@@ -167,19 +167,50 @@ def test_extract_full_data_with_unmatched_rows(matched_data) -> None:
     assert full["x_matched_0"].iloc[5:].notna().all()
 
 
+def test_matching_builds_outputs_on_each_backend(make_dataset) -> None:
+    source = make_dataset(pd.DataFrame({"x": [10.0, 20.0, 30.0]}), {"x": FeatureRole()})
+    data = ExperimentData(source)
+    data.set_value(
+        ExperimentDataEnum.additional_fields,
+        f"FaissNearestNeighbors{S}h{S}{S}0",
+        [2, -1, 0],
+        role=AdditionalMatchingRole(),
+    )
+    output = _make_output(extract_full_data=True)
+    if source.backend_type == BackendsEnum.spark:
+        indexes = MatchingOutput._get_spark_indexes(data)
+    else:
+        output.summary = {"indexes": M.join(["2", "-1", "0"])}
+        indexes = output._extract_driver_indexes(data, {})
+    output._extract_full_data(data, indexes)
+
+    full_frame = output.full_data.raw_data
+    if hasattr(full_frame, "to_pandas"):
+        full_frame = full_frame.to_pandas()
+    index_frame = output.indexes.raw_data
+    if hasattr(index_frame, "to_pandas"):
+        index_frame = index_frame.to_pandas()
+    full_frame = full_frame.sort_index()
+    index_frame = index_frame.sort_index()
+    assert index_frame.iloc[:, 0].tolist() == [2, -1, 0]
+    assert full_frame["x_matched_0"].iloc[0] == 30.0
+    assert pd.isna(full_frame["x_matched_0"].iloc[1])
+    assert full_frame["x_matched_0"].iloc[2] == 10.0
+
+
 def test_match_pandas_all_unmatched_returns_empty(matched_data) -> None:
     data, _ = matched_data
-    output = _make_output()
     t_indexes = Dataset(
         roles={"i": AdditionalMatchingRole()},
         data=pd.DataFrame({"i": [-1, -1]}),
         backend=BackendsEnum.pandas,
     )
-    assert output._match_pandas(data, t_indexes, "i").is_empty()
+    matched = data.ds.lookup_by_index(t_indexes, "i")
+    assert matched.is_empty()
 
 
 # --------------------------------------------------------------------------
-# _extract_driver_indexes branches
+# pandas index extraction branches
 # --------------------------------------------------------------------------
 def _grouped_data() -> ExperimentData:
     df = pd.DataFrame({"g": ["a", "a", "b", "b"], "x": [1.0, 2.0, 3.0, 4.0]})
@@ -192,10 +223,14 @@ def _grouped_data() -> ExperimentData:
     )
 
 
+def _extract_driver_indexes(output, data, reformatted_summary):
+    return output._extract_driver_indexes(data, reformatted_summary)
+
+
 def test_driver_indexes_single_matching_length() -> None:
     output = _make_output()
     output.summary = {"indexes": M.join(["2", "3", "0", "1"])}
-    indexes = output._extract_driver_indexes(_grouped_data(), {})
+    indexes = _extract_driver_indexes(output, _grouped_data(), {})
     assert indexes["indexes"].raw_data.iloc[:, 0].tolist() == [2, 3, 0, 1]
 
 
@@ -203,20 +238,20 @@ def test_driver_indexes_single_length_mismatch_warns() -> None:
     output = _make_output()
     output.summary = {"indexes": M.join(["2", "3"])}
     with pytest.warns(UserWarning, match="Alignment skipped"):
-        indexes = output._extract_driver_indexes(_grouped_data(), {})
+        indexes = _extract_driver_indexes(output, _grouped_data(), {})
     assert len(indexes) == 2
 
 
 def test_driver_indexes_absent_gives_empty() -> None:
     output = _make_output()
     output.summary = {}
-    assert output._extract_driver_indexes(_grouped_data(), {}).is_empty()
+    assert _extract_driver_indexes(output, _grouped_data(), {}).is_empty()
 
 
 def test_driver_indexes_flat_grouped() -> None:
     output = _make_output()
     summary = {"indexes": {"0": M.join(["2", "3", "0", "1"])}}
-    indexes = output._extract_driver_indexes(_grouped_data(), summary)
+    indexes = _extract_driver_indexes(output, _grouped_data(), summary)
     assert indexes["indexes_0"].raw_data.iloc[:, 0].tolist() == [2, 3, 0, 1]
     assert "indexes" not in summary
 
@@ -224,15 +259,15 @@ def test_driver_indexes_flat_grouped() -> None:
 def test_driver_indexes_flat_grouped_length_mismatch_warns() -> None:
     output = _make_output()
     with pytest.warns(UserWarning, match="for group '0'"):
-        output._extract_driver_indexes(
-            _grouped_data(), {"indexes": {"0": M.join(["2", "3"])}}
+        _extract_driver_indexes(
+            output, _grouped_data(), {"indexes": {"0": M.join(["2", "3"])}}
         )
 
 
 def test_driver_indexes_nested_grouped() -> None:
     output = _make_output()
     summary = {"indexes": {"0": {"a": M.join(["2", "3"]), "b": M.join(["0", "1"])}}}
-    indexes = output._extract_driver_indexes(_grouped_data(), summary)
+    indexes = _extract_driver_indexes(output, _grouped_data(), summary)
     assert indexes["indexes_0"].raw_data.iloc[:, 0].tolist() == [2, 3, 0, 1]
 
 

@@ -1401,6 +1401,37 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         return self._wrap_result(result)
 
+    def lookup_by_index(
+        self, keys: Any, column: str, source_index_column: str | None
+    ) -> Any:
+        key_columns = set(keys.data.columns)
+        keys_reset = keys.data.reset_index()
+        position_field = next(
+            column for column in keys_reset.columns if column not in key_columns
+        )
+        mapping = keys_reset.rename(
+            columns={position_field: "_hypex_pos", column: "_hypex_lookup"}
+        )
+
+        if source_index_column is None:
+            source_columns = set(self.data.columns)
+            source = self.data.reset_index()
+            source_index_column = next(
+                column for column in source.columns if column not in source_columns
+            )
+        else:
+            source = self.data
+
+        matched = mapping.merge(
+            source,
+            left_on="_hypex_lookup",
+            right_on=source_index_column,
+            how="inner",
+        )
+        matched = matched.set_index("_hypex_pos", drop=True)
+        matched = matched.drop(columns=["_hypex_lookup", source_index_column])
+        return self._wrap_result(matched)
+
     def is_empty(self) -> bool:
         """Check if dataset contains no data.
 

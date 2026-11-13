@@ -23,8 +23,9 @@ MultiTest.calc(p_values)                  FaissExtension.calc(data, mode=...)
         └── _calc_spark   → to_backend(pandas), then _calc_pandas
 ```
 
-Extensions are **not** `Executor`s: no id, no `ExperimentData`, no pipeline
-position. They take `Dataset`s and return `Dataset`s.
+Extensions are **not** `Executor`s: no id and no pipeline position. Computational
+extensions take `Dataset`s and return `Dataset`s; output extensions may also read
+`ExperimentData` without changing it.
 
 ## File map
 

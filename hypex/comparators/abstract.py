@@ -23,7 +23,6 @@ from ..dataset import (
 from ..executor import Calculator
 from ..utils import (
     NAME_BORDER_SYMBOL,
-    BackendsEnum,
     ExperimentDataEnum,
     FromDictTypes,
     GroupingDataType,
@@ -35,6 +34,7 @@ from ..utils.errors import (
     NoRequiredArgumentError,
     NotSuitableFieldError,
 )
+from ..utils.registry import backend_factory
 
 
 class BaseComparator(Calculator):
@@ -1187,17 +1187,13 @@ class StatsHypothesisTesting(StatsComparator, ABC):
 
 
 class AdaptiveHypothesisTest(BaseComparator):
-    """
-    Routes execute() to a backend-specific hypothesis test at runtime.
+    """Resolve a registered hypothesis-test implementation at runtime.
 
-    Subclasses declare BACKEND_MAP: {BackendsEnum -> concrete test class}.
     The concrete class must be a subclass of either GroupHypothesisTesting or
     StatsHypothesisTesting. Results are always stored under the adaptive
     instance's own id, so pipeline lookups remain consistent regardless of
-    which backend is active.
+    which implementation is active.
     """
-
-    BACKEND_MAP: ClassVar[dict[BackendsEnum, type[BaseComparator]]] = {}
 
     def __init__(
         self,
@@ -1244,10 +1240,10 @@ class AdaptiveHypothesisTest(BaseComparator):
         raise NotImplementedError("Use execute() for adaptive tests.")
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        backend = data.ds.backend_type
-        if backend not in self.BACKEND_MAP:
+        delegate_cls = backend_factory.resolve_backend(type(self), data.ds)
+        if delegate_cls is None:
             raise ValueError(
-                f"{type(self).__name__} has no implementation for backend {backend!r}. "
-                f"Registered: {list(self.BACKEND_MAP)}"
+                f"{type(self).__name__} has no implementation for backend "
+                f"{data.ds.backend_type!r}."
             )
-        return self._build_delegate(self.BACKEND_MAP[backend]).execute(data)
+        return self._build_delegate(delegate_cls).execute(data)

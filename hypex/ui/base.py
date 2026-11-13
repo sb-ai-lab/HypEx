@@ -7,7 +7,7 @@ from typing import Any
 from ..dataset import Dataset, ExperimentData
 from ..experiments.base import Experiment
 from ..reporters import Reporter
-from ..utils import ID_SPLIT_SYMBOL, BackendsEnum
+from ..utils import ID_SPLIT_SYMBOL
 from ..utils.enums import RenameEnum
 
 
@@ -328,14 +328,9 @@ class ExperimentShell:
             # back into the caller's ExperimentData.
             data = data.copy()
 
-        # ── Auto-persist for Spark backend ──────────────────────────
         original_ds = data.ds
         persisted_by_us = False
-        if (
-            self.auto_persist
-            and original_ds.backend_type == BackendsEnum.spark
-            and not original_ds.is_persisted
-        ):
+        if self.auto_persist and not original_ds.is_persisted:
             original_ds.persist(storage_level="MEMORY_AND_DISK", action="count")
             persisted_by_us = True
 

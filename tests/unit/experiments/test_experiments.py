@@ -239,6 +239,108 @@ def test_on_role_vector_executor_runs_once_with_all_targets(data) -> None:
     assert log == [["y1", "y2"]]
 
 
+def test_on_role_classifies_resolved_executor_capability(data) -> None:
+    from hypex.comparators import StatsTTest
+    from hypex.comparators.comparators import StatTestMasterAbstract
+    from hypex.dataset.backends import PandasDataset
+    from hypex.utils.registry import backend_factory
+
+    log: list = []
+
+    class _Master(StatTestMasterAbstract):
+        pass
+
+    class _ResolvedVector(StatsTTest):
+        def execute(self, d):
+            log.append(sorted(d.ds.tmp_roles))
+            return d
+
+    backend_factory.register_explicit(_Master, PandasDataset, _ResolvedVector)
+    try:
+        OnRoleExperiment(
+            [_Master(grouping_role=GroupingRole())], role=TargetRole()
+        ).execute(data)
+    finally:
+        backend_factory.unregister(_Master)
+
+    assert log == [["y1", "y2"]]
+
+
+@pytest.mark.parametrize(
+    ("master_name", "pandas_name", "spark_name"),
+    [
+        ("TTest", "GroupTTest", "StatsTTest"),
+        ("KSTest", "GroupKSTest", "StatsKSTest"),
+        ("UTest", "GroupUTest", "StatsUTest"),
+        ("Chi2Test", "GroupChi2Test", "StatsChi2Test"),
+    ],
+)
+def test_on_role_launches_resolved_executor(
+    master_name,
+    pandas_name,
+    spark_name,
+    frame,
+    backend,
+    make_dataset,
+    monkeypatch,
+) -> None:
+    import hypex.comparators as comparators
+
+    master_cls = getattr(comparators, master_name)
+    expected_name = spark_name if backend == BackendsEnum.spark else pandas_name
+    expected_cls = getattr(comparators, expected_name)
+    ds = make_dataset(
+        frame,
+        {"g": GroupingRole(), "y1": TargetRole(), "y2": TargetRole()},
+    )
+    calls = []
+
+    def spy(self, current_data):
+        calls.append((type(self), sorted(current_data.ds.tmp_roles), self.key))
+        return current_data
+
+    monkeypatch.setattr(expected_cls, "execute", spy)
+    master = master_cls(grouping_role=GroupingRole())
+    experiment = OnRoleExperiment([master], role=TargetRole(), key="dispatch")
+    experiment.execute(ExperimentData(ds))
+
+    expected_batches = (
+        [["y1", "y2"]] if backend == BackendsEnum.spark else [["y1"], ["y2"]]
+    )
+    assert calls == [(expected_cls, batch, "dispatch") for batch in expected_batches]
+    assert experiment.executors[0] is master
+
+
+@pytest.mark.spark
+def test_on_role_launches_spark_z_test(spark_session, monkeypatch) -> None:
+    from hypex.comparators import StatsZTest, ZTest
+
+    ds = Dataset(
+        roles={"g": GroupingRole(), "y1": TargetRole(), "y2": TargetRole()},
+        data=pd.DataFrame(
+            {
+                "g": ["a", "a", "b", "b"],
+                "y1": [0, 1, 0, 1],
+                "y2": [1, 0, 1, 0],
+            }
+        ),
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+    calls = []
+
+    def spy(self, current_data):
+        calls.append((type(self), sorted(current_data.ds.tmp_roles), self.key))
+        return current_data
+
+    monkeypatch.setattr(StatsZTest, "execute", spy)
+    OnRoleExperiment(
+        [ZTest(grouping_role=GroupingRole())], role=TargetRole(), key="z"
+    ).execute(ExperimentData(ds))
+
+    assert calls == [(StatsZTest, ["y1", "y2"], "z")]
+
+
 # ---------------------------------------------------------------------------
 # CycledExperiment
 # ---------------------------------------------------------------------------

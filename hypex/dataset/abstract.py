@@ -1021,7 +1021,7 @@ class DatasetBase:
         keys, and its values provide replacement labels. Missing mappings are
         represented as missing values.
         """
-        if not isinstance(labels, self.__class__):
+        if not isinstance(labels, DatasetBase):
             raise DataTypeError(type(labels))
         if type(labels._backend_data) is not type(self._backend_data):
             raise BackendTypeError(type(labels._backend_data), type(self._backend_data))
@@ -1042,6 +1042,35 @@ class DatasetBase:
             roles=new_roles,
             data=self._backend_data.map_index_values(
                 labels._backend_data, selected_columns
+            ),
+        )
+
+    def lookup_by_index(
+        self,
+        keys: DatasetBase,
+        column: str | None = None,
+        source_index_column: str | None = None,
+    ) -> Self:
+        """Look up rows by key values and index the result by the keys' index."""
+        if not isinstance(keys, DatasetBase):
+            raise DataTypeError(type(keys))
+        if type(keys._backend_data) is not type(self._backend_data):
+            raise BackendTypeError(type(keys._backend_data), type(self._backend_data))
+        if column is None:
+            if len(keys.columns) != 1:
+                raise ValueError("The keys dataset must contain exactly one column.")
+            column = keys.columns[0]
+        if column not in keys.columns:
+            raise KeyError(column)
+        if source_index_column is not None and source_index_column not in self.columns:
+            raise KeyError(source_index_column)
+
+        new_roles = deepcopy(self.roles)
+        new_roles.pop(source_index_column, None)
+        return self.__class__(
+            roles=new_roles,
+            data=self._backend_data.lookup_by_index(
+                keys._backend_data, column, source_index_column
             ),
         )
 

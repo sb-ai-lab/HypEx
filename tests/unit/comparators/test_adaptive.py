@@ -7,20 +7,24 @@ import pytest
 from hypex.comparators import GroupTTest, StatsTTest
 from hypex.comparators.abstract import AdaptiveHypothesisTest
 from hypex.dataset import ExperimentData, TargetRole, TreatmentRole
+from hypex.dataset.backends import PandasDataset, SparkDataset
 from hypex.utils import BackendsEnum
+from hypex.utils.registry import backend_factory
 
 from ._utils import build_dataset, result_frame, three_groups_df, to_pandas
 
 
 class _AdaptiveT(AdaptiveHypothesisTest):
-    BACKEND_MAP = {  # noqa: RUF012
-        BackendsEnum.pandas: GroupTTest,
-        BackendsEnum.spark: StatsTTest,
-    }
+    pass
 
 
 class _PandasOnly(AdaptiveHypothesisTest):
-    BACKEND_MAP = {BackendsEnum.pandas: GroupTTest}  # noqa: RUF012
+    pass
+
+
+backend_factory.register_explicit(_AdaptiveT, PandasDataset, GroupTTest)
+backend_factory.register_explicit(_AdaptiveT, SparkDataset, StatsTTest)
+backend_factory.register_explicit(_PandasOnly, PandasDataset, GroupTTest)
 
 
 ROLES = {"g": TreatmentRole(), "y": TargetRole()}
@@ -84,7 +88,7 @@ def test_unregistered_backend_raises(spark_session) -> None:
         _PandasOnly(grouping_role=TreatmentRole()).execute(ExperimentData(ds))
 
 
-def test_empty_backend_map_raises() -> None:
+def test_unregistered_base_raises() -> None:
     ds = build_dataset(three_groups_df(), ROLES)
     with pytest.raises(ValueError, match="no implementation"):
         AdaptiveHypothesisTest().execute(ExperimentData(ds))
