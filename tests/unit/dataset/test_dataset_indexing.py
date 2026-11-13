@@ -14,7 +14,7 @@ def _ds(make_dataset):
         {
             "a": [1, 2, 3, 4],
             "b": [10.0, 20.0, 30.0, 40.0],
-            "c": ["w", "x", "y", "z"],
+            "c": pd.Series(["w", "x", "y", "z"], dtype=object),
         }
     )
     roles = {"a": FeatureRole(), "b": TargetRole(), "c": FeatureRole()}

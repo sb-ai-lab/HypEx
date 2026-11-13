@@ -9,7 +9,9 @@ from hypex.dataset import Dataset, FeatureRole, GroupingRole
 
 
 def _dataset():
-    frame = pd.DataFrame({"group": ["a", "a", "b"], "value": [1, 2, 3]})
+    frame = pd.DataFrame(
+        {"group": pd.Series(["a", "a", "b"], dtype=object), "value": [1, 2, 3]}
+    )
     frame.index.name = "row_id"
     return Dataset(data=frame, roles={"group": GroupingRole(), "value": FeatureRole()})
 
