@@ -8,7 +8,7 @@ from copy import deepcopy
 import pandas as pd
 import pytest
 
-from hypex.dataset import Dataset, FeatureRole
+from hypex.dataset import Dataset, FeatureRole, TempTargetRole
 from hypex.utils import BackendsEnum
 from hypex.utils.errors import BackendTypeError, DataTypeError
 
@@ -95,6 +95,27 @@ def _as_pandas(ds) -> pd.DataFrame:
     data = ds.backend_data.data
     frame = data.to_pandas() if hasattr(data, "to_pandas") else data
     return frame.sort_index()
+
+
+@pytest.mark.parametrize(
+    "operation, expected, preserves_role",
+    [
+        (lambda ds: ds / 2, [0.5, 1.5], False),
+        (lambda ds: ds > 1, [False, True], False),
+        (lambda ds: ds + 1, [2, 4], True),
+    ],
+    ids=["division", "comparison", "addition"],
+)
+def test_operations_with_tmp_roles(make_dataset, operation, expected, preserves_role):
+    ds = make_dataset(pd.DataFrame({"x": [1, 3]}), {"x": FeatureRole()})
+    ds.tmp_roles = {"x": TempTargetRole()}
+
+    result = operation(ds)
+
+    pd.testing.assert_frame_equal(_as_pandas(result), pd.DataFrame({"x": expected}))
+    assert ("x" in result.tmp_roles) is preserves_role
+    assert ds.tmp_roles["x"].data_type is int
+    pd.testing.assert_frame_equal(_as_pandas(ds), pd.DataFrame({"x": [1, 3]}))
 
 
 def test_bitwise_operators_values(make_dataset) -> None:

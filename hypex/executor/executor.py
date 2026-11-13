@@ -405,7 +405,12 @@ class MLExecutor(Calculator, ABC):
         group_field = Adapter.to_list(group_field)
         features_fields = Adapter.to_list(features_fields)
         if grouping_data is None:
-            grouping_data = data[group_field + features_fields].groupby(group_field)
+            fields = list(
+                dict.fromkeys(
+                    group_field + features_fields + Adapter.to_list(target_field)
+                )
+            )
+            grouping_data = data[fields].groupby(group_field)
         if len(grouping_data) > 1:
             # grouping_data[0][1].tmp_roles = data.tmp_roles
             tmp_roles = data.tmp_roles

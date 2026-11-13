@@ -229,7 +229,9 @@ class TestRobustness:
         fresh_manager.register(key, alive)
         with pytest.warns(RuntimeWarning):
             fresh_manager.release_all(key)
-        assert not alive.persisted, "live plan must be released despite the dead neighbor"
+        assert not alive.persisted, (
+            "live plan must be released despite the dead neighbor"
+        )
 
     def test_frame_without_unpersist_method_warns(self, fresh_manager):
         class Bare:
@@ -267,7 +269,9 @@ class TestThreadSafety:
             except Exception as exc:  # pragma: no cover
                 errors.append(exc)
 
-        threads = [threading.Thread(target=worker, args=(frames[i::4],)) for i in range(4)]
+        threads = [
+            threading.Thread(target=worker, args=(frames[i::4],)) for i in range(4)
+        ]
         for t in threads:
             t.start()
         for t in threads:
