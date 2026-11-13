@@ -59,6 +59,26 @@ def test_execute_unequal_groups(backend, spark_session) -> None:
     assert row["test size %"] == pytest.approx(25.0)
 
 
+def test_execute_ignores_missing_group_labels(backend, spark_session) -> None:
+    import pandas as pd
+
+    df = pd.DataFrame(
+        {
+            "g": ["a"] * 3 + ["b"] * 2 + [None] * 4,
+            "y": [float(i) for i in range(9)],
+        }
+    )
+    ds = build_dataset(df, TREAT_TARGET_ROLES, backend, spark_session)
+    ex = GroupSizes(grouping_role=TreatmentRole())
+
+    row = result_frame(ex.execute(ExperimentData(ds)), ex).iloc[0]
+
+    assert row["control size"] == 3
+    assert row["test size"] == 2
+    assert row["control size %"] == pytest.approx(60.0)
+    assert row["test size %"] == pytest.approx(40.0)
+
+
 def test_execute_three_groups_compares_each_to_baseline(backend, spark_session) -> None:
     ds = build_dataset(
         three_groups_df(n=20), TREAT_TARGET_ROLES, backend, spark_session
