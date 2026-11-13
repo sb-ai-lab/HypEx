@@ -1012,6 +1012,39 @@ class DatasetBase:
             data=self._backend_data.map(func=func, na_action=na_action, **kwargs),
         )
 
+    def map_index_values(
+        self, labels: DatasetBase, columns: list[str] | None = None
+    ) -> Self:
+        """Map the row index and selected columns to values from a label dataset.
+
+        ``labels`` must contain exactly one column. Its index provides source
+        keys, and its values provide replacement labels. Missing mappings are
+        represented as missing values.
+        """
+        if not isinstance(labels, self.__class__):
+            raise DataTypeError(type(labels))
+        if type(labels._backend_data) is not type(self._backend_data):
+            raise BackendTypeError(type(labels._backend_data), type(self._backend_data))
+        if len(labels.columns) != 1:
+            raise ValueError("The labels dataset must contain exactly one column.")
+
+        selected_columns = self.columns if columns is None else columns
+        missing_columns = set(selected_columns) - set(self.columns)
+        if missing_columns:
+            raise KeyError(f"Columns not found: {sorted(missing_columns)}")
+
+        new_roles = deepcopy(self.roles)
+        label_role = next(iter(labels.roles.values()))
+        for column in selected_columns:
+            new_roles[column] = deepcopy(label_role)
+
+        return self.__class__(
+            roles=new_roles,
+            data=self._backend_data.map_index_values(
+                labels._backend_data, selected_columns
+            ),
+        )
+
     def is_empty(self) -> bool:
         return self._backend_data.is_empty()
 
@@ -1245,8 +1278,8 @@ class DatasetBase:
         on: str | None = None,
         left_on: str | None = None,
         right_on: str | None = None,
-        left_index: bool = False,
-        right_index: bool = False,
+        left_index: bool | None = None,
+        right_index: bool | None = None,
         suffixes: tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "outer", "inner", "cross"] = "inner",
     ) -> Self:

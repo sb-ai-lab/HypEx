@@ -634,6 +634,11 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
+    def map_index_values(self, labels: Any, columns: list[str]) -> Any:
+        """Map the row index and selected columns to values from a label dataset."""
+        raise AbstractMethodError
+
+    @abstractmethod
     def is_empty(self) -> bool:
         """Return ``True`` if the dataset contains no rows or columns."""
         raise AbstractMethodError
@@ -877,8 +882,8 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         on: str | None = None,
         left_on: str | None = None,
         right_on: str | None = None,
-        left_index: bool = False,
-        right_index: bool = False,
+        left_index: bool | None = None,
+        right_index: bool | None = None,
         suffixes: tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "inner", "outer", "cross"] = "inner",
     ) -> Any:
