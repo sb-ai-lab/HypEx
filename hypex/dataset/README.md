@@ -51,7 +51,8 @@ The abstract base carrying the implementation. Notable groups of members:
 * **DataFrame-like API** — `__getitem__`, `loc` / `iloc` (via the inner `Locker` /
   `ILocker` dataclasses), `select`, `iselect`, `filter`, `drop`, `dropna`,
   `merge`, `append`, `add_column`, `rename`, `replace`, `sample`, `sort`,
-  `reset_index`, `astype`, `apply`, `map`, `unique`, `value_counts`.
+  `reset_index`, `astype`, `apply`, `map`, `map_index_values`,
+  `lookup_by_index`, `unique`, `value_counts`.
 * **Statistics** — `mean`, `std`, `var`, `min`, `max`, `sum`, `count`, `mode`,
   `median`, `quantile`, `corr`, `cov`, `dot`, `agg`, `coefficient_of_variation`,
   `na_counts`, `isna`.

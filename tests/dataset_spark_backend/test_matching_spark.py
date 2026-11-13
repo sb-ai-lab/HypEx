@@ -15,7 +15,7 @@ from hypex.dataset import (
     TargetRole,
     TreatmentRole,
 )
-from hypex.extensions.matching_output import SparkMatchingOutputExtension
+from hypex.ui.matching import MatchingOutput
 from hypex.utils import BackendsEnum
 
 
@@ -109,9 +109,8 @@ def test_spark_full_data_preserves_unmatched_rows(spark_session):
         session=spark_session,
     )
 
-    full, _ = SparkMatchingOutputExtension().build_full_data(
-        ExperimentData(ds), indexes
-    )
-    result = full.raw_data.to_pandas().sort_index()
+    output = MatchingOutput(extract_full_data=True)
+    output._extract_full_data(ExperimentData(ds), indexes)
+    result = output.full_data.raw_data.to_pandas().sort_index()
     assert pd.isna(result["x_matched_0"].iloc[0])
     assert result["x_matched_0"].iloc[1:].tolist() == [30.0, 10.0]

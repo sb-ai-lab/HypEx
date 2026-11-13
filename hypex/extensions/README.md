@@ -40,7 +40,6 @@ extensions take `Dataset`s and return `Dataset`s; output extensions may also rea
 | `encoders.py` | `pandas` | `DummyEncoderExtension`, `PandasDummyEncoderExtension`, `SparkDummyEncoderExtension` | Enhanced |
 | `bias.py` | — | `BiasExtension`, `PandasBisaExtesion`, `SparkBisaExtesion` | **New** |
 | `matching_metric.py` | — | `MatchingMetricsExtension`, `PandasMatchingMetricsExtension`, `SparkMatchingMetricsExtension` | **New** |
-| `matching_output.py` | — | `MatchingOutputExtension`, `PandasMatchingOutputExtension`, `SparkMatchingOutputExtension` | Active |
 | `stats_hypothesis_testing.py` | — | Enhanced statistical testing extensions | **New** |
 | `__init__.py` | — | Public exports | Active |
 
@@ -184,13 +183,6 @@ Implements matching metrics calculation:
 - `SparkMatchingMetricsExtension` - Spark implementation
 
 Used by `MatchingMetrics` operator for ATE/ATT/ATC estimation.
-
-### `MatchingOutputExtension` (`matching_output.py`)
-
-Builds matched-index and full-data outputs. `MatchingOutput` and `MatchingReporter`
-resolve the registered implementation through `backend_factory`; pandas uses
-in-memory lookups and summary parsing, while Spark keeps index selection and joins
-lazy and manages checkpointing inside the extension.
 
 ## How to work with it
 

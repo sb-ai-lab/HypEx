@@ -136,6 +136,66 @@ def test_map_transforms_values(make_dataset) -> None:
     assert len(doubled) == 3
 
 
+@pytest.mark.parametrize(
+    "ids",
+    [["a", "b", "c"], [2**53 + 3, 2**53 + 5, 2**53 + 7]],
+)
+def test_map_index_values_preserves_labels_and_missing(make_dataset, ids) -> None:
+    labels = make_dataset(pd.DataFrame({"uid": ids}), {"uid": FeatureRole()})
+    data = make_dataset(
+        pd.DataFrame({"matched": [1, -1, 0], "other": [2, 0, 1]}),
+        {"matched": FeatureRole(), "other": FeatureRole()},
+    )
+
+    mapped = data.map_index_values(labels)
+    mapped_selected = data.map_index_values(labels, columns=["matched"])
+    frames = []
+    for result in (mapped, mapped_selected):
+        frame = result.raw_data
+        frame = frame.to_pandas() if hasattr(frame, "to_pandas") else frame
+        frames.append(frame)
+        assert frame.index.tolist() == ids
+        assert frame.index.name == "uid"
+        if result.backend_type == BackendsEnum.spark and isinstance(ids[0], int):
+            matched_values = [row["matched"] for row in result.data.collect()]
+            assert matched_values == [ids[1], None, ids[0]]
+        else:
+            assert frame["matched"].iloc[[0, 2]].tolist() == [ids[1], ids[0]]
+            assert pd.isna(frame["matched"].iloc[1])
+    assert frames[0]["other"].tolist() == [ids[2], ids[0], ids[1]]
+    assert frames[1]["other"].tolist() == [2, 0, 1]
+
+
+def test_map_index_values_requires_single_label_column(make_dataset) -> None:
+    labels = make_dataset(
+        pd.DataFrame({"uid": ["a", "b"], "other": ["x", "y"]}),
+        {"uid": FeatureRole(), "other": FeatureRole()},
+    )
+    data = make_dataset(pd.DataFrame({"matched": [0, 1]}), {"matched": FeatureRole()})
+
+    with pytest.raises(ValueError, match="exactly one column"):
+        data.map_index_values(labels)
+
+
+def test_lookup_by_index_uses_key_positions(make_dataset) -> None:
+    source = make_dataset(pd.DataFrame({"x": [10.0, 20.0, 30.0]}), {"x": FeatureRole()})
+    keys = make_dataset(pd.DataFrame({"lookup": [2, -1, 0]}), {"lookup": FeatureRole()})
+
+    result = source.lookup_by_index(keys)
+    original_columns = set(source.columns)
+    reset = source.reset_index(drop=False)
+    index_column = next(c for c in reset.columns if c not in original_columns)
+    prepared = reset.lookup_by_index(keys, source_index_column=index_column)
+
+    for output in (result, prepared):
+        frame = output.raw_data
+        frame = frame.to_pandas() if hasattr(frame, "to_pandas") else frame
+        frame = frame.sort_index()
+        assert frame.index.tolist() == [0, 2]
+        assert frame["x"].tolist() == [30.0, 10.0]
+    assert index_column not in prepared.columns
+
+
 def test_map_forwards_kwargs_to_func_pandas() -> None:
     """map passes extra kwargs to func (pandas backend)."""
     df = pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]})

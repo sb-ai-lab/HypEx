@@ -1360,6 +1360,76 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         else:
             return self._wrap_result(self.data.apply(func, **kwargs))
 
+    def map_index_values(self, labels: Any, columns: list[str]) -> Any:
+        reserved = set(self.data.columns) | set(labels.data.columns)
+
+        def temporary_name(base: str) -> str:
+            name = base
+            while name in reserved:
+                name = f"_{name}"
+            reserved.add(name)
+            return name
+
+        label_field = labels.data.columns[0]
+        labels.checkpoint(eager=True)
+        original_columns = set(self.data.columns)
+        result = self.data.reset_index()
+        source_field = next(
+            column for column in result.columns if column not in original_columns
+        )
+
+        source_name = temporary_name("__hypex_index_value_source")
+        source_ids = labels.data.rename(columns={label_field: source_name})
+        result = result.merge(
+            source_ids, left_on=source_field, right_index=True, how="left"
+        )
+        result = result.set_index(source_name, drop=True).drop(columns=[source_field])
+        result.index.name = label_field
+
+        for column in columns:
+            mapped_name = temporary_name(f"__hypex_index_value_{column}")
+            mapped_ids = labels.data.rename(columns={label_field: mapped_name})
+            result = result.merge(
+                mapped_ids, left_on=column, right_index=True, how="left"
+            )
+            result = result.drop(columns=[column]).rename(columns={mapped_name: column})
+            converted = self._wrap_result(result)
+            converted.checkpoint(eager=True)
+            result = converted.data
+
+        return self._wrap_result(result)
+
+    def lookup_by_index(
+        self, keys: Any, column: str, source_index_column: str | None
+    ) -> Any:
+        key_columns = set(keys.data.columns)
+        keys_reset = keys.data.reset_index()
+        position_field = next(
+            column for column in keys_reset.columns if column not in key_columns
+        )
+        mapping = keys_reset.rename(
+            columns={position_field: "_hypex_pos", column: "_hypex_lookup"}
+        )
+
+        if source_index_column is None:
+            source_columns = set(self.data.columns)
+            source = self.data.reset_index()
+            source_index_column = next(
+                column for column in source.columns if column not in source_columns
+            )
+        else:
+            source = self.data
+
+        matched = mapping.merge(
+            source,
+            left_on="_hypex_lookup",
+            right_on=source_index_column,
+            how="inner",
+        )
+        matched = matched.set_index("_hypex_pos", drop=True)
+        matched = matched.drop(columns=["_hypex_lookup", source_index_column])
+        return self._wrap_result(matched)
+
     def is_empty(self) -> bool:
         """Check if dataset contains no data.
 

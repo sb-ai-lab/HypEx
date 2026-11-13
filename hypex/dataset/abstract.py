@@ -1012,6 +1012,63 @@ class DatasetBase:
             data=self._backend_data.map(func=func, na_action=na_action, **kwargs),
         )
 
+    def map_index_values(
+        self, labels: DatasetBase, columns: list[str] | None = None
+    ) -> Self:
+        """Map the row index and selected columns to values from a label dataset."""
+        if not isinstance(labels, DatasetBase):
+            raise DataTypeError(type(labels))
+        if type(labels._backend_data) is not type(self._backend_data):
+            raise BackendTypeError(type(labels._backend_data), type(self._backend_data))
+        if len(labels.columns) != 1:
+            raise ValueError("The labels dataset must contain exactly one column.")
+
+        selected_columns = self.columns if columns is None else columns
+        missing_columns = set(selected_columns) - set(self.columns)
+        if missing_columns:
+            raise KeyError(f"Columns not found: {sorted(missing_columns)}")
+
+        new_roles = deepcopy(self.roles)
+        label_role = next(iter(labels.roles.values()))
+        for column in selected_columns:
+            new_roles[column] = deepcopy(label_role)
+
+        return self.__class__(
+            roles=new_roles,
+            data=self._backend_data.map_index_values(
+                labels._backend_data, selected_columns
+            ),
+        )
+
+    def lookup_by_index(
+        self,
+        keys: DatasetBase,
+        column: str | None = None,
+        source_index_column: str | None = None,
+    ) -> Self:
+        """Look up rows by key values and index the result by the keys' index."""
+        if not isinstance(keys, DatasetBase):
+            raise DataTypeError(type(keys))
+        if type(keys._backend_data) is not type(self._backend_data):
+            raise BackendTypeError(type(keys._backend_data), type(self._backend_data))
+        if column is None:
+            if len(keys.columns) != 1:
+                raise ValueError("The keys dataset must contain exactly one column.")
+            column = keys.columns[0]
+        if column not in keys.columns:
+            raise KeyError(column)
+        if source_index_column is not None and source_index_column not in self.columns:
+            raise KeyError(source_index_column)
+
+        new_roles = deepcopy(self.roles)
+        new_roles.pop(source_index_column, None)
+        return self.__class__(
+            roles=new_roles,
+            data=self._backend_data.lookup_by_index(
+                keys._backend_data, column, source_index_column
+            ),
+        )
+
     def is_empty(self) -> bool:
         return self._backend_data.is_empty()
 

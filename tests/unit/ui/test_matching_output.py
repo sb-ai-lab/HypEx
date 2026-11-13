@@ -18,7 +18,6 @@ from hypex.dataset import (
     TargetRole,
     TreatmentRole,
 )
-from hypex.extensions.matching_output import PandasMatchingOutputExtension
 from hypex.operators import MatchingMetrics
 from hypex.ui.matching import MatchingOutput
 from hypex.utils import ID_SPLIT_SYMBOL as S
@@ -155,9 +154,7 @@ def test_extract_full_data_with_unmatched_rows(matched_data) -> None:
     assert full["x_matched_0"].iloc[5:].notna().all()
 
 
-def test_matching_extension_resolves_and_builds_outputs_on_each_backend(
-    make_dataset,
-) -> None:
+def test_matching_builds_outputs_on_each_backend(make_dataset) -> None:
     source = make_dataset(pd.DataFrame({"x": [10.0, 20.0, 30.0]}), {"x": FeatureRole()})
     data = ExperimentData(source)
     data.set_value(
@@ -166,31 +163,18 @@ def test_matching_extension_resolves_and_builds_outputs_on_each_backend(
         [2, -1, 0],
         role=AdditionalMatchingRole(),
     )
-    extension = MatchingOutput._get_extension(data)
-    expected_name = (
-        "SparkMatchingOutputExtension"
-        if source.backend_type == BackendsEnum.spark
-        else "PandasMatchingOutputExtension"
-    )
-    assert type(extension).__name__ == expected_name
+    output = _make_output(extract_full_data=True)
+    if source.backend_type == BackendsEnum.spark:
+        indexes = MatchingOutput._get_spark_indexes(data)
+    else:
+        output.summary = {"indexes": M.join(["2", "-1", "0"])}
+        indexes = output._extract_driver_indexes(data, {})
+    output._extract_full_data(data, indexes)
 
-    summary = (
-        {"indexes": M.join(["2", "-1", "0"])}
-        if source.backend_type == BackendsEnum.pandas
-        else {}
-    )
-    indexes = extension.extract_indexes(
-        experiment_data=data,
-        index_ids=MatchingOutput._get_index_ids(data),
-        summary=summary,
-        reformatted_summary={},
-    )
-    full, extracted = extension.build_full_data(data, indexes)
-
-    full_frame = full.raw_data
+    full_frame = output.full_data.raw_data
     if hasattr(full_frame, "to_pandas"):
         full_frame = full_frame.to_pandas()
-    index_frame = extracted.raw_data
+    index_frame = output.indexes.raw_data
     if hasattr(index_frame, "to_pandas"):
         index_frame = index_frame.to_pandas()
     full_frame = full_frame.sort_index()
@@ -208,7 +192,7 @@ def test_match_pandas_all_unmatched_returns_empty(matched_data) -> None:
         data=pd.DataFrame({"i": [-1, -1]}),
         backend=BackendsEnum.pandas,
     )
-    matched = PandasMatchingOutputExtension()._match(data, t_indexes, "i", context={})
+    matched = data.ds.lookup_by_index(t_indexes, "i")
     assert matched.is_empty()
 
 
@@ -227,12 +211,7 @@ def _grouped_data() -> ExperimentData:
 
 
 def _extract_driver_indexes(output, data, reformatted_summary):
-    return PandasMatchingOutputExtension().extract_indexes(
-        experiment_data=data,
-        index_ids=[],
-        summary=getattr(output, "summary", {}),
-        reformatted_summary=reformatted_summary,
-    )
+    return output._extract_driver_indexes(data, reformatted_summary)
 
 
 def test_driver_indexes_single_matching_length() -> None:
@@ -280,7 +259,7 @@ def test_driver_indexes_nested_grouped() -> None:
 
 
 def test_collect_grouped_indexes_aligns_to_group_rows() -> None:
-    result = PandasMatchingOutputExtension._collect_grouped_indexes(
+    result = MatchingOutput._collect_grouped_indexes(
         _grouped_data(), {"a": M.join(["9", "8"]), "b": M.join(["7", "6"])}
     )
     assert result["indexes"].raw_data.iloc[:, 0].tolist() == [9, 8, 7, 6]

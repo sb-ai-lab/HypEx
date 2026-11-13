@@ -14,11 +14,14 @@ from ..comparators import (
     StatsUTest,
 )
 from ..dataset import Dataset, ExperimentData
-from ..extensions.matching_output import MatchingOutputExtension
 from ..ml import FaissNearestNeighbors
-from ..utils import ID_SPLIT_SYMBOL, ExperimentDataEnum
+from ..utils import (
+    ID_SPLIT_SYMBOL,
+    MATCHING_INDEXES_SPLITTER_SYMBOL,
+    BackendsEnum,
+    ExperimentDataEnum,
+)
 from ..utils.logger import logger
-from ..utils.registry import backend_factory
 from .abstract import (
     DatasetReporter,
     DictReporter,
@@ -84,18 +87,38 @@ class MatchingReporter(DatasetReporter):
         }
 
     def _extract_indexes(self, data: ExperimentData) -> dict[str, str]:
-        """Extract matched neighbor indices through the output extension."""
-        extension_cls = backend_factory.resolve_backend(
-            MatchingOutputExtension, data.ds
-        )
-        if extension_cls is None:
-            raise ValueError(
-                f"Matching output is not implemented for {data.ds.backend_type!r}."
-            )
+        """Extract matched neighbor indices from additional fields.
+
+        For the Pandas backend, values are collected to the driver and
+        joined into a splitter-delimited string (legacy summary format).
+
+        For the Spark backend, returns an empty dict: matched indices
+        already exist as lazy ``AdditionalMatchingRole`` columns of
+        ``data.ds`` (merged by ``ExperimentData._set_additional_fields``
+        and aligned to ``ds.index``). They are consumed directly by
+        ``MatchingOutput.extract`` without any driver collection.
+
+        Args:
+            data: The experiment data container.
+
+        Returns:
+            A dictionary mapping composite index keys to joined index
+            strings, or an empty dict for the Spark backend.
+        """
+        if data.ds.backend_type == BackendsEnum.spark:
+            return {}
+
         ids = data.get_ids(FaissNearestNeighbors, ExperimentDataEnum.additional_fields)[
             FaissNearestNeighbors.__name__
         ][ExperimentDataEnum.additional_fields.value]
-        return extension_cls().extract_summary_indexes(data, ids)
+
+        return {
+            f"indexes{ID_SPLIT_SYMBOL}{col.split(ID_SPLIT_SYMBOL)[3]}": MATCHING_INDEXES_SPLITTER_SYMBOL.join(
+                str(int(i)) if isinstance(i, float) and i.is_integer() else str(i)
+                for i in data.additional_fields[col]._to_numpy()
+            )
+            for col in ids
+        }
 
 
 @logger.log_methods(log_args=False, log_result=False, private=True, static=True)
