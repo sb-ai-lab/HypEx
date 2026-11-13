@@ -302,6 +302,40 @@ def test_spark_compute_cluster_params() -> None:
     assert ext._nprobe == 10
 
 
+@pytest.mark.spark
+def test_spark_prefit_preserves_feature_dimensions_with_small_batches(
+    monkeypatch, spark_session
+) -> None:
+    monkeypatch.setattr(MatchingConfig, "FAISS_DRIVER_INDEX_LIMIT", 2)
+    data = spark_session.createDataFrame(
+        [([float(i), float(i + 1)],) for i in range(8)], ["_features"]
+    ).repartition(4)
+    ext = SparkFaissExtension()
+    ext.k = 3
+    ext._nprobe = 1
+
+    ext._prefit(data, "k-means")
+
+    assert ext._centroids is not None
+    assert ext._centroids.shape == (3, 2)
+
+
+@pytest.mark.spark
+def test_spark_prefit_rejects_insufficient_rows_with_small_batches(
+    monkeypatch, spark_session
+) -> None:
+    monkeypatch.setattr(MatchingConfig, "FAISS_DRIVER_INDEX_LIMIT", 1)
+    data = spark_session.createDataFrame(
+        [([float(i), float(i + 1)],) for i in range(2)], ["_features"]
+    ).repartition(2)
+    ext = SparkFaissExtension()
+    ext.k = 3
+    ext._nprobe = 1
+
+    with pytest.raises(ValueError, match="too small for 3 clusters"):
+        ext._prefit(data, "k-means")
+
+
 @requires_spark_files
 @pytest.mark.spark
 def test_spark_public_predict_after_fit_matches_auto(monkeypatch, spark_pair) -> None:

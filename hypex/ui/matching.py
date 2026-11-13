@@ -10,6 +10,7 @@ from ..dataset import (
     Dataset,
     ExperimentData,
     GroupingRole,
+    IndexRole,
     InfoRole,
     SmallDataset,
     StatisticRole,
@@ -503,6 +504,27 @@ class MatchingOutput(Output):
 
         return indexes
 
+    def _restore_index_role(self, experiment_data: ExperimentData) -> None:
+        index_fields = experiment_data.ds.search_columns(IndexRole())
+        if not index_fields:
+            return
+        index_field = index_fields[0]
+
+        if not self.indexes.is_empty():
+            index_data = experiment_data.ds[index_field]
+            mapped_indexes = self.indexes.map_index_values(index_data)
+            index_role = experiment_data.ds.roles[index_field]
+            self.indexes = Dataset(
+                roles={
+                    column: AdditionalMatchingRole(index_role.data_type)
+                    for column in mapped_indexes.columns
+                },
+                data=mapped_indexes.raw_data,
+                session=experiment_data.ds.session,
+            )
+        if not self.full_data.is_empty():
+            self.full_data = self.full_data.set_index(index_field, drop=False)
+
     def extract(self, experiment_data: ExperimentData) -> None:
         """Extract and format all matching results from experiment data.
 
@@ -560,10 +582,15 @@ class MatchingOutput(Output):
                 backend=experiment_data.ds.backend_type,
                 session=experiment_data.ds.session,
             )
-            self.indexes = Dataset.create_empty(
-                roles={},
-                backend=experiment_data.ds.backend_type,
-                session=experiment_data.ds.session,
+            self.indexes = (
+                indexes
+                if self.compute_indexes
+                else Dataset.create_empty(
+                    roles={},
+                    backend=experiment_data.ds.backend_type,
+                    session=experiment_data.ds.session,
+                )
             )
             logger.debug("Skipping full_data extraction (extract_full_data=False).")
+        self._restore_index_role(experiment_data)
         self.summary.raw_data = self.summary.raw_data.round(4)

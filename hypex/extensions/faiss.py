@@ -943,7 +943,11 @@ class SparkFaissExtension(FaissExtension):
             .rdd.mapPartitions(lambda it: _partition_load(it, batch_size))
             .toLocalIterator()
         ):
-            np_batch = np.array(batch, dtype=np.float32)
+            np_batch = np.asarray(batch, dtype=np.float32)
+            if np_batch.ndim != 2:
+                raise ValueError(
+                    f"Expected a 2D feature batch, got shape {np_batch.shape}."
+                )
             if len(np_batch) < self.k:
                 cache.append(np_batch)
                 continue
