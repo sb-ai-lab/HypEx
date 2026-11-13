@@ -10,6 +10,7 @@ import pyspark.sql as psql
 from hypex import AATest, ABTest
 from hypex.dataset import (
     Dataset,
+    IndexRole,
     InfoRole,
     TargetRole,
     TreatmentRole,
@@ -181,3 +182,23 @@ def test_aatest_spark_runs(spark_session):
     r_sp = AATest(n_iterations=3).execute(ds_sp)
     assert list(r_sp.resume.columns) == list(r_pd.resume.columns)
     assert isinstance(r_sp.best_split.data, psql.DataFrame)
+
+
+def test_aatest_spark_best_split_materializes_split_with_index_role(spark_session):
+    df = _ab_frame()
+    df["uid"] = df["uid"].astype(str)
+    roles = {"uid": IndexRole(str), "y": TargetRole(), "treat": InfoRole()}
+    ds = Dataset(
+        roles=roles,
+        data=df,
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+
+    result = AATest(n_iterations=3, random_states=[1, 2, 3]).execute(ds)
+    best_split = result.best_split.raw_data.to_pandas()
+
+    assert len(best_split) == len(df)
+    assert "split" in best_split.columns
+    assert best_split["split"].notna().all()
+    assert set(best_split["uid"]) == set(df["uid"])

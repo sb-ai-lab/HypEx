@@ -1037,7 +1037,7 @@ class PandasNavigation(DatasetBackendNavigation):
         self.data[index_col_name] = np.array(range(len(self.data)))
 
     def remove_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
-        self.data = self.data.drop(index_col_name)
+        self.data = self.data.drop(columns=[index_col_name])
 
     def from_dict(self, data: FromDictTypes, index: Iterable | Sized | None = None):
         """Load data from dict-like structure into DataFrame.
@@ -1842,15 +1842,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             ):
                 raise MergeOnError(on_)
 
-        if not all(
-            [
-                on,
-                left_on,
-                right_on,
-            ]
-        ) and all([left_index is None, right_index is None]):
+        if all(
+            value is None for value in (on, left_on, right_on, left_index, right_index)
+        ):
             left_index = True
             right_index = True
+        left_index = False if left_index is None else left_index
+        right_index = False if right_index is None else right_index
 
         return self._wrap_result(
             self.data.merge(

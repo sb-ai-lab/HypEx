@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from hypex.dataset import Dataset, FeatureRole, SmallDataset, TargetRole
+from hypex.dataset.backends.pandas_backend import PandasDataset
 
 
 def _ds(make_dataset):
@@ -45,6 +46,50 @@ def test_getitem_by_boolean_mask(make_dataset) -> None:
     filtered = ds[mask]
 
     assert len(filtered) == 2
+
+
+def test_pandas_utility_index_column_round_trip() -> None:
+    backend = PandasDataset(data=pd.DataFrame({"x": [1, 2, 3]}))
+
+    backend.add_index_col()
+    assert "⏣index" in backend.data.columns
+    backend.remove_index_col()
+
+    pd.testing.assert_frame_equal(backend.data, pd.DataFrame({"x": [1, 2, 3]}))
+
+
+def test_keyless_merge_uses_index(make_dataset) -> None:
+    left = make_dataset(pd.DataFrame({"v": [1, 2]}), {"v": FeatureRole()})
+    right = make_dataset(pd.DataFrame({"w": [3, 4]}), {"w": FeatureRole()})
+
+    merged = left.merge(right)
+
+    assert merged.columns == ["v", "w"]
+    assert len(merged) == 2
+
+
+def test_column_merge_does_not_implicitly_use_index(make_dataset) -> None:
+    left = make_dataset(
+        pd.DataFrame({"key": [1, 2], "v": [3, 4]}),
+        {"key": FeatureRole(), "v": FeatureRole()},
+    )
+    right = make_dataset(
+        pd.DataFrame({"key": [1, 2], "w": [5, 6]}),
+        {"key": FeatureRole(), "w": FeatureRole()},
+    )
+
+    merged = left.merge(right, on="key")
+
+    assert merged.columns == ["key", "v", "w"]
+    assert len(merged) == 2
+
+
+def test_scalar_loc_matches_pandas_frame_contract(make_dataset) -> None:
+    ds = _ds(make_dataset)
+
+    selected = ds.loc[0]
+
+    assert selected.raw_data.shape == (3, 1)
 
 
 def test_getitem_missing_column_raises(make_dataset) -> None:

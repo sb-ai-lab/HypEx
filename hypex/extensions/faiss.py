@@ -404,11 +404,7 @@ class PandasFaissExtension(FaissExtension):
                     "index is not created yet. Call 'fit' before 'predict'."
                 )
 
-            X = (
-                self._mahalanobis_transform(test_data, self.mahalanobis).raw_data.values
-                if mode == "auto"
-                else self._mahalanobis_transform(data, self.mahalanobis).raw_data.values
-            )
+            X = self._mahalanobis_transform(test_data, self.mahalanobis).raw_data.values
             return self._predict(data, test_data, X)
         return self
 

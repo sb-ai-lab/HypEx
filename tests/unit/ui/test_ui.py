@@ -11,6 +11,7 @@ from hypex.dataset import (
     Dataset,
     ExperimentData,
     FeatureRole,
+    IndexRole,
     InfoRole,
     PreTargetRole,
     SmallDataset,
@@ -384,3 +385,63 @@ def test_aa_output_extract_experiments_keeps_nan_pass_and_casts_others() -> None
     assert frame["TTest x pass"].tolist()[1:] == [True, False]
     assert frame["KSTest x pass"].tolist() == [True, False, True]
     assert frame["n"].tolist() == [1, 2, 3]
+
+
+# ---------------------------------------------------------------------------
+# Matching IndexRole input preparation
+# ---------------------------------------------------------------------------
+def _matching_index_dataset(ids=("a", "b", "c", "d")) -> Dataset:
+    return Dataset(
+        roles={
+            "id": IndexRole(),
+            "treat": TreatmentRole(),
+            "x": FeatureRole(),
+            "y": TargetRole(),
+        },
+        data=pd.DataFrame(
+            {
+                "id": list(ids),
+                "treat": [0, 1, 0, 1],
+                "x": [1.0, 2.0, 3.0, 4.0],
+                "y": [2.0, 4.0, 6.0, 8.0],
+            },
+            index=[10, 20, 30, 40],
+        ),
+    )
+
+
+def test_matching_prepare_index_role_copies_and_resets_index() -> None:
+    data = _matching_index_dataset()
+    original = data.raw_data.copy()
+
+    prepared = Matching._prepare_index_role(data)
+    prepared_experiment = Matching._prepare_index_role(ExperimentData(data))
+
+    assert prepared.raw_data.index.tolist() == [0, 1, 2, 3]
+    assert prepared_experiment.ds.raw_data.index.tolist() == [0, 1, 2, 3]
+    pd.testing.assert_frame_equal(data.raw_data, original)
+
+
+def test_matching_prepare_without_index_role_is_passthrough() -> None:
+    data = _dataset()
+    assert Matching._prepare_index_role(data) is data
+
+
+@pytest.mark.parametrize(
+    "ids, message",
+    [
+        (["a", "a", "c", "d"], "unique"),
+        (["a", None, "c", "d"], "null"),
+    ],
+)
+def test_matching_index_role_rejects_invalid_ids(ids, message) -> None:
+    with pytest.raises(ValueError, match=message):
+        Matching._prepare_index_role(_matching_index_dataset(ids))
+
+
+def test_matching_rejects_multiple_index_role_columns() -> None:
+    data = _matching_index_dataset()
+    data.add_column(["e", "f", "g", "h"], {"other_id": IndexRole()})
+
+    with pytest.raises(ValueError, match="exactly one IndexRole"):
+        Matching._prepare_index_role(data)

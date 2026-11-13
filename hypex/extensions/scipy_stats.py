@@ -242,15 +242,13 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
         Returns:
             Contingency table as a Dataset, or None if degenerate.
         """
-        proportion = len(data) / (len(data) + len(other))
-
         counted_data = data.value_counts()
         counted_data = self.mini_category_replace(counted_data)
-        data_vc = counted_data["count"] * (1 - proportion)
+        data_vc = counted_data["count"]
 
         counted_other = other.value_counts()
         counted_other = self.mini_category_replace(counted_other)
-        other_vc = counted_other["count"] * proportion
+        other_vc = counted_other["count"]
 
         if len(counted_data) < 2:
             return None
@@ -268,7 +266,9 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
             role={col_name: col_role},
         )
 
-        return data_vc.merge(other_vc, on=col_name)[["count_x", "count_y"]].fillna(0)
+        return data_vc.merge(other_vc, on=col_name, how="outer")[
+            ["count_x", "count_y"]
+        ].fillna(0)
 
 
 @backend_factory.register(GroupKSTestExtension, SparkDataset)

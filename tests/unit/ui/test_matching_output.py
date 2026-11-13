@@ -15,6 +15,7 @@ from hypex.dataset import (
     ExperimentData,
     FeatureRole,
     GroupingRole,
+    IndexRole,
     TargetRole,
     TreatmentRole,
 )
@@ -119,6 +120,18 @@ def test_extract_compute_indexes_returns_matched_indexes(matched_data) -> None:
     data, nn = matched_data
     output = _make_output(compute_indexes=True, extract_full_data=True)
     output.extract(data)
+    assert output.indexes["indexes_0"].raw_data.iloc[:, 0].tolist() == nn.tolist()
+
+
+def test_extract_compute_indexes_without_full_data_returns_matched_indexes(
+    matched_data,
+) -> None:
+    data, nn = matched_data
+    output = _make_output(compute_indexes=True, extract_full_data=False)
+
+    output.extract(data)
+
+    assert output.full_data.is_empty()
     assert output.indexes["indexes_0"].raw_data.iloc[:, 0].tolist() == nn.tolist()
 
 
@@ -268,3 +281,84 @@ def test_collect_grouped_indexes_aligns_to_group_rows() -> None:
 
 def test_matching_output_construction_does_not_use_deprecated_reporters() -> None:
     MatchingOutput()
+
+
+# --------------------------------------------------------------------------
+# IndexRole restoration
+# --------------------------------------------------------------------------
+def _index_role_data(ids) -> ExperimentData:
+    return ExperimentData(
+        Dataset(
+            roles={
+                "uid": IndexRole(),
+                "treat": TreatmentRole(),
+                "x": FeatureRole(),
+                "y": TargetRole(),
+            },
+            data=pd.DataFrame(
+                {
+                    "uid": ids,
+                    "treat": [0, 1, 0, 1],
+                    "x": [1.0, 2.0, 3.0, 4.0],
+                    "y": [2.0, 4.0, 6.0, 8.0],
+                }
+            ),
+        )
+    )
+
+
+@pytest.mark.parametrize("ids", [["a", "b", "c", "d"], [10, 20, 30, 40]])
+def test_restore_index_role_maps_source_neighbors_and_unmatched(ids) -> None:
+    data = _index_role_data(ids)
+    output = _make_output()
+    output.indexes = Dataset(
+        roles={
+            "indexes_a": AdditionalMatchingRole(),
+            "indexes_b": AdditionalMatchingRole(),
+        },
+        data=pd.DataFrame({"indexes_a": [2, -1, 0, 1], "indexes_b": [1, 2, 3, 0]}),
+    )
+    output.full_data = Dataset.create_empty()
+
+    output._restore_index_role(data)
+
+    result = output.indexes.raw_data
+    assert result.index.tolist() == ids
+    assert result.index.name == "uid"
+    assert result["indexes_a"].iloc[[0, 2, 3]].tolist() == [ids[2], ids[0], ids[1]]
+    assert pd.isna(result["indexes_a"].iloc[1])
+    assert result["indexes_b"].tolist() == [ids[1], ids[2], ids[3], ids[0]]
+    assert all(role.data_type is type(ids[0]) for role in output.indexes.roles.values())
+
+
+def test_restore_index_role_preserves_large_integer_ids_with_unmatched() -> None:
+    ids = [2**53 + 3 + 2 * i for i in range(4)]
+    data = _index_role_data(ids)
+    output = _make_output()
+    output.indexes = Dataset(
+        roles={"indexes_0": AdditionalMatchingRole()},
+        data=pd.DataFrame({"indexes_0": [2, -1, 0, 1]}),
+    )
+    output.full_data = Dataset.create_empty()
+
+    output._restore_index_role(data)
+
+    result = output.indexes.raw_data
+    assert result["indexes_0"].dtype == pd.Int64Dtype()
+    assert result["indexes_0"].iloc[[0, 2, 3]].tolist() == [ids[2], ids[0], ids[1]]
+    assert pd.isna(result["indexes_0"].iloc[1])
+    assert result.index.tolist() == ids
+
+
+def test_restore_index_role_sets_full_data_business_index() -> None:
+    ids = ["a", "b", "c", "d"]
+    data = _index_role_data(ids)
+    output = _make_output()
+    output.indexes = Dataset.create_empty()
+    output.full_data = data.ds
+
+    output._restore_index_role(data)
+
+    assert output.full_data.raw_data.index.tolist() == ids
+    assert output.full_data.raw_data.index.name == "uid"
+    assert output.full_data.raw_data["uid"].tolist() == ids

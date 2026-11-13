@@ -1015,7 +1015,12 @@ class DatasetBase:
     def map_index_values(
         self, labels: DatasetBase, columns: list[str] | None = None
     ) -> Self:
-        """Map the row index and selected columns to values from a label dataset."""
+        """Map the row index and selected columns to values from a label dataset.
+
+        ``labels`` must contain exactly one column. Its index provides source
+        keys, and its values provide replacement labels. Missing mappings are
+        represented as missing values.
+        """
         if not isinstance(labels, DatasetBase):
             raise DataTypeError(type(labels))
         if type(labels._backend_data) is not type(self._backend_data):
@@ -1302,8 +1307,8 @@ class DatasetBase:
         on: str | None = None,
         left_on: str | None = None,
         right_on: str | None = None,
-        left_index: bool = False,
-        right_index: bool = False,
+        left_index: bool | None = None,
+        right_index: bool | None = None,
         suffixes: tuple[str, str] = ("_x", "_y"),
         how: Literal["left", "right", "outer", "inner", "cross"] = "inner",
     ) -> Self:

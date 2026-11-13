@@ -71,7 +71,11 @@ class ExperimentData:
         self._initial_cols = deepcopy(self._data.columns)
 
     def copy(self, data: Dataset | SmallDataset | None = None) -> Self:
-        """Create a deep copy of this ExperimentData instance.
+        """Create a copy of this ExperimentData instance.
+
+        Internal state is deep-copied. A provided replacement dataset is used
+        without copying, and its ownership is transferred to the returned
+        instance. The caller must not reuse or mutate it afterward.
 
         Args:
             data: Optional replacement dataset for the primary data field.
@@ -197,11 +201,14 @@ class ExperimentData:
             return exec_id_str in self.variables
         if space == ExperimentDataEnum.analysis_tables:
             return exec_id_str in self.analysis_tables
+        if space == ExperimentDataEnum.groups:
+            return exec_id_str in self.groups
 
-        # Safe fallback: prevents recursion on unknown enum members
         if space not in _SUPPORTED_SPACES:
             return False
-        return any(self.check_hash(executor_id, s) for s in _SUPPORTED_SPACES)
+        return any(
+            self.check_hash(executor_id, s) for s in _SUPPORTED_SPACES if s != space
+        )
 
     def set_value(
         self,
@@ -287,9 +294,8 @@ class ExperimentData:
                     new_data.roles[new_col_name] = normalized_role
                 else:
                     new_data.roles[new_col_name] = value.roles.get(col, DefaultRole())
-        new_data.persist(storage_level=storage_level, action="none")
         if was_persisted:
-            self._data.unpersist()
+            new_data.persist(storage_level=storage_level, action="none")
         self._data = new_data
         return self
 
