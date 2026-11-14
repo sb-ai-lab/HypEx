@@ -1,9 +1,11 @@
 # Advanced HypEx tutorials
 
-A practical series for users who have already seen the basic tutorials and want to
+A practical textbook for users who have already seen the basic tutorials and want to
 understand **how to design, diagnose and extend an experiment**, not only how to call
-its shell. Every notebook is self-contained, uses reproducible synthetic data with a
-known answer, and includes interpretation and methodological caveats.
+its shell. Every chapter is self-contained, uses reproducible synthetic data with a
+known answer, and includes learning objectives, notation, mathematical derivations,
+line-by-line output interpretation, diagnostic visualisations and production
+checklists.
 
 ## Notebooks
 
