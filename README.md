@@ -78,7 +78,7 @@ Requirements: Python `>=3.8, <3.13`. PySpark `3.5.1` is installed with the libra
 
 ## Quick start
 
-Explore usage examples and tutorials [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/).
+Explore usage examples and tutorials [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/). For deeper, methodology-driven examples covering experiment design, variance reduction, matching, custom pipelines and Spark, see the [advanced tutorial series](examples/advanced_tutorials/README.md).
 
 ### Matching example
 
