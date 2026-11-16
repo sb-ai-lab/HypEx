@@ -13,6 +13,8 @@ on:
       - "hypex/**"
       - ".github/workflows/notebooks.yml"
   pull_request:
+    # Retargeting a PR emits edited rather than synchronize.
+    types: [ opened, synchronize, reopened, edited ]
     branches: [ master, dev/master ]
     paths:
       - "examples/tutorials/**"

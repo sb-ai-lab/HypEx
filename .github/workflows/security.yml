@@ -4,6 +4,8 @@ on:
   push:
     branches: [ master, dev/master ]
   pull_request:
+    # Retargeting a PR emits edited rather than synchronize.
+    types: [ opened, synchronize, reopened, edited ]
     branches: [ master, dev/master ]
   schedule:
     # Monday 05:00 UTC: catches advisories published against code nobody has
