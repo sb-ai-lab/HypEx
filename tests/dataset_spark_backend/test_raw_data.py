@@ -68,7 +68,7 @@ def test_spark_data_setter_rejects_list(spark_ds):
 
 def test_spark_setitem_writes_raw(spark_ds):
     spark_ds["a"] = [7, 8, 9]
-    assert spark_ds.raw_data["a"].to_list() == [7, 8, 9]
+    assert spark_ds.raw_data["a"].sort_index().to_list() == [7, 8, 9]
 
 
 def test_spark_append_and_mask(spark_ds):
