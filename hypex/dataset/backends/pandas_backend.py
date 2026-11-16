@@ -13,14 +13,19 @@ from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
 import numpy as np
 import pandas as pd  # type: ignore
-import pyspark.pandas as ps  # type: ignore
-import pyspark.sql as spark  # type: ignore
-import pyspark.sql.functions as F  # type: ignore
 
 # pandas.util.hash_array — C-level vectorized hash
 from pandas.util import hash_array
-from pyspark.ml.feature import StringIndexer  # type: ignore
 
+from ..._spark import (
+    PANDAS_ON_SPARK_DATAFRAME_TYPES,
+    SPARK_SQL_DATAFRAME_TYPES,
+    F,
+    StringIndexer,
+    ps,
+    require_pyspark,
+    spark,
+)
 from ...config import DatasetConfig
 from ...utils import BackendsEnum, FromDictTypes, MergeOnError, ScalarType
 from ...utils.adapter import Adapter
@@ -84,6 +89,7 @@ class PandasNavigation(DatasetBackendNavigation):
             return self
 
         if target_backend == BackendsEnum.spark:
+            require_pyspark()
             if session is None:
                 raise ValueError(
                     "Spark session is required for pandas → spark conversion"
@@ -259,11 +265,11 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data = data
         elif isinstance(data, pd.Series):
             self.data = pd.DataFrame(data)
-        elif isinstance(data, spark.DataFrame):
+        elif isinstance(data, SPARK_SQL_DATAFRAME_TYPES):
             self.data = self._data_compression(
                 data, data_compression, non_compresion_cols
             )
-        elif isinstance(data, ps.DataFrame):
+        elif isinstance(data, PANDAS_ON_SPARK_DATAFRAME_TYPES):
             self.data = data.to_pandas()
         elif isinstance(data, dict):
             wrapped = {
@@ -825,9 +831,6 @@ class PandasNavigation(DatasetBackendNavigation):
         if "append" not in kwargs:
             kwargs["append"] = False
 
-        if "inplace" not in kwargs:
-            kwargs["inplace"] = False
-
         return self._wrap_result(self.data.set_index(keys=keys, drop=drop, **kwargs))
 
     @property
@@ -1211,6 +1214,23 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return self._wrap_result(
             self.data.apply(lambda col: col.map(f, na_action=na_action))
         )
+
+    def map_index_values(self, labels: Any, columns: list[str]) -> Any:
+        label_field = labels.data.columns[0]
+        mapping = labels.data.iloc[:, 0].to_dict()
+        result = self.data.copy()
+        result.index = result.index.map(mapping)
+        result.index.name = label_field
+        labels_dtype = labels.data.iloc[:, 0].dtype
+        for column in columns:
+            mapped_column = result[column].astype(object)
+            mapped_column.iloc[:] = [mapping.get(value) for value in mapped_column]
+            result[column] = (
+                mapped_column.astype("Int64")
+                if pd.api.types.is_integer_dtype(labels_dtype)
+                else mapped_column
+            )
+        return self._wrap_result(result)
 
     def is_empty(self) -> bool:
         """Check if DataFrame is empty (no rows or columns).
@@ -1808,15 +1828,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             ):
                 raise MergeOnError(on_)
 
-        if not all(
-            [
-                on,
-                left_on,
-                right_on,
-            ]
-        ) and all([left_index is None, right_index is None]):
+        if all(
+            value is None for value in (on, left_on, right_on, left_index, right_index)
+        ):
             left_index = True
             right_index = True
+        left_index = False if left_index is None else left_index
+        right_index = False if right_index is None else right_index
 
         return self._wrap_result(
             self.data.merge(

@@ -65,16 +65,18 @@ pip install --pre -U hypex   # 2.0 is in alpha: --pre is required
 
 Without `--pre` pip installs the latest stable release (1.0.x). To pin the alpha: `pip install hypex==2.0.0a1`.
 
-Optional extras for CUPAC models:
+Optional extras for Spark and CUPAC models:
 
 ```bash
-pip install -U "hypex[cat]"   # CatBoost
-pip install -U "hypex[lgbm]"  # LightGBM
-pip install -U "hypex[all]"   # everything above
+pip install -U "hypex[spark]"  # Spark backend
+pip install -U "hypex[cat]"    # CatBoost
+pip install -U "hypex[lgbm]"   # LightGBM
+pip install -U "hypex[all]"    # everything above
 ```
 
-Requirements: Python `>=3.8, <3.13`. PySpark `3.5.1` is installed with the library; running on Spark also needs Java
-(8, 11 or 17).
+Requirements: Python `>=3.8, <3.13`. The base installation uses pandas and does not include PySpark. The `spark` extra installs
+PySpark `3.5.1`; running on Spark also needs Java (8, 11 or 17). Requesting the Spark backend without the extra raises an error
+with the installation command.
 
 ## Quick start
 

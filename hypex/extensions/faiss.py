@@ -15,15 +15,21 @@ from typing import (
 import faiss
 import numpy as np
 import pandas as pd
-
-# Spark imports
-import pyspark.sql as spark
-import pyspark.sql.functions as F
-from pyspark import RDD, Broadcast
-from pyspark.ml.feature import VectorAssembler
-from pyspark.sql.types import ArrayType, FloatType, LongType, StructField, StructType
 from sklearn.cluster import Birch, MiniBatchKMeans
 
+from .._spark import (
+    PYSPARK_AVAILABLE,
+    RDD,
+    ArrayType,
+    Broadcast,
+    F,
+    FloatType,
+    LongType,
+    StructField,
+    StructType,
+    VectorAssembler,
+    spark,
+)
 from ..config import MatchingConfig
 from ..dataset import AdditionalMatchingRole, Dataset
 from ..dataset.backends import PandasDataset, SparkDataset
@@ -684,11 +690,15 @@ class SparkFaissExtension(FaissExtension):
     """
 
     # Storage level for intermediate RDDs
-    PREDICT_SCHEMA = StructType(
-        [
-            StructField("index", LongType(), False),
-            StructField("index_list", ArrayType(LongType()), False),
-        ]
+    PREDICT_SCHEMA = (
+        StructType(
+            [
+                StructField("index", LongType(), False),
+                StructField("index_list", ArrayType(LongType()), False),
+            ]
+        )
+        if PYSPARK_AVAILABLE
+        else None
     )
 
     CLUSTERING_METHODS_MAPPER: ClassVar[dict] = {
@@ -943,7 +953,11 @@ class SparkFaissExtension(FaissExtension):
             .rdd.mapPartitions(lambda it: _partition_load(it, batch_size))
             .toLocalIterator()
         ):
-            np_batch = np.array(batch, dtype=np.float32)
+            np_batch = np.asarray(batch, dtype=np.float32)
+            if np_batch.ndim != 2:
+                raise ValueError(
+                    f"Expected a 2D feature batch, got shape {np_batch.shape}."
+                )
             if len(np_batch) < self.k:
                 cache.append(np_batch)
                 continue

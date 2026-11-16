@@ -15,7 +15,7 @@ def _ds(make_dataset):
         {
             "a": [1, 2, 3, 4],
             "b": [10.0, 20.0, 30.0, 40.0],
-            "c": ["w", "x", "y", "z"],
+            "c": pd.Series(["w", "x", "y", "z"], dtype=object),
         }
     )
     roles = {"a": FeatureRole(), "b": TargetRole(), "c": FeatureRole()}
@@ -56,6 +56,32 @@ def test_pandas_utility_index_column_round_trip() -> None:
     backend.remove_index_col()
 
     pd.testing.assert_frame_equal(backend.data, pd.DataFrame({"x": [1, 2, 3]}))
+
+
+def test_keyless_merge_uses_index(make_dataset) -> None:
+    left = make_dataset(pd.DataFrame({"v": [1, 2]}), {"v": FeatureRole()})
+    right = make_dataset(pd.DataFrame({"w": [3, 4]}), {"w": FeatureRole()})
+
+    merged = left.merge(right)
+
+    assert merged.columns == ["v", "w"]
+    assert len(merged) == 2
+
+
+def test_column_merge_does_not_implicitly_use_index(make_dataset) -> None:
+    left = make_dataset(
+        pd.DataFrame({"key": [1, 2], "v": [3, 4]}),
+        {"key": FeatureRole(), "v": FeatureRole()},
+    )
+    right = make_dataset(
+        pd.DataFrame({"key": [1, 2], "w": [5, 6]}),
+        {"key": FeatureRole(), "w": FeatureRole()},
+    )
+
+    merged = left.merge(right, on="key")
+
+    assert merged.columns == ["key", "v", "w"]
+    assert len(merged) == 2
 
 
 def test_scalar_loc_matches_pandas_frame_contract(make_dataset) -> None:

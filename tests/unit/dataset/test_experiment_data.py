@@ -162,6 +162,19 @@ def test_copy_is_deep() -> None:
     assert "new" not in ed.variables
 
 
+def test_copy_uses_replacement_dataset_without_copying() -> None:
+    """copy(data=...) transfers the replacement dataset to the copy."""
+    ed = _ed()
+    replacement = Dataset(
+        roles={"x": FeatureRole()}, data=pd.DataFrame({"x": [9, 9, 9]})
+    )
+
+    clone = ed.copy(data=replacement)
+
+    assert clone.ds is replacement
+    assert clone.initial_ds.columns == ["x"]
+
+
 def test_field_search_by_role() -> None:
     """field_search resolves columns by semantic role."""
     ed = _ed()
