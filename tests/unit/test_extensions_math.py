@@ -250,6 +250,40 @@ def test_quantile_calc_accepts_best_hypothesis() -> None:
     assert _frame(result).iloc[0]["accepted hypothesis"] == 3
 
 
+def test_quantile_calc_uses_group_sizes_for_standardization() -> None:
+    rng = np.random.default_rng(3)
+    n = 100
+    df = pd.DataFrame(
+        {
+            "g": np.repeat([0, 1], n),
+            "y": np.concatenate([rng.normal(size=n), rng.normal(size=n) + 0.3]),
+        }
+    )
+    ds = Dataset(
+        roles={"g": FeatureRole(), "y": TargetRole()},
+        data=df,
+        backend=BackendsEnum.pandas,
+    )
+    first, second = df.y[df.g == 0], df.y[df.g == 1]
+    corrected_t = (second.mean() - first.mean()) / np.sqrt(
+        second.var() / len(second) + first.var() / len(first)
+    )
+    previous_t = (
+        np.sqrt(2 * n)
+        * (second.mean() - first.mean())
+        / np.sqrt(second.var() + first.var())
+    )
+    threshold = (corrected_t + previous_t) / 2
+
+    result = MultitestQuantile(alpha=0.05, iteration_size=1000, random_state=0)
+    outcome = result._calc_pandas(
+        ds, group_field="g", target_field="y", quantiles=float(threshold)
+    )
+
+    assert previous_t > threshold > corrected_t
+    assert _frame(outcome).iloc[0]["accepted hypothesis"] == 0
+
+
 def test_quantile_calc_rejects_when_groups_equal() -> None:
     rng = np.random.RandomState(1)
     n = 200

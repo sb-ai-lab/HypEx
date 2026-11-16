@@ -152,18 +152,28 @@ def test_fit_mode_returns_self_with_populated_index(control, test_df) -> None:
     assert extension.index.ntotal == len(control)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=ValueError,
-    reason="Issue: mode='predict' queries the index with `data` (the indexed set) instead of "
-    "`test_data`, so the result has the wrong number of rows",
-)
 def test_fit_then_predict_equals_auto(control, test_df) -> None:
     auto = _pdf(PandasFaissExtension().calc(_ds(control), _ds(test_df)))
     extension = PandasFaissExtension()
     extension.calc(_ds(control), _ds(test_df), mode="fit")
     split = _pdf(extension.calc(_ds(control), _ds(test_df), mode="predict"))
-    assert split.shape == auto.shape
+    pd.testing.assert_frame_equal(split, auto)
+
+
+def test_predict_uses_test_data_for_equal_length_queries() -> None:
+    control = pd.DataFrame(
+        {"f1": [0.0, 1.0, 2.0, 3.0, 4.0], "f2": [0.0, 2.0, 4.0, 6.0, 8.0]}
+    )
+    test_df = control.copy()
+    test_df["f1"] += 40.0
+    test_df["f2"] += 80.0
+    extension = PandasFaissExtension()
+    extension.calc(_ds(control), _ds(test_df), mode="fit")
+
+    found = _pdf(extension.calc(_ds(control), _ds(test_df), mode="predict"))
+
+    expected = _brute_force(control, test_df, 1)[:, 0]
+    assert found.iloc[:, 0].tolist() == expected.tolist()
 
 
 def test_abstract_calc_raises() -> None:
@@ -174,6 +184,43 @@ def test_abstract_calc_raises() -> None:
 # ---------------------------------------------------------------------------
 # SparkFaissExtension
 # ---------------------------------------------------------------------------
+def test_spark_prefit_buffers_small_partitions_without_flattening() -> None:
+    class FakeRDD:
+        def __init__(self, partitions):
+            self.partitions = partitions
+
+        def mapPartitions(self, mapper):
+            batches = []
+            for partition in self.partitions:
+                batches.extend(mapper(iter(partition)))
+            return FakeRDD(batches)
+
+        def toLocalIterator(self):
+            return iter(self.partitions)
+
+    class FakeVectorizedData:
+        def __init__(self, partitions):
+            self.rdd = FakeRDD(partitions)
+
+        def select(self, _column):
+            return self
+
+    points = np.random.default_rng(0).normal(size=(40, 2)).astype(np.float32)
+    partitions = [
+        [{"_features": row.tolist()} for row in points[i : i + 2]]
+        for i in range(0, len(points), 2)
+    ]
+    extension = SparkFaissExtension()
+    extension._data_size = len(points)
+    extension._compute_cluster_params()
+    assert extension.k == 3
+
+    extension._prefit(FakeVectorizedData(partitions), model_name="k-means")
+
+    assert extension._centroids.shape == (3, 2)
+    assert extension.index.nlist == 3
+
+
 @pytest.mark.spark
 def test_spark_extension_matches_brute_force(control, test_df, spark_session) -> None:
     ctrl = _ds(control.reset_index(drop=True), BackendsEnum.spark, spark_session)

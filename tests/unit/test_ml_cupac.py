@@ -40,6 +40,32 @@ def _ds(df: pd.DataFrame, role) -> Dataset:
     )
 
 
+def test_prepare_data_accepts_current_and_lagged_features() -> None:
+    rng = np.random.default_rng(0)
+    n = 200
+    df = pd.DataFrame(
+        {
+            "x1": rng.normal(size=n),
+            "x1_lag1": rng.normal(size=n),
+            "y": rng.normal(size=n),
+            "y_lag1": rng.normal(size=n),
+        }
+    )
+    ds = Dataset(
+        data=df,
+        roles={
+            "x1": FeatureRole(),
+            "x1_lag1": FeatureRole(parent="x1", lag=1),
+            "y": TargetRole(cofounders=["x1"]),
+            "y_lag1": PreTargetRole(parent="y", lag=1, cofounders=["x1"]),
+        },
+    )
+
+    prepared = CUPACExecutor._prepare_data(ExperimentData(ds))
+
+    assert prepared["y"]["X_predict"] == [["x1_lag1"], ["y_lag1"]]
+
+
 # ---------------------------------------------------------------------------
 # cuped_theta helper
 # ---------------------------------------------------------------------------
@@ -173,6 +199,23 @@ def test_fit_then_predict_recovers_linear_signal() -> None:
     np.testing.assert_allclose(
         pred.backend_data.data["predict"].to_numpy(), y["t"].to_numpy(), atol=0.1
     )
+
+
+def test_predict_preserves_shuffled_feature_index() -> None:
+    X, y = _frames(noise=0.01)
+    shuffled_index = np.random.default_rng(2).permutation(len(X))
+    X.index = shuffled_index
+    y.index = shuffled_index
+    extension = CupacExtension(random_state=0)
+    model = extension._calc_pandas(
+        data=_ds(X, FeatureRole), mode="fit", model="linear", Y=_ds(y, TargetRole)
+    )
+
+    pred = extension._calc_pandas(data=_ds(X, FeatureRole), mode="predict", model=model)
+
+    assert pred.index.tolist() == X.index.tolist()
+    adjusted = _ds(y, TargetRole) - (pred - pred.mean())
+    assert np.nanvar(adjusted.raw_data["t"]) < np.nanvar(y["t"])
 
 
 def test_unknown_model_name_raises_key_error() -> None:

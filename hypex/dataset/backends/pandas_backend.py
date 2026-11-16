@@ -831,9 +831,6 @@ class PandasNavigation(DatasetBackendNavigation):
         if "append" not in kwargs:
             kwargs["append"] = False
 
-        if "inplace" not in kwargs:
-            kwargs["inplace"] = False
-
         return self._wrap_result(self.data.set_index(keys=keys, drop=drop, **kwargs))
 
     @property
@@ -1043,7 +1040,7 @@ class PandasNavigation(DatasetBackendNavigation):
         self.data[index_col_name] = np.array(range(len(self.data)))
 
     def remove_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
-        self.data = self.data.drop(index_col_name)
+        self.data = self.data.drop(columns=[index_col_name])
 
     def from_dict(self, data: FromDictTypes, index: Iterable | Sized | None = None):
         """Load data from dict-like structure into DataFrame.
@@ -1217,6 +1214,23 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return self._wrap_result(
             self.data.apply(lambda col: col.map(f, na_action=na_action))
         )
+
+    def map_index_values(self, labels: Any, columns: list[str]) -> Any:
+        label_field = labels.data.columns[0]
+        mapping = labels.data.iloc[:, 0].to_dict()
+        result = self.data.copy()
+        result.index = result.index.map(mapping)
+        result.index.name = label_field
+        labels_dtype = labels.data.iloc[:, 0].dtype
+        for column in columns:
+            mapped_column = result[column].astype(object)
+            mapped_column.iloc[:] = [mapping.get(value) for value in mapped_column]
+            result[column] = (
+                mapped_column.astype("Int64")
+                if pd.api.types.is_integer_dtype(labels_dtype)
+                else mapped_column
+            )
+        return self._wrap_result(result)
 
     def is_empty(self) -> bool:
         """Check if DataFrame is empty (no rows or columns).
@@ -1814,15 +1828,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             ):
                 raise MergeOnError(on_)
 
-        if not all(
-            [
-                on,
-                left_on,
-                right_on,
-            ]
-        ) and all([left_index is None, right_index is None]):
+        if all(
+            value is None for value in (on, left_on, right_on, left_index, right_index)
+        ):
             left_index = True
             right_index = True
+        left_index = False if left_index is None else left_index
+        right_index = False if right_index is None else right_index
 
         return self._wrap_result(
             self.data.merge(

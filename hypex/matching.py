@@ -5,7 +5,15 @@ from typing import Literal
 from .analyzers.matching import MatchingAnalyzer
 from .comparators import Chi2Test, KSTest, TTest
 from .comparators.distances import MahalanobisDistance
-from .dataset import AdditionalMatchingRole, FeatureRole, TargetRole, TreatmentRole
+from .dataset import (
+    AdditionalMatchingRole,
+    Dataset,
+    ExperimentData,
+    FeatureRole,
+    IndexRole,
+    TargetRole,
+    TreatmentRole,
+)
 from .encoders.encoders import DummyEncoder
 from .executor import Executor
 from .experiments import GroupExperiment
@@ -16,6 +24,7 @@ from .reporters.matching import MatchingAnalysisTableReporter
 from .transformers import TypeCaster
 from .ui.base import ExperimentShell
 from .ui.matching import MatchingOutput
+from .utils.adapter import Adapter
 from .utils.index_utils import FaissIndexStorage
 
 
@@ -24,6 +33,11 @@ class Matching(ExperimentShell):
 
     This class provides functionality to identify groups that are similar to each other
     using various distance metrics and quality assessment methods.
+
+    Matching interprets one unique, non-null ``IndexRole`` column as a business
+    identifier. Extracted ``indexes`` then contain these identifiers for source and
+    matched rows, with missing values for unmatched rows. Extracted ``full_data`` is
+    indexed by the same identifier. Other experiment types do not interpret this role.
 
     Args:
         group_match (bool, optional): Whether to perform group matching. Defaults to False.
@@ -169,9 +183,10 @@ class Matching(ExperimentShell):
                 )
             ]
         else:
+            selected_tests = Adapter.to_list(quality_tests)
             executors += [
                 OnRoleExperiment(
-                    executors=[test_mapping[test] for test in quality_tests],
+                    executors=[test_mapping[test] for test in selected_tests],
                     role=FeatureRole(),
                 )
             ]
@@ -232,8 +247,33 @@ class Matching(ExperimentShell):
             ),
         )
 
-    def execute(self, data):
+    @staticmethod
+    def _prepare_index_role(
+        data: Dataset | ExperimentData,
+    ) -> Dataset | ExperimentData:
+        ds = data.ds if isinstance(data, ExperimentData) else data
+        index_fields = ds.search_columns(IndexRole())
+        if not index_fields:
+            return data
+        if len(index_fields) > 1:
+            raise ValueError("Matching supports exactly one IndexRole column.")
+
+        index_field = index_fields[0]
+        index_data = ds[index_field]
+        if index_data.count_nulls()[index_field]:
+            raise ValueError(f"IndexRole column '{index_field}' contains null values.")
+        if index_data.nunique(dropna=False)[index_field] != len(ds):
+            raise ValueError(
+                f"IndexRole column '{index_field}' must contain unique values."
+            )
+
+        prepared_ds = ds.reset_index(drop=True)
+        if isinstance(data, ExperimentData):
+            return data.copy(data=prepared_ds)
+        return prepared_ds
+
+    def execute(self, data: Dataset | ExperimentData):
         try:
-            return super().execute(data)
+            return super().execute(self._prepare_index_role(data))
         finally:
             FaissIndexStorage.cleanup()

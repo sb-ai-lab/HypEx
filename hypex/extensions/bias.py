@@ -324,7 +324,7 @@ class PandasBisaExtesion(BiasExtension):
                 "matched_target": matched_target,
             }
         )
-        final_data.set_index("index", inplace=True)
+        final_data = final_data.set_index("index")
         return final_data
 
     def calc(self, data: Dataset, **kwargs) -> Dataset:

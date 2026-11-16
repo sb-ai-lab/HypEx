@@ -418,17 +418,19 @@ def test_extract_id_prefix(analysis_id, expected) -> None:
 
 def test_build_row_index_iterative_mode() -> None:
     analyzer = ABAnalyzer()
-    t_data = pd.DataFrame({"p-value": [0.1, 0.2, 0.3, 0.4]})
+    t_data = pd.DataFrame(
+        {"p-value": [0.1, 0.2, 0.3, 0.4]}, index=["10", "2", "10", "2"]
+    )
     ds = Dataset(
         roles={"p-value": StatisticRole()}, data=t_data, backend=BackendsEnum.pandas
     )
     ids = [f"GroupTTest{S}h{S}y1", f"GroupTTest{S}h{S}y2"]
-    index = analyzer._build_row_index(ds, ids, num_groups=2, group_labels=["b", "c"])
+    index = analyzer._build_row_index(ds, ids, num_groups=2, group_labels=["2", "10"])
     assert index == [
-        f"{ids[0]}{S}b",
-        f"{ids[0]}{S}c",
-        f"{ids[1]}{S}b",
-        f"{ids[1]}{S}c",
+        f"{ids[0]}{S}10",
+        f"{ids[0]}{S}2",
+        f"{ids[1]}{S}10",
+        f"{ids[1]}{S}2",
     ]
 
 

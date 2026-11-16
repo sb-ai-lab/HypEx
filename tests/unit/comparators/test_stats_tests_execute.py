@@ -347,6 +347,24 @@ def test_ztest_execute_statistic_matches_formula(backend, spark_session) -> None
         assert table.loc[f"{grp}┆bin", "statistic"] == pytest.approx(z, abs=1e-6)
 
 
+def test_ttest_execute_aligns_numeric_group_labels_with_values() -> None:
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame(
+        {
+            "g": [2] * 50 + [10] * 50,
+            "y": np.concatenate([rng.normal(0, 1, 50), rng.normal(5, 1, 50)]),
+        }
+    )
+    executor = StatsTTest(grouping_role=TreatmentRole())
+
+    out = executor.execute(_data(df, "y", BackendsEnum.pandas, None))
+    table = _table(out, "StatsTTest┴┴y")
+
+    reference = stats.ttest_ind(df.y[df.g == 2], df.y[df.g == 10], equal_var=False)
+    assert table.index.tolist() == ["10┆y"]
+    assert table.iloc[0]["statistic"] == pytest.approx(reference.statistic)
+
+
 def test_ttest_execute_without_target_raises_or_skips(backend, spark_session) -> None:
     df = _frame()
     ds = build_dataset(

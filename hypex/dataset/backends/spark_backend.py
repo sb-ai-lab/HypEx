@@ -1217,6 +1217,8 @@ class SparkNavigation(DatasetBackendNavigation):
                 consider wrapping for consistency).
         """
         data = self.data.loc[items]
+        if isinstance(data, (pd.Series, ps.Series)):
+            data = data.to_frame()
         return data
 
     def iloc(self, items: Iterable[Any]) -> Self:
@@ -1362,6 +1364,45 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             return self._wrap_result(result.to_frame())
         else:
             return self._wrap_result(self.data.apply(func, **kwargs))
+
+    def map_index_values(self, labels: Any, columns: list[str]) -> Any:
+        reserved = set(self.data.columns) | set(labels.data.columns)
+
+        def temporary_name(base: str) -> str:
+            name = base
+            while name in reserved:
+                name = f"_{name}"
+            reserved.add(name)
+            return name
+
+        label_field = labels.data.columns[0]
+        labels.checkpoint(eager=True)
+        original_columns = set(self.data.columns)
+        result = self.data.reset_index()
+        source_field = next(
+            column for column in result.columns if column not in original_columns
+        )
+
+        source_name = temporary_name("__hypex_index_value_source")
+        source_ids = labels.data.rename(columns={label_field: source_name})
+        result = result.merge(
+            source_ids, left_on=source_field, right_index=True, how="left"
+        )
+        result = result.set_index(source_name, drop=True).drop(columns=[source_field])
+        result.index.name = label_field
+
+        for column in columns:
+            mapped_name = temporary_name(f"__hypex_index_value_{column}")
+            mapped_ids = labels.data.rename(columns={label_field: mapped_name})
+            result = result.merge(
+                mapped_ids, left_on=column, right_index=True, how="left"
+            )
+            result = result.drop(columns=[column]).rename(columns={mapped_name: column})
+            converted = self._wrap_result(result)
+            converted.checkpoint(eager=True)
+            result = converted.data
+
+        return self._wrap_result(result)
 
     def is_empty(self) -> bool:
         """Check if dataset contains no data.
@@ -1732,7 +1773,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         ascending: bool = False,
         dropna: bool = True,
     ) -> Self:
-        """Count unique values in first column.
+        """Count unique row combinations across all columns.
 
         Args:
             normalize (bool): Return proportions instead of counts.
@@ -1744,18 +1785,26 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             SparkDataset: DataFrame with value counts, reset to column format.
         """
 
-        col = next(iter(self.data.columns))
-        series = self.data[col]
+        columns = list(self.data.columns)
+        spark_columns = [F.col(f"`{column}`") for column in columns]
+        sdf = self.data.to_spark()
+        if dropna:
+            sdf = sdf.dropna(subset=columns)
+        total = sdf.count() if normalize else 0
 
-        result = series.value_counts(
-            normalize=normalize, sort=sort, ascending=ascending, dropna=dropna
-        )
+        result = sdf.groupBy(*spark_columns).count()
+        if normalize:
+            result = result.withColumn(
+                "proportion",
+                F.col("count") / float(total) if total else F.lit(0.0),
+            ).drop("count")
+        if sort:
+            sort_column = "proportion" if normalize else "count"
+            result = result.orderBy(
+                F.col(sort_column).asc() if ascending else F.col(sort_column).desc()
+            )
 
-        result_df = result.to_frame(name="count").reset_index()
-
-        result_df = result_df.rename(columns={"index": col})
-
-        return self._wrap_result(result_df)
+        return self._wrap_result(result.pandas_api())
 
     def na_counts(self) -> Self | int:
         """Count null values per column.
@@ -2146,15 +2195,13 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
                 else any(c not in [*self.columns, *right.columns] for c in on_)
             ):
                 raise MergeOnError(on_)
-        if not all(
-            [
-                on,
-                left_on,
-                right_on,
-            ]
-        ) and all([left_index is None, right_index is None]):
+        if all(
+            value is None for value in (on, left_on, right_on, left_index, right_index)
+        ):
             left_index = True
             right_index = True
+        left_index = False if left_index is None else left_index
+        right_index = False if right_index is None else right_index
         result = self.data.merge(
             right=right.data,
             on=on,

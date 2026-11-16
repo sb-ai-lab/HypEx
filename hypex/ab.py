@@ -78,7 +78,9 @@ class ABTest(ExperimentShell):
         additional_tests = (
             [ABTestTypesEnum.t_test] if additional_tests is None else additional_tests
         )
-        if (
+        if isinstance(multitest_method, ABNTestMethodsEnum):
+            pass
+        elif (
             multitest_method is not None
             and multitest_method in ABNTestMethodsEnum._value2member_map_
         ):
