@@ -6,7 +6,6 @@ from copy import deepcopy
 from typing import Any
 
 from ..comparators.abstract import StatsComparator, StatsHypothesisTesting
-from ..comparators.comparators import StatTestMasterAbstract
 from ..dataset import (
     ABCRole,
     AdditionalTargetRole,
@@ -15,7 +14,7 @@ from ..dataset import (
     TempTargetRole,
 )
 from ..executor import Executor
-from ..utils import BackendsEnum, ExperimentDataEnum, HypExLogger, timeit
+from ..utils import ExperimentDataEnum, HypExLogger, timeit
 from ..utils.registry import backend_factory
 
 
@@ -220,18 +219,16 @@ class OnRoleExperiment(Experiment):
     ``role`` (e.g. :class:`~hypex.dataset.TargetRole`) and executes the
     pipeline for each column individually.
 
-    Executors are split into two groups for performance:
+    Resolved executors are split into two groups for performance:
 
-    * **Vector executors** (subclasses of :class:`StatsComparator`,
-      :class:`StatsHypothesisTesting`, or :class:`AdaptiveHypothesisTest`)
-      are capable of processing all target columns in a single pass. They
-      are executed once with ``tmp_roles`` set to all target columns.
-    * **Iterative executors** (everything else, e.g.
-      :class:`GroupDifference`) operate on a single column at a time and
-      are executed in a loop, once per target column.
+    * **Vector executors** (subclasses of :class:`StatsComparator` or
+      :class:`StatsHypothesisTesting`) process all target columns in a single
+      pass with ``tmp_roles`` set to all target columns.
+    * **Iterative executors** (everything else) operate on a single column at
+      a time and are executed once per target column.
 
-    This split minimizes the number of Spark jobs while preserving
-    correctness for executors that expect a single-column input.
+    This split minimizes jobs while preserving correctness for executors that
+    expect a single-column input.
     """
 
     def __init__(
@@ -259,20 +256,9 @@ class OnRoleExperiment(Experiment):
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Execute the pipeline for every column matching the configured role.
 
-        This method iterates over all columns in the dataset that match the
-        roles specified in ``self.role`` (e.g., :class:`~hypex.dataset.TargetRole`).
-        To optimize performance, especially on Spark backends, executors are
-        split into two groups:
-
-        1. **Vector executors**: Subclasses of :class:`StatsComparator` or
-           :class:`StatsHypothesisTesting`. These can process all target columns
-           in a single pass by setting ``tmp_roles`` for all targets simultaneously.
-
-        2. **Iterative executors**: All other executors (including
-           :class:`AdaptiveHypothesisTest` like TTest/KSTest on Pandas backend,
-           which delegate to non-vectorized group tests). These are executed
-           in a loop, once per target column, to ensure compatibility with
-           single-column input requirements.
+        Registered executors are resolved before being classified by their
+        multi-target capability. Vector executors receive all target columns
+        simultaneously; iterative executors receive one target at a time.
 
         The method ensures that ``tmp_roles`` are correctly set and cleared
         for each execution phase to isolate column processing.
@@ -301,22 +287,13 @@ class OnRoleExperiment(Experiment):
 
         vector_executors = []
         iterative_executors = []
-        _backend = data.ds.backend_type
 
-        for ex in self.executors:
-            # StatsComparator and StatsHypothesisTesting are inherently vectorized
-            if isinstance(ex, (StatsComparator, StatsHypothesisTesting)):
-                vector_executors.append(ex)
-            # Master classes (e.g., TTest, KSTest, Chi2Test):
-            # - Spark backend resolves to vectorized Stats* implementations.
-            # - Pandas backend resolves to iterative Group* implementations.
-            elif isinstance(ex, StatTestMasterAbstract):
-                if _backend == BackendsEnum.spark:
-                    vector_executors.append(ex)
-                else:
-                    iterative_executors.append(ex)
+        for executor in self.executors:
+            resolved = self._get_executor_backend(executor, data.ds)
+            if isinstance(resolved, (StatsComparator, StatsHypothesisTesting)):
+                vector_executors.append(resolved)
             else:
-                iterative_executors.append(ex)
+                iterative_executors.append(resolved)
 
         original_executors = self.executors
         try:

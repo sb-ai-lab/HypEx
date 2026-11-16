@@ -177,6 +177,25 @@ def test_map_index_values_requires_single_label_column(make_dataset) -> None:
         data.map_index_values(labels)
 
 
+def test_lookup_by_index_uses_key_positions(make_dataset) -> None:
+    source = make_dataset(pd.DataFrame({"x": [10.0, 20.0, 30.0]}), {"x": FeatureRole()})
+    keys = make_dataset(pd.DataFrame({"lookup": [2, -1, 0]}), {"lookup": FeatureRole()})
+
+    result = source.lookup_by_index(keys)
+    original_columns = set(source.columns)
+    reset = source.reset_index(drop=False)
+    index_column = next(c for c in reset.columns if c not in original_columns)
+    prepared = reset.lookup_by_index(keys, source_index_column=index_column)
+
+    for output in (result, prepared):
+        frame = output.raw_data
+        frame = frame.to_pandas() if hasattr(frame, "to_pandas") else frame
+        frame = frame.sort_index()
+        assert frame.index.tolist() == [0, 2]
+        assert frame["x"].tolist() == [30.0, 10.0]
+    assert index_column not in prepared.columns
+
+
 def test_map_forwards_kwargs_to_func_pandas() -> None:
     """map passes extra kwargs to func (pandas backend)."""
     df = pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]})

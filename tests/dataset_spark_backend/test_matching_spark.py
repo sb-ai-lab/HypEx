@@ -5,6 +5,7 @@ import pytest
 pytest.importorskip("pyspark")
 
 from hypex import Matching
+from hypex.config import MatchingConfig
 from hypex.dataset import (
     AdditionalMatchingRole,
     Dataset,
@@ -42,7 +43,8 @@ def _match_roles():
 
 
 @pytest.mark.parametrize("n_neighbors", [1, 2])
-def test_matching_spark_matches_pandas(spark_session, n_neighbors):
+def test_matching_spark_matches_pandas(spark_session, n_neighbors, monkeypatch):
+    monkeypatch.setattr(MatchingConfig, "FAISS_FIT_MODE", "full")
     df = _match_frame()
     ds_pd = Dataset(roles=_match_roles(), data=df)
     ds_sp = Dataset(
@@ -51,8 +53,22 @@ def test_matching_spark_matches_pandas(spark_session, n_neighbors):
         backend=BackendsEnum.spark,
         session=spark_session,
     )
-    r_pd = Matching(n_neighbors=n_neighbors).execute(ds_pd)
-    r_sp = Matching(n_neighbors=n_neighbors).execute(ds_sp)
+    r_pd = Matching(
+        n_neighbors=n_neighbors,
+        faiss_mode="base",
+        bias_estimation=False,
+        quality_tests=[],
+        compute_indexes=True,
+        extract_full_data=True,
+    ).execute(ds_pd)
+    r_sp = Matching(
+        n_neighbors=n_neighbors,
+        faiss_mode="base",
+        bias_estimation=False,
+        quality_tests=[],
+        compute_indexes=True,
+        extract_full_data=True,
+    ).execute(ds_sp)
 
     a = r_pd.resume.raw_data
     b = r_sp.resume.raw_data
@@ -71,9 +87,34 @@ def test_matching_spark_matches_pandas(spark_session, n_neighbors):
     assert list(idx_sp.index) == list(idx_pd.index)
     np.testing.assert_array_equal(idx_sp.values, idx_pd.values)
 
+    full_pd = r_pd.full_data.raw_data.sort_index()
+    full_sp = r_sp.full_data.raw_data.to_pandas().sort_index()
+    pd.testing.assert_frame_equal(full_sp, full_pd, check_dtype=False)
+
     for res in (a, b):
         att = float(res.loc["ATT", "Effect Size"])
         assert att == pytest.approx(2.0, abs=0.1)
+
+
+def test_spark_full_data_preserves_unmatched_rows(spark_session):
+    ds = Dataset(
+        roles={"x": FeatureRole()},
+        data=pd.DataFrame({"x": [10.0, 20.0, 30.0]}),
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+    indexes = Dataset(
+        roles={"indexes_0": AdditionalMatchingRole()},
+        data=pd.DataFrame({"indexes_0": [-1, 2, 0]}),
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+
+    output = MatchingOutput(extract_full_data=True)
+    output._extract_full_data(ExperimentData(ds), indexes)
+    result = output.full_data.raw_data.to_pandas().sort_index()
+    assert pd.isna(result["x_matched_0"].iloc[0])
+    assert result["x_matched_0"].iloc[1:].tolist() == [30.0, 10.0]
 
 
 def test_matching_index_role_restores_business_ids_on_both_backends(spark_session):

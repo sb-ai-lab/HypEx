@@ -111,3 +111,13 @@ def test_calc_with_explicit_target_cols(frame, roles) -> None:
 def test_inner_function_empty_target_cols_returns_same_dataset(frame, roles) -> None:
     ds = make_ds(frame, roles)
     assert Float32Caster._inner_function(ds, []) is ds
+
+
+def test_calc_casts_to_float32_on_each_backend(frame, roles, make_dataset) -> None:
+    ds = make_dataset(frame, roles)
+    out = Float32Caster.calc(ds, target_cols=["f", "t"])
+    df = to_pandas(out)
+    assert df["f"].dtype == np.float32
+    assert df["t"].dtype == np.float32
+    assert out.roles["f"].data_type is float
+    assert out.roles["t"].data_type is float
