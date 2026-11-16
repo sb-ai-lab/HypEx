@@ -108,6 +108,16 @@ def test_extract_summary_matches_analyzer_table_rounded(matched_data) -> None:
     ]
 
 
+def test_effect_rows_use_summary_index(matched_data) -> None:
+    data, _ = matched_data
+    output = _make_output()
+    output.extract(data)
+    assert [row["metric"] for row in output._effect_rows()] == list(
+        output.summary.index
+    )
+    assert all(metric in repr(output) for metric in ("ATT", "ATC", "ATE"))
+
+
 def test_extract_skips_indexes_and_full_data_by_default(matched_data) -> None:
     data, _ = matched_data
     output = _make_output()
