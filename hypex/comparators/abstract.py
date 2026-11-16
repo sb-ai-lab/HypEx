@@ -711,6 +711,7 @@ class StatsComparator(BaseComparator, ABC):
         """
         from ..extensions.stats_hypothesis_testing import StatsAggregationExtension
 
+        data = data.dropna(subset=group_cols)
         stats = stats or cls.REQUIRED_STATS
         ext = StatsAggregationExtension()
         return ext.calc(
