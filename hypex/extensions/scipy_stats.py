@@ -5,8 +5,6 @@ from copy import copy
 from typing import Any, Callable, Sequence
 
 import numpy as np
-import pyspark.sql.functions as F
-from pyspark.sql import DataFrame as SparkDF
 from scipy.stats import (  # type: ignore
     chi2_contingency,
     ks_2samp,
@@ -17,6 +15,7 @@ from scipy.stats import (  # type: ignore
     ttest_ind,
 )
 
+from .._spark import F, SparkDF
 from ..dataset import Dataset, DatasetAdapter, SmallDataset, StatisticRole
 from ..dataset.backends import PandasDataset, SparkDataset
 from ..dataset.roles import ABCRole

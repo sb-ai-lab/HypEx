@@ -4,9 +4,8 @@ from typing import Any, Literal
 
 import numpy as np
 import pandas as pd  # type: ignore
-import pyspark.pandas as ps
-import pyspark.sql as spark
 
+from .._spark import SPARK_DATAFRAME_TYPES, spark
 from ..utils import (
     BackendsEnum,
     FromDictTypes,
@@ -206,11 +205,7 @@ class DatasetAdapter(Adapter):
         # Convert data based on its type
         if isinstance(data, dict):
             return DatasetAdapter.dict_to_dataset(data, roles, small)
-        elif (
-            isinstance(data, pd.DataFrame)
-            or isinstance(data, spark.DataFrame)
-            or isinstance(data, ps.DataFrame)
-        ):
+        elif isinstance(data, (pd.DataFrame, *SPARK_DATAFRAME_TYPES)):
             if isinstance(roles, ABCRole):
                 raise InvalidArgumentError("roles", "dict[str, ABCRole]")
             return DatasetAdapter.frame_to_dataset(data, roles, small)

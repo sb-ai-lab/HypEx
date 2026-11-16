@@ -3,8 +3,8 @@ from __future__ import annotations
 import copy
 
 import pandas as pd  # type: ignore
-import pyspark.pandas as ps
 
+from .._spark import ps
 from ..dataset import ABCRole, Dataset, DatasetAdapter
 from ..dataset.backends import PandasDataset, SparkDataset
 from ..utils import Adapter

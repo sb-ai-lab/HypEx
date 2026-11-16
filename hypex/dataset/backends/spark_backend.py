@@ -14,16 +14,17 @@ except ImportError:
 
 import numpy as np
 import pandas as pd  # pyright: ignore[reportMissingImports]
-import pyspark.pandas as ps  # pyright: ignore[reportMissingImports]
-import pyspark.sql.functions as F  # pyright: ignore[reportMissingImports]
-from pyspark.pandas.exceptions import (
-    PandasNotImplementedError,  # pyright: ignore[reportMissingImports]
-)
-from pyspark.sql import DataFrame as SparkDF  # pyright: ignore[reportMissingImports]
-from pyspark.sql import SparkSession  # pyright: ignore[reportMissingImports]
-from pyspark.sql.types import StructType  # pyright: ignore[reportMissingImports]
-from pyspark.storagelevel import StorageLevel  # pyright: ignore[reportMissingImports]
 
+from ..._spark import (
+    F,
+    PandasNotImplementedError,
+    SparkDF,
+    SparkSession,
+    StorageLevel,
+    StructType,
+    ps,
+    require_pyspark,
+)
 from ...config import DatasetConfig
 from ...utils import (
     BackendsEnum,
@@ -324,6 +325,8 @@ class SparkNavigation(DatasetBackendNavigation):
             ValueError: If session cannot be inferred and is not provided.
             TypeError: If session is not a SparkSession or data type is unsupported.
         """
+        require_pyspark()
+
         if isinstance(data, dict):
             if "index" in data:
                 data = pd.DataFrame(data=data["data"], index=data["index"])
