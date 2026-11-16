@@ -204,6 +204,10 @@ jobs:
     name: Coverage (locked)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Poetry >=2.3 defaults to marker-only installation. This lock contains
+      # overlapping numeric-stack variants; select one using the active extras.
+      POETRY_INSTALLER_RE_RESOLVE: "true"
     steps:
       - uses: actions/checkout@v4
 
