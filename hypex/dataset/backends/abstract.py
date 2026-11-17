@@ -21,6 +21,58 @@ class DatasetBackendNavigation(ABC):
     structural modifications.
     """
 
+    @property
+    @abstractmethod
+    def persist_key(self) -> str | None:
+        """Lineage ownership key, or None when explicit caching is unsupported."""
+        raise AbstractMethodError
+
+    @abstractmethod
+    def cache_snapshot(self) -> Self | None:
+        """Return a stable snapshot of the current cache, or None if unsupported."""
+        raise AbstractMethodError
+
+    @abstractmethod
+    def same_cache(self, other: DatasetBackendNavigation) -> bool:
+        """Whether both backends refer to the same physical cache."""
+        raise AbstractMethodError
+
+    @abstractmethod
+    def materialize(self, action: Literal["count", "head", "none"]) -> None:
+        """Materialize all, part, or none of the current data."""
+        raise AbstractMethodError
+
+    @abstractmethod
+    def persist(
+        self,
+        storage_level: Literal[
+            "MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"
+        ] = "MEMORY_AND_DISK",
+    ) -> Self:
+        """Cache data when supported; otherwise return self."""
+        raise AbstractMethodError
+
+    @abstractmethod
+    def unpersist(self, blocking: bool = False) -> Self:
+        """Release owned caches when supported; otherwise return self."""
+        raise AbstractMethodError
+
+    @property
+    @abstractmethod
+    def is_persisted(self) -> bool:
+        """Whether the current data has an explicit cache."""
+        raise AbstractMethodError
+
+    @abstractmethod
+    def get_storage_level(self) -> str | None:
+        """Return the cache storage level, or None if absent."""
+        raise AbstractMethodError
+
+    @abstractmethod
+    def get_cache_info(self) -> dict[str, Any]:
+        """Describe cache state and backend memory behavior."""
+        raise AbstractMethodError
+
     @abstractmethod
     def to_backend(
         self,
@@ -1023,7 +1075,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def checkpoint(self) -> None:
+    def checkpoint(self, eager: bool = True) -> Self:
         """Perform a backend‑specific checkpoint (e.g., materialise in Spark).
 
         Raises:

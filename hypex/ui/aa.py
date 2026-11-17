@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import html
 import math
 from typing import Any

@@ -46,7 +46,7 @@ class DummyEncoderExtension(Extension):
         for col in dummies_columns:
             src = cls._resolve_source_column(col, source_cols)
             roles[col] = source_roles[src].asadditional(int)
-            roles[col].data_type = bool
+            roles[col].data_type = int
         return roles
 
 
@@ -71,7 +71,7 @@ class PandasDummyEncoderExtension(DummyEncoderExtension):
         )
         new_roles = copy.deepcopy(roles)
         for role in roles.values():
-            role.data_type = bool
+            role.data_type = int
         return DatasetAdapter.to_dataset(dummies_df, roles=new_roles, small=False)
 
 
@@ -95,5 +95,5 @@ class SparkDummyEncoderExtension(DummyEncoderExtension):
         )
         new_roles = copy.deepcopy(roles)
         for role in roles.values():
-            role.data_type = bool
+            role.data_type = int
         return DatasetAdapter.to_dataset(dummies_df, roles=new_roles, small=False)

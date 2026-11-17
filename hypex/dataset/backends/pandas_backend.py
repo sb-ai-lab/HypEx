@@ -1984,7 +1984,48 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             self.data.explode(column=column, ignore_index=ignore_index)
         )
 
-    def checkpoint(self, eager: bool = True):
+    @property
+    def persist_key(self) -> None:
+        return None
+
+    def cache_snapshot(self) -> None:
+        return None
+
+    def same_cache(self, other: DatasetBackendNavigation) -> bool:
+        return self is other
+
+    def materialize(self, action: Literal["count", "head", "none"]) -> None:
+        pass
+
+    def persist(
+        self,
+        storage_level: Literal[
+            "MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"
+        ] = "MEMORY_AND_DISK",
+    ) -> Self:
+        """Pandas data is already in memory; no explicit cache is needed."""
+        return self
+
+    def unpersist(self, blocking: bool = False) -> Self:
+        """Pandas has no explicit cache to release."""
+        return self
+
+    @property
+    def is_persisted(self) -> bool:
+        return False
+
+    def get_storage_level(self) -> str | None:
+        return None
+
+    def get_cache_info(self) -> dict[str, Any]:
+        return {
+            "is_persisted": self.is_persisted,
+            "storage_level": self.get_storage_level(),
+            "backend_type": BackendsEnum.pandas,
+            "in_memory": True,
+        }
+
+    def checkpoint(self, eager: bool = True) -> Self:
         """Breaks the computation graph (Lineage) to prevent exponential slowdowns.
 
         For the Spark backend, this method materializes the DataFrame to truncate
@@ -1996,4 +2037,4 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             eager: If ``True``, the checkpoint is executed eagerly. This parameter
                 is ignored for the Pandas backend. Defaults to ``True``.
         """
-        pass
+        return self
