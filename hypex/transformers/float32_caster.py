@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -98,6 +98,7 @@ class Float32Caster(Transformer):
         """
         if not target_cols:
             return data
+        dtype_map: dict[str, Any]
         if data.backend_type == BackendsEnum.spark:
             dtype_map = {col: "float32" for col in target_cols}
         else:
@@ -137,7 +138,7 @@ class Float32Caster(Transformer):
             return data
 
         result = data.copy(
-            data=self.calc(data=data.ds, target_cols=target_cols),
+            data=self.calc(data=cast(Dataset, data.ds), target_cols=target_cols),
         )
         return result
 

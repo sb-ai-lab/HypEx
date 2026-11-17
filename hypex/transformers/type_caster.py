@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from ..dataset.dataset import Dataset
 from ..dataset.experiment_data import ExperimentData
@@ -41,8 +41,9 @@ class TypeCaster(Transformer):
         ]
         return data.astype({col: float for col in double_cols})
 
+    # The dtype mapping is required by this specialized transformation.
     @classmethod
-    def calc(
+    def calc(  # type: ignore[override]
         cls,
         data: Dataset,
         dtype: dict[str, type] | dict[type, type],
@@ -53,7 +54,7 @@ class TypeCaster(Transformer):
         if downcasting:
             data = TypeCaster._downcast(data=data)
 
-        cast_mapping = {}
+        cast_mapping: dict[str, type] = {}
         for k, v in dtype.items():
             if isinstance(k, str):
                 cast_mapping[k] = v
@@ -68,7 +69,7 @@ class TypeCaster(Transformer):
     def execute(self, data: ExperimentData) -> ExperimentData:
         result = data.copy(
             data=self.calc(
-                data=data.ds,
+                data=cast(Dataset, data.ds),
                 dtype=self.dtype,
                 roles=self.roles,
                 downcasting=self.downcasting,

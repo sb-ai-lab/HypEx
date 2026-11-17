@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal, cast
 
 from ..dataset.dataset import Dataset
 from ..dataset.experiment_data import ExperimentData
@@ -23,7 +23,7 @@ class NaDropper(Transformer):
     def __init__(
         self,
         target_roles: ABCRole | Sequence[ABCRole] | None = None,
-        how: str = "any",
+        how: Literal["any", "all"] = "any",
         key: Any = "",
     ):
         super().__init__(key=key)
@@ -34,7 +34,7 @@ class NaDropper(Transformer):
     def _inner_function(
         data: Dataset,
         target_cols: list[str],
-        how: str = "any",
+        how: Literal["any", "all"] = "any",
     ) -> Dataset:
         if not target_cols:
             return data
@@ -50,7 +50,7 @@ class NaDropper(Transformer):
 
         result = data.copy(
             data=self.calc(
-                data=data.ds,
+                data=cast(Dataset, data.ds),
                 target_cols=target_cols,
                 how=self.how,
             )
