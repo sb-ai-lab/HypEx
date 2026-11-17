@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from math import sqrt
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, cast
 
 import numpy as np
 from scipy.stats import chi2_contingency, kstwobign  # type: ignore
@@ -620,7 +620,9 @@ class StatsKSTest(StatsHypothesisTesting):
         """
         from ..extensions.stats_hypothesis_testing import StatsKSTestExtension
 
-        subset = data.ds[[group_col, *target_cols]].dropna(subset=[group_col])
+        subset = cast(
+            Dataset, data.ds[[group_col, *target_cols]].dropna(subset=[group_col])
+        )
 
         ext = StatsKSTestExtension(n_bins=self.n_bins, reliability=self.reliability)
         all_group_stats = ext.calc(
@@ -906,7 +908,9 @@ class StatsUTest(StatsHypothesisTesting):
         """
         from ..extensions.stats_hypothesis_testing import StatsKSTestExtension
 
-        subset = data.ds[[group_col, *target_cols]].dropna(subset=[group_col])
+        subset = cast(
+            Dataset, data.ds[[group_col, *target_cols]].dropna(subset=[group_col])
+        )
         ext = StatsKSTestExtension(n_bins=self.n_bins, reliability=self.reliability)
         all_group_stats = ext.calc(
             data=subset,

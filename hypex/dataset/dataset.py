@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
-import pandas as pd  # type: ignore
+import pandas as pd
 
 from .._spark import SPARK_DATAFRAME_TYPES, spark
 from ..utils import (
@@ -65,7 +65,9 @@ class Dataset(DatasetBase):
             )
         return Dataset(
             roles=self.roles,
-            data=self.backend_data.sort_values(by=by, ascending=ascending, **kwargs),
+            data=self.backend_data.sort_values(
+                by=Adapter.to_list(by), ascending=ascending, **kwargs
+            ),
         )
 
 
@@ -73,10 +75,18 @@ class SmallDataset(DatasetBase):
     def __init__(
         self,
         roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
-        data: pd.DataFrame | str | None = None,
+        data: (
+            FromDictTypes
+            | pd.DataFrame
+            | pd.Series
+            | PandasDataset
+            | SparkDataset
+            | str
+            | None
+        ) = None,
         default_role: ABCRole | None = None,
         session: spark.SparkSession | None = None,
-        backend: BackendsEnum = None,
+        backend: BackendsEnum | None = None,
         persist_key: str | None = None,
     ):
         if isinstance(roles, dict) and data is not None:
@@ -95,7 +105,7 @@ class SmallDataset(DatasetBase):
                 columns = list(data["data"].keys())
 
             if columns:
-                new_roles = {}
+                new_roles: dict[Any, Any] = {}
                 for k, v in roles.items():
                     if isinstance(k, int):
                         if k in columns:
@@ -106,7 +116,9 @@ class SmallDataset(DatasetBase):
                             new_roles[str(k)] = v
                     else:
                         new_roles[k] = v
-                roles = new_roles
+                roles = cast(
+                    "dict[ABCRole, list[str] | str] | dict[str, ABCRole]", new_roles
+                )
 
         if isinstance(data, pd.Series):
             if data.name is None:
@@ -143,14 +155,15 @@ class SmallDataset(DatasetBase):
     ) -> SmallDataset:
         if not isinstance(roles, dict):
             if isinstance(roles, ABCRole):
-                roles = {col: roles for col in data.keys()}
+                roles = {col: roles for col in cast("dict[Any, Any]", data).keys()}
             else:
                 raise TypeError(f"Value {roles} is not a dict type.")
 
+        payload: FromDictTypes
         if isinstance(data, dict) and "data" in data:
             payload = data
         elif isinstance(data, dict):
-            payload = {"data": data}
+            payload = cast(FromDictTypes, {"data": data})
         else:
             payload = data
         return SmallDataset(data=payload, roles=roles)
@@ -168,7 +181,9 @@ class SmallDataset(DatasetBase):
             )
         return Dataset(
             roles=self.roles,
-            data=self._backend_data.sort_values(by=by, ascending=ascending, **kwargs),
+            data=self._backend_data.sort_values(
+                by=Adapter.to_list(by), ascending=ascending, **kwargs
+            ),
         )
 
     def reindex(self, labels, fill_value: Any | None = None):
@@ -184,7 +199,7 @@ class SmallDataset(DatasetBase):
         self,
         roles: dict[str, ABCRole] | list[str] | None = None,
     ) -> Dataset:
-        roles_names: list[str | None] = (
+        roles_names: list[str] | None = (
             list(roles.keys()) or [] if isinstance(roles, dict) else roles
         )
         result_data = self.backend_data.transpose(roles_names)
@@ -207,6 +222,8 @@ class DatasetAdapter(Adapter):
     def to_dataset(
         data: dict
         | Dataset
+        | SmallDataset
+        | np.ndarray
         | pd.DataFrame
         | spark.DataFrame
         | list
@@ -231,8 +248,10 @@ class DatasetAdapter(Adapter):
                 raise InvalidArgumentError("roles", "dict[str, ABCRole]")
             return DatasetAdapter.list_to_dataset(data, roles, small)
         elif isinstance(data, np.ndarray):
-            return DatasetAdapter.ndarray_to_dataset(data, roles, small)
-        elif any(isinstance(data, t) for t in [str, int, float, bool]):
+            return DatasetAdapter.ndarray_to_dataset(
+                data, cast("dict[str, ABCRole]", roles), small
+            )
+        elif isinstance(data, (str, int, float, bool)):
             return DatasetAdapter.value_to_dataset(data, roles, small)
         elif isinstance(data, Dataset):
             if small:
@@ -265,6 +284,7 @@ class DatasetAdapter(Adapter):
         small: bool = True,
     ) -> Dataset | SmallDataset:
         roles_names = list(data.keys())
+        result: Dataset | SmallDataset
         if isinstance(roles, dict):
             result = SmallDataset.from_dict(data=data, roles=roles)
         elif isinstance(roles, ABCRole):
@@ -284,11 +304,13 @@ class DatasetAdapter(Adapter):
         small: bool = True,
     ) -> Dataset | SmallDataset:
         """Wrap a list into a one-column pandas-backed ``Dataset``."""
+        dataset_roles: dict[Any, ABCRole] = (
+            roles if len(roles) > 0 else cast("dict[Any, ABCRole]", {0: DefaultRole()})
+        )
+        columns: list[Any] = [next(iter(roles.keys()))] if len(roles) > 0 else [0]
         result = Dataset(
-            roles=roles if len(roles) > 0 else {0: DefaultRole()},
-            data=pd.DataFrame(
-                data=data, columns=[next(iter(roles.keys()))] if len(roles) > 0 else [0]
-            ),
+            roles=cast("dict[str, ABCRole]", dataset_roles),
+            data=pd.DataFrame(data=data, columns=columns),
         )
         return result
 
@@ -298,6 +320,7 @@ class DatasetAdapter(Adapter):
         roles: dict[str, ABCRole],
         small: bool = True,
     ) -> Dataset | SmallDataset:
+        result: Dataset | SmallDataset
         if small:
             result = SmallDataset(
                 roles=roles,
@@ -318,9 +341,9 @@ class DatasetAdapter(Adapter):
     ) -> Dataset | SmallDataset:
         """Wrap a 2-D array into a pandas-backed ``Dataset``."""
         columns = range(data.shape[1]) if len(roles) == 0 else list(roles.keys())
-        data = pd.DataFrame(data=data, columns=columns)
+        frame = pd.DataFrame(data=data, columns=columns)
         result = Dataset(
             roles=roles,
-            data=data,
+            data=frame,
         )
         return result

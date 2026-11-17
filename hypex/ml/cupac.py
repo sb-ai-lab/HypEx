@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from ..dataset.dataset import Dataset, SmallDataset
 from ..dataset.experiment_data import ExperimentData, ExperimentDataEnum
@@ -280,10 +280,13 @@ class CUPACExecutor(MLExecutor):
         )
 
     def predict(self, model: Any, X: Dataset) -> Dataset:
-        return self.extension.calc(
-            data=X,
-            mode="predict",
-            model=model,
+        return cast(
+            Dataset,
+            self.extension.calc(
+                data=X,
+                mode="predict",
+                model=model,
+            ),
         )
 
     @staticmethod
@@ -293,6 +296,7 @@ class CUPACExecutor(MLExecutor):
         res_dataset = None
         column_counter = 0
         for column in cupac_data_slice:
+            col_data: Dataset | SmallDataset | None
             if len(column) == 1:
                 col_data = data.ds[column[0]]
             else:
@@ -308,6 +312,7 @@ class CUPACExecutor(MLExecutor):
                         )
                 col_data = res_lag_column
 
+            col_data = cast(Dataset, col_data)
             standard_col_name = f"{column_counter}"
             col_data = col_data.rename(
                 {next(iter(col_data.columns)): standard_col_name}
@@ -318,7 +323,7 @@ class CUPACExecutor(MLExecutor):
                 res_dataset = col_data
             else:
                 res_dataset = res_dataset.add_column(data=col_data)
-        return res_dataset
+        return cast(Dataset, res_dataset)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Execute CUPAC variance reduction on the experiment data.

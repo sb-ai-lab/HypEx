@@ -192,6 +192,7 @@ class GroupedDataset:
         else:
             raise NotImplementedError("Apply not supported for this groupby type")
 
+        new_roles: dict[str, ABCRole]
         if hasattr(result_data, "columns"):
             new_roles = {col: InfoRole() for col in result_data.columns}
         else:
@@ -362,7 +363,7 @@ class GroupedDataset:
         if suffix:
             raw["data"] = {f"{col}{suffix}": v for col, v in raw["data"].items()}
 
-        new_roles = {col: StatisticRole() for col in raw["data"]}
+        new_roles: dict[str, ABCRole] = {col: StatisticRole() for col in raw["data"]}
         return self._dataset_class(
             roles=new_roles, data=raw, persist_key=self._persist_key
         )
@@ -382,8 +383,9 @@ class GroupedDataset:
         )
         if hasattr(result, "to_frame"):
             result = result.to_frame("size")
+        roles: dict[str, ABCRole] = {"size": StatisticRole()}
         return self._dataset_class(
-            roles={"size": StatisticRole()},
+            roles=roles,
             data=result,
             persist_key=self._persist_key,
         )

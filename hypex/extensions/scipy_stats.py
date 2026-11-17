@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from copy import copy
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Sequence, cast
 
 import numpy as np
 from scipy.stats import (  # type: ignore
@@ -221,7 +221,7 @@ class PandasChi2TestExtension(GroupChi2TestExtension):
                 DatasetAdapter.to_dataset(
                     {
                         cat_col: ["other"],
-                        "count": [int(mini_counts["count"].sum())],
+                        "count": [int(cast(float, mini_counts["count"].sum()))],
                     },
                     roles=new_roles,
                     small=False,
