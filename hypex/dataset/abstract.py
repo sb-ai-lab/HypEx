@@ -385,7 +385,7 @@ class DatasetBase:
         backend = self._backend_data.cache_snapshot()
         if backend is None:
             return None
-        return self.__class__(data=backend, roles=deepcopy(self.roles))
+        return self._from_derived_backend(data=backend, roles=self.roles)
 
     def same_cache(self, other: DatasetBase) -> bool:
         return self._backend_data.same_cache(other.backend_data)
