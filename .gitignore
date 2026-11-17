@@ -178,3 +178,6 @@ catboost_info/
 # Windows download markers and locally downloaded wheels
 *:Zone.Identifier
 /*.whl
+
+# Ml artifacts
+.hypex_experiments
