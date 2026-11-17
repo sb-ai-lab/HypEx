@@ -5,7 +5,7 @@ import warnings
 from collections.abc import Iterable as IterableABC
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any, Callable, Hashable, Iterable, Literal, Sequence
+from typing import Any, Callable, Hashable, Iterable, Literal, Sequence, cast
 
 try:
     from typing import Self  # Python >= 3.11
@@ -649,6 +649,7 @@ class DatasetBase:
             if hasattr(self.backend_data, "data")
             else self.backend_data
         )
+        other_raw: Any
 
         if isinstance(other, self.__class__):
             if type(other._backend_data) is not type(self._backend_data):
@@ -1375,7 +1376,10 @@ class DatasetBase:
         return self._from_derived_backend(
             roles=other.roles if isinstance(other, self.__class__) else {},
             data=self.backend_data.dot(
-                other.backend_data if isinstance(other, self.__class__) else other
+                cast(
+                    Any,
+                    other.backend_data if isinstance(other, self.__class__) else other,
+                )
             ),
         )
 
@@ -1437,7 +1441,7 @@ class DatasetBase:
         )
 
     def cov(self) -> DatasetBase:
-        t_data = self.backend_data.cov()
+        t_data = cast("PandasDataset | SparkDataset", self.backend_data.cov())
         return self._from_derived_backend(
             roles={column: DefaultRole() for column in t_data.columns}, data=t_data
         )
