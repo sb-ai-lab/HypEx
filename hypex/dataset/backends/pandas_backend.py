@@ -1999,7 +1999,9 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def persist(
         self,
-        storage_level: Literal["MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"] = "MEMORY_AND_DISK",
+        storage_level: Literal[
+            "MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"
+        ] = "MEMORY_AND_DISK",
     ) -> Self:
         """Pandas data is already in memory; no explicit cache is needed."""
         return self

@@ -179,9 +179,7 @@ class DatasetBase:
         )
 
         return self._from_derived_backend(
-            data=new_backend_data,
-            roles=self.roles,
-            session=session
+            data=new_backend_data, roles=self.roles, session=session
         )
 
     @staticmethod
@@ -277,7 +275,11 @@ class DatasetBase:
         if backend is not None:
             non_compresion_cols = self._select_non_encoding_columns(roles)
             self._backend_data = self._select_backend_from_str(
-                data, backend, data_compression, session, non_compresion_cols,
+                data,
+                backend,
+                data_compression,
+                session,
+                non_compresion_cols,
                 persist_key=persist_key,
             )
         elif data is not None:
@@ -344,8 +346,7 @@ class DatasetBase:
         result.tmp_roles = {
             c: deepcopy(role)
             for c, role in self.tmp_roles.items()
-            if c in data.columns
-            and role.data_type == result.roles[c].data_type
+            if c in data.columns and role.data_type == result.roles[c].data_type
         }
 
         return result
@@ -483,7 +484,9 @@ class DatasetBase:
             )
             for column in items
         }
-        result = self._from_derived_backend(data=self._backend_data.__getitem__(item), roles=roles)
+        result = self._from_derived_backend(
+            data=self._backend_data.__getitem__(item), roles=roles
+        )
         return result
 
     def reset_index(self, drop: bool = False, **kwargs) -> Self:
@@ -690,7 +693,9 @@ class DatasetBase:
             )
             new_roles[col].data_type = None
 
-        return self._from_derived_backend(data=result_raw, roles=new_roles, session=self.session)
+        return self._from_derived_backend(
+            data=result_raw, roles=new_roles, session=self.session
+        )
 
     # comparison operators:
     def __eq__(self, other: Any) -> Self:
@@ -1035,7 +1040,9 @@ class DatasetBase:
         )
 
     def limit(self, num: int | None = None) -> Any:
-        return self._from_derived_backend(data=self._backend_data.limit(num=num), roles=self.roles)
+        return self._from_derived_backend(
+            data=self._backend_data.limit(num=num), roles=self.roles
+        )
 
     def apply(
         self,
@@ -1198,7 +1205,6 @@ class DatasetBase:
         t_data = self._backend_data.corr(numeric_only=numeric_only)
         t_roles = {column: self.roles[column] for column in t_data.columns}
         return self._from_derived_backend(roles=t_roles, data=t_data)
-
 
     def value_counts(
         self,
@@ -1432,7 +1438,9 @@ class DatasetBase:
 
     def rename(self, names: dict[str, str]) -> Self:
         roles = {names.get(column, column): role for column, role in self.roles.items()}
-        return self._from_derived_backend(roles=roles, data=self.backend_data.rename(names))
+        return self._from_derived_backend(
+            roles=roles, data=self.backend_data.rename(names)
+        )
 
     def replace(
         self, to_replace: Any = None, value: Any = None, regex: bool = False
@@ -1451,7 +1459,9 @@ class DatasetBase:
         extended_roles = {
             c: deepcopy(self.roles[column]) for c in extended_data.columns
         }
-        extended_ds = self._from_derived_backend(roles=extended_roles, data=extended_data)
+        extended_ds = self._from_derived_backend(
+            roles=extended_roles, data=extended_data
+        )
         return self.append(extended_ds, axis=1).drop(column, axis=1)
 
     def to_dict(self) -> dict[str, Any]:

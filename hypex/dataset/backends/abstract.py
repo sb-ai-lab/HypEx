@@ -45,7 +45,9 @@ class DatasetBackendNavigation(ABC):
     @abstractmethod
     def persist(
         self,
-        storage_level: Literal["MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"] = "MEMORY_AND_DISK",
+        storage_level: Literal[
+            "MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"
+        ] = "MEMORY_AND_DISK",
     ) -> Self:
         """Cache data when supported; otherwise return self."""
         raise AbstractMethodError

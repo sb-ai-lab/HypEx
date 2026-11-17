@@ -455,8 +455,10 @@ class SparkNavigation(DatasetBackendNavigation):
         first, second = self._internal_frame_api, other._internal_frame_api
         if first.sparkSession.sparkContext is not second.sparkSession.sparkContext:
             return False
-        return first._jdf.queryExecution().normalized().sameResult(
-            second._jdf.queryExecution().normalized()
+        return (
+            first._jdf.queryExecution()
+            .normalized()
+            .sameResult(second._jdf.queryExecution().normalized())
         )
 
     def materialize(self, action: Literal["count", "head", "none"]) -> None:

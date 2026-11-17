@@ -95,9 +95,7 @@ def test_roles_are_derived_from_original_roles(frame) -> None:
     assert type(result.roles["color_red"]).__name__ == "AdditionalTargetRole"
 
 
-def test_encoded_roles_and_values_are_integer(
-    frame, roles, backend, spark_session
-):
+def test_encoded_roles_and_values_are_integer(frame, roles, backend, spark_session):
     source = _build(frame, roles, backend, spark_session)
     result = DummyEncoder._inner_function(source, target_cols=["color"])
     encoded = _pdf(result)

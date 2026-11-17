@@ -36,7 +36,12 @@ class Dataset(DatasetBase):
         persist_key: str | None = None,
     ):
         super().__init__(
-            roles, data, backend, default_role, session, data_compression,
+            roles,
+            data,
+            backend,
+            default_role,
+            session,
+            data_compression,
             persist_key=persist_key,
         )
 
@@ -115,7 +120,11 @@ class SmallDataset(DatasetBase):
             else BackendsEnum.pandas
         )
         super().__init__(
-            roles, data, backend_arg, default_role, session,
+            roles,
+            data,
+            backend_arg,
+            default_role,
+            session,
             persist_key=persist_key,
         )
 
