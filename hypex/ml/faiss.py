@@ -103,7 +103,7 @@ class FaissNearestNeighbors(MLExecutor):
         cls,
         grouping_data,
         tmp_roles,
-        target_field: str | None = None,
+        target_field: str | list[str] | None = None,
         n_neighbors: int | None = None,
         two_sides: bool | None = None,
         test_pairs: bool | None = None,

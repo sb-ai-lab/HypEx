@@ -57,7 +57,7 @@ class GroupOperator(
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_fields: list[str] | None = None,
+        target_fields: str | list[str] | None = None,
         **kwargs,
     ) -> dict:
         if target_fields is None or len(target_fields) != 2:
@@ -78,7 +78,7 @@ class GroupOperator(
         cls,
         data: Dataset,
         group_field: Sequence[str] | str | None = None,
-        grouping_data: GroupedDataset | None = None,
+        grouping_data: GroupedDataset | list[tuple[str, Dataset]] | None = None,
         target_fields: str | list[str] | None = None,
         **kwargs,
     ) -> dict:
