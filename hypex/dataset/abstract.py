@@ -339,6 +339,7 @@ class DatasetBase:
         )
 
     def _from_derived_backend(self, data, roles, session=None):
+        # Derived backends already carry their lineage; keep the backend wrapper.
         result = self.__class__(roles=deepcopy(roles), data=data, session=session)
         result.tmp_roles = {
             c: deepcopy(role)
@@ -379,7 +380,7 @@ class DatasetBase:
     def persist_key(self) -> str | None:
         return self._backend_data.persist_key
 
-    def cache(self, storage_level: str) -> Self | None:
+    def _acquire_cache(self, storage_level: str) -> Self | None:
         """Acquire a cache and return a stable snapshot for the ownership manager."""
         self._backend_data.persist(storage_level=storage_level)
         backend = self._backend_data.cache_snapshot()

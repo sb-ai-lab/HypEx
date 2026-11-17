@@ -477,7 +477,8 @@ class SparkNavigation(DatasetBackendNavigation):
     def _internal_frame_api(self):
         internal = self.data._internal
         frame = internal.spark_frame
-        # Resolve pending expressions and renames before inspecting the cache.
+        # Pending expressions (e.g. x + 1) can still reference the parent's frame.
+        # Resolve them only when inspecting a plan different from that frame.
         names = set(frame.columns)
         if all(
             name in names

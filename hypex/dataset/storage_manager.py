@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 import uuid
 import warnings
 from typing import TYPE_CHECKING, Literal
@@ -16,13 +17,15 @@ class PersistEntry:
         frame: A Dataset snapshot of a persisted plan. Exposes ``same_cache``
             and ``release_cache`` through the Dataset interface.
         storage_level: Storage level name the frame was persisted with.
+        created_at: Monotonic registration time for debugging cache lifetime.
     """
 
-    __slots__ = ("frame", "storage_level")
+    __slots__ = ("created_at", "frame", "storage_level")
 
     def __init__(self, frame: DatasetBase, storage_level: str | None = None):
         self.frame = frame
         self.storage_level = storage_level
+        self.created_at = time.monotonic()
 
     def __repr__(self) -> str:
         return (
@@ -88,7 +91,8 @@ class StorageManager:
         if action not in ("count", "head", "none"):
             raise ValueError(f"Invalid action: {action!r}")
         with self._lock:
-            cached = data.cache(storage_level)
+            # Public persist() routes here; the internal helper only acquires a snapshot.
+            cached = data._acquire_cache(storage_level)
             if cached is None:
                 return
             key = cached.persist_key
