@@ -369,38 +369,25 @@ class DatasetBase:
           triggered the action;
         - :meth:`unpersist` releases all accumulated references.
         """
-        if self.backend_type == BackendsEnum.spark:
-            self._backend_data.persist(storage_level=storage_level, action=action)
+        self._backend_data.persist(storage_level=storage_level, action=action)
 
         return self
 
     def unpersist(self, blocking: bool = False):
         """Release ALL references accumulated by the dataset lineage."""
-        if self.backend_type == BackendsEnum.spark:
-            self._backend_data.unpersist(blocking=blocking)
+        self._backend_data.unpersist(blocking=blocking)
 
         return self
 
     @property
     def is_persisted(self) -> bool:
-        if self.backend_type == BackendsEnum.spark:
-            return self._backend_data.is_persisted
-        return False
+        return self._backend_data.is_persisted
 
     def get_storage_level(self) -> str | None:
-        if self.backend_type == BackendsEnum.spark:
-            return self._backend_data.get_storage_level()
-        return None
+        return self._backend_data.get_storage_level()
 
     def get_cache_info(self) -> dict[str, Any]:
-        return {
-            "is_persisted": self.is_persisted,
-            "storage_level": self.get_storage_level(),
-            "backend_type": self.backend_type,
-            "in_memory": True
-            if self.backend_type == BackendsEnum.pandas
-            else self.is_persisted,
-        }
+        return self._backend_data.get_cache_info()
 
     def checkpoint(self, eager: bool = True) -> Self:
         """Breaks the computation graph (Lineage) for the Spark backend.

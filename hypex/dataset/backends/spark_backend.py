@@ -899,6 +899,14 @@ class SparkNavigation(DatasetBackendNavigation):
         """
         return self._internal_frame_api.storageLevel != StorageLevel.NONE
 
+    def get_cache_info(self) -> dict[str, Any]:
+        return {
+            "is_persisted": self.is_persisted,
+            "storage_level": self.get_storage_level(),
+            "backend_type": BackendsEnum.spark,
+            "in_memory": self.is_persisted,
+        }
+
     def get_storage_level(self) -> str | None:
         """Get the current storage level of the Spark DataFrame.
 

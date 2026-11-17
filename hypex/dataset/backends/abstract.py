@@ -22,6 +22,36 @@ class DatasetBackendNavigation(ABC):
     """
 
     @abstractmethod
+    def persist(
+        self,
+        storage_level: Literal["MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"] = "MEMORY_AND_DISK",
+        action: Literal["count", "head", "none"] = "count",
+    ) -> Self:
+        """Cache data when supported; otherwise return self."""
+        raise AbstractMethodError
+
+    @abstractmethod
+    def unpersist(self, blocking: bool = False) -> Self:
+        """Release owned caches when supported; otherwise return self."""
+        raise AbstractMethodError
+
+    @property
+    @abstractmethod
+    def is_persisted(self) -> bool:
+        """Whether the current data has an explicit cache."""
+        raise AbstractMethodError
+
+    @abstractmethod
+    def get_storage_level(self) -> str | None:
+        """Return the cache storage level, or None if absent."""
+        raise AbstractMethodError
+
+    @abstractmethod
+    def get_cache_info(self) -> dict[str, Any]:
+        """Describe cache state and backend memory behavior."""
+        raise AbstractMethodError
+
+    @abstractmethod
     def to_backend(
         self,
         target_backend: BackendsEnum,
@@ -1023,7 +1053,7 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def checkpoint(self) -> None:
+    def checkpoint(self, eager: bool = True) -> Self:
         """Perform a backend‑specific checkpoint (e.g., materialise in Spark).
 
         Raises:
