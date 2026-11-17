@@ -71,12 +71,45 @@ class StorageManager:
 
     # ── main api ────────────────────────────────────────────────
 
+    @staticmethod
+    def _same_plan(first, second):
+        if first is second:
+            return True
+        if not hasattr(first, "_jdf") or not hasattr(second, "_jdf"):
+            return False
+        if first.sparkSession.sparkContext is not second.sparkSession.sparkContext:
+            return False
+        return (
+            first._jdf.queryExecution()
+            .normalized()
+            .sameResult(second._jdf.queryExecution().normalized())
+        )
+
+    def persist(self, key, data, storage_level, level_name):
+        """Persist through pandas-on-Spark and register the actual cache atomically."""
+        with self._lock:
+            # The accessor replaces the wrapper's InternalFrame. A backend
+            # deepcopy may still share that wrapper with the caller.
+            cached = data.copy().spark.persist(storage_level)
+            self.register(key, cached._cached, storage_level=level_name)
+            return cached
+
+    def _release_unowned(self, entries, blocking):
+        for entry in entries:
+            has_owner = any(
+                self._same_plan(entry.frame, other.frame)
+                for bucket in self._storage.values()
+                for other in bucket
+            )
+            if not has_owner:
+                self._unpersist_all([entry], blocking)
+
     def register(
         self, key: str, data: Any, storage_level: str | None = None
     ) -> PersistEntry:
         """Register a persisted ``frame`` in the lineage bucket ``key``.
 
-        Idempotent: the very same frame object is never registered twice.
+        Idempotent: equivalent Spark plans are registered once per key.
 
         Args:
             key: Lineage key (``SparkNavigation._persist_key``).
@@ -101,7 +134,7 @@ class StorageManager:
         with self._lock:
             bucket = self._storage.setdefault(key, [])
             for entry in bucket:
-                if entry.frame is frame:
+                if self._same_plan(entry.frame, frame):
                     entry.storage_level = storage_level
                     return entry
             entry = PersistEntry(frame, storage_level=storage_level)
@@ -120,7 +153,7 @@ class StorageManager:
         ``persist`` — every previously accumulated reference is unpersisted
         (the cache mark is removed from those DAG points), while the frame
         that triggered the action (``keep``) stays cached and becomes the
-        only entry of the bucket.
+        only entry of the bucket. Plans still owned by another key stay cached.
 
         Args:
             key: Lineage key.
@@ -144,14 +177,18 @@ class StorageManager:
 
         with self._lock:
             bucket = self._storage.get(key, [])
-            kept = [entry for entry in bucket if entry.frame is frame_to_keep]
-            released = [entry for entry in bucket if entry.frame is not frame_to_keep]
+            kept, released = [], []
+            for entry in bucket:
+                if self._same_plan(entry.frame, frame_to_keep):
+                    kept.append(entry)
+                else:
+                    released.append(entry)
 
             if kept:
                 self._storage[key] = kept
             else:
                 self._storage.pop(key, None)
-        self._unpersist_all(released, blocking=blocking)
+            self._release_unowned(released, blocking)
         return len(released)
 
     def release_all(self, key: str, blocking: bool = True) -> int:
@@ -166,7 +203,7 @@ class StorageManager:
         """
         with self._lock:
             released = self._storage.pop(key, [])
-        self._unpersist_all(released, blocking=blocking)
+            self._release_unowned(released, blocking)
         return len(released)
 
     # ── introspection ────────────────────────────────────────────────
@@ -198,13 +235,9 @@ class StorageManager:
     def clear(self, blocking: bool = True) -> int:
         """Release everything (tests / session shutdown helper)."""
         with self._lock:
-            buckets = self._storage
-            self._storage = {}
-        total = 0
-        for bucket in buckets.values():
-            self._unpersist_all(bucket, blocking=blocking)
-            total += len(bucket)
-        return total
+            return sum(
+                self.release_all(key, blocking=blocking) for key in list(self._storage)
+            )
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"StorageManager(lineages={len(self.keys())}, entries={self.total_entries()})"

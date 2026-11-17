@@ -44,7 +44,7 @@ def test_unpersist_copy_preserves_original_cache(spark_dataset, fresh_manager):
     frame = fresh_manager.frames(dataset.backend_data._persist_key)[0]
     clone = deepcopy(dataset)
 
-    assert not clone.is_persisted
+    assert clone.is_persisted
     clone.unpersist(blocking=True)
 
     assert dataset.is_persisted

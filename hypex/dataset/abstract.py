@@ -270,7 +270,7 @@ class DatasetBase:
                 in the global :class:`~hypex.dataset.backends.persist_manager.PersistManager`.
                 Generated when omitted. Inherited from the parent dataset when
                 the new one is derived from it (``groupby(...).agg(...)``,
-                ``deepcopy``, backend transformations), so the persisted plans
+                backend transformations), so the persisted plans
                 of the lineage stay reachable — references are never lost.
         """
         if backend is not None:
@@ -281,8 +281,7 @@ class DatasetBase:
             )
         elif data is not None:
             if isinstance(data, DatasetBase):
-                # ``deepcopy`` of the backend preserves ``_persist_key``:
-                # the copy shares the persisted-plans bucket of the lineage.
+                # Copies receive a separate cache ownership key.
                 self._backend_data = deepcopy(data._backend_data)
             elif isinstance(data, (PandasDataset, SparkDataset)):
                 self._backend_data = data
@@ -339,7 +338,9 @@ class DatasetBase:
         )
 
     def _from_derived_backend(self, data, roles, session=None):
-        persist_key = getattr(data, "persist_key", None)
+        persist_key = getattr(data, "_persist_key", None)
+        if persist_key is None and isinstance(data, SPARK_DATAFRAME_TYPES + SPARK_SERIES_TYPES):
+            persist_key = self._backend_data._persist_key
         result = self.__class__(roles=deepcopy(roles), data=data, session=session, persist_key=persist_key)
         result.tmp_roles = {
             c: deepcopy(role)
@@ -362,8 +363,8 @@ class DatasetBase:
         Reference tracking is done by the global ``PersistManager`` per
         dataset *lineage* (see the Spark backend):
 
-        - ``action="none"`` — only accumulate the reference;
-        - ``action="count"`` / ``action="head"`` — release all previously
+        - ``action="none"`` / ``action="head"`` — accumulate the reference;
+        - ``action="count"`` — release all previously
           accumulated references of the lineage, except the new one that
           triggered the action;
         - :meth:`unpersist` releases all accumulated references.
@@ -662,8 +663,6 @@ class DatasetBase:
         # func = getattr(self_raw, func_name)
         func = getattr(self.backend_data, func_name)
         result_raw = func(other_raw)
-
-        result_raw = result_raw.data if hasattr(result_raw, "data") else result_raw
 
         if hasattr(result_raw, "to_frame") and not hasattr(result_raw, "columns"):
             col_name = (

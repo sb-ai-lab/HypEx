@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from copy import deepcopy
 from typing import Any
 
 import pandas as pd
@@ -530,14 +531,18 @@ class AASplitterWithStratification(AASplitter):
             const_group_fields[0] if len(const_group_fields) > 0 else None
         )
 
-        persisted_locally = False
-        if data.ds.backend_type == BackendsEnum.spark and not data.ds.is_persisted:
-            data.ds.persist(storage_level="MEMORY_AND_DISK", action="count")
-            persisted_locally = True
+        persisted_locally = (
+            data.ds.backend_type == BackendsEnum.spark and not data.ds.is_persisted
+        )
+        working_ds = (
+            deepcopy(data.ds) if data.ds.backend_type == BackendsEnum.spark else data.ds
+        )
 
         try:
+            if persisted_locally:
+                working_ds.persist(storage_level="MEMORY_AND_DISK", action="count")
             result = self.calc(
-                data.ds,
+                working_ds,
                 random_state=self.random_state,
                 control_size=self.control_size,
                 grouping_fields=grouping_fields,
@@ -551,7 +556,7 @@ class AASplitterWithStratification(AASplitter):
                 result.checkpoint(eager=True)
         finally:
             if persisted_locally:
-                data.ds.unpersist()
+                working_ds.unpersist()
 
         if isinstance(result, Dataset):
             result = result.replace_roles({"split": AdditionalTreatmentRole()})

@@ -444,10 +444,10 @@ class SparkNavigation(DatasetBackendNavigation):
 
         Reference-tracking semantics (via the global :class:`StorageManager`):
 
-        - ``action="none"``: the current DAG point is persisted and its
+        - ``action="none"`` / ``action="head"``: the current DAG point is persisted and its
           reference is simply **accumulated** in the lineage bucket; nothing
           is released.
-        - ``action="count"`` / ``action="head"``: the current DAG point is
+        - ``action="count"``: the current DAG point is
           persisted and materialized by the action, then all previously
           accumulated references of the lineage are unpersisted (the persist
           mark is removed from those DAG points) **except the new one**,
@@ -515,8 +515,11 @@ class SparkNavigation(DatasetBackendNavigation):
         # Persist the current DAG point and register the reference BEFORE
         # running the action: even if the action fails, a later `unpersist()`
         # will still be able to release this frame.
-        self.data.spark.persist(storage_levels[storage_level])
-        manager.register(self._persist_key, self, storage_level=storage_level)
+        cached = manager.persist(
+            self._persist_key, self.data, storage_levels[storage_level], storage_level
+        )
+        self.data = cached
+        frame = cached._cached
 
 
         # The action runs while the previously cached DAG points of the
@@ -527,12 +530,12 @@ class SparkNavigation(DatasetBackendNavigation):
         elif action == "head":
             _ = self.data.spark.frame().limit(1).collect()
 
-        if action != "none":
+        if action == "count":
             # The action has materialized the cache of the current DAG point.
             # Every previously accumulated reference of the lineage is stale
             # now — release it, keeping only the frame that triggered the
             # action.
-            manager.release(self._persist_key, keep=self.data, blocking=True)
+            manager.release(self._persist_key, keep=frame, blocking=True)
 
         if isinstance(original_index_name, str):
             if original_index_name in self.data.columns:
@@ -553,8 +556,8 @@ class SparkNavigation(DatasetBackendNavigation):
         Releases memory/disk resources occupied by ALL cached DAG points
         accumulated by the whole lineage of this dataset (every bucket entry
         registered through :meth:`persist` — the current frame included).
-        After calling this method, subsequent operations will recompute data
-        from source.
+        A plan stays cached while another independent dataset owns it;
+        otherwise subsequent operations recompute data from source.
 
         Args:
             blocking (bool): If True, wait until all blocks are deleted
@@ -597,7 +600,19 @@ class SparkNavigation(DatasetBackendNavigation):
 
     @property
     def _internal_frame_api(self):
-        return self.data._internal.spark_frame
+        internal = self.data._internal
+        frame = internal.spark_frame
+        # Resolve pending expressions and renames before inspecting the cache.
+        names = set(frame.columns)
+        if all(
+            name in names
+            and column._jc.expr().semanticEquals(
+                frame["`" + name.replace("`", "``") + "`"]._jc.expr()
+            )
+            for name, column in zip(internal.spark_column_names, internal.spark_columns)
+        ):
+            return frame
+        return internal.resolved_copy.spark_frame
 
     @property
     def is_persisted(self) -> bool:
@@ -606,7 +621,7 @@ class SparkNavigation(DatasetBackendNavigation):
         Returns:
             bool: True if DataFrame has non-NONE storage level.
         """
-        return StorageManager.instance().count(key=self._persist_key) > 0
+        return self._internal_frame_api.storageLevel != StorageLevel.NONE
 
     def get_storage_level(self) -> str | None:
         """Get the current storage level of the Spark DataFrame.
@@ -615,8 +630,11 @@ class SparkNavigation(DatasetBackendNavigation):
             str | None: Storage level name (e.g., "MEMORY_AND_DISK") if persisted,
                 None if not persisted.
         """
-        entry = StorageManager.instance().entries(key=self._persist_key)
-        return entry[-1].storage_level if entry else None
+        level = self._internal_frame_api.storageLevel
+        for name in ("MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"):
+            if level == getattr(StorageLevel, name):
+                return name
+        return None
 
     def __getitem__(
         self, item: slice | int | str | list | ps.DataFrame | ps.Series
@@ -852,10 +870,6 @@ class SparkNavigation(DatasetBackendNavigation):
                 setattr(result, k, v)
                 memo[id(v)] = v
             else:
-                # `_persist_key` is a plain string: the copy keeps the same
-                # lineage key and therefore the same StorageManager bucket,
-                # so the persisted plans of the lineage stay reachable from
-                # the copy (references are never lost on deepcopy).
                 setattr(result, k, copy.deepcopy(v, memo))
 
         return result

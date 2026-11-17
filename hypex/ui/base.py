@@ -328,23 +328,19 @@ class ExperimentShell:
             # back into the caller's ExperimentData.
             data = data.copy()
 
-        # ── Auto-persist for Spark backend ──────────────────────────
         original_ds = data.ds
-        persisted_by_us = False
-        if (
-            self.auto_persist
-            and original_ds.backend_type == BackendsEnum.spark
-            and not original_ds.is_persisted
-        ):
-            original_ds.persist(storage_level="MEMORY_AND_DISK", action="count")
-            persisted_by_us = True
-
+        manage_cache = self.auto_persist and original_ds.backend_type == BackendsEnum.spark
         try:
+            if manage_cache:
+                original_ds.persist(
+                    storage_level="MEMORY_AND_DISK",
+                    action="none" if original_ds.is_persisted else "count",
+                )
             result_experiment_data = self._experiment.execute(data)
             self._out.extract(result_experiment_data)
             return self._out
         finally:
-            if persisted_by_us and original_ds.is_persisted:
+            if manage_cache:
                 original_ds.unpersist()
 
     @property
