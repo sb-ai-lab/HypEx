@@ -309,3 +309,32 @@ def test_pipeline_cache_lifecycle(spark_session, fresh_manager, scenario, cached
         assert len(output.best_split.raw_data.to_pandas()) > 0
     elif scenario == "matching":
         assert len(output.indexes.raw_data.to_pandas()) == len(original)
+
+
+@pytest.mark.parametrize("index_kind", ["unnamed", "named", "multi"])
+def test_unpersist_preserves_index_and_wrapper(
+    spark_session, fresh_manager, index_kind
+):
+    import pandas as pd
+
+    from hypex.dataset import Dataset, FeatureRole
+    from hypex.utils import BackendsEnum
+
+    index = pd.Index([5, 7], name="row_id" if index_kind == "named" else None)
+    if index_kind == "multi":
+        index = pd.MultiIndex.from_tuples(
+            [("a", 5), ("b", 7)], names=["group_id", "row_id"]
+        )
+    dataset = Dataset(
+        data=pd.DataFrame({"x": [1, 3]}, index=index),
+        roles={"x": FeatureRole()},
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+    dataset.persist()
+    wrapper = dataset.raw_data
+    before = wrapper.to_pandas().sort_index()
+    dataset.unpersist(blocking=True)
+    assert dataset.raw_data is wrapper
+    pd.testing.assert_frame_equal(dataset.raw_data.to_pandas().sort_index(), before)
+    assert not dataset.is_persisted

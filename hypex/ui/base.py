@@ -7,7 +7,7 @@ from typing import Any
 from ..dataset import Dataset, ExperimentData
 from ..experiments.base import Experiment
 from ..reporters import Reporter
-from ..utils import ID_SPLIT_SYMBOL, BackendsEnum
+from ..utils import ID_SPLIT_SYMBOL
 from ..utils.enums import RenameEnum
 
 
@@ -329,7 +329,7 @@ class ExperimentShell:
             data = data.copy()
 
         original_ds = data.ds
-        manage_cache = self.auto_persist and original_ds.backend_type == BackendsEnum.spark
+        manage_cache = self.auto_persist
         try:
             if manage_cache:
                 original_ds.persist(

@@ -149,24 +149,14 @@ class StorageManager:
 
         Args:
             key: Lineage key (``SparkNavigation._persist_key``).
-            frame: Persisted object; the persist mark is already set by the
-                caller, the manager only tracks the reference.
+            data: Persisted Spark DataFrame; the backend resolves wrappers
+                before registration. The manager only tracks ownership.
             storage_level: Storage level name, for introspection.
 
         Returns:
             The registry entry for the frame.
         """
-        # Extract the actual frame from the wrapper if needed.
-        # Priority:
-        # 1. _internal_frame_api (SparkNavigation/SparkDataset) -> Spark DataFrame
-        # 2. _internal.spark_frame (pyspark.pandas.DataFrame) -> Spark DataFrame
-        # 3. data itself (for testing with FakeFrame)
-        if hasattr(data, '_internal_frame_api'):
-            frame = data._internal_frame_api
-        elif hasattr(data, '_internal') and hasattr(data._internal, 'spark_frame'):
-            frame = data._internal.spark_frame
-        else:
-            frame = data
+        frame = data
         with self._lock:
             bucket = self._storage.setdefault(key, [])
             for entry in bucket:
@@ -200,22 +190,11 @@ class StorageManager:
         Returns:
             Number of released references.
         """
-        if keep is None:
-            frame_to_keep = None
-        else:
-            # Extract the actual frame from the wrapper if needed (same logic as register)
-            if hasattr(keep, '_internal_frame_api'):
-                frame_to_keep = keep._internal_frame_api
-            elif hasattr(keep, '_internal') and hasattr(keep._internal, 'spark_frame'):
-                frame_to_keep = keep._internal.spark_frame
-            else:
-                frame_to_keep = keep
-
         with self._lock:
             bucket = self._storage.get(key, [])
             kept, released = [], []
             for entry in bucket:
-                if self._same_plan(entry.frame, frame_to_keep):
+                if self._same_plan(entry.frame, keep):
                     kept.append(entry)
                 else:
                     released.append(entry)
@@ -469,10 +448,8 @@ class SparkNavigation(DatasetBackendNavigation):
             # The checkpoint has materialized the current data on
             # reliable/local storage, so every DAG point of the lineage
             # cached by `persist` above the checkpoint is obsolete: release
-            # all references accumulated for the lineage and reset the
-            # persistence flags.
+            # all references accumulated for the lineage.
             StorageManager.instance().release_all(self._persist_key)
-            self._storage_level_flag = None
 
         return self
 
@@ -731,7 +708,7 @@ class SparkNavigation(DatasetBackendNavigation):
         - :meth:`unpersist` releases **all** references accumulated by the
           lineage.
 
-        Handles index preservation across pyspark.pandas ↔ Spark DataFrame conversions.
+        The pandas-on-Spark accessor preserves the index while resolving the cached plan.
 
         Args:
             storage_level (Literal): Storage strategy for cached
@@ -754,7 +731,7 @@ class SparkNavigation(DatasetBackendNavigation):
 
         Note:
             - Index is preserved across the Spark conversion cycle.
-            - MultiIndex is supported: all index levels are restored after persist.
+            - MultiIndex is supported: all index levels are preserved.
             - The new frame is registered in the lineage bucket *before* the
               action is executed, so even if the action fails a subsequent
               `unpersist()` can still release it (no silent cache leak).
@@ -778,13 +755,6 @@ class SparkNavigation(DatasetBackendNavigation):
             raise ValueError(
                 f"Invalid action: '{action}'. Valid options: 'count', 'head', 'none'"
             )
-
-        original_index_names = self.data.index.names
-        original_index_name = (
-            original_index_names[0]
-            if len(original_index_names) == 1
-            else original_index_names
-        )
 
         manager = StorageManager.instance()
 
@@ -813,17 +783,6 @@ class SparkNavigation(DatasetBackendNavigation):
             # action.
             manager.release(self._persist_key, keep=frame, blocking=True)
 
-        if isinstance(original_index_name, str):
-            if original_index_name in self.data.columns:
-                self.data = self.data.set_index(original_index_name)
-        elif isinstance(original_index_name, list):
-            if all(name in self.data.columns for name in original_index_name):
-                self.data = self.data.set_index(original_index_name)
-        elif original_index_names == [None] and "index" in self.data.columns:
-            self.data = self.data.set_index("index")
-
-        self._storage_level_flag = storage_level
-
         return self
 
     def unpersist(self, blocking: bool = False) -> Self:
@@ -844,33 +803,10 @@ class SparkNavigation(DatasetBackendNavigation):
             Self: Reference to self for method chaining.
         """
         manager = StorageManager.instance()
-        if not (
-            manager.count(self._persist_key) > 0
-        ):
-            return self
-
-        original_index_names = self.data.index.names
-        original_index_name = (
-            original_index_names[0]
-            if len(original_index_names) == 1
-            else original_index_names
-        )
-
         # Clean up every reference accumulated by the lineage: both the
         # frames persisted lazily (action="none") and the frame that
         # triggered the last action.
         manager.release_all(self._persist_key, blocking=blocking)
-
-        if isinstance(original_index_name, str):
-            if original_index_name in self.data.columns:
-                self.data = self.data.set_index(original_index_name)
-        elif isinstance(original_index_name, list):
-            if all(name in self.data.columns for name in original_index_name):
-                self.data = self.data.set_index(original_index_name)
-        elif original_index_names == [None] and "index" in self.data.columns:
-            self.data = self.data.set_index("index")
-
-        self._storage_level_flag = None
 
         return self
 
@@ -900,11 +836,12 @@ class SparkNavigation(DatasetBackendNavigation):
         return self._internal_frame_api.storageLevel != StorageLevel.NONE
 
     def get_cache_info(self) -> dict[str, Any]:
+        persisted = self.is_persisted
         return {
-            "is_persisted": self.is_persisted,
+            "is_persisted": persisted,
             "storage_level": self.get_storage_level(),
             "backend_type": BackendsEnum.spark,
-            "in_memory": self.is_persisted,
+            "in_memory": persisted,
         }
 
     def get_storage_level(self) -> str | None:
