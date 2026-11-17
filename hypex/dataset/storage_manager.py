@@ -45,7 +45,7 @@ class StorageManager:
         # Reentrant: release callbacks may query the manager back.
         self._lock = threading.RLock()
 
-    # ── singlton ────────────────────────────────────────────────
+    # ── singleton ────────────────────────────────────────────────
 
     @classmethod
     def instance(cls) -> StorageManager:
