@@ -1983,10 +1983,22 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             self.data.explode(column=column, ignore_index=ignore_index)
         )
 
+    @property
+    def persist_key(self) -> None:
+        return None
+
+    def cache_snapshot(self) -> None:
+        return None
+
+    def same_cache(self, other: DatasetBackendNavigation) -> bool:
+        return self is other
+
+    def materialize(self, action: Literal["count", "head", "none"]) -> None:
+        pass
+
     def persist(
         self,
         storage_level: Literal["MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"] = "MEMORY_AND_DISK",
-        action: Literal["count", "head", "none"] = "count",
     ) -> Self:
         """Pandas data is already in memory; no explicit cache is needed."""
         return self

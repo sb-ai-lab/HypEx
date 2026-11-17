@@ -15,7 +15,7 @@ from ..dataset import (
 )
 from ..dataset.roles import ConstGroupRole
 from ..executor import Calculator
-from ..utils import BackendsEnum, ExperimentDataEnum, timeit
+from ..utils import ExperimentDataEnum, timeit
 
 MISSING_CONST_LABELS = frozenset({"", "nan", "none", "nat", "<na>"})
 
@@ -531,12 +531,8 @@ class AASplitterWithStratification(AASplitter):
             const_group_fields[0] if len(const_group_fields) > 0 else None
         )
 
-        persisted_locally = (
-            data.ds.backend_type == BackendsEnum.spark and not data.ds.is_persisted
-        )
-        working_ds = (
-            deepcopy(data.ds) if data.ds.backend_type == BackendsEnum.spark else data.ds
-        )
+        working_ds = deepcopy(data.ds) if data.ds.persist_key is not None else data.ds
+        persisted_locally = not working_ds.is_persisted
 
         try:
             if persisted_locally:
@@ -552,8 +548,7 @@ class AASplitterWithStratification(AASplitter):
             )
             # Checkpoint BEFORE unpersist so the materialized result
             # can leverage the cached input.
-            if data.ds.backend_type == BackendsEnum.spark:
-                result.checkpoint(eager=True)
+            result.checkpoint(eager=True)
         finally:
             if persisted_locally:
                 working_ds.unpersist()

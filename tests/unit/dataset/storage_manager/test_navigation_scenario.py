@@ -48,9 +48,9 @@ def test_unpersist_copy_preserves_original_cache(spark_dataset, fresh_manager):
     clone.unpersist(blocking=True)
 
     assert dataset.is_persisted
-    assert frame.storageLevel != StorageLevel.NONE
+    assert frame.backend_data._internal_frame_api.storageLevel != StorageLevel.NONE
     dataset.unpersist(blocking=True)
-    assert frame.storageLevel == StorageLevel.NONE
+    assert frame.backend_data._internal_frame_api.storageLevel == StorageLevel.NONE
 
 
 def test_tmp_roles_preserve_registered_cache(spark_dataset, fresh_manager):
@@ -66,4 +66,7 @@ def test_tmp_roles_preserve_registered_cache(spark_dataset, fresh_manager):
 
     assert not experiment.ds.is_persisted
     assert fresh_manager.count(key) == 0
-    assert all(frame.storageLevel == StorageLevel.NONE for frame in frames)
+    assert all(
+        frame.backend_data._internal_frame_api.storageLevel == StorageLevel.NONE
+        for frame in frames
+    )

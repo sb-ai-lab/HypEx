@@ -18,12 +18,15 @@ def test_groupby_releases_both_cached_plans(spark_dataset, fresh_manager):
     frames = fresh_manager.frames(key)
     assert len(frames) == 2
     for frame in frames:
-        frame.count()
-        assert frame.storageLevel != StorageLevel.NONE
+        frame.materialize("count")
+        assert frame.backend_data._internal_frame_api.storageLevel != StorageLevel.NONE
 
     result.unpersist(blocking=True)
 
-    assert all(frame.storageLevel == StorageLevel.NONE for frame in frames)
+    assert all(
+        frame.backend_data._internal_frame_api.storageLevel == StorageLevel.NONE
+        for frame in frames
+    )
     assert fresh_manager.count(key) == 0
     assert not dataset.is_persisted
     assert not result.is_persisted
@@ -40,12 +43,12 @@ def test_materialized_persist_releases_previous_plan(spark_dataset, fresh_manage
     frames = fresh_manager.frames(key)
     assert len(frames) == 1
     assert frames[0] is not old_frame
-    assert old_frame.storageLevel == StorageLevel.NONE
-    assert frames[0].storageLevel != StorageLevel.NONE
+    assert old_frame.backend_data._internal_frame_api.storageLevel == StorageLevel.NONE
+    assert frames[0].backend_data._internal_frame_api.storageLevel != StorageLevel.NONE
     assert result.is_persisted
 
     result.unpersist(blocking=True)
-    assert frames[0].storageLevel == StorageLevel.NONE
+    assert frames[0].backend_data._internal_frame_api.storageLevel == StorageLevel.NONE
 
 
 def test_independent_datasets_keep_their_caches(spark_dataset, fresh_manager):
@@ -58,12 +61,18 @@ def test_independent_datasets_keep_their_caches(spark_dataset, fresh_manager):
 
     assert not first.is_persisted
     assert second.is_persisted
-    assert second_frame.storageLevel != StorageLevel.NONE
+    assert (
+        second_frame.backend_data._internal_frame_api.storageLevel != StorageLevel.NONE
+    )
     second.unpersist(blocking=True)
-    assert second_frame.storageLevel == StorageLevel.NONE
+    assert (
+        second_frame.backend_data._internal_frame_api.storageLevel == StorageLevel.NONE
+    )
 
 
-@pytest.mark.parametrize("operation", ["arithmetic", "split"])
+@pytest.mark.parametrize(
+    "operation", ["arithmetic", "split", "get", "loc", "iloc", "quantile"]
+)
 def test_transformation_releases_parent(
     spark_dataset, spark_session, fresh_manager, operation
 ):
@@ -75,17 +84,30 @@ def test_transformation_releases_parent(
     parent_frame = fresh_manager.frames(key)[0]
     if operation == "arithmetic":
         result = dataset + 1
-    else:
+    elif operation == "split":
         result = dataset.random_split_labels(
             edges=[5000000, 10000000], labels=["a", "b"]
         )
+    elif operation == "get":
+        result = dataset.get("value")
+    elif operation == "loc":
+        result = dataset.loc[[0, 1]]
+    elif operation == "iloc":
+        result = dataset.iloc[[0, 1]]
+    else:
+        result = dataset.quantile(q=[0.0, 1.0])
     assert result.backend_data._persist_key == key
     result.persist()
     frames = fresh_manager.frames(key)
     result.unpersist(blocking=True)
     assert fresh_manager.count(key) == 0
-    assert parent_frame.storageLevel == StorageLevel.NONE
-    assert all(frame.storageLevel == StorageLevel.NONE for frame in frames)
+    assert (
+        parent_frame.backend_data._internal_frame_api.storageLevel == StorageLevel.NONE
+    )
+    assert all(
+        frame.backend_data._internal_frame_api.storageLevel == StorageLevel.NONE
+        for frame in frames
+    )
     assert {rdd.id() for rdd in sc._jsc.sc().getRDDStorageInfo()} <= before
 
 
@@ -96,9 +118,9 @@ def test_equivalent_plans_have_shared_ownership(spark_dataset, fresh_manager):
     frame = fresh_manager.frames(second.backend_data._persist_key)[0]
     first.unpersist(blocking=True)
     assert second.is_persisted
-    assert frame.storageLevel != StorageLevel.NONE
+    assert frame.backend_data._internal_frame_api.storageLevel != StorageLevel.NONE
     second.unpersist(blocking=True)
-    assert frame.storageLevel == StorageLevel.NONE
+    assert frame.backend_data._internal_frame_api.storageLevel == StorageLevel.NONE
 
 
 def test_parent_flag_after_aggregate(spark_dataset):
@@ -213,7 +235,7 @@ def test_stratified_splitter_preserves_input_cache(
     )
     assert len(result.ds) == 60
     if cached:
-        assert frame.storageLevel != StorageLevel.NONE
+        assert frame.backend_data._internal_frame_api.storageLevel != StorageLevel.NONE
         assert dataset.is_persisted
 
 

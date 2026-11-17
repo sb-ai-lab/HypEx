@@ -235,7 +235,8 @@ class TestRobustness:
 
     def test_frame_without_unpersist_method_warns(self, fresh_manager):
         class Bare:
-            pass
+            def same_cache(self, other):
+                return self is other
 
         key = fresh_manager.new_key()
         bare, alive = Bare(), FakeFrame()
@@ -246,8 +247,8 @@ class TestRobustness:
         assert not alive.persisted
         assert fresh_manager.count(key) == 0
 
-    def test_frame_without_blocking_kwarg_falls_back(self, fresh_manager):
-        """FIX 8: backend without blocking parameter should not receive warning, but should be released."""
+    def test_adapter_handles_native_method_without_blocking(self, fresh_manager):
+        """The Dataset adapter handles native API differences, not the manager."""
         key = fresh_manager.new_key()
         frame = NoBlockingFrame()
         fresh_manager.register(key, frame)

@@ -43,6 +43,7 @@ from .roles import (
     StatisticRole,
     default_roles,
 )
+from .storage_manager import StorageManager
 
 
 class DatasetBase:
@@ -338,10 +339,7 @@ class DatasetBase:
         )
 
     def _from_derived_backend(self, data, roles, session=None):
-        persist_key = getattr(
-            data, "_persist_key", getattr(self._backend_data, "_persist_key", None)
-        )
-        result = self.__class__(roles=deepcopy(roles), data=data, session=session, persist_key=persist_key)
+        result = self.__class__(roles=deepcopy(roles), data=data, session=session)
         result.tmp_roles = {
             c: deepcopy(role)
             for c, role in self.tmp_roles.items()
@@ -360,8 +358,8 @@ class DatasetBase:
     ):
         """Persist the dataset in cache with automatic materialization.
 
-        Reference tracking is done by the global ``PersistManager`` per
-        dataset *lineage* (see the Spark backend):
+        Reference tracking is done by the global ``StorageManager`` per
+        dataset *lineage*:
 
         - ``action="none"`` / ``action="head"`` — accumulate the reference;
         - ``action="count"`` — release all previously
@@ -369,15 +367,35 @@ class DatasetBase:
           triggered the action;
         - :meth:`unpersist` releases all accumulated references.
         """
-        self._backend_data.persist(storage_level=storage_level, action=action)
-
+        StorageManager.instance().persist(self, storage_level, action)
         return self
 
     def unpersist(self, blocking: bool = False):
         """Release ALL references accumulated by the dataset lineage."""
-        self._backend_data.unpersist(blocking=blocking)
-
+        StorageManager.instance().release_all(self.persist_key, blocking=blocking)
         return self
+
+    @property
+    def persist_key(self) -> str | None:
+        return self._backend_data.persist_key
+
+    def cache(self, storage_level: str) -> Self | None:
+        """Acquire a cache and return a stable snapshot for the ownership manager."""
+        self._backend_data.persist(storage_level=storage_level)
+        backend = self._backend_data.cache_snapshot()
+        if backend is None:
+            return None
+        return self.__class__(data=backend, roles=deepcopy(self.roles))
+
+    def same_cache(self, other: DatasetBase) -> bool:
+        return self._backend_data.same_cache(other.backend_data)
+
+    def materialize(self, action: Literal["count", "head", "none"]) -> None:
+        self._backend_data.materialize(action)
+
+    def release_cache(self, blocking: bool = False) -> None:
+        """Release only this snapshot's cache, bypassing lineage ownership."""
+        self._backend_data.unpersist(blocking=blocking)
 
     @property
     def is_persisted(self) -> bool:
@@ -406,6 +424,8 @@ class DatasetBase:
             The dataset instance itself (``Self``) to allow method chaining.
         """
         self._backend_data.checkpoint(eager=eager)
+        if eager:
+            StorageManager.instance().release_all(self.persist_key)
         return self
 
     def __repr__(self):
@@ -1384,7 +1404,6 @@ class DatasetBase:
             A new Dataset instance containing the original index and the new 'name' column.
         """
         # Delegate to the backend implementation
-        # The backend method returns a ps.DataFrame or pd.DataFrame with the index preserved
         result_df = self._backend_data.random_split_labels(
             edges=edges,
             labels=labels,

@@ -66,7 +66,7 @@ class GroupedDataset:
         self._group_cols = group_cols if group_cols is not None else []
         self._backend_data = backend_data
         # Lineage key inherited by the aggregation results (see class docstring).
-        self._persist_key = getattr(backend_data, "_persist_key", None)
+        self._persist_key = backend_data.persist_key if backend_data is not None else None
 
     def _get_agg_roles(self, result_columns: list[str]) -> dict[str, ABCRole]:
         """

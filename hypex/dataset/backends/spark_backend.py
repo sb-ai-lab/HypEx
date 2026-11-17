@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import copy
 import os
-import threading
-import time
 import uuid
 import warnings
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Iterable, Iterator, Literal, Sequence, Sized
+from typing import Any, Callable, ClassVar, Iterable, Literal, Sequence, Sized
 
 try:
     from typing import Self  # Python >= 3.11
@@ -39,259 +37,6 @@ from ...utils import (
     SparkTypeMapper,
 )
 from .abstract import DatasetBackendCalc, DatasetBackendNavigation
-
-
-class PersistEntry:
-    """A single registered persisted plan.
-
-    Attributes:
-        frame: The persisted object (a ``pyspark.sql.DataFrame`` — the DAG
-            point carrying the cache mark). Must expose ``unpersist``.
-        storage_level: Storage level name the frame was persisted with.
-        created_at: Monotonic timestamp of registration (debugging aid).
-    """
-
-    __slots__ = ("created_at", "frame", "storage_level")
-
-    def __init__(self, frame: Any, storage_level: str | None = None):
-        self.frame = frame
-        self.storage_level = storage_level
-        self.created_at = time.monotonic()
-
-    def __repr__(self) -> str:
-        return (
-            f"PersistEntry(frame={type(self.frame).__name__}, "
-            f"storage_level={self.storage_level!r})"
-        )
-
-class StorageManager:
-    """Track Spark cache ownership; shared workflows use the Dataset interface."""
-
-    _instance: StorageManager| None = None
-    _instance_lock = threading.Lock()
-
-    def __init__(self):
-        self._storage: dict[str, list[PersistEntry]] = {}
-        # Reentrant: release callbacks may query the manager back.
-        self._lock = threading.RLock()
-
-    # ── singlton ────────────────────────────────────────────────
-
-    @classmethod
-    def instance(cls) -> StorageManager:
-        """Return the process-wide manager instance."""
-        if cls._instance is None:
-            with cls._instance_lock:
-                if cls._instance is None:
-                    cls._instance = cls()
-        return cls._instance
-
-    @classmethod
-    def set_instance(cls, manager: StorageManager) -> None:
-        with cls._instance_lock:
-            cls._instance = manager
-
-    @classmethod
-    def reset(cls, *, release: bool = True) -> None:
-        with cls._instance_lock:
-            old, cls._instance = cls._instance, None
-        if release and old is not None:
-            old.clear()
-
-    # ── keygen ────────────────────────────────────────────────
-
-    @staticmethod
-    def new_key() -> str:
-        """Generate a new unique lineage key."""
-        return uuid.uuid4().hex
-
-    # ── main api ────────────────────────────────────────────────
-
-    @staticmethod
-    def _same_plan(first, second):
-        if first is second:
-            return True
-        if not hasattr(first, "_jdf") or not hasattr(second, "_jdf"):
-            return False
-        if first.sparkSession.sparkContext is not second.sparkSession.sparkContext:
-            return False
-        return (
-            first._jdf.queryExecution()
-            .normalized()
-            .sameResult(second._jdf.queryExecution().normalized())
-        )
-
-    def persist(self, key, data, storage_level, level_name):
-        """Persist through pandas-on-Spark and register the actual cache atomically."""
-        with self._lock:
-            # The accessor replaces the wrapper's InternalFrame. A backend
-            # deepcopy may still share that wrapper with the caller.
-            cached = data.copy().spark.persist(storage_level)
-            self.register(key, cached._cached, storage_level=level_name)
-            return cached
-
-    def _release_unowned(self, entries, blocking):
-        for entry in entries:
-            has_owner = any(
-                self._same_plan(entry.frame, other.frame)
-                for bucket in self._storage.values()
-                for other in bucket
-            )
-            if not has_owner:
-                self._unpersist_all([entry], blocking)
-
-    def register(
-        self, key: str, data: Any, storage_level: str | None = None
-    ) -> PersistEntry:
-        """Register a persisted ``frame`` in the lineage bucket ``key``.
-
-        Idempotent: equivalent Spark plans are registered once per key.
-
-        Args:
-            key: Lineage key (``SparkNavigation._persist_key``).
-            data: Persisted Spark DataFrame; the backend resolves wrappers
-                before registration. The manager only tracks ownership.
-            storage_level: Storage level name, for introspection.
-
-        Returns:
-            The registry entry for the frame.
-        """
-        frame = data
-        with self._lock:
-            bucket = self._storage.setdefault(key, [])
-            for entry in bucket:
-                if self._same_plan(entry.frame, frame):
-                    entry.storage_level = storage_level
-                    return entry
-            entry = PersistEntry(frame, storage_level=storage_level)
-            bucket.append(entry)
-            return entry
-
-    def release(
-        self,
-        key: str,
-        keep: Any | None = None,
-        blocking: bool = True,
-    ) -> int:
-        """Release all accumulated references of the lineage except ``keep``.
-
-        Rule 2 of the agreed semantics: called right after the action of a
-        ``persist`` — every previously accumulated reference is unpersisted
-        (the cache mark is removed from those DAG points), while the frame
-        that triggered the action (``keep``) stays cached and becomes the
-        only entry of the bucket. Plans still owned by another key stay cached.
-
-        Args:
-            key: Lineage key.
-            keep: Frame that must remain cached (the one that triggered the
-                action). ``None`` releases everything (rule 3 behaviour).
-            blocking: Passed through to ``DataFrame.unpersist``.
-
-        Returns:
-            Number of released references.
-        """
-        with self._lock:
-            bucket = self._storage.get(key, [])
-            kept, released = [], []
-            for entry in bucket:
-                if self._same_plan(entry.frame, keep):
-                    kept.append(entry)
-                else:
-                    released.append(entry)
-
-            if kept:
-                self._storage[key] = kept
-            else:
-                self._storage.pop(key, None)
-            self._release_unowned(released, blocking)
-        return len(released)
-
-    def release_all(self, key: str, blocking: bool = True) -> int:
-        """Release **all** accumulated references of the lineage (rule 3).
-
-        Args:
-            key: Lineage key.
-            blocking: Passed through to ``DataFrame.unpersist``.
-
-        Returns:
-            Number of released references.
-        """
-        with self._lock:
-            released = self._storage.pop(key, [])
-            self._release_unowned(released, blocking)
-        return len(released)
-
-    # ── introspection ────────────────────────────────────────────────
-
-    def entries(self, key: str) -> list[PersistEntry]:
-        """Snapshot of the lineage bucket (safe to iterate)."""
-        with self._lock:
-            return list(self._storage.get(key, []))
-
-    def frames(self, key: str) -> list[Any]:
-            """Snapshot of the persisted frames of the lineage."""
-            return [entry.frame for entry in self.entries(key)]
-
-    def count(self, key: str) -> int:
-        """Number of accumulated references in the lineage bucket."""
-        with self._lock:
-            return len(self._storage.get(key, ()))
-
-    def keys(self):
-        """All lineage keys that still hold at least one reference."""
-        with self._lock:
-            return list(self._storage.keys())
-
-    def total_entries(self) -> int:
-        """Total number of tracked references across all lineages."""
-        with self._lock:
-            return sum(len(bucket) for bucket in self._storage.values())
-
-    def clear(self, blocking: bool = True) -> int:
-        """Release everything (tests / session shutdown helper)."""
-        with self._lock:
-            return sum(
-                self.release_all(key, blocking=blocking) for key in list(self._storage)
-            )
-
-    def __repr__(self) -> str:  # pragma: no cover - debugging aid
-        return f"StorageManager(lineages={len(self.keys())}, entries={self.total_entries()})"
-
-
-    # ── internals ────────────────────────────────────────────────
-    @staticmethod
-    def _unpersist_all(entries: Iterator[PersistEntry], blocking: bool) -> None:
-        """Best-effort ``unpersist`` of every entry; failures are warned
-        about but never propagate — cleanup must not break the pipeline."""
-        for entry in entries:
-            unpersist = getattr(entry.frame, "unpersist", None)
-            if not callable(unpersist):
-                warnings.warn(
-                    f"PersistManager: {entry!r} has no `unpersist`; "
-                    f"the reference is dropped without releasing the cache",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
-                continue
-            try:
-                unpersist(blocking=blocking)
-                continue
-            except TypeError:
-                pass
-            except Exception as exc: #best-effort cleanup
-                warnings.warn(
-                    f"PersistManager: unpersist({entry!r}) failed: {exc!r}",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
-            try:
-                unpersist()
-            except Exception as exc: #best-effort cleanup
-                warnings.warn(
-                    f"StorageManager: unpersist({entry!r}) failed: {exc!r}",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
 
 
 class SparkNavigation(DatasetBackendNavigation):
@@ -444,13 +189,6 @@ class SparkNavigation(DatasetBackendNavigation):
             )
             self.data = self.data.spark.local_checkpoint(eager=eager)
 
-        if eager:
-            # The checkpoint has materialized the current data on
-            # reliable/local storage, so every DAG point of the lineage
-            # cached by `persist` above the checkpoint is obsolete: release
-            # all references accumulated for the lineage.
-            StorageManager.instance().release_all(self._persist_key)
-
         return self
 
     def limit(self, num: int | None = None) -> Self:
@@ -492,7 +230,7 @@ class SparkNavigation(DatasetBackendNavigation):
         Converts raw pyspark.pandas results back into SparkNavigation instances
         for method chaining, or returns scalar values directly. The derived
         backend inherits ``_persist_key`` — the lineage key of the
-        persisted-plans bucket in :class:`StorageManager` — so the references
+        persisted-plans bucket in :class:`~hypex.dataset.storage_manager.StorageManager` — so the references
         accumulated by this lineage stay reachable from the derived objects
         (they are never lost on a transformation).
 
@@ -596,7 +334,7 @@ class SparkNavigation(DatasetBackendNavigation):
             session (SparkSession | None): Spark session for distributed operations.
                 Required if not inferable from data.
             persist_key (str | None): Lineage key of the persisted-plans bucket
-                in :class:`StorageManager`. Generated when omitted; inherited
+                in :class:`~hypex.dataset.storage_manager.StorageManager`. Generated when omitted; inherited
                 from the parent backend when the dataset is derived from
                 another one (see ``_wrap_result``).
 
@@ -677,68 +415,16 @@ class SparkNavigation(DatasetBackendNavigation):
 
         # Lineage key of the persisted-plans bucket in the global
         # StorageManager. Inherited by every backend derived from this one,
-        # so the persisted plans of the lineage stay reachable — even after
-        # `dataset = dataset.groupby(...).agg(...)`, deepcopy or wrapping.
-        self._persist_key = persist_key or StorageManager.new_key()
+        # so derived datasets can release the lineage. Deepcopy uses a new key.
+        self._persist_key = persist_key or uuid.uuid4().hex
 
     def persist(
         self,
         storage_level: Literal[
             "MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"
         ] = "MEMORY_AND_DISK",
-        action: Literal["count", "head", "none"] = "count",
     ) -> Self:
-        """Persist the underlying Spark DataFrame in cache with automatic materialization.
-
-        Marks the dataset for caching in Spark's execution engine to accelerate
-        subsequent operations. Unlike Spark's native `persist()`, this method
-        optionally triggers an action to immediately materialize the cache,
-        ensuring the data is pre-computed and ready for fast access.
-
-        Reference-tracking semantics (via the global :class:`StorageManager`):
-
-        - ``action="none"`` / ``action="head"``: the current DAG point is persisted and its
-          reference is simply **accumulated** in the lineage bucket; nothing
-          is released.
-        - ``action="count"``: the current DAG point is
-          persisted and materialized by the action, then all previously
-          accumulated references of the lineage are unpersisted (the persist
-          mark is removed from those DAG points) **except the new one**,
-          because it triggered the action and its cache is the live one.
-        - :meth:`unpersist` releases **all** references accumulated by the
-          lineage.
-
-        The pandas-on-Spark accessor preserves the index while resolving the cached plan.
-
-        Args:
-            storage_level (Literal): Storage strategy for cached
-                - "MEMORY_ONLY": Store as deserialized Java objects in heap memory.
-                - "MEMORY_AND_DISK": Store in memory, spill partitions to disk if needed.
-                - "DISK_ONLY": Store partitions only on disk.
-                Default is "MEMORY_AND_DISK" for balanced performance/reliability.
-
-            action (Literal): Action to trigger cache materialization:
-                - "count": Execute `count()` action (fast, returns row count).
-                - "head": Execute `head(1)` action (materializes first partition).
-                - "none": Skip automatic action; cache will materialize on first action.
-                Default is "count" for reliable full materialization.
-
-        Returns:
-            Self: Reference to self for method chaining.
-
-        Raises:
-            ValueError: If storage_level or action parameter has invalid value.
-
-        Note:
-            - Index is preserved across the Spark conversion cycle.
-            - MultiIndex is supported: all index levels are preserved.
-            - The new frame is registered in the lineage bucket *before* the
-              action is executed, so even if the action fails a subsequent
-              `unpersist()` can still release it (no silent cache leak).
-            - An already registered frame is never duplicated in the bucket.
-            - Cached data remains until `unpersist()` is called or SparkSession ends.
-            - Use `unpersist()` to manually release cached resources.
-        """
+        """Mark the current plan for caching; Dataset coordinates materialization."""
         storage_levels = {
             "MEMORY_ONLY": StorageLevel.MEMORY_ONLY,
             "MEMORY_AND_DISK": StorageLevel.MEMORY_AND_DISK,
@@ -751,23 +437,29 @@ class SparkNavigation(DatasetBackendNavigation):
                 f"Valid options: {list(storage_levels.keys())}"
             )
 
-        if action not in ("count", "head", "none"):
-            raise ValueError(
-                f"Invalid action: '{action}'. Valid options: 'count', 'head', 'none'"
-            )
+        # The accessor replaces wrapper metadata; keep shared source wrappers intact.
+        self.data = self.data.copy().spark.persist(storage_levels[storage_level])
+        return self
 
-        manager = StorageManager.instance()
+    @property
+    def persist_key(self) -> str:
+        return self._persist_key
 
-        # Persist the current DAG point and register the reference BEFORE
-        # running the action: even if the action fails, a later `unpersist()`
-        # will still be able to release this frame.
-        cached = manager.persist(
-            self._persist_key, self.data, storage_levels[storage_level], storage_level
+    def cache_snapshot(self) -> Self:
+        """Freeze the wrapper for the currently persisted plan."""
+        return self._wrap_result(self.data.copy())
+
+    def same_cache(self, other) -> bool:
+        if not isinstance(other, SparkNavigation):
+            return False
+        first, second = self._internal_frame_api, other._internal_frame_api
+        if first.sparkSession.sparkContext is not second.sparkSession.sparkContext:
+            return False
+        return first._jdf.queryExecution().normalized().sameResult(
+            second._jdf.queryExecution().normalized()
         )
-        self.data = cached
-        frame = cached._cached
 
-
+    def materialize(self, action: Literal["count", "head", "none"]) -> None:
         # The action runs while the previously cached DAG points of the
         # lineage are still materialized, so the new cache is computed from
         # them (and not recomputed from the original source).
@@ -776,38 +468,9 @@ class SparkNavigation(DatasetBackendNavigation):
         elif action == "head":
             _ = self.data.spark.frame().limit(1).collect()
 
-        if action == "count":
-            # The action has materialized the cache of the current DAG point.
-            # Every previously accumulated reference of the lineage is stale
-            # now — release it, keeping only the frame that triggered the
-            # action.
-            manager.release(self._persist_key, keep=frame, blocking=True)
-
-        return self
-
     def unpersist(self, blocking: bool = False) -> Self:
-        """Remove the persisted dataset from Spark cache.
-
-        Releases memory/disk resources occupied by ALL cached DAG points
-        accumulated by the whole lineage of this dataset (every bucket entry
-        registered through :meth:`persist` — the current frame included).
-        A plan stays cached while another independent dataset owns it;
-        otherwise subsequent operations recompute data from source.
-
-        Args:
-            blocking (bool): If True, wait until all blocks are deleted
-                before returning. If False (default), deletion happens
-                asynchronously.
-
-        Returns:
-            Self: Reference to self for method chaining.
-        """
-        manager = StorageManager.instance()
-        # Clean up every reference accumulated by the lineage: both the
-        # frames persisted lazily (action="none") and the frame that
-        # triggered the last action.
-        manager.release_all(self._persist_key, blocking=blocking)
-
+        """Release this concrete plan; Dataset manages lineage ownership."""
+        self._internal_frame_api.unpersist(blocking=blocking)
         return self
 
     @property
@@ -1085,7 +748,7 @@ class SparkNavigation(DatasetBackendNavigation):
         memo[id(self)] = result
         for k, v in self.__dict__.items():
             if k == "_persist_key":
-                new_key = StorageManager.instance().new_key()
+                new_key = uuid.uuid4().hex
                 setattr(result, k, new_key)
             elif isinstance(v, (SparkSession, SparkDF, ps.DataFrame)):
                 setattr(result, k, v)
@@ -1531,13 +1194,12 @@ class SparkNavigation(DatasetBackendNavigation):
             items (Iterable[Any]): Labels of rows to select.
 
         Returns:
-            SparkNavigation: Selected rows (note: currently returns raw data,
-                consider wrapping for consistency).
+            SparkNavigation: Selected rows with the parent cache ownership key.
         """
         data = self.data.loc[items]
         if isinstance(data, (pd.Series, ps.Series)):
             data = data.to_frame()
-        return data
+        return self._wrap_result(data)
 
     def iloc(self, items: Iterable[Any]) -> Self:
         """Integer-position-based selection of rows.
@@ -1554,7 +1216,7 @@ class SparkNavigation(DatasetBackendNavigation):
             data = self.data.iloc[items]
         if not isinstance(data, ps.DataFrame):
             data = ps.DataFrame(data)
-        return data
+        return self._wrap_result(data)
 
     def to_numpy(self) -> np.ndarray:
         """
@@ -1607,7 +1269,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             data (ps.DataFrame | dict | str | ps.Series | None): Source data.
             session (SparkSession | None): Spark session for operations.
             persist_key (str | None): Lineage key of the persisted-plans bucket
-                in :class:`StorageManager`; inherited from the parent backend
+                in :class:`~hypex.dataset.storage_manager.StorageManager`; inherited from the parent backend
                 when the dataset is derived from another one.
         """
         super().__init__(data=data, session=session, persist_key=persist_key)
@@ -1626,9 +1288,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         result = self.data.get(key, default)
         if result is default:
             return result
-        if isinstance(result, ps.Series):
-            return result.to_frame()
-        return result
+        return self._wrap_result(result)
 
     def take(
         self,
@@ -1978,14 +1638,12 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             SparkDataset | float: Quantile values.
         """
         if isinstance(q, list) and len(q) > 1:
-            return self.data.quantile(q=q)
+            return self._wrap_result(self.data.quantile(q=q))
         else:
             result = self.data.quantile(q=q)
             converted = self._convert_agg_result(
                 result.to_frame() if isinstance(result, ps.Series) else result
             )
-            if isinstance(converted, ps.DataFrame):
-                return converted
             return self._wrap_result(converted)
 
     def coefficient_of_variation(self) -> Self | float:
@@ -2349,7 +2007,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         random_state: int | None = None,
         frac: float = 1.0,
         name: str = "split",
-    ) -> ps.DataFrame:
+    ) -> Self:
         """Assign deterministic group labels to rows based on a hash of the index.
 
         The split is approximately proportional to the requested ``edges``
@@ -2368,8 +2026,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             name: Name of the resulting label column.
 
         Returns:
-            A ``pyspark.pandas.DataFrame`` containing only the original index
-            columns and the new label column.
+            A derived backend containing the original index and the new label
+            column, with the parent cache ownership key.
 
         Note:
         The hash function differs from the Pandas backend (Murmur3 vs
@@ -2424,7 +2082,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         sdf = sdf.withColumn(name, case_expr)
         sdf = sdf.filter(F.col(name).isNotNull())
 
-        return sdf.pandas_api(index_col=list(index_cols))
+        return self._wrap_result(sdf.pandas_api(index_col=list(index_cols)))
 
     def select_dtypes(
         self, include: str | None = None, exclude: str | None = None
@@ -2670,7 +2328,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             if n_cols > 1
             else data
         )
-        return data_expanded
+        return self._wrap_result(data_expanded)
 
     def explode(self, column, ignore_index=False):
         """

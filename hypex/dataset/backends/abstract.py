@@ -21,11 +21,31 @@ class DatasetBackendNavigation(ABC):
     structural modifications.
     """
 
+    @property
+    @abstractmethod
+    def persist_key(self) -> str | None:
+        """Lineage ownership key, or None when explicit caching is unsupported."""
+        raise AbstractMethodError
+
+    @abstractmethod
+    def cache_snapshot(self) -> Self | None:
+        """Return a stable snapshot of the current cache, or None if unsupported."""
+        raise AbstractMethodError
+
+    @abstractmethod
+    def same_cache(self, other: DatasetBackendNavigation) -> bool:
+        """Whether both backends refer to the same physical cache."""
+        raise AbstractMethodError
+
+    @abstractmethod
+    def materialize(self, action: Literal["count", "head", "none"]) -> None:
+        """Materialize all, part, or none of the current data."""
+        raise AbstractMethodError
+
     @abstractmethod
     def persist(
         self,
         storage_level: Literal["MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"] = "MEMORY_AND_DISK",
-        action: Literal["count", "head", "none"] = "count",
     ) -> Self:
         """Cache data when supported; otherwise return self."""
         raise AbstractMethodError
