@@ -9,7 +9,7 @@ import copy
 import functools
 import warnings
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Sequence, Sized
+from typing import Any, Callable, Iterable, Literal, Sequence, Sized, cast
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -270,7 +270,7 @@ class PandasNavigation(DatasetBackendNavigation):
                 data, data_compression, non_compresion_cols
             )
         elif isinstance(data, PANDAS_ON_SPARK_DATAFRAME_TYPES):
-            self.data = data.to_pandas()
+            self.data = cast("ps.DataFrame", data).to_pandas()
         elif isinstance(data, dict):
             wrapped = {
                 k: v if isinstance(v, (list, np.ndarray, tuple)) else [v]

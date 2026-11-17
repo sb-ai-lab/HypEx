@@ -20,7 +20,7 @@ Typical usage:
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from ..dataset import Dataset
@@ -68,7 +68,7 @@ class BackendFactory:
         """
         if isinstance(backend_types, (list, tuple, set, frozenset)):
             return list(backend_types)
-        return [backend_types]
+        return [cast(type, backend_types)]
 
     def _insert(
         self,
