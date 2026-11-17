@@ -12,6 +12,25 @@ from .abstract import Transformer
 
 
 class CategoryAggregator(Transformer):
+    """Group rare categorical values into a single category.
+
+    This transformer groups low-frequency categorical values into a single
+    category (typically named 'Other') to reduce the dimensionality of
+    categorical features and improve model performance.
+
+    Args:
+        target_roles: Role(s) identifying categorical columns. Defaults to FeatureRole().
+        threshold: Number of occurrences below which values are grouped. Defaults to 15.
+        new_group_name: Name for the grouped category. Defaults to None (uses 'Other').
+        key: Optional executor identifier.
+
+    Example:
+        >>> from hypex.transformers import CategoryAggregator
+        >>> from hypex.dataset import FeatureRole
+        >>> agg = CategoryAggregator(threshold=10)
+        >>> result = agg.execute(experiment_data)
+    """
+
     def __init__(
         self,
         target_roles: str | Sequence[str] | None = None,

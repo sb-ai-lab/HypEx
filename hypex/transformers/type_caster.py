@@ -11,6 +11,25 @@ from .abstract import Transformer
 
 
 class TypeCaster(Transformer):
+    """Cast column data types to specified types.
+
+    This transformer converts column data types according to the provided
+    mapping. It supports casting by column name or by data type, with
+    optional automatic downcasting of float/decimal columns to float32.
+
+    Args:
+        dtype: Mapping of column names or data types to target types.
+        roles: Role(s) identifying columns to cast. Defaults to FeatureRole().
+        downcasting: Whether to automatically downcast float/decimal to float32. Defaults to True.
+        key: Optional executor identifier.
+
+    Example:
+        >>> from hypex.transformers import TypeCaster
+        >>> from hypex.dataset import FeatureRole
+        >>> caster = TypeCaster(dtype={"col1": str, "col2": int})
+        >>> result = caster.execute(experiment_data)
+    """
+
     def __init__(
         self,
         dtype: dict[str, type] | dict[type, type],
@@ -34,6 +53,14 @@ class TypeCaster(Transformer):
     def _downcast(
         data: Dataset,
     ) -> Dataset:
+        """Downcast float/decimal columns to float32.
+
+        Args:
+            data: Input dataset.
+
+        Returns:
+            Dataset with downcasted columns.
+        """
         double_cols = [
             col
             for col, c_type in data.roles.items()
@@ -49,6 +76,17 @@ class TypeCaster(Transformer):
         roles: ABCRole | Sequence[ABCRole] | None = None,
         **kwargs,
     ):
+        """Stateless entry point for type casting.
+
+        Args:
+            data: Input dataset.
+            dtype: Mapping of column names or data types to target types.
+            roles: Role(s) identifying columns to cast.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Dataset with casted columns.
+        """
         downcasting = kwargs.pop("downcasting", True)
         if downcasting:
             data = TypeCaster._downcast(data=data)
