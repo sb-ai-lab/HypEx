@@ -338,9 +338,9 @@ class DatasetBase:
         )
 
     def _from_derived_backend(self, data, roles, session=None):
-        persist_key = getattr(data, "_persist_key", None)
-        if persist_key is None and isinstance(data, SPARK_DATAFRAME_TYPES + SPARK_SERIES_TYPES):
-            persist_key = self._backend_data._persist_key
+        persist_key = getattr(
+            data, "_persist_key", getattr(self._backend_data, "_persist_key", None)
+        )
         result = self.__class__(roles=deepcopy(roles), data=data, session=session, persist_key=persist_key)
         result.tmp_roles = {
             c: deepcopy(role)
