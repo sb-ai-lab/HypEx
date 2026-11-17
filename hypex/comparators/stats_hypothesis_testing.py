@@ -270,6 +270,7 @@ class StatsChi2Test(StatsHypothesisTesting):
         the 'value_counts' statistic."""
         from ..extensions.stats_hypothesis_testing import StatsChi2TestExtension
 
+        data = data.dropna(subset=group_cols)
         ext = StatsChi2TestExtension()
         return ext.calc(
             data=data,
@@ -619,7 +620,7 @@ class StatsKSTest(StatsHypothesisTesting):
         """
         from ..extensions.stats_hypothesis_testing import StatsKSTestExtension
 
-        subset = data.ds[[group_col, *target_cols]]
+        subset = data.ds[[group_col, *target_cols]].dropna(subset=[group_col])
 
         ext = StatsKSTestExtension(n_bins=self.n_bins, reliability=self.reliability)
         all_group_stats = ext.calc(
@@ -905,7 +906,7 @@ class StatsUTest(StatsHypothesisTesting):
         """
         from ..extensions.stats_hypothesis_testing import StatsKSTestExtension
 
-        subset = data.ds[[group_col, *target_cols]]
+        subset = data.ds[[group_col, *target_cols]].dropna(subset=[group_col])
         ext = StatsKSTestExtension(n_bins=self.n_bins, reliability=self.reliability)
         all_group_stats = ext.calc(
             data=subset,

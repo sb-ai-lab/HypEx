@@ -124,7 +124,7 @@ def test_nan_vs_null_in_stats(backend_kind, spark_session) -> None:
 
 @pytest.mark.xfail(
     strict=True,
-    reason="Issue: Spark count() includes NaN and drops non-numeric columns",
+    reason="Issue: Spark count() includes NaN",
 )
 def test_count_ignores_nan_on_spark(spark_session) -> None:
     df = pd.DataFrame({"x": [1.0, np.nan, 3.0], "s": ["a", "b", "c"]})

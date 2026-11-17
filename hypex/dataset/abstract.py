@@ -947,9 +947,9 @@ class DatasetBase:
         if not hasattr(result, "columns"):
             return result
 
-        role: ABCRole = StatisticRole()
-        return self._from_derived_backend(
-            data=result, roles={column: role for column in result.columns}
+        return self.__class__(
+            data=result,
+            roles={column: StatisticRole() for column in result.columns},
         )
 
     def add_column(
