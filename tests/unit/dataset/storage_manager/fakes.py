@@ -24,6 +24,12 @@ class FakeFrame:
         self.persisted = False
         return self
 
+    def same_cache(self, other):
+        return self is other
+
+    def release_cache(self, blocking=True):
+        return self.unpersist(blocking=blocking)
+
     def groupby(self, *args, **kwargs):
         return FakeFrame(f"{self.name}.groupby")
 
@@ -46,3 +52,6 @@ class NoBlockingFrame(FakeFrame):
         self.blocking_values.append(None)
         self.persisted = False
         return self
+
+    def release_cache(self, blocking=True):
+        return self.unpersist()

@@ -44,13 +44,13 @@ def test_unpersist_copy_preserves_original_cache(spark_dataset, fresh_manager):
     frame = fresh_manager.frames(dataset.backend_data._persist_key)[0]
     clone = deepcopy(dataset)
 
-    assert not clone.is_persisted
+    assert clone.is_persisted
     clone.unpersist(blocking=True)
 
     assert dataset.is_persisted
-    assert frame.storageLevel != StorageLevel.NONE
+    assert frame.backend_data._internal_frame_api.storageLevel != StorageLevel.NONE
     dataset.unpersist(blocking=True)
-    assert frame.storageLevel == StorageLevel.NONE
+    assert frame.backend_data._internal_frame_api.storageLevel == StorageLevel.NONE
 
 
 def test_tmp_roles_preserve_registered_cache(spark_dataset, fresh_manager):
@@ -66,4 +66,22 @@ def test_tmp_roles_preserve_registered_cache(spark_dataset, fresh_manager):
 
     assert not experiment.ds.is_persisted
     assert fresh_manager.count(key) == 0
-    assert all(frame.storageLevel == StorageLevel.NONE for frame in frames)
+    assert all(
+        frame.backend_data._internal_frame_api.storageLevel == StorageLevel.NONE
+        for frame in frames
+    )
+
+
+def test_cache_snapshot_preserves_tmp_roles_and_plan(spark_dataset, fresh_manager):
+    dataset = spark_dataset()
+    dataset.tmp_roles = {"value": TempTargetRole()}
+    dataset.persist()
+    snapshot = fresh_manager.frames(dataset.persist_key)[0]
+
+    assert isinstance(snapshot.tmp_roles["value"], TempTargetRole)
+    assert snapshot.tmp_roles["value"].data_type == dataset.tmp_roles["value"].data_type
+    assert snapshot.tmp_roles["value"] is not dataset.tmp_roles["value"]
+    assert snapshot.same_cache(dataset)
+    assert snapshot.is_persisted
+    snapshot.unpersist(blocking=True)
+    assert not dataset.is_persisted

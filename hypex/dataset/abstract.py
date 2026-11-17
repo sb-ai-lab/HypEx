@@ -43,6 +43,7 @@ from .roles import (
     StatisticRole,
     default_roles,
 )
+from .storage_manager import StorageManager
 
 
 class DatasetBase:
@@ -270,7 +271,7 @@ class DatasetBase:
                 in the global :class:`~hypex.dataset.backends.persist_manager.PersistManager`.
                 Generated when omitted. Inherited from the parent dataset when
                 the new one is derived from it (``groupby(...).agg(...)``,
-                ``deepcopy``, backend transformations), so the persisted plans
+                backend transformations), so the persisted plans
                 of the lineage stay reachable — references are never lost.
         """
         if backend is not None:
@@ -281,8 +282,7 @@ class DatasetBase:
             )
         elif data is not None:
             if isinstance(data, DatasetBase):
-                # ``deepcopy`` of the backend preserves ``_persist_key``:
-                # the copy shares the persisted-plans bucket of the lineage.
+                # Copies receive a separate cache ownership key.
                 self._backend_data = deepcopy(data._backend_data)
             elif isinstance(data, (PandasDataset, SparkDataset)):
                 self._backend_data = data
@@ -339,8 +339,8 @@ class DatasetBase:
         )
 
     def _from_derived_backend(self, data, roles, session=None):
-        persist_key = getattr(data, "persist_key", None)
-        result = self.__class__(roles=deepcopy(roles), data=data, session=session, persist_key=persist_key)
+        # Derived backends already carry their lineage; keep the backend wrapper.
+        result = self.__class__(roles=deepcopy(roles), data=data, session=session)
         result.tmp_roles = {
             c: deepcopy(role)
             for c, role in self.tmp_roles.items()
@@ -359,47 +359,54 @@ class DatasetBase:
     ):
         """Persist the dataset in cache with automatic materialization.
 
-        Reference tracking is done by the global ``PersistManager`` per
-        dataset *lineage* (see the Spark backend):
+        Reference tracking is done by the global ``StorageManager`` per
+        dataset *lineage*:
 
-        - ``action="none"`` — only accumulate the reference;
-        - ``action="count"`` / ``action="head"`` — release all previously
+        - ``action="none"`` / ``action="head"`` — accumulate the reference;
+        - ``action="count"`` — release all previously
           accumulated references of the lineage, except the new one that
           triggered the action;
         - :meth:`unpersist` releases all accumulated references.
         """
-        if self.backend_type == BackendsEnum.spark:
-            self._backend_data.persist(storage_level=storage_level, action=action)
-
+        StorageManager.instance().persist(self, storage_level, action)
         return self
 
     def unpersist(self, blocking: bool = False):
         """Release ALL references accumulated by the dataset lineage."""
-        if self.backend_type == BackendsEnum.spark:
-            self._backend_data.unpersist(blocking=blocking)
-
+        StorageManager.instance().release_all(self.persist_key, blocking=blocking)
         return self
 
     @property
+    def persist_key(self) -> str | None:
+        return self._backend_data.persist_key
+
+    def _acquire_cache(self, storage_level: str) -> Self | None:
+        """Acquire a cache and return a stable snapshot for the ownership manager."""
+        self._backend_data.persist(storage_level=storage_level)
+        backend = self._backend_data.cache_snapshot()
+        if backend is None:
+            return None
+        return self._from_derived_backend(data=backend, roles=self.roles)
+
+    def same_cache(self, other: DatasetBase) -> bool:
+        return self._backend_data.same_cache(other.backend_data)
+
+    def materialize(self, action: Literal["count", "head", "none"]) -> None:
+        self._backend_data.materialize(action)
+
+    def release_cache(self, blocking: bool = False) -> None:
+        """Release only this snapshot's cache, bypassing lineage ownership."""
+        self._backend_data.unpersist(blocking=blocking)
+
+    @property
     def is_persisted(self) -> bool:
-        if self.backend_type == BackendsEnum.spark:
-            return self._backend_data.is_persisted
-        return False
+        return self._backend_data.is_persisted
 
     def get_storage_level(self) -> str | None:
-        if self.backend_type == BackendsEnum.spark:
-            return self._backend_data.get_storage_level()
-        return None
+        return self._backend_data.get_storage_level()
 
     def get_cache_info(self) -> dict[str, Any]:
-        return {
-            "is_persisted": self.is_persisted,
-            "storage_level": self.get_storage_level(),
-            "backend_type": self.backend_type,
-            "in_memory": True
-            if self.backend_type == BackendsEnum.pandas
-            else self.is_persisted,
-        }
+        return self._backend_data.get_cache_info()
 
     def checkpoint(self, eager: bool = True) -> Self:
         """Breaks the computation graph (Lineage) for the Spark backend.
@@ -418,6 +425,8 @@ class DatasetBase:
             The dataset instance itself (``Self``) to allow method chaining.
         """
         self._backend_data.checkpoint(eager=eager)
+        if eager:
+            StorageManager.instance().release_all(self.persist_key)
         return self
 
     def __repr__(self):
@@ -662,8 +671,6 @@ class DatasetBase:
         # func = getattr(self_raw, func_name)
         func = getattr(self.backend_data, func_name)
         result_raw = func(other_raw)
-
-        result_raw = result_raw.data if hasattr(result_raw, "data") else result_raw
 
         if hasattr(result_raw, "to_frame") and not hasattr(result_raw, "columns"):
             col_name = (
@@ -1398,7 +1405,6 @@ class DatasetBase:
             A new Dataset instance containing the original index and the new 'name' column.
         """
         # Delegate to the backend implementation
-        # The backend method returns a ps.DataFrame or pd.DataFrame with the index preserved
         result_df = self._backend_data.random_split_labels(
             edges=edges,
             labels=labels,

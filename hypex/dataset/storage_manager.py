@@ -4,22 +4,25 @@ import threading
 import time
 import uuid
 import warnings
-from typing import Any, Iterator
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from .abstract import DatasetBase
 
 
 class PersistEntry:
     """A single registered persisted plan.
 
     Attributes:
-        frame: The persisted object (a ``pyspark.sql.DataFrame`` — the DAG
-            point carrying the cache mark). Must expose ``unpersist``.
+        frame: A Dataset snapshot of a persisted plan. Exposes ``same_cache``
+            and ``release_cache`` through the Dataset interface.
         storage_level: Storage level name the frame was persisted with.
-        created_at: Monotonic timestamp of registration (debugging aid).
+        created_at: Monotonic registration time for debugging cache lifetime.
     """
 
     __slots__ = ("created_at", "frame", "storage_level")
 
-    def __init__(self, frame: Any, storage_level: str | None = None):
+    def __init__(self, frame: DatasetBase, storage_level: str | None = None):
         self.frame = frame
         self.storage_level = storage_level
         self.created_at = time.monotonic()
@@ -30,8 +33,11 @@ class PersistEntry:
             f"storage_level={self.storage_level!r})"
         )
 
+
 class StorageManager:
-    _instance: StorageManager| None = None
+    """Track cache ownership through the Dataset interface, independently of backend."""
+
+    _instance: StorageManager | None = None
     _instance_lock = threading.Lock()
 
     def __init__(self):
@@ -71,47 +77,76 @@ class StorageManager:
 
     # ── main api ────────────────────────────────────────────────
 
+    @staticmethod
+    def _same_plan(first, second):
+        return first is second or (second is not None and first.same_cache(second))
+
+    def persist(
+        self,
+        data: DatasetBase,
+        storage_level: str,
+        action: Literal["count", "head", "none"],
+    ) -> None:
+        """Acquire and register a Dataset cache before materializing it."""
+        if action not in ("count", "head", "none"):
+            raise ValueError(f"Invalid action: {action!r}")
+        with self._lock:
+            # Public persist() routes here; the internal helper only acquires a snapshot.
+            cached = data._acquire_cache(storage_level)
+            if cached is None:
+                return
+            key = cached.persist_key
+            self.register(key, cached, storage_level=storage_level)
+        cached.materialize(action)
+        if action == "count":
+            self.release(key, keep=cached, blocking=True)
+
+    def _release_unowned(self, entries, blocking):
+        for entry in entries:
+            has_owner = any(
+                self._same_plan(entry.frame, other.frame)
+                for bucket in self._storage.values()
+                for other in bucket
+            )
+            if not has_owner:
+                try:
+                    entry.frame.release_cache(blocking=blocking)
+                except Exception as exc:  # Cleanup must not break the pipeline.
+                    warnings.warn(
+                        f"StorageManager: release_cache({entry!r}) failed: {exc!r}",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
+
     def register(
-        self, key: str, data: Any, storage_level: str | None = None
+        self, key: str, data: DatasetBase, storage_level: str | None = None
     ) -> PersistEntry:
         """Register a persisted ``frame`` in the lineage bucket ``key``.
 
-        Idempotent: the very same frame object is never registered twice.
+        Idempotent: equivalent cached plans are registered once per key.
 
         Args:
-            key: Lineage key (``SparkNavigation._persist_key``).
-            frame: Persisted object; the persist mark is already set by the
-                caller, the manager only tracks the reference.
+            key: Dataset lineage key.
+            data: Dataset cache snapshot. Native objects stay inside its backend.
             storage_level: Storage level name, for introspection.
 
         Returns:
             The registry entry for the frame.
         """
-        # Extract the actual frame from the wrapper if needed.
-        # Priority:
-        # 1. _internal_frame_api (SparkNavigation/SparkDataset) -> Spark DataFrame
-        # 2. _internal.spark_frame (pyspark.pandas.DataFrame) -> Spark DataFrame
-        # 3. data itself (for testing with FakeFrame)
-        if hasattr(data, '_internal_frame_api'):
-            frame = data._internal_frame_api
-        elif hasattr(data, '_internal') and hasattr(data._internal, 'spark_frame'):
-            frame = data._internal.spark_frame
-        else:
-            frame = data
         with self._lock:
             bucket = self._storage.setdefault(key, [])
             for entry in bucket:
-                if entry.frame is frame:
+                if self._same_plan(entry.frame, data):
                     entry.storage_level = storage_level
                     return entry
-            entry = PersistEntry(frame, storage_level=storage_level)
+            entry = PersistEntry(data, storage_level=storage_level)
             bucket.append(entry)
             return entry
 
     def release(
         self,
         key: str,
-        keep: Any | None = None,
+        keep: DatasetBase | None = None,
         blocking: bool = True,
     ) -> int:
         """Release all accumulated references of the lineage except ``keep``.
@@ -120,38 +155,31 @@ class StorageManager:
         ``persist`` — every previously accumulated reference is unpersisted
         (the cache mark is removed from those DAG points), while the frame
         that triggered the action (``keep``) stays cached and becomes the
-        only entry of the bucket.
+        only entry of the bucket. Plans still owned by another key stay cached.
 
         Args:
             key: Lineage key.
             keep: Frame that must remain cached (the one that triggered the
                 action). ``None`` releases everything (rule 3 behaviour).
-            blocking: Passed through to ``DataFrame.unpersist``.
+            blocking: Passed through to ``Dataset.release_cache``.
 
         Returns:
             Number of released references.
         """
-        if keep is None:
-            frame_to_keep = None
-        else:
-            # Extract the actual frame from the wrapper if needed (same logic as register)
-            if hasattr(keep, '_internal_frame_api'):
-                frame_to_keep = keep._internal_frame_api
-            elif hasattr(keep, '_internal') and hasattr(keep._internal, 'spark_frame'):
-                frame_to_keep = keep._internal.spark_frame
-            else:
-                frame_to_keep = keep
-
         with self._lock:
             bucket = self._storage.get(key, [])
-            kept = [entry for entry in bucket if entry.frame is frame_to_keep]
-            released = [entry for entry in bucket if entry.frame is not frame_to_keep]
+            kept, released = [], []
+            for entry in bucket:
+                if self._same_plan(entry.frame, keep):
+                    kept.append(entry)
+                else:
+                    released.append(entry)
 
             if kept:
                 self._storage[key] = kept
             else:
                 self._storage.pop(key, None)
-        self._unpersist_all(released, blocking=blocking)
+            self._release_unowned(released, blocking)
         return len(released)
 
     def release_all(self, key: str, blocking: bool = True) -> int:
@@ -159,15 +187,12 @@ class StorageManager:
 
         Args:
             key: Lineage key.
-            blocking: Passed through to ``DataFrame.unpersist``.
+            blocking: Passed through to ``Dataset.release_cache``.
 
         Returns:
             Number of released references.
         """
-        with self._lock:
-            released = self._storage.pop(key, [])
-        self._unpersist_all(released, blocking=blocking)
-        return len(released)
+        return self.release(key, blocking=blocking)
 
     # ── introspection ────────────────────────────────────────────────
 
@@ -176,9 +201,9 @@ class StorageManager:
         with self._lock:
             return list(self._storage.get(key, []))
 
-    def frames(self, key: str) -> list[Any]:
-            """Snapshot of the persisted frames of the lineage."""
-            return [entry.frame for entry in self.entries(key)]
+    def frames(self, key: str) -> list[DatasetBase]:
+        """Snapshot of the persisted frames of the lineage."""
+        return [entry.frame for entry in self.entries(key)]
 
     def count(self, key: str) -> int:
         """Number of accumulated references in the lineage bucket."""
@@ -198,49 +223,9 @@ class StorageManager:
     def clear(self, blocking: bool = True) -> int:
         """Release everything (tests / session shutdown helper)."""
         with self._lock:
-            buckets = self._storage
-            self._storage = {}
-        total = 0
-        for bucket in buckets.values():
-            self._unpersist_all(bucket, blocking=blocking)
-            total += len(bucket)
-        return total
+            return sum(
+                self.release_all(key, blocking=blocking) for key in list(self._storage)
+            )
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"StorageManager(lineages={len(self.keys())}, entries={self.total_entries()})"
-
-
-    # ── internals ────────────────────────────────────────────────
-    @staticmethod
-    def _unpersist_all(entries: Iterator[PersistEntry], blocking: bool) -> None:
-        """Best-effort ``unpersist`` of every entry; failures are warned
-        about but never propagate — cleanup must not break the pipeline."""
-        for entry in entries:
-            unpersist = getattr(entry.frame, "unpersist", None)
-            if not callable(unpersist):
-                warnings.warn(
-                    f"PersistManager: {entry!r} has no `unpersist`; "
-                    f"the reference is dropped without releasing the cache",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
-                continue
-            try:
-                unpersist(blocking=blocking)
-                continue
-            except TypeError:
-                pass
-            except Exception as exc: #best-effort cleanup
-                warnings.warn(
-                    f"PersistManager: unpersist({entry!r}) failed: {exc!r}",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
-            try:
-                unpersist()
-            except Exception as exc: #best-effort cleanup
-                warnings.warn(
-                    f"StorageManager: unpersist({entry!r}) failed: {exc!r}",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
