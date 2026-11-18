@@ -40,7 +40,9 @@ class Matching(ExperimentShell):
     indexed by the same identifier. Other experiment types do not interpret this role.
 
     Args:
-        group_match (bool, optional): Whether to perform group matching. Defaults to False.
+        group_match (bool, optional): Whether to perform matching independently
+            within levels of a column marked by ``GroupingRole``. Required when
+            ``group_match=True``. Defaults to False.
         distance (Literal["mahalanobis", "l2"], optional): Distance metric to use for matching.
             Options are "mahalanobis" or "l2". Defaults to "mahalanobis".
         metric (Literal["atc", "att", "ate"], optional): Type of treatment effect to estimate.
@@ -98,7 +100,9 @@ class Matching(ExperimentShell):
         """Creates an experiment configuration with specified matching parameters.
 
         Args:
-            group_match (bool, optional): Whether to perform group matching. Defaults to False.
+            group_match (bool, optional): Whether to perform matching independently
+            within levels of a column marked by ``GroupingRole``. Required when
+            ``group_match=True``. Defaults to False.
         distance (Literal["mahalanobis", "l2"], optional): Distance metric to use for matching.
             Options are "mahalanobis" or "l2". Defaults to "mahalanobis".
         metric (Literal["atc", "att", "ate"], optional): Type of treatment effect to estimate.

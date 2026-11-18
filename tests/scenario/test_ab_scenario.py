@@ -9,6 +9,7 @@ from scipy import stats
 
 from hypex import ABTest
 from hypex.dataset import (
+    FeatureRole,
     InfoRole,
     PreTargetRole,
     TargetRole,
@@ -315,14 +316,23 @@ def test_cuped_reduces_pvalue_noise_end_to_end() -> None:
     assert cuped < plain
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: CUPAC cannot run end to end (CupacExtension.calc dispatch and "
-    "_agg_data_from_cupac_data add_column errors)",
-)
 def test_cupac_runs_end_to_end() -> None:
     df, roles = _with_pre()
-    roles = dict(roles, y=TargetRole(cofounders=["f"]))
+    df["y_lag1"] = df["y_pre"]
+    df["y_lag2"] = df["y_pre"].shift(1).fillna(0.0)
+    df["f_lag1"] = df["y_pre"] * 0.5
+    df["f_lag2"] = df["y_pre"] * 0.25
+    df = df.drop(columns="y_pre")
+    roles.pop("y_pre")
+    roles.update(
+        {
+            "y": TargetRole(cofounders=["f"]),
+            "y_lag1": PreTargetRole(parent="y", lag=1),
+            "y_lag2": PreTargetRole(parent="y", lag=2),
+            "f_lag1": FeatureRole(parent="f", lag=1),
+            "f_lag2": FeatureRole(parent="f", lag=2),
+        }
+    )
     _run(df, roles, enable_cupac=True, cupac_models="linear")
 
 

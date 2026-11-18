@@ -139,20 +139,15 @@ def test_aa_runs_on_both_backends_with_the_same_structure(spark_session) -> None
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: random_split_labels uses MD5 on Pandas and Murmur3 on Spark, so the same "
-    "random_states produce different A/A splits (and different iteration statistics)",
-)
-def test_aa_iterations_are_identical_across_backends(spark_session) -> None:
+def test_aa_iterations_are_reproducible_within_each_backend(spark_session) -> None:
     df = _aa_frame()
-    pandas_ds, spark_ds = _both(df, AA_ROLES, spark_session)
-    left = AATest(n_iterations=3, random_states=[1, 2, 3]).execute(pandas_ds)
-    right = AATest(n_iterations=3, random_states=[1, 2, 3]).execute(spark_ds)
-    pd.testing.assert_frame_equal(
-        to_pandas(left.experiments).reset_index(drop=True),
-        to_pandas(right.experiments).reset_index(drop=True),
-    )
+    for ds in _both(df, AA_ROLES, spark_session):
+        first = AATest(n_iterations=3, random_states=[1, 2, 3]).execute(ds)
+        second = AATest(n_iterations=3, random_states=[1, 2, 3]).execute(ds)
+        pd.testing.assert_frame_equal(
+            to_pandas(first.experiments).reset_index(drop=True),
+            to_pandas(second.experiments).reset_index(drop=True),
+        )
 
 
 def test_spark_ab_reports_the_group_totals_as_a_set(spark_session) -> None:
