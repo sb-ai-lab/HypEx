@@ -525,17 +525,15 @@ class DatasetBase:
         value_data_type = None
         if is_dataset_value:
             value_data_type = value.roles[value.columns[0]].data_type
-            value = value.iselect(0).raw_data.iloc[:, 0]
         if key not in self.columns and isinstance(key, str):
-            self.add_column(value, {key: InfoRole()})
+            self.roles[key] = InfoRole()
             warnings.warn(
                 "Column must be added by using add_column method.",
                 category=SyntaxWarning,
             )
-            self.raw_data[key] = value
         else:
             column_data_type = self.roles[key].data_type
-            if (
+            if not (
                 column_data_type is None
                 or (is_dataset_value and value_data_type == column_data_type)
                 or (
@@ -545,9 +543,8 @@ class DatasetBase:
                 )
                 or isinstance(value, column_data_type)
             ):
-                self.raw_data[key] = value
-            else:
                 raise TypeError("Value type does not match the expected data type.")
+        self._backend_data.set_column(key, value)
 
     def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
         display_limit = (

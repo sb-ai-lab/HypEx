@@ -458,6 +458,14 @@ class DatasetBackendNavigation(ABC):
         """
         raise AbstractMethodError
 
+    def set_column(self, key: str, value: Any) -> None:
+        """Assign a column using the backend's native representation."""
+        from ..abstract import DatasetBase
+
+        if isinstance(value, DatasetBase):
+            value = value.iselect(0).raw_data.iloc[:, 0]
+        self.data[key] = value
+
     @abstractmethod
     def add_column(
         self, data: Any, name: str | None = None, index: Sequence | None = None
