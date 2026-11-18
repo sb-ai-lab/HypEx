@@ -193,9 +193,10 @@ class Matching(ExperimentShell):
         executors = (
             executors if distance == "l2" else [distance_mapping[distance], *executors]
         )
+        dtype: dict[type, type] = {int: float}
         executors = [
             TypeCaster(
-                dtype={int: float},
+                dtype=dtype,
                 roles=[FeatureRole(), TargetRole()],
             ),
             *executors,
@@ -227,7 +228,7 @@ class Matching(ExperimentShell):
         extract_full_data: bool = False,
         compute_indexes: bool = False,
     ):
-        metric = "ate"
+        metric: Literal["atc", "att", "ate"] = "ate"
         super().__init__(
             experiment=self._make_experiment(
                 group_match,

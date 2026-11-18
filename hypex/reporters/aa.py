@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from ..comparators import (
     BaseComparator,
@@ -46,7 +46,9 @@ class AATestReporter(DatasetReporter):
     ]
 
     def __init__(
-        self, dict_reporter: DictReporter | None = None, output_format: str = "dataset"
+        self,
+        dict_reporter: DictReporter | None = None,
+        output_format: Literal["dict", "dataset"] = "dataset",
     ):
         """Initialize the A/A test reporter.
 
@@ -100,7 +102,7 @@ class AATestReporter(DatasetReporter):
 
         return result
 
-    def report(self, data: ExperimentData) -> dict[str, Any] | Dataset:
+    def report(self, data: ExperimentData) -> dict[str, Any] | Dataset | SmallDataset:
         """Generate the final A/A test report.
 
         Args:
@@ -121,7 +123,7 @@ class AATestReporter(DatasetReporter):
 
 
 class AAPassedReporter(Reporter):
-    def report(self, data: ExperimentData) -> Dataset:
+    def report(self, data: ExperimentData) -> Dataset | SmallDataset:
         aa_score, best_split = self._collect_tables(data)
         if aa_score is None or best_split is None:
             return SmallDataset.create_empty()
@@ -257,7 +259,7 @@ class AABestSplitReporter(Reporter):
     the primary dataset for downstream analysis.
     """
 
-    def report(self, data: ExperimentData) -> Dataset:
+    def report(self, data: ExperimentData) -> Dataset | SmallDataset:
         """Merge the best split identifier into the main dataset.
 
         Args:

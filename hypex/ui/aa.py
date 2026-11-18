@@ -5,7 +5,14 @@ import math
 from typing import Any
 
 from ..analyzers.aa import AADryTestAnalyzer, AAScoreAnalyzer
-from ..dataset import Dataset, ExperimentData, InfoRole, SmallDataset, StatisticRole
+from ..dataset import (
+    ABCRole,
+    Dataset,
+    ExperimentData,
+    InfoRole,
+    SmallDataset,
+    StatisticRole,
+)
 from ..reporters.aa import AABestSplitReporter, AAPassedReporter
 from ..utils import ExperimentDataEnum, _parse_metric_col
 from ..utils.constants import (
@@ -20,10 +27,10 @@ from .base import Output
 
 
 class AAOutput(Output):
-    best_split: Dataset
-    experiments: Dataset
-    aa_score: Dataset
-    best_split_statistics: Dataset
+    best_split: Dataset | SmallDataset
+    experiments: Dataset | SmallDataset
+    aa_score: Dataset | SmallDataset
+    best_split_statistics: Dataset | SmallDataset
 
     def __init__(self):
         super().__init__(
@@ -114,7 +121,7 @@ class AAOutput(Output):
 
             result_rows.append(rec)
 
-        roles = {}
+        roles: dict[str, ABCRole] = {}
         if result_rows:
             for c in result_rows[0]:
                 if c in ("feature", "group"):
@@ -172,7 +179,9 @@ class AAOutput(Output):
         self.experiments = self._replace_splitters(self.experiments, RenameEnum.columns)
 
     @staticmethod
-    def _add_dry_score(experiment_data: ExperimentData, aa_score: Dataset) -> Dataset:
+    def _add_dry_score(
+        experiment_data: ExperimentData, aa_score: Dataset | SmallDataset
+    ) -> Dataset | SmallDataset:
         dry_score_analyser_ids = experiment_data.get_ids(
             AADryTestAnalyzer, ExperimentDataEnum.analysis_tables
         )[AADryTestAnalyzer.__name__][ExperimentDataEnum.analysis_tables.value]
@@ -180,9 +189,9 @@ class AAOutput(Output):
         if len(dry_score_analyser_ids) == 0:
             return aa_score
 
-        dry_score_analyser_ids = dry_score_analyser_ids[0]
+        dry_score_analyser_id = dry_score_analyser_ids[0]
         table = aa_score.merge(
-            experiment_data.analysis_tables[dry_score_analyser_ids],
+            experiment_data.analysis_tables[dry_score_analyser_id],
             right_index=True,
             left_index=True,
             how="left",

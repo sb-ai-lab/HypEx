@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import warnings
 from copy import deepcopy
-from typing import Any
+from typing import Any, cast
 
-from ..dataset import Dataset, ExperimentData
+from ..dataset import Dataset, ExperimentData, SmallDataset
 from ..experiments.base import Experiment
 from ..reporters import Reporter
 from ..utils import ID_SPLIT_SYMBOL
@@ -111,7 +111,7 @@ class Output:
         print(output.plots)  # Access additional report
     """
 
-    summary: Dataset
+    summary: Dataset | SmallDataset | dict[str, Any]
     _experiment_data: ExperimentData
 
     def __init__(
@@ -137,13 +137,13 @@ class Output:
         return self.summary_reporter
 
     @property
-    def resume(self) -> Dataset:
+    def resume(self) -> Dataset | SmallDataset | dict[str, Any]:
         """Deprecated alias of ``summary``."""
         _warn_resume_deprecated("resume", "summary")
         return self.summary
 
     @resume.setter
-    def resume(self, value: Dataset) -> None:
+    def resume(self, value: Dataset | SmallDataset | dict[str, Any]) -> None:
         _warn_resume_deprecated("resume", "summary")
         self.summary = value
 
@@ -191,8 +191,8 @@ class Output:
 
     @staticmethod
     def _replace_splitters(
-        data: Dataset, mode: RenameEnum = RenameEnum.columns
-    ) -> Dataset:
+        data: Dataset | SmallDataset, mode: RenameEnum = RenameEnum.columns
+    ) -> Dataset | SmallDataset:
         if data.is_empty() or len(data.columns) == 0:
             return data
 
@@ -328,7 +328,8 @@ class ExperimentShell:
             # back into the caller's ExperimentData.
             data = data.copy()
 
-        original_ds = data.ds
+        experiment_data = cast(ExperimentData, data)
+        original_ds = experiment_data.ds
         manage_cache = self.auto_persist
         try:
             if manage_cache:
@@ -336,7 +337,7 @@ class ExperimentShell:
                     storage_level="MEMORY_AND_DISK",
                     action="none" if original_ds.is_persisted else "count",
                 )
-            result_experiment_data = self._experiment.execute(data)
+            result_experiment_data = self._experiment.execute(experiment_data)
             self._out.extract(result_experiment_data)
             return self._out
         finally:

@@ -55,7 +55,7 @@ class AATest(ExperimentShell):
         n_iterations: int,
         control_size: float,
         sample_size: float | None,
-        additional_params: dict[str, Any] | None,
+        additional_params: dict[type, dict[str, Any]] | None,
         random_states: Iterable[int] | None,
         groups_sizes: list[float] | None,
         dry_test: bool,
@@ -112,7 +112,7 @@ class AATest(ExperimentShell):
             groups_sizes,
         )
 
-        experiment_params = [
+        experiment_params: list[Executor] = [
             ParamsExperiment(
                 executors=[base_experiment],
                 params=params,
@@ -165,7 +165,7 @@ class AATest(ExperimentShell):
         control_size: float,
         random_states: Iterable[int] | None = None,
         sample_size: float | None = None,
-        additional_params: dict[str, Any] | None = None,
+        additional_params: dict[type, dict[str, Any]] | None = None,
         groups_sizes: list[float] | None = None,
     ) -> dict[type, dict[str, Any]]:
         """Prepares parameters for the A/A test experiment.
@@ -184,7 +184,7 @@ class AATest(ExperimentShell):
         """
         random_states = random_states or range(n_iterations)
         additional_params = additional_params or {}
-        params = {
+        params: dict[type, dict[str, Any]] = {
             AASplitter: {
                 "random_state": random_states,
                 "control_size": [control_size],
@@ -207,7 +207,7 @@ class AATest(ExperimentShell):
         stratification: bool = False,
         n_iterations: int | None = None,
         sample_size: float | None = None,
-        additional_params: dict[str, Any] | None = None,
+        additional_params: dict[type, dict[str, Any]] | None = None,
         random_states: Iterable[int] | None = None,
         equal_variance: bool | None = None,
         groups_sizes: list[float] | None = None,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Callable, ClassVar, Literal
+from typing import Any, Callable, ClassVar, Literal, cast
 
 import numpy as np
 
@@ -97,6 +97,7 @@ class BaseComparator(Calculator):
     def _extract_dataset(
         compare_result: FromDictTypes, roles: dict[Any, ABCRole]
     ) -> Dataset:
+        compare_result = cast("dict[Any, Any]", compare_result)
         first_val = next(iter(compare_result.values()))
         if isinstance(first_val, (Dataset, SmallDataset)):
             cr_list_v = list(compare_result.values())

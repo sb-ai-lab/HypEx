@@ -105,7 +105,10 @@ class ABTest(ExperimentShell):
             else [additional_tests]
         )
         for test_name in additional_tests:
-            on_role_executors.append(test_mapping[test_name.value])
+            test_value = (
+                test_name.value if isinstance(test_name, ABTestTypesEnum) else test_name
+            )
+            on_role_executors.append(test_mapping[test_value])
 
         # Build base executors list
         executors: list[Executor] = [
