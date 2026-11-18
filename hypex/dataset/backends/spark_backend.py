@@ -1199,7 +1199,10 @@ class SparkNavigation(DatasetBackendNavigation):
         Returns:
             SparkNavigation: Selected rows with the parent cache ownership key.
         """
-        data = self.data.loc[items]
+        if isinstance(items, (list, tuple, np.ndarray, pd.Index)) and len(items) > 0:
+            data = ps.concat([self.data.loc[[item]] for item in items])
+        else:
+            data = self.data.loc[items]
         if isinstance(data, (pd.Series, ps.Series)):
             data = data.to_frame()
         return self._wrap_result(data)
@@ -1426,7 +1429,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         Returns:
             ps.groupby.GroupBy: GroupBy object for subsequent aggregation.
         """
-        return self.data.groupby(by=by, **kwargs)
+        return self.data.replace(np.nan, None).groupby(by=by, **kwargs)
 
     def iter_groups(self, by: list[str]):
         """Iterate over groups defined by column(s), in ascending key order.
@@ -1516,7 +1519,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             selected = list(func)
         else:
             selected = list(self.data.columns)
-        data_to_agg = self.data[selected]
+        data_to_agg = self.data[selected].replace(np.nan, None)
 
         if data_to_agg is None or len(data_to_agg.columns) == 0:
             return None
@@ -1622,40 +1625,29 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             self.data.mode(numeric_only=numeric_only, dropna=dropna)
         )
 
+    def _ddof_agg(self, operation: Literal["std", "var"], ddof: int) -> Self | float:
+        if ddof not in (0, 1):
+            raise ValueError("Spark std/var support only ddof=0 or ddof=1")
+        functions = {
+            "std": (F.stddev_pop, F.stddev_samp),
+            "var": (F.var_pop, F.var_samp),
+        }
+        func = functions[operation][ddof]
+        numeric_cols = self.get_numeric_columns()
+        data = self.data[numeric_cols].replace(np.nan, None)
+        expressions = [func(F.col(f"`{col}`")).alias(col) for col in numeric_cols]
+        result = data.to_spark().agg(*expressions).pandas_api()
+        return self._wrap_result(self._convert_agg_result(result))
+
     def std(self, skipna: bool = True, ddof: int = 1) -> Self | float:
-        """Compute sample standard deviation.
-
-        Args:
-            skipna (bool): Exclude null values.
-            ddof (int): Delta degrees of freedom (default 1 for sample std).
-
-        Returns:
-            SparkDataset | float: Standard deviation values.
-        """
-        result = self.data.std()
-        converted = self._convert_agg_result(
-            result.to_frame() if isinstance(result, ps.Series) else result
-        )
-        return self._wrap_result(converted)
+        """Compute standard deviation with population or sample correction."""
+        return self._ddof_agg("std", ddof)
 
     def var(
         self, skipna: bool = True, ddof: int = 1, numeric_only: bool = False
     ) -> SparkDataset | float:
-        """Compute variance.
-
-        Args:
-            skipna (bool): Exclude null values.
-            ddof (int): Delta degrees of freedom.
-            numeric_only (bool): Consider only numeric columns.
-
-        Returns:
-            SparkDataset | float: Variance values.
-        """
-        result = self.data.var()
-        converted = self._convert_agg_result(
-            result.to_frame() if isinstance(result, ps.Series) else result
-        )
-        return self._wrap_result(converted)
+        """Compute variance with population or sample correction."""
+        return self._ddof_agg("var", ddof)
 
     def log(self) -> SparkDataset:
         """Compute natural logarithm of numeric values.

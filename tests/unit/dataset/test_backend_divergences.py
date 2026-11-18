@@ -102,13 +102,7 @@ def test_nan_vs_null_in_dropna(backend_kind, spark_session) -> None:
 
 
 @pytest.mark.parametrize(
-    "backend_kind",
-    [
-        PANDAS,
-        _spark_xfail(
-            "Issue: pyspark.pandas propagates NaN in mean/sum instead of skipping"
-        ),
-    ],
+    "backend_kind", [PANDAS, pytest.param(BackendsEnum.spark, id="spark")]
 )
 def test_nan_vs_null_in_stats(backend_kind, spark_session) -> None:
     """Aggregations skip NaN (pandas semantics) on every backend."""
@@ -122,10 +116,6 @@ def test_nan_vs_null_in_stats(backend_kind, spark_session) -> None:
     assert float(series["x"]) == pytest.approx(4.0)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: Spark count() includes NaN",
-)
 def test_count_ignores_nan_on_spark(spark_session) -> None:
     df = pd.DataFrame({"x": [1.0, np.nan, 3.0], "s": ["a", "b", "c"]})
     ds = _build(df, BackendsEnum.spark, spark_session)
@@ -157,8 +147,7 @@ def test_aggregation_layout_diverges(backend_kind, spark_session) -> None:
 
 
 @pytest.mark.parametrize(
-    "backend_kind",
-    [PANDAS, _spark_xfail("Issue: SparkDataset.std ignores ddof (always ddof=1)")],
+    "backend_kind", [PANDAS, pytest.param(BackendsEnum.spark, id="spark")]
 )
 def test_std_ddof_zero_diverges(backend_kind, spark_session) -> None:
     ds = _build(
@@ -169,6 +158,21 @@ def test_std_ddof_zero_diverges(backend_kind, spark_session) -> None:
     frame = _pdf(ds.std(ddof=0))
     series = frame.iloc[0] if len(frame) == 1 else frame.iloc[:, 0]
     assert float(series["x"]) == pytest.approx(np.std([1, 2, 3, 4]))
+
+
+def test_var_ddof_zero_on_spark(spark_session) -> None:
+    ds = _build(
+        pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0]}),
+        BackendsEnum.spark,
+        spark_session,
+    )
+    assert float(ds.var(ddof=0)) == pytest.approx(np.var([1, 2, 3, 4]))
+
+
+def test_std_rejects_unsupported_ddof_on_spark(spark_session) -> None:
+    ds = _build(pd.DataFrame({"x": [1.0, 2.0]}), BackendsEnum.spark, spark_session)
+    with pytest.raises(ValueError, match="ddof"):
+        ds.std(ddof=2)
 
 
 @pytest.mark.parametrize(
@@ -192,13 +196,7 @@ def test_quantile_median_diverges(backend_kind, spark_session) -> None:
 
 
 @pytest.mark.parametrize(
-    "backend_kind",
-    [
-        PANDAS,
-        _spark_xfail(
-            "Issue: NaN poisons groupby mean on Spark instead of being skipped"
-        ),
-    ],
+    "backend_kind", [PANDAS, pytest.param(BackendsEnum.spark, id="spark")]
 )
 def test_groupby_mean_nan_diverges(backend_kind, spark_session) -> None:
     df = pd.DataFrame({"g": ["a", "a", "b"], "x": [1.0, np.nan, 5.0]})
@@ -211,14 +209,7 @@ def test_groupby_mean_nan_diverges(backend_kind, spark_session) -> None:
 # Index assignment after loc[list]
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize(
-    "backend_kind",
-    [
-        PANDAS,
-        _spark_xfail(
-            "Issue: Spark loc[list] returns rows in frame order, so a following "
-            "positional index assignment attaches labels to different rows than pandas"
-        ),
-    ],
+    "backend_kind", [PANDAS, pytest.param(BackendsEnum.spark, id="spark")]
 )
 def test_loc_list_then_index_assignment_diverges(backend_kind, spark_session) -> None:
     """``loc[list]`` followed by ``index = [...]`` should label rows like pandas."""
@@ -227,6 +218,14 @@ def test_loc_list_then_index_assignment_diverges(backend_kind, spark_session) ->
     sub.index = [0, 1, 2, 3]
 
     assert _pdf(sub).sort_index()["x"].tolist() == [130, 105, 117, 102]
+
+
+@pytest.mark.parametrize(
+    "backend_kind", [PANDAS, pytest.param(BackendsEnum.spark, id="spark")]
+)
+def test_loc_list_preserves_order_and_duplicates(backend_kind, spark_session) -> None:
+    ds = _build(pd.DataFrame({"x": list(range(100, 110))}), backend_kind, spark_session)
+    assert _pdf(ds.loc[[3, 1, 3]])["x"].tolist() == [103, 101, 103]
 
 
 # ---------------------------------------------------------------------------
