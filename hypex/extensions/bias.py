@@ -507,7 +507,7 @@ class SparkBisaExtesion(BiasExtension):
             data=data, neighbors_cols=neighbors_cols, numeric_cols=numeric_cols
         )
         matched_data = cls.result_to_dataset(matched_data, roles={}, small=False)
-        matched_data = cast(Dataset, matched_data.set_index("initial_index"))
+        matched_data = matched_data.set_index("initial_index")
         matched_data.index.name = None
 
         indexes = data[neighbors_cols]
@@ -642,9 +642,8 @@ class SparkBisaExtesion(BiasExtension):
 
         coefficients_1, coefficients_2 = self._calc_coefs(initial_data)
         final_data = self._calc_bias(initial_data, coefficients_1, coefficients_2)
-        final_dataset = cast(
-            Dataset,
-            self.result_to_dataset(final_data, {}, small=False).set_index("index"),
+        final_dataset = self.result_to_dataset(final_data, {}, small=False).set_index(
+            "index"
         )
         final_dataset.index.name = None
 

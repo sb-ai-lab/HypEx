@@ -532,10 +532,7 @@ class MatchingOutput(Output):
                 session=experiment_data.ds.session,
             )
         if not self.full_data.is_empty():
-            self.full_data = cast(
-                "Dataset | SmallDataset",
-                self.full_data.set_index(index_field, drop=False),
-            )
+            self.full_data = self.full_data.set_index(index_field, drop=False)
 
     def extract(self, experiment_data: ExperimentData) -> None:
         """Extract and format all matching results from experiment data.

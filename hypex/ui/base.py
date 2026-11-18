@@ -328,7 +328,7 @@ class ExperimentShell:
             # back into the caller's ExperimentData.
             data = data.copy()
 
-        experiment_data = cast(ExperimentData, data)
+        experiment_data = data
         original_ds = experiment_data.ds
         manage_cache = self.auto_persist
         try:

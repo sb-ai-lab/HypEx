@@ -1314,7 +1314,7 @@ class SparkFaissExtension(FaissExtension):
         Returns:
             Dataset: The persisted result dataset.
         """
-        result = cast(Dataset, result.set_index("index"))
+        result = result.set_index("index")
         result.index.name = None
         result.persist(storage_level=storage_level, action="count")
         result.checkpoint(eager=True)

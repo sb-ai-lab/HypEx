@@ -105,7 +105,7 @@ class MatchingMetricsExtension(Extension):
             data=data, neighbors_cols=neighbors_cols, numeric_cols=self.target_field
         )
         matched_data = self.result_to_dataset(matched_data, {}, small=False)
-        matched_data = cast(Dataset, matched_data.set_index("initial_index"))
+        matched_data = matched_data.set_index("initial_index")
         matched_data.index.name = None
 
         return matched_data
