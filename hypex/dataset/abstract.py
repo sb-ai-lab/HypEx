@@ -521,8 +521,11 @@ class DatasetBase:
         return self._from_derived_backend(data=new_data, roles=new_roles)
 
     def __setitem__(self, key: str, value: Any) -> None:
-        if isinstance(value, DatasetBase):
-            value = value.iselect(0).raw_data
+        is_dataset_value = isinstance(value, DatasetBase)
+        value_data_type = None
+        if is_dataset_value:
+            value_data_type = value.roles[value.columns[0]].data_type
+            value = value.iselect(0).raw_data.iloc[:, 0]
         if key not in self.columns and isinstance(key, str):
             self.add_column(value, {key: InfoRole()})
             warnings.warn(
@@ -534,8 +537,10 @@ class DatasetBase:
             column_data_type = self.roles[key].data_type
             if (
                 column_data_type is None
+                or (is_dataset_value and value_data_type == column_data_type)
                 or (
-                    isinstance(value, Iterable)
+                    not is_dataset_value
+                    and isinstance(value, Iterable)
                     and all(isinstance(v, column_data_type) for v in value)
                 )
                 or isinstance(value, column_data_type)
@@ -1207,8 +1212,8 @@ class DatasetBase:
             self._backend_data.coefficient_of_variation()
         )
 
-    def corr(self, numeric_only: bool = False) -> Self:
-        t_data = self._backend_data.corr(numeric_only=numeric_only)
+    def corr(self, method: str = "pearson", numeric_only: bool = False) -> Self:
+        t_data = self._backend_data.corr(method=method, numeric_only=numeric_only)
         t_roles = {column: self.roles[column] for column in t_data.columns}
         return self._from_derived_backend(roles=t_roles, data=t_data)
 

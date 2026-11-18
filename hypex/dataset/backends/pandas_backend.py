@@ -1487,18 +1487,20 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def corr(
         self,
+        method: str = "pearson",
         numeric_only: bool = False,
     ) -> pd.DataFrame | float:
-        """Compute pairwise correlation of columns using Pearson method.
+        """Compute pairwise correlation of columns.
 
         Args:
+            method: Correlation method supported by pandas.
             numeric_only: Include only numeric columns if True.
 
         Returns:
             pd.DataFrame: Correlation matrix.
         """
         return self._wrap_result(
-            self.data.corr(method="pearson", numeric_only=numeric_only)
+            self.data.corr(method=method, numeric_only=numeric_only)
         )
 
     def isna(self) -> pd.DataFrame:

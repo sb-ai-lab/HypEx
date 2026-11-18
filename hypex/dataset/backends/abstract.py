@@ -798,10 +798,11 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def corr(self, numeric_only: bool = False) -> Any:
-        """Compute pairwise Pearson correlation of numeric columns.
+    def corr(self, method: str = "pearson", numeric_only: bool = False) -> Any:
+        """Compute pairwise correlation of numeric columns.
 
         Args:
+            method: Correlation method.
             numeric_only: If True, only include numeric columns.
 
         Returns:
