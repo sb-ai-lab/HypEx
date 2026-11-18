@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from ..dataset.dataset import Dataset
 from ..dataset.experiment_data import ExperimentData
-from ..dataset.roles import FeatureRole
+from ..dataset.roles import ABCRole, FeatureRole
 from ..utils import CategoricalTypes
 from ..utils.adapter import Adapter
 from .abstract import Transformer
@@ -14,7 +14,7 @@ from .abstract import Transformer
 class CategoryAggregator(Transformer):
     def __init__(
         self,
-        target_roles: str | Sequence[str] | None = None,
+        target_roles: ABCRole | Sequence[ABCRole] | None = None,
         threshold: int | None = 15,
         new_group_name: str | None = None,
         key: Any = "",
@@ -31,7 +31,7 @@ class CategoryAggregator(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: str | None = None,
+        target_cols: str | list[str] | None = None,
         threshold: int | None = 15,
         new_group_name: str | None = None,
     ) -> Dataset:
@@ -53,7 +53,7 @@ class CategoryAggregator(Transformer):
         )
         result = data.copy(
             data=self.calc(
-                data=data.ds,
+                data=cast(Dataset, data.ds),
                 target_cols=target_cols,
                 threshold=self.threshold,
                 new_group_name=self.new_group_name,

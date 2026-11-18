@@ -72,8 +72,9 @@ class CUPEDTransformer(Transformer):
             )
         return result
 
+    # CUPED requires an explicit target-to-pre-target mapping.
     @classmethod
-    def calc(
+    def calc(  # type: ignore[override]
         cls,
         data: Dataset,
         cuped_features: dict[str, str],
@@ -101,7 +102,9 @@ class CUPEDTransformer(Transformer):
             Updated ``ExperimentData`` with adjusted targets in ``ds``
             and variance-reduction report in ``analysis_tables``.
         """
-        new_ds = self.calc(data=data.ds, cuped_features=self.cuped_features)
+        new_ds = self.calc(
+            data=cast(Dataset, data.ds), cuped_features=self.cuped_features
+        )
 
         # ── Compute variance reductions ──────────────────────────────
         report_rows: list[dict[str, Any]] = []

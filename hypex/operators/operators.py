@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from ..dataset import (
     ABCRole,
@@ -17,7 +17,8 @@ from .abstract import GroupOperator
 
 
 class SMD(GroupOperator):
-    def execute(self, data: ExperimentData) -> ExperimentData:
+    # This legacy extension point currently returns None.
+    def execute(self, data: ExperimentData) -> ExperimentData | None:  # type: ignore[override]
         pass
 
     @classmethod
@@ -25,7 +26,10 @@ class SMD(GroupOperator):
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Any:
         test_data = cls._check_test_data(test_data=test_data)
-        return (data.mean() + test_data.mean()) / data.std()
+        data_mean = cast(float, data.mean())
+        test_mean = cast(float, test_data.mean())
+        data_std = cast(float, data.std())
+        return (data_mean + test_mean) / data_std
 
 
 class MatchingMetrics(GroupOperator):
@@ -97,7 +101,7 @@ class MatchingMetrics(GroupOperator):
     @classmethod
     def _execute_inner_function(
         cls, grouping_data, target_fields: str | list[str] | None = None, **kwargs
-    ) -> dict:
+    ) -> dict | None:
         pass
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -124,10 +128,15 @@ class MatchingMetrics(GroupOperator):
         ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
             return data
 
-        cls = backend_factory.resolve_backend(MatchingMetricsExtension, data.ds)
-        compare_result = cls(
+        extension_cls = cast(
+            "type[MatchingMetricsExtension]",
+            backend_factory.resolve_backend(
+                MatchingMetricsExtension, cast(Dataset, data.ds)
+            ),
+        )
+        compare_result = extension_cls(
             self.grouping_role, self.target_roles, self.metric, self.n_neighbors
-        ).calc(data.ds)
+        ).calc(cast(Dataset, data.ds))
 
         return self._set_value(data, compare_result)
 
@@ -221,7 +230,8 @@ class Bias(GroupOperator):
             grouping_role=grouping_role, target_roles=target_roles, key=key
         )
 
-    def _set_value(
+    # Bias always produces a concrete Dataset rather than an optional mapping.
+    def _set_value(  # type: ignore[override]
         self, data: ExperimentData, value: Dataset, key=None
     ) -> ExperimentData:
         """
@@ -257,7 +267,7 @@ class Bias(GroupOperator):
         target_fields: list[str] | None = None,
         features_fields: list[str] | None = None,
         **kwargs,
-    ) -> dict:
+    ) -> dict | None:
         pass
 
     @classmethod
@@ -267,7 +277,7 @@ class Bias(GroupOperator):
         target_fields: str | list[str] | None = None,
         features_fields: list[str] | None = None,
         **kwargs,
-    ) -> dict:
+    ) -> dict | None:
         pass
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -311,10 +321,13 @@ class Bias(GroupOperator):
             not target_fields and data.initial_ds.tmp_roles
         ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
             return data
-        cls = backend_factory.resolve_backend(BiasExtension, data.ds)
-        compare_result: Dataset = cls(self.grouping_role, self.target_roles).calc(
-            data.ds
+        extension_cls = cast(
+            "type[BiasExtension]",
+            backend_factory.resolve_backend(BiasExtension, cast(Dataset, data.ds)),
         )
+        compare_result: Dataset = extension_cls(
+            self.grouping_role, cast("list[ABCRole]", self.target_roles)
+        ).calc(cast(Dataset, data.ds))
         compare_result.roles["bias"] = AdditionalStatisticRole()
         compare_result.roles["matched_target"] = AdditionalTargetRole()
 

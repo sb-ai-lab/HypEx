@@ -5,7 +5,7 @@ from typing import Any, cast
 
 from ..dataset.dataset import Dataset
 from ..dataset.experiment_data import ExperimentData
-from ..dataset.roles import FeatureRole, InfoRole, PreTargetRole, TargetRole
+from ..dataset.roles import ABCRole, FeatureRole, InfoRole, PreTargetRole, TargetRole
 from ..utils.adapter import Adapter
 from .abstract import Transformer
 
@@ -13,7 +13,7 @@ from .abstract import Transformer
 class CVFilter(Transformer):
     def __init__(
         self,
-        target_roles: str | Sequence[str] | None = None,
+        target_roles: ABCRole | Sequence[ABCRole] | None = None,
         lower_bound: float | None = None,
         upper_bound: float | None = None,
         key: Any = "",
@@ -39,7 +39,7 @@ class CVFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: str | None = None,
+        target_cols: str | list[str] | None = None,
         lower_bound: float | None = None,
         upper_bound: float | None = None,
     ) -> Dataset:
@@ -62,7 +62,7 @@ class CVFilter(Transformer):
             target_cols = data.ds.search_columns(roles=FeatureRole())
         result = data.copy(
             data=self.calc(
-                data=data.ds,
+                data=cast(Dataset, data.ds),
                 target_cols=target_cols,
                 lower_bound=self.lower_bound,
                 upper_bound=self.upper_bound,
@@ -74,7 +74,7 @@ class CVFilter(Transformer):
 class ConstFilter(Transformer):
     def __init__(
         self,
-        target_roles: str | Sequence[str] | None = None,
+        target_roles: ABCRole | Sequence[ABCRole] | None = None,
         threshold: float = 0.95,
         key: Any = "",
     ):
@@ -93,7 +93,7 @@ class ConstFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: str | None = None,
+        target_cols: str | list[str] | None = None,
         threshold: float = 0.95,
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
@@ -107,7 +107,9 @@ class ConstFilter(Transformer):
         target_cols = data.ds.search_columns(roles=self.target_roles)
         result = data.copy(
             data=self.calc(
-                data=data.ds, target_cols=target_cols, threshold=self.threshold
+                data=cast(Dataset, data.ds),
+                target_cols=target_cols,
+                threshold=self.threshold,
             )
         )
         return result
@@ -116,7 +118,7 @@ class ConstFilter(Transformer):
 class NanFilter(Transformer):
     def __init__(
         self,
-        target_roles: str | Sequence[str] | None = None,
+        target_roles: ABCRole | Sequence[ABCRole] | None = None,
         threshold: float = 0.8,
         key: Any = "",
     ):
@@ -135,7 +137,7 @@ class NanFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: str | None = None,
+        target_cols: str | list[str] | None = None,
         threshold: float = 0.8,
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
@@ -150,7 +152,9 @@ class NanFilter(Transformer):
         target_cols = data.ds.search_columns(roles=self.target_roles)
         result = data.copy(
             data=self.calc(
-                data=data.ds, target_cols=target_cols, threshold=self.threshold
+                data=cast(Dataset, data.ds),
+                target_cols=target_cols,
+                threshold=self.threshold,
             )
         )
         return result
@@ -159,8 +163,8 @@ class NanFilter(Transformer):
 class CorrFilter(Transformer):
     def __init__(
         self,
-        target_roles: str | Sequence[str] | None = None,
-        corr_space_roles: str | Sequence[str] | None = None,
+        target_roles: ABCRole | Sequence[ABCRole] | None = None,
+        corr_space_roles: ABCRole | Sequence[ABCRole] | None = None,
         threshold: float = 0.8,
         method: str = "pearson",
         numeric_only: bool = True,
@@ -176,8 +180,8 @@ class CorrFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: str | None = None,
-        corr_space_cols: str | None = None,
+        target_cols: str | list[str] | None = None,
+        corr_space_cols: str | list[str] | None = None,
         threshold: float = 0.8,
         method: str = "pearson",
         numeric_only: bool = True,
@@ -230,7 +234,7 @@ class CorrFilter(Transformer):
         corr_space_cols = data.ds.search_columns(roles=self.corr_space_roles)
         result = data.copy(
             data=self.calc(
-                data=data.ds,
+                data=cast(Dataset, data.ds),
                 target_cols=target_cols,
                 corr_space_cols=corr_space_cols,
                 threshold=self.threshold,
@@ -244,7 +248,7 @@ class CorrFilter(Transformer):
 class OutliersFilter(Transformer):
     def __init__(
         self,
-        target_roles: str | Sequence[str] | None = None,
+        target_roles: ABCRole | Sequence[ABCRole] | None = None,
         lower_percentile: float = 0,
         upper_percentile: float = 1,
         key: Any = "",
@@ -269,15 +273,16 @@ class OutliersFilter(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: str | None = None,
+        target_cols: str | list[str] | None = None,
         lower_percentile: float = 0,
         upper_percentile: float = 1,
     ) -> Dataset:
-        mask = data[target_cols].apply(
+        columns = cast("list[str]", target_cols)
+        mask = data[columns].apply(
             func=lambda x: (
                 (x < x.quantile(lower_percentile)) | (x > x.quantile(upper_percentile))
             ),
-            role={column: InfoRole() for column in cast("list[str]", target_cols)},
+            role={column: InfoRole() for column in columns},
             axis=0,
         )
         mask = mask.apply(func=lambda x: x.any(), role={"filter": InfoRole()}, axis=1)
@@ -291,7 +296,7 @@ class OutliersFilter(Transformer):
             search_types=self.search_types,
         )
         t_ds = self.calc(
-            data=data.ds,
+            data=cast(Dataset, data.ds),
             target_cols=target_cols,
             lower_percentile=self.lower_percentile,
             upper_percentile=self.upper_percentile,

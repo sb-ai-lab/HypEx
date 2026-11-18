@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from ..dataset.dataset import Dataset
 from ..dataset.experiment_data import ExperimentData
-from ..dataset.roles import FeatureRole
+from ..dataset.roles import ABCRole, FeatureRole
 from ..utils import ScalarType
 from ..utils.adapter import Adapter
 from .abstract import Transformer
@@ -14,7 +14,7 @@ from .abstract import Transformer
 class NaFiller(Transformer):
     def __init__(
         self,
-        target_roles: str | Sequence[str] | None = None,
+        target_roles: ABCRole | Sequence[ABCRole] | None = None,
         values: ScalarType | dict[str, ScalarType] | None = None,
         method: Literal["bfill", "ffill"] | None = None,
         key: Any = "",
@@ -40,7 +40,7 @@ class NaFiller(Transformer):
     @staticmethod
     def _inner_function(
         data: Dataset,
-        target_cols: str | None = None,
+        target_cols: str | list[str] | None = None,
         values: ScalarType | dict[str, ScalarType] | None = None,
         method: Literal["bfill", "ffill"] | None = None,
     ) -> Dataset:
@@ -54,7 +54,7 @@ class NaFiller(Transformer):
         target_cols = data.ds.search_columns(roles=self.target_roles)
         result = data.copy(
             data=self.calc(
-                data=data.ds,
+                data=cast(Dataset, data.ds),
                 target_cols=target_cols,
                 values=self.values,
                 method=self.method,
