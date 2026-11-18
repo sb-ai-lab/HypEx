@@ -310,16 +310,12 @@ jobs:
           path: dist/
 
   # ---------------------------------------------------------------------------
-  # Advisory jobs. They report, they do not block, and each carries the
-  # condition under which it should be promoted to blocking.
+  # Static analysis. Type checks block; the dependency audit remains advisory.
   # ---------------------------------------------------------------------------
   typing:
-    name: Type checks (advisory)
+    name: Type checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # 239 mypy errors across 40 files today. Drop this line once that reaches
-    # zero; tox -e typing already fails honestly.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
