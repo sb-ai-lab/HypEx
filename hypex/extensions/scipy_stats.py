@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import warnings
 from copy import copy
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Sequence, cast
 
 import numpy as np
-from scipy.stats import (  # type: ignore
+from scipy.stats import (
     chi2_contingency,
     ks_2samp,
     kstest,
@@ -70,7 +70,7 @@ class GroupStatTest(CompareExtension):
             {
                 "p-value": p_value,
                 "statistic": statistic,
-                "pass": p_value < reliability,
+                "pass": cast(float, p_value) < reliability,
             },
             StatisticRole(),
         )
@@ -162,7 +162,9 @@ class GroupChi2TestExtension(GroupStatTest):
     def __init__(self, reliability=0.05):
         super().__init__(self.test_function, reliability)
 
-    def matrix_preparation(self, data: Dataset, other: Dataset) -> Dataset | None:
+    def matrix_preparation(
+        self, data: Dataset, other: Dataset
+    ) -> Dataset | np.ndarray | None:
         raise NotImplementedError
 
     def calc(self, data, other=None, **kwargs):
@@ -440,16 +442,18 @@ class SparkChi2TestExtension(GroupChi2TestExtension):
     """
 
     @staticmethod
-    def matrix_preparation(data: Dataset, other: Dataset) -> Dataset | None:
-        other = np.array(
+    def matrix_preparation(data: Dataset, other: Dataset) -> np.ndarray:
+        other_values = np.array(
             other.raw_data.to_spark().rdd.flatMap(lambda row: row).collect()
         )
-        data = np.array(data.raw_data.to_spark().rdd.flatMap(lambda row: row).collect())
-        unique_values = set(other) | set(data)
+        data_values = np.array(
+            data.raw_data.to_spark().rdd.flatMap(lambda row: row).collect()
+        )
+        unique_values = set(other_values) | set(data_values)
         contingency_table = np.zeros((2, len(unique_values)))
         for index, element in enumerate(unique_values):
-            contingency_table[0, index] = len(data[data == element])
-            contingency_table[1, index] = len(other[other == element])
+            contingency_table[0, index] = len(data_values[data_values == element])
+            contingency_table[1, index] = len(other_values[other_values == element])
 
         return contingency_table
 
@@ -457,16 +461,21 @@ class SparkChi2TestExtension(GroupChi2TestExtension):
 class NormCDF(GroupStatTest):
     def calc(
         self, data: Dataset, other: Dataset | None = None, **kwargs
-    ) -> Dataset | float:
+    ) -> SmallDataset:
         result = norm.cdf(abs(data.get_values()[0][0]))
-        return DatasetAdapter.to_dataset(
-            {"p-value": 2 * (1 - result)},
-            StatisticRole(),
+        return cast(
+            SmallDataset,
+            DatasetAdapter.to_dataset(
+                {"p-value": 2 * (1 - result)},
+                StatisticRole(),
+            ),
         )
 
 
 class UniformCheck(GroupStatTest):
-    def calc(self, data: Dataset, other: Dataset | None = None, **kwargs) -> Dataset:
+    def calc(
+        self, data: Dataset, other: Dataset | None = None, **kwargs
+    ) -> SmallDataset:
         data = data.raw_data.to_numpy().flatten()
         res = kstest(data, "uniform")
 

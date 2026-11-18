@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from ..dataset import Dataset
+from typing import cast
+
+from ..dataset import Dataset, SmallDataset
 from ..dataset.backends import PandasDataset
 from ..extensions.scipy_stats import (
     GroupChi2TestExtension,
@@ -23,7 +25,7 @@ class GroupTTest(GroupHypothesisTesting):
     @classmethod
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ) -> Dataset:
+    ) -> SmallDataset | float:
         return GroupTTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
@@ -38,8 +40,11 @@ class GroupKSTest(GroupHypothesisTesting):
     @classmethod
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ) -> Dataset:
-        test_cls = backend_factory.resolve_backend(GroupKSTestExtension, data)
+    ) -> SmallDataset | float:
+        test_cls = cast(
+            "type[GroupKSTestExtension]",
+            backend_factory.resolve_backend(GroupKSTestExtension, data),
+        )
         return test_cls(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
@@ -64,7 +69,7 @@ class GroupUTest(GroupHypothesisTesting):
     @classmethod
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ) -> Dataset:
+    ) -> SmallDataset | float:
         return GroupUTestExtension(kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
@@ -79,8 +84,11 @@ class GroupChi2Test(GroupHypothesisTesting):
     @classmethod
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
-    ) -> Dataset:
-        test_cls = backend_factory.resolve_backend(GroupChi2TestExtension, data)
+    ) -> SmallDataset | float:
+        test_cls = cast(
+            "type[GroupChi2TestExtension]",
+            backend_factory.resolve_backend(GroupChi2TestExtension, data),
+        )
         return test_cls(reliability=kwargs.get("reliability", 0.05)).calc(
             data, other=test_data, **kwargs
         )
