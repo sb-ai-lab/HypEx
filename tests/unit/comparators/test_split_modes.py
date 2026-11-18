@@ -93,24 +93,18 @@ def test_groups_mode_empty_targets_raise(ds) -> None:
         GroupsComparator._split_for_groups_mode(ds[["g"]], ds[[]])
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: _split_for_columns_mode is referenced but not implemented",
-)
 def test_columns_mode_is_implemented(ds) -> None:
-    GroupsComparator._split_data_to_buckets(
+    baseline, compared = GroupsComparator._split_data_to_buckets(
         compare_by="columns",
         target_fields_data=ds[["y"]],
         baseline_field_data=ds[["pre"]],
         group_field_data=ds[["g"]],
     )
+    assert len(baseline) == 1
+    assert baseline[0][1].columns == ["pre"]
+    assert [item[1].columns for item in compared] == [["y"]]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: grouping column leaks into compared data in columns_in_groups mode",
-)
 def test_columns_in_groups_mode_pairs_baseline_and_target_per_group(ds) -> None:
     base, comp = GroupsComparator._split_for_columns_in_groups_mode(
         ds[["g"]], ds[["pre"]], ds[["y"]]
@@ -120,10 +114,6 @@ def test_columns_in_groups_mode_pairs_baseline_and_target_per_group(ds) -> None:
     assert [len(d) for _, d in comp] == [3, 2, 4]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: grouping column leaks into compared data in cross mode",
-)
 def test_cross_mode_uses_first_group_baseline_against_other_groups(ds) -> None:
     base, comp = GroupsComparator._split_for_cross_mode(
         ds[["g"]], ds[["pre"]], ds[["y"]]

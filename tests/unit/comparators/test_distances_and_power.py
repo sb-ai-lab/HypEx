@@ -16,8 +16,9 @@ from ._utils import build_dataset, to_pandas
 TOL = 1e-6
 
 
-def _col(values, name="y", role=TargetRole):
-    return build_dataset(pd.DataFrame({name: values}), {name: role()})
+def _col(values, name="y", role=TargetRole, backend=None, session=None):
+    kwargs = {} if backend is None else {"backend": backend, "session": session}
+    return build_dataset(pd.DataFrame({name: values}), {name: role()}, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -68,15 +69,27 @@ def test_mde_defaults_stored() -> None:
 # ---------------------------------------------------------------------------
 # PSI
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: PSI._inner_function calls Dataset.cut which does not exist",
-)
-def test_psi_identical_samples_is_zero() -> None:
+def test_psi_identical_samples_is_zero(backend, spark_session) -> None:
     x = np.linspace(0, 10, 200)
-    res = PSI._inner_function(_col(x), _col(x.copy()))
+    res = PSI._inner_function(
+        _col(x, backend=backend, session=spark_session),
+        _col(x.copy(), backend=backend, session=spark_session),
+    )
     assert res["PSI"] == pytest.approx(0.0, abs=TOL)
+
+
+def test_psi_uses_common_bins_and_handles_empty_bins() -> None:
+    data = np.array([0.0, 1.0, 2.0, 3.0])
+    test = np.array([1.0, 2.0, 3.0, 4.0])
+    edges = np.linspace(0.0, 4.0, 11)
+    data_ratio = np.histogram(data, bins=edges)[0] / len(data)
+    test_ratio = np.histogram(test, bins=edges)[0] / len(test)
+    epsilon = np.finfo(float).eps
+    data_ratio = np.clip(data_ratio, epsilon, None)
+    test_ratio = np.clip(test_ratio, epsilon, None)
+    expected = np.sum((test_ratio - data_ratio) * np.log(test_ratio / data_ratio))
+    res = PSI._inner_function(_col(data), _col(test))
+    assert res["PSI"] == pytest.approx(expected, abs=TOL)
 
 
 def test_psi_requires_test_data() -> None:

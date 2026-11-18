@@ -242,31 +242,40 @@ class PSI(Comparator):
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> dict[str, float]:
         test_data = cls._check_test_data(test_data=test_data)
-        data.sort(ascending=False)
-        test_data.sort(ascending=False)
+        if len(data) == 0 or len(test_data) == 0:
+            raise ValueError("PSI requires non-empty data and test_data")
         data_column = data.iloc[:, 0]
         test_data_column = test_data.iloc[:, 0]
-        data_bins = np.arange(
-            data_column.min(),
-            data_column.max(),
-            (data_column.max() - data_column.min()) / NUM_OF_BUCKETS,
-        )
-        test_data_bins = np.arange(
-            test_data_column.min(),
-            test_data_column.max(),
-            (test_data_column.max() - test_data_column.min()) / NUM_OF_BUCKETS,
-        )
-        data_groups = data_column.groupby(
-            data_column.cut(data_bins).get_values(column=data.columns[0])
-        )
-        test_data_groups = test_data_column.groupby(
-            test_data_column.cut(test_data_bins).get_values(column=test_data.columns[0])
-        )
+        lower = min(float(data_column.min()), float(test_data_column.min()))
+        upper = max(float(data_column.max()), float(test_data_column.max()))
+        if lower == upper:
+            return {
+                "PSI": 0.0
+                if float(data_column.min()) == float(test_data_column.min())
+                else float("inf")
+            }
 
-        data_psi = [x[1].count() / len(data) for x in data_groups]
-        test_data_psi = [x[1].count() / len(test_data) for x in test_data_groups]
-        psi = [(y - x) * np.log(y / x) for x, y in zip(data_psi, test_data_psi)]
-        return {"PSI": sum(psi)}
+        edges = np.linspace(lower, upper, NUM_OF_BUCKETS + 1)
+        epsilon = np.finfo(float).eps
+        psi = 0.0
+        for i, (left, right) in enumerate(zip(edges[:-1], edges[1:])):
+            data_bin = data_column >= left
+            test_bin = test_data_column >= left
+            if i > 0:
+                data_bin = data_column > left
+                test_bin = test_data_column > left
+            if i == NUM_OF_BUCKETS - 1:
+                data_bin = data_bin & (data_column <= right)
+                test_bin = test_bin & (test_data_column <= right)
+            else:
+                data_bin = data_bin & (data_column < right)
+                test_bin = test_bin & (test_data_column < right)
+            data_count = data_bin.astype({data_bin.columns[0]: int}).sum()
+            test_count = test_bin.astype({test_bin.columns[0]: int}).sum()
+            data_ratio = max(float(data_count) / len(data), epsilon)
+            test_ratio = max(float(test_count) / len(test_data), epsilon)
+            psi += (test_ratio - data_ratio) * np.log(test_ratio / data_ratio)
+        return {"PSI": psi}
 
 
 class StatTestMasterAbstract(BaseComparator):
