@@ -1699,7 +1699,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         buckets to labels via the ``edges`` thresholds.
 
         Note:
-            The hash function differs from the Spark backend (MD5 vs
+            The hash function differs from the Spark backend (SipHash vs
             Murmur3), so the exact split assignment may differ across
             backends for the same seed. Determinism is guaranteed
             within each backend.

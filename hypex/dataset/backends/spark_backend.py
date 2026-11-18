@@ -1680,7 +1680,10 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         return self._wrap_result(result)
 
     def quantile(self, q: float = 0.5) -> Self | float:
-        """Compute quantile(s) for numeric columns.
+        """Compute approximate quantile(s) for numeric columns.
+
+        Spark's distributed quantile calculation may differ from the exact
+        pandas result.
 
         Args:
             q (float): Quantile value(s) to compute (0 <= q <= 1).
@@ -2082,7 +2085,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
 
         Note:
         The hash function differs from the Pandas backend (Murmur3 vs
-        MD5), so the exact split assignment may differ across
+        SipHash), so the exact split assignment may differ across
         backends for the same seed. Determinism is guaranteed
         within each backend.
         """

@@ -336,14 +336,9 @@ def test_aa_output_reproducible_with_fixed_states() -> None:
     pd.testing.assert_frame_equal(_frame(first.experiments), _frame(second.experiments))
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="Issue: Matching().execute runs on Spark, but output.indexes is empty (0 rows, expected 300) with default and with compute_indexes=True",
-)
 @pytest.mark.spark
 def test_matching_output_structure_on_spark(spark_session) -> None:
-    output = Matching().execute(
+    output = Matching(compute_indexes=True).execute(
         _dataset(backend=BackendsEnum.spark, session=spark_session)
     )
     assert isinstance(output, MatchingOutput)
