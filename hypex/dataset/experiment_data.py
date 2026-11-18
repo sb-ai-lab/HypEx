@@ -7,14 +7,15 @@ precomputed analysis tables. Supports role-based column search and ID mapping.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Iterable
 from copy import deepcopy
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
-try:
-    from typing import Self  # Python >= 3.11
-except ImportError:
-    from typing_extensions import Self  # Python < 3.11
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 from ..utils import (
     ID_SPLIT_SYMBOL,
@@ -114,7 +115,7 @@ class ExperimentData:
         roles: dict[str, ABCRole] | None = None,
         backend: BackendsEnum = BackendsEnum.pandas,
         index: Any | None = None,
-    ) -> Self:
+    ) -> ExperimentData:
         """Create an empty ExperimentData instance.
 
         Args:
@@ -342,11 +343,14 @@ class ExperimentData:
             self._data = self._data.drop(columns=cols_to_drop)
 
         if cols_to_enable:
-            self._data = self._data.replace_roles(
-                new_roles_map={
-                    col: self._data.roles[col].initial_role for col in cols_to_enable
-                }
+            restored_roles = cast(
+                "dict[str, ABCRole]",
+                {
+                    col: cast(DisabledRole, self._data.roles[col]).initial_role
+                    for col in cols_to_enable
+                },
             )
+            self._data = self._data.replace_roles(new_roles_map=restored_roles)
         return self
 
     def _clean_ds_for_iteration(self) -> Dataset | SmallDataset:
@@ -486,9 +490,9 @@ class ExperimentData:
             ExperimentDataEnum.variables: self.variables.keys(),
         }
 
-        result = {}
+        result: dict[str, dict[str, list[str]]] = {}
         for cls_name in target_classes:
-            cls_matches = {}
+            cls_matches: dict[str, list[str]] = {}
             for space in spaces_to_search:
                 # Skip unsupported enum members gracefully
                 if space not in spaces_map:
@@ -572,7 +576,7 @@ class ExperimentData:
         tmp_role: bool = False,
         search_types: list[type] | None = None,
         space: Literal["all", "ds", "additional_fields"] = "all",
-    ) -> Dataset:
+    ) -> Dataset | SmallDataset:
         """Build a new dataset containing only columns that match the specified roles.
 
         Instead of creating an empty dataset with the full 60M-row index
@@ -590,8 +594,8 @@ class ExperimentData:
                 filter columns by.
 
         Returns:
-            A new ``Dataset`` containing only the matched columns with
-            the requested roles applied. Returns an empty dataset (without
+            A new ``Dataset`` or ``SmallDataset`` containing only the matched
+            columns with the requested roles applied. Returns an empty dataset (without
             materialized index) if no columns match.
         """
         roles_list = Adapter.to_list(roles)

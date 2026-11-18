@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Callable, ClassVar, Literal
+from typing import Any, Callable, ClassVar, Literal, cast
 
 import numpy as np
 
@@ -65,18 +65,25 @@ class BaseComparator(Calculator):
         tmp_role = (
             True if data.ds.tmp_roles or data.additional_fields.tmp_roles else False
         )
-        group_field_data = data.field_data_search(roles=self.grouping_role)
-
-        target_fields_data = data.field_data_search(
-            roles=(
-                (TempTargetRole() if data.ds.tmp_roles else AdditionalTargetRole())
-                if tmp_role
-                else self.target_roles
-            ),
-            tmp_role=tmp_role,
-            search_types=self.search_types,
+        group_field_data = cast(
+            Dataset, data.field_data_search(roles=self.grouping_role)
         )
-        baseline_field_data = data.field_data_search(roles=self.baseline_role)
+
+        target_fields_data = cast(
+            Dataset,
+            data.field_data_search(
+                roles=(
+                    (TempTargetRole() if data.ds.tmp_roles else AdditionalTargetRole())
+                    if tmp_role
+                    else self.target_roles
+                ),
+                tmp_role=tmp_role,
+                search_types=self.search_types,
+            ),
+        )
+        baseline_field_data = cast(
+            Dataset, data.field_data_search(roles=self.baseline_role)
+        )
         return {
             "group_field": group_field_data,
             "target_fields": target_fields_data,
@@ -84,7 +91,10 @@ class BaseComparator(Calculator):
         }
 
     def _set_value(
-        self, data: ExperimentData, value: Dataset | None = None, key: Any = None
+        self,
+        data: ExperimentData,
+        value: Dataset | SmallDataset | None = None,
+        key: Any = None,
     ) -> ExperimentData:
         data.set_value(
             ExperimentDataEnum.analysis_tables,
@@ -319,9 +329,15 @@ class GroupsComparator(BaseComparator, ABC):
                 group_field_data, left_index=True, right_index=True, how="left"
             )
 
-        baseline_data = baseline_field_data.groupby(by=group_field_data.columns)
+        baseline_data = cast(
+            "list[tuple[str, Dataset]]",
+            baseline_field_data.groupby(by=group_field_data.columns),
+        )
         compared_data = cls._split_ds_into_columns(
-            target_fields_data.groupby(by=group_field_data.columns)
+            cast(
+                "list[tuple[str, Dataset]]",
+                target_fields_data.groupby(by=group_field_data.columns),
+            )
         )
         return baseline_data, compared_data
 

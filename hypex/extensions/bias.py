@@ -81,7 +81,7 @@ class BiasExtension(Extension):
         self.group_field = data.search_columns(self.grouping_role)[0]
 
     @staticmethod
-    def prepare_data(data: ExperimentData) -> Dataset:
+    def prepare_data(data: ExperimentData) -> tuple[Dataset, Dataset]:
         """Prepare matched data from experiment data (backend-specific)."""
         raise NotImplementedError
 
@@ -485,7 +485,7 @@ class SparkBisaExtesion(BiasExtension):
         return matched_data
 
     @classmethod
-    def prepare_data(cls, data: Dataset) -> tuple[Dataset]:
+    def prepare_data(cls, data: Dataset) -> tuple[Dataset, Dataset]:
         """Public wrapper for data preparation, returning Dataset objects.
 
         Args:

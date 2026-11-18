@@ -45,7 +45,7 @@ class ExperimentWithReporter(Experiment):
         if not isinstance(results, list):
             results = [results]
 
-        datasets: list[Dataset] = []
+        datasets: list[Any] = []
 
         for res in results:
             if isinstance(res, dict):

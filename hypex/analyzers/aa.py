@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -57,7 +57,7 @@ def _is_passed(value: Any) -> bool:
 def _collect_tables(
     data: ExperimentData,
     analysis_ids: list[str],
-) -> Dataset:
+) -> SmallDataset:
     """Merge multiple analysis tables into one."""
     tables = [data.analysis_tables[aid] for aid in analysis_ids]
     if len(tables) == 1:
@@ -164,7 +164,7 @@ class OneAAStatAnalyzer(Executor):
             for field in ("p-value", "pass"):
                 key = _mean_key(class_name, field)
                 if field in table.columns:
-                    result[key] = table[field].mean()
+                    result[key] = cast(float, table[field].mean())
                 else:
                     result[key] = 0.0
 

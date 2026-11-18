@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any
+from typing import Any, cast
 
 from ..dataset.dataset import Dataset, SmallDataset
 from ..dataset.experiment_data import ExperimentData
@@ -106,8 +106,8 @@ class CUPEDTransformer(Transformer):
         # ── Compute variance reductions ──────────────────────────────
         report_rows: list[dict[str, Any]] = []
         for target_feature in self.cuped_features:
-            original_var = data.ds[target_feature].var()
-            adjusted_var = new_ds[f"{target_feature}_cuped"].var()
+            original_var = cast(float, data.ds[target_feature].var())
+            adjusted_var = cast(float, new_ds[f"{target_feature}_cuped"].var())
             variance_reduction = (
                 (1 - adjusted_var / original_var) * 100 if original_var > 0 else 0.0
             )

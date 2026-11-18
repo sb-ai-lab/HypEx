@@ -4,7 +4,7 @@ import warnings
 from copy import deepcopy
 from typing import Any
 
-from ..dataset import Dataset, ExperimentData
+from ..dataset import Dataset, ExperimentData, SmallDataset
 from ..experiments.base import Experiment
 from ..reporters import Reporter
 from ..utils import ID_SPLIT_SYMBOL
@@ -111,7 +111,7 @@ class Output:
         print(output.plots)  # Access additional report
     """
 
-    summary: Dataset
+    summary: Dataset | SmallDataset
     _experiment_data: ExperimentData
 
     def __init__(
@@ -137,13 +137,13 @@ class Output:
         return self.summary_reporter
 
     @property
-    def resume(self) -> Dataset:
+    def resume(self) -> Dataset | SmallDataset:
         """Deprecated alias of ``summary``."""
         _warn_resume_deprecated("resume", "summary")
         return self.summary
 
     @resume.setter
-    def resume(self, value: Dataset) -> None:
+    def resume(self, value: Dataset | SmallDataset) -> None:
         _warn_resume_deprecated("resume", "summary")
         self.summary = value
 
@@ -191,8 +191,8 @@ class Output:
 
     @staticmethod
     def _replace_splitters(
-        data: Dataset, mode: RenameEnum = RenameEnum.columns
-    ) -> Dataset:
+        data: Dataset | SmallDataset, mode: RenameEnum = RenameEnum.columns
+    ) -> Dataset | SmallDataset:
         if data.is_empty() or len(data.columns) == 0:
             return data
 

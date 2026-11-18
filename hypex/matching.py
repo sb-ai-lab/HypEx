@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, cast
 
 from .analyzers.matching import MatchingAnalyzer
 from .comparators import Chi2Test, KSTest, TTest
@@ -270,7 +270,7 @@ class Matching(ExperimentShell):
         prepared_ds = ds.reset_index(drop=True)
         if isinstance(data, ExperimentData):
             return data.copy(data=prepared_ds)
-        return prepared_ds
+        return cast(Dataset, prepared_ds)
 
     def execute(self, data: Dataset | ExperimentData):
         try:

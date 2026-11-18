@@ -4,7 +4,7 @@ import threading
 import time
 import uuid
 import warnings
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 if TYPE_CHECKING:
     from .abstract import DatasetBase
@@ -95,7 +95,7 @@ class StorageManager:
             cached = data._acquire_cache(storage_level)
             if cached is None:
                 return
-            key = cached.persist_key
+            key = cast(str, cached.persist_key)
             self.register(key, cached, storage_level=storage_level)
         cached.materialize(action)
         if action == "count":

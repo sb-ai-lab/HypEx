@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 from scipy.stats import norm  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
@@ -172,8 +174,8 @@ class MultitestQuantile(Extension):
         )
 
     def _calc_pandas(self, data: Dataset, **kwargs):
-        group_field = kwargs.get("group_field")
-        target_field = kwargs.get("target_field")
+        group_field = cast(str, kwargs.get("group_field"))
+        target_field = cast(str, kwargs.get("target_field"))
         quantiles = kwargs.get("quantiles")
         num_samples = len(data.unique()[group_field])
         grouped_data = list(data[[group_field, target_field]].groupby(group_field))
