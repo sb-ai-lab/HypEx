@@ -15,7 +15,7 @@ from ..dataset import Dataset, ExperimentData, SmallDataset
 from ..dataset.roles import InfoRole, StatisticRole, TreatmentRole
 from ..utils import ID_SPLIT_SYMBOL, Adapter, ExperimentDataEnum
 from ..utils.constants import NAME_BORDER_SYMBOL, TEST_NAME_NORMALIZATION
-from ..utils.errors import AbstractMethodError
+from ..utils.errors import AbstractMethodError, NotFoundInExperimentDataError
 
 REPORTABLE_METRICS = frozenset(
     {
@@ -77,6 +77,9 @@ def _normalize_value(val: Any) -> Any:
     """
     if val is None:
         return None
+
+    if isinstance(val, np.generic):
+        val = val.item()
 
     if isinstance(val, (int, float, str, bool)):
         if isinstance(val, float) and np.isnan(val):
@@ -215,6 +218,7 @@ def extract_group_difference(data: ExperimentData, front: bool) -> dict[str, Any
     ids = data.get_ids(GroupDifference)[GroupDifference.__name__][
         ExperimentDataEnum.analysis_tables.value
     ]
+    ids = [cid for cid in ids if not cid.endswith(f"{NAME_BORDER_SYMBOL}stats")]
     out = {}
     for cid in ids:
         out.update(_extract_from_comparator(data, cid, front))
@@ -231,8 +235,13 @@ def extract_group_sizes(data: ExperimentData, front: bool) -> dict[str, Any]:
     Returns:
         A dictionary containing group sizes and their percentages.
     """
-    cid = data.get_one_id(GroupSizes, ExperimentDataEnum.analysis_tables)
-    return _extract_from_comparator(data, cid, front)
+    ids = data.get_ids(GroupSizes)[GroupSizes.__name__][
+        ExperimentDataEnum.analysis_tables.value
+    ]
+    ids = [cid for cid in ids if not cid.endswith(f"{NAME_BORDER_SYMBOL}stats")]
+    if not ids:
+        raise NotFoundInExperimentDataError(GroupSizes.__name__)
+    return _extract_from_comparator(data, ids[0], front)
 
 
 def extract_analyzer_data(

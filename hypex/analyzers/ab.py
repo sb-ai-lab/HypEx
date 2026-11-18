@@ -24,7 +24,13 @@ from ..dataset import (
 from ..dataset.dataset import SmallDataset
 from ..experiments.base import Executor
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
-from ..utils import ABNTestMethodsEnum, Adapter, ExperimentDataEnum, timeit
+from ..utils import (
+    ABNTestMethodsEnum,
+    Adapter,
+    ExperimentDataEnum,
+    NoColumnsError,
+    timeit,
+)
 from ..utils.constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
 
 
@@ -305,8 +311,11 @@ class ABAnalyzer(Executor):
             under the analyzer's executor ID.
 
         Raises:
+            NoColumnsError: If no target column is present in the dataset.
             KeyError: If the treatment column cannot be found in the dataset.
         """
+        if not data.ds.search_columns(TargetRole()):
+            raise NoColumnsError(TargetRole().role_name)
         executor_ids = data.get_ids(
             [
                 GroupTTest,
