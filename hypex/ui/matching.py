@@ -34,7 +34,7 @@ from .base import Output
 class MatchingOutput(Output):
     """Output handler for matching experiment results."""
 
-    summary: Dataset | SmallDataset
+    summary: Dataset | SmallDataset | dict[str, Any]
     full_data: Dataset | SmallDataset
     quality_results: Dataset | SmallDataset
     indexes: Dataset | SmallDataset
@@ -191,7 +191,7 @@ class MatchingOutput(Output):
     def _match_spark(
         self,
         experiment_data: ExperimentData,
-        t_indexes: Dataset,
+        t_indexes: Dataset | SmallDataset,
         col_name: str,
         ds_reset: Dataset | SmallDataset | None = None,
         idx_col: str | None = None,
@@ -251,7 +251,7 @@ class MatchingOutput(Output):
     def _match_pandas(
         self,
         experiment_data: ExperimentData,
-        t_indexes: Dataset,
+        t_indexes: Dataset | SmallDataset,
         col_name: str,
     ) -> Dataset | SmallDataset:
         """Build matched data via pandas label-based lookup.
@@ -296,7 +296,9 @@ class MatchingOutput(Output):
             )
 
         # Look up matched rows from the original dataset by label.
-        matched_data: Dataset = experiment_data.ds.loc[valid_lookups]
+        matched_data = cast(
+            "Dataset | SmallDataset", experiment_data.ds.loc[valid_lookups]
+        )
 
         # Set index to positional indices so the subsequent
         # merge(left_index=True, right_index=True) aligns correctly.
@@ -530,7 +532,10 @@ class MatchingOutput(Output):
                 session=experiment_data.ds.session,
             )
         if not self.full_data.is_empty():
-            self.full_data = self.full_data.set_index(index_field, drop=False)
+            self.full_data = cast(
+                "Dataset | SmallDataset",
+                self.full_data.set_index(index_field, drop=False),
+            )
 
     def extract(self, experiment_data: ExperimentData) -> None:
         """Extract and format all matching results from experiment data.
@@ -603,7 +608,8 @@ class MatchingOutput(Output):
             )
             logger.debug("Skipping full_data extraction (extract_full_data=False).")
         self._restore_index_role(experiment_data)
-        self.summary.raw_data = self.summary.raw_data.round(4)
+        summary = cast("Dataset | SmallDataset", self.summary)
+        summary.raw_data = summary.raw_data.round(4)
 
     def _effect_rows(self) -> list[dict[str, Any]]:
         """Extract ATT/ATC/ATE rows from summary."""
@@ -611,8 +617,9 @@ class MatchingOutput(Output):
         if not hasattr(self, "summary") or self.summary is None:
             return rows
         try:
-            recs = self.summary.to_records()
-            for idx, r in zip(self.summary.index, recs):
+            summary = cast("Dataset | SmallDataset", self.summary)
+            recs = summary.to_records()
+            for idx, r in zip(summary.index, recs):
                 estimate = r.get("Effect Size")
                 se = r.get("Standard Error")
                 pval = r.get("P-value")

@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, cast
 
 import numpy as np
 
@@ -303,7 +303,7 @@ class Reporter(ABC):
             named ``__init__`` argument.  ``*args`` / ``**kwargs``
             are skipped.
         """
-        init_params = inspect.signature(self.__init__).parameters
+        init_params = inspect.signature(type(self).__init__).parameters
         out: dict[str, Any] = {}
         for name, param in init_params.items():
             if name == "self":
@@ -515,7 +515,9 @@ class TestDictReporter(DictReporter, ABC):
             A nested dictionary structured as
             ``{field: {index: {executor: {metric: value}}}}``.
         """
-        tree = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
+        tree: dict[str, Any] = defaultdict(
+            lambda: defaultdict(lambda: defaultdict(dict))
+        )
         for key, value in data.items():
             if ID_SPLIT_SYMBOL not in key:
                 continue
@@ -622,7 +624,7 @@ class DatasetReporter(Reporter):
 
     def __init__(
         self,
-        dict_reporter: DictReporter | None = None,
+        dict_reporter: DictReporter | DatasetReporter | None = None,
         output_format: Literal["dict", "dataset"] = "dataset",
         single_row: bool = False,
         invert_pass: bool = False,
@@ -649,7 +651,7 @@ class DatasetReporter(Reporter):
             self.dict_reporter.front = old_front
 
     def _report(self, data: ExperimentData) -> dict[str, Any]:
-        return self.dict_reporter.report(data)
+        return cast("dict[str, Any]", self.dict_reporter.report(data))
 
     def report(self, data: ExperimentData) -> dict | Dataset | SmallDataset:
         old_front = self.dict_reporter.front

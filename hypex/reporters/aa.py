@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from ..comparators import (
     BaseComparator,
@@ -46,7 +46,9 @@ class AATestReporter(DatasetReporter):
     ]
 
     def __init__(
-        self, dict_reporter: DictReporter | None = None, output_format: str = "dataset"
+        self,
+        dict_reporter: DictReporter | None = None,
+        output_format: Literal["dict", "dataset"] = "dataset",
     ):
         """Initialize the A/A test reporter.
 

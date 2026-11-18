@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import html
-from typing import Any
+from typing import Any, cast
 
 from ..analyzers.ab import ABAnalyzer
 from ..comparators import GroupDifference, GroupSizes
@@ -40,7 +40,7 @@ class CupedOutput:
         Args:
             experiment_data: The experiment data container.
         """
-        report = CupedReporter().report(experiment_data)
+        report = cast(SmallDataset, CupedReporter().report(experiment_data))
         if report.is_empty():
             self.variance_reductions = None
         else:
@@ -149,8 +149,8 @@ class CupacOutput:
     """
 
     def __init__(self) -> None:
-        self.variance_reductions: Dataset | None = None
-        self.feature_importances: Dataset | None = None
+        self.variance_reductions: SmallDataset | None = None
+        self.feature_importances: SmallDataset | None = None
 
     @staticmethod
     def _vr_color(pct: float) -> str:
@@ -177,7 +177,7 @@ class CupacOutput:
 
         parts: list[str] = ["CupacOutput:"]
 
-        if has_vr:
+        if self.variance_reductions is not None:
             parts.append(
                 f"  variance_reductions ({len(self.variance_reductions)} target(s)):"
             )
@@ -192,7 +192,7 @@ class CupacOutput:
                     f"VR(cv)={vr_cv:>5.1f}%  VR(real)={vr_real:>5.1f}%"
                 )
 
-        if has_fi:
+        if self.feature_importances is not None:
             parts.append(
                 f"  feature_importances ({len(self.feature_importances)} rows):"
             )
@@ -225,7 +225,7 @@ class CupacOutput:
 
         sections: list[str] = []
 
-        if has_vr:
+        if self.variance_reductions is not None:
             records = self.variance_reductions.to_records()
             rows = ""
             for rec in records:
@@ -256,7 +256,7 @@ class CupacOutput:
                 f"{rows}</table>"
             )
 
-        if has_fi:
+        if self.feature_importances is not None:
             records = self.feature_importances.to_records()
             sorted_recs = sorted(
                 records, key=lambda r: r.get("importance", 0), reverse=True
@@ -316,8 +316,8 @@ class ABOutput(Output):
         cupac: CUPAC variance-reduction outputs (when enabled).
     """
 
-    multitest: Dataset | str
-    sizes: Dataset
+    multitest: Dataset | SmallDataset | str
+    sizes: Dataset | SmallDataset
     cuped: CupedOutput | None
     cupac: CupacOutput
 
@@ -367,7 +367,9 @@ class ABOutput(Output):
 
     # ── Differences ──────────────────────────────────────────────────
 
-    def _extract_differences(self, experiment_data: ExperimentData) -> Dataset | None:
+    def _extract_differences(
+        self, experiment_data: ExperimentData
+    ) -> Dataset | SmallDataset | None:
         targets: list[str] = []
         groups: list[str] = []
         ids = experiment_data.get_ids(
@@ -383,8 +385,8 @@ class ABOutput(Output):
                 ].keys()
             )[1:]
         ]
-        for i in self._groups:
-            groups += [i] * len(ids)
+        for group in self._groups:
+            groups += [group] * len(ids)
 
         if not ids:
             return None
@@ -433,7 +435,7 @@ class ABOutput(Output):
     # ── Variance reduction report property ───────────────────────────
 
     @property
-    def variance_reduction_report(self) -> Dataset | str:
+    def variance_reduction_report(self) -> Dataset | SmallDataset | str:
         """Get variance reduction report for CUPED/CUPAC transformations.
 
         CUPED results are returned when CUPED was applied, otherwise CUPAC
@@ -484,7 +486,8 @@ class ABOutput(Output):
         # Feature / group counts from summary
         if hasattr(self, "summary") and self.summary is not None:
             try:
-                recs = self.summary.to_records()
+                summary = cast("Dataset | SmallDataset", self.summary)
+                recs = summary.to_records()
                 features = set()
                 groups = set()
                 for r in recs:
@@ -545,7 +548,8 @@ class ABOutput(Output):
         if not hasattr(self, "summary") or self.summary is None:
             return rows
         try:
-            recs = self.summary.to_records()
+            summary = cast("Dataset | SmallDataset", self.summary)
+            recs = summary.to_records()
             for r in recs:
                 for column, pval in r.items():
                     if not column.endswith(" p-value"):
