@@ -243,6 +243,8 @@ class DatasetBase:
         new_types = {}
         for column, role in roles.items():
             if role.data_type is None:
+                role = deepcopy(role)
+                roles[column] = role
                 role.data_type = columns_dtypes[column]
             elif role.data_type != columns_dtypes[column]:
                 new_types[column] = role.data_type

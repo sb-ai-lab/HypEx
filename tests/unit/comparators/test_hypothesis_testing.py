@@ -190,11 +190,6 @@ def test_execute_uses_natural_order_for_numeric_group_keys() -> None:
     assert table.loc[10, "statistic"] == pytest.approx(reference.statistic, abs=TOL)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: GroupHypothesisTesting.reliability is stored but never forwarded "
-    "to _inner_function (calc_kwargs stays empty), so 0.05 is always used",
-)
 def test_execute_reliability_is_configurable() -> None:
     df = three_groups_df()
     ds = build_dataset(df, {"g": TreatmentRole(), "y": TargetRole()})

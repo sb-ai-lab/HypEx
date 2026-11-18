@@ -136,9 +136,9 @@ def test_ztest_symmetric_proportions_have_zero_statistic() -> None:
     res = StatsZTest._inner_function(
         {"count": 100, "sum": 30}, {"count": 100, "sum": 30}
     )
-    assert res["statistic"][0] == pytest.approx(0.0)
-    assert res["p-value"][0] == pytest.approx(1.0)
-    assert res["pass"][0] is np.False_ or res["pass"][0] is False
+    assert res["statistic"] == pytest.approx(0.0)
+    assert res["p-value"] == pytest.approx(1.0)
+    assert res["pass"] is np.False_ or res["pass"] is False
 
 
 def test_chi2_drops_all_zero_columns() -> None:

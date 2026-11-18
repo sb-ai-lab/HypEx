@@ -620,13 +620,14 @@ class GroupHypothesisTesting(GroupsComparator, ABC):
         key: Any = "",
         calc_kwargs: dict[str, Any] = {},
     ):
+        merged_kwargs = {"reliability": reliability, **calc_kwargs}
         super().__init__(
             compare_by=compare_by,
             grouping_role=grouping_role,
             target_roles=target_role,
             baseline_role=baseline_role,
             key=key,
-            calc_kwargs=calc_kwargs,
+            calc_kwargs=merged_kwargs,
         )
         self.reliability = reliability
 

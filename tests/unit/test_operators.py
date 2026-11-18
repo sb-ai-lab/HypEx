@@ -29,11 +29,6 @@ def _ds(df: pd.DataFrame, **roles) -> Dataset:
 # ---------------------------------------------------------------------------
 # SMD
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: SMD._inner_function computes (mean1 + mean2) / std instead of the "
-    "standardized difference (mean_t - mean_c) / pooled std",
-)
 def test_smd_is_standardized_mean_difference() -> None:
     rng = np.random.RandomState(0)
     a, b = rng.normal(0, 1, 200), rng.normal(0.5, 1, 200)

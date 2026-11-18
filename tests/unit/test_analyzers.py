@@ -203,11 +203,6 @@ def test_aa_score_init_threshold() -> None:
     assert analyzer.threshold == pytest.approx(1 - 0.05 * 1.2)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: pass rate is computed by iterating a Dataset (yields column names), "
-    "so every feature gets pass_rate 0 and weight 1 - alpha",
-)
 def test_aa_score_weights_follow_pass_rate() -> None:
     analyzer = AAScoreAnalyzer(alpha=0.1)
     table = _score_table([[0, 0, 0, 0, 0, 0, 0, 0, 0, 1], [1] * 10])

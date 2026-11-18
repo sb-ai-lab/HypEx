@@ -25,7 +25,8 @@ class SMD(GroupOperator):
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Any:
         test_data = cls._check_test_data(test_data=test_data)
-        return (data.mean() + test_data.mean()) / data.std()
+        pooled_std = ((data.var() + test_data.var()) / 2) ** 0.5
+        return (data.mean() - test_data.mean()) / pooled_std
 
 
 class MatchingMetrics(GroupOperator):
