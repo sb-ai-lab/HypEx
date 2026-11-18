@@ -217,7 +217,7 @@ class ExperimentData:
         executor_id: str | dict[str, str],
         value: Any,
         key: str | None = None,
-        role: ABCRole | None = None,
+        role: ABCRole | dict[str, ABCRole] | None = None,
     ) -> Self:
         """Store a value in the specified experiment data space.
 

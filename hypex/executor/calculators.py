@@ -131,8 +131,9 @@ class MinSampleSize(Calculator):
             vars_.append(float(cast(float, ds[target_field].var())))
         return vars_
 
+    # This stateless algorithm does not require the calculator's dataset argument.
     @classmethod
-    def _inner_function(
+    def _inner_function(  # type: ignore[override]
         cls,
         *,
         num_samples: int,
@@ -172,10 +173,17 @@ class MinSampleSize(Calculator):
             num_samples=num_samples,
             quantile_level=power,
         )
+        quantile_1_values = cast("list[float]", quantile_1)
+        quantile_2_values = cast("list[float]", quantile_2)
 
         if multitest.equal_variance:
             var = variances[0] if isinstance(variances, list) else variances
-            return int(2 * var * ((quantile_1[0] - quantile_2[0]) / mde) ** 2) + 1
+            return (
+                int(
+                    2 * var * ((quantile_1_values[0] - quantile_2_values[0]) / mde) ** 2
+                )
+                + 1
+            )
 
         sizes: list[int] = []
         assert isinstance(variances, list)
@@ -207,7 +215,7 @@ class MinSampleSize(Calculator):
                             )
                             min_t_value = min(min_t_value, t_value)
 
-                    if min_t_value > quantile_1[index]:
+                    if min_t_value > quantile_1_values[index]:
                         current_power += 1.0
 
                 current_power /= float(power_iteration_size)
@@ -216,7 +224,8 @@ class MinSampleSize(Calculator):
 
         return int(np.max(sizes))
 
-    def calc(self, data: Dataset) -> dict:
+    # Unlike stateless calculators, this result depends on instance configuration.
+    def calc(self, data: Dataset, **kwargs) -> dict:  # type: ignore[override]
         group_field, target_fields = self._get_fields(data=data)
 
         self.key = str(
@@ -268,5 +277,6 @@ class MinSampleSize(Calculator):
 
         return result
 
-    def execute(self, data: ExperimentData) -> dict:
-        return self.calc(data.ds)
+    # This calculator intentionally returns a plain result mapping.
+    def execute(self, data: ExperimentData) -> dict:  # type: ignore[override]
+        return self.calc(cast(Dataset, data.ds))

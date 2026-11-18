@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from typing import cast
 
 from ..dataset import Dataset, ExperimentData
 from ..executor import Calculator
@@ -20,5 +21,5 @@ class Transformer(Calculator):
         return cls._inner_function(data, **kwargs)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        data = data.copy(data=self.calc(data=data.ds))
+        data = data.copy(data=self.calc(data=cast(Dataset, data.ds)))
         return data

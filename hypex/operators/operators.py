@@ -96,7 +96,7 @@ class MatchingMetrics(GroupOperator):
 
     @classmethod
     def _execute_inner_function(
-        cls, grouping_data, target_fields: list[str] | None = None, **kwargs
+        cls, grouping_data, target_fields: str | list[str] | None = None, **kwargs
     ) -> dict:
         pass
 
@@ -264,7 +264,7 @@ class Bias(GroupOperator):
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_fields: list[str] | None = None,
+        target_fields: str | list[str] | None = None,
         features_fields: list[str] | None = None,
         **kwargs,
     ) -> dict:

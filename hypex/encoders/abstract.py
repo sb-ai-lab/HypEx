@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
-from ..dataset import Dataset, DisabledRole, ExperimentData, FeatureRole
+from ..dataset import ABCRole, Dataset, DisabledRole, ExperimentData, FeatureRole
 from ..executor import Calculator
 from ..utils import (
     NAME_BORDER_SYMBOL,
@@ -62,7 +62,7 @@ class Encoder(Calculator):
 
     def __init__(
         self,
-        target_roles: str | Sequence[str] | None = None,
+        target_roles: ABCRole | Sequence[ABCRole] | None = None,
         key: Any = "",
     ):
         """Initialize the encoder.
@@ -183,7 +183,7 @@ class Encoder(Calculator):
         Returns:
             ExperimentData: The experiment data with updated roles.
         """
-        disable_roles = {
+        disable_roles: dict[str, ABCRole] = {
             col: DisabledRole(initial_role=data.ds.roles[col]) for col in target_cols
         }
         data.ds.replace_roles(new_roles_map=disable_roles)
@@ -213,7 +213,7 @@ class Encoder(Calculator):
         )
         if not target_cols:
             return data
-        result = self.calc(data=data.ds, target_cols=target_cols)
+        result = self.calc(data=cast(Dataset, data.ds), target_cols=target_cols)
         return self._set_value(
             data=data,
             value=result,
