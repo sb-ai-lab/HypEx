@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from itertools import product
-from typing import Any
+from typing import Any, cast
 
 from tqdm import tqdm
 
@@ -39,13 +39,13 @@ class ExperimentWithReporter(Experiment):
     def _set_result(
         self,
         data: ExperimentData,
-        results: list[Dataset | dict],
+        results: list[Dataset | SmallDataset | dict],
         reset_index: bool = True,
     ):
         if not isinstance(results, list):
             results = [results]
 
-        datasets: list[Dataset] = []
+        datasets: list[Any] = []
 
         for res in results:
             if isinstance(res, dict):
@@ -59,7 +59,7 @@ class ExperimentWithReporter(Experiment):
             else datasets[0]
         )
 
-        data.analysis_tables[self.id] = combined
+        data.analysis_tables[self.id] = cast(SmallDataset, combined)
         return data
 
 
@@ -84,7 +84,7 @@ class CycledExperiment(ExperimentWithReporter):
         # redundant checkpoints and column drops per iteration.
         clean_ds = data._clean_ds_for_iteration()
 
-        result: list[Dataset] = []
+        result: list[Dataset | SmallDataset | dict] = []
         for i in tqdm(range(self.n_iterations)):
             self.key = str(i)
             t_data = ExperimentData(clean_ds)
@@ -126,11 +126,15 @@ class GroupExperiment(ExperimentWithReporter):
 
         return self._set_result(data, results)
 
-    def _set_result(
-        self, data: ExperimentData, results: list[tuple[str, Dataset | dict]]
+    # Grouped results carry an explicit key for each report.
+    def _set_result(  # type: ignore[override]
+        self,
+        data: ExperimentData,
+        results: list[tuple[str, Dataset | SmallDataset | dict]],
     ) -> ExperimentData:
-        datasets = []
+        datasets: list[Dataset | SmallDataset] = []
         for key, res in results:
+            ds: Dataset | SmallDataset
             if isinstance(res, dict):
                 ds = SmallDataset.from_dict(res, roles={})
             else:
@@ -148,7 +152,7 @@ class GroupExperiment(ExperimentWithReporter):
                 ds, left_index=True, right_index=True, how="outer"
             )
 
-        data.analysis_tables[self.id] = combined
+        data.analysis_tables[self.id] = cast(SmallDataset, combined)
         return data
 
 
@@ -268,12 +272,13 @@ class IfParamsExperiment(ParamsExperiment):
         for flat_param in tqdm(self._flat_params):
             t_data = ExperimentData(clean_ds)
             for executor in self.executors:
-                cur_executer = self._get_executor_backend(executor, t_data)
+                cur_executer = self._get_executor_backend(executor, cast(Any, t_data))
                 cur_executer.set_params(flat_param)
                 t_data = cur_executer.execute(t_data)
-            if_result = self.stopping_criterion.execute(t_data)
+            criterion = cast(IfExecutor, self.stopping_criterion)
+            if_result = criterion.execute(t_data)
             if_executor_id = if_result.get_one_id(
-                self.stopping_criterion.__class__, ExperimentDataEnum.variables
+                criterion.__class__, ExperimentDataEnum.variables
             )
             if if_result.variables[if_executor_id]["response"]:
                 return self._set_result(data, [self.reporter.report(t_data)])

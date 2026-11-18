@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Iterable, Sequence
 from copy import deepcopy
-from typing import Any
+from typing import Any, cast
 
 from ..comparators.abstract import StatsComparator, StatsHypothesisTesting
 from ..comparators.comparators import StatTestMasterAbstract
@@ -165,7 +165,7 @@ class Experiment(Executor):
         backend_cls = backend_factory.resolve_backend(executor_cls, ds)
         if backend_cls is None:
             return executor
-        sig = inspect.signature(backend_cls.__init__)
+        sig = inspect.signature(backend_cls)
         expected_params = {p.name for p in sig.parameters.values() if p.name != "self"}
         init_kwargs = {
             k: getattr(executor, k) for k in expected_params if hasattr(executor, k)
@@ -207,7 +207,9 @@ class Experiment(Executor):
                 backend=experiment_data.ds.backend_type.value,
                 log_spark=False,  # can be enabled for detailed logging of Spark processes
             ):
-                cur_executor = self._get_executor_backend(executor, experiment_data.ds)
+                cur_executor = self._get_executor_backend(
+                    executor, cast(Dataset, experiment_data.ds)
+                )
                 cur_executor.key = self.key
                 experiment_data = cur_executor.execute(experiment_data)
         return experiment_data
@@ -299,8 +301,8 @@ class OnRoleExperiment(Experiment):
         if not target_fields:
             return data
 
-        vector_executors = []
-        iterative_executors = []
+        vector_executors: list[Executor] = []
+        iterative_executors: list[Executor] = []
         _backend = data.ds.backend_type
 
         for ex in self.executors:
@@ -322,7 +324,7 @@ class OnRoleExperiment(Experiment):
         try:
             # Vector executors execution (only true StatsComparators)
             if vector_executors:
-                tmp_roles_dict = {}
+                tmp_roles_dict: dict[str, ABCRole] = {}
                 for field in target_fields:
                     if field in data.ds.columns:
                         tmp_roles_dict[field] = TempTargetRole()

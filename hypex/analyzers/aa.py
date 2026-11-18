@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd  # type: ignore
+import pandas as pd
 
 from ..comparators import (
     GroupChi2Test,
@@ -18,6 +18,7 @@ from ..comparators import (
     StatsZTest,
 )
 from ..dataset import (
+    ABCRole,
     Dataset,
     ExperimentData,
     InfoRole,
@@ -57,7 +58,7 @@ def _is_passed(value: Any) -> bool:
 def _collect_tables(
     data: ExperimentData,
     analysis_ids: list[str],
-) -> Dataset:
+) -> SmallDataset:
     """Merge multiple analysis tables into one."""
     tables = [data.analysis_tables[aid] for aid in analysis_ids]
     if len(tables) == 1:
@@ -122,7 +123,9 @@ class OneAAStatAnalyzer(Executor):
     PVALUE_WEIGHT: float = 2 / 3
     TEST_SCORE_WEIGHT: float = 1 / 3
 
-    def _set_value(self, data: ExperimentData, value: Any) -> ExperimentData:
+    def _set_value(
+        self, data: ExperimentData, value: Any, key: Any = None
+    ) -> ExperimentData:
         """Stores the aggregated metrics in the experiment data container."""
         return data.set_value(ExperimentDataEnum.analysis_tables, self.id, value)
 
@@ -164,7 +167,7 @@ class OneAAStatAnalyzer(Executor):
             for field in ("p-value", "pass"):
                 key = _mean_key(class_name, field)
                 if field in table.columns:
-                    result[key] = table[field].mean()
+                    result[key] = cast(float, table[field].mean())
                 else:
                     result[key] = 0.0
 
@@ -220,7 +223,7 @@ class AAScoreAnalyzer(Executor):
     PVALUE_WEIGHT: float = 2 / 3
     TEST_SCORE_WEIGHT: float = 1 / 3
 
-    SPLITTER_CLASS_MAPPING: ClassVar[dict[str, type]] = {
+    SPLITTER_CLASS_MAPPING: ClassVar[dict[str, type[AASplitter]]] = {
         cls.__name__: cls for cls in (AASplitter, AASplitterWithStratification)
     }
 
@@ -266,7 +269,9 @@ class AAScoreAnalyzer(Executor):
         if_param_scores = self._get_if_param_scores(data)
 
         data = self._analyze_aa_score(data, score_table)
-        return self._analyze_best_split(data, score_table, if_param_scores)
+        return self._analyze_best_split(
+            data, cast(Dataset, score_table), cast(Dataset, if_param_scores)
+        )
 
     def build_splitter_from_id(self, splitter_id: str) -> AASplitter:
         """Reconstructs a splitter instance from its serialized identifier.
@@ -338,10 +343,11 @@ class AAScoreAnalyzer(Executor):
         if not rows:
             return SmallDataset.from_dict([{}], roles={})
         df = pd.DataFrame(rows).set_index("_idx")
-        return SmallDataset(
-            roles={"score": StatisticRole(), "pass": StatisticRole()},
-            data=df,
-        )
+        roles: dict[str, ABCRole] = {
+            "score": StatisticRole(),
+            "pass": StatisticRole(),
+        }
+        return SmallDataset(roles=roles, data=df)
 
     # ── Best split selection ──────────────────────────────────────────────
 
@@ -468,7 +474,7 @@ class AAScoreAnalyzer(Executor):
     # ── Utilities ─────────────────────────────────────────────────────────
 
     @staticmethod
-    def _get_if_param_scores(data: ExperimentData) -> Dataset | None:
+    def _get_if_param_scores(data: ExperimentData) -> SmallDataset | None:
         """Retrieve IfParamsExperiment scores if they exist."""
         ids = data.get_ids(IfParamsExperiment, ExperimentDataEnum.analysis_tables)
         table_ids = ids.get("IfParamsExperiment", {}).get("analysis_tables", [])
@@ -477,7 +483,7 @@ class AAScoreAnalyzer(Executor):
         return data.analysis_tables[table_ids[0]]
 
     @staticmethod
-    def _get_dry_score(data: ExperimentData) -> Dataset | None:
+    def _get_dry_score(data: ExperimentData) -> SmallDataset | None:
         dry_ids = data.get_ids("AADryTestAnalyzer", ExperimentDataEnum.analysis_tables)
         dry_table_ids = dry_ids.get("AADryTestAnalyzer", {}).get("analysis_tables", [])
         if not dry_table_ids:
@@ -486,14 +492,15 @@ class AAScoreAnalyzer(Executor):
 
 
 class AADryTestAnalyzer(Executor):
-    def __init__(self, alpha: int = 0.05, key=""):
+    def __init__(self, alpha: float = 0.05, key=""):
         super().__init__(key)
         self.alpha = alpha
         self._fig: plt.Figure | None = None
 
     # ── Storage ───────────────────────────────────────────────────────────
 
-    def _set_value(
+    # The dry-test analyzer explicitly chooses its result storage space.
+    def _set_value(  # type: ignore[override]
         self,
         data: ExperimentData,
         value: Any,
@@ -515,7 +522,7 @@ class AADryTestAnalyzer(Executor):
         score_table = data.analysis_tables[param_id]
         target_columns = data.field_search(TargetRole())
 
-        p_val_dist = self._uniform_test(score_table, target_columns)
+        p_val_dist = self._uniform_test(cast(Dataset, score_table), target_columns)
         output = self._set_value(data, p_val_dist, ExperimentDataEnum.analysis_tables)
         return self._set_value(output, self._fig, ExperimentDataEnum.variables)
 
@@ -526,12 +533,15 @@ class AADryTestAnalyzer(Executor):
         if not rows:
             return SmallDataset.from_dict([{}], roles={})
         df = pd.DataFrame(rows).set_index("_idx")
-        return SmallDataset(
-            roles={"p-value": StatisticRole(), "pass": StatisticRole()},
-            data=df,
-        )
+        roles: dict[str, ABCRole] = {
+            "p-value": StatisticRole(),
+            "pass": StatisticRole(),
+        }
+        return SmallDataset(roles=roles, data=df)
 
-    def _uniform_test(self, score_table: Dataset, target_cols: list[str]) -> Dataset:
+    def _uniform_test(
+        self, score_table: Dataset, target_cols: list[str]
+    ) -> SmallDataset:
         if target_cols is None:
             return SmallDataset.create_empty()
         dry_cols = [
@@ -542,12 +552,18 @@ class AADryTestAnalyzer(Executor):
             and any(t_col in col for t_col in target_cols)
         ]
         data = score_table[dry_cols]
-        rows = {"p-value": [], "pass": [], "_idx": []}
+        rows: dict[str, list[Any]] = {"p-value": [], "pass": [], "_idx": []}
         for col in dry_cols:
             tmp_dict = (
-                UniformCheck(self.alpha).calc(data[col]).to_dict()["data"]["data"]
+                UniformCheck(cast(Any, self.alpha))
+                .calc(data[col])
+                .to_dict()["data"]["data"]
             )
-            feature, raw_test, group = _resolve_column_parts(col)
+            parts = cast(
+                "tuple[str, str, str]",
+                _resolve_column_parts(col),
+            )
+            feature, raw_test, group = parts
             test_name = normalize_test_name(raw_test)
             tmp_dict["_idx"] = [f"{feature} {test_name} {group}".strip()]
             for key in rows.keys():

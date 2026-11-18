@@ -3,13 +3,7 @@ from __future__ import annotations
 from abc import ABC
 from copy import copy
 
-from ..utils import (
-    CategoricalTypes,
-    DefaultRoleTypes,
-    FeatureRoleTypes,
-    RoleNameType,
-    TargetRoleTypes,
-)
+from ..utils import RoleNameType
 
 
 class ABCRole(ABC):
@@ -22,7 +16,7 @@ class ABCRole(ABC):
 
     _role_name: RoleNameType = "Abstract"
 
-    def __init__(self, data_type: DefaultRoleTypes | None = None):
+    def __init__(self, data_type: type | None = None):
         """Initializes a role with an optional data type.
 
         Args:
@@ -31,7 +25,7 @@ class ABCRole(ABC):
         """
         self.data_type = data_type
 
-    def __copy__(self, data_type: DefaultRoleTypes | None = None):
+    def __copy__(self, data_type: type | None = None):
         """Creates a shallow copy of the role with an optional updated data type.
 
         Args:
@@ -64,7 +58,7 @@ class ABCRole(ABC):
         """
         return f"{self._role_name}({self.data_type})"
 
-    def astype(self, data_type: DefaultRoleTypes | None = None) -> ABCRole:
+    def astype(self, data_type: type | None = None) -> ABCRole:
         """Creates a new role instance with the specified data type.
 
         Args:
@@ -78,7 +72,7 @@ class ABCRole(ABC):
         role.data_type = data_type
         return role
 
-    def asadditional(self, data_type: DefaultRoleTypes | None = None) -> ABCRole:
+    def asadditional(self, data_type: type | None = None) -> ABCRole:
         """Returns an ``Additional`` variant of the current role.
 
         Searches the global role registry for a class that inherits from both
@@ -113,7 +107,7 @@ class LagRole(ABCRole):
 
     def __init__(
         self,
-        data_type: DefaultRoleTypes | None = None,
+        data_type: type | None = None,
         parent: str | None = None,
         lag: int | None = None,
     ):
@@ -184,7 +178,7 @@ class StratificationRole(ABCRole):
 
     _role_name: RoleNameType = "Stratification"
 
-    def __init__(self, data_type: CategoricalTypes | None = None):
+    def __init__(self, data_type: type | None = None):
         super().__init__(data_type)
 
 
@@ -196,7 +190,7 @@ class GroupingRole(ABCRole):
 
     _role_name: RoleNameType = "Grouping"
 
-    def __init__(self, data_type: CategoricalTypes | None = None):
+    def __init__(self, data_type: type | None = None):
         """Initializes a grouping role.
 
         Args:
@@ -221,7 +215,7 @@ class TargetRole(ABCRole):
 
     def __init__(
         self,
-        data_type: TargetRoleTypes | None = None,
+        data_type: type | None = None,
         cofounders: list[str] | None = None,
     ):
         """Initializes a target role with optional confounder references.
@@ -246,7 +240,7 @@ class FeatureRole(LagRole):
 
     def __init__(
         self,
-        data_type: FeatureRoleTypes | None = None,
+        data_type: type | None = None,
         parent: str | None = None,
         lag: int | None = None,
     ):
@@ -271,7 +265,7 @@ class PreTargetRole(LagRole):
 
     def __init__(
         self,
-        data_type: TargetRoleTypes | None = None,
+        data_type: type | None = None,
         parent: str | None = None,
         lag: int | None = None,
         cofounders: list[str] | None = None,

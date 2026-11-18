@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any
+from typing import Any, cast
 
 from ..comparators import (
     GroupChi2Test,
@@ -418,11 +418,12 @@ class ABAnalyzer(Executor):
 
         data = self.execute_multitest(
             data,
-            (
+            cast(
+                Dataset,
                 multitest_pvalues
                 if not multitest_pvalues.is_empty()
                 and self.multitest_method != ABNTestMethodsEnum.quantile
-                else data.ds
+                else data.ds,
             ),
         )
 

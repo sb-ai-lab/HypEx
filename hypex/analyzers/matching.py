@@ -1,3 +1,6 @@
+from typing import cast
+
+from ..dataset import SmallDataset
 from ..dataset.dataset import DatasetAdapter
 from ..dataset.experiment_data import ExperimentData
 from ..dataset.roles import StatisticRole
@@ -17,10 +20,14 @@ class MatchingAnalyzer(Executor):
             data.get_one_id(MatchingMetrics, space=ExperimentDataEnum.variables)
         ]
         columns = ["Effect Size", "Standard Error", "P-value", "CI Lower", "CI Upper"]
-        return self._set_value(
-            data,
+        result = cast(
+            SmallDataset,
             DatasetAdapter.to_dataset(
                 variables,
                 {field: StatisticRole(float) for field in list(variables.keys())},
-            ).transpose(roles={column: StatisticRole(float) for column in columns}),
+            ),
         )
+        transposed = result.transpose(
+            roles={column: StatisticRole(float) for column in columns}
+        )
+        return self._set_value(data, transposed)
