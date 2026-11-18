@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 import pandas as pd
 from sklearn.base import clone
 from sklearn.model_selection import KFold
 
-from ..dataset import AdditionalTargetRole, Dataset
+from ..dataset import ABCRole, AdditionalTargetRole, Dataset
 from ..utils.cuped_theta import cuped_theta
 from ..utils.models import CUPAC_MODELS
 from .abstract import MLExtension
@@ -47,9 +47,9 @@ class CupacExtension(MLExtension):
             - "predict": Dataset with predictions
         """
         if mode == "kfold_fit":
-            return self._kfold_fit_pandas(model, data, Y)
+            return self._kfold_fit_pandas(model, data, cast(Dataset, Y))
         if mode == "fit":
-            return self._fit_pandas(model, data, Y)
+            return self._fit_pandas(model, data, cast(Dataset, Y))
         if mode == "predict":
             return self._predict_pandas(model, data)
         raise ValueError(f"Unsupported mode: {mode!r}")
@@ -65,8 +65,8 @@ class CupacExtension(MLExtension):
         Returns:
             Fitted model object.
         """
-        model = kwargs.get("model")
-        return self._fit_pandas(model, X, Y)
+        model = cast(str, kwargs.get("model"))
+        return self._fit_pandas(model, X, cast(Dataset, Y))
 
     def predict(self, X: Dataset, **kwargs) -> Dataset:
         """Generate predictions using a fitted model.
@@ -90,9 +90,9 @@ class CupacExtension(MLExtension):
         **kwargs,
     ) -> Any:
         if mode == "kfold_fit":
-            return self._kfold_fit_pandas(model, data, Y)
+            return self._kfold_fit_pandas(model, data, cast(Dataset, Y))
         if mode == "fit":
-            return self._fit_pandas(model, data, Y)
+            return self._fit_pandas(model, data, cast(Dataset, Y))
         elif mode == "predict":
             return self._predict_pandas(model, data)
         return None
@@ -147,7 +147,8 @@ class CupacExtension(MLExtension):
         predictions = pd.DataFrame(
             model.predict(X_df), columns=["predict"], index=X_df.index
         )
-        return Dataset(roles={"predict": AdditionalTargetRole()}, data=predictions)
+        roles: dict[str, ABCRole] = {"predict": AdditionalTargetRole()}
+        return Dataset(roles=roles, data=predictions)
 
     @staticmethod
     def _extract_fold_importances(
