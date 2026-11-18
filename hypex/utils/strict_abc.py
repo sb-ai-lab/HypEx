@@ -129,7 +129,7 @@ class StrictABCMeta(ABCMeta):
         check_return_type = options.get("check_return_type", False)
 
         # Collect unresolved abstract methods from direct parents
-        parent_abstracts = set()
+        parent_abstracts: set[str] = set()
         for base in bases:
             parent_abstracts.update(getattr(base, "__abstractmethods__", frozenset()))
 

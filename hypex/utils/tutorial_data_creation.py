@@ -87,11 +87,11 @@ def sigmoid_division(
     Returns:
         Binary integer array of the same length as *x*.
     """
-    rng = rng or np.random
+    random = rng if rng is not None else np.random
     if dependent_division:
         prob = sigmoid((x - x.mean()) / x.std())
-        return rng.binomial(1, prob)
-    return rng.binomial(1, 0.5, size=len(x))
+        return random.binomial(1, prob)
+    return random.binomial(1, 0.5, size=len(x))
 
 
 # ── NaN injection ────────────────────────────────────────────────────────────
@@ -247,7 +247,8 @@ class DataGenerator:
             var = params["std"] ** 2
             cov = [[var, rho * var], [rho * var, var]]
             mean = [params["mean"], params["mean"]]
-            return self.rng.multivariate_normal(mean, cov, self.n_samples).T + u_shift
+            pair = self.rng.multivariate_normal(mean, cov, self.n_samples).T + u_shift
+            return pair[0], pair[1]
 
         if dist_type == "bernoulli":
             return self._bernoulli_pair(params["p"], rho)

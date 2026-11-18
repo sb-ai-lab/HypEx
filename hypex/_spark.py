@@ -69,9 +69,9 @@ except ModuleNotFoundError as exc:
     StructField = None
     StructType = None
     TimestampType = None
-    SPARK_SQL_DATAFRAME_TYPES = ()
-    PANDAS_ON_SPARK_DATAFRAME_TYPES = ()
-    SPARK_SERIES_TYPES = ()
+    SPARK_SQL_DATAFRAME_TYPES: tuple[type, ...] = ()
+    PANDAS_ON_SPARK_DATAFRAME_TYPES: tuple[type, ...] = ()
+    SPARK_SERIES_TYPES: tuple[type, ...] = ()
 else:
     PYSPARK_AVAILABLE = True
     SPARK_SQL_DATAFRAME_TYPES = (SparkDF,)

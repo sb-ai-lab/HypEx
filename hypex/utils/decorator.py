@@ -62,7 +62,7 @@ def inherit_docstring_from(
         """
         if isinstance(obj, property):
             doc = getattr(source, "__doc__", "No documentation provided.")
-            return property(obj.fget, obj.fset, obj.fdel, doc)
+            return cast(DecoratedType, property(obj.fget, obj.fset, obj.fdel, doc))
         elif callable(obj):
 
             @wraps(obj)

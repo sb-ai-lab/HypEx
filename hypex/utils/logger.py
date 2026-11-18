@@ -21,7 +21,7 @@ import os
 import time
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Literal, TypeVar
 
 F = TypeVar("F", bound=Callable[..., Any])
 C = TypeVar("C", bound=type)
@@ -172,7 +172,7 @@ class HypExLogger:
             return wrapper  # type: ignore
 
         if func is None:
-            return decorator  # type: ignore
+            return decorator
         return decorator(func)
 
     def log_methods(
@@ -415,7 +415,7 @@ class ProcessContext:
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: Any,
-    ) -> bool:
+    ) -> Literal[False]:
         elapsed = time.perf_counter() - self._start_time
 
         if exc_type:

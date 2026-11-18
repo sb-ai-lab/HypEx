@@ -232,7 +232,7 @@ class DatasetAdapter(Adapter):
             return DatasetAdapter.list_to_dataset(data, roles, small)
         elif isinstance(data, np.ndarray):
             return DatasetAdapter.ndarray_to_dataset(data, roles, small)
-        elif any(isinstance(data, t) for t in [str, int, float, bool]):
+        elif isinstance(data, (str, int, float, bool)):
             return DatasetAdapter.value_to_dataset(data, roles, small)
         elif isinstance(data, Dataset):
             if small:
