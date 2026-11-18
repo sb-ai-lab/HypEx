@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from scipy.stats import norm
@@ -128,7 +128,7 @@ class MinSampleSize(Calculator):
     ) -> list[float]:
         vars_: list[float] = []
         for _, ds in grouping_data:
-            vars_.append(float(ds[target_field].var()))
+            vars_.append(float(cast(float, ds[target_field].var())))
         return vars_
 
     @classmethod

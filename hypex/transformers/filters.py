@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from ..dataset.dataset import Dataset
 from ..dataset.experiment_data import ExperimentData
@@ -45,7 +45,7 @@ class CVFilter(Transformer):
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
-            cv = data[column].coefficient_of_variation()
+            cv = cast(float, data[column].coefficient_of_variation())
             drop = False
             if (upper_bound and cv > upper_bound) or (lower_bound and cv < lower_bound):
                 drop = True
@@ -140,7 +140,8 @@ class NanFilter(Transformer):
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
-            nan_share = data[column].isna().sum() / len(data)
+            nan_values = cast(Dataset, data[column].isna())
+            nan_share = cast(float, nan_values.sum()) / len(data)
             if nan_share > threshold:
                 data.roles[column] = InfoRole()
         return data
@@ -184,9 +185,8 @@ class CorrFilter(Transformer):
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
         corr_space_cols = Adapter.to_list(corr_space_cols)
-        corr_matrix = data[corr_space_cols].corr(
-            method=method, numeric_only=numeric_only
-        )
+        corr_data: Any = data[corr_space_cols]
+        corr_matrix = corr_data.corr(method=method, numeric_only=numeric_only)
         pre_target_column = None
         if drop_policy == "corr":
             pre_target_columns = data.search_columns([PreTargetRole()])
@@ -218,8 +218,8 @@ class CorrFilter(Transformer):
                         elif drop_policy == "cv":
                             drop = (
                                 target
-                                if data[target].coefficient_of_variation()
-                                < data[column].coefficient_of_variation()
+                                if cast(float, data[target].coefficient_of_variation())
+                                < cast(float, data[column].coefficient_of_variation())
                                 else column
                             )
                     data.roles[drop] = InfoRole()
@@ -277,7 +277,7 @@ class OutliersFilter(Transformer):
             func=lambda x: (
                 (x < x.quantile(lower_percentile)) | (x > x.quantile(upper_percentile))
             ),
-            role={column: InfoRole() for column in target_cols},
+            role={column: InfoRole() for column in cast("list[str]", target_cols)},
             axis=0,
         )
         mask = mask.apply(func=lambda x: x.any(), role={"filter": InfoRole()}, axis=1)
@@ -297,5 +297,8 @@ class OutliersFilter(Transformer):
             upper_percentile=self.upper_percentile,
         )
         result = data.copy(data=t_ds)
-        result.additional_fields = result.additional_fields.filter(t_ds.index, axis=0)
+        # Preserve the legacy assignment to the read-only compatibility view.
+        result.additional_fields = result.additional_fields.filter(  # type: ignore[misc]
+            t_ds.index, axis=0
+        )
         return result

@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 import json
+import sys
 import warnings
 from collections.abc import Iterable as IterableABC
+from collections.abc import Sequence as SequenceABC
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any, Callable, Hashable, Iterable, Literal, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Hashable, Iterable, Literal, cast
 
-try:
-    from typing import Self  # Python >= 3.11
-except ImportError:
-    from typing_extensions import Self  # type: ignore # Python < 3.11
+import pandas as pd
 
-
-import pandas as pd  # type: ignore
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 from numpy import ndarray
 
 from .._spark import (
@@ -43,6 +44,9 @@ from .roles import (
     StatisticRole,
     default_roles,
 )
+
+if TYPE_CHECKING:
+    from .groupby_dataset import GroupedDataset
 
 
 class DatasetBase:
@@ -204,10 +208,13 @@ class DatasetBase:
     ) -> list[str] | None:
         columns = None
         if isinstance(roles, dict):
-            if any(isinstance(role, ABCRole) for role in roles.keys()):
-                roles = self._parse_roles(roles)
+            column_roles = (
+                self._parse_roles(roles)
+                if any(isinstance(role, ABCRole) for role in roles)
+                else cast("dict[str, ABCRole]", roles)
+            )
             columns = []
-            for column, role in roles.items():
+            for column, role in column_roles.items():
                 if role.data_type is str:
                     columns.append(column)
         return columns
@@ -307,29 +314,30 @@ class DatasetBase:
                 self._backend_data = PandasDataset(data)
 
         self.default_role = default_role
-        if roles is None and hasattr(data, "roles") and data.roles is not None:
-            roles = data.roles
-        elif roles is None:
-            roles = {}
+        if roles is None:
+            parsed_roles = data.roles if isinstance(data, DatasetBase) else {}
         else:
-            if any(isinstance(role, ABCRole) for role in roles.keys()):
-                roles = self._parse_roles(roles)
+            parsed_roles = (
+                self._parse_roles(roles)
+                if any(isinstance(role, ABCRole) for role in roles)
+                else cast("dict[str, ABCRole]", roles)
+            )
 
-            if any(not isinstance(role, ABCRole) for role in roles.values()):
+            if any(not isinstance(role, ABCRole) for role in parsed_roles.values()):
                 raise TypeError("Roles must be instances of ABCRole type")
 
             if data is not None and hasattr(self._backend_data, "columns"):
                 invalid_columns = [
-                    i for i in roles.keys() if i not in self._backend_data.columns
+                    i for i in parsed_roles if i not in self._backend_data.columns
                 ]
                 if invalid_columns:
                     raise RoleColumnError(invalid_columns, self._backend_data.columns)
 
         if data is not None and hasattr(self._backend_data, "columns"):
-            roles = self._set_all_roles(roles)
-            self._set_empty_types(roles)
+            parsed_roles = self._set_all_roles(parsed_roles)
+            self._set_empty_types(parsed_roles)
 
-        self._roles: dict[str, ABCRole] = roles
+        self._roles: dict[str, ABCRole] = parsed_roles
         self._tmp_roles: dict[str, ABCRole] = {}
 
         self.loc = self.Locker(
@@ -378,7 +386,9 @@ class DatasetBase:
         """Release ALL references accumulated by the dataset lineage."""
         from .storage_manager import StorageManager
 
-        StorageManager.instance().release_all(self.persist_key, blocking=blocking)
+        persist_key = self.persist_key
+        if persist_key is not None:
+            StorageManager.instance().release_all(persist_key, blocking=blocking)
         return self
 
     @property
@@ -433,7 +443,9 @@ class DatasetBase:
         if eager:
             from .storage_manager import StorageManager
 
-            StorageManager.instance().release_all(self.persist_key)
+            persist_key = self.persist_key
+            if persist_key is not None:
+                StorageManager.instance().release_all(persist_key)
         return self
 
     def __repr__(self):
@@ -475,23 +487,25 @@ class DatasetBase:
                 if hasattr(result_data, "columns")
                 else self.columns
             )
-            roles = {col: self.roles.get(col, InfoRole()) for col in res_cols}
-            result = self._from_derived_backend(data=result_data, roles=roles)
+            selected_roles = {col: self.roles.get(col, InfoRole()) for col in res_cols}
+            result = self._from_derived_backend(data=result_data, roles=selected_roles)
             return result
 
-        items = (
-            [item] if isinstance(item, str) or not isinstance(item, Iterable) else item
+        items = cast(
+            "Iterable[str | int]",
+            [item] if isinstance(item, str) or not isinstance(item, Iterable) else item,
         )
-        roles: dict = {
+        dataset_roles = cast("dict[str | int, ABCRole]", self.roles)
+        selected_roles = {
             column: (
-                self.roles[column]
-                if column in self.columns and self.roles.get(column, False)
+                dataset_roles[column]
+                if column in self.columns and dataset_roles.get(column, False)
                 else InfoRole()
             )
             for column in items
         }
         result = self._from_derived_backend(
-            data=self._backend_data.__getitem__(item), roles=roles
+            data=self._backend_data.__getitem__(item), roles=selected_roles
         )
         return result
 
@@ -510,7 +524,7 @@ class DatasetBase:
         # return self.__class__(roles=new_roles, data=new_data)
         return self._from_derived_backend(data=new_data, roles=new_roles)
 
-    def set_index(self, keys, drop=True, **kwargs) -> DatasetBase:
+    def set_index(self, keys, drop=True, **kwargs) -> Self:
         new_data = self._backend_data.set_index(keys=keys, drop=drop, **kwargs)
         new_roles = deepcopy(self.roles)
 
@@ -638,10 +652,7 @@ class DatasetBase:
         return self._from_derived_backend(data=new_data, roles=new_roles)
 
     def __binary_magic_operator(self, other: Any, func_name: str) -> Any:
-        if not any(
-            isinstance(other, t)
-            for t in [self.__class__, str, int, float, bool, Sequence]
-        ):
+        if not isinstance(other, (self.__class__, str, int, float, bool, SequenceABC)):
             raise DataTypeError(type(other))
 
         self_raw = (
@@ -649,6 +660,7 @@ class DatasetBase:
             if hasattr(self.backend_data, "data")
             else self.backend_data
         )
+        other_raw: Any
 
         if isinstance(other, self.__class__):
             if type(other._backend_data) is not type(self._backend_data):
@@ -703,11 +715,11 @@ class DatasetBase:
             data=result_raw, roles=new_roles, session=self.session
         )
 
-    # comparison operators:
-    def __eq__(self, other: Any) -> Self:
+    # Dataset comparisons are element-wise, not object identity predicates.
+    def __eq__(self, other: Any) -> Self:  # type: ignore[override]
         return self.__binary_magic_operator(other=other, func_name="__eq__")
 
-    def __ne__(self, other: Any) -> Self:
+    def __ne__(self, other: Any) -> Self:  # type: ignore[override]
         return self.__binary_magic_operator(other=other, func_name="__ne__")
 
     def __le__(self, other: Any) -> Self:
@@ -855,6 +867,7 @@ class DatasetBase:
         tmp_role: bool = False,
         auto_roles_types: bool = False,
     ):
+        roles_map = cast("dict[Any, Any]", new_roles_map)
         new_roles_map = self._parse_roles(
             {
                 role: (
@@ -862,7 +875,7 @@ class DatasetBase:
                     if isinstance(column, ABCRole)
                     else column
                 )
-                for column, role in new_roles_map.items()
+                for column, role in roles_map.items()
             }
         )
 
@@ -925,6 +938,11 @@ class DatasetBase:
     def tmp_roles(self) -> dict[str, ABCRole]:
         return self._tmp_roles
 
+    @tmp_roles.setter
+    def tmp_roles(self, value: dict[str, ABCRole]) -> None:
+        self._set_roles(new_roles_map=value, temp_role=True)
+        self._set_empty_types(self._tmp_roles)
+
     @property
     def session(self) -> spark.SparkSession | None:
         return self._backend_data.session
@@ -942,11 +960,6 @@ class DatasetBase:
         else:
             raise ValueError("Unknown backend type")
 
-    @tmp_roles.setter
-    def tmp_roles(self, value: dict[str, ABCRole]) -> None:
-        self._set_roles(new_roles_map=value, temp_role=True)
-        self._set_empty_types(self._tmp_roles)
-
     def _convert_data_after_agg(self, result: Any) -> Self | ScalarType | None:
         if result is None:
             return None
@@ -958,10 +971,10 @@ class DatasetBase:
         if not hasattr(result, "columns"):
             return result
 
-        return self.__class__(
-            data=result,
-            roles={column: StatisticRole() for column in result.columns},
-        )
+        roles: dict[str, ABCRole] = {
+            column: StatisticRole() for column in result.columns
+        }
+        return self.__class__(data=result, roles=roles)
 
     def add_column(
         self,
@@ -1122,15 +1135,14 @@ class DatasetBase:
             data=self._backend_data.isin(values),
         )
 
-    # GroupedDataset is not imported at module level: groupby_dataset imports
-    # this module back for typing, and the cycle is flagged by CodeQL.
-    def groupby(self, by: str | Iterable[str], **kwargs) -> GroupedDataset:  # noqa: F821
+    def groupby(self, by: str | Iterable[str], **kwargs) -> GroupedDataset:
+        by_list: list[str]
         if isinstance(by, str):
             by_list = [by]
         elif hasattr(by, "__iter__"):
             by_list = list(by)
         else:
-            by_list = [by]
+            by_list = [cast(str, by)]
 
         by_arg = by_list[0] if len(by_list) == 1 else by_list
 
@@ -1322,9 +1334,9 @@ class DatasetBase:
         return self.filter(items=columns, axis=1)
 
     def iselect(self, columns: int | list[int]):
-        columns = Adapter.to_list(columns)
-        columns = [self.columns[n] for n in columns]
-        return self.filter(items=columns, axis=1)
+        positions = Adapter.to_list(columns)
+        selected_columns = [self.columns[n] for n in positions]
+        return self.filter(items=selected_columns, axis=1)
 
     def select_dtypes(self, include: Any = None, exclude: Any = None):
         t_data = self._backend_data.select_dtypes(include=include, exclude=exclude)
@@ -1375,7 +1387,10 @@ class DatasetBase:
         return self._from_derived_backend(
             roles=other.roles if isinstance(other, self.__class__) else {},
             data=self.backend_data.dot(
-                other.backend_data if isinstance(other, self.__class__) else other
+                cast(
+                    Any,
+                    other.backend_data if isinstance(other, self.__class__) else other,
+                )
             ),
         )
 
@@ -1496,7 +1511,9 @@ class DatasetBase:
     def backend_data(self) -> PandasDataset | SparkDataset:
         return self._backend_data
 
-    def get_values(self, row: str | None = None, column: str | None = None) -> Any:
+    def get_values(
+        self, row: str | int | None = None, column: str | None = None
+    ) -> Any:
         return self._backend_data.get_values(row=row, column=column)
 
     def iget_values(self, row: int | None = None, column: int | None = None) -> Any:
@@ -1504,9 +1521,9 @@ class DatasetBase:
 
     def _set_roles(
         self,
-        new_roles_map: dict[ABCRole, list[str] | str] | dict[list[str] | str] | ABCRole,
+        new_roles_map: (dict[ABCRole, list[str] | str] | dict[str, ABCRole] | ABCRole),
         temp_role: bool = False,
-    ) -> Self:
+    ) -> Self | dict[str, ABCRole]:
         if not new_roles_map:
             if not temp_role:
                 return self.roles
@@ -1514,7 +1531,8 @@ class DatasetBase:
                 self._tmp_roles = {}
                 return self
 
-        keys, values = list(new_roles_map.keys()), list(new_roles_map.values())
+        roles_map = cast("dict[Any, Any]", new_roles_map)
+        keys, values = list(roles_map.keys()), list(roles_map.values())
         roles, columns_sets = (
             (keys, values) if isinstance(keys[0], ABCRole) else (values, keys)
         )

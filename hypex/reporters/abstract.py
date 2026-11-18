@@ -618,7 +618,7 @@ class TestDictReporter(DictReporter, ABC):
 
 
 class DatasetReporter(Reporter):
-    """Reporter that outputs results as a structured ``Dataset`` or dictionary."""
+    """Reporter that outputs a ``Dataset``, ``SmallDataset``, or dictionary."""
 
     def __init__(
         self,
@@ -651,7 +651,7 @@ class DatasetReporter(Reporter):
     def _report(self, data: ExperimentData) -> dict[str, Any]:
         return self.dict_reporter.report(data)
 
-    def report(self, data: ExperimentData) -> dict | Dataset:
+    def report(self, data: ExperimentData) -> dict | Dataset | SmallDataset:
         old_front = self.dict_reporter.front
         self.dict_reporter.front = False
         try:

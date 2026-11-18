@@ -126,7 +126,10 @@ class AASplitter(Calculator):
         if self.save_groups:
             splitter_col = self._id
             unique_vals = data.ds[splitter_col].unique()
-            group_keys = list(unique_vals[splitter_col].to_dict().values())
+            # Keep the legacy group-key conversion unchanged.
+            group_keys = list(
+                unique_vals[splitter_col].to_dict().values()  # type: ignore[attr-defined]
+            )
             for group_key in group_keys:
                 # pd.isna catches None, NaN and pd.NaT.
                 if pd.isna(group_key):

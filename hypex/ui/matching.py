@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import html
 import warnings
-from typing import Any
+from typing import Any, cast
 
 from ..analyzers.matching import MatchingAnalyzer
 from ..dataset import (
+    ABCRole,
     AdditionalMatchingRole,
     Dataset,
     ExperimentData,
@@ -33,9 +34,10 @@ from .base import Output
 class MatchingOutput(Output):
     """Output handler for matching experiment results."""
 
-    summary: Dataset
-    full_data: Dataset
-    quality_results: Dataset
+    summary: Dataset | SmallDataset
+    full_data: Dataset | SmallDataset
+    quality_results: Dataset | SmallDataset
+    indexes: Dataset | SmallDataset
 
     def __init__(
         self,
@@ -61,7 +63,7 @@ class MatchingOutput(Output):
         self.compute_indexes = compute_indexes
 
     def _extract_full_data(
-        self, experiment_data: ExperimentData, indexes: Dataset
+        self, experiment_data: ExperimentData, indexes: Dataset | SmallDataset
     ) -> None:
         """Build the full matched dataset from original data and matched indexes.
 
@@ -98,7 +100,7 @@ class MatchingOutput(Output):
         # iteration, duplicating the entire experiment_data.ds lineage
         # each time.  Hoisting it here ensures the reset_index node
         # appears exactly once in the DAG.
-        ds_reset: Dataset | None = None
+        ds_reset: Dataset | SmallDataset | None = None
         idx_col: str | None = None
         if backend == BackendsEnum.spark:
             orig_cols = set(experiment_data.ds.columns)
@@ -191,9 +193,9 @@ class MatchingOutput(Output):
         experiment_data: ExperimentData,
         t_indexes: Dataset,
         col_name: str,
-        ds_reset: Dataset | None = None,
+        ds_reset: Dataset | SmallDataset | None = None,
         idx_col: str | None = None,
-    ) -> Dataset:
+    ) -> Dataset | SmallDataset:
         """Build matched data via a lazy Spark join — no driver collection.
 
         The match-index column serves as a lookup key against the original
@@ -237,13 +239,13 @@ class MatchingOutput(Output):
         matched_data = mapping_ds.merge(
             ds_reset,
             left_on="_hypex_lookup",
-            right_on=idx_col,
+            right_on=cast(str, idx_col),
             how="left",
         )
 
         # 6. Restore the positional index and drop helper columns.
         matched_data = matched_data.set_index("_hypex_pos", drop=True)
-        matched_data = matched_data.drop(columns=["_hypex_lookup", idx_col])
+        matched_data = matched_data.drop(columns=["_hypex_lookup", cast(str, idx_col)])
         return matched_data
 
     def _match_pandas(
@@ -251,7 +253,7 @@ class MatchingOutput(Output):
         experiment_data: ExperimentData,
         t_indexes: Dataset,
         col_name: str,
-    ) -> Dataset:
+    ) -> Dataset | SmallDataset:
         """Build matched data via pandas label-based lookup.
 
         For each position in *t_indexes*, looks up the corresponding row
@@ -362,7 +364,9 @@ class MatchingOutput(Output):
         return indexes[0].append(indexes[1:]).sort()
 
     @staticmethod
-    def _get_spark_indexes(experiment_data: ExperimentData) -> Dataset:
+    def _get_spark_indexes(
+        experiment_data: ExperimentData,
+    ) -> Dataset | SmallDataset:
         """Select matched-index columns lazily from the experiment dataset.
 
         ``FaissNearestNeighbors`` stores matched indices as
@@ -437,6 +441,7 @@ class MatchingOutput(Output):
         if "indexes" in reformatted_summary.keys():
             indexes_items = reformatted_summary.pop("indexes")
             are_nested = all(isinstance(v, dict) for v in indexes_items.values())
+            index_parts: list[Dataset | SmallDataset]
 
             if are_nested:
                 # ── Branch 1: nested grouped indexes ──────────────────
@@ -515,11 +520,12 @@ class MatchingOutput(Output):
             index_data = experiment_data.ds[index_field]
             mapped_indexes = self.indexes.map_index_values(index_data)
             index_role = experiment_data.ds.roles[index_field]
+            index_roles: dict[str, ABCRole] = {
+                column: AdditionalMatchingRole(index_role.data_type)
+                for column in mapped_indexes.columns
+            }
             self.indexes = Dataset(
-                roles={
-                    column: AdditionalMatchingRole(index_role.data_type)
-                    for column in mapped_indexes.columns
-                },
+                roles=index_roles,
                 data=mapped_indexes.raw_data,
                 session=experiment_data.ds.session,
             )
@@ -542,8 +548,11 @@ class MatchingOutput(Output):
         # Let the base class handle additional_reporters (like quality_results)
         super().extract(experiment_data)
 
-        reformatted_summary = self._reformat_summary(self.summary)
+        reformatted_summary = self._reformat_summary(
+            cast("dict[str, Any]", self.summary)
+        )
 
+        indexes: Dataset | SmallDataset
         if self.compute_indexes:
             if experiment_data.ds.backend_type == BackendsEnum.spark:
                 reformatted_summary.pop("indexes", None)

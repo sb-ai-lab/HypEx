@@ -20,10 +20,10 @@ from .base import Output
 
 
 class AAOutput(Output):
-    best_split: Dataset
-    experiments: Dataset
-    aa_score: Dataset
-    best_split_statistics: Dataset
+    best_split: Dataset | SmallDataset
+    experiments: Dataset | SmallDataset
+    aa_score: Dataset | SmallDataset
+    best_split_statistics: Dataset | SmallDataset
 
     def __init__(self):
         super().__init__(
@@ -172,7 +172,9 @@ class AAOutput(Output):
         self.experiments = self._replace_splitters(self.experiments, RenameEnum.columns)
 
     @staticmethod
-    def _add_dry_score(experiment_data: ExperimentData, aa_score: Dataset) -> Dataset:
+    def _add_dry_score(
+        experiment_data: ExperimentData, aa_score: Dataset | SmallDataset
+    ) -> Dataset | SmallDataset:
         dry_score_analyser_ids = experiment_data.get_ids(
             AADryTestAnalyzer, ExperimentDataEnum.analysis_tables
         )[AADryTestAnalyzer.__name__][ExperimentDataEnum.analysis_tables.value]
