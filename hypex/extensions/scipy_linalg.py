@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd  # type: ignore
+import pandas as pd
 
 from .._spark import LinearRegression, VectorAssembler
 from ..dataset import Dataset
@@ -108,7 +108,7 @@ class SparkLstsqExtension(LstsqExtension):
     Slave-backend class for lstsq extension.
     """
 
-    def calc(self, data: SparkDataset, other: Dataset | None = None, **kwargs):
+    def calc(self, data: Dataset, other: Dataset | None = None, **kwargs):
         target, *features = self.get_columns(data)
         assembler = VectorAssembler(inputCols=features, outputCol="_features")
 

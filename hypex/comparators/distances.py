@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from copy import deepcopy
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -65,7 +65,7 @@ class MahalanobisDistance(Calculator):
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_fields: list[str] | None = None,
+        target_fields: str | list[str] | None = None,
         **kwargs,
     ) -> Dataset:
         """
@@ -190,16 +190,16 @@ class MahalanobisDistance(Calculator):
             w_matrix = np.sqrt(np.diag(w_list / w_list.sum()))
             mahalanobis_transform = mahalanobis_transform.dot(w_matrix)
 
-        mahalanobis_transform: Dataset = mahalanobis_transform.transpose()
+        transformed: Dataset = mahalanobis_transform.transpose()
         # mahalanobis_transform = mahalanobis_transform.rename({col: new_col for col, new_col in zip(mahalanobis_transform.columns, mah_cols)})
-        return mahalanobis_transform
+        return transformed
 
     @classmethod
     def calc(
         cls,
         data: Dataset,
         group_field: Sequence[str] | str | None = None,
-        grouping_data: GroupedDataset | None = None,
+        grouping_data: GroupedDataset | list[tuple[str, Dataset]] | None = None,
         target_fields: str | list[str] | None = None,
         weights: dict[str, float] | None = None,
         **kwargs,
@@ -232,6 +232,7 @@ class MahalanobisDistance(Calculator):
 
         if grouping_data is None:
             grouping_data = list(data.groupby(group_field))
+        grouping_data = cast("list[tuple[str, Dataset]]", grouping_data)
         if len(grouping_data) > 1:
             grouping_data[0][1].tmp_roles = data.tmp_roles
         else:
@@ -281,7 +282,7 @@ class MahalanobisDistance(Calculator):
                     role={field: TargetRole()},
                 )
         mahalanobis_transform = self.calc(
-            data=t_data,
+            data=cast(Dataset, t_data),
             group_field=group_field,
             target_fields=target_fields,
             grouping_data=grouping_data,

@@ -76,7 +76,7 @@ class GroupDifference(StatsComparator):
         return NUMBER_TYPES_LIST
 
     @classmethod
-    def _inner_function(
+    def _inner_function(  # type: ignore[override]
         cls,
         baseline_stats: dict[str, Any],
         compared_stats: dict[str, Any],
@@ -199,7 +199,7 @@ class GroupSizes(StatsComparator):
         )
 
     @classmethod
-    def _inner_function(
+    def _inner_function(  # type: ignore[override]
         cls,
         baseline_stats: dict[str, Any],
         compared_stats: dict[str, Any],

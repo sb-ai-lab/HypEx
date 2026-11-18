@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 
-import pandas as pd  # type: ignore
+import pandas as pd
 
 from .._spark import ps
 from ..dataset import ABCRole, Dataset, DatasetAdapter
