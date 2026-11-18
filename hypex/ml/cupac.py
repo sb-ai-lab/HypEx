@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from ..dataset.dataset import Dataset, SmallDataset
 from ..dataset.experiment_data import ExperimentData, ExperimentDataEnum
@@ -194,11 +194,16 @@ class CUPACExecutor(MLExecutor):
         cofounders: dict[str, list[str]] = {}
         for target in targets:
             if target in data.ds.columns:
-                cofounders[target] = data.ds.roles[target].cofounders
+                role = cast("TargetRole | PreTargetRole", data.ds.roles[target])
+                cofounders[target] = role.cofounders
             else:
                 # For virtual targets, get cofounders from the earliest lag
                 min_lag = min(targets[target].keys())
-                cofounders[target] = data.ds.roles[targets[target][min_lag]].cofounders
+                role = cast(
+                    "TargetRole | PreTargetRole",
+                    data.ds.roles[targets[target][min_lag]],
+                )
+                cofounders[target] = role.cofounders
             if cofounders[target] is None:
                 raise ValueError(
                     f"Cofounders must be defined in the first lag for "
@@ -239,21 +244,22 @@ class CUPACExecutor(MLExecutor):
 
         return cupac_data
 
+    # Legacy CUPAC dispatch methods intentionally have no generic dataset inputs.
     @classmethod
-    def _execute_inner_function(cls) -> None:
+    def _execute_inner_function(cls) -> None:  # type: ignore[override]
         pass
 
     @classmethod
-    def _inner_function(cls) -> None:
+    def _inner_function(cls) -> None:  # type: ignore[override]
         pass
 
-    def calc(
+    def calc(  # type: ignore[override]
         self, mode: str, model: str | Any, X: Dataset, Y: Dataset | None = None
     ) -> Any:
         if mode == "kfold_fit":
-            return self.kfold_fit(model, X, Y)
+            return self.kfold_fit(model, X, cast(Dataset, Y))
         elif mode == "fit":
-            return self.fit(model, X, Y)
+            return self.fit(model, X, cast(Dataset, Y))
         elif mode == "predict":
             return self.predict(model, X)
         return None
@@ -271,7 +277,7 @@ class CUPACExecutor(MLExecutor):
 
         return var_red, feature_importances
 
-    def fit(self, model: str, X: Dataset, Y: Dataset) -> Any:
+    def fit(self, model: str, X: Dataset, Y: Dataset) -> Any:  # type: ignore[override]
         return self.extension.calc(
             data=X,
             mode="fit",
@@ -279,7 +285,7 @@ class CUPACExecutor(MLExecutor):
             Y=Y,
         )
 
-    def predict(self, model: Any, X: Dataset) -> Dataset:
+    def predict(self, model: Any, X: Dataset) -> Dataset:  # type: ignore[override]
         return self.extension.calc(
             data=X,
             mode="predict",
@@ -318,7 +324,7 @@ class CUPACExecutor(MLExecutor):
                 res_dataset = col_data
             else:
                 res_dataset = res_dataset.add_column(data=col_data)
-        return res_dataset
+        return cast(Dataset, res_dataset)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         """Execute CUPAC variance reduction on the experiment data.
@@ -356,6 +362,7 @@ class CUPACExecutor(MLExecutor):
         # ──────────────────────────────────────────────────────────────
 
         cupac_data = self._prepare_data(data)
+        models = Adapter.to_list(self.cupac_models)
 
         for target, target_data in cupac_data.items():
             X_train_feature_names = [column[0] for column in target_data["X_train"]]
@@ -366,7 +373,7 @@ class CUPACExecutor(MLExecutor):
             best_var_red: float | None = None
             best_feature_importances: dict[str, float] | None = None
 
-            for model in self.cupac_models:
+            for model in models:
                 var_red, fold_importances = self.calc(
                     mode="kfold_fit",
                     model=model,

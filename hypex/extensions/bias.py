@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from typing import Any, Literal, cast
+
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 from .._spark import (
     PYSPARK_AVAILABLE,
@@ -15,7 +18,6 @@ from ..dataset import (
     ABCRole,
     AdditionalMatchingRole,
     Dataset,
-    ExperimentData,
     FeatureRole,
     InfoRole,
     TargetRole,
@@ -64,11 +66,11 @@ class BiasExtension(Extension):
         self.grouping_role = grouping_role
         self.target_roles = target_roles
 
-        self.target_field = None
-        self.group_field = None
-        self.features = None
+        self.target_field: str | None = None
+        self.group_field: str | None = None
+        self.features: list[str] | None = None
 
-    def _set_columns(self, data: Dataset) -> list[str]:
+    def _set_columns(self, data: Dataset) -> None:
         """Resolve and store target and group field names from the dataset.
 
         Args:
@@ -81,12 +83,12 @@ class BiasExtension(Extension):
         self.group_field = data.search_columns(self.grouping_role)[0]
 
     @staticmethod
-    def prepare_data(data: ExperimentData) -> Dataset:
+    def prepare_data(data: Dataset) -> tuple[Dataset, Dataset]:
         """Prepare matched data from experiment data (backend-specific)."""
         raise NotImplementedError
 
     @staticmethod
-    def calc_bias(X: Dataset, X_matched: Dataset, coefficients: np.ndarray[float]):
+    def calc_bias(X: Dataset, X_matched: Dataset, coefficients: NDArray[np.floating]):
         """Calculate bias using feature differences and regression coefficients."""
         raise NotImplementedError
 
@@ -94,12 +96,12 @@ class BiasExtension(Extension):
         """Execute the full bias estimation pipeline."""
         raise NotImplementedError
 
-    def _calc_coefs(self, data: Dataset) -> np.ndarray:
+    def _calc_coefs(self, data: Any) -> np.ndarray:
         """Compute linear regression coefficients for each group."""
         raise NotImplementedError
 
     @staticmethod
-    def _extract_info(data: Dataset) -> tuple[Dataset, list[str], list[str]]:
+    def _extract_info(data: Dataset) -> tuple[list[str], list[str]]:
         """Extract neighbor indices and numeric columns from the dataset.
 
         Args:
@@ -207,8 +209,8 @@ class PandasBisaExtesion(BiasExtension):
         """
         group_1, group_2, *_ = sorted(data[self.group_field].unique())
 
-        features = [col + "_matched" for col in self.features]
-        target = self.target_field + "_matched"
+        features = [col + "_matched" for col in cast("list[str]", self.features)]
+        target = cast(str, self.target_field) + "_matched"
         n_coefs = len(features)
 
         def _get_weights(group_data: pd.DataFrame) -> np.ndarray:
@@ -279,7 +281,7 @@ class PandasBisaExtesion(BiasExtension):
         mask_1 = data[self.group_field] == group_1
         mask_2 = data[self.group_field] == group_2
 
-        features = self.features
+        features = cast("list[str]", self.features)
         matched_features = [col + "_matched" for col in features]
 
         def _dot_safe(mask: pd.Series, coefs: np.ndarray) -> None:
@@ -300,9 +302,9 @@ class PandasBisaExtesion(BiasExtension):
         # ── matched_target: keep NaN for unmatched observations.
         #    Downstream MatchingMetrics will exclude them from
         #    the treatment effect estimation.
-        matched_target_col = self.target_field + "_matched"
+        matched_target_col = cast(str, self.target_field) + "_matched"
         matched_target = data[matched_target_col].values.copy()
-        nan_mask = ~np.isfinite(matched_target)
+        nan_mask = ~np.isfinite(cast(Any, matched_target))
 
         n_unmatched = int(nan_mask.sum())
         if n_unmatched > 0:
@@ -352,7 +354,7 @@ class PandasBisaExtesion(BiasExtension):
             numeric_cols=numeric_cols,
         )
 
-        initial_data = data[[*numeric_cols, self.group_field]].raw_data
+        initial_data = data[[*numeric_cols, cast(str, self.group_field)]].raw_data
         initial_data = initial_data.join(matched_data, how="left")
 
         # ── Early exit: no valid matches at all ──────────────────────
@@ -379,7 +381,10 @@ class PandasBisaExtesion(BiasExtension):
                 index=initial_data.index,
             )
             return Dataset(
-                roles={"bias": InfoRole(), "matched_target": InfoRole()},
+                roles=cast(
+                    "dict[str, ABCRole]",
+                    {"bias": InfoRole(), "matched_target": InfoRole()},
+                ),
                 data=final_data,
             )
 
@@ -387,7 +392,10 @@ class PandasBisaExtesion(BiasExtension):
         coefficients_1, coefficients_2 = self._calc_coefs(initial_data)
         final_data = self._calc_bias(initial_data, coefficients_1, coefficients_2)
         return Dataset(
-            roles={"bias": InfoRole(), "matched_target": InfoRole()},
+            roles=cast(
+                "dict[str, ABCRole]",
+                {"bias": InfoRole(), "matched_target": InfoRole()},
+            ),
             data=final_data,
         )
 
@@ -485,7 +493,7 @@ class SparkBisaExtesion(BiasExtension):
         return matched_data
 
     @classmethod
-    def prepare_data(cls, data: Dataset) -> tuple[Dataset]:
+    def prepare_data(cls, data: Dataset) -> tuple[Dataset, Dataset]:
         """Public wrapper for data preparation, returning Dataset objects.
 
         Args:
@@ -499,7 +507,7 @@ class SparkBisaExtesion(BiasExtension):
             data=data, neighbors_cols=neighbors_cols, numeric_cols=numeric_cols
         )
         matched_data = cls.result_to_dataset(matched_data, roles={}, small=False)
-        matched_data = matched_data.set_index("initial_index")
+        matched_data = cast(Dataset, matched_data.set_index("initial_index"))
         matched_data.index.name = None
 
         indexes = data[neighbors_cols]
@@ -521,11 +529,11 @@ class SparkBisaExtesion(BiasExtension):
         group_1, group_2, *_ = sorted(
             map(lambda row: row[0], data.select(self.group_field).distinct().collect())
         )
-        features = [col + "_matched" for col in self.features]
+        features = [col + "_matched" for col in cast("list[str]", self.features)]
         assembler = VectorAssembler(inputCols=features, outputCol="_features")
         lr = LinearRegression(
             featuresCol="_features",
-            labelCol=self.target_field + "_matched",
+            labelCol=cast(str, self.target_field) + "_matched",
             regParam=0.01,
         )
         data = data.repartition(F.col(self.group_field))
@@ -566,6 +574,7 @@ class SparkBisaExtesion(BiasExtension):
         group_1, group_2, *_ = sorted(
             map(lambda row: row[0], data.select(self.group_field).distinct().collect())
         )
+        features = cast("list[str]", self.features)
         initial_data = data.withColumn(
             "bias",
             F.when(
@@ -573,7 +582,7 @@ class SparkBisaExtesion(BiasExtension):
                 sum(
                     [
                         (F.col(col + "_matched") - F.col(col)) * coefficients_1[idx]
-                        for idx, col in enumerate(self.features)
+                        for idx, col in enumerate(features)
                     ]
                 ),
             )
@@ -582,7 +591,7 @@ class SparkBisaExtesion(BiasExtension):
                 sum(
                     [
                         (F.col(col + "_matched") - F.col(col)) * coefficients_2[idx]
-                        for idx, col in enumerate(self.features)
+                        for idx, col in enumerate(features)
                     ]
                 ),
             )
@@ -592,7 +601,7 @@ class SparkBisaExtesion(BiasExtension):
         final_data = initial_data.select(
             F.col("initial_index").alias("index"),
             F.col("bias"),
-            F.col(self.target_field + "_matched").alias("matched_target"),
+            F.col(cast(str, self.target_field) + "_matched").alias("matched_target"),
         )
         return final_data
 
@@ -625,7 +634,7 @@ class SparkBisaExtesion(BiasExtension):
         # matched_data.count()
 
         initial_data: SparkDF = data[
-            [*numeric_cols, self.group_field]
+            [*numeric_cols, cast(str, self.group_field)]
         ].raw_data.to_spark(index_col="initial_index")
         initial_data = initial_data.join(matched_data, on="initial_index")
         initial_data.persist(self.STORAGE_DICT[storage_level])
@@ -633,12 +642,17 @@ class SparkBisaExtesion(BiasExtension):
 
         coefficients_1, coefficients_2 = self._calc_coefs(initial_data)
         final_data = self._calc_bias(initial_data, coefficients_1, coefficients_2)
-        final_dataset: Dataset = self.result_to_dataset(
-            final_data, {}, small=False
-        ).set_index("index")
+        final_dataset = cast(
+            Dataset,
+            self.result_to_dataset(final_data, {}, small=False).set_index("index"),
+        )
         final_dataset.index.name = None
 
-        final_dataset.persist(storage_level)
+        final_dataset.persist(
+            cast(
+                'Literal["MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"]', storage_level
+            )
+        )
         final_dataset.checkpoint(eager=True)
 
         initial_data.unpersist()
