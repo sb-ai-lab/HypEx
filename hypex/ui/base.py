@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from copy import deepcopy
-from typing import Any, cast
+from typing import Any
 
 from ..dataset import Dataset, ExperimentData, SmallDataset
 from ..experiments.base import Experiment

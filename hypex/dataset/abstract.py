@@ -14,7 +14,6 @@ from typing import (
     Hashable,
     Iterable,
     Literal,
-    Sequence,
     cast,
 )
 
