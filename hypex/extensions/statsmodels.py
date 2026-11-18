@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
-from scipy.stats import norm  # type: ignore
-from statsmodels.stats.multitest import multipletests  # type: ignore
+from scipy.stats import norm
+from statsmodels.stats.multitest import multipletests
 
 from ..dataset import Dataset, DatasetAdapter, InfoRole, StatisticRole
 from ..utils import ID_SPLIT_SYMBOL, ABNTestMethodsEnum, BackendsEnum
@@ -172,8 +174,8 @@ class MultitestQuantile(Extension):
         )
 
     def _calc_pandas(self, data: Dataset, **kwargs):
-        group_field = kwargs.get("group_field")
-        target_field = kwargs.get("target_field")
+        group_field = cast(str, kwargs.get("group_field"))
+        target_field = cast(str, kwargs.get("target_field"))
         quantiles = kwargs.get("quantiles")
         num_samples = len(data.unique()[group_field])
         grouped_data = list(data[[group_field, target_field]].groupby(group_field))
@@ -238,8 +240,9 @@ class MultitestQuantile(Extension):
                         min_t_value = min(min_t_value, t_value)
                 t_values.append(min_t_value)
             quantiles.append(np.quantile(t_values, quantile_level))
-        return (
+        return cast(
+            "list[float]",
             np.full(num_samples, quantiles[0]).tolist()
             if self.equal_variance
-            else quantiles
+            else quantiles,
         )

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import math
 from math import sqrt
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, cast
 
 import numpy as np
-from scipy.stats import chi2_contingency, kstwobign  # type: ignore
-from scipy.stats import t as t_dist  # type: ignore
+from scipy.stats import chi2_contingency, kstwobign
+from scipy.stats import t as t_dist
 
 from ..dataset import ABCRole, Dataset, DatasetAdapter, ExperimentData, SmallDataset
 from ..dataset.backends import SparkDataset
@@ -81,7 +81,7 @@ class StatsTTest(StatsHypothesisTesting):
         return NUMBER_TYPES_LIST
 
     @classmethod
-    def _inner_function(
+    def _inner_function(  # type: ignore[override]
         cls,
         baseline_stats: dict[str, Any],
         compared_stats: dict[str, Any],
@@ -286,10 +286,10 @@ class StatsChi2Test(StatsHypothesisTesting):
         Returns:
             List of categorical types supported by the chi-squared test.
         """
-        return CATEGORICAL_TYPES_LIST
+        return cast("list[type]", CATEGORICAL_TYPES_LIST)
 
     @classmethod
-    def _inner_function(
+    def _inner_function(  # type: ignore[override]
         cls,
         baseline_stats: dict[str, Any],
         compared_stats: dict[str, Any],
@@ -410,7 +410,7 @@ class StatsZTest(StatsHypothesisTesting):
         return NUMBER_TYPES_LIST
 
     @classmethod
-    def _inner_function(
+    def _inner_function(  # type: ignore[override]
         cls,
         baseline_stats: dict[str, Any],
         compared_stats: dict[str, Any],
@@ -660,7 +660,7 @@ class StatsKSTest(StatsHypothesisTesting):
         return data
 
     @classmethod
-    def _inner_function(
+    def _inner_function(  # type: ignore[override]
         cls,
         baseline_stats: dict[str, Any],
         compared_stats: dict[str, Any],
@@ -949,7 +949,7 @@ class StatsUTest(StatsHypothesisTesting):
         return data
 
     @classmethod
-    def _inner_function(
+    def _inner_function(  # type: ignore[override]
         cls,
         baseline_stats: dict[str, Any],
         compared_stats: dict[str, Any],

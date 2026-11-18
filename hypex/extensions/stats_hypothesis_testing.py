@@ -77,7 +77,7 @@ class StatsAggregationExtension(Extension):
         agg_result.columns = [
             f"{col}{NAME_BORDER_SYMBOL}{stat}" for col, stat in agg_result.columns
         ]
-        result = {}
+        result: dict[Any, Any] = {}
         for group_key in agg_result.index:
             result[group_key] = {}
             row = agg_result.loc[group_key]
@@ -155,7 +155,7 @@ class StatsAggregationExtension(Extension):
         agg_sdf = sdf.groupBy(*group_col_refs).agg(*agg_exprs)
         rows = agg_sdf.collect()
 
-        result = {}
+        result: dict[Any, Any] = {}
         for row in rows:
             group_key = (
                 row[group_cols[0]]
@@ -361,7 +361,7 @@ class StatsChi2TestExtension(Extension):
             A nested dictionary mapping ``group_key`` → ``column`` →
             ``{"value_counts": {category: count, ...}}``.
         """
-        result = {}
+        result: dict[Any, Any] = {}
         grouped = data.raw_data.groupby(group_col)
 
         for group_key, group_df in grouped:
@@ -429,7 +429,7 @@ class StatsChi2TestExtension(Extension):
             .collect()
         )
 
-        result = {}
+        result: dict[Any, Any] = {}
         for row in value_counts_df:
             grp = row[group_col]
             col = row["column_name"]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -73,7 +73,15 @@ class SmallDataset(DatasetBase):
     def __init__(
         self,
         roles: dict[ABCRole, list[str] | str] | dict[str, ABCRole],
-        data: pd.DataFrame | str | None = None,
+        data: (
+            FromDictTypes
+            | pd.DataFrame
+            | pd.Series
+            | PandasDataset
+            | SparkDataset
+            | str
+            | None
+        ) = None,
         default_role: ABCRole | None = None,
         session: spark.SparkSession | None = None,
         backend: BackendsEnum = None,
@@ -143,10 +151,11 @@ class SmallDataset(DatasetBase):
     ) -> SmallDataset:
         if not isinstance(roles, dict):
             if isinstance(roles, ABCRole):
-                roles = {col: roles for col in data.keys()}
+                roles = {col: roles for col in cast("dict[Any, Any]", data).keys()}
             else:
                 raise TypeError(f"Value {roles} is not a dict type.")
 
+        payload: FromDictTypes
         if isinstance(data, dict) and "data" in data:
             payload = data
         elif isinstance(data, dict):

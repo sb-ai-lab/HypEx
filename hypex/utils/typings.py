@@ -72,12 +72,7 @@ SourceDataTypes = (
 
 MultiFieldKeyTypes = Union[str, Sequence[str]]
 
-FromDictTypes = Union[
-    Dict[str, List[Any]],
-    List[Dict[Any, Any]],
-    Dict[str, Dict[Any, List]],
-    Dict[str, "Dataset"],
-]
+FromDictTypes = Union[Dict[str, Any], List[Dict[Any, Any]]]
 RoleNameType = str
 DecoratedType = TypeVar("DecoratedType", bound=Union[Callable[..., Any], property])
 DocstringInheritDecorator = Callable[[DecoratedType], DecoratedType]

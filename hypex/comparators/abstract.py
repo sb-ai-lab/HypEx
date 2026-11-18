@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Callable, ClassVar, Literal
+from typing import Any, Callable, ClassVar, Literal, cast
 
 import numpy as np
 
@@ -84,7 +84,10 @@ class BaseComparator(Calculator):
         }
 
     def _set_value(
-        self, data: ExperimentData, value: Dataset | None = None, key: Any = None
+        self,
+        data: ExperimentData,
+        value: Dataset | SmallDataset | None = None,
+        key: Any = None,
     ) -> ExperimentData:
         data.set_value(
             ExperimentDataEnum.analysis_tables,
@@ -96,7 +99,8 @@ class BaseComparator(Calculator):
     @staticmethod
     def _extract_dataset(
         compare_result: FromDictTypes, roles: dict[Any, ABCRole]
-    ) -> Dataset:
+    ) -> Dataset | SmallDataset:
+        compare_result = cast("dict[Any, Any]", compare_result)
         first_val = next(iter(compare_result.values()))
         if isinstance(first_val, (Dataset, SmallDataset)):
             cr_list_v = list(compare_result.values())
@@ -137,7 +141,7 @@ class GroupsComparator(BaseComparator, ABC):
 
     def _local_extract_dataset(
         self, compare_result: dict[Any, Any], roles: dict[Any, ABCRole]
-    ) -> Dataset:
+    ) -> Dataset | SmallDataset:
         return self._extract_dataset(compare_result, roles)
 
     @classmethod
@@ -163,7 +167,7 @@ class GroupsComparator(BaseComparator, ABC):
         ],
         **kwargs,
     ) -> dict:
-        result = {}
+        result: dict[str, Dataset | SmallDataset] = {}
         for i in range(len(compared_data)):
             bl_dataset = baseline_data[0 if len(baseline_data) == 1 else i][1]
             cmp_dataset = compared_data[i][1]
@@ -319,9 +323,15 @@ class GroupsComparator(BaseComparator, ABC):
                 group_field_data, left_index=True, right_index=True, how="left"
             )
 
-        baseline_data = baseline_field_data.groupby(by=group_field_data.columns)
+        baseline_data = cast(
+            "list[tuple[str, Dataset]]",
+            baseline_field_data.groupby(by=group_field_data.columns),
+        )
         compared_data = cls._split_ds_into_columns(
-            target_fields_data.groupby(by=group_field_data.columns)
+            cast(
+                "list[tuple[str, Dataset]]",
+                target_fields_data.groupby(by=group_field_data.columns),
+            )
         )
         return baseline_data, compared_data
 
@@ -438,7 +448,8 @@ class GroupsComparator(BaseComparator, ABC):
                 group_field_data, target_fields_data
             )
         elif compare_by == "columns":
-            baseline_data, compared_data = cls._split_for_columns_mode(
+            # Preserve the legacy dynamic hook for backends that provide this method.
+            baseline_data, compared_data = cls._split_for_columns_mode(  # type: ignore[attr-defined]
                 baseline_field_data, target_fields_data
             )
         elif compare_by == "columns_in_groups":
@@ -459,8 +470,9 @@ class GroupsComparator(BaseComparator, ABC):
             )
         return baseline_data, compared_data
 
+    # Comparators consume split datasets rather than one generic data argument.
     @classmethod
-    def calc(
+    def calc(  # type: ignore[override]
         cls,
         compare_by: (
             Literal["groups", "columns", "columns_in_groups", "cross", "matched_pairs"]
@@ -469,9 +481,7 @@ class GroupsComparator(BaseComparator, ABC):
         target_fields_data: Dataset | None = None,
         baseline_field_data: Dataset | None = None,
         group_field_data: Dataset | None = None,
-        grouping_data: (
-            tuple[list[tuple[str, Dataset]]] | list[tuple[str, Dataset]] | None
-        ) = None,
+        grouping_data: GroupingDataType | None = None,
         **kwargs,
     ) -> dict:
         if compare_by is None and target_fields_data is None:
@@ -481,17 +491,17 @@ class GroupsComparator(BaseComparator, ABC):
 
         if grouping_data is None:
             grouping_data = cls._split_data_to_buckets(
-                compare_by=compare_by,
-                target_fields_data=target_fields_data,
-                baseline_field_data=baseline_field_data,
-                group_field_data=group_field_data,
+                compare_by=cast(Any, compare_by),
+                target_fields_data=cast(Dataset, target_fields_data),
+                baseline_field_data=cast(Dataset, baseline_field_data),
+                group_field_data=cast(Dataset, group_field_data),
             )
 
         baseline_data, compared_data = grouping_data
         return cls._execute_inner_function(
             baseline_data=baseline_data,
             compared_data=compared_data,
-            compare_by=compare_by,
+            compare_by=cast(Any, compare_by),
             **kwargs,
         )
 
@@ -668,7 +678,9 @@ class StatsComparator(BaseComparator, ABC):
     def __init__(
         self,
         stats: list[str],
-        compare_by: Literal["groups", "matched_pairs"],
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+        ],
         grouping_role: ABCRole | None = None,
         target_roles: ABCRole | list[ABCRole] | None = None,
         baseline_role: ABCRole | None = None,
@@ -721,9 +733,10 @@ class StatsComparator(BaseComparator, ABC):
             stats=stats,
         )
 
+    # Statistical comparators consume aggregated mappings, not a raw Dataset.
     @classmethod
     @abstractmethod
-    def _inner_function(
+    def _inner_function(  # type: ignore[override]
         cls,
         baseline_stats: dict[str, Any],
         compared_stats: dict[str, Any],
@@ -744,7 +757,9 @@ class StatsComparator(BaseComparator, ABC):
         """
         raise AbstractMethodError
 
-    def _set_stats_value(self, data: ExperimentData, value: Dataset) -> ExperimentData:
+    def _set_stats_value(
+        self, data: ExperimentData, value: Dataset | SmallDataset
+    ) -> ExperimentData:
         data.set_value(
             ExperimentDataEnum.analysis_tables,
             f"{self.id}{NAME_BORDER_SYMBOL}stats",
@@ -752,8 +767,9 @@ class StatsComparator(BaseComparator, ABC):
         )
         return data
 
+    # The two-phase statistical API returns a list of per-comparison datasets.
     @classmethod
-    def calc(
+    def calc(  # type: ignore[override]
         cls,
         target_fields_data: Dataset | None = None,
         group_field_data: Dataset | None = None,
@@ -762,7 +778,7 @@ class StatsComparator(BaseComparator, ABC):
         compare_by: str = "groups",
         group_col_stats: dict[str, dict[str, dict[str, Any]]] | None = None,
         **kwargs,
-    ) -> dict:
+    ) -> list[Dataset | SmallDataset]:
         """Stateless entry point mirroring :meth:`GroupsComparator.calc`.
 
         Runs the two-phase stats comparator outside the experiment pipeline.
@@ -866,6 +882,7 @@ class StatsComparator(BaseComparator, ABC):
                 )
 
             elif compare_by == "matched_pairs":
+                baseline_fields_data = cast(Dataset, baseline_fields_data)
                 best_match_col = baseline_fields_data.columns[0]
                 baseline_fields = baseline_fields_data[best_match_col]
 
@@ -1166,7 +1183,9 @@ class StatsHypothesisTesting(StatsComparator, ABC):
     def __init__(
         self,
         stats: list[str],
-        compare_by: Literal["groups", "matched_pairs"],
+        compare_by: Literal[
+            "groups", "columns", "columns_in_groups", "cross", "matched_pairs"
+        ],
         grouping_role: ABCRole | None = None,
         target_roles: ABCRole | list[ABCRole] | None = None,
         baseline_role: ABCRole | None = None,
@@ -1221,15 +1240,16 @@ class AdaptiveHypothesisTest(BaseComparator):
         Instantiate *cls* with this instance's configuration and override its
         id to match ours so results land under the adaptive class's id.
         """
+        delegate_cls = cast(Any, cls)
         if issubclass(cls, StatsHypothesisTesting):
-            instance = cls(
+            instance = delegate_cls(
                 grouping_role=self.grouping_role,
                 target_roles=self.target_roles,
                 reliability=self.reliability,
                 key=self.key,
             )
         else:  # GroupHypothesisTesting branch
-            instance = cls(
+            instance = delegate_cls(
                 compare_by=self.compare_by,
                 grouping_role=self.grouping_role,
                 target_role=self.target_roles,

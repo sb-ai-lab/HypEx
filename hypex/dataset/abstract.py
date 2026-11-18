@@ -925,6 +925,11 @@ class DatasetBase:
     def tmp_roles(self) -> dict[str, ABCRole]:
         return self._tmp_roles
 
+    @tmp_roles.setter
+    def tmp_roles(self, value: dict[str, ABCRole]) -> None:
+        self._set_roles(new_roles_map=value, temp_role=True)
+        self._set_empty_types(self._tmp_roles)
+
     @property
     def session(self) -> spark.SparkSession | None:
         return self._backend_data.session
@@ -941,11 +946,6 @@ class DatasetBase:
             return BackendsEnum.spark
         else:
             raise ValueError("Unknown backend type")
-
-    @tmp_roles.setter
-    def tmp_roles(self, value: dict[str, ABCRole]) -> None:
-        self._set_roles(new_roles_map=value, temp_role=True)
-        self._set_empty_types(self._tmp_roles)
 
     def _convert_data_after_agg(self, result: Any) -> Self | ScalarType | None:
         if result is None:

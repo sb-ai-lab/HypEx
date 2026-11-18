@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import math
 from copy import deepcopy
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
 from ..dataset import (
+    ABCRole,
     AdditionalTreatmentRole,
     Dataset,
     ExperimentData,
@@ -418,15 +419,15 @@ class AASplitter(Calculator):
     @timeit(level="SPLIT", prefix="SPLITTER")
     def execute(self, data: ExperimentData) -> ExperimentData:
         const_group_fields = data.ds.search_columns(ConstGroupRole())
-        const_group_fields = (
+        const_group_field = (
             const_group_fields[0] if len(const_group_fields) > 0 else None
         )
         result = self.calc(
-            data.ds,
+            cast(Dataset, data.ds),
             random_state=self.random_state,
             control_size=self.control_size,
             sample_size=self.sample_size,
-            const_group_field=const_group_fields,
+            const_group_field=const_group_field,
             groups_sizes=self.groups_sizes,
         )
         data = self._set_value(data, result)
@@ -451,7 +452,7 @@ class AASplitterWithStratification(AASplitter):
     """
 
     @staticmethod
-    def _inner_function(
+    def _inner_function(  # type: ignore[override]
         data: Dataset,
         random_state: int | None = None,
         control_size: float = 0.5,
@@ -538,7 +539,7 @@ class AASplitterWithStratification(AASplitter):
             if persisted_locally:
                 working_ds.persist(storage_level="MEMORY_AND_DISK", action="count")
             result = self.calc(
-                working_ds,
+                cast(Dataset, working_ds),
                 random_state=self.random_state,
                 control_size=self.control_size,
                 grouping_fields=grouping_fields,
@@ -554,6 +555,7 @@ class AASplitterWithStratification(AASplitter):
                 working_ds.unpersist()
 
         if isinstance(result, Dataset):
-            result = result.replace_roles({"split": AdditionalTreatmentRole()})
+            roles: dict[str, ABCRole] = {"split": AdditionalTreatmentRole()}
+            result = result.replace_roles(roles)
         data = self._set_value(data, result)
         return data

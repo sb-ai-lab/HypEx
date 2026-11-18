@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from scipy.stats import norm
 
-from ..dataset import ABCRole, Dataset, ExperimentData
+from ..dataset import ABCRole, Dataset, ExperimentData, SmallDataset
 from ..utils import ExperimentDataEnum
 from .comparators import Comparator
 
@@ -47,7 +47,10 @@ class PowerTesting(Comparator, ABC):
 
 class MDEBySize(PowerTesting):
     def _set_value(
-        self, data: ExperimentData, value: Dataset | None = None, key: Any = None
+        self,
+        data: ExperimentData,
+        value: Dataset | SmallDataset | None = None,
+        key: Any = None,
     ) -> ExperimentData:
         data.set_value(
             ExperimentDataEnum.variables,
@@ -71,7 +74,8 @@ class MDEBySize(PowerTesting):
 
         n_test, n_control = len(test_data), len(data)
 
-        var_test, var_control = test_data.var(ddof=1), data.var(ddof=1)
+        var_test = cast(float, test_data.var(ddof=1))
+        var_control = cast(float, data.var(ddof=1))
         s = np.sqrt(var_test / n_test + var_control / n_control)
 
         return m * s
