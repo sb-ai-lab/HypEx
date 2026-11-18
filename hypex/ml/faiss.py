@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from warnings import warn
 
 from ..comparators.distances import MahalanobisDistance
@@ -73,7 +73,7 @@ class FaissNearestNeighbors(MLExecutor):
     @classmethod
     def _set_global_match_indexes(
         cls, local_indexes: Dataset, data: tuple[str, Dataset]
-    ) -> list[int] | list[list[int]]:
+    ) -> Dataset:
         """
         Map local group indexes to global dataset indexes.
 
@@ -205,7 +205,10 @@ class FaissNearestNeighbors(MLExecutor):
             Any: The result of the nearest neighbor search from the backend-specific FAISS extension.
         """
         mahalanobis = kwargs.get("mahalanobis")
-        faiss_cls = backend_factory.resolve_backend(FaissExtension, data)
+        faiss_cls = cast(
+            "type[FaissExtension]",
+            backend_factory.resolve_backend(FaissExtension, data),
+        )
         return faiss_cls(
             n_neighbors=n_neighbors or 1, faiss_mode=faiss_mode, mahalanobis=mahalanobis
         ).calc(data=data, test_data=test_data)
@@ -222,7 +225,9 @@ class FaissNearestNeighbors(MLExecutor):
         Returns:
             MLExecutor: The fitted executor instance (or the backend-specific extension instance).
         """
-        faiss_cls = backend_factory.resolve_backend(FaissExtension, X)
+        faiss_cls = cast(
+            "type[FaissExtension]", backend_factory.resolve_backend(FaissExtension, X)
+        )
         return faiss_cls(self.n_neighbors, self.faiss_mode).fit(X=X, Y=Y)
 
     def predict(self, X: Dataset) -> Dataset:
@@ -235,7 +240,9 @@ class FaissNearestNeighbors(MLExecutor):
         Returns:
             Dataset: A dataset containing the indices of the nearest neighbors.
         """
-        faiss_cls = backend_factory.resolve_backend(FaissExtension, X)
+        faiss_cls = cast(
+            "type[FaissExtension]", backend_factory.resolve_backend(FaissExtension, X)
+        )
         return faiss_cls().predict(X)
 
     def execute(self, data: ExperimentData) -> ExperimentData:
@@ -287,16 +294,19 @@ class FaissNearestNeighbors(MLExecutor):
             > 0
             else None
         )
-        compare_result = self.calc(
-            data=data.ds,
-            group_field=group_field,
-            grouping_data=grouping_data,
-            features_fields=features_fields,
-            n_neighbors=self.n_neighbors,
-            faiss_mode=self.faiss_mode,
-            two_sides=self.two_sides,
-            test_pairs=self.test_pairs,
-            mahalanobis=mahalanobis,
+        compare_result = cast(
+            dict,
+            self.calc(
+                data=cast(Dataset, data.ds),
+                group_field=group_field,
+                grouping_data=grouping_data,
+                features_fields=features_fields,
+                n_neighbors=self.n_neighbors,
+                faiss_mode=self.faiss_mode,
+                two_sides=self.two_sides,
+                test_pairs=self.test_pairs,
+                mahalanobis=mahalanobis,
+            ),
         )
         nans = 0
 

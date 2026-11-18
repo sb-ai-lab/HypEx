@@ -5,11 +5,13 @@ import gc
 import math
 from abc import abstractmethod
 from typing import (
+    Any,
     Callable,
     ClassVar,
     Generator,
     Iterable,
     Literal,
+    cast,
 )
 
 import faiss
@@ -75,7 +77,7 @@ class FaissExtension(MLExtension):
         self,
         n_neighbors: int = 1,
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
-        mahalanobis: Dataset = None,
+        mahalanobis: Dataset | None = None,
     ):
         """
         Initialize the FAISS extension.
@@ -96,7 +98,8 @@ class FaissExtension(MLExtension):
         self.n_neighbors = n_neighbors
         self.faiss_mode = faiss_mode
         self.mahalanobis = mahalanobis
-        self.index = None
+        self.index: Any = None
+        self._data_size: int | None = 0
 
         super().__init__()
 
@@ -125,7 +128,7 @@ class FaissExtension(MLExtension):
             valid_cols = [col for col in data.columns if col in mahalanobis_index]
             if valid_cols and len(valid_cols) < len(data.columns):
                 data = data[valid_cols]
-            return data.dot(mahalanobis.raw_data)
+            return cast(Dataset, data.dot(mahalanobis.raw_data))
 
     # ── Clusterization parameters ─────────────────────────────────────────────────────
 
@@ -143,7 +146,8 @@ class FaissExtension(MLExtension):
         # TODO: insert into config `m` and 10 and 50 params
         # factor = MatchingConfig.FAISS_CLUSTER_FACTOR
         factor = 4  # heuristic
-        self.k = int(np.sqrt(self._data_size / factor))
+        data_size = cast(int, self._data_size)
+        self.k = int(np.sqrt(data_size / factor))
         self._nprobe = max(
             self.n_neighbors,
             min(
@@ -160,7 +164,8 @@ class FaissExtension(MLExtension):
         return min(self.k, max(1, n_vectors // min_pts))
 
     @abstractmethod
-    def calc(
+    # FAISS accepts a test dataset in addition to the generic ML mode argument.
+    def calc(  # type: ignore[override]
         self,
         data: Dataset,
         test_data: Dataset | None = None,
@@ -244,7 +249,7 @@ class PandasFaissExtension(FaissExtension):
         self,
         n_neighbors: int = 1,
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
-        mahalanobis: Dataset = None,
+        mahalanobis: Dataset | None = None,
     ):
         """
         Initialize the Pandas FAISS extension.
@@ -319,8 +324,11 @@ class PandasFaissExtension(FaissExtension):
             indexes = [int(index[dist][0]) for index, dist in zip(indexes, equal_dist)]
         else:
             indexes = self._prepare_indexes(indexes, dist, self.n_neighbors)
-        result = self.result_to_dataset(result=indexes, roles={}).set_index(
-            test_data.index, drop=False
+        result = cast(
+            Dataset,
+            self.result_to_dataset(result=indexes, roles={}).set_index(
+                test_data.index, drop=False
+            ),
         )
         result.index.name = None
 
@@ -369,7 +377,8 @@ class PandasFaissExtension(FaissExtension):
             self.index = faiss.IndexIDMap(_index)
         self.index.add_with_ids(X, np.array(data.index.tolist(), dtype=np.int64))
 
-    def calc(
+    # FAISS accepts a test dataset in addition to the generic ML mode argument.
+    def calc(  # type: ignore[override]
         self,
         data: Dataset,
         test_data: Dataset | None = None,
@@ -461,12 +470,12 @@ def _spark_partition_fit(
     if not ids:
         return  # for empty partition
 
-    ids = np.array(ids, dtype=np.int64)
-    vectors = np.array(vectors, dtype=np.float32)
+    ids_array = np.array(ids, dtype=np.int64)
+    vectors_array = np.array(vectors, dtype=np.float32)
 
     index_copy = faiss.clone_index(index)
     index_with_ids = faiss.IndexIDMap(index_copy)
-    index_with_ids.add_with_ids(vectors, ids)
+    index_with_ids.add_with_ids(vectors_array, ids_array)
 
     yield storage.save_index(index_with_ids)
 
@@ -503,14 +512,14 @@ def _spark_full_partition_fit(
     if not ids:
         return  # for empty partition
 
-    ids = np.array(ids, dtype=np.int64)
-    vectors = np.array(vectors, dtype=np.float32)
+    ids_array = np.array(ids, dtype=np.int64)
+    vectors_array = np.array(vectors, dtype=np.float32)
 
-    d = vectors.shape[1]
+    d = vectors_array.shape[1]
 
     quantizer = faiss.IndexFlatL2(d)
     index_with_ids = faiss.IndexIDMap(quantizer)
-    index_with_ids.add_with_ids(vectors, ids)
+    index_with_ids.add_with_ids(vectors_array, ids_array)
 
     yield storage.save_index(index_with_ids)
 
@@ -584,7 +593,7 @@ def _per_partition_predict(
         del chunk
         # gc.collect() # TODO: detect time decr when gc.collect disabled
 
-        candidates = [[] for _ in range(len(query_ids))]
+        candidates: list[list[tuple[float, int]]] = [[] for _ in range(len(query_ids))]
         for ref in references:
             tmp_index = cache.get(ref, storage)
             k = min(real_n, tmp_index.ntotal)
@@ -633,11 +642,11 @@ def _crossover_search(
 
     n_neighbors = bc_n_neighbors.value
     control_data = np.ascontiguousarray(
-        np.vstack(control_df["_features"].to_numpy())
+        np.vstack(list(control_df["_features"].to_numpy()))
     ).astype(np.float32)
-    test_data = np.ascontiguousarray(np.vstack(test_df["_features"].to_numpy())).astype(
-        np.float32
-    )
+    test_data = np.ascontiguousarray(
+        np.vstack(list(test_df["_features"].to_numpy()))
+    ).astype(np.float32)
 
     quantizer = faiss.IndexFlatL2(control_data.shape[1])
     quantizer.add(control_data)
@@ -728,7 +737,7 @@ class SparkFaissExtension(FaissExtension):
         self,
         n_neighbors: int = 1,
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
-        mahalanobis: Dataset = None,
+        mahalanobis: Dataset | None = None,
     ):
         """
         Initialize the Spark FAISS extension.
@@ -1034,7 +1043,9 @@ class SparkFaissExtension(FaissExtension):
             for pdf in it:
                 # Ensure features are contiguous in memory
                 # vstack does not guarantee this
-                features = np.ascontiguousarray(np.vstack(pdf["_features"].to_numpy()))
+                features = np.ascontiguousarray(
+                    np.vstack(list(pdf["_features"].to_numpy()))
+                )
                 _, row_cluster = cluster_index.search(features, 1)
 
                 output = pdf.loc[:, ["index", "_features"]].copy()
@@ -1098,7 +1109,8 @@ class SparkFaissExtension(FaissExtension):
             np.ndarray: Array of feature vectors with shape (n_samples, n_features)
                 and dtype float32.
         """
-        frac = min(MatchingConfig.FAISS_SAMPLE_TARGET / max(self._data_size, 1), 1.0)
+        data_size = cast(int, self._data_size)
+        frac = min(MatchingConfig.FAISS_SAMPLE_TARGET / max(data_size, 1), 1.0)
         sample_rows = (
             vectorized_data.sample(fraction=frac, seed=self.seed)
             .select("_features")
@@ -1144,7 +1156,7 @@ class SparkFaissExtension(FaissExtension):
             model_name (str | None): Clustering model name (e.g., "k-means", "birch").
                 Defaults to None (uses "k-means").
         """
-        self._prefit(vectorized_data=vectorized_data, model_name=model_name)
+        self._prefit(vectorized_data=vectorized_data, model_name=cast(str, model_name))
         self.index.nprobe = min(self._nprobe, self.index.nlist)
         self._build_and_persist_sharded_rdd(
             vectorized_data,
@@ -1200,7 +1212,7 @@ class SparkFaissExtension(FaissExtension):
         """
         features = ["index", "_features"]
         self._prepare_data_for_shuffle_mode(
-            vectorized_data.select(*features), model_name
+            vectorized_data.select(*features), cast(str, model_name)
         )
         self.new_execution_flag = True
 
@@ -1287,7 +1299,7 @@ class SparkFaissExtension(FaissExtension):
     def _persist_and_finalize(
         self,
         result: Dataset,
-        storage_level: str,
+        storage_level: Literal["MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"],
         broadcasts_to_destroy: list[Broadcast] | None = None,
     ) -> Dataset:
         """
@@ -1302,7 +1314,7 @@ class SparkFaissExtension(FaissExtension):
         Returns:
             Dataset: The persisted result dataset.
         """
-        result = result.set_index("index")
+        result = cast(Dataset, result.set_index("index"))
         result.index.name = None
         result.persist(storage_level=storage_level, action="count")
         result.checkpoint(eager=True)
@@ -1362,8 +1374,9 @@ class SparkFaissExtension(FaissExtension):
                 session,
             )
         )
+        clustered_control = cast("spark.DataFrame", self._clustered_control)
         control = (
-            self._clustered_control.join(clusters_frame, on="_cluster")
+            clustered_control.join(clusters_frame, on="_cluster")
             .withColumn(
                 "c_buckets", F.pmod(F.hash(F.col("index")), F.col("c_buckets"))
             )  # we use `hash` to guarantee uniform distribution into buckets
@@ -1374,8 +1387,9 @@ class SparkFaissExtension(FaissExtension):
             .select("_cluster", "c_buckets", "t_buckets", "index", "_features")
         )
 
+        clustered_test = cast("spark.DataFrame", self._clustered_test)
         test = (
-            self._clustered_test.withColumn(
+            clustered_test.withColumn(
                 "_cluster", F.explode(F.col("_cluster")).alias("_cluster")
             )
             .join(clusters_frame, on="_cluster")
@@ -1426,7 +1440,8 @@ class SparkFaissExtension(FaissExtension):
                 columns.
         """
         sc = data.sparkSession.sparkContext
-        bc_clusters = sc.broadcast(self._centroids)
+        centroids = cast(np.ndarray, self._centroids)
+        bc_clusters = sc.broadcast(centroids)
 
         bc_clusters_search = sc.broadcast(
             min(
@@ -1435,7 +1450,7 @@ class SparkFaissExtension(FaissExtension):
                     if MatchingConfig.FAISS_N_PROBES > 0
                     else self.n_neighbors
                 ),
-                len(self._centroids),
+                len(centroids),
             )
         )
 
@@ -1452,7 +1467,9 @@ class SparkFaissExtension(FaissExtension):
             quantizer.add(clusters)
 
             for pdf in it:
-                features = np.ascontiguousarray(np.vstack(pdf["_features"].to_numpy()))
+                features = np.ascontiguousarray(
+                    np.vstack(list(pdf["_features"].to_numpy()))
+                )
                 _, c_ids = quantizer.search(features, clusters_search)
 
                 output = pdf.loc[:, ["index", "_features"]]
@@ -1577,8 +1594,10 @@ class SparkFaissExtension(FaissExtension):
             tuple: (result Dataset, list of Broadcast variables to clean up)
         """
         session = test_data.sparkSession
-        index_references = self.storage.collect_and_register(self._sharded_rdd)
-        self._sharded_rdd.unpersist(blocking=True)
+        storage = cast(FaissIndexStorage, self.storage)
+        sharded_rdd = cast("RDD", self._sharded_rdd)
+        index_references = storage.collect_and_register(sharded_rdd)
+        sharded_rdd.unpersist(blocking=True)
         self._sharded_rdd = None
 
         broadcasts = self._create_predict_broadcasts(session, index_references)
@@ -1635,7 +1654,8 @@ class SparkFaissExtension(FaissExtension):
             "storage": session.sparkContext.broadcast(self.storage),
         }
 
-    def calc(
+    # FAISS accepts a test dataset in addition to the generic ML mode argument.
+    def calc(  # type: ignore[override]
         self,
         data: Dataset,
         test_data: Dataset | None = None,
@@ -1703,7 +1723,11 @@ class SparkFaissExtension(FaissExtension):
             )
             vectorized_test = self._vectorize_data(test_operating_data)
 
-            return self._predict(vectorized_test, data.get_storage_level())
+            storage_level = cast(
+                'Literal["MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"] | None',
+                data.get_storage_level(),
+            )
+            return self._predict(vectorized_test, storage_level)
 
         return self
 
@@ -1742,7 +1766,7 @@ class SparkFaissExtension(FaissExtension):
         """
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
         """Context manager exit: release Spark resources, never swallow errors."""
         self.unpersist()
         return False
@@ -1763,5 +1787,5 @@ def get_executor_cache() -> CachingIndex:
         CachingIndex: The LRU cache instance for FAISS indexes.
     """
     if not hasattr(builtins, "_faiss_index_cache"):
-        builtins._faiss_index_cache = CachingIndex()
-    return builtins._faiss_index_cache
+        setattr(builtins, "_faiss_index_cache", CachingIndex())
+    return cast(CachingIndex, getattr(builtins, "_faiss_index_cache"))
