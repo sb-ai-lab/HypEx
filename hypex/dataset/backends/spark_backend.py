@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import copy
 import os
+import sys
 import uuid
 import warnings
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Iterable, Literal, Sequence, Sized
+from typing import Any, Callable, ClassVar, Iterable, Literal, Sequence, Sized, cast
 
-try:
-    from typing import Self  # Python >= 3.11
-except ImportError:
-    from typing_extensions import Self  # Python < 3.11
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 import numpy as np
 import pandas as pd  # pyright: ignore[reportMissingImports]
@@ -99,7 +100,7 @@ class SparkNavigation(DatasetBackendNavigation):
         self,
         target_backend: BackendsEnum,
         session: Any | None = None,
-    ) -> Self:
+    ) -> DatasetBackendNavigation:
         """Convert spark backend to another backend with index preservation.
 
         When converting to Pandas, the memory-limit guard
@@ -602,11 +603,11 @@ class SparkNavigation(DatasetBackendNavigation):
         )
 
     # comparison operators:
-    def __eq__(self, other: Any) -> Self:
+    def __eq__(self, other: Any) -> Self:  # type: ignore[override]
         """Element-wise equality comparison."""
         return self._wrap_result(self.data == self.__magic_determine_other(other))
 
-    def __ne__(self, other: Any) -> Self:
+    def __ne__(self, other: Any) -> Self:  # type: ignore[override]
         """Element-wise inequality comparison."""
         return self._wrap_result(self.data != self.__magic_determine_other(other))
 
@@ -1079,10 +1080,11 @@ class SparkNavigation(DatasetBackendNavigation):
                     )
         return self._wrap_result(self.data)
 
-    def add_column(
+    # Concrete backends require a name; the abstract method also allows omission.
+    def add_column(  # type: ignore[override]
         self,
-        data: Sequence[Any],
-        name: str | list[str],
+        data: Any,
+        name: str | list[str] | None,
         index: Sequence[Any] | None = None,
     ) -> None:
         """Add a new column to the dataset.
@@ -1159,11 +1161,11 @@ class SparkNavigation(DatasetBackendNavigation):
             self.data.index = index
         return self
 
-    def to_dict(self) -> dict[str, list[Any]]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert dataset to dictionary format with data and index.
 
         Returns:
-            dict[str, list[Any]]: Dictionary with keys:
+            dict[str, Any]: Dictionary with keys:
                 - "data": dict mapping column names to value lists
                 - "index": list of index values
 
@@ -1240,7 +1242,9 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
     """
 
     @staticmethod
-    def _convert_agg_result(result: ps.Series | ps.DataFrame) -> Self | ScalarType:
+    def _convert_agg_result(
+        result: ps.Series | ps.DataFrame,
+    ) -> ps.DataFrame | ScalarType:
         """Convert aggregation results to appropriate return type.
 
         Handles edge case where single-value aggregations should return scalar
@@ -1250,7 +1254,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             result (ps.Series | ps.DataFrame): Result from aggregation operation.
 
         Returns:
-            SparkDataset | ScalarType: Wrapped DataFrame for multi-value results,
+            ps.DataFrame | ScalarType: DataFrame for multi-value results,
                 or the native scalar value for single-value results.
         """
         if isinstance(result, ps.Series):
@@ -1543,7 +1547,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             "kurtosis",
         }
         numeric_types = {int, float, np.int64, np.float64, np.int32, np.float32}
-        types = self.get_column_type()
+        types = cast("dict[str, type]", self.get_column_type())
         non_numeric = []
         for col, operations in agg_dict.items():
             operations = operations if isinstance(operations, list) else [operations]
@@ -1666,7 +1670,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         np_data = np.log(self.data.to_numpy())
         return self._wrap_result(ps.DataFrame(np_data, columns=self.data.columns))
 
-    def cov(self) -> SparkDataset:
+    def cov(self) -> SparkDataset | None:
         """Compute covariance matrix for numeric columns.
 
         Returns:
@@ -1697,7 +1701,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             )
             return self._wrap_result(converted)
 
-    def coefficient_of_variation(self) -> Self | float:
+    def coefficient_of_variation(self) -> Self | float | None:
         """Compute coefficient of variation (std/mean) for numeric columns.
 
         Returns:
@@ -1745,14 +1749,14 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         Returns:
             list[str]: List of column names with numeric types.
         """
-        types = self.get_column_type()
+        types = cast("dict[str, type]", self.get_column_type())
         return [
             col
             for col, dtype in types.items()
             if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]
         ]
 
-    def corr(self, numeric_only: bool = False) -> Self | float:
+    def corr(self, numeric_only: bool = False) -> Self | float | None:
         """Compute Pearson correlation matrix for numeric columns.
 
         Args:
@@ -1976,7 +1980,7 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
         n: int | None = None,
         frac: float | None = None,
         replace: bool = False,
-        seed: int = 42,
+        seed: int | None = 42,
     ) -> ps.DataFrame:
         """Generate reproducible random sample using Spark hashing.
 
@@ -2265,7 +2269,8 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             self.data.drop(labels=labels, axis=axis, columns=columns)
         )
 
-    def filter(
+    # Spark does not implement the pandas-only boolean ``column`` argument.
+    def filter(  # type: ignore[override]
         self, items: list | None = None, regex: str | None = None, axis: int | str = 0
     ) -> Self:
         """Filter columns based on labels or regex pattern.
