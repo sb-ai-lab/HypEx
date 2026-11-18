@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 import pandas as pd
@@ -84,8 +84,8 @@ class MatchingMetricsExtension(Extension):
         self.metric = metric
         self.n_neighbors = n_neighbors
 
-        self.new_target_field = None
-        self.neighbors_cols = None
+        self.new_target_field: str | None = None
+        self.neighbors_cols: list[str] | None = None
 
     def _calc_stats_and_weights(self, data):
         """Compute group statistics and neighbor weights (backend-specific)."""
@@ -105,7 +105,7 @@ class MatchingMetricsExtension(Extension):
             data=data, neighbors_cols=neighbors_cols, numeric_cols=self.target_field
         )
         matched_data = self.result_to_dataset(matched_data, {}, small=False)
-        matched_data = matched_data.set_index("initial_index")
+        matched_data = cast(Dataset, matched_data.set_index("initial_index"))
         matched_data.index.name = None
 
         return matched_data
@@ -118,7 +118,9 @@ class MatchingMetricsExtension(Extension):
         raise NotImplementedError
 
     @staticmethod
-    def _extract_info(data: Dataset) -> tuple[Dataset, list[str], list[str]]:
+    def _extract_info(
+        data: Dataset,
+    ) -> tuple[list[str], list[str], str | None, str | None]:
         """Extract neighbor indices, numeric columns, bias, and new target columns."""
         neighbors_cols = data.search_columns(AdditionalMatchingRole())
         if len(neighbors_cols) == 0:
@@ -142,14 +144,14 @@ class MatchingMetricsExtension(Extension):
         )
         return neighbors_cols, numeric_cols, bias_col, new_target_col
 
-    def _set_columns(self, data: Dataset) -> list[str]:
+    def _set_columns(self, data: Dataset) -> None:
         """Resolve and store target and group field names."""
         self.target_field = data.search_columns(self.target_roles)[0]
         self.group_field = data.search_columns(self.grouping_role)[0]
 
     @staticmethod
     def _calc_se(
-        n_c: int, n_t: int, var_c: float, var_t: float, fs_c: float, fs_t: float
+        n_c: float, n_t: float, var_c: float, var_t: float, fs_c: float, fs_t: float
     ) -> float:
         """Calculate the standard error of the treatment effect estimate.
 
@@ -183,15 +185,16 @@ class MatchingMetricsExtension(Extension):
         Returns:
             The two-sided p-value.
         """
-        return (
-            NormCDF()
-            .calc(SmallDataset.from_dict({"value": [x]}, roles={"value": InfoRole()}))
-            .get_values()[0][0]
+        input_data = cast(
+            Dataset,
+            SmallDataset.from_dict({"value": [x]}, roles={"value": InfoRole()}),
         )
+        result = cast(Dataset, NormCDF().calc(input_data))
+        return result.get_values()[0][0]
 
     def _calc_metrics(
         self, stats_itc: dict[str, float], stats_itt: dict[str, float]
-    ) -> dict[str, float]:
+    ) -> dict[str, list[float]]:
         """Compute final ATT, ATC, and ATE metrics with confidence intervals.
 
         Returns NaN-filled rows when either group has zero observations,
@@ -417,7 +420,9 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
     ) -> tuple[dict[str, float], dict[str, float]]:
         new_data: pd.DataFrame = data.raw_data.copy()
         scaled_counts = self._calc_scaled_counts(
-            new_data, self.neighbors_cols, self.n_neighbors
+            new_data,
+            cast("str | list[str]", self.neighbors_cols),
+            self.n_neighbors,
         )
         group_1, group_2, *_ = sorted(new_data[self.group_field].unique())
 
@@ -425,7 +430,9 @@ class PandasMatchingMetricsExtension(MatchingMetricsExtension):
         new_target_vals = new_data[self.new_target_field].values
         bias_vals = new_data[self.bias_field].values
 
-        valid_mask = np.isfinite(new_target_vals) & np.isfinite(bias_vals)
+        valid_mask = np.isfinite(cast(Any, new_target_vals)) & np.isfinite(
+            cast(Any, bias_vals)
+        )
 
         n_excluded = int((~valid_mask).sum())
         if n_excluded > 0:
@@ -579,7 +586,9 @@ class SparkMatchingMetricsExtension(MatchingMetricsExtension):
         """
         new_data: SparkDF = data.raw_data.to_spark(index_col="index")
         scaled_counts = self._calc_scaled_counts(
-            new_data, self.neighbors_cols, self.n_neighbors
+            new_data,
+            cast("str | list[str]", self.neighbors_cols),
+            self.n_neighbors,
         )
         scaled_counts.persist(self.PERSIST_POLITIC)
 
