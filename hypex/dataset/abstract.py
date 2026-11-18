@@ -7,7 +7,16 @@ from collections.abc import Iterable as IterableABC
 from collections.abc import Sequence as SequenceABC
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Hashable, Iterable, Literal, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Hashable,
+    Iterable,
+    Literal,
+    Sequence,
+    cast,
+)
 
 import pandas as pd
 
@@ -1452,7 +1461,7 @@ class DatasetBase:
         )
 
     def cov(self) -> DatasetBase:
-        t_data = self.backend_data.cov()
+        t_data = cast("PandasDataset | SparkDataset", self.backend_data.cov())
         return self._from_derived_backend(
             roles={column: DefaultRole() for column in t_data.columns}, data=t_data
         )

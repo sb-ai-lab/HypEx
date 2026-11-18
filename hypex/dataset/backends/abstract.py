@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-try:
-    from typing import Self  # Python >= 3.11
-except ImportError:
-    from typing_extensions import Self  # Python < 3.11
-
+import sys
 from abc import ABC, abstractmethod
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 from collections.abc import Callable, Iterable, Sequence, Sized
 from typing import Any, Literal
 
@@ -78,7 +79,7 @@ class DatasetBackendNavigation(ABC):
         self,
         target_backend: BackendsEnum,
         session: Any | None = None,
-    ) -> Self:
+    ) -> DatasetBackendNavigation:
         """Convert the dataset to a different backend preserving the index.
 
         Enables cross-backend operations by converting the underlying data
@@ -207,12 +208,12 @@ class DatasetBackendNavigation(ABC):
     # Comparison operators
     # ------------------------------------------------------------------
     @abstractmethod
-    def __eq__(self, other: Any) -> Self:
+    def __eq__(self, other: Any) -> Self:  # type: ignore[override]
         """Element‑wise equality comparison (``self == other``)."""
         raise AbstractMethodError
 
     @abstractmethod
-    def __ne__(self, other: Any) -> Self:
+    def __ne__(self, other: Any) -> Self:  # type: ignore[override]
         """Element‑wise inequality comparison (``self != other``)."""
         raise AbstractMethodError
 
@@ -433,7 +434,7 @@ class DatasetBackendNavigation(ABC):
     @abstractmethod
     def astype(
         self, dtype: dict[str, type], errors: Literal["raise", "ignore"] = "raise"
-    ) -> Self:
+    ) -> Any:
         """Cast columns to the specified types.
 
         Args:
@@ -460,7 +461,10 @@ class DatasetBackendNavigation(ABC):
 
     @abstractmethod
     def add_column(
-        self, data: Any, name: str | None = None, index: Sequence | None = None
+        self,
+        data: Any,
+        name: str | list[str] | None = None,
+        index: Sequence | None = None,
     ) -> None:
         """Add a new column to the dataset (in‑place).
 
@@ -474,7 +478,7 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def append(self, other: Any, reset_index: bool = False, axis: int = 0) -> Self:
+    def append(self, other: Any, reset_index: bool = False, axis: int = 0) -> Any:
         """Concatenate ``other`` dataset(s) to the current one.
 
         Args:
@@ -490,7 +494,7 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def loc(self, values: Iterable) -> Self:
+    def loc(self, values: Iterable) -> Any:
         """Label‑based selection.
 
         Args:
@@ -503,7 +507,7 @@ class DatasetBackendNavigation(ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def iloc(self, values: Iterable) -> Self:
+    def iloc(self, values: Iterable) -> Any:
         """Integer‑position‑based selection.
 
         Args:
