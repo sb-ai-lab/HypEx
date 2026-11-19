@@ -25,8 +25,14 @@ class SMD(GroupOperator):
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Any:
         test_data = cls._check_test_data(test_data=test_data)
+        mean_difference = data.mean() - test_data.mean()
         pooled_std = ((data.var() + test_data.var()) / 2) ** 0.5
-        return (data.mean() - test_data.mean()) / pooled_std
+        if float(pooled_std) == 0.0:
+            difference = float(mean_difference)
+            if difference == 0.0:
+                return 0.0
+            return float("inf") if difference > 0.0 else float("-inf")
+        return mean_difference / pooled_std
 
 
 class MatchingMetrics(GroupOperator):
