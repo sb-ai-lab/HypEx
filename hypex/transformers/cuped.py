@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any
+from typing import Any, cast
 
 from ..dataset.dataset import Dataset, SmallDataset
 from ..dataset.experiment_data import ExperimentData
@@ -72,8 +72,9 @@ class CUPEDTransformer(Transformer):
             )
         return result
 
+    # CUPED requires an explicit target-to-pre-target mapping.
     @classmethod
-    def calc(
+    def calc(  # type: ignore[override]
         cls,
         data: Dataset,
         cuped_features: dict[str, str],
@@ -101,13 +102,15 @@ class CUPEDTransformer(Transformer):
             Updated ``ExperimentData`` with adjusted targets in ``ds``
             and variance-reduction report in ``analysis_tables``.
         """
-        new_ds = self.calc(data=data.ds, cuped_features=self.cuped_features)
+        new_ds = self.calc(
+            data=cast(Dataset, data.ds), cuped_features=self.cuped_features
+        )
 
         # ── Compute variance reductions ──────────────────────────────
         report_rows: list[dict[str, Any]] = []
         for target_feature in self.cuped_features:
-            original_var = data.ds[target_feature].var()
-            adjusted_var = new_ds[f"{target_feature}_cuped"].var()
+            original_var = cast(float, data.ds[target_feature].var())
+            adjusted_var = cast(float, new_ds[f"{target_feature}_cuped"].var())
             variance_reduction = (
                 (1 - adjusted_var / original_var) * 100 if original_var > 0 else 0.0
             )

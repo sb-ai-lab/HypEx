@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from ..dataset import Dataset
 from ..extensions.encoders import DummyEncoderExtension
 from ..utils.registry import backend_factory
@@ -52,5 +54,8 @@ class DummyEncoder(Encoder):
         if not target_cols:
             return Dataset.create_empty()
 
-        encoder_cls = backend_factory.resolve_backend(DummyEncoderExtension, data)
+        encoder_cls = cast(
+            "type[DummyEncoderExtension]",
+            backend_factory.resolve_backend(DummyEncoderExtension, data),
+        )
         return encoder_cls.calc(data=data, target_cols=target_cols, **kwargs)

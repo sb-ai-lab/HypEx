@@ -57,9 +57,9 @@ class GroupOperator(
     def _execute_inner_function(
         cls,
         grouping_data,
-        target_fields: list[str] | None = None,
+        target_fields: str | list[str] | None = None,
         **kwargs,
-    ) -> dict:
+    ) -> dict | None:
         if target_fields is None or len(target_fields) != 2:
             raise ValueError(
                 f"This operator works with 2 targets, but got {len(target_fields) if target_fields else None}"
@@ -78,10 +78,10 @@ class GroupOperator(
         cls,
         data: Dataset,
         group_field: Sequence[str] | str | None = None,
-        grouping_data: GroupedDataset | None = None,
+        grouping_data: GroupedDataset | list[tuple[str, Dataset]] | None = None,
         target_fields: str | list[str] | None = None,
         **kwargs,
-    ) -> dict:
+    ) -> dict | None:
         group_field = Adapter.to_list(group_field)
 
         if grouping_data is None:
@@ -96,7 +96,7 @@ class GroupOperator(
         )
 
     def _set_value(
-        self, data: ExperimentData, value: dict | None = None, key: Any = None
+        self, data: ExperimentData, value: Any = None, key: Any = None
     ) -> ExperimentData:
         data.set_value(
             ExperimentDataEnum.variables,
