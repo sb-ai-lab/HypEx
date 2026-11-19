@@ -246,14 +246,15 @@ class PSI(Comparator):
             raise ValueError("PSI requires non-empty data and test_data")
         data_column = data.iloc[:, 0]
         test_data_column = test_data.iloc[:, 0]
-        lower = min(float(data_column.min()), float(test_data_column.min()))
-        upper = max(float(data_column.max()), float(test_data_column.max()))
-        if lower == upper:
-            return {
-                "PSI": 0.0
-                if float(data_column.min()) == float(test_data_column.min())
-                else float("inf")
-            }
+        data_min = float(data_column.min())
+        data_max = float(data_column.max())
+        test_min = float(test_data_column.min())
+        test_max = float(test_data_column.max())
+        if data_min == data_max and test_min == test_max:
+            return {"PSI": 0.0 if data_min == test_min else float("inf")}
+
+        lower = min(data_min, test_min)
+        upper = max(data_max, test_max)
 
         edges = np.linspace(lower, upper, NUM_OF_BUCKETS + 1)
         epsilon = np.finfo(float).eps
