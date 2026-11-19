@@ -93,24 +93,28 @@ def test_groups_mode_empty_targets_raise(ds) -> None:
         GroupsComparator._split_for_groups_mode(ds[["g"]], ds[[]])
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="Issue: _split_for_columns_mode is referenced but not implemented",
-)
 def test_columns_mode_is_implemented(ds) -> None:
-    GroupsComparator._split_data_to_buckets(
+    baseline, compared = GroupsComparator._split_data_to_buckets(
         compare_by="columns",
         target_fields_data=ds[["y"]],
         baseline_field_data=ds[["pre"]],
         group_field_data=ds[["g"]],
     )
+    assert len(baseline) == 1
+    assert baseline[0][1].columns == ["pre"]
+    assert [item[1].columns for item in compared] == [["y"]]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: grouping column leaks into compared data in columns_in_groups mode",
-)
+def test_columns_mode_compares_every_target_and_preserves_values(ds) -> None:
+    baseline, compared = GroupsComparator._split_for_columns_mode(
+        ds[["pre"]], ds[["y", "z"]]
+    )
+    assert to_pandas(baseline[0][1])["pre"].tolist() == list(range(9))
+    assert [item[1].columns for item in compared] == [["y"], ["z"]]
+    assert to_pandas(compared[0][1])["y"].iloc[:3].tolist() == [1.0, 2.0, 3.0]
+    assert to_pandas(compared[1][1])["z"].iloc[:3].tolist() == [5.0, 6.0, 7.0]
+
+
 def test_columns_in_groups_mode_pairs_baseline_and_target_per_group(ds) -> None:
     base, comp = GroupsComparator._split_for_columns_in_groups_mode(
         ds[["g"]], ds[["pre"]], ds[["y"]]
@@ -120,16 +124,45 @@ def test_columns_in_groups_mode_pairs_baseline_and_target_per_group(ds) -> None:
     assert [len(d) for _, d in comp] == [3, 2, 4]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: grouping column leaks into compared data in cross mode",
-)
 def test_cross_mode_uses_first_group_baseline_against_other_groups(ds) -> None:
     base, comp = GroupsComparator._split_for_cross_mode(
         ds[["g"]], ds[["pre"]], ds[["y"]]
     )
     assert len(base) == 1 and len(base[0][1]) == 3
     assert [len(d) for _, d in comp] == [2, 4]
+
+
+def test_grouped_split_modes_preserve_exact_values(
+    frame, backend, spark_session
+) -> None:
+    roles = {
+        "g": GroupingRole(),
+        "y": TargetRole(),
+        "z": TargetRole(),
+        "pre": PreTargetRole(),
+    }
+    data = build_dataset(frame, roles, backend, spark_session)
+    base, comp = GroupsComparator._split_for_columns_in_groups_mode(
+        data[["g"]], data[["pre"]], data[["y"]]
+    )
+    assert {name for name, _ in base} == {"a", "b", "c"}
+    for name, bucket in base:
+        assert bucket.columns == ["pre"]
+    for name, bucket in comp:
+        assert bucket.columns == ["y"]
+    assert sorted(to_pandas(dict(comp)["a"])["y"]) == [1.0, 2.0, 3.0]
+    assert sorted(to_pandas(dict(base)["c"])["pre"]) == [5.0, 6.0, 7.0, 8.0]
+
+    base, comp = GroupsComparator._split_for_cross_mode(
+        data[["g"]], data[["pre"]], data[["y"]]
+    )
+    assert len(base) == 1
+    assert base[0][0] == "a"
+    assert base[0][1].columns == ["pre"]
+    assert sorted(to_pandas(base[0][1])["pre"]) == [0.0, 1.0, 2.0]
+    assert _names(comp) == ["b", "c"]
+    assert sorted(to_pandas(comp[0][1])["y"]) == [10.0, 20.0]
+    assert sorted(to_pandas(comp[1][1])["y"]) == [100.0, 200.0, 300.0, 400.0]
 
 
 def test_matched_pairs_mode_aligns_baseline_with_matches() -> None:
@@ -159,6 +192,52 @@ def test_unknown_compare_by_raises(ds) -> None:
             baseline_field_data=ds[["pre"]],
             group_field_data=ds[["g"]],
         )
+
+
+def test_calc_columns_mode_compares_each_target_with_baseline(ds) -> None:
+    result = _Collect.calc(
+        compare_by="columns",
+        target_fields_data=ds[["y", "z"]],
+        baseline_field_data=ds[["pre"]],
+        group_field_data=ds[["g"]],
+    )
+    assert sorted(result) == ["columns┆y", "columns┆z"]
+    y = to_pandas(result["columns┆y"]).iloc[0]
+    z = to_pandas(result["columns┆z"]).iloc[0]
+    assert y["mean_base"] == pytest.approx(4.0)
+    assert (y["n_base"], y["n_test"]) == (9, 9)
+    assert z["mean_base"] == pytest.approx(4.0)
+    assert z["mean_test"] == pytest.approx(9.0)
+
+
+def test_calc_columns_in_groups_mode_uses_matching_group_baselines(ds) -> None:
+    result = _Collect.calc(
+        compare_by="columns_in_groups",
+        target_fields_data=ds[["y"]],
+        baseline_field_data=ds[["pre"]],
+        group_field_data=ds[["g"]],
+    )
+    assert sorted(result) == ["a┆y", "b┆y", "c┆y"]
+    assert to_pandas(result["a┆y"]).iloc[0]["mean_base"] == pytest.approx(1.0)
+    assert to_pandas(result["a┆y"]).iloc[0]["mean_test"] == pytest.approx(2.0)
+    assert to_pandas(result["b┆y"]).iloc[0]["n_base"] == 2
+    assert to_pandas(result["b┆y"]).iloc[0]["mean_test"] == pytest.approx(15.0)
+    assert to_pandas(result["c┆y"]).iloc[0]["n_base"] == 4
+    assert to_pandas(result["c┆y"]).iloc[0]["mean_test"] == pytest.approx(250.0)
+
+
+def test_calc_cross_mode_uses_first_group_baseline(ds) -> None:
+    result = _Collect.calc(
+        compare_by="cross",
+        target_fields_data=ds[["y"]],
+        baseline_field_data=ds[["pre"]],
+        group_field_data=ds[["g"]],
+    )
+    assert sorted(result) == ["b┆y", "c┆y"]
+    for key, expected_mean in (("b┆y", 15.0), ("c┆y", 250.0)):
+        row = to_pandas(result[key]).iloc[0]
+        assert row["mean_base"] == pytest.approx(1.0)
+        assert row["mean_test"] == pytest.approx(expected_mean)
 
 
 def test_calc_groups_mode_returns_one_result_per_compared_group(ds) -> None:
