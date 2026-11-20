@@ -425,14 +425,17 @@ class ABAnalyzer(Executor):
             [analysis_data], {f: StatisticRole(float) for f in analysis_data}
         )
 
-        data = self.execute_multitest(
-            data,
-            (
-                multitest_pvalues
-                if not multitest_pvalues.is_empty()
-                and self.multitest_method != ABNTestMethodsEnum.quantile
-                else data.ds
-            ),
-        )
+        if (
+            not multitest_pvalues.is_empty()
+            or self.multitest_method == ABNTestMethodsEnum.quantile
+        ):
+            data = self.execute_multitest(
+                data,
+                (
+                    multitest_pvalues
+                    if self.multitest_method != ABNTestMethodsEnum.quantile
+                    else data.ds
+                ),
+            )
 
         return self._set_value(data, analysis_dataset)
