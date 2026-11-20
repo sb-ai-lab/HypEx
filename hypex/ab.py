@@ -78,15 +78,10 @@ class ABTest(ExperimentShell):
         additional_tests = (
             [ABTestTypesEnum.t_test] if additional_tests is None else additional_tests
         )
-        if isinstance(multitest_method, ABNTestMethodsEnum):
-            pass
-        elif (
-            multitest_method is not None
-            and multitest_method in ABNTestMethodsEnum._value2member_map_
+        if multitest_method is not None and not isinstance(
+            multitest_method, ABNTestMethodsEnum
         ):
             multitest_method = ABNTestMethodsEnum(multitest_method)
-        else:
-            multitest_method = ABNTestMethodsEnum.holm
         if additional_tests:
             if isinstance(additional_tests, list):
                 additional_tests = [
@@ -156,7 +151,7 @@ class ABTest(ExperimentShell):
                 "fdr_bh",
                 "fdr_by",
                 "fdr_tsbh",
-                "fdr_tsbhy",
+                "fdr_tsbky",
                 "quantile",
             ]
             | None

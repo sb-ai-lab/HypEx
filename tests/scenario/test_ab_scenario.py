@@ -254,11 +254,6 @@ def test_bonferroni_equals_pvalue_times_comparisons(three_groups) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: ABTest._make_experiment replaces None (and any unknown name) with 'holm', "
-    "so multitest_method=None cannot disable the correction",
-)
 def test_no_multitest_method_gives_message(three_groups) -> None:
     out = _run(three_groups, multitest_method=None)
     assert isinstance(out.multitest, str)
@@ -273,12 +268,6 @@ def test_quantile_multitest_runs(three_groups) -> None:
     _run(three_groups, multitest_method="quantile")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=pytest.fail.Exception,
-    reason="Issue: unknown multitest method names (including the documented 'fdr_tsbhy') are "
-    "silently replaced by 'holm' instead of raising",
-)
 @pytest.mark.parametrize("name", ["fdr_tsbhy", "nonsense"])
 def test_unknown_multitest_method_is_rejected(name) -> None:
     with pytest.raises(ValueError):

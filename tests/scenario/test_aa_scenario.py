@@ -30,7 +30,7 @@ def _run(df=None, roles=None, **kwargs):
 
 
 def test_homogeneous_data_passes_aa() -> None:
-    output = _run(n_iterations=20, random_states=range(20))
+    output = _run(n_iterations=100, random_states=range(100))
     resume = to_pandas(output.resume)
     # resume has one row per target/feature column
     assert (resume["result"] == "OK").all()

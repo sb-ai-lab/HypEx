@@ -5,7 +5,7 @@ from math import sqrt
 from typing import Any, ClassVar, Literal
 
 import numpy as np
-from scipy.stats import chi2_contingency, kstwobign  # type: ignore
+from scipy.stats import chi2_contingency, kstwobign, norm  # type: ignore
 from scipy.stats import t as t_dist  # type: ignore
 
 from ..dataset import ABCRole, Dataset, DatasetAdapter, ExperimentData, SmallDataset
@@ -457,12 +457,12 @@ class StatsZTest(StatsHypothesisTesting):
             return {"p-value": None, "statistic": None, "pass": None}
 
         z_stat = (p1 - p2) / se
-        p_value = float(2 * t_dist.sf(abs(z_stat), n1 + n2 - 2))
+        p_value = float(2 * norm.sf(abs(z_stat)))
 
         return {
-            "p-value": [p_value],
-            "statistic": [float(z_stat)],
-            "pass": [p_value < reliability],
+            "p-value": p_value,
+            "statistic": float(z_stat),
+            "pass": p_value < reliability,
         }
 
 

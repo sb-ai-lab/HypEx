@@ -43,11 +43,6 @@ def _frame(ds) -> pd.DataFrame:
     return ds.backend_data.data
 
 
-def _as_bool(value) -> bool:
-    """MultiTest stores booleans as strings ("True"/"False"), see the dtype test below."""
-    return str(value) == "True"
-
-
 # ---------------------------------------------------------------------------
 # MultiTest
 # ---------------------------------------------------------------------------
@@ -71,15 +66,10 @@ def test_multitest_matches_statsmodels(method, sm_name) -> None:
     np.testing.assert_allclose(
         result["new p-value"].astype(float), expected[1], atol=TOL
     )
-    assert [_as_bool(v) for v in result["rejected"]] == expected[0].tolist()
+    assert result["rejected"].tolist() == expected[0].tolist()
     np.testing.assert_allclose(result["old p-value"].astype(float), RAW_P, atol=TOL)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: MultiTest result columns are stringified (p-values and 'rejected' come "
-    "back as str), so bool(rejected) is True for every row",
-)
 def test_multitest_result_columns_are_typed() -> None:
     result = _frame(
         MultiTest(ABNTestMethodsEnum.bonferroni).calc(_pvalue_dataset(RAW_P))
@@ -144,9 +134,7 @@ def test_alpha_controls_rejection() -> None:
     loose = _frame(
         MultiTest(ABNTestMethodsEnum.bonferroni, alpha=0.5).calc(_pvalue_dataset(RAW_P))
     )
-    assert sum(_as_bool(v) for v in strict["rejected"]) < sum(
-        _as_bool(v) for v in loose["rejected"]
-    )
+    assert strict["rejected"].sum() < loose["rejected"].sum()
 
 
 def test_correction_is_applied_per_test_family() -> None:
