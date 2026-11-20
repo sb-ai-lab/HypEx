@@ -278,6 +278,10 @@ detailed API documentation for advanced use cases.
 The architecture of the package (executors, `ExperimentData`, backends) is described in
 [hypex/README.md](hypex/README.md).
 
+Additional architecture documentation and source navigation are available in the
+[DeepWiki codebase overview](https://deepwiki.com/sb-ai-lab/HypEx). This AI-generated resource may lag behind the latest
+release.
+
 ## Contributions
 
 Join our community! For guidelines on contributing, reporting issues or seeking support, please refer to
