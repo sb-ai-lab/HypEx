@@ -11,6 +11,7 @@ from hypex.dataset import (
     Dataset,
     ExperimentData,
     FeatureRole,
+    IndexRole,
     InfoRole,
     PreTargetRole,
     SmallDataset,
@@ -335,14 +336,9 @@ def test_aa_output_reproducible_with_fixed_states() -> None:
     pd.testing.assert_frame_equal(_frame(first.experiments), _frame(second.experiments))
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="Issue: Matching().execute runs on Spark, but output.indexes is empty (0 rows, expected 300) with default and with compute_indexes=True",
-)
 @pytest.mark.spark
 def test_matching_output_structure_on_spark(spark_session) -> None:
-    output = Matching().execute(
+    output = Matching(compute_indexes=True).execute(
         _dataset(backend=BackendsEnum.spark, session=spark_session)
     )
     assert isinstance(output, MatchingOutput)
@@ -384,3 +380,140 @@ def test_aa_output_extract_experiments_keeps_nan_pass_and_casts_others() -> None
     assert frame["TTest x pass"].tolist()[1:] == [True, False]
     assert frame["KSTest x pass"].tolist() == [True, False, True]
     assert frame["n"].tolist() == [1, 2, 3]
+
+
+# ---------------------------------------------------------------------------
+# Rich string and HTML representations
+# ---------------------------------------------------------------------------
+def test_ab_result_rows_keep_group_and_each_test() -> None:
+    output = ABTest(additional_tests=["t-test", "u-test", "ks-test"]).execute(
+        _dataset(_df(groups=3))
+    )
+    rows = output._result_rows()
+    assert len(rows) == 6
+    assert {row["group"] for row in rows} == {"1", "2"}
+    assert {row["test"] for row in rows} == {"TTest", "KSTest", "UTest"}
+    assert all(
+        any(row["group"] == group and row["test"] == test for row in rows)
+        for group in ("1", "2")
+        for test in ("TTest", "KSTest", "UTest")
+    )
+    assert "group=1, TTest" in repr(output)
+    assert "Group" in output._repr_html_()
+    assert "Test" in output._repr_html_()
+
+
+def test_ab_repr_without_tests_does_not_report_failure() -> None:
+    output = ABOutput()
+    output.summary = SmallDataset.from_dict(
+        [{"feature": "y", "group": "1", "difference %": 1.0}],
+        roles={},
+    )
+    assert output._result_rows() == []
+    assert "❌" not in repr(output)
+
+
+def test_aa_summary_includes_best_split() -> None:
+    output = AATest(n_iterations=2, random_states=[1, 2]).execute(_dataset())
+    expected = output.best_split_statistics.to_records()[0]["group"]
+    assert output._summary_stats()["best_split"] == expected
+    assert f"Best Split : {expected}" in repr(output)
+
+
+def test_cupac_html_handles_zero_importance_and_escapes_values() -> None:
+    output = CupacOutput()
+    output.variance_reductions = SmallDataset.from_dict(
+        [
+            {
+                "target": "<b>target</b>",
+                "best_model": "<i>model</i>",
+                "variance_reduction_cv": 10.0,
+                "variance_reduction_real": 20.0,
+            }
+        ],
+        roles={},
+    )
+    output.feature_importances = SmallDataset.from_dict(
+        [{"feature": "<img src=x>", "importance": 0.0}],
+        roles={},
+    )
+    rendered = output._repr_html_()
+    assert "width:0.0%" in rendered
+    assert "&lt;b&gt;target&lt;/b&gt;" in rendered
+    assert "&lt;i&gt;model&lt;/i&gt;" in rendered
+    assert "&lt;img src=x&gt;" in rendered
+    assert "<b>target</b>" not in rendered
+    assert "<i>model</i>" not in rendered
+    assert "<img src=x>" not in rendered
+
+
+def test_cuped_html_escapes_feature_name() -> None:
+    from hypex.ui.ab import CupedOutput
+
+    output = CupedOutput()
+    output.variance_reductions = SmallDataset.from_dict(
+        [{"feature": "<b>x</b>", "variance_reduction_pct": 20.0}],
+        roles={},
+    )
+    rendered = output._repr_html_()
+    assert "&lt;b&gt;x&lt;/b&gt;" in rendered
+    assert "<b>x</b>" not in rendered
+
+
+# Matching IndexRole input preparation
+# ---------------------------------------------------------------------------
+def _matching_index_dataset(ids=("a", "b", "c", "d")) -> Dataset:
+    return Dataset(
+        roles={
+            "id": IndexRole(),
+            "treat": TreatmentRole(),
+            "x": FeatureRole(),
+            "y": TargetRole(),
+        },
+        data=pd.DataFrame(
+            {
+                "id": list(ids),
+                "treat": [0, 1, 0, 1],
+                "x": [1.0, 2.0, 3.0, 4.0],
+                "y": [2.0, 4.0, 6.0, 8.0],
+            },
+            index=[10, 20, 30, 40],
+        ),
+    )
+
+
+def test_matching_prepare_index_role_copies_and_resets_index() -> None:
+    data = _matching_index_dataset()
+    original = data.raw_data.copy()
+
+    prepared = Matching._prepare_index_role(data)
+    prepared_experiment = Matching._prepare_index_role(ExperimentData(data))
+
+    assert prepared.raw_data.index.tolist() == [0, 1, 2, 3]
+    assert prepared_experiment.ds.raw_data.index.tolist() == [0, 1, 2, 3]
+    pd.testing.assert_frame_equal(data.raw_data, original)
+
+
+def test_matching_prepare_without_index_role_is_passthrough() -> None:
+    data = _dataset()
+    assert Matching._prepare_index_role(data) is data
+
+
+@pytest.mark.parametrize(
+    "ids, message",
+    [
+        (["a", "a", "c", "d"], "unique"),
+        (["a", None, "c", "d"], "null"),
+    ],
+)
+def test_matching_index_role_rejects_invalid_ids(ids, message) -> None:
+    with pytest.raises(ValueError, match=message):
+        Matching._prepare_index_role(_matching_index_dataset(ids))
+
+
+def test_matching_rejects_multiple_index_role_columns() -> None:
+    data = _matching_index_dataset()
+    data.add_column(["e", "f", "g", "h"], {"other_id": IndexRole()})
+
+    with pytest.raises(ValueError, match="exactly one IndexRole"):
+        Matching._prepare_index_role(data)

@@ -41,7 +41,11 @@ class ABCRole(ABC):
         Returns:
             A new instance of the same role class with the specified data type.
         """
-        return type(self)(data_type or self.data_type)
+        role = type(self)(data_type or self.data_type)
+        role.__dict__.update(self.__dict__)
+        if data_type is not None:
+            role.data_type = data_type
+        return role
 
     @property
     def role_name(self) -> str:
@@ -93,8 +97,11 @@ class ABCRole(ABC):
             if isinstance(role_type, self.__class__) and isinstance(
                 role_type, AdditionalRole
             ):
-                return role_type.__class__(data_type)
-        return self.__class__(data_type)
+                additional = role_type.__class__(data_type)
+                additional.__dict__.update(self.__dict__)
+                additional.data_type = data_type
+                return additional
+        return self.__copy__(data_type)
 
 
 class LagRole(ABCRole):

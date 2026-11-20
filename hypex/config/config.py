@@ -17,9 +17,9 @@ Classes:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import ClassVar, Literal
+from typing import Any, ClassVar, Literal
 
-from pyspark import StorageLevel  # pyright: ignore[reportMissingImports]
+from .._spark import PYSPARK_AVAILABLE, StorageLevel
 
 
 class DatasetConfig:
@@ -180,7 +180,9 @@ class MatchingConfig:
             Defaults to 250_000.
     """
 
-    FAISS_PERSIST_POLITIC: ClassVar[StorageLevel] = StorageLevel.MEMORY_AND_DISK
+    FAISS_PERSIST_POLITIC: ClassVar[Any] = (
+        StorageLevel.MEMORY_AND_DISK if PYSPARK_AVAILABLE else None
+    )
     FAISS_SAMPLE_TARGET: ClassVar[int] = 5_000_000
     FAISS_DRIVER_INDEX_LIMIT: ClassVar[int] = 5_000_000
     FAISS_CHUNK_SIZE: ClassVar[int] = 4096

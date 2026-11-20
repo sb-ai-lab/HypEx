@@ -13,7 +13,7 @@ from hypex.dataset import (
     SmallDataset,
     TargetRole,
 )
-from hypex.utils import ExperimentDataEnum
+from hypex.utils import BackendsEnum, ExperimentDataEnum
 from hypex.utils.constants import ID_SPLIT_SYMBOL
 from hypex.utils.errors import NotFoundInExperimentDataError
 
@@ -71,6 +71,30 @@ def test_set_value_each_space(space: ExperimentDataEnum) -> None:
         assert "control" in ed.groups["splitter"]
 
 
+@pytest.mark.spark
+@pytest.mark.parametrize("was_persisted", [False, True])
+def test_additional_fields_preserve_persistence_state(
+    spark_session, was_persisted
+) -> None:
+    ds = Dataset(
+        roles={"x": FeatureRole()},
+        data=pd.DataFrame({"x": [1, 2, 3]}),
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+    if was_persisted:
+        ds.persist(action="none")
+    ed = ExperimentData(ds)
+
+    ed.set_value(
+        ExperimentDataEnum.additional_fields, "extra", [4, 5, 6], role=InfoRole()
+    )
+
+    assert ed.ds.is_persisted is was_persisted
+    if was_persisted:
+        ed.ds.unpersist()
+
+
 def test_set_value_unknown_space_raises() -> None:
     """Unknown spaces raise ValueError."""
     ed = _ed()
@@ -84,6 +108,15 @@ def test_check_hash(check: str, result: bool) -> None:
     ed = _ed()
     ed.set_value(ExperimentDataEnum.variables, "calc", 1, key="k")
     assert ed.check_hash(check, ExperimentDataEnum.variables) is result
+
+
+def test_check_hash_groups_does_not_recurse() -> None:
+    ed = _ed()
+    ed.set_value(ExperimentDataEnum.groups, "splitter", ed.ds, key="control")
+
+    assert ed.check_hash("splitter", ExperimentDataEnum.groups) is True
+    assert ed.check_hash("ghost", ExperimentDataEnum.groups) is False
+    assert ed.check_hash("splitter", ExperimentDataEnum.ml) is False
 
 
 def test_get_ids_filters_by_class_and_key() -> None:
@@ -127,6 +160,19 @@ def test_copy_is_deep() -> None:
     clone = ed.copy()
     clone.variables["new"] = {"k": 1}
     assert "new" not in ed.variables
+
+
+def test_copy_uses_replacement_dataset_without_copying() -> None:
+    """copy(data=...) transfers the replacement dataset to the copy."""
+    ed = _ed()
+    replacement = Dataset(
+        roles={"x": FeatureRole()}, data=pd.DataFrame({"x": [9, 9, 9]})
+    )
+
+    clone = ed.copy(data=replacement)
+
+    assert clone.ds is replacement
+    assert clone.initial_ds.columns == ["x"]
 
 
 def test_field_search_by_role() -> None:
