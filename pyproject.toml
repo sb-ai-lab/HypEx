@@ -69,7 +69,7 @@ faiss-cpu = [
 ]
 seaborn = "<=0.13.2"
 statsmodels = "<=0.14.2"
-pyspark = "3.5.1"
+pyspark = "3.5.9"
 pyarrow = ">=4.0.0"
 
 catboost = { version = "*", optional = true }
