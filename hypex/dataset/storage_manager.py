@@ -8,18 +8,23 @@ from typing import Any, Literal, Protocol, cast
 
 
 class _CacheFrame(Protocol):
-    def same_cache(self, other: Any) -> bool: ...
+    def same_cache(self, other: Any) -> bool:
+        """Return whether both frames refer to the same physical cache."""
 
-    def release_cache(self, blocking: bool = False) -> None: ...
+    def release_cache(self, blocking: bool = False) -> None:
+        """Release this frame's cache."""
 
 
 class _PersistableDataset(_CacheFrame, Protocol):
     @property
-    def persist_key(self) -> str | None: ...
+    def persist_key(self) -> str | None:
+        """Return the lineage key of the persisted dataset."""
 
-    def _acquire_cache(self, storage_level: str) -> _PersistableDataset | None: ...
+    def _acquire_cache(self, storage_level: str) -> _PersistableDataset | None:
+        """Acquire a cache and return a stable dataset snapshot."""
 
-    def materialize(self, action: Literal["count", "head", "none"]) -> None: ...
+    def materialize(self, action: Literal["count", "head", "none"]) -> None:
+        """Materialize all, part, or none of the current data."""
 
 
 class PersistEntry:
