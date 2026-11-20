@@ -3,8 +3,8 @@
 [![PyPI version](https://img.shields.io/pypi/v/hypex?color=darkgreen)](https://pypi.org/project/hypex/)
 [![CI](https://github.com/sb-ai-lab/HypEx/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/sb-ai-lab/HypEx/actions/workflows/ci.yml?query=branch%3Amaster)
 [![Coverage gate](https://img.shields.io/badge/coverage%20gate-88%25-brightgreen)](https://github.com/sb-ai-lab/HypEx/actions/workflows/ci.yml?query=branch%3Amaster)
-[![Documentation](https://readthedocs.org/projects/hypex/badge/?version=stable)](https://hypex.readthedocs.io/en/stable/)
-[![Python versions](https://img.shields.io/pypi/pyversions/hypex.svg)](https://pypi.org/project/hypex/)
+[![Documentation](https://img.shields.io/badge/docs-Read%20the%20Docs-blue)](https://hypex.readthedocs.io/en/stable/)
+[![Python versions](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)](https://pypi.org/project/hypex/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/sb-ai-lab/HypEx/blob/master/LICENSE)
 [![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/hypexchat)
 
