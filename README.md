@@ -78,7 +78,7 @@ Requirements: Python `>=3.8, <3.13`. PySpark `3.5.1` is installed with the libra
 
 ## Quick start
 
-Explore usage examples and tutorials [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/). For deeper, methodology-driven examples covering experiment design, variance reduction, matching, custom pipelines and Spark, see the [advanced tutorial series](examples/advanced_tutorials/README.md).
+Run your first experiment in [Quick Start](examples/learning/QuickStart.ipynb), or browse the [HypEx Learning Materials](examples/learning/README.md) for tutorials and how-to guides.
 
 ### Matching example
 
@@ -106,13 +106,14 @@ test = Matching(extract_full_data=True, compute_indexes=True)  # Also build full
 result = test.execute(data)
 result.summary  # Summary of results (ATE, ATT, ATC)
 result.quality_results  # Matching quality tests
-result.full_data  # Wide dataset with pairs (requires extract_full_data=True)
-result.indexes  # Matched pairs of indexes, good for join (requires compute_indexes=True)
+result.full_data  # Wide dataset with pairs (requires both flags)
+result.indexes  # Matched pairs of indexes, good for join (requires both flags)
 ```
 
-`full_data` and `indexes` are skipped by default because they are expensive on large data.
+Enable both `extract_full_data=True` and `compute_indexes=True` to inspect matched pairs in this version. The effect
+summary and quality reports are available with both flags left at their defaults.
 
-More about Matching [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/MatchingTutorial.ipynb)
+See the [Matching quick tutorial](examples/learning/quick_tutorials/MatchingQuick.ipynb) and [Matching in depth](examples/learning/quick_tutorials/Matching.ipynb).
 
 ### AA-test example
 
@@ -139,7 +140,7 @@ result.best_split  # The most homogeneous split
 result.best_split_statistic  # Statistics of the best split
 ```
 
-More about AA test [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/AATestTutorial.ipynb)
+See the [AATest tutorial](examples/learning/quick_tutorials/AATest.ipynb).
 
 ### Homogeneity test example
 
@@ -151,7 +152,7 @@ result = HomogeneityTest().execute(data)
 result.summary
 ```
 
-More about the homogeneity test [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/HomogeneityTestTutorial.ipynb)
+See the [HomogeneityTest tutorial](examples/learning/quick_tutorials/HomogeneityTest.ipynb).
 
 ### AB-test example
 
@@ -219,14 +220,15 @@ result.cupac.feature_importances  # which covariates helped the most
 
 `"catboost"` requires `pip install "hypex[cat]"`. If `cupac_models` is omitted, all available models are tried.
 
-Full guide: [CUPED & CUPAC tutorial](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/CUPED_CUPAC.ipynb).
-
-More about AB test [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/ABTestTutorial.ipynb)
+See the [CUPED and CUPAC tutorial](examples/learning/quick_tutorials/CUPED_CUPAC.ipynb) and the [ABTest tutorial](examples/learning/quick_tutorials/ABTest.ipynb).
 
 ## Spark backend
 
-Every experiment above runs on Spark with the same API. Create a `SparkSession`, pass it to `Dataset` and select the
-backend explicitly. `data` can be a `pandas.DataFrame`, it is converted to a Spark DataFrame.
+Run A/A, A/B, homogeneity tests and matching through the same experiment API on Spark. Create a `SparkSession`,
+pass it to `Dataset` and select the backend explicitly. `data` can be a Spark DataFrame or a pandas DataFrame that
+HypEx converts to Spark.
+
+> **Backend limitation.** CUPED and CUPAC require the pandas backend.
 
 ```python
 from pyspark.sql import SparkSession
@@ -262,7 +264,7 @@ Notes:
 - `SmallDataset` is pandas-based by design: it holds compact `analysis_tables` and reporting results.
 - Supported runtime: Python `>=3.8`, PySpark `3.5.1`, Java 8/11/17.
 
-Each tutorial has a "Working with the Spark backend" section.
+See the [Spark notebook](examples/learning/quick_tutorials/SparkBackend.ipynb) for side-by-side runs on pandas and Spark.
 
 ## Documentation
 
