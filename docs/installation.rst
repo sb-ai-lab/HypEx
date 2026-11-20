@@ -4,7 +4,7 @@ Installation
 Requirements
 ------------
 
-* Python 3.8 or higher
+* Python 3.8–3.12 (``>=3.8,<3.13``)
 * NumPy
 * Pandas
 * SciPy
@@ -51,7 +51,7 @@ For additional functionality, install with extras:
     pip install "hypex[all]"
 
 The base installation supports pandas and does not install PySpark. The
-``spark`` extra installs PySpark 3.5.1. If you request Spark functionality
+``spark`` extra installs PySpark 3.5.7. If you request Spark functionality
 without it, HypEx raises an error with the installation command.
 
 For a full development environment, install all extras in editable mode with

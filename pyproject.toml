@@ -1,6 +1,6 @@
 [project]
 name = "HypEx"
-version = "2.0.0a1"
+version = "2.0.0"
 description = "Fast and customizable framework for Causal Inference"
 authors = [
     {name = "Dmitry Tikhomirov", email = "dimasta00@gmail.com"},
@@ -25,7 +25,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Natural Language :: English",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
@@ -85,6 +85,9 @@ all = [
 
 [project.urls]
 Repository = "https://github.com/sb-ai-lab/HypEx"
+Documentation = "https://hypex.readthedocs.io/en/stable/"
+Issues = "https://github.com/sb-ai-lab/HypEx/issues"
+Changelog = "https://github.com/sb-ai-lab/HypEx/blob/master/RELEASE_NOTES_2.0.0.md"
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.13"
@@ -92,8 +95,8 @@ python = ">=3.8,<3.13"
 [tool.poetry.group.dev.dependencies]
 pytest     = ">=8.3,<10"
 pytest-cov = ">=5,<8"
-mypy       = ">=1.8,<3" 
-ruff       = "0.16.6"  
+mypy       = ">=1.8,<3"
+ruff       = "0.16.6"
 pre-commit = ">=3.5,<5"
 psutil     = ">=7.0,<8"
 jsonschema = ">=4.23,<5"
@@ -129,6 +132,7 @@ namespaces = false
 
 [tool.setuptools.package-data]
 "*" = ["README.md"]
+"hypex" = ["py.typed"]
 
 [tool.ruff]
 line-length = 88

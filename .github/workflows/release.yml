@@ -51,6 +51,19 @@ jobs:
       - name: Verify the artifact metadata
         run: twine check --strict dist/*
 
+      - name: Check installed wheel versions
+        run: |
+          set -euo pipefail
+          python -m pip install --force-reinstall dist/*.whl
+          project="$(poetry version --short)"
+          metadata="$(cd "${RUNNER_TEMP}" && python -c 'from importlib.metadata import version; print(version("HypEx"))')"
+          runtime="$(cd "${RUNNER_TEMP}" && python -c 'import hypex; print(hypex.__version__)')"
+          echo "pyproject=${project} wheel=${metadata} runtime=${runtime}"
+          if [[ "${metadata}" != "${project}" || "${runtime}" != "${project}" ]]; then
+            echo "::error::Installed wheel versions do not match pyproject.toml"
+            exit 1
+          fi
+
       - uses: actions/upload-artifact@v7
         with:
           name: dist
