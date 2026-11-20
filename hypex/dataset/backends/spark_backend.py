@@ -1747,21 +1747,24 @@ class SparkDataset(SparkNavigation, DatasetBackendCalc):
             if dtype in [int, float, np.int64, np.float64, np.int32, np.float32]
         ]
 
-    def corr(self, numeric_only: bool = False) -> Self | float:
+    def corr(self, method: str = "pearson", numeric_only: bool = False) -> Self | float:
         """Compute Pearson correlation matrix for numeric columns.
 
         Args:
+            method: Only ``pearson`` is supported by the Spark backend.
             numeric_only (bool): Currently ignored; only numeric columns processed.
 
         Returns:
             SparkDataset | float: Correlation matrix, or None if no numeric columns.
         """
+        if method != "pearson":
+            raise NotImplementedError("Spark corr supports only method='pearson'")
         numeric_cols = self.get_numeric_columns()
 
         if len(numeric_cols) == 0:
             return None
 
-        result = self.data[numeric_cols].corr(method="pearson")
+        result = self.data[numeric_cols].corr(method=method)
 
         if isinstance(result, ps.DataFrame):
             return self._wrap_result(result)

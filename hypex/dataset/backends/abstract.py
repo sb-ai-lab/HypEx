@@ -458,6 +458,14 @@ class DatasetBackendNavigation(ABC):
         """
         raise AbstractMethodError
 
+    def set_column(self, key: str, value: Any) -> None:
+        """Assign a column using the backend's native representation."""
+        from ..abstract import DatasetBase
+
+        if isinstance(value, DatasetBase):
+            value = value.iselect(0).raw_data.iloc[:, 0]
+        self.data[key] = value
+
     @abstractmethod
     def add_column(
         self, data: Any, name: str | None = None, index: Sequence | None = None
@@ -798,10 +806,11 @@ class DatasetBackendCalc(DatasetBackendNavigation, ABC):
         raise AbstractMethodError
 
     @abstractmethod
-    def corr(self, numeric_only: bool = False) -> Any:
-        """Compute pairwise Pearson correlation of numeric columns.
+    def corr(self, method: str = "pearson", numeric_only: bool = False) -> Any:
+        """Compute pairwise correlation of numeric columns.
 
         Args:
+            method: Correlation method.
             numeric_only: If True, only include numeric columns.
 
         Returns:
