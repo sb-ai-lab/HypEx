@@ -440,8 +440,7 @@ class ABAnalyzer(Executor):
                 data,
                 (
                     multitest_pvalues
-                    if not multitest_pvalues.is_empty()
-                    and self.multitest_method != ABNTestMethodsEnum.quantile
+                    if self.multitest_method != ABNTestMethodsEnum.quantile
                     else data.ds
                 ),
             )
