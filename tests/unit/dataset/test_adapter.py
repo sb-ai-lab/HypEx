@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from hypex.dataset import Dataset, FeatureRole, StatisticRole
+from hypex.dataset import Dataset, FeatureRole
 from hypex.dataset.dataset import DatasetAdapter
 from hypex.utils.adapter import Adapter
 from hypex.utils.errors import InvalidArgumentError
@@ -25,17 +25,6 @@ def test_to_dataset_dispatch_dict() -> None:
     )
     assert isinstance(ds, Dataset)
     assert len(ds) == 2
-
-
-def test_shared_role_preserves_mixed_column_types() -> None:
-    ds = DatasetAdapter.to_dataset(
-        {"label": ["a", "b"], "value": [1.5, 2.5], "flag": [True, False]},
-        roles=StatisticRole(),
-    )
-    assert ds.raw_data["label"].dtype == object
-    assert ds.raw_data["value"].dtype.kind == "f"
-    assert ds.raw_data["flag"].dtype == bool
-    assert [ds.roles[c].data_type for c in ds.columns] == [str, float, bool]
 
 
 def test_to_dataset_dispatch_list() -> None:

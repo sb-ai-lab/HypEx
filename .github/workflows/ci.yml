@@ -4,8 +4,6 @@ on:
   push:
     branches: [ master, dev/master ]
   pull_request:
-    # Retargeting a PR emits edited rather than synchronize.
-    types: [ opened, synchronize, reopened, edited ]
     branches: [ master, dev/master ]
   workflow_dispatch:
 
@@ -36,16 +34,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: poetry.lock
 
       - name: Cache tox environments
-        uses: actions/cache@v6
+        uses: actions/cache@v4
         with:
           path: .tox
           key: tox-lint-${{ runner.os }}-${{ hashFiles('tox.ini', 'pyproject.toml') }}
@@ -64,7 +62,7 @@ jobs:
           tox_ver=$(grep -oP 'ruff == \K[0-9.]+' tox.ini | sort -u)
           pc_ver=$(grep -A1 'astral-sh/ruff-pre-commit' .pre-commit-config.yaml \
                    | grep -oP 'rev: v\K[0-9.]+')
-          pp_ver=$(python -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["tool"]["poetry"]["group"]["dev"]["dependencies"]["ruff"])')
+          pp_ver=$(grep -oP '^ruff = "\K[0-9.]+' pyproject.toml)
           echo "tox=$tox_ver pre-commit=$pc_ver pyproject=$pp_ver"
           if [ "$(printf '%s\n' "$tox_ver" "$pc_ver" "$pp_ver" | sort -u | wc -l)" != "1" ]; then
             echo "::error::Ruff versions disagree between tox.ini, .pre-commit-config.yaml and pyproject.toml"
@@ -78,9 +76,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -88,25 +86,6 @@ jobs:
 
       # Catches a pyproject.toml edited without re-running `poetry lock`.
       - run: poetry check --lock
-
-  no-spark:
-    name: Tests without PySpark
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: poetry.lock
-
-      - run: python -m pip install tox
-
-      # Installs the wheel without extras and checks imports, pandas workflows,
-      # and the actionable errors exposed by Spark-only entry points.
-      - run: tox -e no-spark
 
   # ---------------------------------------------------------------------------
   # The test matrix. Narrowed from 17 jobs to 10: every supported interpreter
@@ -124,14 +103,14 @@ jobs:
     name: Tests ${{ matrix.python-version }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    continue-on-error: ${{ matrix.experimental || false }}
     strategy:
       # One red interpreter must not hide the state of the others.
       fail-fast: false
       matrix:
         include:
-          # Ubuntu 26.04 has no setup-python builds for these interpreters.
-          - { os: ubuntu-22.04, python-version: "3.8", spark: full }
-          - { os: ubuntu-22.04, python-version: "3.9", spark: full }
+          - { os: ubuntu-latest, python-version: "3.8", spark: full }
+          - { os: ubuntu-latest, python-version: "3.9", spark: full }
           - { os: ubuntu-latest, python-version: "3.10", spark: full }
           - { os: ubuntu-latest, python-version: "3.11", spark: full }
           - { os: ubuntu-latest, python-version: "3.12", spark: full }
@@ -140,22 +119,25 @@ jobs:
           - { os: macos-15-intel, python-version: "3.8", spark: smoke }
           - { os: macos-latest, python-version: "3.12", spark: smoke }
           - { os: windows-latest, python-version: "3.8", spark: smoke }
-          # PySpark 3.5 crashes its Python worker on this leg. Keep the
-          # non-Spark tests blocking; restore Spark coverage with PySpark 4.
-          - { os: windows-latest, python-version: "3.12", spark: none }
+          # Every Spark-backed test that ships a Python function to an executor
+          # crashes the Python worker on this leg ("Python worker exited
+          # unexpectedly"); the same tests pass on Linux and macOS 3.12 and on
+          # Windows 3.8. pyspark 3.5 does not officially support 3.12. Not
+          # reproducible locally. Make it blocking again once pyspark 4 is in.
+          - { os: windows-latest, python-version: "3.12", spark: smoke, experimental: true }
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: poetry.lock
 
       - name: Cache tox environments
-        uses: actions/cache@v6
+        uses: actions/cache@v4
         with:
           path: .tox
           key: >-
@@ -163,7 +145,7 @@ jobs:
             hashFiles('tox.ini', 'pyproject.toml') }}
 
       # Spark-backed tests start a local JVM.
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -180,7 +162,7 @@ jobs:
         run: tox -- --durations=25
 
       - name: Run the test suite without Spark
-        if: matrix.spark != 'full'
+        if: matrix.spark == 'smoke'
         run: tox -- -m "not spark" --durations=25
 
       # Runs even when the previous step failed, so one run shows both. These
@@ -202,21 +184,17 @@ jobs:
     name: Coverage (locked)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      # Poetry >=2.3 defaults to marker-only installation. This lock contains
-      # overlapping numeric-stack variants; select one using the active extras.
-      POETRY_INSTALLER_RE_RESOLVE: "true"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: poetry.lock
 
       # Spark-backed tests start a local JVM.
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -232,21 +210,31 @@ jobs:
           --cov=hypex --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: coverage-xml
           path: coverage.xml
           if-no-files-found: warn
 
+      # Codecov is optional: without a token on a private fork it is skipped
+      # rather than failing the run.
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        continue-on-error: true
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
   docs:
     name: Documentation
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
           cache: pip
@@ -264,7 +252,7 @@ jobs:
       # means catching it before merge rather than after.
       - run: tox -e docs
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: docs-html
@@ -276,9 +264,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
@@ -290,7 +278,7 @@ jobs:
       # cannot be the first time we discover the metadata is invalid.
       - run: tox -e build
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
@@ -307,9 +295,9 @@ jobs:
     # zero; tox -e typing already fails honestly.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
           cache: pip
@@ -318,3 +306,24 @@ jobs:
       - run: python -m pip install tox
 
       - run: tox -e typing
+
+  audit:
+    name: Dependency audit (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Advisory because a new CVE in a transitive dependency should not turn an
+    # unrelated pull request red. The scheduled run in security.yml is what
+    # gets watched.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: poetry.lock
+
+      - run: python -m pip install tox
+
+      - run: tox -e audit

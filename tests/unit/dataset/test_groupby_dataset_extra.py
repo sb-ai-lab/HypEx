@@ -187,12 +187,7 @@ def test_iter_without_backend_raises_type_error() -> None:
 
 def test_iter_without_group_cols_raises_type_error() -> None:
     grouped = GroupedDataset(
-        None,
-        Dataset,
-        {},
-        {},
-        group_cols=[],
-        backend_data=Dataset(roles={}).backend_data,
+        None, Dataset, {}, {}, group_cols=[], backend_data=object()
     )
     with pytest.raises(TypeError, match="not iterable"):
         next(iter(grouped))

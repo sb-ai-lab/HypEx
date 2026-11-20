@@ -4,7 +4,6 @@ from copy import deepcopy
 from typing import Any
 
 from ..comparators import (
-    GroupChi2Test,
     GroupKSTest,
     GroupTTest,
     GroupUTest,
@@ -24,13 +23,7 @@ from ..dataset import (
 from ..dataset.dataset import SmallDataset
 from ..experiments.base import Executor
 from ..extensions.statsmodels import MultiTest, MultitestQuantile
-from ..utils import (
-    ABNTestMethodsEnum,
-    Adapter,
-    ExperimentDataEnum,
-    NoColumnsError,
-    timeit,
-)
+from ..utils import ABNTestMethodsEnum, Adapter, ExperimentDataEnum, timeit
 from ..utils.constants import ID_SPLIT_SYMBOL, NAME_BORDER_SYMBOL
 
 
@@ -108,10 +101,10 @@ class ABAnalyzer(Executor):
     def execute_multitest(self, data: ExperimentData, p_values: Dataset, **kwargs):
         """Applies multiple testing correction to aggregated p-values.
 
-        Standard corrections use the actual number of collected p-values as the
-        family size. Quantile correction retains the numeric-target calculation
-        needed to drive its per-target simulations. Correction is applied only
-        when more than one comparison is present.
+        Retrieves treatment and target fields from the experiment data and calculates
+        the total number of statistical comparisons being made. The correction is
+        applied if the total number of comparisons (calculated as
+        ``(num_groups - 1) * num_target_fields``) is strictly greater than 1.
 
         For standard correction methods (e.g., Bonferroni, Holm), it uses the
         ``MultiTest`` extension wrapping ``statsmodels``. For the ``quantile`` method,
@@ -132,11 +125,8 @@ class ABAnalyzer(Executor):
         group_field = data.ds.search_columns(TreatmentRole())[0]
         target_fields = data.ds.search_columns(TargetRole(), search_types=[int, float])
 
-        num_comparisons = (
-            (len(data.groups[group_field]) - 1) * len(target_fields)
-            if self.multitest_method == ABNTestMethodsEnum.quantile
-            else len(p_values)
-        )
+        num_groups = len(data.groups[group_field])
+        num_comparisons = (num_groups - 1) * len(target_fields)
 
         if self.multitest_method and num_comparisons > 1:
             if self.multitest_method != ABNTestMethodsEnum.quantile:
@@ -247,15 +237,9 @@ class ABAnalyzer(Executor):
         num_targets = len(t_data) // num_groups if num_groups > 0 else 1
 
         if len(analysis_ids) == num_targets:
-            # Iterative tables already carry the compared group in each row index.
-            # Use those labels rather than assuming data.groups has the same order.
-            existing_index = self._get_index_values(t_data)
-            if len(existing_index) == len(analysis_ids) * num_groups:
-                return [
-                    f"{aid}{ID_SPLIT_SYMBOL}{existing_index[target_position * num_groups + group_position]}"
-                    for target_position, aid in enumerate(analysis_ids)
-                    for group_position in range(num_groups)
-                ]
+            # Iterative mode: one analysis_id per target, rows are
+            # target-major.  Each analysis_id already has the format
+            # ``TestName┆hash┆single_target`` so we just append the group.
             return [
                 f"{aid}{ID_SPLIT_SYMBOL}{group}"
                 for aid in analysis_ids
@@ -311,24 +295,13 @@ class ABAnalyzer(Executor):
             under the analyzer's executor ID.
 
         Raises:
-            NoColumnsError: If no target column is present and no CUPAC virtual-target
-                results are available.
             KeyError: If the treatment column cannot be found in the dataset.
         """
-        if not data.ds.search_columns(TargetRole()):
-            from ..ml.cupac import CUPACExecutor
-
-            cupac_ids = data.get_ids(CUPACExecutor, ExperimentDataEnum.analysis_tables)[
-                CUPACExecutor.__name__
-            ][ExperimentDataEnum.analysis_tables.value]
-            if not cupac_ids:
-                raise NoColumnsError(TargetRole().role_name)
         executor_ids = data.get_ids(
             [
                 GroupTTest,
                 GroupUTest,
                 GroupKSTest,
-                GroupChi2Test,
                 StatsTTest,
                 StatsChi2Test,
                 StatsKSTest,
@@ -432,17 +405,14 @@ class ABAnalyzer(Executor):
             [analysis_data], {f: StatisticRole(float) for f in analysis_data}
         )
 
-        if (
-            not multitest_pvalues.is_empty()
-            or self.multitest_method == ABNTestMethodsEnum.quantile
-        ):
-            data = self.execute_multitest(
-                data,
-                (
-                    multitest_pvalues
-                    if self.multitest_method != ABNTestMethodsEnum.quantile
-                    else data.ds
-                ),
-            )
+        data = self.execute_multitest(
+            data,
+            (
+                multitest_pvalues
+                if not multitest_pvalues.is_empty()
+                and self.multitest_method != ABNTestMethodsEnum.quantile
+                else data.ds
+            ),
+        )
 
         return self._set_value(data, analysis_dataset)

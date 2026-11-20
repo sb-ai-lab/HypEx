@@ -178,7 +178,3 @@ catboost_info/
 # Windows download markers and locally downloaded wheels
 *:Zone.Identifier
 /*.whl
-
-# Local agent instructions
-AGENTS.md
-AGENT.MD

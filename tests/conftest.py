@@ -77,14 +77,8 @@ def numpy_seed_guard():
 # ---------------------------------------------------------------------------
 # Backend parametrization fixture
 # ---------------------------------------------------------------------------
-@pytest.fixture
-def pyspark_types():
-    """Require PySpark types without starting a Spark session."""
-    return pytest.importorskip("pyspark.sql.types")
-
-
 @pytest.fixture(params=[BackendsEnum.pandas, BackendsEnum.spark])
-def backend(request):
+def backend(request, spark_session):
     """Parametrize tests over Pandas and Spark backends.
 
     When the parameter is ``BackendsEnum.spark``, the test is
@@ -93,6 +87,8 @@ def backend(request):
 
     Args:
         request: pytest request object providing the parameter value.
+        spark_session: Session-scoped Spark session (unused for pandas
+            but required to be available when spark is selected).
 
     Yields:
         BackendsEnum: The backend enum value for this test iteration.
@@ -100,7 +96,6 @@ def backend(request):
     backend_value = request.param
     if backend_value == BackendsEnum.spark:
         request.node.add_marker(pytest.mark.spark)
-        request.getfixturevalue("spark_session")
     yield backend_value
 
 
@@ -108,7 +103,7 @@ def backend(request):
 # Dataset factory fixture
 # ---------------------------------------------------------------------------
 @pytest.fixture
-def make_dataset(backend, request):
+def make_dataset(backend, spark_session):
     """Factory fixture for creating Dataset instances on the active backend.
 
     Builds a ``Dataset`` from a ``pd.DataFrame`` and a roles mapping,
@@ -118,7 +113,7 @@ def make_dataset(backend, request):
 
     Args:
         backend: The backend enum value from the ``backend`` fixture.
-        request: Pytest request for loading the Spark session only when needed.
+        spark_session: Session-scoped Spark session.
 
     Returns:
         Callable: A factory function with signature
@@ -151,7 +146,7 @@ def make_dataset(backend, request):
         """
         effective_session = session
         if backend == BackendsEnum.spark and effective_session is None:
-            effective_session = request.getfixturevalue("spark_session")
+            effective_session = spark_session
 
         return Dataset(
             data=data,
@@ -178,10 +173,7 @@ def pytest_collection_modifyitems(config, items):
         items: List of collected test items.
     """
     for item in items:
-        if "spark_session" in getattr(item, "fixturenames", []) or (
-            getattr(item, "callspec", None) is not None
-            and item.callspec.params.get("backend") == BackendsEnum.spark
-        ):
+        if "spark_session" in getattr(item, "fixturenames", []):
             # Only add if not already marked (backend fixture handles its own)
             if not any(marker.name == "spark" for marker in item.iter_markers()):
                 item.add_marker(pytest.mark.spark)

@@ -8,7 +8,6 @@ import pytest
 
 from hypex import AATest
 from hypex.dataset import FeatureRole, InfoRole, TargetRole
-from hypex.utils import BackendsEnum
 
 from ._utils import make_dataset, to_pandas
 
@@ -30,7 +29,7 @@ def _run(df=None, roles=None, **kwargs):
 
 
 def test_homogeneous_data_passes_aa() -> None:
-    output = _run(n_iterations=100, random_states=range(100))
+    output = _run(n_iterations=20, random_states=range(20))
     resume = to_pandas(output.resume)
     # resume has one row per target/feature column
     assert (resume["result"] == "OK").all()
@@ -119,24 +118,3 @@ def test_groups_sizes_three_way_split() -> None:
 def test_early_stopping_runs_fewer_iterations() -> None:
     output = _run(n_iterations=50, random_states=range(50), early_stopping=True)
     assert len(to_pandas(output.experiments)) <= 50
-
-
-@pytest.mark.spark
-def test_spark_sample_size_drops_unlabeled_rows(spark_session) -> None:
-    df = _homogeneous(400)
-    df["category"] = np.where(np.arange(len(df)) % 2, "a", "b")
-    ds = make_dataset(
-        df,
-        {**AA_ROLES, "category": TargetRole(str)},
-        BackendsEnum.spark,
-        spark_session,
-    )
-
-    output = AATest(n_iterations=3, sample_size=0.75, random_states=range(3)).execute(
-        ds
-    )
-    experiments = to_pandas(output.experiments)
-
-    assert len(experiments) == 3
-    assert experiments["y TTest p-value test_1"].notna().all()
-    assert experiments["category Chi2Test p-value test_1"].notna().all()

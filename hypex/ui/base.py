@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import warnings
 from copy import deepcopy
-from decimal import Decimal
 from typing import Any
 
-from ..dataset import Dataset, ExperimentData, FeatureRole, TargetRole
+from ..dataset import Dataset, ExperimentData
 from ..experiments.base import Experiment
 from ..reporters import Reporter
-from ..transformers.type_caster import TypeCaster
 from ..utils import ID_SPLIT_SYMBOL, BackendsEnum
 from ..utils.enums import RenameEnum
 
@@ -288,9 +286,6 @@ class ExperimentShell:
         Orchestrates the full experiment lifecycle: data preparation, optional
         caching for Spark backends, pipeline execution, and result extraction.
 
-        Spark Decimal feature and target columns are cast to double in the
-        working copy before pipeline execution. The caller's dataset is unchanged.
-
         **Auto-persist behaviour (Spark only):**
         When ``auto_persist`` is enabled (default) and the input dataset uses
         the Spark backend, the method automatically persists the dataset with
@@ -333,26 +328,23 @@ class ExperimentShell:
             # back into the caller's ExperimentData.
             data = data.copy()
 
-        if data.ds.backend_type == BackendsEnum.spark:
-            data = TypeCaster(
-                dtype={Decimal: float},
-                roles=[FeatureRole(), TargetRole()],
-                downcasting=False,
-            ).execute(data)
-
+        # ── Auto-persist for Spark backend ──────────────────────────
         original_ds = data.ds
-        manage_cache = self.auto_persist
+        persisted_by_us = False
+        if (
+            self.auto_persist
+            and original_ds.backend_type == BackendsEnum.spark
+            and not original_ds.is_persisted
+        ):
+            original_ds.persist(storage_level="MEMORY_AND_DISK", action="count")
+            persisted_by_us = True
+
         try:
-            if manage_cache:
-                original_ds.persist(
-                    storage_level="MEMORY_AND_DISK",
-                    action="none" if original_ds.is_persisted else "count",
-                )
             result_experiment_data = self._experiment.execute(data)
             self._out.extract(result_experiment_data)
             return self._out
         finally:
-            if manage_cache:
+            if persisted_by_us and original_ds.is_persisted:
                 original_ds.unpersist()
 
     @property

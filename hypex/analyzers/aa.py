@@ -301,7 +301,7 @@ class AAScoreAnalyzer(Executor):
             if feature == "mean":
                 continue
             test_name = normalize_test_name(raw_test)
-            col_data = score_table.get_values(column=col)
+            col_data = score_table[col]
             pass_rate = (
                 sum(1 for v in col_data if _is_passed(v)) / len(col_data)
                 if len(col_data) > 0

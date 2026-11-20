@@ -190,13 +190,13 @@ use for each.
   It provides easy to use auto-documenting via docstrings.
     - [Tutorials](../examples/tutorials) - Notebooks with tutorials.
 
-- [hypex](../hypex) - The code of the HypEx library.
-    - [aa.py](../hypex/aa.py), [ab.py](../hypex/ab.py), [matching.py](../hypex/matching.py) and
-      [homogeneity.py](../hypex/homogeneity.py) - Public experiment entry points.
-    - [dataset](../hypex/dataset) - Dataset abstractions, roles, pandas and Spark backends.
-    - [comparators](../hypex/comparators) - Group comparisons and statistical tests.
-    - [experiments](../hypex/experiments) - Composable experiment pipelines.
-    - [utils](../hypex/utils) - Shared enums, errors, backend registry, logging and profiling.
+- [hypex](../hypex) - The code of HypEx library.
+    - [ab_test](../hypex/ab_test) - The main module for A/B testing
+    - [algorithms](../hypex/algorithms) - Modules with different algorithms for calculation (Like Knn)
+      blenders and ready-made presets.
+    - [dataset](../hypex/dataset) - The internal interface for working with data. Also contains data generator
+    - [selectors](../hypex/selectors) - Modules with different pre-processing data (Filters, feature selectors)
+    - [utils](../hypex/utils) - Common util tools (Timer, Profiler, Logging).
 
 ## Developing HypEx
 
@@ -226,14 +226,14 @@ If you are installing from the source, you will need Python 3.8 or later.
     poetry install
     ```
 
-   To install all dependencies and development tools:
+   To install all dependencies:
     ```bash
-    poetry install --all-extras --with dev
+    poetry install --all-extras
     ```
 
-   To install the base package with development tools:
-    ```bash
-    poetry install --with dev
+   To install only specific dependency groups:
+    ```
+    poetry install -E cv -E report
     ```
 
 After that, there is virtual environment, where you can test and implement your own code.
@@ -291,18 +291,7 @@ hooks accept is a commit CI accepts. When you bump one, bump the other --
 `.github/workflows/ci.yml` fails the lint job if the two pins drift apart.
 
 ### Testing
-
-Run the focused test suite or a complete interpreter environment with tox:
-
-```console
-tox -e py311 -- tests/unit/path/to/test_file.py -q
-tox -e py311
-tox -e py311 -- -m "not spark"
-tox -e coverage
-```
-
-The coverage environment enforces the minimum project coverage configured in
-`pyproject.toml`. Tests that require Spark also require a local Java runtime.
+(in progress)
 
 ## Documentation
 
@@ -317,14 +306,33 @@ By default, functions, that have no description will be mock from overall docume
 
 ### Building Documentation
 
-Build the documentation from the repository root:
+To build the documentation:
 
-```console
-tox -e docs
+1. Clone repository to your device.
+
+```bash
+git clone git@github.com:sb-ai-lab/HypEx.git
+cd HypEx
 ```
 
-This runs Sphinx with warnings treated as errors and checks the reStructuredText
-sources with doc8. Generated HTML files are written to `docs/_build/html`.
+2. Make environment and install requirements.
+
+```bash
+poetry install -E cv -E nlp
+```
+
+3. Remove existing html files:
+
+```bash
+cd docs
+poetry run make clean html
+```
+
+4. Generate HTML documentation files. The generated files will be in `docs/_build/html`.
+
+```bash
+poetry build
+```
 
 ### Writing Documentation
 

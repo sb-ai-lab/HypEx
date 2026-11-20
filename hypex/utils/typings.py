@@ -20,9 +20,9 @@ from typing import (
 
 import numpy as np
 import pandas as pd
-
-from .._spark import (
-    PYSPARK_AVAILABLE,
+import pyspark.pandas as ps
+import pyspark.sql as spark
+from pyspark.sql.types import (
     BooleanType,
     ByteType,
     DataType,
@@ -35,8 +35,6 @@ from .._spark import (
     ShortType,
     StringType,
     TimestampType,
-    ps,
-    spark,
 )
 
 if TYPE_CHECKING:
@@ -49,25 +47,17 @@ FeatureRoleTypes = Union[float, bool, str, int]
 CategoricalTypes = str
 ScalarType = Union[float, int, str, bool]
 PysparkScalarType = (
-    (
-        IntegerType,
-        LongType,
-        FloatType,
-        DoubleType,
-        DecimalType,
-        ShortType,
-        ByteType,
-    )
-    if PYSPARK_AVAILABLE
-    else ()
+    IntegerType,
+    LongType,
+    FloatType,
+    DoubleType,
+    DecimalType,
+    ShortType,
+    ByteType,
 )
 ListLikeTypes = Union[list, tuple, np.ndarray, pd.Index, pd.Series]
 GroupingDataType = Tuple[List[Tuple[str, "Dataset"]], List[Tuple[str, "Dataset"]]]
-SourceDataTypes = (
-    Union[pd.DataFrame, ps.DataFrame, spark.DataFrame]
-    if PYSPARK_AVAILABLE
-    else pd.DataFrame
-)
+SourceDataTypes = Union[pd.DataFrame, ps.DataFrame, spark.DataFrame]
 
 
 MultiFieldKeyTypes = Union[str, Sequence[str]]
@@ -160,8 +150,6 @@ class SparkTypeMapper:
             TimestampType: str,
             DecimalType: Decimal,
         }
-        if PYSPARK_AVAILABLE
-        else {}
     )
 
     @classmethod

@@ -4,7 +4,9 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Literal
 
-from .._spark import SparkConf, SparkSession, require_pyspark
+from pyspark import SparkConf
+from pyspark.sql import SparkSession
+
 from ..config import MatchingConfig
 
 logger = logging.getLogger(__name__)
@@ -587,7 +589,8 @@ class SparkSessionCalculator:
         Returns:
             New Spark session
         """
-        require_pyspark()
+        if SparkSession is None:
+            raise ImportError("PySpark is not installed")
 
         builder = (
             SparkSession.builder.appName("HypEx-FAISS")
@@ -657,7 +660,8 @@ class SparkSessionCalculator:
             >>> conf = SparkConf().setAppName("MyApp").setMaster("yarn")
             >>> optimized_conf = calculator.optimize_config(conf)
         """
-        require_pyspark()
+        if SparkConf is None:
+            raise ImportError("PySpark is not installed")
 
         # Get optimal settings
         optimal_settings = self.calculate_optimal_settings()

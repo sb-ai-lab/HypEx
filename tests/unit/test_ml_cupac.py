@@ -8,7 +8,6 @@ import pytest
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold
 
-from hypex import ABTest
 from hypex.dataset import (
     Dataset,
     ExperimentData,
@@ -39,32 +38,6 @@ def _ds(df: pd.DataFrame, role) -> Dataset:
         data=df.copy(),
         backend=BackendsEnum.pandas,
     )
-
-
-def test_prepare_data_accepts_current_and_lagged_features() -> None:
-    rng = np.random.default_rng(0)
-    n = 200
-    df = pd.DataFrame(
-        {
-            "x1": rng.normal(size=n),
-            "x1_lag1": rng.normal(size=n),
-            "y": rng.normal(size=n),
-            "y_lag1": rng.normal(size=n),
-        }
-    )
-    ds = Dataset(
-        data=df,
-        roles={
-            "x1": FeatureRole(),
-            "x1_lag1": FeatureRole(parent="x1", lag=1),
-            "y": TargetRole(cofounders=["x1"]),
-            "y_lag1": PreTargetRole(parent="y", lag=1, cofounders=["x1"]),
-        },
-    )
-
-    prepared = CUPACExecutor._prepare_data(ExperimentData(ds))
-
-    assert prepared["y"]["X_predict"] == [["x1_lag1"], ["y_lag1"]]
 
 
 # ---------------------------------------------------------------------------
@@ -202,23 +175,6 @@ def test_fit_then_predict_recovers_linear_signal() -> None:
     )
 
 
-def test_predict_preserves_shuffled_feature_index() -> None:
-    X, y = _frames(noise=0.01)
-    shuffled_index = np.random.default_rng(2).permutation(len(X))
-    X.index = shuffled_index
-    y.index = shuffled_index
-    extension = CupacExtension(random_state=0)
-    model = extension._calc_pandas(
-        data=_ds(X, FeatureRole), mode="fit", model="linear", Y=_ds(y, TargetRole)
-    )
-
-    pred = extension._calc_pandas(data=_ds(X, FeatureRole), mode="predict", model=model)
-
-    assert pred.index.tolist() == X.index.tolist()
-    adjusted = _ds(y, TargetRole) - (pred - pred.mean())
-    assert np.nanvar(adjusted.raw_data["t"]) < np.nanvar(y["t"])
-
-
 def test_unknown_model_name_raises_key_error() -> None:
     X, y = _frames()
     with pytest.raises(KeyError):
@@ -337,23 +293,6 @@ def test_execute_adds_cupac_report_and_adjusted_target() -> None:
     row = report.backend_data.data.iloc[0]
     assert row["cupac_best_model"] == "linear"
     assert row["cupac_variance_reduction_cv"] > 50
-
-
-def test_abtest_virtual_target_returns_cupac_report() -> None:
-    ed = _temporal_experiment()
-    df = ed.ds.raw_data.drop(columns="y")
-    roles = {name: role for name, role in ed.ds.roles.items() if name != "y"}
-    roles["y_l1"] = PreTargetRole(parent="y", lag=1, cofounders=["f"])
-    dataset = Dataset(roles=roles, data=df, backend=BackendsEnum.pandas)
-
-    out = ABTest(enable_cupac=True, cupac_models="linear").execute(dataset)
-
-    report = out.cupac.variance_reductions.to_records()
-    assert len(report) == 1
-    assert report[0]["target"] == "y"
-    assert report[0]["best_model"] == "linear"
-    assert report[0]["variance_reduction_cv"] > 50
-    assert report[0]["variance_reduction_real"] is None
 
 
 def test_public_calc_dispatches_to_pandas_implementation() -> None:

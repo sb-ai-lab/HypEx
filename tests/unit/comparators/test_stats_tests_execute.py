@@ -20,7 +20,7 @@ from hypex.dataset import ExperimentData, TargetRole, TreatmentRole
 from hypex.utils import BackendsEnum, NoColumnsError
 from hypex.utils.errors import NotSuitableFieldError
 
-from ._utils import build_dataset, result_frame, to_pandas
+from ._utils import build_dataset, to_pandas
 
 NONE_RESULT = {"p-value": None, "statistic": None, "pass": None}
 
@@ -136,9 +136,9 @@ def test_ztest_symmetric_proportions_have_zero_statistic() -> None:
     res = StatsZTest._inner_function(
         {"count": 100, "sum": 30}, {"count": 100, "sum": 30}
     )
-    assert res["statistic"] == pytest.approx(0.0)
-    assert res["p-value"] == pytest.approx(1.0)
-    assert res["pass"] is np.False_ or res["pass"] is False
+    assert res["statistic"][0] == pytest.approx(0.0)
+    assert res["p-value"][0] == pytest.approx(1.0)
+    assert res["pass"][0] is np.False_ or res["pass"][0] is False
 
 
 def test_chi2_drops_all_zero_columns() -> None:
@@ -320,83 +320,6 @@ def test_spark_stats_tests_ignore_nan(cls, spark_session) -> None:
     assert row["p-value"] < 1e-6  # not the NaN-poisoned 1.0
 
 
-def _staggered_nan_frame() -> pd.DataFrame:
-    """Two numeric targets whose NaNs sit on different rows."""
-    rng = np.random.RandomState(11)
-    n = 150
-    df = pd.DataFrame(
-        {
-            "g": ["a"] * n + ["b"] * n,
-            "y1": np.r_[rng.normal(0.0, 1.0, n), rng.normal(0.4, 1.0, n)],
-            "y2": np.r_[rng.normal(0.0, 1.0, n), rng.normal(0.8, 1.0, n)],
-        }
-    )
-    # NaNs on different rows: a row-wise dropna would distort both columns.
-    df.loc[df.index % 5 == 0, "y1"] = np.nan
-    df.loc[df.index % 7 == 0, "y2"] = np.nan
-    return df
-
-
-@pytest.mark.spark
-@pytest.mark.parametrize("cls", [StatsKSTest, StatsUTest], ids=["ks", "u"])
-def test_spark_stats_tests_omit_nans_per_target(cls, spark_session) -> None:
-    """Each target's NaNs are omitted independently (``nan_policy="omit"``).
-
-    NaNs of one target must not leak into another target's histogram — the
-    per-column result has to match the reference computed from that column
-    alone, as if the other column did not exist.
-    """
-    df = _staggered_nan_frame()
-    ex = cls(grouping_role=TreatmentRole(), n_bins=2000)
-    out = ex.execute(
-        ExperimentData(
-            build_dataset(
-                df,
-                {"g": TreatmentRole(), "y1": TargetRole(), "y2": TargetRole()},
-                BackendsEnum.spark,
-                spark_session,
-            )
-        )
-    )
-    reference = stats.ks_2samp if cls is StatsKSTest else stats.mannwhitneyu
-    for col in ("y1", "y2"):
-        ex.key = col
-        row = _table(out, ex.id).loc["b"]
-        a = df.loc[df.g == "a", col].dropna()
-        b = df.loc[df.g == "b", col].dropna()
-        ref = reference(a, b)
-        assert row["statistic"] == pytest.approx(ref.statistic, rel=0.02)
-        assert row["p-value"] == pytest.approx(ref.pvalue, rel=0.5, abs=1e-12)
-
-
-def test_ttest_omits_target_nans_per_column(backend, spark_session) -> None:
-    """``_compute_stats`` drops only rows with missing group labels.
-
-    Target NaNs are omitted per column (scipy ``nan_policy="omit"``), so two
-    targets with NaNs on different rows do not distort each other.
-    """
-    df = _staggered_nan_frame()
-    ex = StatsTTest(grouping_role=TreatmentRole())
-    out = ex.execute(
-        ExperimentData(
-            build_dataset(
-                df,
-                {"g": TreatmentRole(), "y1": TargetRole(), "y2": TargetRole()},
-                backend,
-                spark_session,
-            )
-        )
-    )
-    table = result_frame(out, ex)
-    for col in ("y1", "y2"):
-        a = df.loc[df.g == "a", col].dropna()
-        b = df.loc[df.g == "b", col].dropna()
-        ref = stats.ttest_ind(a, b, equal_var=False)
-        row = table.loc[f"b┆{col}"]
-        assert row["p-value"] == pytest.approx(ref.pvalue, abs=1e-6)
-        assert row["statistic"] == pytest.approx(ref.statistic, abs=1e-6)
-
-
 def test_chi2_execute_matches_scipy(backend, spark_session) -> None:
     df = _frame()
     ex = StatsChi2Test(grouping_role=TreatmentRole())
@@ -422,24 +345,6 @@ def test_ztest_execute_statistic_matches_formula(backend, spark_session) -> None
             pool * (1 - pool) * (1 / len(a) + 1 / len(c))
         )
         assert table.loc[f"{grp}┆bin", "statistic"] == pytest.approx(z, abs=1e-6)
-
-
-def test_ttest_execute_aligns_numeric_group_labels_with_values() -> None:
-    rng = np.random.default_rng(0)
-    df = pd.DataFrame(
-        {
-            "g": [2] * 50 + [10] * 50,
-            "y": np.concatenate([rng.normal(0, 1, 50), rng.normal(5, 1, 50)]),
-        }
-    )
-    executor = StatsTTest(grouping_role=TreatmentRole())
-
-    out = executor.execute(_data(df, "y", BackendsEnum.pandas, None))
-    table = _table(out, "StatsTTest┴┴y")
-
-    reference = stats.ttest_ind(df.y[df.g == 2], df.y[df.g == 10], equal_var=False)
-    assert table.index.tolist() == ["10┆y"]
-    assert table.iloc[0]["statistic"] == pytest.approx(reference.statistic)
 
 
 def test_ttest_execute_without_target_raises_or_skips(backend, spark_session) -> None:

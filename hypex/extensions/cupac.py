@@ -144,9 +144,7 @@ class CupacExtension(MLExtension):
     def _predict_pandas(self, model: Any, X: Dataset) -> Dataset:
         """Make predictions using pandas backend."""
         X_df = X.raw_data
-        predictions = pd.DataFrame(
-            model.predict(X_df), columns=["predict"], index=X_df.index
-        )
+        predictions = pd.DataFrame(model.predict(X_df), columns=["predict"])
         return Dataset(roles={"predict": AdditionalTargetRole()}, data=predictions)
 
     @staticmethod
