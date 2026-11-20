@@ -43,6 +43,7 @@ from .roles import (
     StatisticRole,
     default_roles,
 )
+from .storage_manager import StorageManager
 
 
 class DatasetBase:
@@ -370,16 +371,11 @@ class DatasetBase:
           triggered the action;
         - :meth:`unpersist` releases all accumulated references.
         """
-        # Load after DatasetBase is defined to avoid a module-level import cycle.
-        from .storage_manager import StorageManager
-
         StorageManager.instance().persist(self, storage_level, action)
         return self
 
     def unpersist(self, blocking: bool = False):
         """Release ALL references accumulated by the dataset lineage."""
-        from .storage_manager import StorageManager
-
         StorageManager.instance().release_all(self.persist_key, blocking=blocking)
         return self
 
@@ -433,8 +429,6 @@ class DatasetBase:
         """
         self._backend_data.checkpoint(eager=eager)
         if eager:
-            from .storage_manager import StorageManager
-
             StorageManager.instance().release_all(self.persist_key)
         return self
 

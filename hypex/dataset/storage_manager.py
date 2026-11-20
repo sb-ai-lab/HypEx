@@ -4,10 +4,22 @@ import threading
 import time
 import uuid
 import warnings
-from typing import TYPE_CHECKING, Literal
+from typing import Any, Literal, Protocol, cast
 
-if TYPE_CHECKING:
-    from .abstract import DatasetBase
+
+class _CacheFrame(Protocol):
+    def same_cache(self, other: Any) -> bool: ...
+
+    def release_cache(self, blocking: bool = False) -> None: ...
+
+
+class _PersistableDataset(_CacheFrame, Protocol):
+    @property
+    def persist_key(self) -> str | None: ...
+
+    def _acquire_cache(self, storage_level: str) -> _PersistableDataset | None: ...
+
+    def materialize(self, action: Literal["count", "head", "none"]) -> None: ...
 
 
 class PersistEntry:
@@ -22,7 +34,7 @@ class PersistEntry:
 
     __slots__ = ("created_at", "frame", "storage_level")
 
-    def __init__(self, frame: DatasetBase, storage_level: str | None = None):
+    def __init__(self, frame: _CacheFrame, storage_level: str | None = None):
         self.frame = frame
         self.storage_level = storage_level
         self.created_at = time.monotonic()
@@ -83,7 +95,7 @@ class StorageManager:
 
     def persist(
         self,
-        data: DatasetBase,
+        data: _PersistableDataset,
         storage_level: str,
         action: Literal["count", "head", "none"],
     ) -> None:
@@ -95,7 +107,7 @@ class StorageManager:
             cached = data._acquire_cache(storage_level)
             if cached is None:
                 return
-            key = cached.persist_key
+            key = cast(str, cached.persist_key)
             self.register(key, cached, storage_level=storage_level)
         cached.materialize(action)
         if action == "count":
@@ -119,7 +131,7 @@ class StorageManager:
                     )
 
     def register(
-        self, key: str, data: DatasetBase, storage_level: str | None = None
+        self, key: str, data: _CacheFrame, storage_level: str | None = None
     ) -> PersistEntry:
         """Register a persisted ``frame`` in the lineage bucket ``key``.
 
@@ -146,7 +158,7 @@ class StorageManager:
     def release(
         self,
         key: str,
-        keep: DatasetBase | None = None,
+        keep: _CacheFrame | None = None,
         blocking: bool = True,
     ) -> int:
         """Release all accumulated references of the lineage except ``keep``.
@@ -201,7 +213,7 @@ class StorageManager:
         with self._lock:
             return list(self._storage.get(key, []))
 
-    def frames(self, key: str) -> list[DatasetBase]:
+    def frames(self, key: str) -> list[_CacheFrame]:
         """Snapshot of the persisted frames of the lineage."""
         return [entry.frame for entry in self.entries(key)]
 
