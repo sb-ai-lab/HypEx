@@ -405,12 +405,7 @@ class MLExecutor(Calculator, ABC):
         group_field = Adapter.to_list(group_field)
         features_fields = Adapter.to_list(features_fields)
         if grouping_data is None:
-            fields = list(
-                dict.fromkeys(
-                    group_field + features_fields + Adapter.to_list(target_field)
-                )
-            )
-            grouping_data = data[fields].groupby(group_field)
+            grouping_data = data[group_field + features_fields].groupby(group_field)
         if len(grouping_data) > 1:
             # grouping_data[0][1].tmp_roles = data.tmp_roles
             tmp_roles = data.tmp_roles
@@ -422,15 +417,15 @@ class MLExecutor(Calculator, ABC):
         return result
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        group_field, target_field = self._get_fields(data=data)
+        group_field, target_fields = self._get_fields(data=data)
         features_fields = data.ds.search_columns(
             FeatureRole(), search_types=self.search_types
         )
         self.key = str(
-            target_field[0] if len(target_field) == 1 else (target_field or "")
+            target_fields[0] if len(target_fields) == 1 else (target_fields or "")
         )
         if (
-            not target_field and data.ds.tmp_roles
+            not target_fields and data.ds.tmp_roles
         ):  # if the column is not suitable for the test, then the target will be empty, but if there is a role tempo, then this is normal behavior
             return data
         if group_field[0] in data.groups:  # TODO: to recheck if this is a correct check
@@ -441,7 +436,7 @@ class MLExecutor(Calculator, ABC):
             data=data.ds,
             group_field=group_field,
             grouping_data=grouping_data,
-            target_field=target_field,
+            target_fields=target_fields,
             features_fields=features_fields,
         )
         # TODO: add roles to compare_result

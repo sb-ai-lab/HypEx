@@ -24,8 +24,9 @@ class GroupTTest(GroupHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        reliability = kwargs.pop("reliability", 0.05)
-        return GroupTTestExtension(reliability).calc(data, other=test_data, **kwargs)
+        return GroupTTestExtension(kwargs.get("reliability", 0.05)).calc(
+            data, other=test_data, **kwargs
+        )
 
 
 @backend_factory.register(KSTest, PandasDataset)
@@ -39,8 +40,9 @@ class GroupKSTest(GroupHypothesisTesting):
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
         test_cls = backend_factory.resolve_backend(GroupKSTestExtension, data)
-        reliability = kwargs.pop("reliability", 0.05)
-        return test_cls(reliability).calc(data, other=test_data, **kwargs)
+        return test_cls(kwargs.get("reliability", 0.05)).calc(
+            data, other=test_data, **kwargs
+        )
 
 
 @backend_factory.register(UTest, PandasDataset)
@@ -63,8 +65,9 @@ class GroupUTest(GroupHypothesisTesting):
     def _inner_function(
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
-        reliability = kwargs.pop("reliability", 0.05)
-        return GroupUTestExtension(reliability).calc(data, other=test_data, **kwargs)
+        return GroupUTestExtension(kwargs.get("reliability", 0.05)).calc(
+            data, other=test_data, **kwargs
+        )
 
 
 @backend_factory.register(Chi2Test, PandasDataset)
@@ -78,5 +81,6 @@ class GroupChi2Test(GroupHypothesisTesting):
         cls, data: Dataset, test_data: Dataset | None = None, **kwargs
     ) -> Dataset:
         test_cls = backend_factory.resolve_backend(GroupChi2TestExtension, data)
-        reliability = kwargs.pop("reliability", 0.05)
-        return test_cls(reliability=reliability).calc(data, other=test_data, **kwargs)
+        return test_cls(reliability=kwargs.get("reliability", 0.05)).calc(
+            data, other=test_data, **kwargs
+        )

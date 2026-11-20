@@ -58,8 +58,7 @@ comparator hierarchy; treat the two families as siblings for now.
 
 ### `SMD`
 
-Standardised Mean Difference: `(data.mean() - test_data.mean()) / sqrt((data.var() + test_data.var()) / 2)`.
-Zero pooled variance returns `0` for equal means and signed infinity otherwise.
+Standardised Mean Difference: `(data.mean() + test_data.mean()) / data.std()`.
 Used as a matching-quality check. Note that its `execute` is a stub (`pass`) —
 `SMD` is currently used through `calc` / `_inner_function`, not as a pipeline
 block.

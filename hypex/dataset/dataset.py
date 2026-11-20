@@ -4,8 +4,9 @@ from typing import Any, Literal
 
 import numpy as np
 import pandas as pd  # type: ignore
+import pyspark.pandas as ps
+import pyspark.sql as spark
 
-from .._spark import SPARK_DATAFRAME_TYPES, spark
 from ..utils import (
     BackendsEnum,
     FromDictTypes,
@@ -33,17 +34,8 @@ class Dataset(DatasetBase):
         data_compression: Literal[
             "downcasting", "encoding", "auto", "disable"
         ] = "auto",
-        persist_key: str | None = None,
     ):
-        super().__init__(
-            roles,
-            data,
-            backend,
-            default_role,
-            session,
-            data_compression,
-            persist_key=persist_key,
-        )
+        super().__init__(roles, data, backend, default_role, session, data_compression)
 
     def to_small_dataset(self) -> SmallDataset:
         return SmallDataset(
@@ -77,7 +69,6 @@ class SmallDataset(DatasetBase):
         default_role: ABCRole | None = None,
         session: spark.SparkSession | None = None,
         backend: BackendsEnum = None,
-        persist_key: str | None = None,
     ):
         if isinstance(roles, dict) and data is not None:
             columns = None
@@ -119,14 +110,7 @@ class SmallDataset(DatasetBase):
             if isinstance(data, (PandasDataset, SparkDataset))
             else BackendsEnum.pandas
         )
-        super().__init__(
-            roles,
-            data,
-            backend_arg,
-            default_role,
-            session,
-            persist_key=persist_key,
-        )
+        super().__init__(roles, data, backend_arg, default_role, session)
 
     @property
     def index(self):
@@ -222,7 +206,11 @@ class DatasetAdapter(Adapter):
         # Convert data based on its type
         if isinstance(data, dict):
             return DatasetAdapter.dict_to_dataset(data, roles, small)
-        elif isinstance(data, (pd.DataFrame, *SPARK_DATAFRAME_TYPES)):
+        elif (
+            isinstance(data, pd.DataFrame)
+            or isinstance(data, spark.DataFrame)
+            or isinstance(data, ps.DataFrame)
+        ):
             if isinstance(roles, ABCRole):
                 raise InvalidArgumentError("roles", "dict[str, ABCRole]")
             return DatasetAdapter.frame_to_dataset(data, roles, small)

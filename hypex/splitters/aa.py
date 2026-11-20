@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from copy import deepcopy
 from typing import Any
 
 import pandas as pd
@@ -15,7 +14,7 @@ from ..dataset import (
 )
 from ..dataset.roles import ConstGroupRole
 from ..executor import Calculator
-from ..utils import ExperimentDataEnum, timeit
+from ..utils import BackendsEnum, ExperimentDataEnum, timeit
 
 MISSING_CONST_LABELS = frozenset({"", "nan", "none", "nat", "<na>"})
 
@@ -531,14 +530,14 @@ class AASplitterWithStratification(AASplitter):
             const_group_fields[0] if len(const_group_fields) > 0 else None
         )
 
-        working_ds = deepcopy(data.ds) if data.ds.persist_key is not None else data.ds
-        persisted_locally = not working_ds.is_persisted
+        persisted_locally = False
+        if data.ds.backend_type == BackendsEnum.spark and not data.ds.is_persisted:
+            data.ds.persist(storage_level="MEMORY_AND_DISK", action="count")
+            persisted_locally = True
 
         try:
-            if persisted_locally:
-                working_ds.persist(storage_level="MEMORY_AND_DISK", action="count")
             result = self.calc(
-                working_ds,
+                data.ds,
                 random_state=self.random_state,
                 control_size=self.control_size,
                 grouping_fields=grouping_fields,
@@ -548,10 +547,11 @@ class AASplitterWithStratification(AASplitter):
             )
             # Checkpoint BEFORE unpersist so the materialized result
             # can leverage the cached input.
-            result.checkpoint(eager=True)
+            if data.ds.backend_type == BackendsEnum.spark:
+                result.checkpoint(eager=True)
         finally:
             if persisted_locally:
-                working_ds.unpersist()
+                data.ds.unpersist()
 
         if isinstance(result, Dataset):
             result = result.replace_roles({"split": AdditionalTreatmentRole()})

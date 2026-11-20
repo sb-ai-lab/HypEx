@@ -5,15 +5,7 @@ from typing import Literal
 from .analyzers.matching import MatchingAnalyzer
 from .comparators import Chi2Test, KSTest, TTest
 from .comparators.distances import MahalanobisDistance
-from .dataset import (
-    AdditionalMatchingRole,
-    Dataset,
-    ExperimentData,
-    FeatureRole,
-    IndexRole,
-    TargetRole,
-    TreatmentRole,
-)
+from .dataset import AdditionalMatchingRole, FeatureRole, TargetRole, TreatmentRole
 from .encoders.encoders import DummyEncoder
 from .executor import Executor
 from .experiments import GroupExperiment
@@ -24,8 +16,6 @@ from .reporters.matching import MatchingAnalysisTableReporter
 from .transformers import TypeCaster
 from .ui.base import ExperimentShell
 from .ui.matching import MatchingOutput
-from .utils.adapter import Adapter
-from .utils.index_utils import FaissIndexStorage
 
 
 class Matching(ExperimentShell):
@@ -34,15 +24,8 @@ class Matching(ExperimentShell):
     This class provides functionality to identify groups that are similar to each other
     using various distance metrics and quality assessment methods.
 
-    Matching interprets one unique, non-null ``IndexRole`` column as a business
-    identifier. Extracted ``indexes`` then contain these identifiers for source and
-    matched rows, with missing values for unmatched rows. Extracted ``full_data`` is
-    indexed by the same identifier. Other experiment types do not interpret this role.
-
     Args:
-        group_match (bool, optional): Whether to perform matching independently
-            within levels of a column marked by ``GroupingRole``. Required when
-            ``group_match=True``. Defaults to False.
+        group_match (bool, optional): Whether to perform group matching. Defaults to False.
         distance (Literal["mahalanobis", "l2"], optional): Distance metric to use for matching.
             Options are "mahalanobis" or "l2". Defaults to "mahalanobis".
         metric (Literal["atc", "att", "ate"], optional): Type of treatment effect to estimate.
@@ -52,7 +35,7 @@ class Matching(ExperimentShell):
             Defaults to "ate".
         bias_estimation (bool, optional): Whether to estimate bias. Defaults to True.
         quality_tests (Union[str, List[str]], optional): Quality tests to perform.
-            Options are "chi2-test", "ks-test", "t-test", or "auto".
+            Options are "smd", "psi", "ks-test", "repeats", "t-test", or "auto".
             Can be a single test or list of tests. Defaults to "auto".
         faiss_mode (Literal["base", "fast", "auto"], optional): Faiss mode to use for matching.
             Options are "base", "fast", or "auto". Defaults to "auto".
@@ -89,8 +72,12 @@ class Matching(ExperimentShell):
         metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: (
-            Literal["ks-test", "t-test", "chi2-test", "auto"]
-            | list[Literal["ks-test", "t-test", "chi2-test", "auto"]]
+            Literal["smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"]
+            | list[
+                Literal[
+                    "smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"
+                ]
+            ]
         ) = "auto",
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
         n_neighbors: int = 1,
@@ -100,9 +87,7 @@ class Matching(ExperimentShell):
         """Creates an experiment configuration with specified matching parameters.
 
         Args:
-            group_match (bool, optional): Whether to perform matching independently
-            within levels of a column marked by ``GroupingRole``. Required when
-            ``group_match=True``. Defaults to False.
+            group_match (bool, optional): Whether to perform group matching. Defaults to False.
         distance (Literal["mahalanobis", "l2"], optional): Distance metric to use for matching.
             Options are "mahalanobis" or "l2". Defaults to "mahalanobis".
         metric (Literal["atc", "att", "ate"], optional): Type of treatment effect to estimate.
@@ -112,7 +97,7 @@ class Matching(ExperimentShell):
             Defaults to "ate".
         bias_estimation (bool, optional): Whether to estimate bias. Defaults to True.
         quality_tests (Union[str, List[str]], optional): Quality tests to perform.
-            Options are "ks-test", "t-test", "chi2-test" or "auto".
+            Options are "ks-test", "t-test", or "auto".
             Can be a single test or list of tests. Defaults to "auto", which performs all tests.
         faiss_mode (Literal["base", "fast", "auto"], optional): Faiss mode to use for matching.
             Options are "base", "fast", or "auto". Defaults to "auto".
@@ -187,10 +172,10 @@ class Matching(ExperimentShell):
                 )
             ]
         else:
-            selected_tests = Adapter.to_list(quality_tests)
+            # warnings.warn("Now quality tests aren't supported yet")
             executors += [
                 OnRoleExperiment(
-                    executors=[test_mapping[test] for test in selected_tests],
+                    executors=[test_mapping[test] for test in quality_tests],
                     role=FeatureRole(),
                 )
             ]
@@ -221,8 +206,12 @@ class Matching(ExperimentShell):
         # metric: Literal["atc", "att", "ate"] = "ate",
         bias_estimation: bool = True,
         quality_tests: (
-            Literal["ks-test", "t-test", "chi2-test", "auto"]
-            | list[Literal["ks-test", "t-test", "chi2-test", "auto"]]
+            Literal["smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"]
+            | list[
+                Literal[
+                    "smd", "psi", "ks-test", "repeats", "t-test", "chi2-test", "auto"
+                ]
+            ]
         ) = "auto",
         faiss_mode: Literal["base", "fast", "auto"] = "auto",
         n_neighbors: int = 1,
@@ -250,34 +239,3 @@ class Matching(ExperimentShell):
                 compute_indexes=compute_indexes,
             ),
         )
-
-    @staticmethod
-    def _prepare_index_role(
-        data: Dataset | ExperimentData,
-    ) -> Dataset | ExperimentData:
-        ds = data.ds if isinstance(data, ExperimentData) else data
-        index_fields = ds.search_columns(IndexRole())
-        if not index_fields:
-            return data
-        if len(index_fields) > 1:
-            raise ValueError("Matching supports exactly one IndexRole column.")
-
-        index_field = index_fields[0]
-        index_data = ds[index_field]
-        if index_data.count_nulls()[index_field]:
-            raise ValueError(f"IndexRole column '{index_field}' contains null values.")
-        if index_data.nunique(dropna=False)[index_field] != len(ds):
-            raise ValueError(
-                f"IndexRole column '{index_field}' must contain unique values."
-            )
-
-        prepared_ds = ds.reset_index(drop=True)
-        if isinstance(data, ExperimentData):
-            return data.copy(data=prepared_ds)
-        return prepared_ds
-
-    def execute(self, data: Dataset | ExperimentData):
-        try:
-            return super().execute(self._prepare_index_role(data))
-        finally:
-            FaissIndexStorage.cleanup()

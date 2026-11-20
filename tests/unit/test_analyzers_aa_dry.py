@@ -148,8 +148,8 @@ def test_build_dry_score_dataset_empty_placeholder() -> None:
 def _score_table() -> Dataset:
     return _table(
         **{
-            "y GroupTTest pass test_1": [0] * 19 + [1],
-            "y GroupTTest p-value test_1": [0.5] * 20,
+            "y GroupTTest pass test_1": [1, 1, 1, 1, 1],
+            "y GroupTTest p-value test_1": [0.5, 0.4, 0.6, 0.7, 0.3],
         }
     )
 

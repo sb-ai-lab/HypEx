@@ -207,7 +207,7 @@ class CorrFilter(Transformer):
                     abs(corr_matrix.get_values(row=target, column=column)) > threshold
                 ):
                     drop = target
-                    if column in corr_target_cols:
+                    if data.roles[column] in corr_target_cols:
                         if drop_policy == "corr":
                             if abs(
                                 corr_matrix.get_values(target, pre_target_column)

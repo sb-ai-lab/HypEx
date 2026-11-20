@@ -4,7 +4,7 @@ Installation
 Requirements
 ------------
 
-* Python 3.8–3.12 (``>=3.8,<3.13``)
+* Python 3.8 or higher
 * NumPy
 * Pandas
 * SciPy
@@ -38,21 +38,11 @@ For additional functionality, install with extras:
 
 .. code-block:: bash
 
-    # For Spark backend support (also requires Java 8, 11, or 17 at runtime)
-    pip install "hypex[spark]"
-
     # For CatBoost support
-    pip install "hypex[cat]"
+    pip install hypex[cat]
 
     # For LightGBM support
-    pip install "hypex[lgbm]"
+    pip install hypex[lgbm]
 
     # All extras
-    pip install "hypex[all]"
-
-The base installation supports pandas and does not install PySpark. The
-``spark`` extra installs PySpark 3.5.7. If you request Spark functionality
-without it, HypEx raises an error with the installation command.
-
-For a full development environment, install all extras in editable mode with
-``pip install -e ".[all]"``.
+    pip install hypex[all]

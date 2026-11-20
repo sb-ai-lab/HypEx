@@ -71,11 +71,7 @@ class ExperimentData:
         self._initial_cols = deepcopy(self._data.columns)
 
     def copy(self, data: Dataset | SmallDataset | None = None) -> Self:
-        """Create a copy of this ExperimentData instance.
-
-        Internal state is deep-copied. A provided replacement dataset is used
-        without copying, and its ownership is transferred to the returned
-        instance. The caller must not reuse or mutate it afterward.
+        """Create a deep copy of this ExperimentData instance.
 
         Args:
             data: Optional replacement dataset for the primary data field.
@@ -201,14 +197,11 @@ class ExperimentData:
             return exec_id_str in self.variables
         if space == ExperimentDataEnum.analysis_tables:
             return exec_id_str in self.analysis_tables
-        if space == ExperimentDataEnum.groups:
-            return exec_id_str in self.groups
 
+        # Safe fallback: prevents recursion on unknown enum members
         if space not in _SUPPORTED_SPACES:
             return False
-        return any(
-            self.check_hash(executor_id, s) for s in _SUPPORTED_SPACES if s != space
-        )
+        return any(self.check_hash(executor_id, s) for s in _SUPPORTED_SPACES)
 
     def set_value(
         self,
@@ -262,8 +255,12 @@ class ExperimentData:
             Self for method chaining.
         """
         normalized_role = self._normalize_role(role)
-        was_persisted = self._data.is_persisted
+
         storage_level = self._data.get_storage_level() or "MEMORY_AND_DISK"
+        was_persisted = self._data.is_persisted
+
+        if was_persisted:
+            self._data.unpersist()
 
         if not isinstance(value, Dataset):
             # Raw data (list, scalar, etc.) — add as a single column
@@ -290,10 +287,9 @@ class ExperimentData:
                     new_data.roles[new_col_name] = normalized_role
                 else:
                     new_data.roles[new_col_name] = value.roles.get(col, DefaultRole())
-
+        new_data.persist(storage_level=storage_level, action="none")
         if was_persisted:
-            new_data.persist(storage_level=storage_level, action="none")
-
+            self._data.unpersist()
         self._data = new_data
         return self
 

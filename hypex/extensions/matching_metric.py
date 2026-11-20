@@ -4,8 +4,14 @@ from typing import Literal
 
 import numpy as np
 import pandas as pd
+from pyspark import StorageLevel
+from pyspark.sql import (
+    DataFrame as SparkDF,
+)
+from pyspark.sql import (
+    functions as F,
+)
 
-from .._spark import PYSPARK_AVAILABLE, F, SparkDF, StorageLevel
 from ..dataset import (
     ABCRole,
     AdditionalMatchingRole,
@@ -61,7 +67,7 @@ class MatchingMetricsExtension(Extension):
         n_neighbors: Number of neighbors used in the matching process (for weight scaling).
     """
 
-    PERSIST_POLITIC = StorageLevel.MEMORY_AND_DISK if PYSPARK_AVAILABLE else None
+    PERSIST_POLITIC = StorageLevel.MEMORY_AND_DISK
 
     def __init__(
         self,

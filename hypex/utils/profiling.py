@@ -74,9 +74,9 @@ def timeit(
     Notes
     -----
     Performance indicators:
-    - "[SLOW]": Execution time > 300 seconds
-    - "[WARN]": Execution time > 100 seconds
-    - "[OK]": Execution time <= 100 seconds
+    - "[SLOW]": Execution time > 10 seconds
+    - "[WARN]": Execution time > 1 second
+    - "[OK]": Execution time <= 1 second
     - "[FAIL]": Execution failed with exception
 
     The decorator automatically detects if it's applied to a method

@@ -13,8 +13,6 @@ on:
       - "hypex/**"
       - ".github/workflows/notebooks.yml"
   pull_request:
-    # Retargeting a PR emits edited rather than synchronize.
-    types: [ opened, synchronize, reopened, edited ]
     branches: [ master, dev/master ]
     paths:
       - "examples/tutorials/**"
@@ -34,16 +32,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: poetry.lock
 
       # Spark-backed tests start a local JVM.
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"

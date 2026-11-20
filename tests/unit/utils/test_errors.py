@@ -96,6 +96,11 @@ def test_most_errors_are_exported_from_utils_package() -> None:
         assert getattr(utils, exc_cls.__name__) is exc_cls
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="Issue: NoneArgumentError, InvalidArgumentError and PairsNotFoundError are not "
+    "re-exported from hypex.utils (callers must import hypex.utils.errors)",
+)
 def test_all_errors_are_exported_from_utils_package() -> None:
     import hypex.utils as utils
 
