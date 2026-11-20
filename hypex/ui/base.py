@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import warnings
 from copy import deepcopy
+from decimal import Decimal
 from typing import Any
 
-from ..dataset import Dataset, ExperimentData
+from ..dataset import Dataset, ExperimentData, FeatureRole, TargetRole
 from ..experiments.base import Experiment
 from ..reporters import Reporter
-from ..utils import ID_SPLIT_SYMBOL
+from ..transformers.type_caster import TypeCaster
+from ..utils import ID_SPLIT_SYMBOL, BackendsEnum
 from ..utils.enums import RenameEnum
 
 
@@ -286,6 +288,9 @@ class ExperimentShell:
         Orchestrates the full experiment lifecycle: data preparation, optional
         caching for Spark backends, pipeline execution, and result extraction.
 
+        Spark Decimal feature and target columns are cast to double in the
+        working copy before pipeline execution. The caller's dataset is unchanged.
+
         **Auto-persist behaviour (Spark only):**
         When ``auto_persist`` is enabled (default) and the input dataset uses
         the Spark backend, the method automatically persists the dataset with
@@ -327,6 +332,13 @@ class ExperimentShell:
             # Copy the container so that set_value() calls do not leak
             # back into the caller's ExperimentData.
             data = data.copy()
+
+        if data.ds.backend_type == BackendsEnum.spark:
+            data = TypeCaster(
+                dtype={Decimal: float},
+                roles=[FeatureRole(), TargetRole()],
+                downcasting=False,
+            ).execute(data)
 
         original_ds = data.ds
         manage_cache = self.auto_persist
