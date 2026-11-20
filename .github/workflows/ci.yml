@@ -239,16 +239,6 @@ jobs:
           path: coverage.xml
           if-no-files-found: warn
 
-      # Codecov is optional: without a token on a private fork it is skipped
-      # rather than failing the run.
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        continue-on-error: true
-        with:
-          files: coverage.xml
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
   docs:
     name: Documentation
     runs-on: ubuntu-latest

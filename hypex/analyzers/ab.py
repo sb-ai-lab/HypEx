@@ -311,11 +311,18 @@ class ABAnalyzer(Executor):
             under the analyzer's executor ID.
 
         Raises:
-            NoColumnsError: If no target column is present in the dataset.
+            NoColumnsError: If no target column is present and no CUPAC virtual-target
+                results are available.
             KeyError: If the treatment column cannot be found in the dataset.
         """
         if not data.ds.search_columns(TargetRole()):
-            raise NoColumnsError(TargetRole().role_name)
+            from ..ml.cupac import CUPACExecutor
+
+            cupac_ids = data.get_ids(CUPACExecutor, ExperimentDataEnum.analysis_tables)[
+                CUPACExecutor.__name__
+            ][ExperimentDataEnum.analysis_tables.value]
+            if not cupac_ids:
+                raise NoColumnsError(TargetRole().role_name)
         executor_ids = data.get_ids(
             [
                 GroupTTest,

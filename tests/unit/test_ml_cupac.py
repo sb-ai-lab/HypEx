@@ -8,6 +8,7 @@ import pytest
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold
 
+from hypex import ABTest
 from hypex.dataset import (
     Dataset,
     ExperimentData,
@@ -336,6 +337,23 @@ def test_execute_adds_cupac_report_and_adjusted_target() -> None:
     row = report.backend_data.data.iloc[0]
     assert row["cupac_best_model"] == "linear"
     assert row["cupac_variance_reduction_cv"] > 50
+
+
+def test_abtest_virtual_target_returns_cupac_report() -> None:
+    ed = _temporal_experiment()
+    df = ed.ds.raw_data.drop(columns="y")
+    roles = {name: role for name, role in ed.ds.roles.items() if name != "y"}
+    roles["y_l1"] = PreTargetRole(parent="y", lag=1, cofounders=["f"])
+    dataset = Dataset(roles=roles, data=df, backend=BackendsEnum.pandas)
+
+    out = ABTest(enable_cupac=True, cupac_models="linear").execute(dataset)
+
+    report = out.cupac.variance_reductions.to_records()
+    assert len(report) == 1
+    assert report[0]["target"] == "y"
+    assert report[0]["best_model"] == "linear"
+    assert report[0]["variance_reduction_cv"] > 50
+    assert report[0]["variance_reduction_real"] is None
 
 
 def test_public_calc_dispatches_to_pandas_implementation() -> None:
