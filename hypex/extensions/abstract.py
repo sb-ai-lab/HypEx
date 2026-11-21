@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, overload
 
-from ..dataset import ABCRole, Dataset
+from ..dataset import ABCRole, Dataset, SmallDataset
 from ..dataset.dataset import DatasetAdapter
 from ..utils import BackendsEnum
 
@@ -14,10 +14,28 @@ class Extension(ABC):
         BackendsEnum.spark: "_calc_spark",
     }
 
+    @overload
+    @staticmethod
+    def result_to_dataset(
+        result: Any, roles: ABCRole | dict[str, ABCRole], small: Literal[True] = True
+    ) -> SmallDataset: ...
+
+    @overload
+    @staticmethod
+    def result_to_dataset(
+        result: Any, roles: ABCRole | dict[str, ABCRole], small: Literal[False]
+    ) -> Dataset: ...
+
+    @overload
+    @staticmethod
+    def result_to_dataset(
+        result: Any, roles: ABCRole | dict[str, ABCRole], small: bool
+    ) -> Dataset | SmallDataset: ...
+
     @staticmethod
     def result_to_dataset(
         result: Any, roles: ABCRole | dict[str, ABCRole], small: bool = True
-    ) -> Dataset:
+    ) -> Dataset | SmallDataset:
         return DatasetAdapter.to_dataset(result, roles=roles, small=small)
 
     def calc(self, data: Dataset, *args, **kwargs):

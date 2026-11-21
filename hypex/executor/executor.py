@@ -4,7 +4,7 @@ import html
 import inspect
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from ..dataset import (
     ABCRole,
@@ -74,9 +74,11 @@ class Executor(ABC):
 
     def set_params(self, params: SetParamsDictTypes) -> None:
         if isinstance(next(iter(params)), str):
-            self.check_and_setattr(params)
+            self.check_and_setattr(cast("dict[str, Any]", params))
         elif isinstance(next(iter(params)), type):
-            for executor_class, class_params in params.items():
+            for executor_class, class_params in cast(
+                "dict[type, dict[str, Any]]", params
+            ).items():
                 if isinstance(self, executor_class):
                     self.check_and_setattr(class_params)
         else:
@@ -150,7 +152,7 @@ class Executor(ABC):
             A mapping ``{parameter_name: current_value}`` for every named
             ``__init__`` argument. ``*args`` / ``**kwargs`` are skipped.
         """
-        init_params = inspect.signature(self.__init__).parameters
+        init_params = inspect.signature(type(self).__init__).parameters
         out: dict[str, Any] = {}
 
         for name, param in init_params.items():
@@ -357,9 +359,9 @@ class MLExecutor(Calculator, ABC):
     @classmethod
     def _execute_inner_function(
         cls,
-        grouping_data,
-        tmp_roles,
-        target_field: str | None = None,
+        grouping_data: GroupedDataset | list[tuple[str, Dataset]],
+        tmp_roles: dict[str, ABCRole],
+        target_field: str | list[str] | None = None,
         **kwargs,
     ) -> Any:
         (_, _data), (_, _test_data), *_ = grouping_data
@@ -396,8 +398,7 @@ class MLExecutor(Calculator, ABC):
         cls,
         data: Dataset,
         group_field: Sequence[str] | str | None = None,
-        # grouping_data: list[tuple[str, Dataset]] | None = None,
-        grouping_data: GroupedDataset | None = None,
+        grouping_data: GroupedDataset | list[tuple[str, Dataset]] | None = None,
         target_field: str | list[str] | None = None,
         features_fields: str | list[str] | None = None,
         **kwargs,
@@ -438,7 +439,7 @@ class MLExecutor(Calculator, ABC):
         else:
             grouping_data = None
         compare_result = self.calc(
-            data=data.ds,
+            data=cast(Dataset, data.ds),
             group_field=group_field,
             grouping_data=grouping_data,
             target_field=target_field,
