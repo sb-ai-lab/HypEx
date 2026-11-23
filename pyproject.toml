@@ -87,7 +87,7 @@ all = [
 Repository = "https://github.com/sb-ai-lab/HypEx"
 Documentation = "https://hypex.readthedocs.io/en/stable/"
 Issues = "https://github.com/sb-ai-lab/HypEx/issues"
-Changelog = "https://github.com/sb-ai-lab/HypEx/blob/master/RELEASE_NOTES_2.0.0.md"
+Changelog = "https://github.com/sb-ai-lab/HypEx/blob/master/.github/release-notes/RELEASE_NOTES_2.0.0.md"
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.13"

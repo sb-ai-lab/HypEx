@@ -114,7 +114,7 @@ jobs:
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
-          file="RELEASE_NOTES_${version}.md"
+          file=".github/release-notes/RELEASE_NOTES_${version}.md"
           if [ -f "${file}" ]; then
             echo "path=${file}" >> "$GITHUB_OUTPUT"
           else
