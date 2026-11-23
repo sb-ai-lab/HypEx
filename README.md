@@ -1,8 +1,11 @@
 # HypEx: Advanced Causal Inference and AB Testing Toolkit
 
 [![PyPI version](https://img.shields.io/pypi/v/hypex?color=darkgreen)](https://pypi.org/project/hypex/)
-![Python versions](https://img.shields.io/badge/python-3.8_|_3.9_|_3.10_|_3.11_|_3.12-blue)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![CI](https://github.com/sb-ai-lab/HypEx/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/sb-ai-lab/HypEx/actions/workflows/ci.yml?query=branch%3Amaster)
+[![Coverage gate](https://img.shields.io/badge/coverage%20gate-88%25-brightgreen)](https://github.com/sb-ai-lab/HypEx/actions/workflows/ci.yml?query=branch%3Amaster)
+[![Documentation](https://img.shields.io/badge/docs-Read%20the%20Docs-blue)](https://hypex.readthedocs.io/en/stable/)
+[![Python versions](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)](https://pypi.org/project/hypex/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/sb-ai-lab/HypEx/blob/master/LICENSE)
 [![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/hypexchat)
 
 HypEx (Hypotheses and Experiments) is a library for causal inference and AB testing. It runs the same experiments on
@@ -11,8 +14,8 @@ HypEx (Hypotheses and Experiments) is a library for causal inference and AB test
 ## What's new in 2.0
 
 HypEx 2.0 adds an Apache Spark backend, is substantially faster than 1.0.x (most of all on large data, in A/A loops and
-in matching), and extends the statistical toolkit. Alpha: the API may still change. See the
-[release notes](RELEASE_NOTES_2.0.0a1.md) for the full list.
+in matching), and extends the statistical toolkit. See the
+[release notes](https://github.com/sb-ai-lab/HypEx/blob/master/RELEASE_NOTES_2.0.0.md) for the full list.
 
 - **Spark backend.** `Dataset` runs on pandas or Spark with the same API for AA tests, AB tests, homogeneity tests and
   matching.
@@ -60,21 +63,23 @@ and make the results unrepresentative.
 ## Installation
 
 ```bash
-pip install --pre -U hypex   # 2.0 is in alpha: --pre is required
+pip install -U hypex
 ```
 
-Without `--pre` pip installs the latest stable release (1.0.x). To pin the alpha: `pip install hypex==2.0.0a1`.
+To pin this release: `pip install hypex==2.0.0`.
 
-Optional extras for CUPAC models:
+Optional extras for Spark and CUPAC models:
 
 ```bash
-pip install -U "hypex[cat]"   # CatBoost
-pip install -U "hypex[lgbm]"  # LightGBM
-pip install -U "hypex[all]"   # everything above
+pip install -U "hypex[spark]"  # Spark backend
+pip install -U "hypex[cat]"    # CatBoost
+pip install -U "hypex[lgbm]"   # LightGBM
+pip install -U "hypex[all]"    # everything above
 ```
 
-Requirements: Python `>=3.8, <3.13`. PySpark `3.5.1` is installed with the library; running on Spark also needs Java
-(8, 11 or 17).
+Requirements: Python `>=3.8, <3.13`. The base installation uses pandas and does not include PySpark. The `spark` extra installs
+PySpark `3.5.7`; running on Spark also needs Java (8, 11 or 17). Requesting the Spark backend without the extra raises an error
+with the installation command.
 
 ## Quick start
 
@@ -260,18 +265,22 @@ Notes:
   `dataset.to_backend(BackendsEnum.spark, session=spark)`. Converting a large Spark dataset to pandas is refused when it
   would not fit in memory.
 - `SmallDataset` is pandas-based by design: it holds compact `analysis_tables` and reporting results.
-- Supported runtime: Python `>=3.8`, PySpark `3.5.1`, Java 8/11/17.
+- Supported runtime: Python `>=3.8`, PySpark `3.5.7`, Java 8/11/17.
 
 Each tutorial has a "Working with the Spark backend" section.
 
 ## Documentation
 
 For more detailed information about the library, visit our
-[documentation on ReadTheDocs](https://hypex.readthedocs.io/en/latest/). It has guides and tutorials to get started and
+[documentation on ReadTheDocs](https://hypex.readthedocs.io/en/stable/). It has guides and tutorials to get started and
 detailed API documentation for advanced use cases.
 
 The architecture of the package (executors, `ExperimentData`, backends) is described in
 [hypex/README.md](hypex/README.md).
+
+Additional architecture documentation and source navigation are available in the
+[DeepWiki codebase overview](https://deepwiki.com/sb-ai-lab/HypEx). This AI-generated resource may lag behind the latest
+release.
 
 ## Contributions
 

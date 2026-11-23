@@ -225,7 +225,7 @@ class CorrFilter(Transformer):
         key: Any = "",
     ):
         super().__init__(key=key)
-        self.target_roles = target_roles or [FeatureRole(), TargetRole()]
+        self.target_roles = target_roles or FeatureRole()
         self.corr_space_roles = corr_space_roles or [FeatureRole(), TargetRole()]
         self.threshold = threshold
         self.method = method
@@ -239,32 +239,48 @@ class CorrFilter(Transformer):
         threshold: float = 0.8,
         method: str = "pearson",
         numeric_only: bool = True,
+        drop_policy: str = "cv",
     ) -> Dataset:
-        corr_matrix = data.ds.corr(method=method, numeric_only=numeric_only)
-        corr_target_cols = Adapter.to_list(target_cols)
+        target_cols = Adapter.to_list(target_cols)
         corr_space_cols = Adapter.to_list(corr_space_cols)
+        corr_matrix = data[corr_space_cols].corr(
+            method=method, numeric_only=numeric_only
+        )
+        pre_target_column = None
+        if drop_policy == "corr":
+            pre_target_columns = data.search_columns([PreTargetRole()])
+            if (pre_target_columns[0] not in corr_space_cols) | len(
+                pre_target_columns
+            ) != 1:
+                raise ValueError(
+                    "Correlation-based filtering cannot be applied if there are more than one PreTarget columns"
+                )
+            else:
+                pre_target_column = pre_target_columns[0]
+        corr_target_cols = [
+            column for column in target_cols if column in corr_matrix.columns
+        ]
         for target in corr_target_cols:
-            for pre_target_column in corr_space_cols:
-                if target not in corr_target_cols or pre_target_column not in corr_space_cols:
-                    continue
-                if target == pre_target_column:
-                    continue
-                drop_policy = "corr" if method == "pearson" else "cv"
-                if data.roles[target] in corr_target_cols:
-                    if drop_policy == "corr":
-                        if abs(
-                            corr_matrix.get_values(target, pre_target_column)
-                        ) > abs(corr_matrix.get_values(column, pre_target_column)):
-                            drop = target
-                        else:
-                            drop = column
-                    elif drop_policy == "cv":
-                        drop = (
-                            target
-                            if data[target].coefficient_of_variation()
-                            < data[column].coefficient_of_variation()
-                            else column
-                        )
+            for column in corr_matrix.columns:
+                if (target != column) and (
+                    abs(corr_matrix.get_values(row=target, column=column)) > threshold
+                ):
+                    drop = target
+                    if data.roles[column] in corr_target_cols:
+                        if drop_policy == "corr":
+                            if abs(
+                                corr_matrix.get_values(target, pre_target_column)
+                            ) > abs(corr_matrix.get_values(column, pre_target_column)):
+                                drop = target
+                            else:
+                                drop = column
+                        elif drop_policy == "cv":
+                            drop = (
+                                target
+                                if data[target].coefficient_of_variation()
+                                < data[column].coefficient_of_variation()
+                                else column
+                            )
                     data.roles[drop] = InfoRole()
         return data
 

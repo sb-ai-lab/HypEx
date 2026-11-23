@@ -179,5 +179,9 @@ catboost_info/
 *:Zone.Identifier
 /*.whl
 
+# Local agent instructions
+AGENTS.md
+AGENT.MD
+
 # Ml artifacts
 .hypex_experiments

@@ -12,15 +12,15 @@ class Shuffle(Calculator):
         random_state: int | None = None,
         key: Any = "",
     ):
-        super().__init__(key)
         self.random_state = random_state
+        super().__init__(key)
 
     @staticmethod
     def _inner_function(data: Dataset, random_state: int | None = None) -> Dataset:
-        return data.shuffle(random_state=random_state)
+        return data.sample(frac=1.0, random_state=random_state)
 
-    def generate_params_hash(self):
-        return f"{self.random_state}"
+    def _generate_params_hash(self):
+        self._params_hash = f"{self.random_state}"
 
     def execute(self, data: ExperimentData) -> ExperimentData:
         result = data.copy(data=self.calc(data=data.ds, random_state=self.random_state))

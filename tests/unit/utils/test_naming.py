@@ -70,6 +70,15 @@ def test_space_separated_columns(col, expected) -> None:
     assert _parse_metric_col(col) == expected
 
 
+def test_feature_named_difference_is_not_parsed_as_metric() -> None:
+    assert _parse_metric_col("difference TTest pass test_1") == (
+        "difference",
+        "TTest",
+        "pass",
+        "test_1",
+    )
+
+
 def test_difference_percent_is_not_confused_with_difference() -> None:
     assert _parse_metric_col("y GroupDifference difference % b")[2] == "difference %"
     assert _parse_metric_col("y GroupDifference difference b")[2] == "difference"
