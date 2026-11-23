@@ -35,6 +35,7 @@
 ## 4. Статистика / comparators / extensions
 
 - ИСПРАВЛЕНО (числа изменились, см. «Изменения численных результатов»): `GroupChi2TestExtension.calc` передаёт `_form_results(p_value, statistic, ...)` в перепутанном порядке (pandas и Spark).
+- ИСПРАВЛЕНО: `PandasChi2TestExtension.matrix_preparation` масштабировал частоты по долям групп, уменьшая эффективный размер выборки и завышая p-value. Теперь в `chi2_contingency` передаются наблюдаемые частоты, как и на Spark; strict-xfail `test_chi2_matches_scipy_contingency` снят.
 - ИСПРАВЛЕНО (вариант a: таблица кладётся под id самого `Stats*`-исполнителя, как на Spark; нигде в фасадах не используется, имена в отчётах не меняются): `StatsKSTest` / `StatsUTest` на pandas (теперь Spark-only: `execute` на не-Spark данных бросает `TypeError`, на pandas `KSTest`/`UTest` резолвятся в `Group*`; pandas-fallback удалён): код ставил `delegate._id`, а результаты лежат под `GroupKSTest┴┴y` / `GroupUTest┴┴y` — поиск по id Stats-исполнителя не находит.
 - ИСПРАВЛЕНО: `PandasLstsqExtension.calc` через `create_empty().fillna()` даёт pandas FutureWarning (3 теста lstsq).
 - ИСПРАВЛЕНО на pandas (`MultitestQuantile` — один класс, диспетчеризация через `Extension.BACKEND_MAPPING`; `_calc_spark` бросает `NotImplementedError` — не поддержан; `accepted hypothesis` теперь int): `MultitestQuantile._calc_pandas` не тестируется: вызов `groupby(fields_list=...)` падает дальше, т.к. в группах остаётся строковая колонка группы.
@@ -49,6 +50,7 @@
 - ИСПРАВЛЕНО (текст предупреждения и docstring; поведение прежнее): NaN в результате faiss вызывают `PairsNotFoundError`, а не заменяются заглушками.
 - ИСПРАВЛЕНО: `MLExecutor._execute_inner_function` с `target_field` вызывает `_data.drop(target_field)` без `axis=1` — pandas пытается удалить строку.
 - ИСПРАВЛЕНО: публичный `FaissExtension.predict` уходил в `RecursionError` (`super().calc` -> `MLExtension.calc` -> `self.predict`); теперь `predict` = `self.calc(data=X, test_data=X, mode="predict")` с `AdditionalMatchingRole`. `PandasFaissExtension(faiss_mode="fast").fit(X)` при >1000 строк падал с `TypeError` (`len(None)`) — исправлено.
+- ИСПРАВЛЕНО: `PandasFaissExtension.calc(mode="predict")` строил матрицу запросов из `data` вместо `test_data`, из-за чего при одинаковой длине соседи присваивались не тем строкам, а при разной возникала ошибка формы. Теперь `fit` + `predict` эквивалентно `auto`, добавлен тест для запросов одинаковой длины с разными значениями.
 - ИСПРАВЛЕНО (числа изменились, см. «Изменения численных результатов»): pandas FAISS `_predict` заменял на -1 совпадения с метками контрольной группы > `len(control)+len(test)` (граница сравнивала метку строки с числом строк); граница удалена, как и на Spark.
 - `FaissNearestNeighbors.predict` создаёт ненаученный extension → `ValueError("index is not created yet")`; рабочий путь — `fit(X).predict(Y)`.
 - `MLExecutor.execute` передаёт `target_fields=`, а `calc` принимает `target_field` — таргет не доходит до `_inner_function` (теста нет).

@@ -139,11 +139,6 @@ def test_missing_treatment_role_raises() -> None:
         ABTest().execute(make_dataset(df, {"y": TargetRole(), "x": FeatureRole()}))
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: a dataset without any TargetRole column silently yields an empty report "
-    "instead of raising NoColumnsError",
-)
 def test_missing_target_role_raises() -> None:
     df = _frame()[["treat", "x"]]
     with pytest.raises(NoColumnsError):

@@ -100,7 +100,7 @@ class MultiTest(Extension):
                 corrected_ds = multitest._calc_pandas(p_value_dataset)
                 print(corrected_ds[["test", "old p-value", "new p-value", "rejected"]])
         """
-        p_values = data.raw_data.values.flatten()
+        p_values = data.raw_data.astype(float).values.flatten()
         tests_raw, fields, groups = self._index_parts(data.index)
 
         # Normalize BEFORE grouping into families
@@ -176,10 +176,10 @@ class MultitestQuantile(Extension):
         target_field = kwargs.get("target_field")
         quantiles = kwargs.get("quantiles")
         num_samples = len(data.unique()[group_field])
-        sample_size = len(data)
         grouped_data = list(data[[group_field, target_field]].groupby(group_field))
         means = [sample[1][target_field].agg("mean") for sample in grouped_data]
         variances = [sample[1][target_field].agg("var") for sample in grouped_data]
+        sample_sizes = [len(sample[1]) for sample in grouped_data]
         if num_samples != len(means) or num_samples != len(variances):
             num_samples = min(num_samples, len(means), len(variances))
         if type(quantiles) is float:
@@ -194,10 +194,8 @@ class MultitestQuantile(Extension):
             min_t_value = np.inf
             for i in range(num_samples):
                 if i != j:
-                    t_value = (
-                        np.sqrt(sample_size)
-                        * (means[j] - means[i])
-                        / np.sqrt(variances[j] + variances[i])
+                    t_value = (means[j] - means[i]) / np.sqrt(
+                        variances[j] / sample_sizes[j] + variances[i] / sample_sizes[i]
                     )
                     min_t_value = min(min_t_value, t_value)
             if min_t_value > quantiles[j]:

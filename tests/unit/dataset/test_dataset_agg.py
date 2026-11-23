@@ -23,6 +23,13 @@ def _scalar(value) -> float:
     return float(value)
 
 
+def _agg_series(value) -> pd.Series:
+    """Normalize pandas and Spark aggregation layouts to one Series."""
+    data = value.raw_data
+    frame = data.to_pandas() if hasattr(data, "to_pandas") else data
+    return frame.iloc[0] if len(frame) == 1 else frame.iloc[:, 0]
+
+
 def test_basic_stats_match_expected(make_dataset, xfail_backend) -> None:
     xfail_backend(
         BackendsEnum.spark,
@@ -102,6 +109,57 @@ def test_agg_with_str_list_dict(make_dataset, func) -> None:
     assert result is not None
 
 
+@pytest.mark.parametrize("method", ["mean", "sum"])
+def test_numeric_aggregations_reject_non_numeric_columns(spark_session, method) -> None:
+    df = pd.DataFrame({"num": [1.0, 2.0], "txt": ["ab", "cd"]})
+    ds = Dataset(
+        data=df,
+        roles={"num": FeatureRole(), "txt": FeatureRole()},
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+
+    with pytest.raises(TypeError, match="non-numeric columns"):
+        getattr(ds, method)()
+
+
+@pytest.mark.parametrize(
+    "method,expected_num,expected_txt",
+    [("min", 1.0, "ab"), ("max", 2.0, "cd"), ("count", 2, 2)],
+)
+def test_supported_aggregations_keep_non_numeric_columns(
+    make_dataset, method, expected_num, expected_txt
+) -> None:
+    df = pd.DataFrame({"num": [1.0, 2.0], "txt": ["ab", "cd"]})
+    ds = make_dataset(df, {"num": FeatureRole(), "txt": FeatureRole()})
+
+    result = _agg_series(getattr(ds, method)())
+
+    assert result["num"] == expected_num
+    assert result["txt"] == expected_txt
+
+
+@pytest.mark.parametrize("method,expected", [("min", "ab"), ("max", "cd")])
+def test_single_string_aggregation_returns_native_scalar(
+    make_dataset, method, expected
+) -> None:
+    ds = make_dataset(pd.DataFrame({"txt": ["ab", "cd"]}), {"txt": FeatureRole()})
+
+    assert getattr(ds, method)() == expected
+
+
+def test_agg_dict_honors_non_numeric_columns(make_dataset) -> None:
+    df = pd.DataFrame({"num": [1.0, 2.0], "txt": ["ab", "cd"]})
+    ds = make_dataset(df, {"num": FeatureRole(), "txt": FeatureRole()})
+
+    result = ds.agg({"num": "mean", "txt": "max"})
+    data = result.raw_data
+    frame = data.to_pandas() if hasattr(data, "to_pandas") else data
+
+    assert 1.5 in frame.to_numpy()
+    assert "cd" in frame.to_numpy()
+
+
 def test_log(make_dataset) -> None:
     df = pd.DataFrame({"x": [1.0, math.e]})
     ds = make_dataset(df, {"x": FeatureRole()})
@@ -117,6 +175,19 @@ def test_value_counts(make_dataset) -> None:
     ds = make_dataset(df, {"x": FeatureRole()})
     counts = ds.value_counts()
     assert len(counts) == 2
+
+
+def test_value_counts_multiple_columns_and_normalize(make_dataset) -> None:
+    df = pd.DataFrame({"x": ["a", "a", "b"], "y": [1, 1, 2]})
+    ds = make_dataset(df, {"x": FeatureRole(), "y": FeatureRole()})
+
+    counts = ds.value_counts()
+    proportions = ds.value_counts(normalize=True)
+
+    assert counts.columns == ["x", "y", "count"]
+    assert proportions.columns == ["x", "y", "proportion"]
+    assert counts.raw_data["count"].sum() == 3
+    assert proportions.raw_data["proportion"].sum() == pytest.approx(1.0)
 
 
 def test_nunique_and_unique(make_dataset) -> None:

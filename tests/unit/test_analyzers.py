@@ -203,11 +203,6 @@ def test_aa_score_init_threshold() -> None:
     assert analyzer.threshold == pytest.approx(1 - 0.05 * 1.2)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: pass rate is computed by iterating a Dataset (yields column names), "
-    "so every feature gets pass_rate 0 and weight 1 - alpha",
-)
 def test_aa_score_weights_follow_pass_rate() -> None:
     analyzer = AAScoreAnalyzer(alpha=0.1)
     table = _score_table([[0, 0, 0, 0, 0, 0, 0, 0, 0, 1], [1] * 10])
@@ -401,6 +396,22 @@ def test_ab_multitest_skipped_for_single_comparison() -> None:
     assert f"{analyzer.id}MultiTest" not in out.analysis_tables
 
 
+@pytest.mark.spark
+def test_ab_empty_pvalues_do_not_convert_spark_input(spark_session) -> None:
+    n = 100_001
+    ds = Dataset(
+        roles={"g": TreatmentRole(), "y1": TargetRole()},
+        data=pd.DataFrame({"g": np.zeros(n, dtype=int), "y1": np.zeros(n)}),
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+    analyzer = ABAnalyzer(multitest_method=ABNTestMethodsEnum.holm)
+
+    out = analyzer.execute(ExperimentData(ds))
+
+    assert f"{analyzer.id}MultiTest" not in out.analysis_tables
+
+
 def test_ab_quantile_method_runs() -> None:
     _, experiment_data = _grouped_experiment()
     ABAnalyzer(
@@ -418,17 +429,19 @@ def test_extract_id_prefix(analysis_id, expected) -> None:
 
 def test_build_row_index_iterative_mode() -> None:
     analyzer = ABAnalyzer()
-    t_data = pd.DataFrame({"p-value": [0.1, 0.2, 0.3, 0.4]})
+    t_data = pd.DataFrame(
+        {"p-value": [0.1, 0.2, 0.3, 0.4]}, index=["10", "2", "10", "2"]
+    )
     ds = Dataset(
         roles={"p-value": StatisticRole()}, data=t_data, backend=BackendsEnum.pandas
     )
     ids = [f"GroupTTest{S}h{S}y1", f"GroupTTest{S}h{S}y2"]
-    index = analyzer._build_row_index(ds, ids, num_groups=2, group_labels=["b", "c"])
+    index = analyzer._build_row_index(ds, ids, num_groups=2, group_labels=["2", "10"])
     assert index == [
-        f"{ids[0]}{S}b",
-        f"{ids[0]}{S}c",
-        f"{ids[1]}{S}b",
-        f"{ids[1]}{S}c",
+        f"{ids[0]}{S}10",
+        f"{ids[0]}{S}2",
+        f"{ids[1]}{S}10",
+        f"{ids[1]}{S}2",
     ]
 
 

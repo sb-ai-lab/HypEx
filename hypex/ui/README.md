@@ -114,6 +114,33 @@ result.indexes         # matched pair indexes
 result.quality_results # post-matching balance tests
 ```
 
+### Business identifiers in matching outputs
+
+Matching interprets one unique, non-null `IndexRole` column as the external row
+identifier. This role is Matching-specific and does not change global `Dataset` index,
+join, or splitting behavior.
+
+```python
+from hypex import Matching
+from hypex.dataset import Dataset, IndexRole, TargetRole, TreatmentRole, FeatureRole
+
+data = Dataset(
+    data=frame,
+    roles={
+        "user_id": IndexRole(str),
+        "treat": TreatmentRole(),
+        "outcome": TargetRole(),
+    },
+    default_role=FeatureRole(),
+)
+result = Matching(compute_indexes=True, extract_full_data=True).execute(data)
+```
+
+`result.indexes` uses `user_id` values for both source and matched rows. Unmatched rows
+have missing IDs. `result.full_data` is indexed by `user_id` and retains both source and
+matched ID columns. Multiple `IndexRole` columns, null IDs, and duplicate IDs are
+rejected. Without `IndexRole`, Matching keeps its existing integer-index output.
+
 ### Enhanced matching example with Spark
 ```python
 from hypex import Matching

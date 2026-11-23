@@ -13,14 +13,19 @@ from typing import Any, Callable, Iterable, Literal, Sequence, Sized
 
 import numpy as np
 import pandas as pd  # type: ignore
-import pyspark.pandas as ps  # type: ignore
-import pyspark.sql as spark  # type: ignore
-import pyspark.sql.functions as F  # type: ignore
 
 # pandas.util.hash_array — C-level vectorized hash
 from pandas.util import hash_array
-from pyspark.ml.feature import StringIndexer  # type: ignore
 
+from ..._spark import (
+    PANDAS_ON_SPARK_DATAFRAME_TYPES,
+    SPARK_SQL_DATAFRAME_TYPES,
+    F,
+    StringIndexer,
+    ps,
+    require_pyspark,
+    spark,
+)
 from ...config import DatasetConfig
 from ...utils import BackendsEnum, FromDictTypes, MergeOnError, ScalarType
 from ...utils.adapter import Adapter
@@ -84,6 +89,7 @@ class PandasNavigation(DatasetBackendNavigation):
             return self
 
         if target_backend == BackendsEnum.spark:
+            require_pyspark()
             if session is None:
                 raise ValueError(
                     "Spark session is required for pandas → spark conversion"
@@ -259,11 +265,11 @@ class PandasNavigation(DatasetBackendNavigation):
             self.data = data
         elif isinstance(data, pd.Series):
             self.data = pd.DataFrame(data)
-        elif isinstance(data, spark.DataFrame):
+        elif isinstance(data, SPARK_SQL_DATAFRAME_TYPES):
             self.data = self._data_compression(
                 data, data_compression, non_compresion_cols
             )
-        elif isinstance(data, ps.DataFrame):
+        elif isinstance(data, PANDAS_ON_SPARK_DATAFRAME_TYPES):
             self.data = data.to_pandas()
         elif isinstance(data, dict):
             wrapped = {
@@ -825,9 +831,6 @@ class PandasNavigation(DatasetBackendNavigation):
         if "append" not in kwargs:
             kwargs["append"] = False
 
-        if "inplace" not in kwargs:
-            kwargs["inplace"] = False
-
         return self._wrap_result(self.data.set_index(keys=keys, drop=drop, **kwargs))
 
     @property
@@ -1037,7 +1040,7 @@ class PandasNavigation(DatasetBackendNavigation):
         self.data[index_col_name] = np.array(range(len(self.data)))
 
     def remove_index_col(self, index_col_name: str | None = UTILITY_INDEX_COL_NAME):
-        self.data = self.data.drop(index_col_name)
+        self.data = self.data.drop(columns=[index_col_name])
 
     def from_dict(self, data: FromDictTypes, index: Iterable | Sized | None = None):
         """Load data from dict-like structure into DataFrame.
@@ -1120,20 +1123,21 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
         Handles edge cases:
             - pd.Series -> pd.DataFrame
-            - Single-value (1x1) DataFrame -> float
+            - Single-value (1x1) DataFrame -> native scalar value
             - Otherwise returns pd.DataFrame
 
         Args:
             result: Output from pandas aggregation methods.
 
         Returns:
-            float or pd.DataFrame: Simplified result for single values,
+            Scalar value or pd.DataFrame: Simplified result for single values,
             otherwise DataFrame.
         """
         if isinstance(result, pd.Series):
             result = result.to_frame()
         if result.shape == (1, 1):
-            return float(result.loc[result.index[0], result.columns[0]])
+            value = result.loc[result.index[0], result.columns[0]]
+            return float("nan") if value is None else value
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame(result)
 
     def __init__(
@@ -1211,6 +1215,23 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         return self._wrap_result(
             self.data.apply(lambda col: col.map(f, na_action=na_action))
         )
+
+    def map_index_values(self, labels: Any, columns: list[str]) -> Any:
+        label_field = labels.data.columns[0]
+        mapping = labels.data.iloc[:, 0].to_dict()
+        result = self.data.copy()
+        result.index = result.index.map(mapping)
+        result.index.name = label_field
+        labels_dtype = labels.data.iloc[:, 0].dtype
+        for column in columns:
+            mapped_column = result[column].astype(object)
+            mapped_column.iloc[:] = [mapping.get(value) for value in mapped_column]
+            result[column] = (
+                mapped_column.astype("Int64")
+                if pd.api.types.is_integer_dtype(labels_dtype)
+                else mapped_column
+            )
+        return self._wrap_result(result)
 
     def is_empty(self) -> bool:
         """Check if DataFrame is empty (no rows or columns).
@@ -1466,18 +1487,20 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
 
     def corr(
         self,
+        method: str = "pearson",
         numeric_only: bool = False,
     ) -> pd.DataFrame | float:
-        """Compute pairwise correlation of columns using Pearson method.
+        """Compute pairwise correlation of columns.
 
         Args:
+            method: Correlation method supported by pandas.
             numeric_only: Include only numeric columns if True.
 
         Returns:
             pd.DataFrame: Correlation matrix.
         """
         return self._wrap_result(
-            self.data.corr(method="pearson", numeric_only=numeric_only)
+            self.data.corr(method=method, numeric_only=numeric_only)
         )
 
     def isna(self) -> pd.DataFrame:
@@ -1678,7 +1701,7 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
         buckets to labels via the ``edges`` thresholds.
 
         Note:
-            The hash function differs from the Spark backend (MD5 vs
+            The hash function differs from the Spark backend (SipHash vs
             Murmur3), so the exact split assignment may differ across
             backends for the same seed. Determinism is guaranteed
             within each backend.
@@ -1808,15 +1831,13 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             ):
                 raise MergeOnError(on_)
 
-        if not all(
-            [
-                on,
-                left_on,
-                right_on,
-            ]
-        ) and all([left_index is None, right_index is None]):
+        if all(
+            value is None for value in (on, left_on, right_on, left_index, right_index)
+        ):
             left_index = True
             right_index = True
+        left_index = False if left_index is None else left_index
+        right_index = False if right_index is None else right_index
 
         return self._wrap_result(
             self.data.merge(
@@ -1965,7 +1986,48 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             self.data.explode(column=column, ignore_index=ignore_index)
         )
 
-    def checkpoint(self, eager: bool = True):
+    @property
+    def persist_key(self) -> None:
+        return None
+
+    def cache_snapshot(self) -> None:
+        return None
+
+    def same_cache(self, other: DatasetBackendNavigation) -> bool:
+        return self is other
+
+    def materialize(self, action: Literal["count", "head", "none"]) -> None:
+        pass
+
+    def persist(
+        self,
+        storage_level: Literal[
+            "MEMORY_ONLY", "MEMORY_AND_DISK", "DISK_ONLY"
+        ] = "MEMORY_AND_DISK",
+    ) -> Self:
+        """Pandas data is already in memory; no explicit cache is needed."""
+        return self
+
+    def unpersist(self, blocking: bool = False) -> Self:
+        """Pandas has no explicit cache to release."""
+        return self
+
+    @property
+    def is_persisted(self) -> bool:
+        return False
+
+    def get_storage_level(self) -> str | None:
+        return None
+
+    def get_cache_info(self) -> dict[str, Any]:
+        return {
+            "is_persisted": self.is_persisted,
+            "storage_level": self.get_storage_level(),
+            "backend_type": BackendsEnum.pandas,
+            "in_memory": True,
+        }
+
+    def checkpoint(self, eager: bool = True) -> Self:
         """Breaks the computation graph (Lineage) to prevent exponential slowdowns.
 
         For the Spark backend, this method materializes the DataFrame to truncate
@@ -1977,4 +2039,4 @@ class PandasDataset(PandasNavigation, DatasetBackendCalc):
             eager: If ``True``, the checkpoint is executed eagerly. This parameter
                 is ignored for the Pandas backend. Defaults to ``True``.
         """
-        pass
+        return self
