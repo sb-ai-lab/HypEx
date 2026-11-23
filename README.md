@@ -304,15 +304,24 @@ discover why HypEx is the best solution for causal inference
 
 ### Testing different libraries for the speed of matching
 
-Visit [this](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-part-2) notebook on Kaggle and
-estimate results by yourself. The benchmark was run on an earlier HypEx version.
+The benchmark follows the methodology of [this Kaggle notebook](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-part-2),
+adapted to the current `Matching` API. Within-industry matching searches for neighbors only within the same `industry`
+category; otherwise, neighbors are selected from the full dataset with `industry` retained as a feature. Missing values are
+filled before estimation. Each cell is a single run, excluding data-generation and dataset-construction time.
 
-| Group size             | 32 768 | 65 536 | 131 072 | 262 144 | 524 288 | 1 048 576 | 2 097 152 | 4 194 304 |
-|------------------------|--------|--------|---------|---------|---------|-----------|-----------|-----------|
-| Causal Inference       | 46s    | 169s   | None    | None    | None    | None      | None      | None      |
-| DoWhy                  | 9s     | 19s    | 40s     | 77s     | 159s    | 312s      | 615s      | 1 235s    |
-| HypEx with grouping    | 2s     | 6s     | 16s     | 42s     | 167s    | 509s      | 1 932s    | 7 248s    |
-| HypEx without grouping | 2s     | 7s     | 21s     | 101s    | 273s    | 982s      | 3 750s    | 14 720s   |
+Environment: Apple M4 Pro with 24 GB RAM, Python 3.11.14, HypEx 2.0.0 (`21577a1`), DoWhy 0.11.1, causalinference
+0.1.3.post1, and PySpark 3.5.1 in local mode with 8 GB driver memory. Causal Inference runs above 65 536 rows did not
+complete within a 10-minute timeout or were not run; both cases are marked with `—`. The fastest result for each group
+size is shown in bold.
+
+| Library          | Backend | Within-industry matching | 32 768 | 65 536 | 131 072 | 262 144 | 524 288 | 1 048 576 | 2 097 152 | 4 194 304 |
+|------------------|---------|--------------------------|--------|--------|---------|---------|---------|-----------|-----------|-----------|
+| Causal Inference | Pandas  | No                       | 11.22s | 48.02s | —       | —       | —       | —         | —         | —         |
+| DoWhy            | Pandas  | No                       | 1.70s  | 3.49s  | 6.95s   | 14.24s  | 29.00s  | 57.21s    | 114.55s   | 243.34s   |
+| HypEx            | Pandas  | Yes                      | 0.59s  | 0.73s  | **1.03s**   | **2.00s**   | **4.05s**   | **8.49s**     | **19.38s**    | **59.92s**    |
+| HypEx            | Pandas  | No                       | **0.39s**  | **0.66s**  | 1.24s   | 2.72s   | 6.84s   | 21.10s    | 50.18s    | 145.79s   |
+| HypEx            | Spark   | Yes                      | 50.87s | 45.95s | 42.86s  | 48.87s  | 63.41s  | 165.92s   | 196.46s   | 250.98s   |
+| HypEx            | Spark   | No                       | 14.30s | 15.98s | 15.69s  | 20.75s  | 81.91s  | 92.36s    | 108.85s   | 118.82s   |
 
 ## Join Our Community
 
