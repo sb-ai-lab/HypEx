@@ -79,8 +79,6 @@ modular architecture with enhanced backend support.
 | `ui/` | output | `ExperimentShell` and `Output` — the user-facing facade | [README](ui/README.md) |
 | `forks/` | control flow | Conditional branching inside a pipeline | [README](forks/README.md) |
 | `utils/` | support | Enums, errors, typings, constants, adapters, data generators | [README](utils/README.md) |
-| `factory/` | **inactive** | Reserved for config-driven pipeline construction | [README](factory/README.md) |
-| `hypotheses/` | **inactive** | Reserved for JSON-described experiments | [README](hypotheses/README.md) |
 
 ## Top-level modules (not folders)
 

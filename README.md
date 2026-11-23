@@ -1,7 +1,6 @@
 # HypEx: Advanced Causal Inference and AB Testing Toolkit
 
 [![PyPI version](https://img.shields.io/pypi/v/hypex?color=darkgreen)](https://pypi.org/project/hypex/)
-[![CI](https://github.com/sb-ai-lab/HypEx/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/sb-ai-lab/HypEx/actions/workflows/ci.yml?query=branch%3Amaster)
 [![Coverage gate](https://img.shields.io/badge/coverage%20gate-88%25-brightgreen)](https://github.com/sb-ai-lab/HypEx/actions/workflows/ci.yml?query=branch%3Amaster)
 [![Documentation](https://img.shields.io/badge/docs-Read%20the%20Docs-blue)](https://hypex.readthedocs.io/en/stable/)
 [![Python versions](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)](https://pypi.org/project/hypex/)
@@ -15,7 +14,8 @@ HypEx (Hypotheses and Experiments) is a library for causal inference and AB test
 
 HypEx 2.0 adds an Apache Spark backend, is substantially faster than 1.0.x (most of all on large data, in A/A loops and
 in matching), and extends the statistical toolkit. See the
-[release notes](https://github.com/sb-ai-lab/HypEx/blob/master/RELEASE_NOTES_2.0.0.md) for the full list.
+[release notes](https://github.com/sb-ai-lab/HypEx/blob/master/.github/release-notes/RELEASE_NOTES_2.0.0.md) for the 
+full list.
 
 - **Spark backend.** `Dataset` runs on pandas or Spark with the same API for AA tests, AB tests, homogeneity tests and
   matching.
