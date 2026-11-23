@@ -140,7 +140,7 @@ class CUPACExecutor(MLExecutor):
                 )
                 for field in searched_fields
             ]
-            sorted_fields_by_lag = sorted(searched_lags, key=lambda x: x[1])
+            sorted_fields_by_lag = sorted(searched_lags, key=lambda x: x[1] or 0)
             for field, lag in sorted_fields_by_lag:
                 if lag in [None, 0]:
                     fields[field] = {}

@@ -186,10 +186,7 @@ def test_nested_contexts_restore_in_order() -> None:
     assert is_profiling_enabled() is False
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: timeit docstring promises [SLOW] > 10 s and [WARN] > 1 s, but the "
-    "implementation uses 300 s and 100 s",
-)
 def test_documented_thresholds_match_implementation() -> None:
-    assert profiling.SLOW_THRESHOLD == 10.0 and profiling.WARN_THRESHOLD == 1.0
+    assert profiling.SLOW_THRESHOLD == 300.0 and profiling.WARN_THRESHOLD == 100.0
+    docstring = profiling.timeit.__doc__
+    assert "> 300 seconds" in docstring and "> 100 seconds" in docstring

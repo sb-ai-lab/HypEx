@@ -11,7 +11,7 @@ It is built as a **pipeline of small, composable blocks** (`Executor`s) that rea
 from and write into a single shared state object (`ExperimentData`), on top of a
 backend-agnostic tabular structure (`Dataset`, pandas or Spark).
 
-## Current Version: 2.0.0a1
+## Current Version: 2.0.0
 
 **Architecture Status**: The new architecture is now **ACTIVE** and fully functional. 
 The library has successfully transitioned from the old 0.1.10 version to the new 
@@ -51,7 +51,7 @@ modular architecture with enhanced backend support.
                     └──────────────────────────────────────────────┘
                                 │
                     ┌───────────▼──────────────────────────────────┐
- output             │  Reporter  →  Output  (resume, full_data...) │
+ output             │  Reporter  →  Output  (summary, full_data...) │
                     └──────────────────────────────────────────────┘
 
  extensions ── thin adapters over scipy / statsmodels / faiss / sklearn,
@@ -79,8 +79,6 @@ modular architecture with enhanced backend support.
 | `ui/` | output | `ExperimentShell` and `Output` — the user-facing facade | [README](ui/README.md) |
 | `forks/` | control flow | Conditional branching inside a pipeline | [README](forks/README.md) |
 | `utils/` | support | Enums, errors, typings, constants, adapters, data generators | [README](utils/README.md) |
-| `factory/` | **inactive** | Reserved for config-driven pipeline construction | [README](factory/README.md) |
-| `hypotheses/` | **inactive** | Reserved for JSON-described experiments | [README](hypotheses/README.md) |
 
 ## Top-level modules (not folders)
 
@@ -206,11 +204,12 @@ matter when reading this code:
 
 ## Migration from 1.0.7
 
-2.0.0a1 keeps the 1.0 architecture (roles, executors, `ExperimentData`), but a few defaults and
-names changed. Full list: `RELEASE_NOTES_2.0.0a1.md` in the repository root.
+2.0.0 keeps the 1.0 architecture (roles, executors, `ExperimentData`), but a few defaults and
+names changed. Full list: `RELEASE_NOTES_2.0.0.md` in the repository root.
 
 ### Breaking Changes:
-- Python 3.13 is not supported (`python >=3.8, <3.13`); PySpark 3.5.1 is now a hard dependency.
+- Python 3.13 is not supported (`python >=3.8, <3.13`). PySpark 3.5.7 is optional and is installed with
+  `pip install "hypex[spark]"`; the base installation supports pandas.
 - `Output.resume` / `resume_reporter` are renamed to `summary` / `summary_reporter`; the old names
   still work and emit `DeprecationWarning`.
 - A/A splits use a different hash (SipHash on pandas): the same data and seed give different groups.

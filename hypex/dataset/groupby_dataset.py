@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 from typing import TYPE_CHECKING, Any, Callable
 
+import pandas as pd
+
 from ..utils import NAME_BORDER_SYMBOL
 from .roles import ABCRole, InfoRole, StatisticRole
 
@@ -28,6 +30,13 @@ class GroupedDataset:
         tmp_roles (dict[str, ABCRole]): Temporary roles mapping.
         _group_cols (list[str]): Columns used for grouping.
         _backend_data (Any): Original DataSet.
+        _persist_key (str | None): Lineage key of the persisted-plans bucket
+            in the global ``PersistManager``, taken from the parent backend.
+            Aggregation results inherit it, so ``unpersist`` on the result
+            can release every reference accumulated by the lineage (this is
+            what fixes the "2 plans cached, only 1 freed" leak:
+            ``dataset = dataset.groupby(...).agg(...)`` used to lose the
+            references accumulated by the predecessor).
     """
 
     def __init__(
@@ -56,6 +65,10 @@ class GroupedDataset:
         self.tmp_roles = tmp_roles
         self._group_cols = group_cols if group_cols is not None else []
         self._backend_data = backend_data
+        # Lineage key inherited by the aggregation results (see class docstring).
+        self._persist_key = (
+            backend_data.persist_key if backend_data is not None else None
+        )
 
     def _get_agg_roles(self, result_columns: list[str]) -> dict[str, ABCRole]:
         """
@@ -150,13 +163,16 @@ class GroupedDataset:
         else:
             new_roles = {}
 
-        return self._dataset_class(roles=new_roles, data=result_data)
+        return self._dataset_class(
+            roles=new_roles, data=result_data, persist_key=self._persist_key
+        )
 
     def apply(self, func: Callable[..., Any]) -> DatasetBase:
         """
         Apply a custom function to each group and combine the results.
 
         Applies the callable to each group independently and concatenates the results.
+        On pandas, the callable receives the grouping columns as well.
         Resulting columns are assigned InfoRole by default.
 
         Args:
@@ -169,7 +185,10 @@ class GroupedDataset:
             NotImplementedError: If apply is not supported for the current groupby type.
         """
         if hasattr(self._groupby, "apply"):
-            result_data = self._groupby.apply(func)
+            groupby = self._groupby
+            if isinstance(getattr(groupby, "obj", None), pd.DataFrame):
+                groupby = groupby[list(groupby.obj.columns)]
+            result_data = groupby.apply(func)
         else:
             raise NotImplementedError("Apply not supported for this groupby type")
 
@@ -178,7 +197,9 @@ class GroupedDataset:
         else:
             new_roles = {}
 
-        return self._dataset_class(roles=new_roles, data=result_data)
+        return self._dataset_class(
+            roles=new_roles, data=result_data, persist_key=self._persist_key
+        )
 
     def count(self) -> DatasetBase:
         """
@@ -342,7 +363,9 @@ class GroupedDataset:
             raw["data"] = {f"{col}{suffix}": v for col, v in raw["data"].items()}
 
         new_roles = {col: StatisticRole() for col in raw["data"]}
-        return self._dataset_class(roles=new_roles, data=raw)
+        return self._dataset_class(
+            roles=new_roles, data=raw, persist_key=self._persist_key
+        )
 
     def size(self) -> DatasetBase:
         """
@@ -359,7 +382,11 @@ class GroupedDataset:
         )
         if hasattr(result, "to_frame"):
             result = result.to_frame("size")
-        return self._dataset_class(roles={"size": StatisticRole()}, data=result)
+        return self._dataset_class(
+            roles={"size": StatisticRole()},
+            data=result,
+            persist_key=self._persist_key,
+        )
 
     def __iter__(self):
         """
@@ -386,6 +413,10 @@ class GroupedDataset:
                 col: role for col, role in self.roles.items() if col in group_cols
             }
 
+            # NB: every iterated group is an *independent* dataset — it gets
+            # a fresh lineage key on purpose, so persisting/unpersisting one
+            # group cannot release the cached plans of the parent dataset or
+            # of the other groups.
             yield key, self._dataset_class(roles=filtered_roles, data=group)
 
     def __len__(self):
