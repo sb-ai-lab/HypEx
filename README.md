@@ -78,7 +78,7 @@ Requirements: Python `>=3.8, <3.13`. PySpark `3.5.1` is installed with the libra
 
 ## Quick start
 
-Run your first experiment in [Quick Start](examples/learning/QuickStart.ipynb), or browse the [HypEx Learning Materials](examples/learning/README.md) for tutorials and how-to guides.
+Run your first experiment in [Quick Start](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/QuickStart.ipynb), or browse the [HypEx Learning Materials](examples/tutorials/README.md) for tutorials and how-to guides.
 
 ### Matching example
 
@@ -113,7 +113,7 @@ result.indexes  # Matched pairs of indexes, good for join (requires both flags)
 Enable both `extract_full_data=True` and `compute_indexes=True` to inspect matched pairs in this version. The effect
 summary and quality reports are available with both flags left at their defaults.
 
-See the [Matching quick tutorial](examples/learning/quick_tutorials/MatchingQuick.ipynb) and [Matching in depth](examples/learning/quick_tutorials/Matching.ipynb).
+See the [Matching quick tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/MatchingQuick.ipynb) and [Matching in depth](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/Matching.ipynb).
 
 ### AA-test example
 
@@ -140,7 +140,7 @@ result.best_split  # The most homogeneous split
 result.best_split_statistic  # Statistics of the best split
 ```
 
-See the [AATest tutorial](examples/learning/quick_tutorials/AATest.ipynb).
+See the [AATest tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/AATest.ipynb).
 
 ### Homogeneity test example
 
@@ -152,7 +152,7 @@ result = HomogeneityTest().execute(data)
 result.summary
 ```
 
-See the [HomogeneityTest tutorial](examples/learning/quick_tutorials/HomogeneityTest.ipynb).
+See the [HomogeneityTest tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/HomogeneityTest.ipynb).
 
 ### AB-test example
 
@@ -220,7 +220,7 @@ result.cupac.feature_importances  # which covariates helped the most
 
 `"catboost"` requires `pip install "hypex[cat]"`. If `cupac_models` is omitted, all available models are tried.
 
-See the [CUPED and CUPAC tutorial](examples/learning/quick_tutorials/CUPED_CUPAC.ipynb) and the [ABTest tutorial](examples/learning/quick_tutorials/ABTest.ipynb).
+See the [CUPED and CUPAC tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/CUPED_CUPAC.ipynb) and the [ABTest tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/ABTest.ipynb).
 
 ## Spark backend
 
@@ -264,7 +264,7 @@ Notes:
 - `SmallDataset` is pandas-based by design: it holds compact `analysis_tables` and reporting results.
 - Supported runtime: Python `>=3.8`, PySpark `3.5.1`, Java 8/11/17.
 
-See the [Spark notebook](examples/learning/quick_tutorials/SparkBackend.ipynb) for side-by-side runs on pandas and Spark.
+See the [Spark notebook](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/SparkBackend.ipynb) for side-by-side runs on pandas and Spark.
 
 ## Documentation
 
