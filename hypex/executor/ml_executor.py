@@ -13,7 +13,7 @@ from .executor import Executor
 
 
 @dataclass
-class MLExecutorSnapshot:
+class ExecutorSnapshot:
     qualname: str
     module: str
     id: str
@@ -90,9 +90,9 @@ class MLExecutor(Executor, ABC):
 
     # ── STATUS serialization protocol (the lightweight part) ─────────────
 
-    def get_artifact(self) -> MLExecutorSnapshot:
+    def get_artifact(self) -> ExecutorSnapshot:
         cls = type(self)
-        return MLExecutorSnapshot(
+        return ExecutorSnapshot(
             qualname=cls.__qualname__,
             module=cls.__module__,
             id=self.id,
