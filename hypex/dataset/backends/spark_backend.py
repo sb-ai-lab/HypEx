@@ -1079,6 +1079,20 @@ class SparkNavigation(DatasetBackendNavigation):
                     )
         return self._wrap_result(self.data)
 
+    def _column_input(self, value: Any) -> tuple[Any, type | None] | None:
+        if isinstance(value, ps.DataFrame):
+            value = self._single_column(value)
+        if isinstance(value, ps.Series):
+            return value, SparkTypeMapper.to_python(value.spark.data_type)
+        return super()._column_input(value)
+
+    def set_column(
+        self, key: str, value: Any, expected_type: type | None = None
+    ) -> type | None:
+        with self._ops_on_diff_frames():
+            # IPython can reload this method without a __class__ closure.
+            return super().set_column(key, value, expected_type)
+
     def add_column(
         self,
         data: Sequence[Any],

@@ -968,6 +968,15 @@ class PandasNavigation(DatasetBackendNavigation):
                 self.data = self.astype({column_name: type_name})
         return self
 
+    def _column_input(self, value: Any) -> tuple[Any, type | None] | None:
+        if isinstance(value, (pd.DataFrame, pd.Series)):
+            frame = value.to_frame() if isinstance(value, pd.Series) else value
+            column = self._single_column(frame)
+            name = frame.columns[0]
+            types = self._wrap_result(frame).get_column_type([name])
+            return column, types.get(name)
+        return super()._column_input(value)
+
     def add_column(
         self,
         data: Any,

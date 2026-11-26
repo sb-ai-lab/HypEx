@@ -523,30 +523,20 @@ class DatasetBase:
         return self._from_derived_backend(data=new_data, roles=new_roles)
 
     def __setitem__(self, key: str, value: Any) -> None:
-        is_dataset_value = isinstance(value, DatasetBase)
-        value_data_type = None
-        if is_dataset_value:
-            value_data_type = value.roles[value.columns[0]].data_type
-        if key not in self.columns and isinstance(key, str):
-            self.roles[key] = InfoRole()
+        is_new = isinstance(key, str) and key not in self.columns
+        column_type = None if is_new else self.roles[key].data_type
+        value_type = self._backend_data.set_column(key, value, column_type)
+
+        if is_new:
+            self.roles[key] = InfoRole(value_type)
             warnings.warn(
                 "Column must be added by using add_column method.",
                 category=SyntaxWarning,
             )
-        else:
-            column_data_type = self.roles[key].data_type
-            if not (
-                column_data_type is None
-                or (is_dataset_value and value_data_type == column_data_type)
-                or (
-                    not is_dataset_value
-                    and isinstance(value, Iterable)
-                    and all(isinstance(v, column_data_type) for v in value)
-                )
-                or isinstance(value, column_data_type)
-            ):
-                raise TypeError("Value type does not match the expected data type.")
-        self._backend_data.set_column(key, value)
+        elif column_type is int and value_type is float:
+            self.roles[key] = self.roles[key].astype(float)
+            if key in self.tmp_roles:
+                self.tmp_roles[key] = self.tmp_roles[key].astype(float)
 
     def _build_repr(self, n_cols, n_rows) -> pd.DataFrame:
         display_limit = (
