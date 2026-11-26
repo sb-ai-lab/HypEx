@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pandas as pd
 import pytest
 
 from hypex.dataset import Dataset, FeatureRole, SmallDataset, TargetRole
 from hypex.dataset.backends.pandas_backend import PandasDataset
+from hypex.utils import BackendsEnum
 
 
 def _ds(make_dataset):
@@ -112,6 +115,56 @@ def test_setitem_existing_column_replaces(make_dataset) -> None:
     ds = _ds(make_dataset)
     ds["a"] = [9, 9, 9, 9]
     assert ds["a"].get_values() == [[9], [9], [9], [9]] or ds["a"].sum() == 36
+
+
+def test_setitem_widens_integer_column_with_float_dataset(make_dataset) -> None:
+    ds = make_dataset(
+        pd.DataFrame({"x": [1, 2, 3]}),
+        {"x": FeatureRole(int, parent="original", lag=1)},
+    )
+
+    ds["x"] = (ds["x"] - 1) / 2
+
+    assert isinstance(ds.roles["x"], FeatureRole)
+    assert ds.roles["x"].data_type is float
+    assert ds.roles["x"].parent == "original"
+    assert ds.roles["x"].lag == 1
+    assert sorted(row["x"] for row in ds.to_records()) == [0.0, 0.5, 1.0]
+
+
+@pytest.mark.parametrize("as_series", [False, True], ids=["frame", "series"])
+def test_setitem_accepts_native_float_column(make_dataset, as_series) -> None:
+    ds = _ds(make_dataset)
+    rhs = (ds["b"] / 4).raw_data
+
+    ds["a"] = rhs.iloc[:, 0] if as_series else rhs
+
+    assert ds.roles["a"].data_type is float
+    assert sorted(row["a"] for row in ds.to_records()) == [2.5, 5.0, 7.5, 10.0]
+
+
+def test_spark_setitem_assigns_dataframe_column_without_driver_actions(spark_session):
+    from pyspark.sql import DataFrame
+
+    def dataset(rows, field):
+        frame = spark_session.createDataFrame(rows, ["row_id", field])
+        roles = {"row_id": FeatureRole(int), field: FeatureRole(int)}
+        return Dataset(data=frame, roles=roles).set_index("row_id")
+
+    ds = dataset([(1, 0), (2, 0)], "value")
+    source = dataset([(2, 20), (1, 10)], "replacement")
+
+    no_collect = patch.object(DataFrame, "collect", side_effect=AssertionError("collect"))
+    no_count = patch.object(DataFrame, "count", side_effect=AssertionError("count"))
+    with no_collect, no_count:
+        ds["value"] = source
+        with pytest.warns(SyntaxWarning, match="add_column"):
+            ds["new"] = source.raw_data
+
+    assert ds.to_backend(BackendsEnum.pandas).raw_data.sort_index().to_dict() == {
+        "value": {1: 10, 2: 20},
+        "new": {1: 10, 2: 20},
+    }
 
 
 def test_get_with_default(make_dataset) -> None:
