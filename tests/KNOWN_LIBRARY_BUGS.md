@@ -35,6 +35,7 @@
 ## 4. Статистика / comparators / extensions
 
 - ИСПРАВЛЕНО (числа изменились, см. «Изменения численных результатов»): `GroupChi2TestExtension.calc` передаёт `_form_results(p_value, statistic, ...)` в перепутанном порядке (pandas и Spark).
+- ИСПРАВЛЕНО: `PandasChi2TestExtension.matrix_preparation` масштабировал частоты по долям групп, уменьшая эффективный размер выборки и завышая p-value. Теперь в `chi2_contingency` передаются наблюдаемые частоты, как и на Spark; strict-xfail `test_chi2_matches_scipy_contingency` снят.
 - ИСПРАВЛЕНО (вариант a: таблица кладётся под id самого `Stats*`-исполнителя, как на Spark; нигде в фасадах не используется, имена в отчётах не меняются): `StatsKSTest` / `StatsUTest` на pandas (теперь Spark-only: `execute` на не-Spark данных бросает `TypeError`, на pandas `KSTest`/`UTest` резолвятся в `Group*`; pandas-fallback удалён): код ставил `delegate._id`, а результаты лежат под `GroupKSTest┴┴y` / `GroupUTest┴┴y` — поиск по id Stats-исполнителя не находит.
 - ИСПРАВЛЕНО: `PandasLstsqExtension.calc` через `create_empty().fillna()` даёт pandas FutureWarning (3 теста lstsq).
 - ИСПРАВЛЕНО на pandas (`MultitestQuantile` — один класс, диспетчеризация через `Extension.BACKEND_MAPPING`; `_calc_spark` бросает `NotImplementedError` — не поддержан; `accepted hypothesis` теперь int): `MultitestQuantile._calc_pandas` не тестируется: вызов `groupby(fields_list=...)` падает дальше, т.к. в группах остаётся строковая колонка группы.

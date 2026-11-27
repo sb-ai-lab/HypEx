@@ -7,21 +7,6 @@ from decimal import Decimal
 from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple, Union
 
 import pytest
-from pyspark.sql.types import (
-    ArrayType,
-    BinaryType,
-    BooleanType,
-    ByteType,
-    DateType,
-    DecimalType,
-    DoubleType,
-    FloatType,
-    IntegerType,
-    LongType,
-    ShortType,
-    StringType,
-    TimestampType,
-)
 
 from hypex.utils.typings import (
     CategoricalTypes,
@@ -150,31 +135,41 @@ def test_alias_contents() -> None:
 @pytest.mark.parametrize(
     "spark_type,python_type",
     [
-        (IntegerType(), int),
-        (LongType(), int),
-        (ShortType(), int),
-        (ByteType(), int),
-        (FloatType(), float),
-        (DoubleType(), float),
-        (BooleanType(), bool),
-        (StringType(), str),
-        (DateType(), str),
-        (TimestampType(), str),
-        (DecimalType(10, 2), Decimal),
+        ("IntegerType", int),
+        ("LongType", int),
+        ("ShortType", int),
+        ("ByteType", int),
+        ("FloatType", float),
+        ("DoubleType", float),
+        ("BooleanType", bool),
+        ("StringType", str),
+        ("DateType", str),
+        ("TimestampType", str),
+        ("DecimalType", Decimal),
     ],
 )
-def test_spark_type_mapper(spark_type, python_type) -> None:
+def test_spark_type_mapper(spark_type, python_type, pyspark_types) -> None:
+    spark_type = (
+        pyspark_types.DecimalType(10, 2)
+        if spark_type == "DecimalType"
+        else getattr(pyspark_types, spark_type)()
+    )
     assert SparkTypeMapper.to_python(spark_type) is python_type
 
 
-@pytest.mark.parametrize("spark_type", [BinaryType(), ArrayType(IntegerType())])
-def test_unmapped_spark_types_fall_back_to_object(spark_type) -> None:
-    assert SparkTypeMapper.to_python(spark_type) is object
+@pytest.mark.parametrize("spark_type", ["BinaryType", "ArrayType"])
+def test_unmapped_spark_types_fall_back_to_object(spark_type, pyspark_types) -> None:
+    value = (
+        pyspark_types.ArrayType(pyspark_types.IntegerType())
+        if spark_type == "ArrayType"
+        else pyspark_types.BinaryType()
+    )
+    assert SparkTypeMapper.to_python(value) is object
 
 
-def test_mapping_is_read_only() -> None:
+def test_mapping_is_read_only(pyspark_types) -> None:
     with pytest.raises(TypeError):
-        SparkTypeMapper._SPARK_TO_PY[IntegerType] = str  # type: ignore[index]
+        SparkTypeMapper._SPARK_TO_PY[pyspark_types.IntegerType] = str  # type: ignore[index]
 
 
 @pytest.mark.xfail(
@@ -182,5 +177,5 @@ def test_mapping_is_read_only() -> None:
     reason="Issue: to_python is annotated to accept a type-name string, but it looks up "
     "type(spark_type), so strings such as 'long' map to object",
 )
-def test_string_type_names_are_supported() -> None:
+def test_string_type_names_are_supported(pyspark_types) -> None:
     assert SparkTypeMapper.to_python("long") is int

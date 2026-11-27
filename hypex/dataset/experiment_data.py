@@ -262,12 +262,8 @@ class ExperimentData:
             Self for method chaining.
         """
         normalized_role = self._normalize_role(role)
-
-        storage_level = self._data.get_storage_level() or "MEMORY_AND_DISK"
         was_persisted = self._data.is_persisted
-
-        if was_persisted:
-            self._data.unpersist()
+        storage_level = self._data.get_storage_level() or "MEMORY_AND_DISK"
 
         if not isinstance(value, Dataset):
             # Raw data (list, scalar, etc.) — add as a single column
@@ -294,8 +290,10 @@ class ExperimentData:
                     new_data.roles[new_col_name] = normalized_role
                 else:
                     new_data.roles[new_col_name] = value.roles.get(col, DefaultRole())
+
         if was_persisted:
             new_data.persist(storage_level=storage_level, action="none")
+
         self._data = new_data
         return self
 

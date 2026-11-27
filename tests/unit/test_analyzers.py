@@ -203,11 +203,6 @@ def test_aa_score_init_threshold() -> None:
     assert analyzer.threshold == pytest.approx(1 - 0.05 * 1.2)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: pass rate is computed by iterating a Dataset (yields column names), "
-    "so every feature gets pass_rate 0 and weight 1 - alpha",
-)
 def test_aa_score_weights_follow_pass_rate() -> None:
     analyzer = AAScoreAnalyzer(alpha=0.1)
     table = _score_table([[0, 0, 0, 0, 0, 0, 0, 0, 0, 1], [1] * 10])
@@ -398,6 +393,22 @@ def test_ab_multitest_skipped_for_single_comparison() -> None:
     data = experiment.execute(ExperimentData(ds))
     analyzer = ABAnalyzer(multitest_method=ABNTestMethodsEnum.bonferroni)
     out = analyzer.execute(data)
+    assert f"{analyzer.id}MultiTest" not in out.analysis_tables
+
+
+@pytest.mark.spark
+def test_ab_empty_pvalues_do_not_convert_spark_input(spark_session) -> None:
+    n = 100_001
+    ds = Dataset(
+        roles={"g": TreatmentRole(), "y1": TargetRole()},
+        data=pd.DataFrame({"g": np.zeros(n, dtype=int), "y1": np.zeros(n)}),
+        backend=BackendsEnum.spark,
+        session=spark_session,
+    )
+    analyzer = ABAnalyzer(multitest_method=ABNTestMethodsEnum.holm)
+
+    out = analyzer.execute(ExperimentData(ds))
+
     assert f"{analyzer.id}MultiTest" not in out.analysis_tables
 
 

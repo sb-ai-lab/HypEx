@@ -293,6 +293,21 @@ class GroupsComparator(BaseComparator, ABC):
         return baseline_data, compared_data
 
     @classmethod
+    def _split_for_columns_mode(
+        cls,
+        baseline_field_data: Dataset,
+        target_fields_data: Dataset,
+    ) -> GroupingDataType:
+        baseline_field_data = cls._field_validity_check(
+            baseline_field_data, "baseline_field_data", "columns"
+        )
+        if len(target_fields_data.columns) == 0:
+            raise NoRequiredArgumentError("target_fields_data")
+        baseline_data = [(baseline_field_data.columns[0], baseline_field_data)]
+        compared_data = cls._split_ds_into_columns([("columns", target_fields_data)])
+        return baseline_data, compared_data
+
+    @classmethod
     def _split_for_columns_in_groups_mode(
         cls,
         group_field_data: Dataset,
@@ -310,6 +325,8 @@ class GroupsComparator(BaseComparator, ABC):
         )
 
         group_col = group_field_data.columns[0]
+        baseline_col = baseline_field_data.columns[0]
+        target_cols = list(target_fields_data.columns)
         if group_col not in baseline_field_data.columns:
             baseline_field_data = baseline_field_data.merge(
                 group_field_data, left_index=True, right_index=True, how="left"
@@ -319,9 +336,15 @@ class GroupsComparator(BaseComparator, ABC):
                 group_field_data, left_index=True, right_index=True, how="left"
             )
 
-        baseline_data = baseline_field_data.groupby(by=group_field_data.columns)
+        baseline_data = [
+            (key, ds[[baseline_col]])
+            for key, ds in baseline_field_data.groupby(by=group_field_data.columns)
+        ]
         compared_data = cls._split_ds_into_columns(
-            target_fields_data.groupby(by=group_field_data.columns)
+            [
+                (key, ds[target_cols])
+                for key, ds in target_fields_data.groupby(by=group_field_data.columns)
+            ]
         )
         return baseline_data, compared_data
 
@@ -343,6 +366,8 @@ class GroupsComparator(BaseComparator, ABC):
         )
 
         group_col = group_field_data.columns[0]
+        baseline_col = baseline_field_data.columns[0]
+        target_cols = list(target_fields_data.columns)
         if group_col not in baseline_field_data.columns:
             baseline_field_data = baseline_field_data.merge(
                 group_field_data, left_index=True, right_index=True, how="left"
@@ -352,18 +377,20 @@ class GroupsComparator(BaseComparator, ABC):
                 group_field_data, left_index=True, right_index=True, how="left"
             )
 
-        baseline_data = [
-            sorted(
-                baseline_field_data.groupby(by=group_field_data.columns),
-                key=lambda tup: tup[0],
-            ).pop(0)
-        ]
+        baseline_groups = sorted(
+            baseline_field_data.groupby(by=group_field_data.columns),
+            key=lambda tup: tup[0],
+        )
+        baseline_key, baseline = baseline_groups[0]
+        baseline_data = [(baseline_key, baseline[[baseline_col]])]
         compared_data = sorted(
             target_fields_data.groupby(by=group_field_data.columns),
             key=lambda tup: tup[0],
         )
         compared_data.pop(0)
-        compared_data = cls._split_ds_into_columns(data=compared_data)
+        compared_data = cls._split_ds_into_columns(
+            data=[(key, ds[target_cols]) for key, ds in compared_data]
+        )
         return baseline_data, compared_data
 
     @classmethod
@@ -620,13 +647,14 @@ class GroupHypothesisTesting(GroupsComparator, ABC):
         key: Any = "",
         calc_kwargs: dict[str, Any] = {},
     ):
+        merged_kwargs = {"reliability": reliability, **calc_kwargs}
         super().__init__(
             compare_by=compare_by,
             grouping_role=grouping_role,
             target_roles=target_role,
             baseline_role=baseline_role,
             key=key,
-            calc_kwargs=calc_kwargs,
+            calc_kwargs=merged_kwargs,
         )
         self.reliability = reliability
 
@@ -711,6 +739,7 @@ class StatsComparator(BaseComparator, ABC):
         """
         from ..extensions.stats_hypothesis_testing import StatsAggregationExtension
 
+        data = data.dropna(subset=group_cols)
         stats = stats or cls.REQUIRED_STATS
         ext = StatsAggregationExtension()
         return ext.calc(

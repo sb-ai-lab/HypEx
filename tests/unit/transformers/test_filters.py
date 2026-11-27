@@ -205,11 +205,6 @@ def _corr_roles():
     }
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=TypeError,
-    reason="Issue: CorrFilter passes method= to Dataset.corr, which does not accept it",
-)
 def test_corr_filter_drops_highly_correlated_feature(corr_frame) -> None:
     ds = make_ds(corr_frame, _corr_roles())
     out = CorrFilter._inner_function(
@@ -224,11 +219,29 @@ def test_corr_filter_drops_highly_correlated_feature(corr_frame) -> None:
     assert not _is_info(out, "y")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=TypeError,
-    reason="Issue: CorrFilter passes method= to Dataset.corr, which does not accept it",
-)
+def test_corr_filter_supports_spearman(corr_frame) -> None:
+    ds = make_ds(corr_frame, _corr_roles())
+    out = CorrFilter._inner_function(
+        ds,
+        target_cols=["a", "a_copy", "indep"],
+        corr_space_cols=["a", "a_copy", "indep", "y"],
+        method="spearman",
+        threshold=0.8,
+    )
+    assert any(_is_info(out, c) for c in ["a", "a_copy"])
+
+
+def test_corr_filter_rejects_non_pearson_on_spark(corr_frame, spark_session) -> None:
+    ds = make_ds(corr_frame, _corr_roles(), BackendsEnum.spark, spark_session)
+    with pytest.raises(NotImplementedError, match="pearson"):
+        CorrFilter._inner_function(
+            ds,
+            target_cols=["a", "a_copy"],
+            corr_space_cols=["a", "a_copy"],
+            method="spearman",
+        )
+
+
 def test_corr_filter_high_threshold_keeps_all(corr_frame) -> None:
     ds = make_ds(corr_frame, _corr_roles())
     out = CorrFilter._inner_function(
@@ -240,11 +253,6 @@ def test_corr_filter_high_threshold_keeps_all(corr_frame) -> None:
     assert not any(_is_info(out, c) for c in ["a", "a_copy", "indep"])
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=TypeError,
-    reason="Issue: CorrFilter passes method= to Dataset.corr, which does not accept it",
-)
 def test_corr_filter_execute(corr_frame) -> None:
     out = CorrFilter(threshold=0.8).execute(make_ed(corr_frame, _corr_roles()))
     info_cols = [c for c in corr_frame if _is_info(out.ds, c)]
@@ -252,12 +260,6 @@ def test_corr_filter_execute(corr_frame) -> None:
     assert len(info_cols) >= 1
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue (currently masked by the Dataset.corr(method=) TypeError): "
-    "`data.roles[column] in corr_target_cols` compares a role object with "
-    "column names, so the 'cv' drop_policy tie-break never runs; the target is always dropped",
-)
 def test_corr_filter_cv_policy_drops_lower_cv_column() -> None:
     rng = np.random.RandomState(0)
     base = rng.normal(0, 1, 300)

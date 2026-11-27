@@ -1,8 +1,10 @@
 # HypEx: Advanced Causal Inference and AB Testing Toolkit
 
 [![PyPI version](https://img.shields.io/pypi/v/hypex?color=darkgreen)](https://pypi.org/project/hypex/)
-![Python versions](https://img.shields.io/badge/python-3.8_|_3.9_|_3.10_|_3.11_|_3.12-blue)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Coverage gate](https://img.shields.io/badge/coverage%20gate-88%25-brightgreen)](https://github.com/sb-ai-lab/HypEx/actions/workflows/ci.yml?query=branch%3Amaster)
+[![Documentation](https://img.shields.io/badge/docs-Read%20the%20Docs-blue)](https://hypex.readthedocs.io/en/stable/)
+[![Python versions](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)](https://pypi.org/project/hypex/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/sb-ai-lab/HypEx/blob/master/LICENSE)
 [![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/hypexchat)
 
 HypEx (Hypotheses and Experiments) is a library for causal inference and AB testing. It runs the same experiments on
@@ -11,8 +13,9 @@ HypEx (Hypotheses and Experiments) is a library for causal inference and AB test
 ## What's new in 2.0
 
 HypEx 2.0 adds an Apache Spark backend, is substantially faster than 1.0.x (most of all on large data, in A/A loops and
-in matching), and extends the statistical toolkit. Alpha: the API may still change. See the
-[release notes](RELEASE_NOTES_2.0.0a1.md) for the full list.
+in matching), and extends the statistical toolkit. See the
+[release notes](https://github.com/sb-ai-lab/HypEx/blob/master/.github/release-notes/RELEASE_NOTES_2.0.0.md) for the 
+full list.
 
 - **Spark backend.** `Dataset` runs on pandas or Spark with the same API for AA tests, AB tests, homogeneity tests and
   matching.
@@ -60,25 +63,27 @@ and make the results unrepresentative.
 ## Installation
 
 ```bash
-pip install --pre -U hypex   # 2.0 is in alpha: --pre is required
+pip install -U hypex
 ```
 
-Without `--pre` pip installs the latest stable release (1.0.x). To pin the alpha: `pip install hypex==2.0.0a1`.
+To pin this release: `pip install hypex==2.0.0`.
 
-Optional extras for CUPAC models:
+Optional extras for Spark and CUPAC models:
 
 ```bash
-pip install -U "hypex[cat]"   # CatBoost
-pip install -U "hypex[lgbm]"  # LightGBM
-pip install -U "hypex[all]"   # everything above
+pip install -U "hypex[spark]"  # Spark backend
+pip install -U "hypex[cat]"    # CatBoost
+pip install -U "hypex[lgbm]"   # LightGBM
+pip install -U "hypex[all]"    # everything above
 ```
 
-Requirements: Python `>=3.8, <3.13`. PySpark `3.5.1` is installed with the library; running on Spark also needs Java
-(8, 11 or 17).
+Requirements: Python `>=3.8, <3.13`. The base installation uses pandas and does not include PySpark. The `spark` extra installs
+PySpark `3.5.7`; running on Spark also needs Java (8, 11 or 17). Requesting the Spark backend without the extra raises an error
+with the installation command.
 
 ## Quick start
 
-Run your first experiment in [Quick Start](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/QuickStart.ipynb), or browse the [HypEx Learning Materials](examples/tutorials/README.md) for tutorials and how-to guides.
+Explore usage examples and tutorials [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/).
 
 ### Matching example
 
@@ -106,14 +111,13 @@ test = Matching(extract_full_data=True, compute_indexes=True)  # Also build full
 result = test.execute(data)
 result.summary  # Summary of results (ATE, ATT, ATC)
 result.quality_results  # Matching quality tests
-result.full_data  # Wide dataset with pairs (requires both flags)
-result.indexes  # Matched pairs of indexes, good for join (requires both flags)
+result.full_data  # Wide dataset with pairs (requires extract_full_data=True)
+result.indexes  # Matched pairs of indexes, good for join (requires compute_indexes=True)
 ```
 
-Enable both `extract_full_data=True` and `compute_indexes=True` to inspect matched pairs in this version. The effect
-summary and quality reports are available with both flags left at their defaults.
+`full_data` and `indexes` are skipped by default because they are expensive on large data.
 
-See the [Matching quick tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/MatchingQuick.ipynb) and [Matching in depth](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/Matching.ipynb).
+More about Matching [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/MatchingTutorial.ipynb)
 
 ### AA-test example
 
@@ -140,7 +144,7 @@ result.best_split  # The most homogeneous split
 result.best_split_statistic  # Statistics of the best split
 ```
 
-See the [AATest tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/AATest.ipynb).
+More about AA test [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/AATestTutorial.ipynb)
 
 ### Homogeneity test example
 
@@ -152,7 +156,7 @@ result = HomogeneityTest().execute(data)
 result.summary
 ```
 
-See the [HomogeneityTest tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/HomogeneityTest.ipynb).
+More about the homogeneity test [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/HomogeneityTestTutorial.ipynb)
 
 ### AB-test example
 
@@ -220,15 +224,14 @@ result.cupac.feature_importances  # which covariates helped the most
 
 `"catboost"` requires `pip install "hypex[cat]"`. If `cupac_models` is omitted, all available models are tried.
 
-See the [CUPED and CUPAC tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/CUPED_CUPAC.ipynb) and the [ABTest tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/ABTest.ipynb).
+Full guide: [CUPED & CUPAC tutorial](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/CUPED_CUPAC.ipynb).
+
+More about AB test [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/ABTestTutorial.ipynb)
 
 ## Spark backend
 
-Run A/A, A/B, homogeneity tests and matching through the same experiment API on Spark. Create a `SparkSession`,
-pass it to `Dataset` and select the backend explicitly. `data` can be a Spark DataFrame or a pandas DataFrame that
-HypEx converts to Spark.
-
-> **Backend limitation.** CUPED and CUPAC require the pandas backend.
+Every experiment above runs on Spark with the same API. Create a `SparkSession`, pass it to `Dataset` and select the
+backend explicitly. `data` can be a `pandas.DataFrame`, it is converted to a Spark DataFrame.
 
 ```python
 from pyspark.sql import SparkSession
@@ -262,18 +265,22 @@ Notes:
   `dataset.to_backend(BackendsEnum.spark, session=spark)`. Converting a large Spark dataset to pandas is refused when it
   would not fit in memory.
 - `SmallDataset` is pandas-based by design: it holds compact `analysis_tables` and reporting results.
-- Supported runtime: Python `>=3.8`, PySpark `3.5.1`, Java 8/11/17.
+- Supported runtime: Python `>=3.8`, PySpark `3.5.7`, Java 8/11/17.
 
-See the [Spark notebook](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/97a84108fae4c985827e52fb09a5e9e1a86dc2c6/examples/tutorials/quick_tutorials/SparkBackend.ipynb) for side-by-side runs on pandas and Spark.
+Each tutorial has a "Working with the Spark backend" section.
 
 ## Documentation
 
 For more detailed information about the library, visit our
-[documentation on ReadTheDocs](https://hypex.readthedocs.io/en/latest/). It has guides and tutorials to get started and
+[documentation on ReadTheDocs](https://hypex.readthedocs.io/en/stable/). It has guides and tutorials to get started and
 detailed API documentation for advanced use cases.
 
 The architecture of the package (executors, `ExperimentData`, backends) is described in
 [hypex/README.md](hypex/README.md).
+
+Additional architecture documentation and source navigation are available in the
+[DeepWiki codebase overview](https://deepwiki.com/sb-ai-lab/HypEx). This AI-generated resource may lag behind the latest
+release.
 
 ## Contributions
 
@@ -297,15 +304,24 @@ discover why HypEx is the best solution for causal inference
 
 ### Testing different libraries for the speed of matching
 
-Visit [this](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-part-2) notebook on Kaggle and
-estimate results by yourself. The benchmark was run on an earlier HypEx version.
+The benchmark follows the methodology of [this Kaggle notebook](https://www.kaggle.com/code/kseniavasilieva/hypex-vs-causal-inference-part-2),
+adapted to the current `Matching` API. Within-industry matching searches for neighbors only within the same `industry`
+category; otherwise, neighbors are selected from the full dataset with `industry` retained as a feature. Missing values are
+filled before estimation. Each cell is a single run, excluding data-generation and dataset-construction time.
 
-| Group size             | 32 768 | 65 536 | 131 072 | 262 144 | 524 288 | 1 048 576 | 2 097 152 | 4 194 304 |
-|------------------------|--------|--------|---------|---------|---------|-----------|-----------|-----------|
-| Causal Inference       | 46s    | 169s   | None    | None    | None    | None      | None      | None      |
-| DoWhy                  | 9s     | 19s    | 40s     | 77s     | 159s    | 312s      | 615s      | 1 235s    |
-| HypEx with grouping    | 2s     | 6s     | 16s     | 42s     | 167s    | 509s      | 1 932s    | 7 248s    |
-| HypEx without grouping | 2s     | 7s     | 21s     | 101s    | 273s    | 982s      | 3 750s    | 14 720s   |
+Environment: Apple M4 Pro with 24 GB RAM, Python 3.11.14, HypEx 2.0.0 (`21577a1`), DoWhy 0.11.1, causalinference
+0.1.3.post1, and PySpark 3.5.1 in local mode with 8 GB driver memory. Causal Inference runs above 65 536 rows did not
+complete within a 10-minute timeout or were not run; both cases are marked with `—`. The fastest result for each group
+size is shown in bold.
+
+| Library          | Backend | Within-industry matching | 32 768 | 65 536 | 131 072 | 262 144 | 524 288 | 1 048 576 | 2 097 152 | 4 194 304 |
+|------------------|---------|--------------------------|--------|--------|---------|---------|---------|-----------|-----------|-----------|
+| Causal Inference | Pandas  | No                       | 11.22s | 48.02s | —       | —       | —       | —         | —         | —         |
+| DoWhy            | Pandas  | No                       | 1.70s  | 3.49s  | 6.95s   | 14.24s  | 29.00s  | 57.21s    | 114.55s   | 243.34s   |
+| HypEx            | Pandas  | Yes                      | 0.59s  | 0.73s  | **1.03s**   | **2.00s**   | **4.05s**   | **8.49s**     | **19.38s**    | **59.92s**    |
+| HypEx            | Pandas  | No                       | **0.39s**  | **0.66s**  | 1.24s   | 2.72s   | 6.84s   | 21.10s    | 50.18s    | 145.79s   |
+| HypEx            | Spark   | Yes                      | 50.87s | 45.95s | 42.86s  | 48.87s  | 63.41s  | 165.92s   | 196.46s   | 250.98s   |
+| HypEx            | Spark   | No                       | 14.30s | 15.98s | 15.69s  | 20.75s  | 81.91s  | 92.36s    | 108.85s   | 118.82s   |
 
 ## Join Our Community
 

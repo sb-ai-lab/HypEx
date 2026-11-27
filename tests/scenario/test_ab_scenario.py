@@ -9,6 +9,7 @@ from scipy import stats
 
 from hypex import ABTest
 from hypex.dataset import (
+    FeatureRole,
     InfoRole,
     PreTargetRole,
     TargetRole,
@@ -253,11 +254,6 @@ def test_bonferroni_equals_pvalue_times_comparisons(three_groups) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: ABTest._make_experiment replaces None (and any unknown name) with 'holm', "
-    "so multitest_method=None cannot disable the correction",
-)
 def test_no_multitest_method_gives_message(three_groups) -> None:
     out = _run(three_groups, multitest_method=None)
     assert isinstance(out.multitest, str)
@@ -272,12 +268,6 @@ def test_quantile_multitest_runs(three_groups) -> None:
     _run(three_groups, multitest_method="quantile")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=pytest.fail.Exception,
-    reason="Issue: unknown multitest method names (including the documented 'fdr_tsbhy') are "
-    "silently replaced by 'holm' instead of raising",
-)
 @pytest.mark.parametrize("name", ["fdr_tsbhy", "nonsense"])
 def test_unknown_multitest_method_is_rejected(name) -> None:
     with pytest.raises(ValueError):
@@ -315,14 +305,23 @@ def test_cuped_reduces_pvalue_noise_end_to_end() -> None:
     assert cuped < plain
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: CUPAC cannot run end to end (CupacExtension.calc dispatch and "
-    "_agg_data_from_cupac_data add_column errors)",
-)
 def test_cupac_runs_end_to_end() -> None:
     df, roles = _with_pre()
-    roles = dict(roles, y=TargetRole(cofounders=["f"]))
+    df["y_lag1"] = df["y_pre"]
+    df["y_lag2"] = df["y_pre"].shift(1).fillna(0.0)
+    df["f_lag1"] = df["y_pre"] * 0.5
+    df["f_lag2"] = df["y_pre"] * 0.25
+    df = df.drop(columns="y_pre")
+    roles.pop("y_pre")
+    roles.update(
+        {
+            "y": TargetRole(cofounders=["f"]),
+            "y_lag1": PreTargetRole(parent="y", lag=1),
+            "y_lag2": PreTargetRole(parent="y", lag=2),
+            "f_lag1": FeatureRole(parent="f", lag=1),
+            "f_lag2": FeatureRole(parent="f", lag=2),
+        }
+    )
     _run(df, roles, enable_cupac=True, cupac_models="linear")
 
 

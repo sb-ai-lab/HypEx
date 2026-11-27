@@ -139,11 +139,6 @@ def test_chi2_contingency_includes_categories_unique_to_one_sample() -> None:
     assert matrix.raw_data.eq(0).any().any()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: matrix_preparation scales counts by group proportion instead of "
-    "building a real contingency table, so results differ from chi2_contingency",
-)
 def test_chi2_matches_scipy_contingency() -> None:
     a = ["u"] * 30 + ["v"] * 10
     b = ["u"] * 15 + ["v"] * 25
@@ -195,11 +190,6 @@ def test_execute_uses_natural_order_for_numeric_group_keys() -> None:
     assert table.loc[10, "statistic"] == pytest.approx(reference.statistic, abs=TOL)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Issue: GroupHypothesisTesting.reliability is stored but never forwarded "
-    "to _inner_function (calc_kwargs stays empty), so 0.05 is always used",
-)
 def test_execute_reliability_is_configurable() -> None:
     df = three_groups_df()
     ds = build_dataset(df, {"g": TreatmentRole(), "y": TargetRole()})

@@ -137,10 +137,7 @@ def test_chi2_matrix_preparation_merges_rare_categories() -> None:
     # everything below 7 is removed, leaving categories a and b
     assert len(arr) == 2
     assert set(arr.columns) == {"count_x", "count_y"}
-    prop = 40 / (40 + 39)
-    assert sorted(arr["count_x"].round(6)) == sorted(
-        [round(20 * (1 - prop), 6), round(15 * (1 - prop), 6)]
-    )
+    assert sorted(arr["count_x"]) == [15, 20]
 
 
 def test_chi2_matrix_preparation_single_category_returns_none() -> None:
