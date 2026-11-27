@@ -83,7 +83,7 @@ with the installation command.
 
 ## Quick start
 
-Explore usage examples and tutorials [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/).
+Run your first experiment in [Quick Start](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/25e6b954d81a31dad60568d2c2b2fc47b1e3b599/examples/tutorials/QuickStart.ipynb), or browse the [HypEx Learning Materials](examples/tutorials/README.md) for tutorials and how-to guides.
 
 ### Matching example
 
@@ -117,7 +117,7 @@ result.indexes  # Matched pairs of indexes, good for join (requires compute_inde
 
 `full_data` and `indexes` are skipped by default because they are expensive on large data.
 
-More about Matching [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/MatchingTutorial.ipynb)
+See the [Matching quick tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/25e6b954d81a31dad60568d2c2b2fc47b1e3b599/examples/tutorials/quick_tutorials/MatchingQuick.ipynb) and [Matching in depth](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/25e6b954d81a31dad60568d2c2b2fc47b1e3b599/examples/tutorials/quick_tutorials/Matching.ipynb).
 
 ### AA-test example
 
@@ -144,7 +144,7 @@ result.best_split  # The most homogeneous split
 result.best_split_statistic  # Statistics of the best split
 ```
 
-More about AA test [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/AATestTutorial.ipynb)
+See the [AATest tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/25e6b954d81a31dad60568d2c2b2fc47b1e3b599/examples/tutorials/quick_tutorials/AATest.ipynb).
 
 ### Homogeneity test example
 
@@ -156,7 +156,7 @@ result = HomogeneityTest().execute(data)
 result.summary
 ```
 
-More about the homogeneity test [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/HomogeneityTestTutorial.ipynb)
+See the [HomogeneityTest tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/25e6b954d81a31dad60568d2c2b2fc47b1e3b599/examples/tutorials/quick_tutorials/HomogeneityTest.ipynb).
 
 ### AB-test example
 
@@ -224,9 +224,7 @@ result.cupac.feature_importances  # which covariates helped the most
 
 `"catboost"` requires `pip install "hypex[cat]"`. If `cupac_models` is omitted, all available models are tried.
 
-Full guide: [CUPED & CUPAC tutorial](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/CUPED_CUPAC.ipynb).
-
-More about AB test [here](https://github.com/sb-ai-lab/HypEx/tree/master/examples/tutorials/ABTestTutorial.ipynb)
+See the [CUPED and CUPAC tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/25e6b954d81a31dad60568d2c2b2fc47b1e3b599/examples/tutorials/quick_tutorials/CUPED_CUPAC.ipynb) and the [ABTest tutorial](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/25e6b954d81a31dad60568d2c2b2fc47b1e3b599/examples/tutorials/quick_tutorials/ABTest.ipynb).
 
 ## Spark backend
 
@@ -267,7 +265,7 @@ Notes:
 - `SmallDataset` is pandas-based by design: it holds compact `analysis_tables` and reporting results.
 - Supported runtime: Python `>=3.8`, PySpark `3.5.7`, Java 8/11/17.
 
-Each tutorial has a "Working with the Spark backend" section.
+See the [Spark notebook](https://nbviewer.org/github/sb-ai-lab/HypEx/blob/25e6b954d81a31dad60568d2c2b2fc47b1e3b599/examples/tutorials/quick_tutorials/SparkBackend.ipynb) for side-by-side runs on pandas and Spark.
 
 ## Documentation
 
