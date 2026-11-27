@@ -7,7 +7,7 @@ import warnings
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from .abstract import DatasetBase
+    from hypex.dataset import DatasetBase
 
 
 class PersistEntry:
