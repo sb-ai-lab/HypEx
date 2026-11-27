@@ -97,6 +97,20 @@ def test_psi_uses_common_bins_and_handles_empty_bins() -> None:
     assert res["PSI"] == pytest.approx(_psi_reference(data, test), abs=TOL)
 
 
+def test_psi_includes_interior_bin_edges() -> None:
+    data = np.arange(11, dtype=float)
+    test = np.array([0.0] + [1.0] * 9 + [10.0])
+    res = PSI._inner_function(_col(data), _col(test))
+    expected = _psi_reference(data, test)
+    assert expected > 1.0
+    assert res["PSI"] == pytest.approx(expected, abs=TOL)
+
+    data_mid = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    test_mid = np.array([0.0, 2.0, 2.0, 2.0, 4.0])
+    res_mid = PSI._inner_function(_col(data_mid), _col(test_mid))
+    assert res_mid["PSI"] == pytest.approx(_psi_reference(data_mid, test_mid), abs=TOL)
+
+
 def test_psi_matches_numpy_for_different_sample_sizes(backend, spark_session) -> None:
     rng = np.random.default_rng(42)
     data = rng.normal(0.0, 1.0, 137)

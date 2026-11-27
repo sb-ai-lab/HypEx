@@ -262,9 +262,6 @@ class PSI(Comparator):
         for i, (left, right) in enumerate(zip(edges[:-1], edges[1:])):
             data_bin = data_column >= left
             test_bin = test_data_column >= left
-            if i > 0:
-                data_bin = data_column > left
-                test_bin = test_data_column > left
             if i == NUM_OF_BUCKETS - 1:
                 data_bin = data_bin & (data_column <= right)
                 test_bin = test_bin & (test_data_column <= right)
