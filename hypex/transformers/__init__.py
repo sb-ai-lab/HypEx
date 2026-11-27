@@ -6,7 +6,8 @@ from .cuped import CUPEDTransformer
 from .filters import ConstFilter, CorrFilter, CVFilter, NanFilter, OutliersFilter
 from .float32_caster import Float32Caster
 from .na_dropper import NaDropper
-from .na_filler import NaFiller
+from .na_filler import MLNaFilter, NaFiller
+from .scaler import MLScaler
 from .shuffle import Shuffle
 from .type_caster import TypeCaster
 
@@ -18,6 +19,8 @@ __all__ = [
     "CorrFilter",
     "DummyEncoder",
     "Float32Caster",
+    "MLNaFilter",
+    "MLScaler",
     "NaDropper",
     "NaFiller",
     "NanFilter",

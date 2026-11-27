@@ -458,13 +458,44 @@ class DatasetBackendNavigation(ABC):
         """
         raise AbstractMethodError
 
-    def set_column(self, key: str, value: Any) -> None:
-        """Assign a column using the backend's native representation."""
+    @staticmethod
+    def _single_column(frame: Any) -> Any:
+        if len(frame.columns) != 1:
+            raise ValueError("Column assignment requires exactly one source column.")
+        return frame.iloc[:, 0]
+
+    def _column_input(self, value: Any) -> tuple[Any, type | None] | None:
         from ..abstract import DatasetBase
 
         if isinstance(value, DatasetBase):
-            value = value.iselect(0).raw_data.iloc[:, 0]
+            column = self._single_column(value.raw_data)
+            return column, value.roles[value.columns[0]].data_type
+        return None
+
+    def set_column(
+        self, key: str, value: Any, expected_type: type | None = None
+    ) -> type | None:
+        """Assign a column, using schema metadata for dataframe and series inputs."""
+        prepared = self._column_input(value)
+        value_type = None
+        if prepared is not None:
+            value, value_type = prepared
+
+        if expected_type is not None:
+            if prepared is not None:
+                compatible = value_type is expected_type or (
+                    expected_type is int and value_type is float
+                )
+            else:
+                compatible = isinstance(value, expected_type) or (
+                    isinstance(value, Iterable)
+                    and all(isinstance(item, expected_type) for item in value)
+                )
+            if not compatible:
+                raise TypeError("Value type does not match the expected data type.")
+
         self.data[key] = value
+        return value_type
 
     @abstractmethod
     def add_column(

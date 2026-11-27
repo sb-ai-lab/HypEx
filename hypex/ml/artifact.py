@@ -36,11 +36,11 @@ import importlib
 import json
 import os
 from datetime import datetime
-from typing import Any
+from typing import Any, Sequence
 
 from ..config import MLConfig
 from ..dataset.roles import ABCRole
-from ..executor import Executor, MLExecutor
+from ..executor import Executor, ExecutorSnapshot, MLExecutor
 
 
 class HypexJsonEncoder(json.JSONEncoder):
@@ -102,7 +102,7 @@ class MLArtifact:
         self.base_dir = base_dir or MLConfig.DEFAULT_ARTIFACT_PATH
         self.created_at = created_at or datetime.now().isoformat()
 
-        self._executors: list[MLExecutor] = []
+        self._executors: Sequence[Executor] = []
         self.pipeline_config: list[dict[str, Any]] = []
 
         safe_created_at = self.created_at.replace(":", "-").replace(".", "-")
@@ -138,12 +138,12 @@ class MLArtifact:
                 raise ValueError(massage)
 
     @staticmethod
-    def _build_pipeline_config(executors: list[Executor | MLExecutor]) -> list[dict[str, Any]]:
+    def _build_pipeline_config(executors: Sequence[Executor]) -> list[dict[str, Any]]:
         """Serialize the pipeline structure from a list of executors.
 
         Parameters
         ----------
-        executors : list[Executor | MLExecutor]
+        executors : Sequence[Executor]
             The list of executors to serialize into a pipeline configuration.
 
         Returns
@@ -153,7 +153,7 @@ class MLArtifact:
             including class name, module, ID, key, and parameters.
         """
 
-        def _ser(ex: MLExecutor) -> dict[str, Any]:
+        def _ser(ex: Executor) -> dict[str, Any]:
             return {
                 "class": type(ex).__name__,
                 "module": type(ex).__module__,
@@ -202,7 +202,7 @@ class MLArtifact:
     # ── save experiment ────────────────────────────────────────────
 
     @staticmethod
-    def _state_to_json(executor: MLExecutor) -> dict[str, Any]:
+    def _state_to_json(executor: Executor) -> dict[str, Any]:
         """Convert an executor's state to a JSON-serializable dictionary.
 
         Parameters
@@ -215,8 +215,17 @@ class MLArtifact:
         dict[str, Any]
             JSON-serializable dictionary representation of the executor's state.
         """
-        executor_state = executor.get_artifact()
-        return executor_state.json
+        if isinstance(executor, MLExecutor):
+            return executor.get_artifact().json
+
+        return ExecutorSnapshot(
+            qualname=type(executor).__qualname__,
+            module=type(executor).__module__,
+            id=executor.id,
+            key=executor.key,
+            params=executor.get_params(),
+            has_model=False,
+        ).json
 
     def save_experiment(self) -> None:
         """Save the experiment's state to disk.
@@ -321,14 +330,14 @@ class MLArtifact:
         decoded = {}
         for key, value in params.items():
             if isinstance(value, dict):
-                if value["class"].endswith("Role"):
+                if value.get("class", "").endswith("Role"):
                     decoded[key] = ABCRole.from_dict(value)
                 else:
                     decoded[key] = value
             elif isinstance(value, list):
                 decoded[key] = [
                     ABCRole.from_dict(v)
-                    if isinstance(v, dict) and v["class"].endswith("Role")
+                    if isinstance(v, dict) and v.get("class", "").endswith("Role")
                     else v
                     for v in value
                 ]
@@ -377,8 +386,9 @@ class MLArtifact:
         obj = cls(**MLArtifact._decode_params(state["params"]))
         obj._id = state["id"]
         obj.key = state["key"]
-        obj.is_fitted = True
-        if state.get("has_model", False):
+        if isinstance(obj, MLExecutor):
+            obj.is_fitted = True
+        if isinstance(obj, MLExecutor) and state.get("has_model", False):
             if not os.path.exists(models_dir):
                 raise FileNotFoundError(
                     f"Models directory does not exist: {models_dir}"

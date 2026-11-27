@@ -182,3 +182,6 @@ catboost_info/
 # Local agent instructions
 AGENTS.md
 AGENT.MD
+
+# Ml artifacts
+.hypex_experiments

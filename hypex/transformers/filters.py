@@ -11,6 +11,25 @@ from .abstract import Transformer
 
 
 class CVFilter(Transformer):
+    """Filter columns based on coefficient of variation.
+
+    This transformer identifies columns with unusual variability by computing
+    the coefficient of variation (CV = std / mean) and filters out columns
+    that fall outside specified bounds.
+
+    Args:
+        target_roles: Role(s) identifying columns to filter. Defaults to FeatureRole().
+        lower_bound: Minimum acceptable CV. Columns below this are considered constant. Defaults to None.
+        upper_bound: Maximum acceptable CV. Columns above this are considered unstable. Defaults to None.
+        key: Optional executor identifier.
+
+    Example:
+        >>> from hypex.transformers import CVFilter
+        >>> from hypex.dataset import FeatureRole
+        >>> filter = CVFilter(lower_bound=0.1, upper_bound=5.0)
+        >>> result = filter.execute(experiment_data)
+    """
+
     def __init__(
         self,
         target_roles: str | Sequence[str] | None = None,
@@ -18,14 +37,6 @@ class CVFilter(Transformer):
         upper_bound: float | None = None,
         key: Any = "",
     ):
-        """Initialize coefficient of variation filter of the columns in which it does not fit into the defined borders.
-
-        Args:
-            lower_bound:
-                The minimum acceptable coefficient of variation below which we consider the column to be constant
-            upper_bound:
-                The maximum acceptable coefficient of variation above which we consider the to be incorrect
-        """
         super().__init__(key=key)
         self.target_roles = target_roles or FeatureRole()
         self.lower_bound = lower_bound
@@ -72,20 +83,29 @@ class CVFilter(Transformer):
 
 
 class ConstFilter(Transformer):
+    """Filter constant or near-constant columns.
+
+    This transformer identifies columns where a single value occurs
+    more frequently than a specified threshold and filters them out.
+
+    Args:
+        target_roles: Role(s) identifying columns to filter. Defaults to FeatureRole().
+        threshold: Maximum acceptable frequency for a constant value. Defaults to 0.95.
+        key: Optional executor identifier.
+
+    Example:
+        >>> from hypex.transformers import ConstFilter
+        >>> from hypex.dataset import FeatureRole
+        >>> filter = ConstFilter(threshold=0.9)
+        >>> result = filter.execute(experiment_data)
+    """
+
     def __init__(
         self,
         target_roles: str | Sequence[str] | None = None,
         threshold: float = 0.95,
         key: Any = "",
     ):
-        """Initialize constants filter of the values which occur more often than defined by threshold.
-
-        Args:
-            target:
-                The column or columns to be filtered
-            threshold:
-                The maximum acceptable frequency above which we consider the column to be constant
-        """
         super().__init__(key=key)
         self.target_roles = target_roles or FeatureRole()
         self.threshold = threshold
@@ -98,36 +118,49 @@ class ConstFilter(Transformer):
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
-            value_counts = data[column].value_counts(normalize=True, sort=True)
-            if value_counts.get_values(0, "proportion") > threshold:
+            value_counts = data[column].value_counts(normalize=True)
+            if value_counts[column] > threshold:
                 data.roles[column] = InfoRole()
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        target_cols = data.ds.search_columns(roles=self.target_roles)
+        target_cols = data.ds.search_columns(
+            roles=self.target_roles, search_types=self.search_types
+        )
         result = data.copy(
             data=self.calc(
-                data=data.ds, target_cols=target_cols, threshold=self.threshold
+                data=data.ds,
+                target_cols=target_cols,
+                threshold=self.threshold,
             )
         )
         return result
 
 
 class NanFilter(Transformer):
+    """Filter columns with excessive NaN values.
+
+    This transformer identifies columns where NaN values occur more
+    frequently than a specified threshold and filters them out.
+
+    Args:
+        target_roles: Role(s) identifying columns to filter. Defaults to FeatureRole().
+        threshold: Maximum acceptable frequency of NaN values in a column. Defaults to 0.8.
+        key: Optional executor identifier.
+
+    Example:
+        >>> from hypex.transformers import NanFilter
+        >>> from hypex.dataset import FeatureRole
+        >>> filter = NanFilter(threshold=0.7)
+        >>> result = filter.execute(experiment_data)
+    """
+
     def __init__(
         self,
         target_roles: str | Sequence[str] | None = None,
         threshold: float = 0.8,
         key: Any = "",
     ):
-        """Initialize filter of the columns in which NaN occurs more often than defined by threshold.
-
-        Args:
-            target:
-                The column or columns to be filtered
-            threshold:
-                The maximum acceptable frequency of NaN values in a column
-        """
         super().__init__(key=key)
         self.target_roles = target_roles or FeatureRole()
         self.threshold = threshold
@@ -140,22 +173,48 @@ class NanFilter(Transformer):
     ) -> Dataset:
         target_cols = Adapter.to_list(target_cols)
         for column in target_cols:
-            nan_share = data[column].isna().sum() / len(data)
-            if nan_share > threshold:
+            nan_ratio = data[column].isna().mean()
+            if nan_ratio > threshold:
                 data.roles[column] = InfoRole()
         return data
 
     def execute(self, data: ExperimentData) -> ExperimentData:
-        target_cols = data.ds.search_columns(roles=self.target_roles)
+        target_cols = data.ds.search_columns(
+            roles=self.target_roles, search_types=self.search_types
+        )
         result = data.copy(
             data=self.calc(
-                data=data.ds, target_cols=target_cols, threshold=self.threshold
+                data=data.ds,
+                target_cols=target_cols,
+                threshold=self.threshold,
             )
         )
         return result
 
 
 class CorrFilter(Transformer):
+    """Filter columns based on correlation with target columns.
+
+    This transformer identifies and filters columns that are highly
+    correlated with target columns. It uses the correlation matrix
+    to determine which columns to keep based on the specified method
+    (pearson, kendall, or spearman).
+
+    Args:
+        target_roles: Role(s) identifying target columns. Defaults to TargetRole().
+        corr_space_roles: Role(s) identifying columns to consider for correlation. Defaults to [FeatureRole(), TargetRole()].
+        threshold: Correlation threshold for filtering. Defaults to 0.8.
+        method: Correlation method - 'pearson', 'kendall', or 'spearman'. Defaults to 'pearson'.
+        numeric_only: Whether to compute correlations only for numeric columns. Defaults to True.
+        key: Optional executor identifier.
+
+    Example:
+        >>> from hypex.transformers import CorrFilter
+        >>> from hypex.dataset import TargetRole, FeatureRole
+        >>> filter = CorrFilter(threshold=0.7, method='pearson')
+        >>> result = filter.execute(experiment_data)
+    """
+
     def __init__(
         self,
         target_roles: str | Sequence[str] | None = None,
@@ -207,7 +266,7 @@ class CorrFilter(Transformer):
                     abs(corr_matrix.get_values(row=target, column=column)) > threshold
                 ):
                     drop = target
-                    if column in corr_target_cols:
+                    if data.roles[column] in corr_target_cols:
                         if drop_policy == "corr":
                             if abs(
                                 corr_matrix.get_values(target, pre_target_column)
@@ -242,6 +301,25 @@ class CorrFilter(Transformer):
 
 
 class OutliersFilter(Transformer):
+    """Filter rows with outlier values based on percentiles.
+
+    This transformer identifies and removes rows where column values
+    fall outside specified percentile ranges, effectively filtering
+    out extreme outlier values.
+
+    Args:
+        target_roles: Role(s) identifying columns to filter. Defaults to FeatureRole().
+        lower_percentile: Lower percentile threshold. Defaults to 0.
+        upper_percentile: Upper percentile threshold. Defaults to 1.
+        key: Optional executor identifier.
+
+    Example:
+        >>> from hypex.transformers import OutliersFilter
+        >>> from hypex.dataset import FeatureRole
+        >>> filter = OutliersFilter(lower_percentile=0.01, upper_percentile=0.99)
+        >>> result = filter.execute(experiment_data)
+    """
+
     def __init__(
         self,
         target_roles: str | Sequence[str] | None = None,
@@ -249,14 +327,6 @@ class OutliersFilter(Transformer):
         upper_percentile: float = 1,
         key: Any = "",
     ):
-        """Initialize outliers filter of the values laying beyond the given percentile and NaNs.
-
-        Args:
-            target:
-                The name of target column to be filtered from outlier values
-            percentile:
-                The value of the percentile to filter outliers
-        """
         super().__init__(key=key)
         self.target_roles = target_roles or FeatureRole()
         self.lower_percentile = lower_percentile
