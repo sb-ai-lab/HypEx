@@ -6,7 +6,7 @@ from copy import deepcopy
 from math import isfinite
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import Any, Literal
 
 from ...dataset import ABCRole, Dataset
 from ...utils.registry import backend_factory
@@ -16,22 +16,6 @@ from .abstract import MLModel
 def _l1_ratio(elastic_net_param: float, reg_type: Literal["l1", "l2"]) -> float:
     """Interpret zero as a request to use the penalty selected by reg_type."""
     return elastic_net_param or float(reg_type == "l1")
-
-
-@runtime_checkable
-class _LinearBackend(Protocol):
-    def fit(self, data: Dataset, features: list[str], target: str) -> None: ...
-
-    def predict(
-        self, X: Dataset, features: list[str], output: str, role: ABCRole
-    ) -> Dataset: ...
-
-    def dumps(self) -> bytes: ...
-
-    @classmethod
-    def loads(cls, data: bytes) -> _LinearBackend:
-        """Restore the native model from bytes produced by this backend."""
-        ...
 
 
 class LinearModel(MLModel):
@@ -93,19 +77,34 @@ class LinearModel(MLModel):
     def search_types(self) -> list[type]:
         return [int, float]
 
+    def _init_params(self) -> dict[str, Any]:
+        return {
+            **self.calc_kwargs,
+            **self.model_params,
+            "target_roles": self.target_roles,
+            "feature_roles": self.feature_roles,
+            "key": self.key,
+        }
+
+    # ── Backend selection ────────────────────────────────────────────
+
     def _check_model_signature(self, model: Any) -> None:
-        if not isinstance(model, _LinearBackend):
+        if not isinstance(model, LinearModel):
             raise TypeError("Expected a linear model backend.")
 
-    def _resolve_backend(self, data: Dataset) -> type[_LinearBackend]:
-        backend_cls = backend_factory.resolve_backend(type(self), data)
+    @staticmethod
+    def _resolve_backend(data: Dataset) -> type[LinearModel]:
+        backend_cls = backend_factory.resolve_backend(LinearModel, data)
         if backend_cls is None:
             raise ValueError(
                 f"No linear regression backend registered for {data.backend_type}."
             )
         return backend_cls
 
+    # ── Training ────────────────────────────────────────────
+
     def fit(self, data: Dataset) -> LinearModel:
+        backend_cls = self._resolve_backend(data)
         if not isfinite(self.reg_param) or self.reg_param < 0:
             raise ValueError("reg_param must be finite and non-negative.")
         if not 0 <= self.elastic_net_param <= 1:
@@ -116,8 +115,8 @@ class LinearModel(MLModel):
         target, features = self._get_fields(data)
         feature_roles = {name: deepcopy(data.roles[name]) for name in features}
         target_roles = {f"{target}_predicted": data.roles[target].astype(float)}
-        backend = self._resolve_backend(data)(**self.model_params)
-        backend.fit(data, features, target)
+        backend = backend_cls(**self._init_params())
+        backend._fit_native(data, features, target)
 
         self.model = backend
         self._features_dict = feature_roles
@@ -125,10 +124,16 @@ class LinearModel(MLModel):
         self.is_fitted = True
         return self
 
+    def _fit_native(self, data: Dataset, features: list[str], target: str) -> None:
+        raise NotImplementedError
+
+    # ── Prediction ────────────────────────────────────────────
+
     def predict(self, X: Dataset) -> Dataset:
         if not self.fitted:
             raise ValueError("Fit or load LinearModel before calling predict.")
-        if type(self.model) is not self._resolve_backend(X):
+        backend = self.model
+        if not isinstance(backend, self._resolve_backend(X)):
             # TODO: add convertion from one backend to another
             raise ValueError("Prediction data must use the fitted model's backend.")
         features = list(self._features_dict)
@@ -140,7 +145,22 @@ class LinearModel(MLModel):
         if invalid:
             raise ValueError(f"Missing or non-numeric feature columns: {invalid}")
         output, role = next(iter(self._target_dict.items()))
-        return self.model.predict(X, features, output, deepcopy(role))
+        return backend._predict_native(X, features, output, deepcopy(role))
+
+    def _predict_native(
+        self, X: Dataset, features: list[str], output: str, role: ABCRole
+    ) -> Dataset:
+        raise NotImplementedError
+
+    # ── Serialization ────────────────────────────────────────────
+
+    def dumps(self) -> bytes:
+        raise NotImplementedError
+
+    @classmethod
+    def loads(cls, data: bytes, **params: Any) -> LinearModel:
+        """Restore the native estimator in a backend-specific instance."""
+        raise NotImplementedError
 
     def save(self, path: str) -> None:
         """Save the HypEx state and native model bytes in one pickle file."""
@@ -150,19 +170,14 @@ class LinearModel(MLModel):
         destination.parent.mkdir(parents=True, exist_ok=True)
         if destination.exists():
             raise FileExistsError(destination)
+        backend = self.model
         state = {
-            "backend": type(self.model),
-            "params": {
-                **self.calc_kwargs,
-                **self.model_params,
-                "target_roles": self.target_roles,
-                "feature_roles": self.feature_roles,
-                "key": self.key,
-            },
+            "backend": type(backend),
+            "params": self._init_params(),
             "features": self._features_dict,
             "target": self._target_dict,
         }
-        artifact = {"state": state, "model": self.model.dumps()}
+        artifact = {"state": state, "model": backend.dumps()}
         with TemporaryDirectory(dir=destination.parent) as temporary:
             staged_file = Path(temporary) / "model.pkl"
             with staged_file.open("wb") as stream:
@@ -177,11 +192,12 @@ class LinearModel(MLModel):
         state = artifact["state"]
         backend_cls = state["backend"]
         if not isinstance(backend_cls, type) or not issubclass(
-            backend_cls, _LinearBackend
+            backend_cls, LinearModel
         ):
             raise ValueError(f"Linear regression backend is unavailable: {backend_cls}")
+        backend = backend_cls.loads(artifact["model"], **state["params"])
         instance = cls(**state["params"])
-        instance.model = backend_cls.loads(artifact["model"])
+        instance.model = backend
         instance._features_dict = state["features"]
         instance._target_dict = state["target"]
         instance.is_fitted = True

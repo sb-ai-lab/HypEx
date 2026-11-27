@@ -3,7 +3,7 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import ClassVar, Literal
+from typing import Any, ClassVar
 from zipfile import ZipFile
 
 from pyspark.ml.feature import VectorAssembler
@@ -20,7 +20,7 @@ _PREDICTION = "_linear_prediction"
 
 
 @backend_factory.register(LinearModel, SparkDataset)
-class SparkLinearModel:
+class SparkLinearModel(LinearModel):
     PARAMS_CONVERSION: ClassVar[dict[str, str]] = {
         "fit_intercept": "fitIntercept",
         "reg_param": "regParam",
@@ -30,45 +30,28 @@ class SparkLinearModel:
         "tol": "tol",
     }
 
-    def __init__(
-        self,
-        *,
-        fit_intercept: bool = True,
-        reg_param: float = 0.0,
-        elastic_net_param: float = 0.0,
-        reg_type: Literal["l1", "l2"] = "l1",
-        solver: str | None = None,
-        max_iter: int = 1000,
-        tol: float = 0.0001,
-    ) -> None:
-        params = {
-            "fit_intercept": fit_intercept,
-            "reg_param": reg_param,
-            "elastic_net_param": _l1_ratio(elastic_net_param, reg_type)
-            if reg_param
-            else 0.0,
-            "solver": "normal" if solver == "cholesky" else solver or "auto",
-            "max_iter": max_iter,
-            "tol": tol,
-        }
-        self._estimator = LinearRegression(
+    def _fit_native(self, data: Dataset, features: list[str], target: str) -> None:
+        params = self.model_params
+        params["elastic_net_param"] = (
+            _l1_ratio(self.elastic_net_param, self.reg_type) if self.reg_param else 0.0
+        )
+        params["solver"] = (
+            "normal" if self.solver == "cholesky" else self.solver or "auto"
+        )
+        estimator = LinearRegression(
             featuresCol=_FEATURES,
             predictionCol=_PREDICTION,
+            labelCol=target,
             **{
                 native_name: params[name]
                 for name, native_name in self.PARAMS_CONVERSION.items()
             },
         )
-        self._model: LinearRegressionModel
-
-    def fit(self, data: Dataset, features: list[str], target: str) -> None:
         training = data.data.select(*features, target)
         assembler = VectorAssembler(inputCols=features, outputCol=_FEATURES)
-        self._model = self._estimator.setLabelCol(target).fit(
-            assembler.transform(training)
-        )
+        self._model = estimator.fit(assembler.transform(training))
 
-    def predict(
+    def _predict_native(
         self, X: Dataset, features: list[str], output: str, role: ABCRole
     ) -> Dataset:
         raw = X.raw_data
@@ -85,7 +68,7 @@ class SparkLinearModel:
             .pandas_api(index_col=index_columns)
             .rename_axis(index=raw.index.names)
         )
-        return LinearModel.result_to_dataset(result, roles={output: role}, small=False)
+        return self.result_to_dataset(result, roles={output: role}, small=False)
 
     def dumps(self) -> bytes:
         with TemporaryDirectory() as temporary, BytesIO() as buffer:
@@ -98,8 +81,8 @@ class SparkLinearModel:
             return buffer.getvalue()
 
     @classmethod
-    def loads(cls, data: bytes) -> SparkLinearModel:
-        instance = cls.__new__(cls)
+    def loads(cls, data: bytes, **params: Any) -> SparkLinearModel:
+        instance = cls(**params)
         with TemporaryDirectory() as temporary, BytesIO(data) as buffer:
             with ZipFile(buffer) as archive:
                 archive.extractall(temporary)

@@ -50,7 +50,10 @@ def _predictions(model, data):
 def test_linear_model_native_round_trip(make_dataset, tmp_path, params):
     training = _data(make_dataset).set_index("row_id")
     scoring = training[["second", "first"]]
-    model = LinearModel(**params).fit(training)
+    model = LinearModel(**params)
+    assert model.fit(training) is model
+    assert isinstance(model.model, LinearModel)
+    assert model.fitted
     reference = _predictions(model, scoring)
 
     assert reference.index.name == "row_id"
@@ -78,6 +81,8 @@ def test_linear_model_native_round_trip(make_dataset, tmp_path, params):
     ):
         loaded = LinearModel.load(str(path))
 
+    assert type(loaded) is LinearModel
+    assert loaded.fitted
     assert type(loaded.model) is type(model.model)
     assert loaded.model_params == model.model_params
     pd.testing.assert_frame_equal(_predictions(loaded, scoring), reference)
