@@ -13,6 +13,7 @@ try:
     from pyspark import RDD, Broadcast, SparkConf, SparkFiles, StorageLevel
     from pyspark.ml.feature import StringIndexer, VectorAssembler
     from pyspark.ml.regression import LinearRegression
+    from pyspark.ml.stat import Correlation
     from pyspark.pandas.exceptions import PandasNotImplementedError
     from pyspark.sql import DataFrame as SparkDF
     from pyspark.sql import SparkSession
@@ -57,6 +58,7 @@ except ModuleNotFoundError as exc:
     ArrayType = None
     BooleanType = None
     ByteType = None
+    Correlation = None
     DataType = None
     DateType = None
     DecimalType = None
