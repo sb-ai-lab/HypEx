@@ -354,6 +354,22 @@ def test_unite_cov_averages_group_covariances() -> None:
     np.testing.assert_allclose(single, a.cov().to_numpy(), atol=1e-9)
 
 
+def test_unite_cov_keeps_feature_labels_for_dot(make_dataset) -> None:
+    columns = ["income", "_features"]
+    frame = pd.DataFrame([(1.0, 0.0), (2.0, 1.0), (0.0, 3.0)], columns=columns)
+    data = make_dataset(frame, {column: FeatureRole() for column in columns})
+    matrix = _frame(UniteCovExtension().calc(data))
+
+    assert matrix.columns.tolist() == columns
+    assert matrix.index.tolist() == columns
+    np.testing.assert_allclose(matrix.to_numpy(), frame.cov().to_numpy())
+    reordered = make_dataset(
+        frame[columns[::-1]], {column: FeatureRole() for column in columns}
+    )
+    product = reordered.dot(matrix).raw_data.sort_index().to_numpy()
+    np.testing.assert_allclose(product, frame.dot(frame.cov()).to_numpy())
+
+
 def _regression_ds(backend=BackendsEnum.pandas, session=None, noise=0.0):
     rng = np.random.RandomState(0)
     n = 200
